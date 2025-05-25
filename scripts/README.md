@@ -7,9 +7,11 @@ This directory contains project-level scripts and utilities for the HuleEdu micr
 ### Environment Setup
 
 #### `setup_huledu_environment.sh`
+
 **Purpose**: Sets up the complete HuleEdu development environment for OpenAI Codex agent work.
 
 **Usage**:
+
 ```bash
 # From project root
 ./scripts/setup_huledu_environment.sh
@@ -20,6 +22,7 @@ chmod +x scripts/setup_huledu_environment.sh
 ```
 
 **What it does**:
+
 - ✅ Verifies project structure and location
 - ✅ Installs PDM (Python Dependency Manager) if not present
 - ✅ Installs all monorepo tools (Black, isort, flake8, mypy, pytest)
@@ -27,11 +30,13 @@ chmod +x scripts/setup_huledu_environment.sh
 - ✅ Provides summary of available development commands
 
 **Requirements**:
+
 - Python 3.11+
 - pip (for PDM installation)
 - Internet connection for package downloads
 
-**Target Environment**: 
+**Target Environment**:
+
 - OpenAI Codex browser-based sandbox environments
 - Local development environments
 - CI/CD environments
@@ -68,13 +73,13 @@ All scripts in this directory should:
 
 For utility scripts that don't warrant top-level placement, use the `utils/` subdirectory:
 
-```
+``` markdown
 scripts/
 ├── utils/
 │   ├── backup.sh
 │   ├── maintenance.sh
 │   └── cleanup.sh
-└── main_script.sh
+└── setup_huledu_environment.sh
 ```
 
 ## Integration with PDM
@@ -82,6 +87,7 @@ scripts/
 These scripts complement the PDM-based development workflow defined in the root `pyproject.toml`. While PDM scripts handle code quality and testing tasks, these scripts handle environment setup and deployment tasks.
 
 **PDM Scripts** (run with `pdm run <script>`):
+
 - `format-all` - Code formatting
 - `lint-all` - Code linting  
 - `typecheck-all` - Type checking
@@ -89,6 +95,7 @@ These scripts complement the PDM-based development workflow defined in the root 
 - `docker-*` - Docker operations
 
 **Project Scripts** (run directly):
+
 - Environment setup
 - Deployment automation
 - Maintenance tasks
@@ -101,4 +108,4 @@ For questions about scripts or to report issues:
 1. Check the documentation in `scripts/docs/`
 2. Review the script source code for inline comments
 3. Consult the project's main documentation in the root `README.md`
-4. Check the `.cursor/rules/` directory for development standards 
+4. Check the `.cursor/rules/` directory for development standards

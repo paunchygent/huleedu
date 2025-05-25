@@ -6,7 +6,7 @@
 
 | Extension | ID | Purpose | Status |
 |-----------|----|---------| -------|
-| **Ruff** | `charliermarsh.ruff` | Linting, formatting, import sorting | ✅ REQUIRED |
+| **Ruff** | `ms-python.ruff` | Linting, formatting, import sorting | ✅ REQUIRED |
 | **MyPy Type Checker** | `ms-python.mypy-type-checker` | Type checking | ✅ REQUIRED |
 | **Python** | `ms-python.python` | Core Python support | ✅ REQUIRED |
 | **Pylance** | `ms-python.vscode-pylance` | Enhanced IntelliSense | 🔄 RECOMMENDED |

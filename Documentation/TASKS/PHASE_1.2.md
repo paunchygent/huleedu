@@ -11,6 +11,7 @@
 This ticket outlines the implementation of key Phase 1.2 tasks, building upon the successful completion of Phase 1.1. These tasks focus on enhancing testability, automating infrastructure, improving observability, introducing the Essay Lifecycle Service (ELS) skeleton, and incorporating several architectural micro-refinements. Completing these steps is critical for ensuring a robust, maintainable, and scalable foundation before proceeding to full Phase 2 (NLP & AI Feedback) development. All changes align with the HuleEdu `README.md` architectural blueprint.
 
 **Overall Acceptance Criteria**:
+
 * All sub-tasks (Foundational, Core, and Architectural Nudges where applicable as code changes) are completed and validated.
 * All automated tests (new and existing) pass in CI.
 * Code adheres to project standards (formatting, linting, typing per `.cursor/rules/050-python-coding-standards.mdc`).
@@ -24,6 +25,7 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 
 * **Objective**: Improve the developer experience and error diagnosability of the `topic_name()` helper.
 * **Existing Code Context**: `common_core/src/common_core/enums.py` - `topic_name()` function.
+
     ```python
     # common_core/src/common_core/enums.py (current relevant part)
     # def topic_name(event: ProcessingEvent) -> str:
@@ -39,10 +41,12 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
     #         )
     #     return topic_mapping[event]
     ```
+
 * **Suggested Refactoring**:
-    1.  **Improve Error Message**: When an event is not found in `topic_mapping`, the `ValueError` message should list available `ProcessingEvent` enum members that *are* mapped, not just the keys of the `topic_mapping` if they are identical. More importantly, list the actual event-to-topic mappings.
-    2.  **Enhance Docstring**: Update the `topic_name()` docstring to include the current `topic_mapping` table directly, making it visible on IDE hover.
+    1. **Improve Error Message**: When an event is not found in `topic_mapping`, the `ValueError` message should list available `ProcessingEvent` enum members that *are* mapped, not just the keys of the `topic_mapping` if they are identical. More importantly, list the actual event-to-topic mappings.
+    2. **Enhance Docstring**: Update the `topic_name()` docstring to include the current `topic_mapping` table directly, making it visible on IDE hover.
 * **Implementation Guide**:
+
     ```python
     # common_core/src/common_core/enums.py (suggested changes)
     # ... (ProcessingEvent enum and other parts of the file) ...
@@ -87,16 +91,18 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
             )
         return _TOPIC_MAPPING[event]
     ```
+
 * **Key Files to Modify**: `common_core/src/common_core/enums.py`.
 * **Acceptance Criteria**:
-    * `ValueError` from `topic_name()` for an unmapped event includes a list of currently mapped events and their topics.
-    * The docstring of `topic_name()` is updated to include (or clearly reference) the mapping table.
+  * `ValueError` from `topic_name()` for an unmapped event includes a list of currently mapped events and their topics.
+  * The docstring of `topic_name()` is updated to include (or clearly reference) the mapping table.
 
 ### A.2. Configure MyPy for External Libraries Without Type Stubs
 
 * **Objective**: Eliminate MyPy warnings for `aiokafka` and `aiofiles` by configuring MyPy to handle missing type stubs appropriately, ensuring a cleaner CI type-checking process.
 * **Implementation Guide**:
-    1.  **Configure MyPy for Missing Stubs**: Add MyPy overrides to `pyproject.toml` to handle external libraries without official stubs:
+    1. **Configure MyPy for Missing Stubs**: Add MyPy overrides to `pyproject.toml` to handle external libraries without official stubs:
+
         ```toml
         # pyproject.toml (root) - Add to [tool.mypy] section
         [[tool.mypy.overrides]]
@@ -108,22 +114,24 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
         # Note: This is the recommended approach for external libraries without official stubs
         # We maintain strict typing for our own code while allowing flexibility for external deps
         ```
-    2.  **Verify Configuration**: Run `pdm run typecheck-all` to confirm that warnings are resolved.
-    3.  **Document Decision**: Add comment in `pyproject.toml` explaining why these specific modules are configured to ignore missing imports.
+
+    2. **Verify Configuration**: Run `pdm run typecheck-all` to confirm that warnings are resolved.
+    3. **Document Decision**: Add comment in `pyproject.toml` explaining why these specific modules are configured to ignore missing imports.
 * **Key Files to Modify**: Root `pyproject.toml` (MyPy configuration only).
-* **Acceptance Criteria**: 
-    - `pdm run typecheck-all` no longer shows missing import warnings for `aiokafka` and `aiofiles`
-    - MyPy configuration properly handles external libraries without compromising type safety for internal code
-    - **CRITICAL**: No manual `pdm.lock` edits or local stub packages created
+* **Acceptance Criteria**:
+  * `pdm run typecheck-all` no longer shows missing import warnings for `aiokafka` and `aiofiles`
+  * MyPy configuration properly handles external libraries without compromising type safety for internal code
+  * **CRITICAL**: No manual `pdm.lock` edits or local stub packages created
 
 ### A.3. Create Root `.dockerignore` File
 
 * **Objective**: Speed up Docker image builds by preventing unnecessary files from being sent to the Docker daemon build context.
 * **Implementation Guide**:
-    1.  Create a `.dockerignore` file in the project root (`huledu-reboot/.dockerignore`).
-    2.  Add common patterns for files and directories that should not be part of the build context for *any* service when the context is the repository root.
+    1. Create a `.dockerignore` file in the project root (`huledu-reboot/.dockerignore`).
+    2. Add common patterns for files and directories that should not be part of the build context for *any* service when the context is the repository root.
 * **Content for `.dockerignore`**:
-    ```
+
+    ``` bash
     # .dockerignore (at project root)
     __pycache__/
     *.pyc
@@ -170,6 +178,7 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
     TASKS/
     # .cursor/ # Rules are not needed in images
     ```
+
 * **Key Files to Modify**: `.dockerignore` (New file at project root).
 * **Acceptance Criteria**: Docker builds (e.g., `pdm run docker-build`) are noticeably faster due to a smaller build context being sent to the daemon. Verify by observing build output or context size.
 
@@ -183,8 +192,8 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 * **README.md Link/Rationale**: Implements **Service Autonomy** (README Sec 1), verifies adherence to **Explicit Contracts** (README Sec 1 & 3) and "Thin Events + Callback APIs" (README Sec 3). DI improves testability and maintainability. Context managers improve resource handling.
 
 * **Refactoring `services/spell_checker_service/worker.py`**:
-    1.  **Dependency Injection**: Modify `process_single_message` (or a similar core processing function) to accept `Workspace_content_func`, `store_content_func`, and `perform_spell_check_func` as injectable callables.
-    2.  **Kafka Client State Management**: Refactor `spell_checker_worker_main` to use an `asynccontextmanager` for managing the `consumer_running` and `producer_running` states and the startup/shutdown of Kafka clients.
+    1. **Dependency Injection**: Modify `process_single_message` (or a similar core processing function) to accept `Workspace_content_func`, `store_content_func`, and `perform_spell_check_func` as injectable callables.
+    2. **Kafka Client State Management**: Refactor `spell_checker_worker_main` to use an `asynccontextmanager` for managing the `consumer_running` and `producer_running` states and the startup/shutdown of Kafka clients.
 
     ```python
     # services/spell_checker_service/worker.py (Suggested Refinements)
@@ -364,14 +373,15 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
     # PRODUCER_CLIENT_ID = "spellchecker-service" # Prefix for client_id
     # KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
     ```
+
 * **Implementation Guide (for tests in `services/spell_checker_service/tests/test_worker.py`)**:
-    * Create fake/mock async versions of `Workspace_content_func`, `store_content_func`, `perform_spell_check_func`.
-    * Call the refactored `process_single_message` with these fakes and mock Kafka/HTTP objects.
-    * Assert behavior of fakes and the output/calls from `process_single_message`.
+  * Create fake/mock async versions of `Workspace_content_func`, `store_content_func`, `perform_spell_check_func`.
+  * Call the refactored `process_single_message` with these fakes and mock Kafka/HTTP objects.
+  * Assert behavior of fakes and the output/calls from `process_single_message`.
 * **Acceptance Criteria**:
-    * `worker.py` is refactored to use DI for core logic functions and an async context manager for Kafka clients.
-    * Unit tests for `process_single_message` cover success and key failure paths using injected fake/mock functions.
-    * Tests pass; code coverage for the core processing logic is high.
+  * `worker.py` is refactored to use DI for core logic functions and an async context manager for Kafka clients.
+  * Unit tests for `process_single_message` cover success and key failure paths using injected fake/mock functions.
+  * Tests pass; code coverage for the core processing logic is high.
 
 ---
 
@@ -382,8 +392,9 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 * **README.md Link/Rationale**: Supports **Event-Driven Communication Backbone** (README Sec 3).
 
 * **Implementation Guide**:
-    1.  Implement `scripts/kafka_topic_bootstrap.py` as per Task A.1 (and previous detailed response).
-    2.  **Modify `docker-compose.yml`**: Add a one-shot service to run this script.
+    1. Implement `scripts/kafka_topic_bootstrap.py` as per Task A.1 (and previous detailed response).
+    2. **Modify `docker-compose.yml`**: Add a one-shot service to run this script.
+
         ```yaml
         # docker-compose.yml (additions/modifications)
         services:
@@ -435,14 +446,15 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
                 condition: service_healthy
             # ... rest of batch_service config
         ```
+
         *Note: Kafka itself (e.g., Bitnami image) might take time to be fully ready for admin client connections after its healthcheck passes. The bootstrap script should have retries or robust error handling for `KafkaConnectionError`.*
-    3.  Ensure Kafka service in `docker-compose.yml` has an effective `healthcheck`. Bitnami Kafka images usually do.
+    3. Ensure Kafka service in `docker-compose.yml` has an effective `healthcheck`. Bitnami Kafka images usually do.
 * **Key Files to Modify**:
-    * `scripts/kafka_topic_bootstrap.py` (as developed in A.1).
-    * `docker-compose.yml` (Add `kafka_topic_setup` service, update `depends_on` for other services).
+  * `scripts/kafka_topic_bootstrap.py` (as developed in A.1).
+  * `docker-compose.yml` (Add `kafka_topic_setup` service, update `depends_on` for other services).
 * **Acceptance Criteria**:
-    * On `docker compose up`, the `kafka_topic_setup` service runs, creates topics, and exits successfully.
-    * Other services start only after topic setup is complete.
+  * On `docker compose up`, the `kafka_topic_setup` service runs, creates topics, and exits successfully.
+  * Other services start only after topic setup is complete.
 
 ---
 
@@ -452,12 +464,13 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 * **README.md Link/Rationale**: Supports **Scalability & Maintainability** (README Sec 1) via observability for **Autonomous Services** (README Sec 1). Queue latency is a key operational metric.
 
 * **Implementation Guide for HTTP Services (`content_service`, `batch_service`)**:
-    1.  Follow guide from previous ticket response (Task 3) to add `prometheus-client`, `REQUESTS_TOTAL`, `REQUEST_LATENCY_SECONDS`, and the `/metrics` endpoint using `app.mount("/metrics", make_asgi_app(registry=REGISTRY))` for Quart apps.
+    1. Follow guide from previous ticket response (Task 3) to add `prometheus-client`, `REQUESTS_TOTAL`, `REQUEST_LATENCY_SECONDS`, and the `/metrics` endpoint using `app.mount("/metrics", make_asgi_app(registry=REGISTRY))` for Quart apps.
 * **Implementation Guide for "Queue Latency" (Example in `spell_checker_service`)**:
-    * This metric makes most sense in services that *consume* from Kafka and then process.
-    * **File**: `services/spell_checker_service/worker.py`
-    * **Add Metric Definition**:
-        ```python
+  * This metric makes most sense in services that *consume* from Kafka and then process.
+  * **File**: `services/spell_checker_service/worker.py`
+  * **Add Metric Definition**:
+
+    ```python
         # services/spell_checker_service/worker.py (additions)
         from prometheus_client import Histogram # Assuming you'll expose metrics from worker
         # ...
@@ -470,9 +483,11 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
             'Latency between event timestamp and processing start',
             ['topic', 'consumer_group']
         )
-        ```
-    * **Record Metric in `process_single_message`**:
-        ```python
+    ```
+
+  * **Record Metric in `process_single_message`**:
+
+```python
         # services/spell_checker_service/worker.py (inside process_single_message)
         # async def process_single_message(...):
         #     # ...
@@ -491,10 +506,12 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
         #                     consumer_group=CONSUMER_GROUP_ID # Ensure CONSUMER_GROUP_ID is accessible
         #                 ).observe(queue_latency_seconds)
         #         # ... rest of the processing
-        ```
-    * **Exposing Metrics from Worker**: The `spell_checker_service` is a non-HTTP worker. To expose Prometheus metrics:
-        1.  Option A: In `spell_checker_worker_main`, start a simple HTTP server in a separate async task using `prometheus_client.start_http_server(port, addr)`.
-            ```python
+```
+
+   **Exposing Metrics from Worker**: The `spell_checker_service` is a non-HTTP worker. To expose Prometheus metrics:
+        1. Option A: In `spell_checker_worker_main`, start a simple HTTP server in a separate async task using `prometheus_client.start_http_server(port, addr)`.
+
+```python
             # In spell_checker_worker_main, before the main loop
             # from prometheus_client import start_http_server
             # import asyncio
@@ -502,20 +519,22 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
             # # Start metrics server in background task to avoid blocking
             # asyncio.create_task(asyncio.to_thread(start_http_server, METRICS_PORT, "0.0.0.0"))
             # logger.info(f"Prometheus metrics server started on port {METRICS_PORT}")
-            ```
-        2.  Update its Dockerfile/`docker-compose.yml` to expose this metrics port.
-        3.  **Note**: Ensure port uniqueness across service instances to avoid conflicts.
+```
+
+        2. Update its Dockerfile/`docker-compose.yml` to expose this metrics port.
+        3. **Note**: Ensure port uniqueness across service instances to avoid conflicts.
+
 * **Key Files to Modify**:
-    * `services/content_service/app.py`, `services/content_service/pyproject.toml`
-    * `services/batch_service/app.py`, `services/batch_service/pyproject.toml`
-    * `services/spell_checker_service/worker.py` (add latency metric, start metrics server)
-    * `services/spell_checker_service/pyproject.toml` (add `prometheus-client`)
-    * `services/spell_checker_service/Dockerfile` (expose metrics port)
-    * `docker-compose.yml` (expose metrics port for spell_checker_service).
+  * `services/content_service/app.py`, `services/content_service/pyproject.toml`
+  * `services/batch_service/app.py`, `services/batch_service/pyproject.toml`
+  * `services/spell_checker_service/worker.py` (add latency metric, start metrics server)
+  * `services/spell_checker_service/pyproject.toml` (add `prometheus-client`)
+  * `services/spell_checker_service/Dockerfile` (expose metrics port)
+  * `docker-compose.yml` (expose metrics port for spell_checker_service).
 * **Acceptance Criteria**:
-    * `/metrics` endpoint available on HTTP services.
-    * Spell checker service exposes metrics (including queue latency) on a configured port.
-    * Metrics are in Prometheus format.
+  * `/metrics` endpoint available on HTTP services.
+  * Spell checker service exposes metrics (including queue latency) on a configured port.
+  * Metrics are in Prometheus format.
 
 ---
 
@@ -526,8 +545,9 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 * **README.md Link/Rationale**: Validates **Event-Driven Architecture** (README Sec 1 & 3) and **Explicit Contracts** (README Sec 1 & 3). Caching improves CI efficiency.
 
 * **Implementation Guide**:
-    1.  Implement GitHub Actions workflow (`.github/workflows/smoke_test.yml`) and Python smoke test script (`tests/smoke/run_core_flow_smoke_test.py`) as per previous detailed response.
-    2.  **Add Docker Layer Caching to GitHub Actions workflow**:
+    1. Implement GitHub Actions workflow (`.github/workflows/smoke_test.yml`) and Python smoke test script (`tests/smoke/run_core_flow_smoke_test.py`) as per previous detailed response.
+    2. **Add Docker Layer Caching to GitHub Actions workflow**:
+
         ```yaml
         # .github/workflows/smoke_test.yml (excerpt showing caching)
         # name: Smoke Test
@@ -578,14 +598,15 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 
         #       # ... (rest of the steps: docker compose up, run smoke test, docker compose down) ...
         ```
+
         *Note: Effective Docker layer caching with `actions/cache` and `docker buildx` can be complex. Ensure your `docker-build` PDM script (which runs `docker compose build`) is compatible with Buildx cache export/import if you use this method. Simpler GitHub-managed Docker layer caching might apply if your runners provide it. The key is to investigate and implement the best caching strategy for your CI environment.*
 * **Key Files to Modify**:
-    * `.github/workflows/smoke_test.yml` (Add caching steps).
-    * `tests/smoke/run_core_flow_smoke_test.py`
-    * `docker-compose.yml` (Verify health checks).
+  * `.github/workflows/smoke_test.yml` (Add caching steps).
+  * `tests/smoke/run_core_flow_smoke_test.py`
+  * `docker-compose.yml` (Verify health checks).
 * **Acceptance Criteria**:
-    * CI smoke test runs and passes.
-    * Subsequent CI runs are faster due to Docker layer caching (verify via CI logs/timings).
+  * CI smoke test runs and passes.
+  * Subsequent CI runs are faster due to Docker layer caching (verify via CI logs/timings).
 
 ---
 
@@ -595,15 +616,16 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 * **README.md Link/Rationale**: Initiates **ELS** implementation (README Sec 2), addresses **Batch/Essay Service Separation** (README Sec 2), and prepares for ELS's role in managing essay states (README Sec 4.B). A stub store allows for more meaningful initial logic.
 
 * **Implementation Guide (`services/essay_lifecycle_service/worker.py`)**:
-    1.  Follow the previous ELS skeleton setup guide (Task 5 from prior ticket).
-    2.  **Add Stub State Store**:
+    1. Follow the previous ELS skeleton setup guide (Task 5 from prior ticket).
+    2. **Add Stub State Store**:
         * For simplicity, start with an in-memory Python dictionary: `essay_states = {}` (global or class member in the worker).
         * Alternatively, for persistence across worker restarts (useful for local dev, but still a stub), use `sqlite3`.
-    3.  **Enhance Message Handler**:
+    3. **Enhance Message Handler**:
         * When an event like `SpellcheckResultDataV1` is consumed:
             * Extract `essay_id` and the new `status`.
             * Update the `essay_states` dictionary: `essay_states[essay_id] = {"status": status, "last_updated": datetime.now(timezone.utc), "spellcheck_details": event_data.model_dump()}`.
             * Log the update and the current (stubbed) state of the essay.
+
         ```python
         # services/essay_lifecycle_service/worker.py (conceptual additions for stub store)
         # ... (imports as before) ...
@@ -624,13 +646,14 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
         #     logger.info(f"ELS: Updated stub store for Essay ID: {essay_id}. Current stubbed state: {essay_stub_store.get(essay_id)}")
             # ... (rest of handler logic from previous skeleton)
         ```
+
 * **Key Files to Modify**:
-    * `services/essay_lifecycle_service/worker.py` (Add stub store logic).
-    * Other ELS files (`pyproject.toml`, `Dockerfile`), `docker-compose.yml`, root `pyproject.toml` as per previous ELS skeleton setup.
+  * `services/essay_lifecycle_service/worker.py` (Add stub store logic).
+  * Other ELS files (`pyproject.toml`, `Dockerfile`), `docker-compose.yml`, root `pyproject.toml` as per previous ELS skeleton setup.
 * **Acceptance Criteria**:
-    * ELS skeleton service consumes events (e.g., `SpellcheckResultDataV1`).
-    * Updates its in-memory/SQLite stub state store with the essay's ID and new status/details.
-    * Logs these updates.
+  * ELS skeleton service consumes events (e.g., `SpellcheckResultDataV1`).
+  * Updates its in-memory/SQLite stub state store with the essay's ID and new status/details.
+  * Logs these updates.
 
 ---
 
@@ -642,8 +665,9 @@ These are general improvements to be applied across services or to `common_core`
 
 * **Objective**: Standardize service configuration management using Pydantic's `BaseSettings` for type safety, defaults, and `.env` file loading.
 * **Action**: For each service (`content_service`, `batch_service`, `spell_checker_service`, and new `essay_lifecycle_service`):
-    * Create a `config.py` file (e.g., `services/content_service/config.py`).
-    * Define a class inheriting from `pydantic_settings.BaseSettings`.
+  * Create a `config.py` file (e.g., `services/content_service/config.py`).
+  * Define a class inheriting from `pydantic_settings.BaseSettings`.
+
         ```python
         # Example: services/content_service/config.py
         from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -660,14 +684,16 @@ These are general improvements to be applied across services or to `common_core`
         
         settings = ContentServiceSettings() # Singleton instance
         ```
-    * In service code (e.g., `app.py`, `worker.py`), import and use this `settings` object instead of direct `os.getenv()`.
-    * Ensure `.env` files are supported for local development (Pydantic `BaseSettings` does this by default).
+
+  * In service code (e.g., `app.py`, `worker.py`), import and use this `settings` object instead of direct `os.getenv()`.
+  * Ensure `.env` files are supported for local development (Pydantic `BaseSettings` does this by default).
 * **Rationale**: Typed configuration, validation, clear defaults, and .env support improve robustness and developer experience, aligning with maintainable service design.
 
 ### C.2. Enum JSON Serialization for API Models
 
 * **Objective**: Ensure consistent enum serialization for any Pydantic models that might be directly returned via REST APIs (outside of an `EventEnvelope`).
 * **Action**: If any service API endpoint directly returns a Pydantic model containing enums, ensure that model's `model_config` includes `json_encoders={Enum: lambda v: v.value}`.
+
     ```python
     # Example for a Pydantic model returned by an API
     # from pydantic import BaseModel
@@ -682,26 +708,28 @@ These are general improvements to be applied across services or to `common_core`
         #     api_status: MyApiStatusEnum
         #     model_config = ConfigDict(json_encoders={Enum: lambda v: v.value}) # Pydantic v2 syntax
     ```
+
 * **Rationale**: Consistent enum representation across all external interfaces (events and APIs).
 
 ### C.3. DLQ / Retry Strategy Consideration (Decision Point)
 
 * **Objective**: Formulate an initial strategy for handling "poison pill" messages in Kafka consumers and transient errors.
 * **Action**: This is a discussion and decision point for the team, not an immediate full implementation.
-    * **Decision 1 (Poison Pills)**: For messages that repeatedly fail deserialization or cause unrecoverable business logic errors:
-        * Option A (Simple): Log the error extensively, commit the offset, and move on. Risk of data loss if the message was important.
-        * Option B (DLQ): After a few retries, publish the problematic message to a Dead-Letter Topic (e.g., `<original_topic>.DLT`). This requires a DLQ consumer or monitoring.
-    * **Decision 2 (Transient Retries)**: For errors like temporary network issues when calling other services:
-        * Implement a limited retry mechanism with exponential backoff within the consumer's message processing logic before giving up (and potentially sending to DLQ or just logging and committing). Libraries like `tenacity` can help.
-    * **Initial Step for Phase 1.2**: For now, ensure all Kafka consumer message processing loops (e.g., in `spell_checker_service`, `els_skeleton`) have robust `try...except Exception` blocks that log detailed errors and *commit the offset* to prevent consumer blockage. Document this as the current "log and move on" strategy, with DLQ/retry as a planned enhancement.
+  * **Decision 1 (Poison Pills)**: For messages that repeatedly fail deserialization or cause unrecoverable business logic errors:
+    * Option A (Simple): Log the error extensively, commit the offset, and move on. Risk of data loss if the message was important.
+    * Option B (DLQ): After a few retries, publish the problematic message to a Dead-Letter Topic (e.g., `<original_topic>.DLT`). This requires a DLQ consumer or monitoring.
+  * **Decision 2 (Transient Retries)**: For errors like temporary network issues when calling other services:
+    * Implement a limited retry mechanism with exponential backoff within the consumer's message processing logic before giving up (and potentially sending to DLQ or just logging and committing). Libraries like `tenacity` can help.
+  * **Initial Step for Phase 1.2**: For now, ensure all Kafka consumer message processing loops (e.g., in `spell_checker_service`, `els_skeleton`) have robust `try...except Exception` blocks that log detailed errors and *commit the offset* to prevent consumer blockage. Document this as the current "log and move on" strategy, with DLQ/retry as a planned enhancement.
 * **Rationale**: Critical for service resilience. Prevents single bad messages from halting all processing.
 
 ### C.4. Version Bump Discipline & `EventEnvelope` Schema Version
 
 * **Objective**: Establish practices for semantic versioning of packages and add schema versioning to the `EventEnvelope`.
 * **Actions**:
-    1.  **Semantic Versioning**: Once ELS skeleton (Task B.5) is in and Phase 1.2 tasks are complete, plan to bump the versions of `huleedu-common-core` and all services from `0.1.0` to `0.2.0` (assuming these additions are non-breaking for existing consumers of 0.1.0 functionality). Document this decision and the trigger for future version bumps.
-    2.  **`EventEnvelope` Schema Version**: Add a `schema_version` field to `common_core/src/common_core/events/envelope.py`.
+    1. **Semantic Versioning**: Once ELS skeleton (Task B.5) is in and Phase 1.2 tasks are complete, plan to bump the versions of `huleedu-common-core` and all services from `0.1.0` to `0.2.0` (assuming these additions are non-breaking for existing consumers of 0.1.0 functionality). Document this decision and the trigger for future version bumps.
+    2. **`EventEnvelope` Schema Version**: Add a `schema_version` field to `common_core/src/common_core/events/envelope.py`.
+
         ```python
         # common_core/src/common_core/events/envelope.py (modification)
         # from pydantic import BaseModel, Field # , UUID, datetime, TypeVar, Generic, Optional
@@ -721,6 +749,7 @@ These are general improvements to be applied across services or to `common_core`
                 "json_encoders": {Enum: lambda v: v.value}, # Already there from Phase 1.1
             }
         ```
+
 * **Rationale**: Semantic versioning clarifies compatibility and release management. `EventEnvelope.schema_version` aids in future-proofing event consumers, allowing them to handle different envelope structures if the envelope itself evolves (though `EventEnvelope.data` versioning is handled by `event_type` string).
 
 ---
