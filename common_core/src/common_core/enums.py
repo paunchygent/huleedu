@@ -68,39 +68,49 @@ class ProcessingEvent(str, Enum):
     PROCESSING_FAILED = "processing.failed"
 
 
+# Private mapping for topic_name() function
+_TOPIC_MAPPING = {
+    ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED: "huleedu.essay.spellcheck.requested.v1",
+    ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED: "huleedu.essay.spellcheck.completed.v1",
+    # Add more mappings as needed for other events - EACH MUST BE EXPLICIT
+}
+
+
 def topic_name(event: ProcessingEvent) -> str:
     """
     Convert a ProcessingEvent to its corresponding Kafka topic name.
-    This centralizes topic naming to prevent divergence across services.
-    
+
+    This centralizes topic naming. All events intended for Kafka MUST have an
+    explicit mapping here to enforce architectural discipline.
+
     Args:
-        event: The ProcessingEvent enum value
-        
+        event: The ProcessingEvent enum value.
+
     Returns:
-        The Kafka topic name string
-        
+        The Kafka topic name string.
+
     Raises:
-        ValueError: If the event does not have an explicit topic mapping
-        
+        ValueError: If the event does not have an explicit topic mapping.
+
+    Current Topic Mapping:
+    ----------------------
+    ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED ➜ "huleedu.essay.spellcheck.requested.v1"
+    ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED ➜ "huleedu.essay.spellcheck.completed.v1"
+
     Example:
-        topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED) -> "huleedu.essay.spellcheck.requested.v1"
+        topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED) ->
+            "huleedu.essay.spellcheck.requested.v1"
     """
-    # Explicit mapping ensures all events have deliberate topic contracts
-    # This prevents accidental topic creation and enforces architectural discipline
-    topic_mapping = {
-        ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED: "huleedu.essay.spellcheck.requested.v1",
-        ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED: "huleedu.essay.spellcheck.completed.v1",
-        # Add more mappings as needed for other events - EACH MUST BE EXPLICIT
-    }
-    
-    if event not in topic_mapping:
-        raise ValueError(
-            f"Event '{event}' does not have an explicit topic mapping. "
-            f"All events must have deliberate topic contracts defined in topic_mapping. "
-            f"Available events: {list(topic_mapping.keys())}"
+    if event not in _TOPIC_MAPPING:
+        mapped_events_summary = "\n".join(
+            [f"- {e.name} ({e.value}) ➜ '{t}'" for e, t in _TOPIC_MAPPING.items()]
         )
-    
-    return topic_mapping[event]
+        raise ValueError(
+            f"Event '{event.name} ({event.value})' does not have an explicit topic mapping. "
+            f"All events intended for Kafka must have deliberate topic contracts defined. "
+            f"Currently mapped events:\n{mapped_events_summary}"
+        )
+    return _TOPIC_MAPPING[event]
 
 
 # ---------------------------------------------------------------------------

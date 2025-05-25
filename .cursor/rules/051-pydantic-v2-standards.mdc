@@ -1,0 +1,268 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+===
+# 051: Pydantic v2 Standards
+
+## 1. Purpose
+These standards define mandatory Pydantic v2 usage patterns for HuleEdu microservices. You (AI agent) **MUST** follow these to ensure type safety, proper serialization, and architectural compliance.
+
+## 2. Model Configuration Standards
+
+### 2.1. Rule: Use ConfigDict for Complex Configurations
+    - For models requiring custom configuration, **MUST** use `ConfigDict` from `pydantic`.
+    - **FORBIDDEN**: Using dictionary syntax for complex configurations in new code.
+    - **Your Directive**: Always import and use `ConfigDict` for new models with custom settings.
+
+```python
+# ✅ CORRECT: Pydantic v2 with ConfigDict
+from pydantic import BaseModel, ConfigDict
+from enum import Enum
+
+class ApiResponseModel(BaseModel):
+    model_config = ConfigDict(
+        json_encoders={Enum: lambda v: v.value},
+        str_strip_whitespace=True,
+        validate_assignment=True
+    )
+    
+    id: str
+    status: MyStatusEnum
+```
+
+### 2.2. Rule: Dictionary Configuration Acceptable for Simple Cases
+    - Simple configurations **MAY** use dictionary syntax (as in current `EventEnvelope`).
+    - This is acceptable for backward compatibility and simple configurations.
+
+```python
+# ✅ ACCEPTABLE: Simple dictionary configuration
+class EventEnvelope(BaseModel, Generic[T_EventData]):
+    model_config = {
+        "populate_by_name": True,
+        "json_encoders": {Enum: lambda v: v.value},
+    }
+```
+
+## 3. Serialization Standards
+
+### 3.1. Rule: Kafka Message Serialization
+    - Kafka producers **MUST** send bytes, not Python objects.
+    - **CRITICAL**: Use `json.dumps().encode('utf-8')` for manual serialization.
+    - **Your Directive**: Always verify Kafka message types are bytes.
+
+```python
+# ❌ WRONG: Sends dict to Kafka
+await producer.send_and_wait(
+    topic,
+    envelope.model_dump(mode="json"),  # Returns dict
+    key=key.encode("utf-8")
+)
+
+# ✅ CORRECT: Properly serialize to bytes
+import json
+await producer.send_and_wait(
+    topic,
+    json.dumps(envelope.model_dump(mode="json")).encode('utf-8'),  # Returns bytes
+    key=key.encode("utf-8")
+)
+```
+
+### 3.2. Rule: Use Service Libraries When Available
+    - Prefer using `KafkaBus` from `huleedu_service_libs` which handles serialization.
+    - Only use manual serialization when direct `AIOKafkaProducer` usage is required.
+
+```python
+# ✅ PREFERRED: Use KafkaBus (handles serialization internally)
+await kafka_bus.publish(
+    topic=topic_name,
+    envelope=event_envelope,
+    key=entity_id
+)
+```
+
+## 4. Field and Validation Standards
+
+### 4.1. Rule: Use Field() for Complex Field Definitions
+    - **MUST** use `Field()` for fields requiring validation, defaults, or metadata.
+    - **Your Directive**: Import `Field` from `pydantic` when needed.
+
+```python
+from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+from uuid import UUID, uuid4
+
+class EventEnvelope(BaseModel, Generic[T_EventData]):
+    event_id: UUID = Field(default_factory=uuid4)
+    event_timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    correlation_id: Optional[UUID] = Field(None, description="For distributed tracing")
+```
+
+### 4.2. Rule: Use @field_validator for Custom Validation
+    - **MUST** use `@field_validator` decorator for field-level validation.
+    - **FORBIDDEN**: Using deprecated `@validator` decorator.
+
+```python
+from pydantic import BaseModel, field_validator
+from pathlib import Path
+from typing import Union
+
+class ServiceConfig(BaseModel):
+    data_path: Path
+    
+    @field_validator('data_path')
+    @classmethod
+    def validate_path(cls, v: Union[Path, str]) -> Path:
+        """Ensure path is absolute and exists."""
+        path = Path(v)
+        if not path.is_absolute():
+            path = Path.cwd() / path
+        return path
+```
+
+## 5. Settings Management Standards
+
+### 5.1. Rule: Use pydantic-settings for Configuration
+    - **MUST** use `pydantic-settings` package for service configuration.
+    - **MUST** use `SettingsConfigDict` for settings configuration.
+
+```python
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
+
+class ServiceSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file='.env',
+        env_file_encoding='utf-8',
+        extra='ignore',
+        case_sensitive=False
+    )
+    
+    kafka_bootstrap_servers: str = Field(
+        default="kafka:9092",
+        description="Kafka bootstrap servers"
+    )
+    log_level: str = Field(default="INFO", description="Logging level")
+    port: int = Field(default=8000, description="Service port")
+
+# Singleton instance
+settings = ServiceSettings()
+```
+
+## 6. Type Safety Standards
+
+### 6.1. Rule: Precise Type Annotations
+    - **MUST** use precise type annotations, avoiding `Any` where possible.
+    - **MUST** use `from __future__ import annotations` for forward references.
+
+```python
+from __future__ import annotations
+
+from typing import Generic, TypeVar, Optional
+from pydantic import BaseModel
+
+T_EventData = TypeVar("T_EventData", bound=BaseModel)
+
+class EventEnvelope(BaseModel, Generic[T_EventData]):
+    data: T_EventData  # Precise generic type
+    correlation_id: Optional[UUID] = None  # Explicit Optional
+```
+
+### 6.2. Rule: Model Validation
+    - **MUST** use `model_validate()` for deserializing external data.
+    - **FORBIDDEN**: Using deprecated `parse_obj()` or `parse_raw()`.
+
+```python
+# ✅ CORRECT: Pydantic v2 validation
+envelope = EventEnvelope[SpellcheckRequestedDataV1].model_validate(
+    json.loads(kafka_message.value.decode('utf-8'))
+)
+
+# ❌ WRONG: Deprecated v1 methods
+envelope = EventEnvelope.parse_obj(data)  # Removed in v2
+```
+
+## 7. Migration Patterns
+
+### 7.1. Rule: Consistent v2 Syntax
+    - **FORBIDDEN**: Mixing v1 and v2 configuration patterns in the same model.
+    - **Your Directive**: When updating models, ensure complete v2 compliance.
+
+```python
+# ❌ WRONG: Mixed v1/v2 syntax
+class BadModel(BaseModel):
+    class Config:  # v1 style
+        json_encoders = {Enum: lambda v: v.value}
+    
+    model_config = ConfigDict(...)  # v2 style - conflicts!
+
+# ✅ CORRECT: Consistent v2 syntax
+class GoodModel(BaseModel):
+    model_config = ConfigDict(
+        json_encoders={Enum: lambda v: v.value}
+    )
+```
+
+## 8. Testing Standards
+
+### 8.1. Rule: Test Serialization Round-trips
+    - **MUST** test serialization/deserialization for Kafka event models.
+    - **Your Directive**: Include serialization tests for new event models.
+
+```python
+import json
+from common_core.events.envelope import EventEnvelope
+
+def test_event_envelope_serialization():
+    """Test EventEnvelope Kafka serialization."""
+    envelope = EventEnvelope[MyEventData](
+        event_type="test.event.v1",
+        source_service="test-service",
+        data=MyEventData(...)
+    )
+    
+    # Test serialization to bytes (Kafka format)
+    serialized = json.dumps(envelope.model_dump(mode="json")).encode('utf-8')
+    assert isinstance(serialized, bytes)
+    
+    # Test round-trip
+    deserialized = json.loads(serialized.decode('utf-8'))
+    reconstructed = EventEnvelope[MyEventData].model_validate(deserialized)
+    assert reconstructed.event_id == envelope.event_id
+```
+
+## 9. Common Pitfalls to Avoid
+
+### 9.1. Serialization Type Mismatches
+```python
+# ❌ WRONG: Type mismatch
+kafka_value = envelope.model_dump(mode="json")  # dict
+await producer.send_and_wait(topic, kafka_value)  # Expects bytes
+
+# ✅ CORRECT: Proper types
+kafka_value = json.dumps(envelope.model_dump(mode="json")).encode('utf-8')  # bytes
+```
+
+### 9.2. Missing Imports
+```python
+# ❌ WRONG: Missing ConfigDict import
+from pydantic import BaseModel
+model_config = ConfigDict(...)  # NameError
+
+# ✅ CORRECT: Proper import
+from pydantic import BaseModel, ConfigDict
+```
+
+## 10. Architecture Compliance
+
+These standards ensure compliance with:
+- **020-architectural-mandates.mdc**: Explicit contracts via Pydantic models
+- **030-event-driven-architecture-eda-standards.mdc**: Proper EventEnvelope usage
+- **050-python-coding-standards.mdc**: Type safety and precise annotations
+
+---
+**Strict Pydantic v2 compliance ensures type safety and reliable inter-service communication.**
+===

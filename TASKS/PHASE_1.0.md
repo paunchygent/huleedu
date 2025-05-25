@@ -508,8 +508,8 @@ dev = [
 
 **Development Workflow (IMPLEMENTED):**
 - `pdm install`: Install all packages in editable mode
-- `pdm run format-all`: Format all code with Black and isort
-- `pdm run lint-all`: Lint all code with Flake8
+- `pdm run format-all`: Format all code with Ruff
+- `pdm run lint-all`: Lint all code with Ruff
 - `pdm run typecheck-all`: Type check with MyPy
 - `pdm run docker-up`: Start all services with Docker Compose
 

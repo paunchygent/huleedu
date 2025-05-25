@@ -12,9 +12,7 @@ accesslog = "-"
 errorlog = "-"
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 
-graceful_timeout = int(
-    os.getenv("GRACEFUL_TIMEOUT", 30)
-)  # Shorter for faster shutdown in dev
+graceful_timeout = int(os.getenv("GRACEFUL_TIMEOUT", 30))  # Shorter for faster shutdown in dev
 keepalive_timeout = int(os.getenv("KEEP_ALIVE_TIMEOUT", 5))
 
 # Reloading should be handled by Quart's dev server or other tools if needed

@@ -1,0 +1,92 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 082: Ruff Linting Standards
+
+## 1. Purpose
+This rule defines Ruff configuration standards for the HuleEdu monorepo, validated against current Ruff capabilities.
+
+## 2. Ruff Configuration
+
+### 2.1. Rule: Core Settings
+**REQUIRED** Ruff configuration in `pyproject.toml`:
+
+```toml
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".pdm-python",
+    ".pdm-build",
+    "common_core/.venv",
+]
+```
+
+### 2.2. Rule: Lint Rules Selection
+**REQUIRED** lint rules:
+
+```toml
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+]
+ignore = [
+    "E203",  # whitespace before ':' (conflicts with black)
+]
+```
+
+### 2.3. Rule: Format Settings
+**REQUIRED** format configuration:
+
+```toml
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+```
+
+## 3. Per-File Ignores
+
+### 3.1. Rule: Service Entry Points
+**ALLOWED** imports after `load_dotenv()`:
+
+```toml
+[tool.ruff.lint.per-file-ignores]
+"services/*/app.py" = ["E402"]
+"services/*/worker.py" = ["E402"]
+```
+
+## 4. VS Code Integration
+
+### 4.1. Rule: Modern VS Code Settings
+**REQUIRED** VS Code settings for 2025:
+
+```json
+{
+  "ruff.nativeServer": "auto",
+  "ruff.lineLength": 100,
+  "ruff.lint.select": ["E", "W", "F", "I"],
+  "ruff.lint.ignore": ["E203"],
+  "ruff.organizeImports": true,
+  "ruff.logLevel": "info"
+}
+```
+
+### 4.2. Rule: Deprecated Settings
+**FORBIDDEN** deprecated VS Code settings:
+- `ruff.format.args` (handled automatically)
+- `ruff.lint.args` (handled automatically)
+- `ruff.showNotifications` (use `ruff.logLevel`)
+
+---
+**Ruff replaces Black, isort, and Flake8 with unified, fast tooling.**

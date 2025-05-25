@@ -1,0 +1,48 @@
+# .dockerignore (at project root)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-cache/
+.pdm-build/
+.pdm-python # PDM's Python interpreter installations
+pdm.lock # Usually not needed in context if pyproject.toml is copied first
+         # and pdm install is run in Docker. But can exclude if large.
+
+.git/
+.github/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# IDE and OS files
+.DS_Store
+Thumbs.db
+
+# Test files and reports (unless a specific Dockerfile needs test files for multi-stage builds)
+# This is a general ignore; if a Dockerfile *needs* tests (e.g. for a test stage),
+# it can still COPY them if this rule is not too broad or negated carefully.
+# For service builds, tests are typically not needed in the final image.
+tests/
+common_core/tests/
+services/**/tests/
+htmlcov/
+.pytest_cache/
+.coverage
+
+# Local development artifacts
+.local_content_store_mvp/ # Example from content_service dev
+*.log
+
+# Documentation / Tasks (usually not needed in service images)
+README.md
+TASKS/
+.cursor/ # Rules are not needed in images
+
+# MyPy cache
+.mypy_cache/ 

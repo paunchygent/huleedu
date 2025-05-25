@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 import pathlib
@@ -8,7 +7,7 @@ from typing import Union
 import aiofiles
 import aiofiles.os
 from dotenv import load_dotenv
-from quart import Quart, Response, abort, jsonify, request, send_file
+from quart import Quart, Response, jsonify, request, send_file
 
 load_dotenv()
 
@@ -66,27 +65,20 @@ async def upload_content() -> Union[Response, tuple[Response, int]]:
 @app.get("/v1/content/<string:content_id>")
 async def download_content(content_id: str) -> Union[Response, tuple[Response, int]]:
     try:
-        if (
-            not all(c in "0123456789abcdefABCDEF" for c in content_id)
-            or len(content_id) != 32
-        ):
+        if not all(c in "0123456789abcdefABCDEF" for c in content_id) or len(content_id) != 32:
             logger.warning(f"Invalid content_id format received: {content_id}")
             return jsonify({"error": "Invalid content ID format."}), 400
 
         file_path = STORE_ROOT / content_id
 
         if not await aiofiles.os.path.isfile(str(file_path)):
-            logger.warning(
-                f"Content not found for ID: {content_id} at path {file_path.resolve()}"
-            )
+            logger.warning(f"Content not found for ID: {content_id} at path {file_path.resolve()}")
             return jsonify({"error": "Content not found."}), 404
 
         logger.info(f"Serving content for ID: {content_id} from {file_path.resolve()}")
         return await send_file(file_path)
     except Exception as e:
-        logger.error(
-            f"Error during content download for ID {content_id}: {e}", exc_info=True
-        )
+        logger.error(f"Error during content download for ID {content_id}: {e}", exc_info=True)
         return jsonify({"error": "Failed to retrieve content."}), 500
 
 
@@ -95,9 +87,7 @@ async def health_check() -> Union[Response, tuple[Response, int]]:
     # Basic check, can be expanded
     try:
         if not STORE_ROOT.exists() or not os.access(str(STORE_ROOT), os.W_OK):
-            logger.error(
-                f"Health check failed: Store root {STORE_ROOT.resolve()} not accessible."
-            )
+            logger.error(f"Health check failed: Store root {STORE_ROOT.resolve()} not accessible.")
             return (
                 jsonify({"status": "unhealthy", "message": "Storage not accessible"}),
                 503,

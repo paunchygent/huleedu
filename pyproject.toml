@@ -11,38 +11,39 @@ license = {text = "MIT"}
 
 # Minimal root dependencies - most deps are per-service or in common_core
 dependencies = [
-    "python-dotenv>=1.0.0",
+    "python-dotenv",
 ]
 
 [tool.pdm]
 distribution = false
 
+# PDM configuration - using defaults (inherit_metadata=True is already default)
+
 [dependency-groups]
-# Tools for overall monorepo management
+# Tools for overall monorepo management - let PDM resolve latest compatible versions
 monorepo-tools = [
-    "black>=24.4.0",
-    "isort>=5.13.2",
-    "flake8>=7.0.0",
-    "mypy>=1.9.0",
-    "pytest>=8.0.0",
-    "pytest-cov>=5.0.0",
-    "pytest-asyncio>=0.23.0",
-    "pre-commit>=3.6.0"
+    "ruff",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "pre-commit"
 ]
 
 # Install all new services and common_core for unified development
 dev = [
     "-e file:///${PROJECT_ROOT}/common_core",
     "-e file:///${PROJECT_ROOT}/services/libs",
-    "-e file:///${PROJECT_ROOT}/services/content_service", 
+    "-e file:///${PROJECT_ROOT}/services/content_service",
     "-e file:///${PROJECT_ROOT}/services/spell_checker_service",
     "-e file:///${PROJECT_ROOT}/services/batch_service",
 ]
 
 [tool.pdm.scripts]
 # Monorepo-wide scripts
-format-all = { composite = ["black .", "isort ."] }
-lint-all = "flake8 ."
+format-all = "ruff format --force-exclude ."
+lint-all = "ruff check --force-exclude ."
+lint-fix = "ruff check --fix --force-exclude ."
 typecheck-all = "mypy --config-file pyproject.toml ."
 test-all = "pytest -n auto"
 
@@ -61,28 +62,40 @@ run-spellchecker = "pdm run -p services/spell_checker_service start_worker"
 # Build common_core wheel
 build-common-core = "pdm build -p common_core"
 
-[tool.black]
-line-length = 88
-target-version = ['py311']
-exclude = '''
-/(
-    \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-  | __pypackages__ 
-)/
-'''
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".pdm-python",
+    ".pdm-build",
+    "common_core/.venv",
+]
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-skip_glob = ["*/.venv/*", "*/__pypackages__/*"]
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+]
+ignore = [
+    "E203",  # whitespace before ':' (conflicts with black)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint.per-file-ignores]
+# Allow imports after load_dotenv() in service entry points
+"services/*/app.py" = ["E402"]
+"services/*/worker.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -90,8 +103,10 @@ warn_return_any = true
 warn_unused_configs = true
 check_untyped_defs = true
 explicit_package_bases = true
+namespace_packages = true
 exclude = [
     "common_core/src/",
+    "services/libs/huleedu_service_libs/",
     ".venv/",
     "__pypackages__/",
     ".pdm-build/"
@@ -109,6 +124,16 @@ module = [
 ignore_missing_imports = false
 disallow_untyped_defs = true
 
+# External libraries without official type stubs
+[[tool.mypy.overrides]]
+module = [
+    "aiokafka.*",
+    "aiofiles.*"
+]
+ignore_missing_imports = true
+# Note: These external libraries lack official type stubs on PyPI
+# We maintain strict typing for our own code while allowing flexibility for external deps
+
 # Existing code (less strict initially)
 [[tool.mypy.overrides]]
 module = [
@@ -122,7 +147,7 @@ disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 testpaths = [
-    "common_core/tests", 
+    "common_core/tests",
     "services/content_service/tests",
     "services/spell_checker_service/tests",
     "services/batch_service/tests",
@@ -131,7 +156,7 @@ testpaths = [
 python_files = "test_*.py *_test.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-s -v --durations=10 -n auto --log-cli-level=INFO" 
+addopts = "-s -v --durations=10 -n auto --log-cli-level=INFO"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s:%(filename)s:%(lineno)s %(message)s"
@@ -152,4 +177,4 @@ filterwarnings = [
 
 [build-system]
 requires = ["pdm-backend"]
-build-backend = "pdm.backend" 
+build-backend = "pdm.backend"

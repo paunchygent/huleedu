@@ -32,21 +32,22 @@
 huledu-reboot/
 ├── services/
 │   ├── batch_service/          # Batch Orchestration Service (✅ Active)
-│   ├── content_service/        # Content Management Service (✅ Active)  
+│   ├── content_service/        # Content Management Service (✅ Active)
 │   ├── spell_checker_service/  # Spell Checking Service (✅ Active)
 │   ├── essay_service/          # Essay Lifecycle Service (🚧 Placeholder)
 │   └── libs/                   # Shared Service Libraries (✅ Active)
 ├── common_core/                # Common Core Package (✅ Active)
 ├── scripts/                    # Project Scripts & Utilities
-└── .cursor/rules/              # 🚨 MANDATORY DEVELOPMENT RULES
+├── .cursor/rules/              # 🚨 MANDATORY DEVELOPMENT RULES
+└── TASKS/                      # 🚨 PREVIOUS AND CURRENT DEVELOPMENT TASKS
 ```
 
 ## Development Commands (PDM Monorepo)
 
 ### Quality Assurance (MANDATORY before commits)
 ```bash
-pdm run format-all      # Black + isort formatting (REQUIRED)
-pdm run lint-all        # flake8 linting (REQUIRED) 
+pdm run format-all      # Ruff formatting (REQUIRED)
+pdm run lint-all        # Ruff linting (REQUIRED) 
 pdm run typecheck-all   # mypy type checking (REQUIRED)
 pdm run test-all        # pytest test suite (REQUIRED)
 ```
@@ -122,7 +123,17 @@ event = EventEnvelope(
 )
 ```
 
-### 7. **Documentation Standards** (Reference: `.cursor/rules/090-documentation-standards.mdc`)
+### 7. **Network-Restricted Task Handling**
+When encountering tasks with network dependencies:
+```python
+# Example: Skip network-dependent research
+if task_requires_network_access:
+    logger.warning("🌐 NETWORK ACCESS REQUIRED: Skipping PyPI research")
+    logger.info("DEFERRED: Task requires network-enabled agent")
+    # Continue with local portions only
+```
+
+### 8. **Documentation Standards** (Reference: `.cursor/rules/090-documentation-standards.mdc`)
 - **Google-style docstrings** for all public functions/classes
 - **Update documentation** after meaningful changes
 - **Cite sources** using format: `12:15:app/components/Todo.tsx`
@@ -153,6 +164,38 @@ event = EventEnvelope(
 - **RESPECT** `.gitignore` patterns for security
 - **AVOID** exposing API keys, secrets, or credentials in code/logs
 
+### Network Access Restrictions (Containerized Agents)
+- **NO INTERNET ACCESS**: Containerized agents cannot access external networks for security
+- **NO EXTERNAL API CALLS**: Cannot reach PyPI, GitHub, Docker Hub, or other external services
+- **NO KAFKA/DATABASE CONNECTIONS**: Cannot connect to external infrastructure
+- **LOCAL OPERATIONS ONLY**: Limited to file system operations and local code analysis
+
+### Task Classification for Network-Restricted Agents
+
+#### ✅ **SAFE TASKS** (No Network Required)
+- Code refactoring and local file modifications
+- Creating new files and directories
+- Local testing and validation
+- Configuration file updates
+- Documentation updates
+- Static code analysis and linting
+
+#### 🌐 **NETWORK-DEPENDENT TASKS** (Defer to Network-Enabled Agents)
+When encountering tasks marked with **🌐 NETWORK ACCESS REQUIRED**, containerized agents must:
+
+1. **SKIP** the network-dependent portions
+2. **DOCUMENT** what was skipped with clear reasoning
+3. **DEFER** to AI agents with network access via terminal
+4. **COMPLETE** any local/offline portions of the task
+
+**Example Network-Dependent Tasks:**
+- Research on PyPI, GitHub, or external documentation
+- CI/CD pipeline setup and testing
+- Docker image building and registry operations
+- Database or message queue connections
+- External API integrations
+- Package installation or dependency updates
+
 ### Sandbox Behavior
 - **READ-ONLY** access to sensitive directories
 - **NETWORK-DISABLED** execution in full-auto mode
@@ -163,7 +206,7 @@ event = EventEnvelope(
 ### When Issues Arise
 1. **Check Rules**: Consult `.cursor/rules/110.4-debugging-mode.mdc`
 2. **Run Tests**: `pdm run test-all` to identify regressions
-3. **Check Linting**: `pdm run lint-all` for code quality issues
+3. **Check Linting**: `pdm run lint-all` for Ruff code quality issues
 4. **Verify Types**: `pdm run typecheck-all` for type errors
 
 ### Common Patterns
@@ -191,6 +234,27 @@ except ValidationError as e:
 - ✅ **Logging**: Structured logging with correlation IDs
 - ✅ **Contracts**: Pydantic models for all inter-service data
 
+## Phase 1.2 Task Analysis Summary
+
+### Network-Dependent Tasks Identified in TASKS/PHASE_1.2.md
+- **A.2**: PyPI research for type stubs (🌐 NETWORK REQUIRED)
+- **B.2**: Kafka topic creation and cluster connection (🌐 NETWORK REQUIRED)  
+- **B.4**: CI/CD setup and Docker operations (🌐 NETWORK REQUIRED)
+
+### Safe Tasks for Containerized Agents
+- **A.1**: Code refactoring for `topic_name()` helper
+- **A.3**: Creating `.dockerignore` file
+- **B.1**: Unit test implementation with dependency injection
+- **B.3**: Prometheus metrics implementation (local code changes)
+- **B.5**: ELS skeleton service creation
+- **C.1-C.4**: Configuration and architectural improvements
+
+### Technical Issues Corrected
+- Fixed Kafka message serialization (bytes vs dict)
+- Corrected Pydantic v2 syntax for model configuration
+- Improved async metrics server implementation
+- Added network access warnings to relevant tasks
+
 ## Final Reminders
 
 1. **MANDATORY**: Start every response with "WoofWoof"
@@ -198,6 +262,7 @@ except ValidationError as e:
 3. **REQUIRED**: Consult `.cursor/rules/` before any development task
 4. **ESSENTIAL**: Run all quality gates before considering work complete
 5. **CRITICAL**: Maintain DDD/EDA architectural integrity at all times
+6. **NETWORK-RESTRICTED**: Skip and defer network-dependent tasks with clear documentation
 
 ---
 

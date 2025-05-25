@@ -43,24 +43,12 @@ class ProcessingPipelineState(BaseModel):
 
     batch_id: str
     requested_pipelines: List[str]
-    spellcheck: Optional[PipelineStateDetail] = Field(
-        default_factory=PipelineStateDetail
-    )
-    nlp_metrics: Optional[PipelineStateDetail] = Field(
-        default_factory=PipelineStateDetail
-    )
-    ai_feedback: Optional[PipelineStateDetail] = Field(
-        default_factory=PipelineStateDetail
-    )
-    ai_editor_revision: Optional[PipelineStateDetail] = Field(
-        default_factory=PipelineStateDetail
-    )
-    grammar_check: Optional[PipelineStateDetail] = Field(
-        default_factory=PipelineStateDetail
-    )
-    cj_assessment: Optional[PipelineStateDetail] = Field(
-        default_factory=PipelineStateDetail
-    )
+    spellcheck: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
+    nlp_metrics: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
+    ai_feedback: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
+    ai_editor_revision: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
+    grammar_check: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
+    cj_assessment: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
     last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def get_pipeline(self, name: str) -> Optional[PipelineStateDetail]:

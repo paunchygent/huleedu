@@ -92,24 +92,29 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
     * `ValueError` from `topic_name()` for an unmapped event includes a list of currently mapped events and their topics.
     * The docstring of `topic_name()` is updated to include (or clearly reference) the mapping table.
 
-### A.2. Add MyPy Stubs for External Libraries
+### A.2. Configure MyPy for External Libraries Without Type Stubs
 
-* **Objective**: Eliminate MyPy warnings for `aiokafka` and `aiofiles` by installing their type stubs, ensuring a cleaner CI type-checking process.
+* **Objective**: Eliminate MyPy warnings for `aiokafka` and `aiofiles` by configuring MyPy to handle missing type stubs appropriately, ensuring a cleaner CI type-checking process.
 * **Implementation Guide**:
-    1.  In the root `pyproject.toml`, add `types-aiokafka` and `types-aiofiles` to the appropriate development dependency group (e.g., `monorepo-tools` or a new `typing-stubs` group).
+    1.  **Configure MyPy for Missing Stubs**: Add MyPy overrides to `pyproject.toml` to handle external libraries without official stubs:
         ```toml
-        # pyproject.toml (root)
-        # [tool.pdm.dev-dependencies] # Or [dependency-groups]
-        # monorepo-tools = [
-        #     # ... existing tools ...
-        #     "types-aiokafka>=X.Y.Z",  # Replace X.Y.Z with the latest compatible version
-        #     "types-aiofiles>=A.B.C",  # Replace A.B.C with the latest compatible version
-        # ]
+        # pyproject.toml (root) - Add to [tool.mypy] section
+        [[tool.mypy.overrides]]
+        module = [
+            "aiokafka.*",
+            "aiofiles.*"
+        ]
+        ignore_missing_imports = true
+        # Note: This is the recommended approach for external libraries without official stubs
+        # We maintain strict typing for our own code while allowing flexibility for external deps
         ```
-    2.  Run `pdm install` (or `pdm install -G monorepo-tools`) at the root to update the lock file.
-    3.  Run `pdm run typecheck-all` to confirm that warnings related to these libraries are gone.
-* **Key Files to Modify**: Root `pyproject.toml`, `pdm.lock`.
-* **Acceptance Criteria**: `pdm run typecheck-all` no longer shows `ignore_missing_imports` warnings for `aiokafka` and `aiofiles`.
+    2.  **Verify Configuration**: Run `pdm run typecheck-all` to confirm that warnings are resolved.
+    3.  **Document Decision**: Add comment in `pyproject.toml` explaining why these specific modules are configured to ignore missing imports.
+* **Key Files to Modify**: Root `pyproject.toml` (MyPy configuration only).
+* **Acceptance Criteria**: 
+    - `pdm run typecheck-all` no longer shows missing import warnings for `aiokafka` and `aiofiles`
+    - MyPy configuration properly handles external libraries without compromising type safety for internal code
+    - **CRITICAL**: No manual `pdm.lock` edits or local stub packages created
 
 ### A.3. Create Root `.dockerignore` File
 
@@ -271,7 +276,7 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
             )
             await producer.send_and_wait(
                 OUTPUT_TOPIC,
-                result_envelope.model_dump(mode="json"), # Use model_dump for Pydantic v2
+                json.dumps(result_envelope.model_dump(mode="json")).encode('utf-8'), # Properly serialize to bytes
                 key=essay_id.encode("utf-8")
             )
             logger.info(f"Essay {essay_id}: Published spellcheck result. Event ID: {result_envelope.event_id}")
@@ -372,6 +377,7 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 
 ### B.2. Automate Kafka Topic Creation (with Docker Compose one-shot service)
 
+* **🌐 NETWORK ACCESS REQUIRED**: Requires connection to Kafka cluster
 * **Objective**: Implement a robust script for Kafka topic creation, runnable as a one-shot Docker Compose service for ensuring topics are present before other services start.
 * **README.md Link/Rationale**: Supports **Event-Driven Communication Backbone** (README Sec 3).
 
@@ -487,15 +493,18 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
         #         # ... rest of the processing
         ```
     * **Exposing Metrics from Worker**: The `spell_checker_service` is a non-HTTP worker. To expose Prometheus metrics:
-        1.  Option A: In `spell_checker_worker_main`, start a simple HTTP server in a separate thread/async task using `prometheus_client.start_http_server(port, addr)`.
+        1.  Option A: In `spell_checker_worker_main`, start a simple HTTP server in a separate async task using `prometheus_client.start_http_server(port, addr)`.
             ```python
             # In spell_checker_worker_main, before the main loop
             # from prometheus_client import start_http_server
+            # import asyncio
             # METRICS_PORT = int(os.getenv("SPELLCHECKER_METRICS_PORT", "8001")) # Example port
-            # start_http_server(METRICS_PORT)
+            # # Start metrics server in background task to avoid blocking
+            # asyncio.create_task(asyncio.to_thread(start_http_server, METRICS_PORT, "0.0.0.0"))
             # logger.info(f"Prometheus metrics server started on port {METRICS_PORT}")
             ```
         2.  Update its Dockerfile/`docker-compose.yml` to expose this metrics port.
+        3.  **Note**: Ensure port uniqueness across service instances to avoid conflicts.
 * **Key Files to Modify**:
     * `services/content_service/app.py`, `services/content_service/pyproject.toml`
     * `services/batch_service/app.py`, `services/batch_service/pyproject.toml`
@@ -512,6 +521,7 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 
 ### B.4. Implement CI Smoke Test (with Docker Layer Caching)
 
+* **🌐 NETWORK ACCESS REQUIRED**: Requires GitHub Actions setup, Docker Hub access, and CI/CD operations
 * **Objective**: Create an automated CI smoke test for the core event flow, optimizing CI run time with Docker layer caching.
 * **README.md Link/Rationale**: Validates **Event-Driven Architecture** (README Sec 1 & 3) and **Explicit Contracts** (README Sec 1 & 3). Caching improves CI efficiency.
 
@@ -667,10 +677,10 @@ These are general improvements to be applied across services or to `common_core`
     #     ACTIVE = "active"
     #     INACTIVE = "inactive"
     #
-    # class MyApiResponseModel(BaseModel):
-    #     id: str
-    #     api_status: MyApiStatusEnum
-    #     model_config = {"json_encoders": {Enum: lambda v: v.value}}
+            # class MyApiResponseModel(BaseModel):
+        #     id: str
+        #     api_status: MyApiStatusEnum
+        #     model_config = ConfigDict(json_encoders={Enum: lambda v: v.value}) # Pydantic v2 syntax
     ```
 * **Rationale**: Consistent enum representation across all external interfaces (events and APIs).
 

@@ -1,5 +1,5 @@
 ---
-description:
+description: "Central index of all HuleEdu development rules. Always check here first to understand the complete rule set and their relationships."
 globs:
 alwaysApply: true
 ---

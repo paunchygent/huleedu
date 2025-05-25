@@ -15,15 +15,21 @@ These define Python standards for HuleEdu. You (AI agent) **MUST** follow these 
 
 ## 3. Tooling & Formatting (PDM Scripts)
 
-### 3.1. Rule: Code Formatting (Black) & Import Sorting (isort)
-    - **Tools**: Black (line length 88), isort (Black profile, multi_line_output=3).
-    - **Execution**: Code **MUST** be formatted via `pdm run format`.
-    - **Your Directive**: Your generated Python code **MUST** be Black/isort compliant.
-
-### 3.2. Rule: Linting (Flake8)
-    - **Tool**: Flake8 (max line length 100; ignores W503,E203,D107,S101 - see `.flake8`).
-    - **Execution**: Code **MUST** pass `pdm run lint`.
-    - **Your Directive**: Aim for Flake8 compliance on substantive issues.
+### 3.1. Rule: Code Formatting and Linting (Ruff)
+    - **Tool**: Ruff (replaces Black, isort, and Flake8 with unified tooling).
+    - **Configuration**: All settings **MUST** be in `pyproject.toml` under `[tool.ruff]`.
+    - **Execution**: 
+        - Formatting: `pdm run format-all` (uses `ruff format --force-exclude .`)
+        - Linting: `pdm run lint-all` (uses `ruff check --force-exclude .`)
+        - Auto-fix: `ruff check --fix --force-exclude .` for automatically fixable issues
+    - **Critical**: **MUST** use `--force-exclude` flag to ensure exclusions work when passing directories directly to Ruff.
+    - **Per-file Ignores**: Use `[tool.ruff.lint.per-file-ignores]` for intentional violations (e.g., imports after `load_dotenv()`).
+    - **Systematic Approach**: 
+        1. Run auto-fix first: `ruff check --fix --force-exclude .`
+        2. Manually address remaining issues (line length, etc.)
+        3. Use `--unsafe-fixes` for trailing whitespace if needed
+        4. Configure per-file ignores for legitimate patterns
+    - **Your Directive**: Your generated Python code **MUST** be Ruff compliant.
 
 ## 4. Static Typing (Mypy) - CRITICAL STANDARD
 
@@ -56,15 +62,15 @@ These define Python standards for HuleEdu. You (AI agent) **MUST** follow these 
     - Private: `_private_member`. Avoid `__double_underscore` unless essential.
 
 ## 7. Imports
-    - Use absolute imports (e.g., `from common.models.base import BasePydanticModel`). `isort` handles organization.
+    - Use absolute imports (e.g., `from common.models.base import BasePydanticModel`). Ruff handles import organization automatically.
 
 ## 8. Error Handling
     - Catch specific exceptions. Define and use domain-specific exceptions (e.g., from `common/exceptions.py`). Use `try...finally` or `with` for resource cleanup.
 
 ## 9. General Code Structure
-    - Line Length: Black's 88 for code. Flake8 allows 100 for comments/docstrings if agreed.
+    - Line Length: 100 characters (configured in Ruff).
     - Blank Lines: Per PEP 8 (e.g., two between top-level functions/classes) for readability.
 
 ---
-**Clean, consistent, well-typed, and documented Python is VITAL. Your adherence is mandatory.**
+**Clean, consistent, well-typed, and documented Python is VITAL. Your adherence to Ruff standards is mandatory.**
 ===

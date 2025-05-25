@@ -3,13 +3,12 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Optional  # Added Any
+from typing import Optional  # Added Any
 from uuid import uuid4
 
 import aiohttp
 from aiohttp import ClientTimeout
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, TopicPartition
-from aiokafka.errors import KafkaConnectionError  # Specific error for Kafka
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
@@ -30,24 +29,17 @@ from common_core.events.spellcheck_models import (
     SpellcheckResultDataV1,
 )
 from common_core.metadata_models import (
-    EntityReference,
     StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(
-    level=LOG_LEVEL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
-CONTENT_SERVICE_URL = os.getenv(
-    "CONTENT_SERVICE_URL", "http://content_service:8000/v1/content"
-)
-CONSUMER_GROUP_ID = os.getenv(
-    "SPELLCHECKER_CONSUMER_GROUP", "spellchecker-service-group-v1.1"
-)
+CONTENT_SERVICE_URL = os.getenv("CONTENT_SERVICE_URL", "http://content_service:8000/v1/content")
+CONSUMER_GROUP_ID = os.getenv("SPELLCHECKER_CONSUMER_GROUP", "spellchecker-service-group-v1.1")
 PRODUCER_CLIENT_ID = "spellchecker-service-producer"
 CONSUMER_CLIENT_ID = "spellchecker-service-consumer"
 # Topic names using centralized helper function
@@ -57,20 +49,14 @@ SOURCE_SERVICE_NAME = "spell-checker-service"
 
 
 async def perform_spell_check(text: str, essay_id: str) -> tuple[str, int]:
-    logger.info(
-        f"Performing DUMMY spell check for essay {essay_id} (text length: {len(text)})"
-    )
+    logger.info(f"Performing DUMMY spell check for essay {essay_id} (text length: {len(text)})")
     await asyncio.sleep(0.1)  # Simulate work
     # This is a placeholder. Replace with your actual spell check logic.
     # Example: from your_spellchecker_lib import check_text
     # corrected_text, corrections_count = await check_text(text)
-    corrected_text = text.replace("teh", "the").replace(
-        "recieve", "receive"
-    )  # Simple dummy
+    corrected_text = text.replace("teh", "the").replace("recieve", "receive")  # Simple dummy
     corrections_count = text.count("teh") + text.count("recieve")
-    logger.info(
-        f"Dummy spell check for {essay_id} made {corrections_count} corrections."
-    )
+    logger.info(f"Dummy spell check for {essay_id} made {corrections_count} corrections.")
     return corrected_text, corrections_count
 
 
@@ -85,7 +71,8 @@ async def fetch_content_from_service(
             response.raise_for_status()
             content = await response.text()
             logger.debug(
-                f"Essay {essay_id}: Fetched content from {storage_id} (first 100 chars: {content[:100]})"
+                f"Essay {essay_id}: Fetched content from {storage_id} "
+                f"(first 100 chars: {content[:100]})"
             )
             return content
     except Exception as e:
@@ -110,9 +97,7 @@ async def store_content_to_service(
             response.raise_for_status()
             data: dict[str, str] = await response.json()
             storage_id = data.get("storage_id")
-            logger.info(
-                f"Essay {essay_id}: Stored corrected text, new_storage_id: {storage_id}"
-            )
+            logger.info(f"Essay {essay_id}: Stored corrected text, new_storage_id: {storage_id}")
             return storage_id
     except Exception as e:
         logger.error(f"Essay {essay_id}: Error storing content: {e}", exc_info=True)
@@ -142,14 +127,16 @@ async def spell_checker_worker_main() -> None:
     producer_running = False
 
     logger.info(
-        f"Spell Checker Worker starting. Kafka: {KAFKA_BOOTSTRAP_SERVERS}, Content Service: {CONTENT_SERVICE_URL}"
+        f"Spell Checker Worker starting. Kafka: {KAFKA_BOOTSTRAP_SERVERS}, "
+        f"Content Service: {CONTENT_SERVICE_URL}"
     )
     await consumer.start()
     consumer_running = True
     await producer.start()
     producer_running = True
     logger.info(
-        f"Spell Checker Worker started. Consuming from '{INPUT_TOPIC}', group '{CONSUMER_GROUP_ID}'."
+        f"Spell Checker Worker started. Consuming from '{INPUT_TOPIC}', "
+        f"group '{CONSUMER_GROUP_ID}'."
     )
 
     try:
@@ -158,31 +145,29 @@ async def spell_checker_worker_main() -> None:
                 tp = TopicPartition(msg.topic, msg.partition)
                 offset_to_commit = msg.offset + 1
                 logger.info(
-                    f"Received msg from '{msg.topic}' p{msg.partition} o{msg.offset} key='{msg.key}'"
+                    f"Received msg from '{msg.topic}' p{msg.partition} o{msg.offset} "
+                    f"key='{msg.key}'"
                 )
 
                 # Capture when processing actually starts
                 processing_started_at = datetime.now(timezone.utc)
 
                 try:
-                    envelope = EventEnvelope[SpellcheckRequestedDataV1].model_validate(
-                        msg.value
-                    )
+                    envelope = EventEnvelope[SpellcheckRequestedDataV1].model_validate(msg.value)
                     request_data: SpellcheckRequestedDataV1 = envelope.data
                     essay_id = request_data.entity_ref.entity_id
                     original_text_storage_id = request_data.text_storage_id
 
                     logger.info(
-                        f"Processing spellcheck for essay_id: {essay_id}, original_storage_id: {original_text_storage_id}"
+                        f"Processing spellcheck for essay_id: {essay_id}, "
+                        f"original_storage_id: {original_text_storage_id}"
                     )
 
                     original_text = await fetch_content_from_service(
                         http_session, original_text_storage_id, essay_id
                     )
                     if original_text is None:
-                        logger.error(
-                            f"Essay {essay_id}: Could not fetch original text. Skipping."
-                        )
+                        logger.error(f"Essay {essay_id}: Could not fetch original text. Skipping.")
                         await consumer.commit({tp: offset_to_commit})
                         continue
 
@@ -195,15 +180,14 @@ async def spell_checker_worker_main() -> None:
                     )
                     if corrected_text_storage_id is None:
                         logger.error(
-                            f"Essay {essay_id}: Could not store corrected text. Skipping result event."
+                            f"Essay {essay_id}: Could not store corrected text. "
+                            f"Skipping result event."
                         )
                         await consumer.commit({tp: offset_to_commit})
                         continue
 
                     storage_meta = StorageReferenceMetadata()
-                    storage_meta.add_reference(
-                        ContentType.ORIGINAL_ESSAY, original_text_storage_id
-                    )
+                    storage_meta.add_reference(ContentType.ORIGINAL_ESSAY, original_text_storage_id)
                     storage_meta.add_reference(
                         ContentType.CORRECTED_TEXT, corrected_text_storage_id
                     )
@@ -237,17 +221,19 @@ async def spell_checker_worker_main() -> None:
 
                     await producer.send_and_wait(
                         OUTPUT_TOPIC,
-                        result_envelope.model_dump(mode="json"),
+                        json.dumps(result_envelope.model_dump(mode="json")).encode("utf-8"),
                         key=essay_id.encode("utf-8"),
                     )
                     logger.info(
-                        f"Essay {essay_id}: Published spellcheck result. Event ID: {result_envelope.event_id}"
+                        f"Essay {essay_id}: Published spellcheck result. "
+                        f"Event ID: {result_envelope.event_id}"
                     )
                     await consumer.commit({tp: offset_to_commit})
 
                 except ValidationError as ve:
                     logger.error(
-                        f"Pydantic validation error for msg at offset {msg.offset}: {ve.errors(include_url=False)}",
+                        f"Pydantic validation error for msg at offset {msg.offset}: "
+                        f"{ve.errors(include_url=False)}",
                         exc_info=False,
                     )  # Less verbose
                     await consumer.commit({tp: offset_to_commit})

@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 import uuid
@@ -19,21 +18,15 @@ from common_core.events.spellcheck_models import SpellcheckRequestedDataV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(
-    level=LOG_LEVEL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 app = Quart(__name__)
 KAFKA_BUS_CLIENT_ID = "batch-service-producer"
 app.config["KAFKA_BUS"] = None
 
-CONTENT_SERVICE_URL = os.getenv(
-    "CONTENT_SERVICE_URL", "http://content_service:8000/v1/content"
-)
-OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST = topic_name(
-    ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED
-)
+CONTENT_SERVICE_URL = os.getenv("CONTENT_SERVICE_URL", "http://content_service:8000/v1/content")
+OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
 
 
 @app.before_serving
@@ -44,9 +37,7 @@ async def startup() -> None:
         app.config["KAFKA_BUS"] = bus
         logger.info("Batch Service KafkaBus started.")
     except Exception as e:
-        logger.critical(
-            f"Failed to start KafkaBus for Batch Service: {e}", exc_info=True
-        )
+        logger.critical(f"Failed to start KafkaBus for Batch Service: {e}", exc_info=True)
 
 
 @app.after_serving
@@ -69,14 +60,13 @@ async def trigger_spellcheck_test_endpoint() -> Union[Response, tuple[Response, 
         essay_id_1 = str(uuid.uuid4())
         correlation_id_val = uuid.uuid4()
 
-        dummy_essay_text = (
-            "This is a tset essay with a teh and anothre recieve error for testing."
-        )
+        dummy_essay_text = "This is a tset essay with a teh and anothre recieve error for testing."
         original_text_storage_id: Optional[str] = None
 
         async with aiohttp.ClientSession() as http_session:
             logger.info(
-                f"Posting dummy essay text to content service for batch {batch_id}, essay {essay_id_1}"
+                f"Posting dummy essay text to content service for batch {batch_id}, "
+                f"essay {essay_id_1}"
             )
             async with http_session.post(
                 CONTENT_SERVICE_URL, data=dummy_essay_text.encode("utf-8")
@@ -84,18 +74,14 @@ async def trigger_spellcheck_test_endpoint() -> Union[Response, tuple[Response, 
                 if response.status == 201:
                     data = await response.json()
                     original_text_storage_id = data.get("storage_id")
-                    logger.info(
-                        f"Dummy essay stored, content_id: {original_text_storage_id}"
-                    )
+                    logger.info(f"Dummy essay stored, content_id: {original_text_storage_id}")
                 else:
                     error_text = await response.text()
                     logger.error(
                         f"Failed to store dummy essay text: {response.status} - {error_text}"
                     )
                     return (
-                        jsonify(
-                            {"error": f"Failed to store dummy essay: {response.status}"}
-                        ),
+                        jsonify({"error": f"Failed to store dummy essay: {response.status}"}),
                         500,
                     )
 
@@ -105,9 +91,7 @@ async def trigger_spellcheck_test_endpoint() -> Union[Response, tuple[Response, 
                 500,
             )
 
-        essay_ref = EntityReference(
-            entity_id=essay_id_1, entity_type="essay", parent_id=batch_id
-        )
+        essay_ref = EntityReference(entity_id=essay_id_1, entity_type="essay", parent_id=batch_id)
 
         system_meta_for_request = SystemProcessingMetadata(
             entity=essay_ref,
@@ -131,12 +115,11 @@ async def trigger_spellcheck_test_endpoint() -> Union[Response, tuple[Response, 
             data=spellcheck_request_data,
         )
 
-        await bus.publish(
-            OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST, envelope, key=essay_id_1
-        )
+        await bus.publish(OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST, envelope, key=essay_id_1)
 
         logger.info(
-            f"Published SpellcheckRequestedDataV1 for essay {essay_id_1}, event_id {envelope.event_id}"
+            f"Published SpellcheckRequestedDataV1 for essay {essay_id_1}, "
+            f"event_id {envelope.event_id}"
         )
         return (
             jsonify(

@@ -66,8 +66,8 @@ After setup, you have access to these PDM scripts:
 
 ### 🔧 Code Quality
 ```bash
-pdm run format-all      # Format code with Black and isort
-pdm run lint-all        # Lint with flake8
+pdm run format-all      # Format code with Ruff
+pdm run lint-all        # Lint with Ruff
 pdm run typecheck-all   # Type check with mypy
 pdm run test-all        # Run all tests with pytest
 ```
@@ -95,8 +95,8 @@ When making changes to any service:
 
 ```bash
 # Format and check your code
-pdm run format-all
-pdm run lint-all
+pdm run format-all      # Ruff formatting
+pdm run lint-all        # Ruff linting
 pdm run typecheck-all
 
 # Run tests

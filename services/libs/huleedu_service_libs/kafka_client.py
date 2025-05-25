@@ -2,13 +2,12 @@
 Thin Kafka wrapper using aiokafka for HuleEdu microservices.
 """
 
-import asyncio
 import json
 import logging
 import os
 from typing import Any, AsyncIterator, Optional, TypeVar  # Added Optional
 
-from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, TopicPartition
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from aiokafka.errors import KafkaConnectionError, KafkaTimeoutError
 from pydantic import BaseModel
 
@@ -23,9 +22,7 @@ T_EventPayload = TypeVar("T_EventPayload", bound=BaseModel)
 
 
 class KafkaBus:
-    def __init__(
-        self, *, client_id: str, bootstrap_servers: str = KAFKA_BOOTSTRAP_SERVERS
-    ):
+    def __init__(self, *, client_id: str, bootstrap_servers: str = KAFKA_BOOTSTRAP_SERVERS):
         self.bootstrap_servers = bootstrap_servers
         self.client_id = client_id  # Store client_id for logging
         self.producer = AIOKafkaProducer(
@@ -66,13 +63,12 @@ class KafkaBus:
         key: Optional[str] = None,
     ) -> None:
         if not self._started:
-            logger.warning(
-                f"KafkaProducer '{self.client_id}' not started. Attempting to start."
-            )
+            logger.warning(f"KafkaProducer '{self.client_id}' not started. Attempting to start.")
             await self.start()
             if not self._started:
                 logger.error(
-                    f"Cannot publish on topic '{topic}', producer '{self.client_id}' is not running."
+                    f"Cannot publish on topic '{topic}', "
+                    f"producer '{self.client_id}' is not running."
                 )
                 raise RuntimeError(f"KafkaProducer '{self.client_id}' is not running.")
         try:
@@ -82,12 +78,12 @@ class KafkaBus:
             )
             record_metadata = future
             logger.debug(
-                f"Message published by '{self.client_id}' to {topic} [partition:{record_metadata.partition}, offset:{record_metadata.offset}] key='{key}' event_id='{envelope.event_id}'"
+                f"Message published by '{self.client_id}' to {topic} "
+                f"[partition:{record_metadata.partition}, offset:{record_metadata.offset}] "
+                f"key='{key}' event_id='{envelope.event_id}'"
             )
         except KafkaTimeoutError:
-            logger.error(
-                f"Timeout publishing message by '{self.client_id}' to topic '{topic}'."
-            )
+            logger.error(f"Timeout publishing message by '{self.client_id}' to topic '{topic}'.")
             raise
         except Exception as e:
             logger.error(
@@ -124,20 +120,17 @@ async def consume_events(
 
     await consumer.start()
     consumer_running = True
-    logger.info(
-        f"KafkaConsumer '{client_id}' started for topic(s) '{topics}', group '{group_id}'."
-    )
+    logger.info(f"KafkaConsumer '{client_id}' started for topic(s) '{topics}', group '{group_id}'.")
     try:
         async for msg in consumer:  # msg is an AIOKafkaConsumer message object
             logger.debug(
-                f"'{client_id}' consumed message from {msg.topic} [partition:{msg.partition}, offset:{msg.offset}] key='{msg.key}'"
+                f"'{client_id}' consumed message from {msg.topic} "
+                f"[partition:{msg.partition}, offset:{msg.offset}] key='{msg.key}'"
             )
             yield msg
             # Manual commit should be handled by the caller after processing
     except KafkaConnectionError as e:
-        logger.error(
-            f"KafkaConsumer '{client_id}' connection error: {e}", exc_info=True
-        )
+        logger.error(f"KafkaConsumer '{client_id}' connection error: {e}", exc_info=True)
     except Exception as e:  # Catch any other exception during consumption loop
         logger.error(
             f"KafkaConsumer '{client_id}' unexpected error in consumption loop: {e}",

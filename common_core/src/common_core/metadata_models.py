@@ -31,9 +31,7 @@ class EntityReference(BaseModel):
     parent_id: Optional[str] = None
     model_config = {
         "frozen": True,
-        "json_schema_extra": {
-            "examples": [{"entity_id": "123", "entity_type": "essay"}]
-        },
+        "json_schema_extra": {"examples": [{"entity_id": "123", "entity_type": "essay"}]},
     }
 
 
@@ -43,12 +41,8 @@ class SystemProcessingMetadata(BaseModel):
     processing_stage: Optional[ProcessingStage] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    event: Optional[str] = (
-        None  # Actual event name string, e.g., from ProcessingEvent enum
-    )
-    events_trail: List[Dict[str, Any]] = Field(
-        default_factory=list, alias="events"
-    )  # Audit trail
+    event: Optional[str] = None  # Actual event name string, e.g., from ProcessingEvent enum
+    events_trail: List[Dict[str, Any]] = Field(default_factory=list, alias="events")  # Audit trail
     error_info: Dict[str, Any] = Field(default_factory=dict)
     model_config = {"populate_by_name": True}
 
@@ -67,9 +61,7 @@ class BatchProcessingMetadata(BaseModel):
     essay_instructions: Optional[str] = None
     class_designation: Optional[str] = None
     upload_started_at: Optional[datetime] = None
-    processing_completed_at: Optional[datetime] = Field(
-        default=None, alias="completed_at"
-    )
+    processing_completed_at: Optional[datetime] = Field(default=None, alias="completed_at")
     is_terminal_state: bool = False
     can_cancel: bool = True
     success_rate: Optional[float] = None
@@ -120,6 +112,4 @@ class UserActivityMetadata(BaseModel):
 class CancellationMetadata(BaseModel):
     cancelled_by: Optional[str] = None
     reason: Optional[str] = None
-    cancellation_time: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    cancellation_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -169,7 +169,7 @@ SpellcheckResultDataV1(BaseEventDataV1):
 ### 8.2. Development Dependencies
 - MyPy for type checking
 - Pytest for testing
-- Black and isort for code formatting
+- Ruff for code formatting and linting
 
 ## 9. Distribution and Versioning
 

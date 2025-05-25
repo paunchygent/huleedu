@@ -6,12 +6,7 @@ from typing import Optional
 
 from pydantic import Field
 
-from ..enums import (  # For context and type hints
-    ContentType,
-    EssayStatus,
-    ProcessingEvent,
-)
-from ..metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
+from ..metadata_models import StorageReferenceMetadata
 from .base_event_models import EnhancedProcessingUpdate
 
 
@@ -23,17 +18,17 @@ class SpellcheckRequestedDataV1(EnhancedProcessingUpdate):
     'system_metadata' provides context for this request event.
     """
 
-    text_storage_id: str = Field(
-        description="Storage ID of the original text to be spellchecked."
-    )
+    text_storage_id: str = Field(description="Storage ID of the original text to be spellchecked.")
     # No need to repeat system_metadata, it's inherited.
 
 
 class SpellcheckResultDataV1(EnhancedProcessingUpdate):
     """
     Data representing the result of a spellcheck.
-    'event_name' (from BaseEventData) should be ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED.value
-    'status' (from EnhancedProcessingUpdate) indicates outcome (e.g., SPELLCHECKED_SUCCESS or _FAILED).
+    'event_name' (from BaseEventData) should be
+        ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED.value
+    'status' (from EnhancedProcessingUpdate) indicates outcome
+        (e.g., SPELLCHECKED_SUCCESS or _FAILED).
     'system_metadata' provides context for this result event, including error_info if failed.
     """
 
@@ -43,6 +38,4 @@ class SpellcheckResultDataV1(EnhancedProcessingUpdate):
     storage_metadata: Optional[StorageReferenceMetadata] = Field(
         default=None, description="Ref to corrected text, logs."
     )
-    corrections_made: Optional[int] = Field(
-        default=None, description="Number of corrections made."
-    )
+    corrections_made: Optional[int] = Field(default=None, description="Number of corrections made.")
