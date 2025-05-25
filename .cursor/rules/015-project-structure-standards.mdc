@@ -1,0 +1,167 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 015: Project Structure Standards
+
+## 1. Purpose
+This rule defines the mandatory file and folder organization standards for the HuleEdu monorepo. You (AI agent) **MUST** adhere to these standards when creating, moving, or organizing files.
+
+## 2. Root Directory Structure
+
+### 2.1. Rule: Clean Root Directory
+The root directory **MUST** remain clean and organized. Only the following files and directories are permitted at the root level:
+
+**Permitted Root Files:**
+- `README.md` - Main project documentation
+- `LICENSE` - Project license
+- `pyproject.toml` - PDM configuration and dependencies
+- `pdm.lock` - PDM lock file
+- `docker-compose.yml` - Docker orchestration
+- `.gitignore` - Git ignore rules
+- `.pdm-python` - PDM Python version specification
+
+**Permitted Root Directories:**
+- `.git/` - Git repository data
+- `.venv/` - Virtual environment (PDM managed)
+- `.mypy_cache/` - MyPy cache
+- `__pycache__/` - Python cache
+- `.cursor/` - Cursor IDE rules and configuration
+- `common_core/` - Shared core package
+- `services/` - All microservices
+- `scripts/` - Project-level scripts and utilities
+- `TASKS/` - Project-wide task documentation
+
+### 2.2. Rule: Prohibited Root Files
+The following **MUST NOT** be placed in the root directory:
+- Setup scripts (use `scripts/` directory)
+- Documentation files other than `README.md` (use appropriate `docs/` subdirectories)
+- Service-specific files (use `services/` subdirectories)
+- Temporary files or development artifacts
+
+## 3. Scripts Directory Structure
+
+### 3.1. Rule: Scripts Organization
+```
+scripts/
+├── docs/                           # Documentation for scripts
+│   ├── SETUP_GUIDE.md             # Setup and environment documentation
+│   └── DEPLOYMENT_GUIDE.md        # Deployment documentation
+├── setup_huledu_environment.sh    # Environment setup script
+├── deploy.sh                      # Deployment scripts
+└── utils/                         # Utility scripts
+    ├── backup.sh
+    └── maintenance.sh
+```
+
+### 3.2. Rule: Script Documentation
+- All scripts **MUST** have corresponding documentation in `scripts/docs/`
+- Documentation **MUST** explain purpose, usage, and requirements
+- Script documentation **MUST NOT** be placed in separate folders outside `scripts/docs/`
+
+## 4. Services Directory Structure
+
+### 4.1. Rule: Service Organization
+```
+services/
+├── libs/                          # Shared service libraries
+│   ├── huleedu_service_libs/
+│   ├── pyproject.toml
+│   └── __init__.py
+├── content_service/               # Individual microservice
+│   ├── app.py
+│   ├── pyproject.toml
+│   ├── Dockerfile
+│   ├── hypercorn_config.py
+│   ├── tests/                     # Service-specific tests
+│   └── docs/                      # Service-specific documentation
+├── batch_service/
+├── spell_checker_service/
+└── essay_service/                 # Future implementation
+```
+
+### 4.2. Rule: Service-Level Documentation
+- Service-specific `README.md` files **MUST** be placed at the service root level
+- Service documentation **MUST** be placed in `services/{service_name}/docs/`
+- Service documentation **MUST NOT** be placed in the root directory
+
+## 5. Common Core Structure
+
+### 5.1. Rule: Common Core Organization
+```
+common_core/
+├── src/
+│   └── common_core/
+│       ├── __init__.py
+│       ├── enums.py
+│       ├── metadata_models.py
+│       ├── pipeline_models.py
+│       ├── events/
+│       └── py.typed
+├── tests/                         # Common core tests
+├── pyproject.toml
+└── README.md                      # Common core documentation
+```
+
+## 6. TASKS Directory Structure
+
+### 6.1. Rule: Task Documentation Organization
+```
+TASKS/
+├── PHASE_1.0.md                   # Project-wide phase documentation
+├── PHASE_1.1.md
+├── PHASE_1.2.md
+└── services/                      # Service-specific tasks (if needed)
+    ├── content_service/
+    └── batch_service/
+```
+
+### 6.2. Rule: Task Scope Classification
+- **Project-wide tasks** affecting multiple services **MUST** be documented in `TASKS/` root
+- **Service-specific tasks** affecting only one service **MUST** be documented in `TASKS/services/{service_name}/`
+- Task documentation **MUST** clearly indicate scope and affected components
+
+## 7. Documentation Placement Rules
+
+### 7.1. Rule: README.md Placement
+- **Root README.md**: Project overview and architecture
+- **Service README.md**: Service-specific documentation at `services/{service_name}/README.md`
+- **Common Core README.md**: Package documentation at `common_core/README.md`
+- README.md files **MUST NOT** be placed in separate documentation folders
+
+### 7.2. Rule: Documentation Hierarchy
+- **Project-level docs**: `scripts/docs/` for scripts, root `README.md` for project
+- **Service-level docs**: `services/{service_name}/docs/` and `services/{service_name}/README.md`
+- **Package-level docs**: `common_core/README.md` and inline docstrings
+
+## 8. File Creation Guidelines
+
+### 8.1. Rule: Pre-Creation Validation
+Before creating any file, you **MUST**:
+1. Verify the target directory exists and is appropriate for the file type
+2. Ensure the file placement follows this structure standard
+3. Create necessary parent directories if they don't exist
+4. Update this rule if new patterns emerge
+
+### 8.2. Rule: Structure Maintenance
+- This rule **MUST** be updated whenever new file types or directories are introduced
+- All file movements **MUST** maintain the established structure
+- Temporary files **MUST** be cleaned up and not committed to the repository
+
+## 9. Enforcement
+
+### 9.1. Rule: AI Agent Compliance
+You (AI agent) **MUST**:
+- Always check this rule before creating or moving files
+- Refuse to create files that violate this structure
+- Suggest proper locations when users request inappropriate file placement
+- Update this rule when new organizational needs arise
+
+### 9.2. Rule: Structure Validation
+- Before any file operation, validate against this structure
+- Propose corrections if existing files violate these standards
+- Maintain consistency across all operations
+
+---
+**Proper project structure is essential for maintainability, scalability, and team collaboration.**

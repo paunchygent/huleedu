@@ -10,6 +10,7 @@ This index lists all development rules for the HuleEdu microservice ecosystem. Y
 
 ## Core Principles & Architecture
 - [010-foundational-principles.md](mdc:010-foundational-principles.md): Core tenets and mindset.
+- [015-project-structure-standards.md](mdc:015-project-structure-standards.md): File and folder organization standards.
 - [020-architectural-mandates.md](mdc:020-architectural-mandates.md): DDD, Service Autonomy, Explicit Contracts.
 - [021-content-service-architecture.md](mdc:021-content-service-architecture.md): Content Service architecture and implementation.
 - [022-spell-checker-service-architecture.md](mdc:022-spell-checker-service-architecture.md): Spell Checker Service architecture and implementation.
