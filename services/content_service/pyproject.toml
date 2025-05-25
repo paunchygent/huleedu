@@ -1,0 +1,33 @@
+[project]
+name = "huleedu-content-service"
+version = "0.1.0"
+description = "HuleEdu Content Storage Service (MVP)"
+authors = [
+    { name = "Olof Larsson", email = "paunchygent@gmail.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "quart>=0.19.4",
+    "aiofiles>=23.1.0",
+    "hypercorn>=0.16.0",
+    "python-dotenv>=1.0.0",
+    "huleedu-common-core"
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.scripts]
+start = "hypercorn app:app -c hypercorn_config.py"
+dev = "quart --app app:app --debug run -p 8001" # Changed port for dev to match compose
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+ignore_missing_imports = false
+check_untyped_defs = true
+disallow_untyped_defs = false 

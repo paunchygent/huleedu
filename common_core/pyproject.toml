@@ -1,0 +1,35 @@
+[project]
+name = "huleedu-common-core"
+version = "0.1.0"
+description = "HuleEdu Common Core Library for Microservices"
+authors = [
+    { name = "Olof Larsson", email = "paunchygent@gmail.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic[email]>=2.0",
+    "typing-extensions>=4.0.0"
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = false
+check_untyped_defs = true
+disallow_untyped_defs = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = [
+    "*.tests.*",
+    "tests.*"
+]
+ignore_errors = true 

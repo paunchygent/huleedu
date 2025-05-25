@@ -1,0 +1,35 @@
+[project]
+name = "huleedu-spell-checker-service"
+version = "0.1.0"
+description = "HuleEdu Spell Checker Service (MVP)"
+authors = [
+    { name = "Olof Larsson", email = "paunchygent@gmail.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "aiokafka>=0.10.0",
+    "aiohttp>=3.9.0",
+    "python-dotenv>=1.0.0",
+    # Add your actual spell checking library here if it's a direct dependency
+    # e.g., "pyspellchecker>=0.8.1",
+    # For common_core as a local path dependency:
+    "huleedu-common-core",
+    "huleedu-service-libs"
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.scripts]
+start_worker = "python worker.py"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+ignore_missing_imports = false
+check_untyped_defs = true
+# disallow_untyped_defs = false # Default in root config 

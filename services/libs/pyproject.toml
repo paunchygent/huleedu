@@ -1,0 +1,27 @@
+[project]
+name = "huleedu-service-libs"
+version = "0.1.0"
+description = "HuleEdu Shared Service Libraries"
+authors = [
+    { name = "Olof Larsson", email = "paunchygent@gmail.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "aiokafka>=0.10.0",
+    "pydantic>=2.0",
+    "huleedu-common-core",
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = false
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+ignore_missing_imports = false
+check_untyped_defs = true
+disallow_untyped_defs = false 

@@ -1,0 +1,133 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 021: Content Service Architecture
+
+## 1. Purpose
+This document defines the architecture and implementation details of the HuleEdu Content Service, a minimal MVP service for content storage and retrieval.
+
+## 2. Service Overview
+
+### 2.1. Service Identity
+- **Name**: Content Service
+- **Package**: `huleedu-content-service`
+- **Container**: `content_service`
+- **Port**: 8000 (HTTP API)
+- **Technology Stack**: Quart (async Flask), aiofiles, Hypercorn
+
+### 2.2. Bounded Context
+The Content Service manages the storage and retrieval of content artifacts (essays, corrected text, etc.) for the HuleEdu platform.
+
+## 3. API Specification
+
+### 3.1. Endpoints
+
+#### POST /v1/content
+- **Purpose**: Store content and return a storage ID
+- **Request**: Raw binary data in request body
+- **Response**: `{"storage_id": "uuid"}`
+- **Status Codes**: 201 (success), 400 (no data), 500 (storage error)
+
+#### GET /v1/content/{content_id}
+- **Purpose**: Retrieve content by storage ID
+- **Response**: Raw content data
+- **Status Codes**: 200 (success), 404 (not found), 500 (retrieval error)
+
+#### GET /healthz
+- **Purpose**: Health check endpoint
+- **Response**: `{"status": "ok"}`
+- **Status Codes**: 200 (healthy)
+
+## 4. Storage Implementation
+
+### 4.1. Storage Backend
+- **Type**: Local filesystem storage
+- **Root Path**: Configurable via `CONTENT_STORE_ROOT` environment variable
+- **Default**: `/data/content_service_store`
+- **File Naming**: UUID-based content IDs (no file extensions)
+
+### 4.2. Storage Operations
+- **Write**: Async file operations using `aiofiles`
+- **Read**: Async file operations using `aiofiles`
+- **Persistence**: Docker volume mount for data persistence
+
+## 5. Configuration
+
+### 5.1. Environment Variables
+- `CONTENT_STORE_ROOT`: Storage root directory path
+- `PORT`: HTTP server port (default: 8000)
+- `LOG_LEVEL`: Logging level (default: INFO)
+
+### 5.2. Dependencies
+- `quart>=0.19.4`: Async web framework
+- `aiofiles>=23.1.0`: Async file operations
+- `hypercorn>=0.16.0`: ASGI server
+- `python-dotenv>=1.0.0`: Environment configuration
+- `huleedu-common-core`: Shared models and types
+
+## 6. Integration Points
+
+### 6.1. Consumers
+- **Spell Checker Service**: Fetches original text, stores corrected text
+- **Batch Service**: May store uploaded content
+- **Future Services**: Any service requiring content storage
+
+### 6.2. Communication Pattern
+- **Protocol**: HTTP REST API
+- **Data Format**: Raw binary content
+- **Service Discovery**: Environment variable `CONTENT_SERVICE_URL`
+
+## 7. Deployment
+
+### 7.1. Docker Configuration
+- **Base Image**: `python:3.11-slim`
+- **Package Manager**: PDM
+- **Volume Mount**: `/data/content_service_store`
+- **Health Check**: `/healthz` endpoint
+
+### 7.2. Development Commands
+- `pdm run start`: Production server with Hypercorn
+- `pdm run dev`: Development server with debug mode
+
+## 8. Monitoring and Logging
+
+### 8.1. Logging
+- **Format**: Structured logging with timestamps
+- **Levels**: INFO for operations, ERROR for failures
+- **Content**: Storage operations, retrieval requests, errors
+
+### 8.2. Metrics (Future)
+- Storage operations count
+- Content size metrics
+- Response time metrics
+
+## 9. Security Considerations
+
+### 9.1. Current Implementation
+- No authentication (internal service)
+- No content validation
+- No access control
+
+### 9.2. Future Enhancements
+- Content type validation
+- Size limits
+- Access control integration
+
+## 10. Limitations and Future Work
+
+### 10.1. Current Limitations
+- Local filesystem only (no cloud storage)
+- No content deduplication
+- No metadata storage
+- No content versioning
+
+### 10.2. Planned Enhancements
+- Cloud storage backend (S3, etc.)
+- Content metadata tracking
+- Content type detection
+- Compression support
+
+---
+**This service provides the foundational content storage capability for the HuleEdu microservices ecosystem.**

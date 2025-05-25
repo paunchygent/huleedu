@@ -1,0 +1,171 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 022: Spell Checker Service Architecture
+
+## 1. Purpose
+This document defines the architecture and implementation details of the HuleEdu Spell Checker Service, an event-driven worker service for processing spell checking requests.
+
+## 2. Service Overview
+
+### 2.1. Service Identity
+- **Name**: Spell Checker Service
+- **Package**: `huleedu-spell-checker-service`
+- **Container**: `spell_checker_service`
+- **Type**: Kafka Consumer Worker (no HTTP API)
+- **Technology Stack**: aiokafka, aiohttp, Python asyncio
+
+### 2.2. Bounded Context
+The Spell Checker Service processes spell checking requests for essays, consuming events from Kafka, fetching content from the Content Service, performing spell checking, and publishing results.
+
+## 3. Event-Driven Architecture
+
+### 3.1. Consumed Events
+- **Topic**: `essay.spellcheck.requested.v1`
+- **Event Type**: `huleedu.essay.spellcheck.requested.v1`
+- **Data Model**: `SpellcheckRequestedDataV1`
+- **Consumer Group**: `spellchecker-service-group`
+
+### 3.2. Published Events
+- **Topic**: `essay.spellcheck.completed.v1`
+- **Event Type**: `huleedu.essay.spellcheck.completed.v1`
+- **Data Model**: `SpellcheckResultDataV1`
+
+### 3.3. Event Processing Flow
+1. Consume `SpellcheckRequestedDataV1` from Kafka
+2. Extract `text_storage_id` from event data
+3. Fetch original text from Content Service
+4. Perform spell checking (currently dummy implementation)
+5. Store corrected text via Content Service
+6. Publish `SpellcheckResultDataV1` with results
+7. Commit Kafka offset
+
+## 4. Integration Points
+
+### 4.1. Content Service Integration
+- **Protocol**: HTTP REST API
+- **Fetch URL**: `GET {CONTENT_SERVICE_URL}/{storage_id}`
+- **Store URL**: `POST {CONTENT_SERVICE_URL}`
+- **Client**: aiohttp.ClientSession for async operations
+
+### 4.2. Kafka Integration
+- **Consumer**: AIOKafkaConsumer with manual offset management
+- **Producer**: AIOKafkaProducer for result publishing
+- **Serialization**: JSON with Pydantic model validation
+
+## 5. Spell Checking Implementation
+
+### 5.1. Current Implementation (MVP)
+- **Type**: Dummy/placeholder implementation
+- **Logic**: Simple string replacements ("teh" → "the", "recieve" → "receive")
+- **Purpose**: Proof of concept for event-driven architecture
+
+### 5.2. Future Implementation
+- **Libraries**: pyspellchecker, symspellpy, or SparkNLP integration
+- **Features**: Advanced spell checking, grammar checking, language detection
+- **Performance**: Batch processing, caching, model optimization
+
+## 6. Configuration
+
+### 6.1. Environment Variables
+- `KAFKA_BOOTSTRAP_SERVERS`: Kafka cluster connection (default: "kafka:9092")
+- `CONTENT_SERVICE_URL`: Content Service API URL (default: "http://content_service:8000/v1/content")
+- `LOG_LEVEL`: Logging level (default: INFO)
+
+### 6.2. Dependencies
+- `aiokafka>=0.10.0`: Async Kafka client
+- `aiohttp>=3.9.0`: Async HTTP client
+- `python-dotenv>=1.0.0`: Environment configuration
+- `huleedu-common-core`: Shared models and event schemas
+- `huleedu-service-libs`: Shared Kafka utilities
+
+## 7. Error Handling and Resilience
+
+### 7.1. Error Scenarios
+- **Content Service Unavailable**: Log error, commit offset, skip message
+- **Invalid Event Format**: Pydantic validation error, commit offset
+- **Spell Check Failure**: Log error, optionally publish failure event
+- **Storage Failure**: Log error, commit offset, skip result publishing
+
+### 7.2. Resilience Patterns
+- **Manual Offset Management**: Commit only after successful processing
+- **Circuit Breaker**: Future enhancement for Content Service calls
+- **Dead Letter Queue**: Future enhancement for failed messages
+- **Retry Logic**: Future enhancement with exponential backoff
+
+## 8. Data Models
+
+### 8.1. Input Event Structure
+```python
+SpellcheckRequestedDataV1:
+    event: str                           # Processing event type
+    entity_ref: EntityReference          # Essay reference
+    status: str                          # Target essay status
+    system_metadata: SystemProcessingMetadata
+    text_storage_id: str                 # Content Service storage ID
+```
+
+### 8.2. Output Event Structure
+```python
+SpellcheckResultDataV1:
+    event: str                           # Processing event type
+    entity_ref: EntityReference          # Essay reference
+    status: str                          # Updated essay status
+    system_metadata: SystemProcessingMetadata
+    storage_metadata: StorageReferenceMetadata
+    corrections_made: int                # Number of corrections
+```
+
+## 9. Monitoring and Observability
+
+### 9.1. Logging
+- **Format**: Structured logging with correlation IDs
+- **Content**: Event processing, Content Service calls, spell check results
+- **Levels**: INFO for normal operations, ERROR for failures
+
+### 9.2. Metrics (Future)
+- Events processed per minute
+- Processing latency
+- Content Service call success rate
+- Spell check accuracy metrics
+
+## 10. Deployment
+
+### 10.1. Docker Configuration
+- **Base Image**: `python:3.11-slim`
+- **Package Manager**: PDM
+- **Entry Point**: `python worker.py`
+- **Dependencies**: Kafka and Content Service
+
+### 10.2. Development Commands
+- `pdm run start_worker`: Start the worker process
+
+## 11. Security Considerations
+
+### 11.1. Current Implementation
+- No authentication for Content Service calls (internal network)
+- No encryption for Kafka messages (development setup)
+- No input validation beyond Pydantic schemas
+
+### 11.2. Future Enhancements
+- Service-to-service authentication
+- Message encryption
+- Input sanitization for spell checking
+
+## 12. Performance Characteristics
+
+### 12.1. Current Performance
+- **Throughput**: Limited by dummy spell check implementation
+- **Latency**: Dominated by Content Service HTTP calls
+- **Concurrency**: Single-threaded async processing
+
+### 12.2. Optimization Opportunities
+- Parallel processing of multiple messages
+- Content caching
+- Batch spell checking
+- Connection pooling for Content Service
+
+---
+**This service demonstrates event-driven microservice architecture with proper separation of concerns and async processing.**
