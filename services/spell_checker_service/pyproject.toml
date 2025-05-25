@@ -14,7 +14,9 @@ dependencies = [
     # e.g., "pyspellchecker>=0.8.1",
     # For common_core as a local path dependency:
     "huleedu-common-core",
-    "huleedu-service-libs"
+    "huleedu-service-libs",
+    "pydantic",
+    "pydantic-settings",
 ]
 
 [build-system]
@@ -23,6 +25,14 @@ build-backend = "pdm.backend"
 
 [tool.pdm]
 distribution = false
+
+# Package configuration for proper imports
+[tool.pdm.dev-dependencies]
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+]
 
 [tool.pdm.scripts]
 start_worker = "python worker.py"

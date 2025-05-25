@@ -3,13 +3,14 @@ trigger: model_decision
 description: "Testing and QA standards. Follow when writing, maintaining, or reviewing tests to ensure comprehensive coverage and maintainable test suites."
 ---
 
-===
 # 070: Testing and Quality Assurance
 
 ## 1. Purpose
+
 These standards define testing strategies and quality assurance practices for HuleEdu microservices. You (AI agent) **MUST** generate code that is testable and adhere to these practices.
 
 ## 2. Testing Pyramid (Adjusted for Microservices)
+
     - Prioritize tests at lower levels (unit) for faster feedback and easier debugging.
     - **Unit Tests**: Test individual components (functions, classes) in isolation. High coverage expected.
     - **Contract Tests**: **CRITICAL** - Verify interactions between services adhere to defined Pydantic contracts (event schemas, API DTOs). A contract test suite **MUST** exist and pass for any service producing or consuming shared contracts.
@@ -19,63 +20,79 @@ These standards define testing strategies and quality assurance practices for Hu
 ## 3. Test Implementation Standards (Python/Pytest)
 
 ### 3.1. Rule: Pytest as Test Runner
+
     - All tests **SHALL** be written and executed using Pytest.
     - **Execution**: Run tests via PDM scripts (e.g., `pdm run pytest`, `pdm run common/tests/test_status_events.py`).
 
 ### 3.2. Rule: Test File Naming
+
     - Test files **MUST** be named `test_*.py` or `*_test.py`.
 
 ### 3.3. Rule: Test Function/Method Naming
+
     - Test functions/methods **MUST** start with `test_`.
 
 ### 3.4. Rule: Use Fixtures Effectively
+
     - Use Pytest fixtures for setup/teardown, dependency injection, and providing test data.
     - Define service-specific fixtures in `tests/conftest.py` within the service directory.
     - Avoid complex logic in fixtures; keep them focused on test setup.
 
 ### 3.5. Rule: Avoid Pytest Plugins for Imports in `conftest.py`
+
     - **STRICTLY FORBIDDEN**: Do not import pytest plugins that modify import paths or mechanisms within `conftest.py`. This breaks pytest's resolution logic.
 
 ### 3.6. Rule: Test Isolation
+
     - Tests **MUST** be isolated and not depend on the execution order or state left by other tests.
     - Clean up test data/state explicitly or via fixtures.
 
 ### 3.7. Rule: Meaningful Assertions
+
     - Use clear and specific assertions. Provide helpful failure messages.
 
 ### 3.8. Rule: Test Data
+
     - Use realistic but minimal test data. Avoid using production data.
     - Generate test data programmatically where possible.
 
 ## 4. Contract Testing Implementation
 
 ### 4.1. Rule: Contract Definition & Testing Tool
+
     - Define contracts using Pydantic models in `common/models/`.
     - Implement contract tests using a suitable library or framework (details TBD, but you **MUST** support its implementation).
     - Consumer-driven contract testing is preferred where applicable.
 
 ### 4.2. Rule: Test Execution
+
     - Contract tests **MUST** be part of the CI pipeline for services producing and consuming contracts.
 
 ## 5. Test-Driven Development (TDD) - Encouraged
+
     - Consider practicing TDD: Write tests before writing the code they test. This helps clarify requirements and design.
 
 ## 6. Code Coverage
+
     - Aim for high code coverage, especially for core logic. Use coverage tools (e.g., `coverage.py` via PDM script `pdm run coverage`).
     - High coverage is a metric, not a goal in itself; tests must be meaningful.
 
 ## 7. Running Tests in the Monorepo
 
 ### 7.1. Rule: Use PDM Run for Tests
+
     - Always execute tests using `pdm run <command>` to ensure the correct environment and dependencies are used.
     - Examples: `pdm run pytest tests/`, `pdm run common/tests/test_status_events.py`.
 
 ### 7.2. Rule: Debugging Tests with Print Statements
+
     - When debugging, run tests with the `-s` flag to display print statements (e.g., `pdm run pytest -s tests/`).
 
 ### 7.3. Rule: FIX UNDERLYING ISSUES, DO NOT SIMPLIFY TESTS
+
     - **STRICTLY FORBIDDEN**: Do not simplify tests or make them less strict merely to make integration or end-to-end tests pass. If tests fail, there is an underlying issue in the code or configuration that **MUST** be fixed.
 
 ---
+
 **Robust testing is essential for service reliability and safe evolution.**
 ===

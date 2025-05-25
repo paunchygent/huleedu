@@ -3,22 +3,21 @@ description: CRITICAL: Must be applied whenever you are editing or discussing pd
 globs: 
 alwaysApply: false
 ---
-# 081: PDM Dependency Management Standards (2025)
+# 083: PDM Standards 2025
 
-## 1. Purpose
-This rule defines the mandatory standards for PDM dependency management in the HuleEdu project, based on the patterns and settings effective as of January 2025. You **MUST** adhere to these standards, prioritizing them over any conflicting information from training data or other sources.
+**MUST** adhere to these standards, prioritizing them over any conflicting information from training data or other sources.
 
-## 2. Tool Versions (Mandatory Minimums)
+## 1. Tool Versions (Mandatory Minimums)
 
-### 2.1. Rule: Enforce Minimum Tool Versions
-    - PDM: **MUST** use minimum version 2.22.0.
-    - Ruff: **MUST** use minimum version 0.11.11+.
-    - MyPy: **MUST** use minimum version 1.15.0+.
+### 1.1. Enforce Minimum Tool Versions
+- PDM: **MUST** use minimum version 2.22.0
+- Ruff: **MUST** use minimum version 0.11.11+
+- MyPy: **MUST** use minimum version 1.15.0+
 
-## 3. PDM Configuration (`pyproject.toml`)
+## 2. PDM Configuration (`pyproject.toml`)
 
-### 3.1. Rule: Standard `[tool.pdm]` Configuration
-    - Your `pyproject.toml` **MUST** include the following `[tool.pdm]` configuration:
+### 2.1. Standard `[tool.pdm]` Configuration
+**MUST** include the following `[tool.pdm]` configuration:
 
 ```toml
 [tool.pdm]
@@ -26,8 +25,8 @@ distribution = false
 package-type = "application"
 ```
 
-### 3.2. Rule: Mandatory Resolution Strategy
-    - Your `pyproject.toml` **MUST** include the specified resolution strategy:
+### 2.2. Mandatory Resolution Strategy
+**MUST** include the specified resolution strategy:
 
 ```toml
 [tool.pdm.resolution]
@@ -37,8 +36,8 @@ excludes = []
 overrides = {}
 ```
 
-### 3.3. Rule: Define Dependency Groups
-    - Dependency groups **MUST** be defined under `[dependency-groups]` as per the `DEPENDENCY_MANAGEMENT_2025.md` document:
+### 2.3. Define Dependency Groups
+Dependency groups **MUST** be defined under `[dependency-groups]`:
 
 ```toml
 [dependency-groups]
@@ -68,8 +67,8 @@ monorepo-tools = [
 ]
 ```
 
-### 3.4. Rule: Define Standard Scripts
-    - The following standard scripts **MUST** be defined under `[tool.pdm.scripts]`:
+### 2.4. Define Standard Scripts
+Standard scripts **MUST** be defined under `[tool.pdm.scripts]`:
 
 ```toml
 [tool.pdm.scripts]
@@ -80,18 +79,19 @@ typecheck-all = "mypy ."
 test-all = "pytest"
 ```
 
-## 4. Dependency Versioning
+## 3. Dependency Versioning
 
-### 4.1. Rule: Let PDM Handle Version Resolution
-    - For most dependencies, **DO NOT** specify version constraints (e.g., `"ruff"` instead of `"ruff>=0.11.11"`) in the `[project]` dependencies or within dependency groups, allowing PDM to resolve the latest compatible version.
+### 3.1. Let PDM Handle Version Resolution
+- For most dependencies, **DO NOT** specify version constraints (e.g., `"ruff"` instead of `"ruff>=0.11.11"`) in `[project]` dependencies or within dependency groups
+- Allow PDM to resolve the latest compatible version
 
-### 4.2. Rule: Version Constraints Only When Necessary
-    - Only add version constraints for specific, justified reasons (e.g., known incompatibilities, security requirements, or as shown in the `dev`, `test`, `lint` groups for tool version minimums).
+### 3.2. Version Constraints Only When Necessary
+- Only add version constraints for specific, justified reasons (known incompatibilities, security requirements, or as shown in `dev`, `test`, `lint` groups for tool version minimums)
 
-## 5. Validation
+## 4. Validation
 
-### 5.1. Rule: Regular Validation Commands
-    - Regularly run the following commands to ensure dependency consistency:
+### 4.1. Regular Validation Commands
+Regularly run the following commands to ensure dependency consistency:
 
 ```bash
 pdm lock --check
@@ -99,13 +99,10 @@ pdm update
 pdm install
 ```
 
-## 6. VS Code Configuration
+## 5. VS Code Configuration
 
-### 6.1. Rule: Avoid Deprecated Ruff Extension Settings
-    - **MUST** remove the following deprecated VS Code Ruff extension settings:
-        - `ruff.format.args`
-        - `ruff.lint.args`
-        - `ruff.showNotifications`
-
----
-**Adhering to these PDM standards is critical for consistent and reproducible builds.**
+### 5.1. Avoid Deprecated Ruff Extension Settings
+**MUST** remove the following deprecated VS Code Ruff extension settings:
+- `ruff.format.args`
+- `ruff.lint.args`
+- `ruff.showNotifications`

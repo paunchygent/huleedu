@@ -7,9 +7,11 @@ alwaysApply: true
 # 023: Batch Service Architecture
 
 ## 1. Overview
+
 Orchestration service for triggering and managing essay processing workflows.
 
 ## 2. Service Identity
+
 - **Name**: `huleedu-batch-service`
 - **Port**: 5000
 - **Stack**: Quart, aiokafka, aiohttp
@@ -18,9 +20,11 @@ Orchestration service for triggering and managing essay processing workflows.
 ## 3. API Endpoints
 
 ### 3.1. Active Endpoints
+
 - `POST /v1/trigger-spellcheck`
   - **Request**: `{"text": "essay content"}`
-  - **Response**: 
+  - **Response**:
+
     ```json
     {
       "message": "Spellcheck triggered",
@@ -28,6 +32,7 @@ Orchestration service for triggering and managing essay processing workflows.
       "correlation_id": "uuid"
     }
     ```
+
   - **Status**: 202 Accepted
 
 - `GET /healthz`
@@ -35,6 +40,7 @@ Orchestration service for triggering and managing essay processing workflows.
   - **Status**: 200 OK
 
 ### 3.2. Planned Endpoints
+
 - `POST /v1/batch` - Create batch
 - `POST /v1/batch/{id}/spellcheck` - Trigger batch spellcheck
 - `GET /v1/batch/{id}/status` - Get batch status
@@ -42,6 +48,7 @@ Orchestration service for triggering and managing essay processing workflows.
 ## 4. Event Flow
 
 ### 4.1. Published Events
+
 ```python
 # Topic: essay.spellcheck.requested.v1
 {
@@ -60,6 +67,7 @@ Orchestration service for triggering and managing essay processing workflows.
 ```
 
 ### 4.2. Processing Steps
+
 1. Receive essay via HTTP
 2. Store in Content Service
 3. Generate IDs
@@ -69,11 +77,13 @@ Orchestration service for triggering and managing essay processing workflows.
 ## 5. Integrations
 
 ### 5.1. Content Service
+
 - **Protocol**: HTTP REST
 - **Endpoint**: `POST {CONTENT_SERVICE_URL}`
 - **Purpose**: Store essay content
 
 ### 5.2. Kafka
+
 - **Role**: Event producer
 - **Topic**: `essay.spellcheck.requested.v1`
 - **Serialization**: JSON + Pydantic
@@ -81,6 +91,7 @@ Orchestration service for triggering and managing essay processing workflows.
 ## 6. Configuration
 
 ### 6.1. Environment
+
 ```env
 PORT=5000
 HOST=0.0.0.0
@@ -90,6 +101,7 @@ LOG_LEVEL=INFO
 ```
 
 ### 6.2. Dependencies
+
 - `quart>=0.19.4`
 - `aiokafka>=0.10.0`
 - `aiohttp>=3.9.0`
@@ -99,6 +111,7 @@ LOG_LEVEL=INFO
 ## 7. Error Handling
 
 ### 7.1. Error Responses
+
 ```json
 {
   "error": "Service unavailable",
@@ -107,6 +120,7 @@ LOG_LEVEL=INFO
 ```
 
 ### 7.2. HTTP Status Codes
+
 - 400: Bad request
 - 500: Server error
 - 202: Accepted (async processing)
@@ -114,10 +128,12 @@ LOG_LEVEL=INFO
 ## 8. Security
 
 ### 8.1. Current (MVP)
+
 - No auth
 - Basic input validation
 
 ### 8.2. Future
+
 - API key auth
 - Request validation
 - Rate limiting
@@ -125,6 +141,7 @@ LOG_LEVEL=INFO
 ## 9. Deployment
 
 ### 9.1. Docker
+
 - **Base**: `python:3.11-slim`
 - **Package Manager**: PDM
 - **Command**: `hypercorn app:app -c hypercorn_config.py`
@@ -132,11 +149,13 @@ LOG_LEVEL=INFO
 ## 10. Monitoring
 
 ### 10.1. Logging
+
 - Structured format
 - Correlation IDs
 - INFO/ERROR levels
 
 ### 10.2. Metrics (Future)
+
 - Request rate/latency
 - Event publishing success
 - Service health

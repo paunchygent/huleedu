@@ -31,17 +31,6 @@ class EventTracker(BaseEventData):
     system_metadata: SystemProcessingMetadata  # Context of THIS event's creation
 
 
-# Rebuild models after all imports are complete
-def _rebuild_models() -> None:
-    """Rebuild Pydantic models to resolve forward references."""
-    try:
-        BaseEventData.model_rebuild()
-        EnhancedProcessingUpdate.model_rebuild()
-        EventTracker.model_rebuild()
-    except Exception:
-        # If rebuild fails, it's likely because the forward references aren't available yet
-        # This is fine during import time
-        pass
-
-
-_rebuild_models()
+# Note: Model rebuilding is now handled explicitly in test environments (conftest.py)
+# and at the package level (__init__.py) after all imports are complete.
+# We no longer silently ignore rebuild failures as they indicate real issues.

@@ -5,186 +5,74 @@ alwaysApply: false
 ---
 # 023: Batch Service Architecture
 
-## 1. Purpose
-This document defines the architecture and implementation details of the HuleEdu Batch Service, a minimal MVP orchestration service for triggering essay processing workflows.
-
-## 2. Service Overview
-
-### 2.1. Service Identity
-- **Name**: Batch Service
+## 1. Service Identity
 - **Package**: `huleedu-batch-service`
-- **Container**: `batch_service`
 - **Port**: 5000 (HTTP API)
-- **Technology Stack**: Quart (async Flask), aiokafka, aiohttp, Hypercorn
+- **Stack**: Quart, aiokafka, aiohttp, Hypercorn
+- **Purpose**: Orchestrates essay processing workflows
 
-### 2.2. Bounded Context
-The Batch Service orchestrates essay processing workflows by triggering spell checking requests and managing the overall processing pipeline for batches of essays.
-
-## 3. API Specification
-
-### 3.1. Endpoints
+## 2. API Endpoints
 
 #### POST /v1/trigger-spellcheck
-- **Purpose**: Trigger spell checking for a test essay
-- **Request**: JSON with essay text
+- **Request**: `{"text": "Essay content..."}`
 - **Response**: `{"message": "Spellcheck triggered", "essay_id": "uuid", "correlation_id": "uuid"}`
-- **Status Codes**: 202 (accepted), 400 (bad request), 500 (server error)
+- **Status**: 202 (accepted), 400 (bad request), 500 (server error)
 
 #### GET /healthz
-- **Purpose**: Health check endpoint
 - **Response**: `{"status": "ok"}`
-- **Status Codes**: 200 (healthy)
 
-### 3.2. Future Endpoints (Planned)
-- `POST /v1/batch/{batch_id}/initiate-spellcheck`: Trigger spellcheck for entire batch
-- `GET /v1/batch/{batch_id}/status`: Get batch processing status
-- `POST /v1/batch`: Create new batch
+**Future**: `POST /v1/batch/{batch_id}/initiate-spellcheck`, `GET /v1/batch/{batch_id}/status`, `POST /v1/batch`
 
-## 4. Event Publishing
+## 3. Event Publishing
 
-### 4.1. Published Events
 - **Topic**: `essay.spellcheck.requested.v1`
 - **Event Type**: `huleedu.essay.spellcheck.requested.v1`
 - **Data Model**: `SpellcheckRequestedDataV1`
 
-### 4.2. Event Publishing Flow
-1. Receive HTTP request with essay content
-2. Store essay content via Content Service
-3. Generate essay and correlation IDs
-4. Create `SpellcheckRequestedDataV1` event
-5. Publish event to Kafka topic
-6. Return response with IDs
+**Flow**: HTTP request → Store content → Generate IDs → Create event → Publish → Return response
 
-## 5. Integration Points
+## 4. Integration Points
 
-### 5.1. Content Service Integration
-- **Protocol**: HTTP REST API
-- **Store URL**: `POST {CONTENT_SERVICE_URL}`
-- **Purpose**: Store original essay text before triggering processing
-- **Client**: aiohttp.ClientSession for async operations
+- **Content Service**: HTTP REST API via aiohttp.ClientSession
+- **Kafka**: KafkaBus wrapper around AIOKafkaProducer
 
-### 5.2. Kafka Integration
-- **Producer**: KafkaBus wrapper around AIOKafkaProducer
-- **Topics**: Essay processing event topics
-- **Serialization**: JSON with Pydantic model validation
+## 5. Configuration
 
-## 6. Configuration
+**Environment Variables**:
+- `PORT` (default: 5000), `HOST` (default: "0.0.0.0")
+- `KAFKA_BOOTSTRAP_SERVERS` (default: "kafka:9092")
+- `CONTENT_SERVICE_URL` (default: "http://content_service:8000/v1/content")
+- `LOG_LEVEL` (default: INFO)
 
-### 6.1. Environment Variables
-- `PORT`: HTTP server port (default: 5000)
-- `HOST`: HTTP server host (default: "0.0.0.0")
-- `KAFKA_BOOTSTRAP_SERVERS`: Kafka cluster connection (default: "kafka:9092")
-- `CONTENT_SERVICE_URL`: Content Service API URL (default: "http://content_service:8000/v1/content")
-- `LOG_LEVEL`: Logging level (default: INFO)
+**Dependencies**: quart, hypercorn, aiokafka, aiohttp, huleedu-common-core, huleedu-service-libs
 
-### 6.2. Dependencies
-- `quart>=0.19.4`: Async web framework
-- `hypercorn>=0.16.0`: ASGI server
-- `python-dotenv>=1.0.0`: Environment configuration
-- `aiokafka>=0.10.0`: Kafka producer
-- `aiohttp>=3.9.0`: HTTP client for Content Service
-- `huleedu-common-core`: Shared models and event schemas
-- `huleedu-service-libs`: Shared Kafka utilities
+## 6. Data Models
 
-## 7. Data Models
+**Request**: `{"text": "Essay content..."}`
 
-### 7.1. Request Models
-```python
-# Trigger spellcheck request (JSON)
-{
-    "text": "Essay content to be spell checked..."
-}
-```
+**Published Event**: `SpellcheckRequestedDataV1` with entity_ref, system_metadata, text_storage_id
 
-### 7.2. Published Event Structure
-```python
-SpellcheckRequestedDataV1:
-    event: str                           # Processing event type
-    entity_ref: EntityReference          # Essay reference
-    status: str                          # Target essay status
-    system_metadata: SystemProcessingMetadata
-    text_storage_id: str                 # Content Service storage ID
-```
+## 7. Error Handling
 
-## 8. Error Handling
+**Scenarios**: Content Service unavailable (500), Kafka unavailable (500), Invalid request (400)
+**Response**: `{"error": "description", "details": "additional details"}`
 
-### 8.1. Error Scenarios
-- **Content Service Unavailable**: Return 500 error
-- **Kafka Unavailable**: Return 500 error
-- **Invalid Request Data**: Return 400 error
-- **Missing Required Fields**: Return 400 error
+## 8. Deployment
 
-### 8.2. Error Responses
-```python
-{
-    "error": "Error description",
-    "details": "Additional error details"
-}
-```
+**Docker**: `python:3.11-slim` base, PDM package manager, `hypercorn app:app -c hypercorn_config.py`
+**Commands**: `pdm run start` (production), `pdm run dev` (development)
 
-## 9. Deployment
+## 9. Monitoring
 
-### 9.1. Docker Configuration
-- **Base Image**: `python:3.11-slim`
-- **Package Manager**: PDM
-- **Entry Point**: `hypercorn app:app -c hypercorn_config.py`
-- **Dependencies**: Kafka and Content Service
+**Logging**: Structured with correlation IDs, INFO/ERROR levels
+**Future Metrics**: HTTP rate/latency, event publishing success, Content Service calls
 
-### 9.2. Development Commands
-- `pdm run start`: Production server with Hypercorn
-- `pdm run dev`: Development server with debug mode
+## 10. Security
 
-## 10. Monitoring and Logging
+**Current**: No authentication (MVP)
+**Future**: API auth, input validation, rate limiting
 
-### 10.1. Logging
-- **Format**: Structured logging with correlation IDs
-- **Content**: HTTP requests, event publishing, Content Service calls
-- **Levels**: INFO for operations, ERROR for failures
+## 11. Future Evolution
 
-### 10.2. Metrics (Future)
-- HTTP request rate and latency
-- Event publishing success rate
-- Content Service call success rate
-- Active batch processing metrics
-
-## 11. Security Considerations
-
-### 11.1. Current Implementation
-- No authentication (development MVP)
-- No input validation beyond basic checks
-- No rate limiting
-
-### 11.2. Future Enhancements
-- API authentication and authorization
-- Input validation and sanitization
-- Rate limiting and throttling
-- Request size limits
-
-## 12. Future Architecture Evolution
-
-### 12.1. Planned Enhancements
-- **Batch Management**: Full batch lifecycle management
-- **Status Tracking**: Real-time processing status updates
-- **Event Consumption**: Listen for processing completion events
-- **Database Integration**: Persistent batch and essay state
-- **Workflow Orchestration**: Complex multi-step processing pipelines
-
-### 12.2. Service Split Considerations
-- **Essay Lifecycle Service**: Dedicated service for essay state management
-- **Workflow Orchestration Service**: Dedicated service for complex workflows
-- **Batch Management Service**: Dedicated service for batch operations
-
-## 13. Testing Strategy
-
-### 13.1. Current Testing
-- Manual testing via `/v1/trigger-spellcheck` endpoint
-- Integration testing with Content Service and Kafka
-
-### 13.2. Future Testing
-- Unit tests for business logic
-- Integration tests for external dependencies
-- End-to-end workflow testing
-- Load testing for batch processing
-
----
-**This service provides the orchestration foundation for the HuleEdu essay processing pipeline.**
+**Planned**: Batch management, status tracking, event consumption, database integration
+**Service Splits**: Essay Lifecycle Service, Workflow Orchestration Service

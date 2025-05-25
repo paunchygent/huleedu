@@ -1,31 +1,40 @@
+"""
+HuleEdu Batch Service Application.
+
+This module implements the Batch Service REST API using Quart framework.
+It provides endpoints for triggering batch processing operations, including
+test endpoints for spell checking workflows. The service integrates with
+Kafka for event publishing and the Content Service for text storage.
+"""
+
 import logging
-import os
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Union
 
 import aiohttp
-from dotenv import load_dotenv
-from quart import Quart, Response, jsonify
-
-load_dotenv()
-
 from huleedu_service_libs.kafka_client import KafkaBus
+from quart import Quart, Response, jsonify
 
 from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckRequestedDataV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+# Import the settings instance
+from .config import settings
+
+logging.basicConfig(
+    level=settings.LOG_LEVEL.upper(),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 app = Quart(__name__)
 KAFKA_BUS_CLIENT_ID = "batch-service-producer"
 app.config["KAFKA_BUS"] = None
 
-CONTENT_SERVICE_URL = os.getenv("CONTENT_SERVICE_URL", "http://content_service:8000/v1/content")
+CONTENT_SERVICE_URL = settings.CONTENT_SERVICE_URL
 OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
 
 

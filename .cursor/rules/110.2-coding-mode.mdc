@@ -3,47 +3,39 @@ description: Read before implementing ANY code. Must be requested if user does n
 globs: 
 alwaysApply: false
 ---
-===
 # 110.2: Coding Mode
 
-## 1. Purpose
-This rule defines your (AI agent's) guidelines when operating in Coding Mode.
+## 1. Guidelines
 
-## 2. Guidelines
+### 1.1. Adhere to Python Coding Standards
+- When generating or modifying Python code, **MUST** strictly follow all rules in [050-python-coding-standards.mdc](mdc:050-python-coding-standards.mdc), especially regarding typing, docstrings, Ruff formatting and linting, and MyPy type checking
 
-### 2.1. Rule: Adhere to Python Coding Standards
-    - When generating or modifying Python code, **MUST** strictly follow all rules in [050-python-coding-standards.mdc](mdc:050-python-coding-standards.mdc), especially regarding typing, docstrings, Ruff formatting and linting, and MyPy type checking.
+### 1.2. Use Common Models and Utilities
+- **MUST** use Pydantic models defined in `common/models/` for all inter-service data structures
+- **MUST** use utilities and exceptions defined in `common/` where applicable
 
-### 2.2. Rule: Use Common Models and Utilities
-    - **MUST** use Pydantic models defined in `common/models/` for all inter-service data structures.
-    - **MUST** use utilities and exceptions defined in `common/` where applicable.
+### 1.3. Respect Architectural Mandates
+- **MUST** ensure generated code adheres to the architectural mandates in [020-architectural-mandates.mdc](mdc:020-architectural-mandates.mdc), particularly concerning Bounded Contexts, Contract adherence, and data ownership
 
-### 2.3. Rule: Respect Architectural Mandates
-    - **MUST** ensure generated code adheres to the architectural mandates in [020-architectural-mandates.mdc](mdc:020-architectural-mandates.mdc), particularly concerning Bounded Contexts, Contract adherence, and data ownership.
+### 1.4. Implement According to Service Implementation Guidelines
+- **MUST** follow the guidelines in [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc) for service-specific concerns like using Quart, async/await, configuration, and logging (including `correlation_id`)
 
-### 2.4. Rule: Implement According to Service Implementation Guidelines
-    - **MUST** follow the guidelines in [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc) for service-specific concerns like using Quart, async/await, configuration, and logging (including `correlation_id`).
+### 1.5. Implement EDA Standards Correctly
+- When implementing event-driven logic, **MUST** strictly follow the standards in [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc), including using `EventEnvelope`, correct event naming, and the Thin Events principle
 
-### 2.5. Rule: Implement EDA Standards Correctly
-    - When implementing event-driven logic, **MUST** strictly follow the standards in [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc), including using `EventEnvelope`, correct event naming, and the Thin Events principle.
+### 1.6. Write Testable Code
+- **MUST** write code that is easily testable according to the principles in [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc)
 
-### 2.6. Rule: Write Testable Code
-    - **MUST** write code that is easily testable according to the principles in [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc).
+### 1.7. Use the `edit_file` Tool Correctly
+- **MUST** use the `edit_file` tool for all code modifications or new file creation
+- **MUST** provide precise `code_edit` and `instructions` fields
+- **MUST** use the `// ... existing code ...` marker correctly to represent unchanged code
 
-### 2.7. Rule: Use the `edit_file` Tool Correctly
-    - **MUST** use the `edit_file` tool for all code modifications or new file creation.
-    - **MUST** provide precise `code_edit` and `instructions` fields.
-    - **MUST** use the `// ... existing code ...` marker correctly to represent unchanged code.
+### 1.8. Minimal Code Output in `code_edit`
+- In the `code_edit` field, **MUST** only include the lines that are being added or modified, representing surrounding unchanged code with `// ... existing code ...`
 
-### 2.8. Rule: Minimal Code Output in `code_edit`
-    - In the `code_edit` field, **MUST** only include the lines that are being added or modified, representing surrounding unchanged code with `// ... existing code ...`.
+### 1.9. Update Documentation
+- As part of the coding task, **MUST** ensure that relevant documentation (docstrings, READMEs) is updated as required
 
-### 2.9. Rule: Update Documentation
-    - As part of the coding task, **MUST** ensure that relevant documentation (docstrings, READMEs) is updated as required.
-
-### 2.10. Rule: Avoid "Vibe Coding"
-    - **STRICTLY FORBIDDEN**: Do not generate code based on intuition or undocumented patterns. Code **MUST** be based on explicit requirements, rules, and the existing codebase structure.
-
----
-**Code generated in this mode must be correct, compliant, and maintainable.**
-===
+### 1.10. Avoid "Vibe Coding"
+- **STRICTLY FORBIDDEN**: Do not generate code based on intuition or undocumented patterns. Code **MUST** be based on explicit requirements, rules, and the existing codebase structure

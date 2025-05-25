@@ -8,6 +8,7 @@ description: "Mandatory patterns for Common Core event handling, Kafka integrati
 ## 1. Service Integration
 
 ### 1.1 Core Dependencies
+
 ```python
 # pyproject.toml
 [project.dependencies]
@@ -17,6 +18,7 @@ common-core = "^1.0.0"  # Published package
 ```
 
 ### 1.2 Key Components
+
 - **Event Schemas**: Type-safe event definitions
 - **Enums**: Shared business enumerations
 - **Models**: Reusable Pydantic models
@@ -25,6 +27,7 @@ common-core = "^1.0.0"  # Published package
 ## 2. Event Publishing (Producer)
 
 ### 2.1 Basic Event Creation
+
 ```python
 from datetime import datetime
 from uuid import uuid4
@@ -54,6 +57,7 @@ envelope = EventEnvelope[SpellcheckRequestedDataV1](
 ```
 
 ### 2.2 Publishing to Kafka
+
 ```python
 from kafka import KafkaProducer
 import orjson
@@ -106,6 +110,7 @@ async def publish_event(
 ## 3. Event Consumption (Consumer)
 
 ### 3.1 Basic Consumption
+
 ```python
 from typing import TypeVar, Type, Any
 from pydantic import TypeAdapter
@@ -139,6 +144,7 @@ def parse_event(
 ```
 
 ### 3.2 Consumer Implementation
+
 ```python
 from kafka import AIOKafkaConsumer
 
@@ -171,24 +177,28 @@ async def consume_events(bootstrap_servers: list[str], topic: str, group_id: str
 ## 4. Best Practices
 
 ### 4.1 Schema Evolution
+
 - Use semantic versioning for event types
 - Add new fields as optional with sensible defaults
 - Never remove or change required fields in existing schemas
 - Document breaking changes in release notes
 
 ### 4.2 Error Handling
+
 - Implement dead-letter queues for failed messages
 - Add circuit breakers for external service calls
 - Log sufficient context for debugging
 - Use structured logging with correlation IDs
 
 ### 4.3 Performance
+
 - Batch events when possible
 - Use connection pooling for Kafka producers/consumers
 - Monitor consumer lag and processing time
 - Consider compression for large messages
 
 ### 4.4 Monitoring
+
 - Track event publication/consumption metrics
 - Monitor schema validation errors
 - Set up alerts for consumer lag

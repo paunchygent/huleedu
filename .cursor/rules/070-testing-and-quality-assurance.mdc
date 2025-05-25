@@ -6,46 +6,46 @@ alwaysApply: false
 ===
 # 070: Testing and Quality Assurance
 
-## 1. Purpose
-These standards define testing strategies and quality assurance practices for HuleEdu microservices. You (AI agent) **MUST** generate code that is testable and adhere to these practices.
+## 1. Testing Pyramid
 
-## 2. Testing Pyramid (Adjusted for Microservices)
-    - Prioritize tests at lower levels (unit) for faster feedback and easier debugging.
-    - **Unit Tests**: Test individual components (functions, classes) in isolation. High coverage expected.
-    - **Contract Tests**: **CRITICAL** - Verify interactions between services adhere to defined Pydantic contracts (event schemas, API DTOs). A contract test suite **MUST** exist and pass for any service producing or consuming shared contracts.
-    - **Integration Tests**: Test interactions between a few closely related components or services (e.g., service interacting with its database). Scope should be limited.
-    - **End-to-End (E2E) Tests**: Test major user flows across multiple services. Use sparingly due to complexity and fragility. Primarily smoke tests.
+- **Unit Tests**: Individual components in isolation (high coverage)
+- **Contract Tests**: **CRITICAL** - Verify Pydantic contracts between services
+- **Integration Tests**: Limited scope component interactions
+- **E2E Tests**: Major user flows (use sparingly)
 
-## 3. Test Implementation Standards (Python/Pytest)
+## 2. Test Implementation Standards
 
-### 3.1. Rule: Pytest as Test Runner
-    - All tests **SHALL** be written and executed using Pytest.
-    - **Execution**: Run tests via PDM scripts (e.g., `pdm run pytest`, `pdm run common/tests/test_status_events.py`).
+### 2.1. Basic Rules
+- **Runner**: Pytest via PDM (`pdm run pytest`)
+- **Naming**: `test_*.py` files, `test_*` functions
+- **Isolation**: Tests must be independent
+- **Data**: Realistic but minimal test data
 
-### 3.2. Rule: Test File Naming
-    - Test files **MUST** be named `test_*.py` or `*_test.py`.
+### 2.2. Fixtures
+- Use for setup/teardown and dependency injection
+- Define in `tests/conftest.py` within service directory
+- **FORBIDDEN**: Pytest plugins that modify import paths in `conftest.py`
 
-### 3.3. Rule: Test Function/Method Naming
-    - Test functions/methods **MUST** start with `test_`.
+### 2.3. Layered Testing Strategy
+- **Function-Level**: Test business logic with dependency injection
+- **HTTP-Level**: Test HTTP interactions with async context manager mocking
+- **Integration**: Test full service interactions
+- **FORBIDDEN**: Mixing abstraction levels in same test
 
-### 3.4. Rule: Use Fixtures Effectively
-    - Use Pytest fixtures for setup/teardown, dependency injection, and providing test data.
-    - Define service-specific fixtures in `tests/conftest.py` within the service directory.
-    - Avoid complex logic in fixtures; keep them focused on test setup.
+### 2.4. Async Context Manager Mocking
+```python
+@asynccontextmanager
+async def mock_http_context_manager(mock_response: AsyncMock) -> Any:
+    yield mock_response
+```
 
-### 3.5. Rule: Avoid Pytest Plugins for Imports in `conftest.py`
-    - **STRICTLY FORBIDDEN**: Do not import pytest plugins that modify import paths or mechanisms within `conftest.py`. This breaks pytest's resolution logic.
-
-### 3.6. Rule: Test Isolation
-    - Tests **MUST** be isolated and not depend on the execution order or state left by other tests.
-    - Clean up test data/state explicitly or via fixtures.
-
-### 3.7. Rule: Meaningful Assertions
-    - Use clear and specific assertions. Provide helpful failure messages.
-
-### 3.8. Rule: Test Data
-    - Use realistic but minimal test data. Avoid using production data.
-    - Generate test data programmatically where possible.
+### 2.5. Dependency Injection for Testing
+```python
+async def process_function(
+    core_data, external_dependencies,
+    injectable_func_1: Callable, injectable_func_2: Callable,
+) -> bool:
+```
 
 ## 4. Contract Testing Implementation
 
@@ -75,6 +75,14 @@ These standards define testing strategies and quality assurance practices for Hu
 
 ### 7.3. Rule: FIX UNDERLYING ISSUES, DO NOT SIMPLIFY TESTS
     - **STRICTLY FORBIDDEN**: Do not simplify tests or make them less strict merely to make integration or end-to-end tests pass. If tests fail, there is an underlying issue in the code or configuration that **MUST** be fixed.
+
+## 8. Testing Anti-Patterns to Avoid
+    - **FORBIDDEN**: `try/except pass` blocks hiding model rebuilding failures
+    - **FORBIDDEN**: Mocking at wrong abstraction levels
+    - **FORBIDDEN**: Mixing business logic and HTTP testing in same test
+    - **FORBIDDEN**: Using `AsyncMock()` directly for async context managers
+
+See [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc) Section 8.2 for Pydantic testing patterns.
 
 ---
 **Robust testing is essential for service reliability and safe evolution.**

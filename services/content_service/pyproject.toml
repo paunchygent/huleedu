@@ -11,7 +11,9 @@ dependencies = [
     "aiofiles>=23.1.0",
     "hypercorn>=0.16.0",
     "python-dotenv>=1.0.0",
-    "huleedu-common-core"
+    "huleedu-common-core",
+    "pydantic",
+    "pydantic-settings",
 ]
 
 [build-system]

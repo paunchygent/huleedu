@@ -1,27 +1,31 @@
+"""
+HuleEdu Content Service Application.
+
+This module implements the Content Service REST API using Quart framework.
+It provides endpoints for uploading and downloading content with proper
+error handling, logging, and health checks. Content is stored as files
+on the local filesystem with UUID-based identifiers.
+"""
+
 import logging
-import os
-import pathlib
 import uuid
 from typing import Union
 
 import aiofiles
-import aiofiles.os
-from dotenv import load_dotenv
+import aiofiles.os  # Keep for await aiofiles.os.path.isfile
 from quart import Quart, Response, jsonify, request, send_file
 
-load_dotenv()
+# Import the settings instance
+from .config import settings
 
 logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    level=settings.LOG_LEVEL.upper(),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# Determine store root based on environment or a specific env var
-# This allows flexibility for Docker vs. local runs.
-# In Docker, CONTENT_STORE_ROOT will be set. Locally, it can fall back or be set in .env
-STORE_ROOT_PATH_STR = os.getenv("CONTENT_STORE_ROOT_PATH", "./.local_content_store_mvp")
-STORE_ROOT = pathlib.Path(STORE_ROOT_PATH_STR)
+# Determine store root from settings
+STORE_ROOT = settings.CONTENT_STORE_ROOT_PATH
 
 app = Quart(__name__)
 
@@ -86,7 +90,10 @@ async def download_content(content_id: str) -> Union[Response, tuple[Response, i
 async def health_check() -> Union[Response, tuple[Response, int]]:
     # Basic check, can be expanded
     try:
-        if not STORE_ROOT.exists() or not os.access(str(STORE_ROOT), os.W_OK):
+        store_path = settings.CONTENT_STORE_ROOT_PATH
+        path_exists = store_path.exists()
+        path_is_dir = store_path.is_dir()
+        if not path_exists or not path_is_dir:
             logger.error(f"Health check failed: Store root {STORE_ROOT.resolve()} not accessible.")
             return (
                 jsonify({"status": "unhealthy", "message": "Storage not accessible"}),
@@ -105,7 +112,5 @@ async def health_check() -> Union[Response, tuple[Response, int]]:
 
 if __name__ == "__main__":
     # For local dev, not for production container
-    import os
-
-    port = int(os.environ.get("PORT", 8000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    # Port is now sourced from settings
+    app.run(host="0.0.0.0", port=settings.PORT, debug=True)

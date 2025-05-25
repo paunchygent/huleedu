@@ -2,6 +2,10 @@
 HuleEdu Common Core Package.
 """
 
+# Required for Pydantic model rebuilding - Union is used in forward references
+# in base_event_models.py and must be available when model_rebuild() is called
+from typing import Union
+
 from .enums import (
     BatchStatus,
     ContentType,
@@ -69,12 +73,9 @@ __all__ = [
 ]
 
 # Rebuild models to resolve forward references after all imports
-try:
-    BaseEventData.model_rebuild()
-    EnhancedProcessingUpdate.model_rebuild()
-    EventTracker.model_rebuild()
-    SpellcheckRequestedDataV1.model_rebuild()
-    SpellcheckResultDataV1.model_rebuild()
-except Exception:
-    # If rebuild fails during import, that's okay
-    pass
+# Now that all enums are imported above, forward references should resolve successfully
+BaseEventData.model_rebuild(raise_errors=True)
+EnhancedProcessingUpdate.model_rebuild(raise_errors=True)
+EventTracker.model_rebuild(raise_errors=True)
+SpellcheckRequestedDataV1.model_rebuild(raise_errors=True)
+SpellcheckResultDataV1.model_rebuild(raise_errors=True)

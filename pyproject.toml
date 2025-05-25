@@ -27,7 +27,9 @@ monorepo-tools = [
     "pytest",
     "pytest-cov",
     "pytest-asyncio",
-    "pre-commit"
+    "pytest-xdist",
+    "pre-commit",
+    "structlog",
 ]
 
 # Install all new services and common_core for unified development
@@ -45,7 +47,9 @@ format-all = "ruff format --force-exclude ."
 lint-all = "ruff check --force-exclude ."
 lint-fix = "ruff check --fix --force-exclude ."
 typecheck-all = "mypy --config-file pyproject.toml ."
-test-all = "pytest -n auto"
+test-all = "pytest"
+test-parallel = "pytest -n auto"
+test-sequential = "pytest -n 0"
 
 # Docker convenience scripts
 docker-build = "docker compose build"
@@ -96,6 +100,11 @@ indent-style = "space"
 # Allow imports after load_dotenv() in service entry points
 "services/*/app.py" = ["E402"]
 "services/*/worker.py" = ["E402"]
+# Union import needed for Pydantic model rebuilding (not directly used in file)
+"common_core/src/common_core/__init__.py" = ["F401"]
+
+# Note: Import restrictions would be enforced through custom linting rules
+# For now, rely on type system and code review to prevent standard library logging
 
 [tool.mypy]
 python_version = "3.11"
@@ -156,12 +165,13 @@ testpaths = [
 python_files = "test_*.py *_test.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-s -v --durations=10 -n auto --log-cli-level=INFO"
+addopts = "-s -v --durations=10 --log-cli-level=INFO"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s:%(filename)s:%(lineno)s %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 markers = [
     "slow: marks tests as slow running",

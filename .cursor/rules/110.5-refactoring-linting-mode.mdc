@@ -3,30 +3,26 @@ description: Always use if linting issues are reported
 globs: 
 alwaysApply: false
 ---
-===
 # 110.5: Refactoring/Linting Mode
 
-## 1. Purpose
-This rule defines your (AI agent's) guidelines when operating in Refactoring/Linting Mode.
+## 1. Guidelines
 
-## 2. Guidelines
+### 1.1. Adhere to Python Coding Standards
+- When refactoring code or addressing linting issues, **MUST** strictly follow all rules in [050-python-coding-standards.mdc](mdc:050-python-coding-standards.mdc)
+- Includes applying Ruff formatting and linting, and addressing MyPy type checking issues
 
-### 2.1. Rule: Adhere to Python Coding Standards
-    - When refactoring code or addressing linting issues, **MUST** strictly follow all rules in [050-python-coding-standards.mdc](mdc:050-python-coding-standards.mdc).
-    - This includes applying Ruff formatting and linting, and addressing MyPy type checking issues.
+### 1.2. Use PDM Scripts for Tooling
+- **MUST** use `pdm run format-all`, `pdm run lint-all`, and `pdm run typecheck-all` when proposing commands to automatically fix formatting, linting, or identify typing issues
+- **Critical**: Always use `--force-exclude` flag in Ruff commands to ensure proper exclusion of ignored directories
 
-### 2.2. Rule: Use PDM Scripts for Tooling
-    - **MUST** use `pdm run format-all`, `pdm run lint-all`, and `pdm run typecheck-all` when proposing commands to automatically fix formatting, linting, or identify typing issues.
-    - **Critical**: Always use `--force-exclude` flag in Ruff commands to ensure proper exclusion of ignored directories.
+### 1.3. Prioritize Clarity and Maintainability
+- Refactoring **SHOULD** aim to improve code readability, reduce complexity, remove duplication, and enhance maintainability without changing the code's external behavior
 
-### 2.3. Rule: Prioritize Clarity and Maintainability
-    - Refactoring **SHOULD** aim to improve code readability, reduce complexity, remove duplication, and enhance maintainability without changing the code's external behavior.
-
-### 2.4. Rule: Address Linting and Typing Issues Systematically
-    - **MUST** address reported Ruff and MyPy errors/warnings methodically.
-    - Use `ruff check --fix --force-exclude .` for auto-fixable issues first, then manually address remaining issues.
-    - For MyPy errors, **MUST** ensure correct and precise type hints are added or corrected.
-    - **MUST** configure per-file ignores in `pyproject.toml` for intentional violations (e.g., imports after `load_dotenv()`).
+### 1.4. Address Linting and Typing Issues Systematically
+- **MUST** address reported Ruff and MyPy errors/warnings methodically
+- Use `ruff check --fix --force-exclude .` for auto-fixable issues first, then manually address remaining issues
+- For MyPy errors, **MUST** ensure correct and precise type hints are added or corrected
+- **MUST** configure per-file ignores in `pyproject.toml` for intentional violations (e.g., imports after `load_dotenv()`)
 
 ### 2.5. Rule: Use the `edit_file` Tool for Changes
     - **MUST** use the `edit_file` tool to propose refactoring changes or apply linting/typing fixes.
