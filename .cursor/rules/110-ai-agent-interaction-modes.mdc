@@ -1,0 +1,64 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+===
+# 110: AI Agent Interaction Modes
+
+## 1. Purpose
+This rule defines your (AI agent's) operational modes and general interaction principles with the user and codebase.
+
+## 2. General Interaction Principles
+
+### 2.1. Rule: Prioritize Understanding
+    - Before any action (planning, coding, etc.), **MUST** ensure you fully understand the user's request, the relevant codebase context, and all applicable rules and architectural mandates.
+    - If unclear, **MUST** ask clarifying questions.
+
+### 2.2. Rule: Adhere to Rules and Architecture
+    - All your actions and generated output (code, plans, explanations) **MUST** strictly adhere to the rules defined in this directory and the overall HuleEdu architecture.
+    - If a user request conflicts with rules or architecture, **MUST** explain the conflict and propose compliant alternatives.
+
+### 2.3. Rule: Use Provided Tools
+    - **MUST** use the provided tools (`read_file`, `codebase_search`, `edit_file`, `run_terminal_cmd`, etc.) to interact with the codebase and environment.
+    - Do not simulate tool execution or invent tool outputs.
+
+### 2.4. Rule: Explain Actions
+    - Briefly explain *why* you are performing a tool action (e.g., "Reading file to understand existing implementation").
+
+### 2.5. Rule: Be Explicit and Structured
+    - Structure your responses clearly.
+    - When proposing code changes, use the `edit_file` tool format precisely.
+    - When proposing terminal commands, use the `run_terminal_cmd` tool.
+
+### 2.6. Rule: Cite Sources
+    - When referencing existing code or documentation, **MUST** cite the source file and relevant line numbers using the specified format.
+
+### 2.7. Rule: Update Documentation
+    - As part of task completion, **MUST** identify and propose updates to relevant documentation (service READMEs, rule index) as required by [090-documentation-standards.md](mdc:090-documentation-standards.md).
+
+## 3. Operational Modes (Detailed in Sub-Rules)
+
+    - Your interaction will typically fall into one of these modes, each with specific guidelines:
+
+### 3.1. Planning Mode ([110.1-planning-mode.md](mdc:110.1-planning-mode.md))
+    - Guidelines for analyzing tasks, breaking them down, and creating execution plans.
+
+### 3.2. Coding Mode ([110.2-coding-mode.md](mdc:110.2-coding-mode.md))
+    - Guidelines for generating, modifying, and structuring code.
+
+### 3.3. Testing Mode ([110.3-testing-mode.md](mdc:110.3-testing-mode.md))
+    - Guidelines for creating, executing, and evaluating tests.
+
+### 3.4. Debugging Mode ([110.4-debugging-mode.md](mdc:110.4-debugging-mode.md))
+    - Guidelines for identifying, diagnosing, and fixing issues.
+
+### 3.5. Refactoring/Linting Mode ([110.5-refactoring-linting-mode.md](mdc:110.5-refactoring-linting-mode.md))
+    - Guidelines for improving existing code and addressing style/linting issues.
+
+## 4. State Management (Your Internal)
+    - You **SHOULD** maintain context about the current task, relevant files, architectural constraints, and recent interactions to inform your actions.
+
+---
+**Your effectiveness depends on disciplined adherence to these interaction principles and mode-specific guidelines.**
+===

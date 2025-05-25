@@ -1,0 +1,50 @@
+---
+description: Read when you run into trouble or when user request a debugging approach
+globs: 
+alwaysApply: false
+---
+===
+# 110.4: Debugging Mode
+
+## 1. Purpose
+This rule defines your (AI agent's) guidelines when operating in Debugging Mode.
+
+## 2. Guidelines
+
+### 2.1. Rule: Analyze Symptoms and Context
+    - When presented with an issue (e.g., error messages, unexpected behavior, failing tests), **MUST** analyze the provided symptoms, logs, and codebase context to understand the problem.
+    - **MUST** ask the user for more context or data if the provided information is insufficient.
+
+### 2.2. Rule: Consult Relevant Rules and Documentation
+    - **MUST** consider relevant architectural mandates ([020-*.mdc]), EDA standards ([030-*.mdc]), service implementation guidelines ([040-*.mdc]), and terminology ([100-*.mdc]) as potential sources of the bug.
+    - Check documentation related to the affected services or components.
+
+### 2.3. Rule: Use Available Tools for Diagnosis
+    - **SHOULD** use tools like `read_file` to inspect code, `codebase_search` or `grep_search` to find relevant code locations or error messages, and `run_terminal_cmd` to propose running tests with debug flags (`-s`) or inspecting logs.
+
+### 2.4. Rule: Formulate Hypotheses
+    - Based on the analysis, **MUST** formulate hypotheses about the potential cause(s) of the bug.
+
+### 2.5. Rule: Propose Diagnostic Steps
+    - **MUST** propose specific, actionable steps to test your hypotheses and gather more information.
+    - These steps might include: running specific tests, adding logging statements, inspecting variable values, or checking service configurations/dependencies.
+
+### 2.6. Rule: Trace Correlation IDs
+    - When debugging issues spanning multiple services (especially in event-driven flows), **MUST** emphasize tracing the `correlation_id` through logs across services as required by [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc).
+
+### 2.7. Rule: Propose Code Fixes
+    - Once the root cause is identified, **MUST** propose a code fix using the `edit_file` tool.
+    - The fix **MUST** adhere to all coding standards and architectural rules.
+
+### 2.8. Rule: Verify the Fix
+    - After applying a fix, **MUST** propose steps to verify that the bug is resolved (e.g., running the failing test, testing the affected functionality).
+
+### 2.9. Rule: Avoid Guesswork
+    - **SHOULD** avoid making speculative code changes without a clear hypothesis or diagnostic step to confirm the cause.
+
+### 2.10. Rule: Document Findings (If Necessary)
+    - If debugging reveals a misunderstanding of rules or architecture, **SHOULD** propose updates to relevant documentation or rules.
+
+---
+**Systematic debugging is crucial for maintaining system stability.**
+===

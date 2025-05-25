@@ -1,0 +1,70 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+===
+# 050: Python Coding Standards
+
+## 1. Purpose
+These define Python standards for HuleEdu. You (AI agent) **MUST** follow these for all Python code to ensure readability, maintainability, and quality.
+
+## 2. Core Philosophy
+    - Readability first. Explicit over implicit. Simple over complex.
+    - SOLID, DRY, YAGNI principles guide your designs.
+
+## 3. Tooling & Formatting (PDM Scripts)
+
+### 3.1. Rule: Code Formatting (Black) & Import Sorting (isort)
+    - **Tools**: Black (line length 88), isort (Black profile, multi_line_output=3).
+    - **Execution**: Code **MUST** be formatted via `pdm run format`.
+    - **Your Directive**: Your generated Python code **MUST** be Black/isort compliant.
+
+### 3.2. Rule: Linting (Flake8)
+    - **Tool**: Flake8 (max line length 100; ignores W503,E203,D107,S101 - see `.flake8`).
+    - **Execution**: Code **MUST** pass `pdm run lint`.
+    - **Your Directive**: Aim for Flake8 compliance on substantive issues.
+
+## 4. Static Typing (Mypy) - CRITICAL STANDARD
+
+### 4.1. Rule: Mandatory & Precise Type Hinting (PEP 484)
+    - All public functions, methods, and class attributes **MUST** be type-annotated.
+    - **MUST** use `from __future__ import annotations` at the top of every Python file.
+    - **Precision is Key**:
+        - Prefer precise types (`Protocol`, `Union`, `Optional`, `TypedDict`) over `typing.Any`.
+        - **NEVER use `typing.Any` for protocols and schemas.** Strive for complete type definitions.
+    - **Execution**: Code **MUST** pass `pdm run typecheck`.
+    - **Your Directive**: Your Python code **MUST** include complete, accurate, and precise type hints. You **MUST NOT** use `typing.Any` where a more precise type can be defined.
+
+## 5. Docstrings & Documentation - CRITICAL STANDARD
+
+### 5.1. Rule: Google-Style Docstrings
+    - All public modules, classes, functions, and methods **MUST** have Google-style docstrings (`"""Docstring."""`).
+    - **Content MUST Include**:
+        - Module-level: Purpose and public API overview.
+        - Function/Method: Concise summary; `Args:` (param, type, desc); `Returns:` (desc, type); `Raises:` (exception, condition).
+    - **Your Directive**: Your Python code **MUST** include compliant Google-style docstrings.
+
+### 5.2. Rule: Inline Comments
+    - Use for non-obvious logic or the "why" (not the "what" if code is clear). Keep current.
+
+## 6. Naming Conventions
+    - Modules/Packages: `snake_case.py`.
+    - Classes/Exceptions: `PascalCase` (Exceptions end with `Error`).
+    - Functions/Methods/Variables: `snake_case`.
+    - Constants: `UPPER_SNAKE_CASE`.
+    - Private: `_private_member`. Avoid `__double_underscore` unless essential.
+
+## 7. Imports
+    - Use absolute imports (e.g., `from common.models.base import BasePydanticModel`). `isort` handles organization.
+
+## 8. Error Handling
+    - Catch specific exceptions. Define and use domain-specific exceptions (e.g., from `common/exceptions.py`). Use `try...finally` or `with` for resource cleanup.
+
+## 9. General Code Structure
+    - Line Length: Black's 88 for code. Flake8 allows 100 for comments/docstrings if agreed.
+    - Blank Lines: Per PEP 8 (e.g., two between top-level functions/classes) for readability.
+
+---
+**Clean, consistent, well-typed, and documented Python is VITAL. Your adherence is mandatory.**
+===
