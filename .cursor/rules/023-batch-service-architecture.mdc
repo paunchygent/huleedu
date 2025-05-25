@@ -1,5 +1,5 @@
 ---
-description: 
+description: Defines the architecture and implementation details of the HuleEdu Batch Service
 globs: 
 alwaysApply: false
 ---

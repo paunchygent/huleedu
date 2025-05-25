@@ -19,6 +19,7 @@ ext install charliermarsh.ruff ms-python.mypy-type-checker ms-python.python ms-p
 ```
 
 Or install individually:
+
 ```bash
 ext install charliermarsh.ruff
 ext install ms-python.mypy-type-checker
@@ -60,6 +61,7 @@ After installation, verify these settings in your `.vscode/settings.json`:
 ### 🔍 Status Bar Indicators
 
 When working correctly, you should see:
+
 - **Ruff (native)** - Ruff server running
 - **MyPy** - Type checker active
 - **Python 3.11.x** - Correct interpreter
@@ -106,6 +108,7 @@ Your IDE settings mirror these PDM commands:
 **Why deprecated?**: The native Rust language server (ruff server) handles these automatically and more efficiently.
 
 **Updated settings** for 2025:
+
 ```json
 // ✅ USE THESE MODERN SETTINGS
 "ruff.nativeServer": "auto",  // Uses native server by default

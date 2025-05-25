@@ -105,6 +105,7 @@ monorepo-tools = [
 ```
 
 **Why no version constraints?**
+
 - PDM's resolver is sophisticated enough to find compatible versions
 - Avoids dependency hell from over-constraining
 - Automatically gets security updates and bug fixes

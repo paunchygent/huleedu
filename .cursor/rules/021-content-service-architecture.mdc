@@ -1,8 +1,13 @@
 ---
-description: 
+description: Defines the architecture and implementation details for the Content Service
 globs: 
 alwaysApply: false
 ---
+---
+description: Defines the architecture and implementation details for the Content Service.
+alwaysApply: false
+---
+
 # 021: Content Service Architecture
 
 ## 1. Purpose

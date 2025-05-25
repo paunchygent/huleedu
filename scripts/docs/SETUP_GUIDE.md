@@ -13,6 +13,7 @@ This guide explains how to set up the HuleEdu microservice development environme
 ```
 
 This script will:
+
 - ✅ Verify you're in the correct HuleEdu project directory
 - ✅ Install PDM (Python Dependency Manager) if not present
 - ✅ Install all monorepo tools (Black, isort, flake8, mypy, pytest)
@@ -36,12 +37,14 @@ pdm run typecheck-all
 HuleEdu is a sophisticated microservice ecosystem built with:
 
 ### 🏗️ Architecture
+
 - **Domain-Driven Design (DDD)**: Each service owns its bounded context
 - **Event-Driven Architecture**: Asynchronous communication via Kafka events
 - **Explicit Contracts**: Pydantic models for all inter-service communication
 - **Service Autonomy**: Independent deployment and scaling
 
 ### 🔧 Technology Stack
+
 - **Python 3.11+**: Modern Python with full type hints
 - **PDM**: Monorepo dependency management
 - **Quart**: Async web framework
@@ -65,6 +68,7 @@ HuleEdu is a sophisticated microservice ecosystem built with:
 After setup, you have access to these PDM scripts:
 
 ### 🔧 Code Quality
+
 ```bash
 pdm run format-all      # Format code with Ruff
 pdm run lint-all        # Lint with Ruff
@@ -73,6 +77,7 @@ pdm run test-all        # Run all tests with pytest
 ```
 
 ### 🐳 Docker Operations
+
 ```bash
 pdm run docker-build   # Build all service containers
 pdm run docker-up      # Start services with Docker Compose
@@ -82,6 +87,7 @@ pdm run docker-restart # Restart all services
 ```
 
 ### 🚀 Service Development
+
 ```bash
 pdm run dev-content         # Run content service in development mode
 pdm run dev-batch           # Run batch service in development mode
@@ -91,6 +97,7 @@ pdm run -p services/spell_checker_service start_worker    # Start spell checker 
 ## Development Workflow
 
 ### 1. Code Changes
+
 When making changes to any service:
 
 ```bash
@@ -104,6 +111,7 @@ pdm run test-all
 ```
 
 ### 2. Testing Individual Services
+
 ```bash
 # Test specific service
 pdm run -p services/content_service pytest
@@ -113,6 +121,7 @@ pdm run pytest --cov=services/content_service
 ```
 
 ### 3. Running Services Locally
+
 ```bash
 # Start infrastructure (Kafka, etc.)
 pdm run docker-up
@@ -138,6 +147,7 @@ This environment is optimized for AI coding agents with:
 ### 📋 Current Development Phase
 
 The project is currently in **Phase 1.2**, focusing on:
+
 - ✅ Core service implementations
 - 🔄 Enhanced testing and observability
 - 🔄 Essay Lifecycle Service skeleton
@@ -156,6 +166,7 @@ See `TASKS/PHASE_1.2.md` for detailed current work.
 ## Troubleshooting
 
 ### PDM Issues
+
 ```bash
 # Reinstall PDM if needed
 python3 -m pip install --user --upgrade pdm
@@ -165,6 +176,7 @@ pdm cache clear
 ```
 
 ### Dependency Issues
+
 ```bash
 # Reinstall all dependencies
 pdm install --clean
@@ -174,6 +186,7 @@ pdm update
 ```
 
 ### Docker Issues
+
 ```bash
 # Clean Docker environment
 pdm run docker-down
@@ -193,6 +206,7 @@ After setup, you can:
 ## Support
 
 For questions about:
+
 - **Architecture**: See `README.md` and `.cursor/rules/` directory
 - **Development Standards**: Check `.cursor/rules/050-python-coding-standards.md`
 - **Testing**: Review `.cursor/rules/070-testing-and-quality-assurance.md`
@@ -200,4 +214,4 @@ For questions about:
 
 ---
 
-**Happy coding! The HuleEdu microservice ecosystem is ready for your contributions! 🚀** 
+**Happy coding! The HuleEdu microservice ecosystem is ready for your contributions! 🚀**

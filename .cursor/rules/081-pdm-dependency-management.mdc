@@ -1,6 +1,6 @@
 ---
-description:
-globs:
+description: MUST READ whenever working on or discussing pdm resolution, versioning, and .toml files
+globs: 
 alwaysApply: false
 ---
 # 081: PDM Dependency Management Standards

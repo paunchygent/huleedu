@@ -1,248 +1,140 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # 024: Common Core Architecture
 
 ## 1. Purpose
-This document defines the architecture and implementation details of the HuleEdu Common Core package, the foundational library providing shared models, enums, and event schemas for all microservices.
+
+Defines HuleEdu's Common Core package with shared models, enums, and event schemas.
 
 ## 2. Package Overview
 
 ### 2.1. Package Identity
-- **Name**: Common Core
-- **Package**: `huleedu-common-core`
-- **Version**: 0.1.0
-- **Type**: Shared library package
-- **Technology Stack**: Pydantic, Python typing
 
-### 2.2. Bounded Context
-The Common Core provides the single source of truth for data contracts, event schemas, and shared business logic across the entire HuleEdu microservices ecosystem.
+- **Name**: `huleedu-common-core`
+- **Type**: Shared library (Pydantic, Python typing)
+- **Context**: Single source of truth for data contracts
 
-## 3. Package Structure
+### 2.2. Module Structure
 
-### 3.1. Module Organization
 ```
-src/common_core/
-├── __init__.py              # Package exports
-├── enums.py                 # Business enums
-├── metadata_models.py       # Metadata and reference models
-├── pipeline_models.py       # Pipeline state models
-└── events/
-    ├── __init__.py          # Event package exports
-    ├── envelope.py          # Generic event envelope
-    ├── base_event_models.py # Base event data classes
-    └── spellcheck_models.py # Spell check event models
+common_core/
+├── enums.py           # Business enums
+├── metadata_models.py # Metadata/reference models
+├── pipeline_models.py # Pipeline state
+└── events/            # Event schemas
+    ├── envelope.py
+    └── spellcheck_models.py
 ```
 
-### 3.2. Key Components
-- **Enums**: Business domain enumerations
-- **Metadata Models**: Entity references and processing metadata
-- **Pipeline Models**: Processing pipeline state management
-- **Event Models**: Event-driven communication schemas
-- **Event Envelope**: Generic wrapper for all events
+## 3. Core Enums
 
-## 4. Core Enumerations
+### 3.1. ProcessingStage
 
-### 4.1. ProcessingStage
-Defines the high-level stages of essay processing:
-- `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `CANCELLED`
+`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `CANCELLED`
 
-### 4.2. ProcessingEvent
-Defines specific processing events:
-- Essay lifecycle events (upload, validation, completion)
-- Processing phase events (spellcheck, NLP, AI feedback)
-- System events (cancellation, error handling)
+### 3.2. ProcessingEvent
 
-### 4.3. EssayStatus
-Defines detailed essay processing states:
-- Upload states: `uploaded`, `text_extracted`
-- Spellcheck states: `awaiting_spellcheck`, `spellchecked_success`, `spellcheck_failed`
-- Processing states: `awaiting_nlp`, `nlp_completed_success`, `nlp_failed`
-- Final states: `essay_all_processing_completed`, `essay_critical_failure`
+- Lifecycle: upload, validation, completion
+- Phases: spellcheck, NLP, AI feedback
+- System: cancellation, errors
 
-### 4.4. BatchStatus
-Defines batch processing states:
-- `created`, `uploading`, `processing`, `completed`, `failed`, `cancelled`
+### 3.3. EssayStatus
 
-### 4.5. ContentType
-Defines content artifact types:
-- `ORIGINAL_ESSAY`, `CORRECTED_TEXT`, `NLP_ANALYSIS`, `AI_FEEDBACK`
+- Upload: `uploaded`, `text_extracted`
+- Spellcheck: `awaiting_spellcheck`, `spellchecked_*`
+- Processing: `awaiting_nlp`, `nlp_*`
+- Final: `all_processing_completed`, `critical_failure`
 
-### 4.6. ErrorCode
-Defines standardized error codes:
-- `VALIDATION_ERROR`, `PROCESSING_ERROR`, `STORAGE_ERROR`, `TIMEOUT_ERROR`
+### 3.4. BatchStatus
 
-## 5. Metadata Models
+`created`, `uploading`, `processing`, `completed`, `failed`, `cancelled`
 
-### 5.1. EntityReference
-Immutable reference to business entities:
+### 3.5. ContentType
+
+`ORIGINAL_ESSAY`, `CORRECTED_TEXT`, `NLP_ANALYSIS`, `AI_FEEDBACK`
+
+## 4. Models
+
+### 4.1. EntityReference
+
 ```python
-EntityReference:
-    entity_id: str           # Unique entity identifier
-    entity_type: str         # Type of entity (essay, batch, etc.)
-    parent_id: Optional[str] # Parent entity reference
+entity_id: str
+type: str
+parent_id: Optional[str]
 ```
 
-### 5.2. SystemProcessingMetadata
-System-level processing metadata:
+### 4.2. SystemProcessingMetadata
+
 ```python
-SystemProcessingMetadata:
-    entity: EntityReference
-    timestamp: datetime
-    processing_stage: Optional[ProcessingStage]
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
-    event: Optional[str]
-    events_trail: List[Dict[str, Any]]
-    error_info: Dict[str, Any]
+entity: EntityReference
+timeline: {started_at, completed_at, timestamp}
+stage: Optional[ProcessingStage]
+event: Optional[str]
 ```
 
-### 5.3. StorageReferenceMetadata
-Content storage references:
+### 4.3. StorageReference
+
 ```python
-StorageReferenceMetadata:
-    references: Dict[ContentType, Dict[str, str]]
-    
-    def add_reference(self, ctype: ContentType, storage_id: str, path_hint: Optional[str])
+references: Dict[ContentType, Dict[str, str]]
 ```
 
-## 6. Event Architecture
+## 5. Event System
 
-### 6.1. EventEnvelope
-Generic wrapper for all events:
+### 5.1. EventEnvelope
+
 ```python
-EventEnvelope[T]:
-    event_type: str          # Versioned event type identifier
-    source_service: str      # Originating service
-    correlation_id: str      # Request correlation ID
-    timestamp: datetime      # Event timestamp
-    data: T                  # Typed event payload
+type: str           # Versioned ID
+source: str         # Service name
+correlation_id: str
+timestamp: datetime
+data: T             # Typed payload
 ```
 
-### 6.2. Base Event Models
-Foundation classes for event data:
+### 5.2. Base Event
+
 ```python
-BaseEventDataV1:
-    event: str               # Processing event type
-    entity_ref: EntityReference
-    status: str              # Target entity status
-    system_metadata: SystemProcessingMetadata
+event: str
+entity: EntityReference
+status: str
+metadata: SystemProcessingMetadata
 ```
 
-### 6.3. Spell Check Event Models
-Specific event models for spell checking:
+### 5.3. Spellcheck Events
+
 ```python
-SpellcheckRequestedDataV1(BaseEventDataV1):
-    text_storage_id: str     # Content Service storage ID
+class SpellcheckRequested:
+    text_storage_id: str
 
-SpellcheckResultDataV1(BaseEventDataV1):
-    storage_metadata: StorageReferenceMetadata
-    corrections_made: int    # Number of corrections made
+class SpellcheckResult:
+    storage: StorageReference
+    corrections: int
 ```
 
-## 7. Type Safety and Validation
+## 6. Implementation
 
-### 7.1. Pydantic Integration
-- All models inherit from `pydantic.BaseModel`
-- Automatic validation and serialization
-- Type hints for all fields
-- Custom validators where needed
+### 6.1. Pydantic
 
-### 7.2. MyPy Configuration
-- Strict type checking enabled
-- `disallow_untyped_defs = true`
-- `warn_return_any = true`
-- Explicit package bases for namespace packages
+- All models inherit `BaseModel`
+- Type hints required
+- Custom validators as needed
 
-### 7.3. Email Validation
-- Uses `pydantic[email]` for email field validation
-- Includes `email-validator` dependency
+### 6.2. Type Checking
 
-## 8. Dependencies
+- MyPy with strict mode
+- No untyped definitions
+- No `Any` returns
 
-### 8.1. Core Dependencies
-- `pydantic[email]>=2.0`: Data validation and serialization
-- `typing-extensions>=4.0.0`: Extended typing support
+### 6.3. Dependencies
 
-### 8.2. Development Dependencies
-- MyPy for type checking
-- Pytest for testing
-- Ruff for code formatting and linting
+- Core: `pydantic[email]>=2.0`
+- Dev: MyPy, Pytest, Ruff
 
-## 9. Distribution and Versioning
+## 7. Versioning
 
-### 9.1. Package Distribution
-- Built as Python wheel using PDM
-- Installable via `pip` or PDM
 - Semantic versioning (0.1.0)
-
-### 9.2. Version Management
-- Breaking changes require major version bump
-- New event models require new version suffixes (V1, V2, etc.)
-- Backward compatibility maintained within major versions
-
-## 10. Usage Patterns
-
-### 10.1. Service Integration
-Services depend on Common Core for:
-- Event schema definitions
-- Shared business enums
-- Metadata model structures
-- Type safety across service boundaries
-
-### 10.2. Event Publishing
-```python
-from common_core.events.envelope import EventEnvelope
-from common_core.events.spellcheck_models import SpellcheckRequestedDataV1
-
-# Create event data
-event_data = SpellcheckRequestedDataV1(...)
-
-# Wrap in envelope
-envelope = EventEnvelope[SpellcheckRequestedDataV1](
-    event_type="huleedu.essay.spellcheck.requested.v1",
-    source_service="batch-service",
-    data=event_data
-)
-
-# Publish to Kafka
-await kafka_producer.send("topic", envelope.model_dump(mode="json"))
-```
-
-### 10.3. Event Consumption
-```python
-# Deserialize from Kafka
-raw_data = json.loads(kafka_message.value)
-envelope = EventEnvelope[SpellcheckRequestedDataV1].model_validate(raw_data)
-request_data = envelope.data  # Typed as SpellcheckRequestedDataV1
-```
-
-## 11. Testing Strategy
-
-### 11.1. Model Validation Tests
-- Pydantic model validation
-- Serialization/deserialization round-trips
-- Edge case handling
-
-### 11.2. Type Safety Tests
-- MyPy static analysis
-- Runtime type checking
-- Cross-service compatibility
-
-## 12. Future Evolution
-
-### 12.1. Planned Enhancements
-- Additional event models for new services
-- Enhanced metadata models
-- Performance optimizations
-- Schema evolution support
-
-### 12.2. Breaking Change Management
-- Deprecation warnings for old models
-- Migration guides for major versions
-- Backward compatibility layers
-
----
-**This package ensures type safety, consistency, and proper contracts across the entire HuleEdu microservices ecosystem.**
+- Breaking changes = major version
+- Event models use V1, V2 suffixes
+- Backward compatibility within major versions

@@ -22,6 +22,9 @@ This rule defines the process for updating or proposing changes to this set of H
 ### 2.3. Rule: Update Rule Index
     - If a new rule file is created or an existing one is renamed, **MUST** propose an update to the [000-rule-index.mdc](mdc:000-rule-index.mdc) file using the `edit_file` tool to ensure the index remains accurate.
 
+### 2.3. Rule: Ensure new rules have a frontmatter containing Rule Type and     
+    Description. 
+
 ### 2.4. Rule: Explain Impact
     - When proposing a rule change, **SHOULD** explain the impact of the change on development practices or other rules.
 
@@ -34,9 +37,6 @@ This rule defines the process for updating or proposing changes to this set of H
 ## 4. Maintaining Rule Consistency
     - After a rule change is approved and applied, **MUST** ensure your subsequent actions and code generation adhere to the updated rule set.
     - If you notice discrepancies or outdated information in other rules as a result of a change, **SHOULD** propose further updates as needed.
-
-## 5. Historical Context (Removed)
-    - Previous versions or historical context of rules (like dates or version numbers within the rule file content itself) are to be removed for conciseness and managed via version control (Git).
 
 ---
 **This process ensures that our development rules remain accurate, relevant, and agreed upon.**

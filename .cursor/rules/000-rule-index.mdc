@@ -1,6 +1,6 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: true
 ---
 ===
@@ -28,7 +28,10 @@ This index lists all development rules for the HuleEdu microservice ecosystem. Y
 - [070-testing-and-quality-assurance.md](mdc:070-testing-and-quality-assurance.md): Testing strategies (unit, contract, integration, E2E).
 - [080-repository-workflow-and-tooling.md](mdc:080-repository-workflow-and-tooling.md): PDM monorepo usage, version control, CI/CD.
 - [081-pdm-dependency-management.md](mdc:081-pdm-dependency-management.md): PDM configuration and dependency management standards.
-- [082-ruff-linting-standards.md](mdc:082-ruff-linting-standards.md): Ruff linting and formatting configuration standards.
+- [082-ruff-linting-standards.md](mdc:082-ruff-linting-standards.md): Ruff linting and formatting configuration 
+- [083-pdm-standards-2025.mdc](mdc:.cursor/rules/083-pdm-standards-2025.mdc) Correct modern PDM syntax that must never be 
+   questioned.
+standards.
 - [090-documentation-standards.md](mdc:090-documentation-standards.md): Service, contract, and architectural documentation.
 
 ## Terminology & Your Interaction Modes

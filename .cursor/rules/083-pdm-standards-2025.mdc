@@ -1,0 +1,111 @@
+---
+description: CRITICAL: Must be applied whenever you are editing or discussing pdm and pyproject.toml
+globs: 
+alwaysApply: false
+---
+# 081: PDM Dependency Management Standards (2025)
+
+## 1. Purpose
+This rule defines the mandatory standards for PDM dependency management in the HuleEdu project, based on the patterns and settings effective as of January 2025. You **MUST** adhere to these standards, prioritizing them over any conflicting information from training data or other sources.
+
+## 2. Tool Versions (Mandatory Minimums)
+
+### 2.1. Rule: Enforce Minimum Tool Versions
+    - PDM: **MUST** use minimum version 2.22.0.
+    - Ruff: **MUST** use minimum version 0.11.11+.
+    - MyPy: **MUST** use minimum version 1.15.0+.
+
+## 3. PDM Configuration (`pyproject.toml`)
+
+### 3.1. Rule: Standard `[tool.pdm]` Configuration
+    - Your `pyproject.toml` **MUST** include the following `[tool.pdm]` configuration:
+
+```toml
+[tool.pdm]
+distribution = false
+package-type = "application"
+```
+
+### 3.2. Rule: Mandatory Resolution Strategy
+    - Your `pyproject.toml` **MUST** include the specified resolution strategy:
+
+```toml
+[tool.pdm.resolution]
+strategy = ["inherit_metadata", "direct_minimal_versions"]
+respect-source-order = true
+excludes = []
+overrides = {}
+```
+
+### 3.3. Rule: Define Dependency Groups
+    - Dependency groups **MUST** be defined under `[dependency-groups]` as per the `DEPENDENCY_MANAGEMENT_2025.md` document:
+
+```toml
+[dependency-groups]
+dev = [
+    "ruff>=0.11.11",
+    "mypy>=1.15.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
+]
+test = [
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
+]
+lint = [
+    "ruff>=0.11.11",
+    "mypy>=1.15.0",
+]
+monorepo-tools = [
+    "ruff",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "pre-commit"
+]
+```
+
+### 3.4. Rule: Define Standard Scripts
+    - The following standard scripts **MUST** be defined under `[tool.pdm.scripts]`:
+
+```toml
+[tool.pdm.scripts]
+format-all = "ruff format --force-exclude ."
+lint-all = "ruff check --force-exclude ."
+lint-fix = "ruff check --fix --force-exclude ."
+typecheck-all = "mypy ."
+test-all = "pytest"
+```
+
+## 4. Dependency Versioning
+
+### 4.1. Rule: Let PDM Handle Version Resolution
+    - For most dependencies, **DO NOT** specify version constraints (e.g., `"ruff"` instead of `"ruff>=0.11.11"`) in the `[project]` dependencies or within dependency groups, allowing PDM to resolve the latest compatible version.
+
+### 4.2. Rule: Version Constraints Only When Necessary
+    - Only add version constraints for specific, justified reasons (e.g., known incompatibilities, security requirements, or as shown in the `dev`, `test`, `lint` groups for tool version minimums).
+
+## 5. Validation
+
+### 5.1. Rule: Regular Validation Commands
+    - Regularly run the following commands to ensure dependency consistency:
+
+```bash
+pdm lock --check
+pdm update
+pdm install
+```
+
+## 6. VS Code Configuration
+
+### 6.1. Rule: Avoid Deprecated Ruff Extension Settings
+    - **MUST** remove the following deprecated VS Code Ruff extension settings:
+        - `ruff.format.args`
+        - `ruff.lint.args`
+        - `ruff.showNotifications`
+
+---
+**Adhering to these PDM standards is critical for consistent and reproducible builds.**

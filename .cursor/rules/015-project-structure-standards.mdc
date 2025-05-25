@@ -1,5 +1,5 @@
 ---
-description: 
+description: Read whenever trying to understand code and file structure or creating new files.
 globs: 
 alwaysApply: false
 ---
@@ -21,6 +21,9 @@ The root directory **MUST** remain clean and organized. Only the following files
 - `docker-compose.yml` - Docker orchestration
 - `.gitignore` - Git ignore rules
 - `.pdm-python` - PDM Python version specification
+- `.dockerignore` - Docker ignore rules
+- `.DS_Store` - macOS directory services store (often ignored)
+- `AGENTS.md` - Documentation related to AI agents
 
 **Permitted Root Directories:**
 - `.git/` - Git repository data
@@ -28,6 +31,8 @@ The root directory **MUST** remain clean and organized. Only the following files
 - `.mypy_cache/` - MyPy cache
 - `__pycache__/` - Python cache
 - `.cursor/` - Cursor IDE rules and configuration
+- `.ruff_cache/` - Ruff linting/formatting cache
+- `.windsurf/` - Windsurf specific configuration/data
 - `common_core/` - Shared core package
 - `services/` - All microservices
 - `scripts/` - Project-level scripts and utilities
@@ -48,8 +53,8 @@ scripts/
 ├── docs/                           # Documentation for scripts
 │   ├── SETUP_GUIDE.md             # Setup and environment documentation
 │   └── DEPLOYMENT_GUIDE.md        # Deployment documentation
+├── README.md                      # Documentation for scripts directory
 ├── setup_huledu_environment.sh    # Environment setup script
-├── deploy.sh                      # Deployment scripts
 └── utils/                         # Utility scripts
     ├── backup.sh
     └── maintenance.sh

@@ -1,5 +1,5 @@
 ---
-description: 
+description: defines the architecture and implementation details of the HuleEdu Spell Checker Service
 globs: 
 alwaysApply: false
 ---
