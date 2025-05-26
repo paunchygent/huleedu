@@ -102,76 +102,68 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 
 ---
 
-### B.2. Automate Kafka Topic Creation (with Docker Compose one-shot service)
+### B.2. Automate Kafka Topic Creation (with Docker Compose one-shot service) [COMPLETED]
 
+* **Status**: COMPLETED
 * **🌐 NETWORK ACCESS REQUIRED**: Requires connection to Kafka cluster
 * **Objective**: Implement a robust script for Kafka topic creation, runnable as a one-shot Docker Compose service for ensuring topics are present before other services start.
 * **README.md Link/Rationale**: Supports **Event-Driven Communication Backbone** (README Sec 3).
 
 * **Implementation Guide**:
-    1. Implement `scripts/kafka_topic_bootstrap.py` as per Task A.1 (and previous detailed response).
-    2. **Modify `docker-compose.yml`**: Add a one-shot service to run this script.
+    1. **Kafka Bootstrap Script**: Async topic creation with retry logic and dynamic topic discovery
+    2. **Docker One-shot Service**: `kafka_topic_setup` service with proper dependencies
+    3. **Service Dependencies**: All services depend on successful topic setup completion
+* **Implementation Summary**:
+    1. **Kafka Topic Bootstrap Script**: Successfully implemented `scripts/kafka_topic_bootstrap.py` with robust async topic creation, retry logic, and proper error handling
+    2. **Docker Compose Integration**: Added `kafka_topic_setup` one-shot service with proper dependencies and health checks
+    3. **Service Dependencies**: Updated all services to depend on successful topic setup completion
+    4. **Critical Issue Resolution**: Resolved Docker container import issues by using absolute imports (`from config import settings`) instead of relative imports
+    5. **MyPy Configuration**: Added module override for `config` module to handle monorepo vs container import differences
 
-        ```yaml
-        # docker-compose.yml (additions/modifications)
-        services:
-          # ... zookeeper, kafka definitions ...
+* **Key Implementation Details**:
+    1. **Topic Bootstrap Service**: Creates all required Kafka topics dynamically from `common_core.enums.topic_name()`
+    2. **Container Import Pattern**: Services use absolute imports for local modules because they run from service directories in containers
+    3. **MyPy Compatibility**: Added `[[tool.mypy.overrides]]` for `config` module to ignore missing imports from monorepo root
+    4. **Service Startup Order**: Kafka topic setup → Content Service → Batch Service & Spell Checker Service
 
-          kafka_topic_setup:
-            image: python:3.11-slim # Or your common base image if it has PDM/dependencies
-            container_name: huleedu_kafka_topic_setup
-            restart: "no" # Ensures it's a one-shot service
-            depends_on:
-              kafka:
-                condition: service_healthy # Assumes Kafka has a healthcheck
-            networks:
-              - huleedu_internal_network
-            volumes:
-              - .:/app # Mount the whole project to access scripts and common_core
-            working_dir: /app
-            environment:
-              - KAFKA_BOOTSTRAP_SERVERS=kafka:9092 # Internal Docker network address for Kafka
-              - PYTHONPATH=/app/common_core/src:/app # To find common_core
-            # Install minimal deps if base python image is used
-            command: >
-              sh -c "pip install aiokafka==0.10.0 && 
-                     python scripts/kafka_topic_bootstrap.py"
-            # If using an image with PDM and project already structured:
-            # command: pdm run python scripts/kafka_topic_bootstrap.py
-            # Or if PDM script is defined:
-            # command: pdm run kafka-setup-topics
+* **Acceptance Criteria**: ✅ **COMPLETED**
+  * On `docker compose up`, the `kafka_topic_setup` service runs, creates topics, and exits successfully
+  * Other services start only after topic setup is complete
+  * All services run properly with absolute imports for local configuration modules
+  * MyPy type checking passes with proper module override configuration
 
-          # ... content_service, spell_checker_service, batch_service definitions ...
-          # Make them depend on kafka_topic_setup for startup order
-          content_service:
-            depends_on:
-              kafka_topic_setup: # Wait for topic setup to complete
-                condition: service_completed_successfully
-            # ... rest of content_service config
-          spell_checker_service:
-            depends_on:
-              kafka_topic_setup:
-                condition: service_completed_successfully
-              content_service: # Existing dependency
-                condition: service_healthy
-            # ... rest of spell_checker_service config
-          batch_service:
-            depends_on:
-              kafka_topic_setup:
-                condition: service_completed_successfully
-              content_service: # Existing dependency
-                condition: service_healthy
-            # ... rest of batch_service config
-        ```
+### B.2.1. Rule Cleanup and Standardization [COMPLETED]
 
-        *Note: Kafka itself (e.g., Bitnami image) might take time to be fully ready for admin client connections after its healthcheck passes. The bootstrap script should have retries or robust error handling for `KafkaConnectionError`.*
-    3. Ensure Kafka service in `docker-compose.yml` has an effective `healthcheck`. Bitnami Kafka images usually do.
-* **Key Files to Modify**:
-  * `scripts/kafka_topic_bootstrap.py` (as developed in A.1).
-  * `docker-compose.yml` (Add `kafka_topic_setup` service, update `depends_on` for other services).
-* **Acceptance Criteria**:
-  * On `docker compose up`, the `kafka_topic_setup` service runs, creates topics, and exits successfully.
-  * Other services start only after topic setup is complete.
+* **Status**: COMPLETED
+* **Objective**: Clean up verbose rules to follow the clean, principle-focused pattern of good examples like `050-python-coding-standards.mdc` and `051-pydantic-v2-standards.mdc`.
+
+* **Implementation Summary**:
+    1. **Cleaned Verbose Rules**: Systematically reviewed and cleaned up verbose rules that didn't follow the clean, principle-focused pattern
+    2. **Standardized Structure**: Applied consistent structure with clear sections, exact code snippets, and focused principles
+    3. **Removed AI Slop**: Eliminated verbose prose and unnecessary explanations while maintaining essential information
+    4. **Maintained Effectiveness**: Ensured rules remain effective and actionable while being more concise
+
+* **Rules Cleaned**:
+  * `110.4-debugging-mode.mdc`: Focused on "READ ERROR MESSAGES" principle with specific Docker import patterns
+  * `040-service-implementation-guidelines.mdc`: Streamlined to core stack, async patterns, and essential guidelines
+  * `070-testing-and-quality-assurance.mdc`: Condensed to core rules, testing patterns, and anti-patterns
+  * `110.1-planning-mode.mdc`: Simplified to core process, requirements, and conflict resolution
+  * `110.2-coding-mode.mdc`: Reduced to core standards, event-driven code, quality, and tool usage
+  * `110.3-testing-mode.mdc`: Focused on core principles, priorities, debugging, and patterns
+  * `110.5-refactoring-linting-mode.mdc`: Streamlined to standards, systematic approach, goals, and verification
+
+* **Test Regression Resolution**:
+    1. **Root Cause**: Monorepo import conflict where pytest imported wrong `config.py` files due to all service directories being in Python path
+    2. **Proper Solution**: Used pytest's official `pythonpath` configuration to resolve import conflicts
+    3. **Implementation**: Added `pythonpath = ["services/spell_checker_service", "services/content_service", "services/batch_service"]` to `pyproject.toml`
+    4. **Result**: All 18 tests now pass without workarounds, mocks, or scripts
+
+* **Acceptance Criteria**: ✅ **COMPLETED**
+  * All verbose rules cleaned up to follow clean, principle-focused pattern
+  * Rules maintain effectiveness while being more concise
+  * Exact code snippets preserved where essential
+  * Verbose prose and AI slop removed
+  * Test regression fixed with proper architectural solution
 
 ---
 

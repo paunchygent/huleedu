@@ -25,8 +25,12 @@ build-backend = "pdm.backend"
 [tool.pdm]
 distribution = false
 
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/common_core"
+huleedu-service-libs = "file:///app/services/libs"
+
 [tool.pdm.scripts]
-start = "hypercorn app:app -c hypercorn_config.py"
+start = "hypercorn app:app --config python:hypercorn_config"
 dev = "quart --app app:app --debug run -p 5001"
 
 [tool.mypy]

@@ -5,27 +5,14 @@ alwaysApply: false
 ---
 # 040: Service Implementation Guidelines
 
-## 1. Frameworks & Libraries
+## 1. Core Stack
+- **Framework**: Quart for async HTTP services
+- **Dependencies**: PDM exclusively (`pyproject.toml`, `pdm.lock`)
+- **Programming**: `async/await` for all I/O operations
 
-### 1.1. Quart for Service Implementation
-- **Framework**: Quart **SHALL** be primary web framework for async microservices
-- **MUST** use Quart's native async capabilities for all request handling and I/O
+## 2. Async Patterns
 
-### 1.2. PDM for Dependency Management
-- Manage Python dependencies exclusively with PDM (`pyproject.toml`, `pdm.lock`)
-- Add/update dependencies using PDM commands, ensuring `pdm.lock` is current
-
-## 2. Asynchronous Programming
-
-### 2.1. Embrace `async/await`
-- All I/O-bound operations (network, DB, file system) **MUST** use `async/await` and async-compatible libraries
-- **MUST** avoid blocking calls in async code paths
-
-### 2.2. Proper Async Context Management
-- Use `async with` for async context managers
-- Manage task lifecycles and cancellation correctly
-
-### 2.3. Dependency Injection for Testability
+### 2.1. Dependency Injection
 ```python
 async def process_single_message(
     msg: ConsumerRecord,
@@ -37,7 +24,7 @@ async def process_single_message(
 ) -> bool:
 ```
 
-### 2.4. Resource Lifecycle Management
+### 2.2. Resource Management
 ```python
 @asynccontextmanager
 async def kafka_clients(
@@ -50,25 +37,15 @@ async def kafka_clients(
 ```
 
 ## 3. State Management
-
-### 3.1. Batch Orchestration Service State
-- **Responsibility**: Exclusively manages `BatchUpload.status` and `BatchUpload.processing_metadata` (holding `ProcessingPipelineState`)
-- Strictly follow state transition logic and `ProcessingPipelineState` updates from Architectural Design Blueprint
-
-### 3.2. Essay Lifecycle Service State
-- **Responsibility**: Exclusively manages `ProcessedEssay.status`
-- Strictly follow `EssayStatus` enum and transition logic from Architectural Design Blueprint
-
-### 3.3. Clear State Ownership & Eventing
 - Each service owns its primary entities' state
-- Significant state changes **MUST** be communicated via events published by owning service
+- State changes **MUST** be communicated via events
+- Follow state transition logic from Architectural Design Blueprint
 
-## 4. Internal API Design (If Applicable)
-If a service exposes synchronous APIs (use sparingly):
-- **MUST** follow RESTful principles
-- **MUST** use Pydantic models (from `common/` or service-specific) for request/response schemas
-- **MUST** include API versioning (e.g., `/v1/...`)
-- **MUST** use `ErrorInfoModel` (from `common/`) for standardized error responses
+## 4. API Design
+- RESTful principles
+- Pydantic models for request/response schemas
+- API versioning (`/v1/...`)
+- `ErrorInfoModel` for standardized error responses
 
 ## 5. Configuration Management
 
@@ -102,13 +79,22 @@ settings = Settings()
 
 ## 6. Logging
 
-### 6.1. Structured Logging (JSON)
-- Use structured logging (e.g., `python-json-logger`) for machine-readable JSON logs
+### 6.1. Centralized Logging Utility
+- **MUST** use `huleedu_service_libs.logging_utils` for all logging
+- **FORBIDDEN**: Standard library `logging` module in services
+- **Pattern**:
+```python
+from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+
+# Service initialization
+configure_service_logging("service-name", log_level=settings.LOG_LEVEL)
+logger = create_service_logger("component-name")
+```
 
 ### 6.2. Mandatory Correlation IDs
 - For any operation chain (request/event), a `correlation_id` **MUST** be established or propagated
 - This `correlation_id` **MUST** be in all log messages across all involved services
-- **MUST** ensure logging statements include the `correlation_id`
+- Use `log_event_processing()` for EventEnvelope processing
 
 ### 6.3. Consistent Log Levels & Clear Messages
 - Use appropriate levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`)

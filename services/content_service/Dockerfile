@@ -7,22 +7,28 @@ ENV PYTHONUNBUFFERED=1 \
     QUART_ENV=production \
     LOG_LEVEL=INFO \
     CONTENT_STORE_ROOT_PATH=/data/huleedu_content_store \
-    PORT=8000
+    PORT=8000 \
+    PDM_USE_VENV=false
 
+# Set base WORKDIR for the application
 WORKDIR /app
 
-# Install PDM
+# Install PDM globally in the image
 RUN pip install --no-cache-dir pdm
 
-# Copy only build files from repo root context
-COPY services/content_service/pyproject.toml services/content_service/pdm.lock ./
+# Copy shared local dependencies first
+COPY common_core/ /app/common_core/
+COPY services/libs/ /app/services/libs/
 
-# Install dependencies --no-editable to ensure it fetches from remote if common_core is published
-# Or, if common_core is local, adjust pdm install to find it or copy its wheel.
-RUN pdm install --prod --no-editable
+# Now, handle the specific service
+COPY services/content_service/ /app/services/content_service/
 
-# Copy the rest of the application code
-COPY services/content_service/ ./
+# Switch to service directory for dependency installation
+WORKDIR /app/services/content_service
+
+# Install dependencies for the content_service using its own pyproject.toml
+# PDM will use the overrides to find local dependencies at the correct paths
+RUN pdm install --prod
 
 RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser && \
     mkdir -p ${CONTENT_STORE_ROOT_PATH} && \
@@ -33,5 +39,8 @@ USER appuser
 # Expose the port the app runs on
 EXPOSE ${PORT}
 
-# Command to run the application
+# Expose the port the app runs on
+EXPOSE ${PORT}
+
+# Command to run the application from service directory
 CMD ["pdm", "run", "start"] 

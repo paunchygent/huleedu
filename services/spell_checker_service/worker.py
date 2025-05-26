@@ -18,6 +18,7 @@ import aiohttp
 from aiohttp import ClientTimeout
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, ConsumerRecord, TopicPartition
 from aiokafka.errors import KafkaConnectionError
+from config import settings
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
     create_service_logger,
@@ -43,9 +44,6 @@ from common_core.metadata_models import (
     StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
-
-# Import the settings instance
-from .config import settings
 
 # Configure structured logging for the service
 configure_service_logging(
@@ -196,7 +194,9 @@ async def process_single_message(
     processing_started_at = datetime.now(timezone.utc)
 
     try:
-        envelope = EventEnvelope[SpellcheckRequestedDataV1].model_validate(msg.value)
+        envelope = EventEnvelope[SpellcheckRequestedDataV1].model_validate(
+            json.loads(msg.value.decode("utf-8"))
+        )
         request_data: SpellcheckRequestedDataV1 = envelope.data
         essay_id = request_data.entity_ref.entity_id
         original_text_storage_id = request_data.text_storage_id

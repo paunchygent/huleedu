@@ -1,4 +1,4 @@
-from .config import settings
+from config import settings
 
 bind = f"{settings.HOST}:{settings.PORT}"
 workers = settings.WEB_CONCURRENCY

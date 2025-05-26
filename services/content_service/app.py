@@ -7,22 +7,18 @@ error handling, logging, and health checks. Content is stored as files
 on the local filesystem with UUID-based identifiers.
 """
 
-import logging
 import uuid
 from typing import Union
 
 import aiofiles
 import aiofiles.os  # Keep for await aiofiles.os.path.isfile
+from config import settings
+from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from quart import Quart, Response, jsonify, request, send_file
 
-# Import the settings instance
-from .config import settings
-
-logging.basicConfig(
-    level=settings.LOG_LEVEL.upper(),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+# Configure structured logging for the service
+configure_service_logging("content-service", log_level=settings.LOG_LEVEL)
+logger = create_service_logger("api")
 
 # Determine store root from settings
 STORE_ROOT = settings.CONTENT_STORE_ROOT_PATH

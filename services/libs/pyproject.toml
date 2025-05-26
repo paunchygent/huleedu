@@ -7,9 +7,9 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "aiokafka>=0.10.0",
-    "pydantic>=2.0",
-    "python-json-logger>=2.0.0",
+    "aiokafka",
+    "pydantic",
+    "structlog",
     "huleedu-common-core",
 ]
 

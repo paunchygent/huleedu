@@ -29,10 +29,9 @@ monorepo-tools = [
     "pytest-asyncio",
     "pytest-xdist",
     "pre-commit",
-    "structlog",
 ]
 
-# Install all new services and common_core for unified development
+# Install all services and common_core for unified development
 dev = [
     "-e file:///${PROJECT_ROOT}/common_core",
     "-e file:///${PROJECT_ROOT}/services/libs",
@@ -65,6 +64,9 @@ run-spellchecker = "pdm run -p services/spell_checker_service start_worker"
 
 # Build common_core wheel
 build-common-core = "pdm build -p common_core"
+
+# Kafka infrastructure
+kafka-setup-topics = "python scripts/kafka_topic_bootstrap.py"
 
 [tool.ruff]
 line-length = 100
@@ -143,6 +145,11 @@ ignore_missing_imports = true
 # Note: These external libraries lack official type stubs on PyPI
 # We maintain strict typing for our own code while allowing flexibility for external deps
 
+# Service-local config modules
+[[tool.mypy.overrides]]
+module = "config"
+ignore_missing_imports = true
+
 # Existing code (less strict initially)
 [[tool.mypy.overrides]]
 module = [
@@ -161,6 +168,11 @@ testpaths = [
     "services/spell_checker_service/tests",
     "services/batch_service/tests",
     "tests"
+]
+pythonpath = [
+    "services/spell_checker_service",
+    "services/content_service", 
+    "services/batch_service"
 ]
 python_files = "test_*.py *_test.py"
 python_classes = "Test*"

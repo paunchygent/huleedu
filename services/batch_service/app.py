@@ -7,13 +7,14 @@ test endpoints for spell checking workflows. The service integrates with
 Kafka for event publishing and the Content Service for text storage.
 """
 
-import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Union
 
 import aiohttp
+from config import settings
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from quart import Quart, Response, jsonify
 
 from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage, topic_name
@@ -21,14 +22,9 @@ from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckRequestedDataV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 
-# Import the settings instance
-from .config import settings
-
-logging.basicConfig(
-    level=settings.LOG_LEVEL.upper(),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+# Configure structured logging for the service
+configure_service_logging("batch-service", log_level=settings.LOG_LEVEL)
+logger = create_service_logger("api")
 
 app = Quart(__name__)
 KAFKA_BUS_CLIENT_ID = "batch-service-producer"

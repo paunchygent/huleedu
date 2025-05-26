@@ -85,7 +85,7 @@ alwaysApply: false
 ## 7. Monitoring and Logging
 
 ### 7.1. Logging
-- **Format**: Structured logging with timestamps
+- **Utility**: `huleedu_service_libs.logging_utils` (centralized)
 - **Levels**: INFO for operations, ERROR for failures
 - **Content**: Storage operations, retrieval requests, errors
 

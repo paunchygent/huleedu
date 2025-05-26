@@ -5,7 +5,7 @@
 groups = ["default", "dev", "monorepo-tools"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:0499071c5d02c32811179c603c1d984016299d5217377e1f32c288f1fdee440c"
+content_hash = "sha256:48e04bd300ff5bfb22b3c0c626c075b53f48d718df92e2d084ac2352940657ce"
 
 [[metadata.targets]]
 requires_python = ">=3.11"
@@ -100,6 +100,7 @@ files = [
     {file = "aiohttp-3.12.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:33bb4ab2c7b86bf0ef19d426afcc3e60f08415b8e46b9cdb67b632c1d48931a3"},
     {file = "aiohttp-3.12.0-cp313-cp313-win32.whl", hash = "sha256:199bfe20aebba88c94113def5c5f7eb8abeca55caf4dab8060fa25f573f062e5"},
     {file = "aiohttp-3.12.0-cp313-cp313-win_amd64.whl", hash = "sha256:9c24ce9ccfe2c24e391bdd72f3d5ff9c42ed1f8b15f813cb4b4c22e0d5930433"},
+    {file = "aiohttp-3.12.0.tar.gz", hash = "sha256:e3f0a2b4d7fb16c0d584d9b8860f1e46d39f7d93372b25a6f80c10015a7acdab"},
 ]
 
 [[package]]
@@ -573,8 +574,8 @@ path = "./common_core"
 summary = "HuleEdu Common Core Library for Microservices"
 groups = ["dev"]
 dependencies = [
-    "pydantic[email]>=2.0",
-    "typing-extensions>=4.0.0",
+    "pydantic[email]",
+    "typing-extensions",
 ]
 
 [[package]]
@@ -588,6 +589,7 @@ groups = ["dev"]
 dependencies = [
     "aiofiles>=23.1.0",
     "huleedu-common-core",
+    "huleedu-service-libs",
     "hypercorn>=0.16.0",
     "pydantic",
     "pydantic-settings",
@@ -604,10 +606,10 @@ path = "./services/libs"
 summary = "HuleEdu Shared Service Libraries"
 groups = ["dev"]
 dependencies = [
-    "aiokafka>=0.10.0",
+    "aiokafka",
     "huleedu-common-core",
-    "pydantic>=2.0",
-    "python-json-logger>=2.0.0",
+    "pydantic",
+    "structlog",
 ]
 
 [[package]]
@@ -1235,20 +1237,6 @@ files = [
 ]
 
 [[package]]
-name = "python-json-logger"
-version = "3.3.0"
-requires_python = ">=3.8"
-summary = "JSON Log Formatter for the Python Logging Package"
-groups = ["dev"]
-dependencies = [
-    "typing-extensions; python_version < \"3.10\"",
-]
-files = [
-    {file = "python_json_logger-3.3.0-py3-none-any.whl", hash = "sha256:dd980fae8cffb24c13caf6e158d3d61c0d6d22342f932cb6e9deedab3d35eec7"},
-    {file = "python_json_logger-3.3.0.tar.gz", hash = "sha256:12b7e74b17775e7d565129296105bbe3910842d9d0eb083fc83a6a617aa8df84"},
-]
-
-[[package]]
 name = "pyyaml"
 version = "6.0.2"
 requires_python = ">=3.8"
@@ -1341,7 +1329,7 @@ name = "structlog"
 version = "25.3.0"
 requires_python = ">=3.8"
 summary = "Structured Logging for Python"
-groups = ["monorepo-tools"]
+groups = ["dev"]
 dependencies = [
     "typing-extensions; python_version < \"3.11\"",
 ]

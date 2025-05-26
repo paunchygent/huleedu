@@ -7,6 +7,7 @@ with dependency injection and mocked external dependencies.
 
 from __future__ import annotations
 
+import json
 from typing import Optional, Tuple
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -128,7 +129,8 @@ def kafka_message(
     sample_essay_id: str,
 ) -> ConsumerRecord:
     """Provide a mock Kafka ConsumerRecord for testing."""
-    message_value = spellcheck_request_envelope.model_dump(mode="json")
+    # Serialize to JSON bytes like Kafka would send
+    message_value = json.dumps(spellcheck_request_envelope.model_dump(mode="json")).encode("utf-8")
 
     # Create a mock ConsumerRecord
     record = MagicMock(spec=ConsumerRecord)
@@ -234,6 +236,7 @@ def invalid_kafka_message() -> ConsumerRecord:
     record.partition = 0
     record.offset = 456
     record.key = b"invalid-key"
-    record.value = {"invalid": "data"}  # Invalid structure
+    # Provide invalid JSON bytes like Kafka would send
+    record.value = json.dumps({"invalid": "data"}).encode("utf-8")
 
     return record

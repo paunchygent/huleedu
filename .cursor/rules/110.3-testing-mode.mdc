@@ -5,40 +5,21 @@ alwaysApply: false
 ---
 # 110.3: Testing Mode
 
-## 1. Guidelines
+## 1. Core Principles
+- **MUST** follow [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc)
+- **MUST** use `pdm run pytest` for all test execution
+- **FORBIDDEN**: Fixing tests to make them pass - fix underlying code issues
 
-### 1.1. Adhere to Testing Standards
-- **MUST** strictly follow all rules and guidelines in [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc) when creating or modifying tests
-- Includes using Pytest, following naming conventions, using fixtures correctly, and ensuring test isolation
+## 2. Test Priorities
+- Prioritize unit and contract tests
+- Update contract tests when Pydantic models change
+- Write meaningful tests based on requirements, not coverage
 
-### 1.2. Prioritize Unit and Contract Tests
-- **MUST** prioritize generating unit tests and contract tests as they provide the most value for the effort in a microservice architecture
-- **MUST** ensure that contract tests are created or updated whenever shared Pydantic models change
+## 3. Debugging
+- Use `pdm run pytest -s` for debug output
+- Analyze test failures and correlate with code changes
+- Fix application code, not tests
 
-### 1.3. Write Meaningful Tests
-- **MUST** write tests that verify correct behavior based on requirements and design, not just achieve code coverage
-- Tests **SHOULD** be readable, maintainable, and focused
-
-### 1.4. Use PDM Run for Execution
-- When proposing test execution to the user, **MUST** always use `pdm run pytest ...` or `pdm run <specific_test_script>`
-
-### 1.5. Debug Tests with -s Flag
-- When assisting with debugging failing tests, **SHOULD** suggest running tests with `-s` flag (`pdm run pytest -s ...`) to display print statements
-
-### 1.6. Analyze Test Failures
-- If tests fail after code changes or during debugging task, **MUST** analyze test output to understand the cause
-- **MUST** correlate test failures with recent code changes or identified issues
-
-### 1.7. Propose Fixes for Code, Not Tests
-- **CRITICAL**: If tests fail, the issue is almost always in application code or environment configuration, NOT the test itself (unless test is newly written and incorrect)
-- **STRICTLY FORBIDDEN**: Do not propose simplifying or weakening tests to make them pass. **MUST** focus on identifying and fixing underlying issue in application code
-
-### 1.8. Update Tests for Changes
-- If code changes intentionally alter behavior, **MUST** update existing tests or write new ones to reflect correct new behavior
-
-### 1.9. Document New Test Strategies
-- If task requires new testing strategy or significant changes to existing testing patterns, **SHOULD** propose updates or additions to [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc)
-
-### 1.10. Apply Established Testing Patterns
-- **MUST** follow patterns in [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc) Sections 3.9-3.11
-- **MUST** follow Pydantic patterns in [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc) Section 8.2
+## 4. Patterns
+- Follow [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc) Sections 3.9-3.11
+- Follow [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc) Section 8.2

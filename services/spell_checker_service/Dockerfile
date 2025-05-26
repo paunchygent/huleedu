@@ -5,23 +5,31 @@ ENV PYTHONUNBUFFERED=1 \
     ENV_TYPE=docker \
     LOG_LEVEL=INFO \
     KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-    CONTENT_SERVICE_URL=http://content_service:8000/v1/content
+    CONTENT_SERVICE_URL=http://content_service:8000/v1/content \
+    PDM_USE_VENV=false
 
+# Set base WORKDIR for the application
 WORKDIR /app
 
+# Install PDM globally in the image
 RUN pip install --no-cache-dir pdm
 
-# Copy common_core and libs from repo root context
-COPY common_core ./common_core/
-COPY services/libs ./libs/
-COPY services/spell_checker_service/pyproject.toml services/spell_checker_service/pdm.lock ./
+# Copy shared local dependencies first
+COPY common_core/ /app/common_core/
+COPY services/libs/ /app/services/libs/
 
-# Install dependencies. PDM will use the local common_core due to path dependency.
-RUN pdm install --prod --no-lock # --no-lock to ensure it respects the path dep
+# Now, handle the specific service
+COPY services/spell_checker_service/ /app/services/spell_checker_service/
 
-COPY services/spell_checker_service/worker.py ./
+# Switch to service directory for dependency installation
+WORKDIR /app/services/spell_checker_service
+
+# Install dependencies for the spell_checker_service using its own pyproject.toml
+# PDM will use the overrides to find local dependencies at the correct paths
+RUN pdm install --prod
 
 RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
 USER appuser
 
+# Command to run the application from service directory
 CMD ["pdm", "run", "start_worker"] 

@@ -3,7 +3,6 @@ Thin Kafka wrapper using aiokafka for HuleEdu microservices.
 """
 
 import json
-import logging
 import os
 from typing import Any, AsyncIterator, Optional, TypeVar  # Added Optional
 
@@ -14,7 +13,9 @@ from pydantic import BaseModel
 # Assuming common_core is installed and accessible
 from common_core.events.envelope import EventEnvelope
 
-logger = logging.getLogger(__name__)  # Use module-level logger
+from .logging_utils import create_service_logger
+
+logger = create_service_logger("kafka-client")  # Use structured logger
 
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 

@@ -12,9 +12,12 @@ dependencies = [
     "hypercorn>=0.16.0",
     "python-dotenv>=1.0.0",
     "huleedu-common-core",
+    "huleedu-service-libs",
     "pydantic",
     "pydantic-settings",
 ]
+
+
 
 [build-system]
 requires = ["pdm-backend"]
@@ -23,8 +26,12 @@ build-backend = "pdm.backend"
 [tool.pdm]
 distribution = false
 
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/common_core"
+huleedu-service-libs = "file:///app/services/libs"
+
 [tool.pdm.scripts]
-start = "hypercorn app:app -c hypercorn_config.py"
+start = "hypercorn app:app --bind 0.0.0.0:8000"
 dev = "quart --app app:app --debug run -p 8001" # Changed port for dev to match compose
 
 [tool.mypy]

@@ -427,13 +427,15 @@ class TestEventContractCompliance:
         # Arrange
         original_correlation_id = spellcheck_request_envelope.correlation_id
 
-        # Create a Kafka message with the envelope
+        # Create a Kafka message with the envelope (serialize to bytes like Kafka would)
         kafka_message = MagicMock()
         kafka_message.topic = "test-topic"
         kafka_message.partition = 0
         kafka_message.offset = 123
         kafka_message.key = sample_essay_id.encode("utf-8")
-        kafka_message.value = spellcheck_request_envelope.model_dump(mode="json")
+        kafka_message.value = json.dumps(
+            spellcheck_request_envelope.model_dump(mode="json")
+        ).encode("utf-8")
 
         # Act
         await process_single_message(

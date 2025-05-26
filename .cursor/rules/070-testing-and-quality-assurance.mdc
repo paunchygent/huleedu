@@ -7,39 +7,20 @@ alwaysApply: false
 # 070: Testing and Quality Assurance
 
 ## 1. Testing Pyramid
-
 - **Unit Tests**: Individual components in isolation (high coverage)
 - **Contract Tests**: **CRITICAL** - Verify Pydantic contracts between services
 - **Integration Tests**: Limited scope component interactions
 - **E2E Tests**: Major user flows (use sparingly)
 
-## 2. Test Implementation Standards
-
-### 2.1. Basic Rules
-- **Runner**: Pytest via PDM (`pdm run pytest`)
+## 2. Core Rules
+- **Runner**: `pdm run pytest`
 - **Naming**: `test_*.py` files, `test_*` functions
 - **Isolation**: Tests must be independent
-- **Data**: Realistic but minimal test data
-
-### 2.2. Fixtures
-- Use for setup/teardown and dependency injection
-- Define in `tests/conftest.py` within service directory
-- **FORBIDDEN**: Pytest plugins that modify import paths in `conftest.py`
-
-### 2.3. Layered Testing Strategy
-- **Function-Level**: Test business logic with dependency injection
-- **HTTP-Level**: Test HTTP interactions with async context manager mocking
-- **Integration**: Test full service interactions
 - **FORBIDDEN**: Mixing abstraction levels in same test
 
-### 2.4. Async Context Manager Mocking
-```python
-@asynccontextmanager
-async def mock_http_context_manager(mock_response: AsyncMock) -> Any:
-    yield mock_response
-```
+## 3. Testing Patterns
 
-### 2.5. Dependency Injection for Testing
+### 3.1. Dependency Injection
 ```python
 async def process_function(
     core_data, external_dependencies,
@@ -47,43 +28,25 @@ async def process_function(
 ) -> bool:
 ```
 
-## 4. Contract Testing Implementation
+### 3.2. Async Context Manager Mocking
+```python
+@asynccontextmanager
+async def mock_http_context_manager(mock_response: AsyncMock) -> Any:
+    yield mock_response
+```
 
-### 4.1. Rule: Contract Definition & Testing Tool
-    - Define contracts using Pydantic models in `common/models/`.
-    - Implement contract tests using a suitable library or framework (details TBD, but you **MUST** support its implementation).
-    - Consumer-driven contract testing is preferred where applicable.
+## 4. Execution Rules
+- **Command**: `pdm run pytest` (always use PDM)
+- **Debug**: `pdm run pytest -s` for print statements
+- **FORBIDDEN**: Simplifying tests to make them pass - fix underlying issues
 
-### 4.2. Rule: Test Execution
-    - Contract tests **MUST** be part of the CI pipeline for services producing and consuming contracts.
-
-## 5. Test-Driven Development (TDD) - Encouraged
-    - Consider practicing TDD: Write tests before writing the code they test. This helps clarify requirements and design.
-
-## 6. Code Coverage
-    - Aim for high code coverage, especially for core logic. Use coverage tools (e.g., `coverage.py` via PDM script `pdm run coverage`).
-    - High coverage is a metric, not a goal in itself; tests must be meaningful.
-
-## 7. Running Tests in the Monorepo
-
-### 7.1. Rule: Use PDM Run for Tests
-    - Always execute tests using `pdm run <command>` to ensure the correct environment and dependencies are used.
-    - Examples: `pdm run pytest tests/`, `pdm run common/tests/test_status_events.py`.
-
-### 7.2. Rule: Debugging Tests with Print Statements
-    - When debugging, run tests with the `-s` flag to display print statements (e.g., `pdm run pytest -s tests/`).
-
-### 7.3. Rule: FIX UNDERLYING ISSUES, DO NOT SIMPLIFY TESTS
-    - **STRICTLY FORBIDDEN**: Do not simplify tests or make them less strict merely to make integration or end-to-end tests pass. If tests fail, there is an underlying issue in the code or configuration that **MUST** be fixed.
-
-## 8. Testing Anti-Patterns to Avoid
-    - **FORBIDDEN**: `try/except pass` blocks hiding model rebuilding failures
-    - **FORBIDDEN**: Mocking at wrong abstraction levels
-    - **FORBIDDEN**: Mixing business logic and HTTP testing in same test
-    - **FORBIDDEN**: Using `AsyncMock()` directly for async context managers
+## 5. Anti-Patterns
+- **FORBIDDEN**: `try/except pass` blocks hiding model rebuilding failures
+- **FORBIDDEN**: Mocking at wrong abstraction levels
+- **FORBIDDEN**: Using `AsyncMock()` directly for async context managers
 
 See [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc) Section 8.2 for Pydantic testing patterns.
 
 ---
-**Robust testing is essential for service reliability and safe evolution.**
+**Fix underlying issues, don't simplify tests.**
 ===

@@ -64,7 +64,7 @@ alwaysApply: false
 
 ## 9. Monitoring
 
-**Logging**: Structured with correlation IDs, INFO/ERROR levels
+**Logging**: `huleedu_service_libs.logging_utils` with correlation IDs, INFO/ERROR levels
 **Future Metrics**: HTTP rate/latency, event publishing success, Content Service calls
 
 ## 10. Security
