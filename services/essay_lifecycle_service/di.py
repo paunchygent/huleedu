@@ -15,10 +15,12 @@ from prometheus_client import CollectorRegistry
 from config import Settings, settings
 from core_logic import StateTransitionValidator
 from protocols import (
+    BatchCommandHandler,
     ContentClient,
     EssayStateStore,
     EventPublisher,
     MetricsCollector,
+    SpecializedServiceRequestDispatcher,
 )
 from protocols import (
     StateTransitionValidator as StateTransitionValidatorProtocol,
@@ -87,6 +89,23 @@ class EssayLifecycleServiceProvider(Provider):
         """Provide metrics collector implementation."""
         return DefaultMetricsCollector(registry)
 
+    @provide(scope=Scope.APP)
+    def provide_specialized_service_request_dispatcher(
+        self, producer: AIOKafkaProducer, settings: Settings
+    ) -> SpecializedServiceRequestDispatcher:
+        """Provide specialized service request dispatcher implementation."""
+        return DefaultSpecializedServiceRequestDispatcher(producer, settings)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_command_handler(
+        self,
+        state_store: EssayStateStore,
+        request_dispatcher: SpecializedServiceRequestDispatcher,
+        event_publisher: EventPublisher
+    ) -> BatchCommandHandler:
+        """Provide batch command handler implementation."""
+        return DefaultBatchCommandHandler(state_store, request_dispatcher, event_publisher)
+
 
 # Concrete implementations
 class DefaultEventPublisher:
@@ -133,36 +152,97 @@ class DefaultEventPublisher:
         message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
         await self.producer.send_and_wait(topic, message)
 
-    async def publish_processing_request(
+    async def publish_batch_phase_progress(
         self,
-        event_type: str,
-        essay_ref: EntityReference,
-        payload: dict[str, Any],
-        correlation_id: UUID | None = None,
+        batch_id: str,
+        phase: str,
+        completed_count: int,
+        failed_count: int,
+        total_essays_in_phase: int,
+        correlation_id: UUID | None = None
     ) -> None:
-        """Publish processing request to specialized services."""
+        """Report aggregated progress of a specific phase for a batch to BS."""
         import json
         from datetime import UTC, datetime
-
-        # Create event envelope with processing request
-        from typing import Any
         from uuid import uuid4
 
         from common_core.events.envelope import EventEnvelope
+        from common_core.metadata_models import EntityReference
 
-        envelope = EventEnvelope[Any](
-            event_type=event_type,
-            source_service=self.settings.SERVICE_NAME,
-            correlation_id=correlation_id or uuid4(),
-            data={
-                "entity_ref": essay_ref.model_dump(),
-                "timestamp": datetime.now(UTC).isoformat(),
-                **payload,
-            },
+        # Create batch progress event data
+        batch_ref = EntityReference(
+            entity_id=batch_id,
+            entity_type="batch"
         )
 
-        # Determine topic based on event type
-        topic = self._get_topic_for_event_type(event_type)
+        event_data = {
+            "event_name": "batch.phase.progress.v1",
+            "entity_ref": batch_ref.model_dump(),
+            "phase": phase,
+            "completed_count": completed_count,
+            "failed_count": failed_count,
+            "total_essays_in_phase": total_essays_in_phase,
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+
+        # Create event envelope
+        from typing import Any
+
+        envelope = EventEnvelope[Any](
+            event_type="huleedu.els.batch_phase.progress.v1",
+            source_service=self.settings.SERVICE_NAME,
+            correlation_id=correlation_id or uuid4(),
+            data=event_data,
+        )
+
+        # Publish to Batch Service topic
+        topic = "batch.phase.progress.events"
+        message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
+        await self.producer.send_and_wait(topic, message)
+
+    async def publish_batch_phase_concluded(
+        self,
+        batch_id: str,
+        phase: str,
+        status: str,
+        details: dict[str, Any],
+        correlation_id: UUID | None = None
+    ) -> None:
+        """Report the final conclusion of a phase for a batch to BS."""
+        import json
+        from datetime import UTC, datetime
+        from uuid import uuid4
+
+        from common_core.events.envelope import EventEnvelope
+        from common_core.metadata_models import EntityReference
+
+        # Create batch conclusion event data
+        batch_ref = EntityReference(
+            entity_id=batch_id,
+            entity_type="batch"
+        )
+
+        event_data = {
+            "event_name": "batch.phase.concluded.v1",
+            "entity_ref": batch_ref.model_dump(),
+            "phase": phase,
+            "status": status,
+            "details": details,
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+
+        # Create event envelope
+        from typing import Any
+
+        envelope = EventEnvelope[Any](
+            event_type="huleedu.els.batch_phase.concluded.v1",
+            source_service=self.settings.SERVICE_NAME,
+            correlation_id=correlation_id or uuid4(),
+            data=event_data,
+        )
+
+        # Publish to Batch Service topic
+        topic = "batch.phase.concluded.events"
         message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
         await self.producer.send_and_wait(topic, message)
 
@@ -254,3 +334,96 @@ class DefaultMetricsCollector:
 
         if metric_name == "operations":
             self.operation_counter.labels(**labels).inc()
+
+
+class DefaultBatchCommandHandler:
+    """Default implementation of BatchCommandHandler protocol."""
+
+    def __init__(
+        self,
+        state_store: EssayStateStore,
+        request_dispatcher: SpecializedServiceRequestDispatcher,
+        event_publisher: EventPublisher
+    ) -> None:
+        self.state_store = state_store
+        self.request_dispatcher = request_dispatcher
+        self.event_publisher = event_publisher
+
+    async def process_initiate_spellcheck_command(
+        self,
+        command_data: Any,  # BatchServiceSpellcheckInitiateCommandDataV1
+        correlation_id: UUID | None = None
+    ) -> None:
+        """Process spellcheck phase initiation command from Batch Service."""
+        # TODO: Implement spellcheck command processing
+        # 1. Update essay states to AWAITING_SPELLCHECK
+        # 2. Dispatch individual requests to Spellcheck Service
+        # 3. Track batch progress
+        pass
+
+    async def process_initiate_nlp_command(
+        self,
+        command_data: Any,  # BatchServiceNLPInitiateCommandDataV1
+        correlation_id: UUID | None = None
+    ) -> None:
+        """Process NLP phase initiation command from Batch Service."""
+        # TODO: Implement NLP command processing
+        pass
+
+    async def process_initiate_ai_feedback_command(
+        self,
+        command_data: Any,  # BatchServiceAIFeedbackInitiateCommandDataV1
+        correlation_id: UUID | None = None
+    ) -> None:
+        """Process AI feedback phase initiation command from Batch Service."""
+        # TODO: Implement AI feedback command processing
+        pass
+
+    async def process_initiate_cj_assessment_command(
+        self,
+        command_data: Any,  # BatchServiceCJAssessmentInitiateCommandDataV1
+        correlation_id: UUID | None = None
+    ) -> None:
+        """Process CJ assessment phase initiation command from Batch Service."""
+        # TODO: Implement CJ assessment command processing
+        pass
+
+
+class DefaultSpecializedServiceRequestDispatcher:
+    """Default implementation of SpecializedServiceRequestDispatcher protocol."""
+
+    def __init__(self, producer: AIOKafkaProducer, settings: Settings) -> None:
+        self.producer = producer
+        self.settings = settings
+
+    async def dispatch_spellcheck_requests(
+        self,
+        essays_to_process: list[Any],  # List[EssayProcessingInputRefV1]
+        language: str,
+        batch_correlation_id: UUID | None = None
+    ) -> None:
+        """Dispatch spellcheck requests to Spellcheck Service."""
+        # TODO: Implement spellcheck request dispatching
+        # Create EssayLifecycleSpellcheckRequestV1 for each essay
+        # Publish to spellcheck service topic
+        pass
+
+    async def dispatch_nlp_requests(
+        self,
+        essays_to_process: list[Any],  # List[EssayProcessingInputRefV1]
+        language: str,
+        batch_correlation_id: UUID | None = None
+    ) -> None:
+        """Dispatch NLP requests to NLP Service."""
+        # TODO: Implement NLP request dispatching
+        pass
+
+    async def dispatch_ai_feedback_requests(
+        self,
+        essays_to_process: list[Any],  # List[EssayProcessingInputRefV1]
+        context: Any,  # AIFeedbackBatchContextDataV1
+        batch_correlation_id: UUID | None = None
+    ) -> None:
+        """Dispatch AI feedback requests to AI Feedback Service."""
+        # TODO: Implement AI feedback request dispatching
+        pass

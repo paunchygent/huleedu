@@ -10,7 +10,6 @@ from __future__ import annotations
 from datetime import datetime
 
 from common_core.enums import ContentType, EssayStatus
-from common_core.metadata_models import EntityReference
 from dishka import FromDishka, make_async_container
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from pydantic import BaseModel, ValidationError
@@ -278,24 +277,17 @@ async def retry_essay_processing(
     }
     await state_store.update_essay_state(essay_id, target_status, retry_metadata)
 
-    # Create entity reference
-    entity_ref = EntityReference(
-        entity_id=essay_id,
-        entity_type="essay",
-        parent_id=essay_state.batch_id,
-    )
-
-    # Publish retry request event
-    event_type_map = {
-        "spellcheck": "essay.spellcheck.requested.v1",
-        "nlp": "essay.nlp.requested.v1",
-        "ai_feedback": "essay.ai_feedback.requested.v1",
-    }
-
-    await event_publisher.publish_processing_request(
-        event_type_map[retry_request.phase],
-        entity_ref,
-        {"retry": True, "text_storage_id": ""},  # TODO: Get proper storage ID
+    # NOTE: Under batch-centric orchestration, ELS only updates essay state
+    # The Batch Service is responsible for detecting retry-eligible essays
+    # and issuing appropriate batch commands to re-trigger processing
+    logger.info(
+        f"Essay {essay_id} marked for retry in phase {retry_request.phase}",
+        extra={
+            "essay_id": essay_id,
+            "phase": retry_request.phase,
+            "target_status": target_status.value,
+            "message": "Batch Service will detect and re-initiate processing"
+        }
     )
 
     # Record metrics

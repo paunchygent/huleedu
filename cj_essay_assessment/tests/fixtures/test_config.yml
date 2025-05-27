@@ -1,0 +1,66 @@
+# Test configuration for the CJ Essay Assessment system
+
+# Database settings
+database_url: "sqlite+aiosqlite:///test.db"
+
+# Logging
+log_level: "DEBUG"
+
+# LLM Provider Configuration
+default_provider: "openrouter"
+
+llm_providers:
+  openrouter:
+    api_base: "https://openrouter.ai/api/v1"
+  openai:
+    api_base: "https://api.openai.com/v1"
+  anthropic:
+    api_base: "https://api.anthropic.com/v1"
+  google:
+    api_base: "https://generativelanguage.googleapis.com/v1beta"
+
+# Model selection
+comparison_model: "openai/gpt-o4-mini"
+system_prompt: "You are an expert evaluator of student essays."
+assessment_prompt_template: |
+  Please compare the following two essays based on clarity and overall quality.
+  Respond with a JSON object with winner, justification, and confidence.
+
+  Essay A (ID: {essay_a_id}):
+  ---
+  {essay_a_text}
+  ---
+
+  Essay B (ID: {essay_b_id}):
+  ---
+  {essay_b_text}
+  ---
+temperature: 0.3
+max_tokens_response: 250
+
+# Comparison Process Control
+max_pairwise_comparisons: 100
+score_stability_threshold: 0.005
+min_comparisons_for_stability_check: 20
+comparisons_per_stability_check_iteration: 10
+
+# Paths & Directories
+essay_input_dir: "tests/fixtures/essays"
+
+# Spell Checking (PyEnchant)
+default_spell_check_language: "en_US"
+supported_spell_check_languages:
+  - "en_US"
+  - "sv_SE"
+  - "en_GB"
+
+# Caching
+cache_enabled: true
+cache_type: "memory"
+cache_directory: "tests/fixtures/cache"
+cache_ttl_seconds: 3600 # 1 hour
+
+# NLP Analysis
+nlp_features_to_compute:
+  - word_count
+  - avg_word_length 

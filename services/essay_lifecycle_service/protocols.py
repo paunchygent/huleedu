@@ -11,7 +11,7 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from common_core.enums import ContentType, EssayStatus
-from common_core.metadata_models import EntityReference
+from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 
 
 class EssayState(Protocol):
@@ -62,14 +62,94 @@ class EventPublisher(Protocol):
         """Publish essay status update event."""
         ...
 
-    async def publish_processing_request(
+    async def publish_batch_phase_progress(
         self,
-        event_type: str,
-        essay_ref: EntityReference,
-        payload: dict[str, Any],
-        correlation_id: UUID | None = None,
+        batch_id: str,
+        phase: str,
+        completed_count: int,
+        failed_count: int,
+        total_essays_in_phase: int,
+        correlation_id: UUID | None = None
     ) -> None:
-        """Publish processing request to specialized services."""
+        """Report aggregated progress of a specific phase for a batch to BS."""
+        ...
+
+    async def publish_batch_phase_concluded(
+        self,
+        batch_id: str,
+        phase: str,
+        status: str,
+        details: dict[str, Any],
+        correlation_id: UUID | None = None
+    ) -> None:
+        """Report the final conclusion of a phase for a batch to BS."""
+        ...
+
+
+class BatchCommandHandler(Protocol):
+    """Protocol for handling batch processing commands from Batch Service."""
+
+    async def process_initiate_spellcheck_command(
+        self,
+        command_data: Any,  # BatchServiceSpellcheckInitiateCommandDataV1
+        correlation_id: UUID | None = None
+    ) -> None:
+        """Process spellcheck phase initiation command from Batch Service."""
+        ...
+
+    async def process_initiate_nlp_command(
+        self,
+        command_data: Any,  # BatchServiceNLPInitiateCommandDataV1
+        correlation_id: UUID | None = None
+    ) -> None:
+        """Process NLP phase initiation command from Batch Service."""
+        ...
+
+    async def process_initiate_ai_feedback_command(
+        self,
+        command_data: Any,  # BatchServiceAIFeedbackInitiateCommandDataV1
+        correlation_id: UUID | None = None
+    ) -> None:
+        """Process AI feedback phase initiation command from Batch Service."""
+        ...
+
+    async def process_initiate_cj_assessment_command(
+        self,
+        command_data: Any,  # BatchServiceCJAssessmentInitiateCommandDataV1
+        correlation_id: UUID | None = None
+    ) -> None:
+        """Process CJ assessment phase initiation command from Batch Service."""
+        ...
+
+
+class SpecializedServiceRequestDispatcher(Protocol):
+    """Protocol for dispatching individual essay processing requests to Specialized Services."""
+
+    async def dispatch_spellcheck_requests(
+        self,
+        essays_to_process: list[EssayProcessingInputRefV1],
+        language: str,
+        batch_correlation_id: UUID | None = None
+    ) -> None:
+        """Dispatch spellcheck requests to Spellcheck Service."""
+        ...
+
+    async def dispatch_nlp_requests(
+        self,
+        essays_to_process: list[EssayProcessingInputRefV1],
+        language: str,
+        batch_correlation_id: UUID | None = None
+    ) -> None:
+        """Dispatch NLP requests to NLP Service."""
+        ...
+
+    async def dispatch_ai_feedback_requests(
+        self,
+        essays_to_process: list[EssayProcessingInputRefV1],
+        context: Any,  # AIFeedbackBatchContextDataV1 (to be defined)
+        batch_correlation_id: UUID | None = None
+    ) -> None:
+        """Dispatch AI feedback requests to AI Feedback Service."""
         ...
 
 

@@ -15,11 +15,11 @@ from .enums import (  # Assuming enums.py is in the same directory
 __all__ = [
     "EntityReference",
     "SystemProcessingMetadata",
-    "BatchProcessingMetadata",
     "AIFeedbackMetadata",
     "StorageReferenceMetadata",
     "UserActivityMetadata",
     "CancellationMetadata",
+    "EssayProcessingInputRefV1",
 ]
 
 
@@ -41,29 +41,6 @@ class SystemProcessingMetadata(BaseModel):
     completed_at: Optional[datetime] = None
     event: Optional[str] = None  # Actual event name string, e.g., from ProcessingEvent enum
     error_info: Dict[str, Any] = Field(default_factory=dict)
-    model_config = {"populate_by_name": True}
-
-
-class BatchProcessingMetadata(BaseModel):
-    user_id: Optional[str] = None  # Changed to str for flexibility
-    context_source: str = Field(default="web_upload", alias="context")
-    file_count: int
-    total_essays: Optional[int] = None
-    processed_essays: Optional[int] = None
-    failed_essays: Optional[int] = None
-    failed_upload_count: Optional[int] = None
-    failed_processing_count: Optional[int] = None
-    teacher_name: Optional[str] = None
-    course_code: Optional[str] = None
-    essay_instructions: Optional[str] = None
-    class_designation: Optional[str] = None
-    upload_started_at: Optional[datetime] = None
-    processing_completed_at: Optional[datetime] = Field(default=None, alias="completed_at")
-    is_terminal_state: bool = False
-    can_cancel: bool = True
-    success_rate: Optional[float] = None
-    failure_reasons: Dict[str, Any] = Field(default_factory=dict)
-    processing_metrics: Dict[str, Any] = Field(default_factory=dict)
     model_config = {"populate_by_name": True}
 
 
@@ -104,3 +81,11 @@ class CancellationMetadata(BaseModel):
     cancelled_by: Optional[str] = None
     reason: Optional[str] = None
     cancellation_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class EssayProcessingInputRefV1(BaseModel):
+    """Reference to an essay and its text content for processing requests."""
+
+    essay_id: str
+    text_storage_id: str
+    student_name: Optional[str] = None
