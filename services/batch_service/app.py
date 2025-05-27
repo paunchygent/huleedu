@@ -13,9 +13,12 @@ from typing import Optional, Union
 
 import aiohttp
 from config import settings
-from huleedu_service_libs.kafka_client import KafkaBus
+from di import BatchServiceProvider
+from dishka import FromDishka, make_async_container
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from protocols import BatchEventPublisherProtocol
 from quart import Quart, Response, jsonify
+from quart_dishka import QuartDishka, inject
 
 from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage, topic_name
 from common_core.events.envelope import EventEnvelope
@@ -27,8 +30,6 @@ configure_service_logging("batch-service", log_level=settings.LOG_LEVEL)
 logger = create_service_logger("api")
 
 app = Quart(__name__)
-KAFKA_BUS_CLIENT_ID = "batch-service-producer"
-app.config["KAFKA_BUS"] = None
 
 CONTENT_SERVICE_URL = settings.CONTENT_SERVICE_URL
 OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
@@ -36,30 +37,23 @@ OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST = topic_name(ProcessingEvent.ESSAY_SPELLCH
 
 @app.before_serving
 async def startup() -> None:
+    """Initialize the DI container and setup quart-dishka integration."""
     try:
-        bus = KafkaBus(client_id=KAFKA_BUS_CLIENT_ID)
-        await bus.start()
-        app.config["KAFKA_BUS"] = bus
-        logger.info("Batch Service KafkaBus started.")
+        container = make_async_container(BatchServiceProvider())
+        QuartDishka(app=app, container=container)
+        logger.info(
+            "Batch Service DI container and quart-dishka integration initialized successfully."
+        )
     except Exception as e:
-        logger.critical(f"Failed to start KafkaBus for Batch Service: {e}", exc_info=True)
-
-
-@app.after_serving
-async def shutdown() -> None:
-    bus = app.config.get("KAFKA_BUS")
-    if bus:
-        await bus.stop()
-        logger.info("Batch Service KafkaBus stopped.")
+        logger.critical(f"Failed to initialize DI container for Batch Service: {e}", exc_info=True)
 
 
 @app.post("/v1/batches/trigger-spellcheck-test")
-async def trigger_spellcheck_test_endpoint() -> Union[Response, tuple[Response, int]]:
-    bus: Optional[KafkaBus] = app.config.get("KAFKA_BUS")
-    if not bus:
-        logger.error("KafkaBus not initialized in Batch Service.")
-        return jsonify({"error": "Service not ready, Kafka producer unavailable."}), 503
-
+@inject
+async def trigger_spellcheck_test_endpoint(
+    event_publisher: FromDishka[BatchEventPublisherProtocol],
+) -> Union[Response, tuple[Response, int]]:
+    """Test endpoint to trigger a spellcheck request using DI."""
     try:
         batch_id = str(uuid.uuid4())
         essay_id_1 = str(uuid.uuid4())
@@ -120,7 +114,8 @@ async def trigger_spellcheck_test_endpoint() -> Union[Response, tuple[Response, 
             data=spellcheck_request_data,
         )
 
-        await bus.publish(OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST, envelope, key=essay_id_1)
+        # Use the injected event publisher
+        await event_publisher.publish_batch_event(envelope)
 
         logger.info(
             f"Published SpellcheckRequestedDataV1 for essay {essay_id_1}, "
@@ -147,14 +142,12 @@ async def trigger_spellcheck_test_endpoint() -> Union[Response, tuple[Response, 
 
 @app.get("/healthz")
 async def health_check() -> Union[Response, tuple[Response, int]]:
-    bus: Optional[KafkaBus] = app.config.get("KAFKA_BUS")
-    kafka_status = "connected" if bus and bus._started else "disconnected"
+    """Health check endpoint."""
     return (
         jsonify(
             {
                 "status": "ok",
                 "message": "Batch Service is healthy",
-                "kafka_producer": kafka_status,
             }
         ),
         200,

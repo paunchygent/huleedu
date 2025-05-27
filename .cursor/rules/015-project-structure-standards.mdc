@@ -1,7 +1,7 @@
 ---
-description: Read whenever trying to understand code and file structure or creating new files.
+description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # 015: Project Structure Standards
 

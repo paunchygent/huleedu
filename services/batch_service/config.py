@@ -19,6 +19,8 @@ class Settings(BaseSettings):
 
     LOG_LEVEL: str = "INFO"
     ENVIRONMENT: str = "development"  # development, production, testing
+    SERVICE_NAME: str = "batch-service"
+    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
     PORT: int = 5000  # Default port for batch service
     HOST: str = "0.0.0.0"

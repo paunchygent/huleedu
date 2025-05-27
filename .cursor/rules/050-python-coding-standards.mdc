@@ -30,7 +30,9 @@ alwaysApply: true
 
 ### 3.2. Dependency Injection Principle
 - Business logic **MUST** depend on abstractions (`typing.Protocol`), not concrete implementations.
-- Concrete implementations are provided at service entry points (e.g., `worker_main.py`, `app.py`), ideally via a DI framework (Dishka is the target).
+- **MUST** use Dishka DI framework; every provider lives in `<service>/di.py`
+- HTTP services **MUST** use `quart-dishka` integration with `@inject` decorator
+- **FORBIDDEN**: Direct imports of concrete classes in business logic
 
 ## 4. Documentation
 

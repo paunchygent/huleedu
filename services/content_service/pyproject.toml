@@ -15,6 +15,8 @@ dependencies = [
     "huleedu-service-libs",
     "pydantic",
     "pydantic-settings",
+    "prometheus-client",
+    "dishka",
 ]
 
 

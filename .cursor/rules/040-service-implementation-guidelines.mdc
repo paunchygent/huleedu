@@ -17,24 +17,54 @@ alwaysApply: false
 - Business logic components (e.g., in `event_router.py` or Quart route handlers) **MUST** depend on these protocols, not concrete implementations directly.
 - Concrete implementations of protocols are provided at the service entry point (e.g., in `worker_main.py` or `app.py`), ideally via a DI framework like Dishka.
 
-### 2.2. Dependency Injection (Manual Example, Dishka Preferred)
-- While Dishka is the target (see Δ-2), the principle is to inject dependencies.
-- Example of passing protocol implementations (manually): 
-```python
-# In worker_main.py or app.py (simplified)
-content_client_impl = DefaultContentClient(...)
-result_store_impl = DefaultResultStore(...)
-# ... other implementations
+### 2.2. Dependency Injection with Dishka
+- **MUST** use Dishka DI framework for all services
+- **HTTP Services**: Use `quart-dishka` integration with `@inject` decorator and `FromDishka[T]` annotations
+- **Worker Services**: Use Dishka container with manual scoping for Kafka message processing
 
-# When calling a processing function:
-await process_single_message(
-    msg,
-    kafka_producer_instance, # Direct instance
-    http_session_instance,   # Direct instance
-    content_client=content_client_impl, # Protocol implementation
-    result_store=result_store_impl,     # Protocol implementation
-    # ... other protocol implementations
-)
+#### HTTP Service Pattern (Quart + quart-dishka):
+```python
+# app.py
+from dishka import make_async_container
+from quart_dishka import QuartDishka, inject
+from di import ServiceProvider
+
+@app.before_serving
+async def startup():
+    container = make_async_container(ServiceProvider())
+    QuartDishka(app=app, container=container)
+
+@app.post("/endpoint")
+@inject
+async def handler(dependency: FromDishka[Protocol]) -> Response:
+    # Use dependency directly
+    pass
+```
+
+#### Worker Service Pattern:
+```python
+# worker_main.py
+from dishka import make_async_container
+
+async def main():
+    container = make_async_container(ServiceProvider())
+    async with container() as request_container:
+        dependency = await request_container.get(Protocol)
+        # Use dependency
+```
+
+#### DI Provider Pattern:
+- **MUST** create `<service>/di.py` with service-specific `Provider` class
+- **MUST** use `@provide` decorator with appropriate scopes (`Scope.APP`, `Scope.REQUEST`)
+- **MUST** return protocol interfaces, not concrete classes from business logic
+```python
+# di.py
+from dishka import Provider, Scope, provide
+
+class ServiceProvider(Provider):
+    @provide(scope=Scope.APP)
+    def provide_protocol(self) -> ProtocolInterface:
+        return ConcreteImplementation()
 ```
 
 ### 2.3. Worker Service Structure Pattern (Example: Spell Checker)

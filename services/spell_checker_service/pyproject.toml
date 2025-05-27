@@ -17,6 +17,8 @@ dependencies = [
     "huleedu-service-libs",
     "pydantic",
     "pydantic-settings",
+    "prometheus-client",
+    "dishka",
 ]
 
 [build-system]
@@ -47,3 +49,19 @@ warn_return_any = true
 ignore_missing_imports = false
 check_untyped_defs = true
 # disallow_untyped_defs = false # Default in root config 
+
+# External libraries without official type stubs
+[[tool.mypy.overrides]]
+module = [
+    "dishka.*",
+]
+ignore_missing_imports = true
+
+# Service-local modules
+[[tool.mypy.overrides]]
+module = [
+    "di",
+    "protocols",
+    "config",
+]
+ignore_missing_imports = true 

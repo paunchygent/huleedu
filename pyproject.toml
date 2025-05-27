@@ -139,7 +139,9 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = [
     "aiokafka.*",
-    "aiofiles.*"
+    "aiofiles.*",
+    "dishka.*",
+    "quart_dishka.*",
 ]
 ignore_missing_imports = true
 # Note: These external libraries lack official type stubs on PyPI
@@ -147,7 +149,11 @@ ignore_missing_imports = true
 
 # Service-local config modules
 [[tool.mypy.overrides]]
-module = "config"
+module = [
+    "config",
+    "di",
+    "protocols",
+]
 ignore_missing_imports = true
 
 # Existing code (less strict initially)

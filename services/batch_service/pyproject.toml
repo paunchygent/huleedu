@@ -16,6 +16,9 @@ dependencies = [
     "huleedu-service-libs",
     "pydantic",
     "pydantic-settings",
+    "prometheus-client",
+    "dishka",
+    "quart-dishka",
 ]
 
 [build-system]
@@ -37,3 +40,19 @@ dev = "quart --app app:app --debug run -p 5001"
 python_version = "3.11"
 warn_return_any = true
 ignore_missing_imports = false 
+
+# External libraries without official type stubs
+[[tool.mypy.overrides]]
+module = [
+    "dishka.*",
+]
+ignore_missing_imports = true
+
+# Service-local modules
+[[tool.mypy.overrides]]
+module = [
+    "di",
+    "protocols",
+    "config",
+]
+ignore_missing_imports = true 
