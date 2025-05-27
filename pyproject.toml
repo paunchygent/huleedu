@@ -38,6 +38,7 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/content_service",
     "-e file:///${PROJECT_ROOT}/services/spell_checker_service",
     "-e file:///${PROJECT_ROOT}/services/batch_service",
+    "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service"
 ]
 
 [tool.pdm.scripts]
@@ -130,7 +131,7 @@ module = [
     "services.libs.*",
     "services.content_service.*",
     "services.spell_checker_service.*",
-    "services.batch_service.*"
+    "services.batch_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true
@@ -162,7 +163,7 @@ module = [
     "server_web_app.*",
     "ai_feedback_svenska.*",
     "common.*",
-    "CJ_ESSAY_ASSESSMENT.*"
+    "CJ_ESSAY_ASSESSMENT.*",
 ]
 ignore_missing_imports = true
 disallow_untyped_defs = false
@@ -173,12 +174,14 @@ testpaths = [
     "services/content_service/tests",
     "services/spell_checker_service/tests",
     "services/batch_service/tests",
+    "services/essay_lifecycle_service/tests",
     "tests"
 ]
 pythonpath = [
     "services/spell_checker_service",
     "services/content_service", 
-    "services/batch_service"
+    "services/batch_service",
+    "services/essay_lifecycle_service"
 ]
 python_files = "test_*.py *_test.py"
 python_classes = "Test*"

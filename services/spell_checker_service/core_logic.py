@@ -23,11 +23,12 @@ logger = create_service_logger("spell_checker_service.core_logic")
 
 # --- Default Implementations / Helpers ---
 
+
 async def default_fetch_content_impl(
     session: aiohttp.ClientSession,
     storage_id: str,
     content_service_url: str,
-    essay_id: Optional[str] = None
+    essay_id: Optional[str] = None,
 ) -> str:
     """
     Default implementation for fetching content from the content service.
@@ -42,8 +43,7 @@ async def default_fetch_content_impl(
             response.raise_for_status()
             content = await response.text()
             logger.debug(
-                f"{log_prefix}Fetched content from {storage_id} "
-                f"(first 100 chars: {content[:100]})"
+                f"{log_prefix}Fetched content from {storage_id} (first 100 chars: {content[:100]})"
             )
             return content
     except Exception as e:
@@ -51,7 +51,7 @@ async def default_fetch_content_impl(
             f"{log_prefix}Error fetching content {storage_id} from {url}: {e}",
             exc_info=True,
         )
-        raise # Re-raise after logging
+        raise  # Re-raise after logging
 
 
 async def default_store_content_impl(
@@ -84,12 +84,11 @@ async def default_store_content_impl(
             return storage_id
     except Exception as e:
         logger.error(f"{log_prefix}Error storing content: {e}", exc_info=True)
-        raise # Re-raise after logging
+        raise  # Re-raise after logging
 
 
 async def default_perform_spell_check_algorithm(
-    text: str,
-    essay_id: Optional[str] = None
+    text: str, essay_id: Optional[str] = None
 ) -> Tuple[str, int]:
     """
     Core spell check algorithm.
@@ -97,8 +96,7 @@ async def default_perform_spell_check_algorithm(
     """
     log_prefix = f"Essay {essay_id}: " if essay_id else ""
     logger.info(
-        f"{log_prefix}Performing DUMMY spell check algorithm for text "
-        f"(length: {len(text)})"
+        f"{log_prefix}Performing DUMMY spell check algorithm for text (length: {len(text)})"
     )
     await asyncio.sleep(0.1)  # Simulate work
 

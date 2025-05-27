@@ -49,8 +49,8 @@ class TestEventContractCompliance:
         mock_producer: Any,  # AIOKafkaProducer mock
         mock_http_session: Any,
         sample_essay_id: str,  # Keep for assertions
-        sample_text: str,      # Added: needed for mock_content_client and spell_check_algo
-        corrected_text: str,   # Added: needed for mock_spell_check_algo
+        sample_text: str,  # Added: needed for mock_content_client and spell_check_algo
+        corrected_text: str,  # Added: needed for mock_spell_check_algo
     ) -> None:
         """Test that published events conform to the expected Pydantic schema."""
 
@@ -100,7 +100,8 @@ class TestEventContractCompliance:
             request_envelope_dict = json.loads(kafka_message.value.decode("utf-8"))
             expected_correlation_id = (
                 UUID(request_envelope_dict["correlation_id"])
-                if request_envelope_dict.get("correlation_id") else None
+                if request_envelope_dict.get("correlation_id")
+                else None
             )
 
             # Construct a representative EventEnvelope for validation
@@ -114,7 +115,7 @@ class TestEventContractCompliance:
                 event_type=expected_event_type_str,
                 source_service=expected_source_service,
                 correlation_id=published_correlation_id,  # Use what was passed to publisher
-                data=published_event_data
+                data=published_event_data,
             )
             # Validate the constructed envelope can be dumped and re-parsed (basic Pydantic check)
             # This validates the *structure* of the data that would form the envelope
@@ -139,8 +140,7 @@ class TestEventContractCompliance:
                 == mock_corrected_storage_id
             )
             assert (
-                published_event_data.system_metadata.processing_stage ==
-                ProcessingStage.COMPLETED
+                published_event_data.system_metadata.processing_stage == ProcessingStage.COMPLETED
             )
 
     @pytest.mark.asyncio
@@ -150,8 +150,8 @@ class TestEventContractCompliance:
         mock_producer: Any,
         mock_http_session: Any,
         sample_essay_id: str,  # Keep for assertions and mocking
-        sample_text: str,      # Added: needed for mock_content_client and spell_check_algo
-        corrected_text: str,   # Added: needed for mock_spell_check_algo
+        sample_text: str,  # Added: needed for mock_content_client and spell_check_algo
+        corrected_text: str,  # Added: needed for mock_spell_check_algo
     ) -> None:
         """Test that correlation ID is properly propagated from request to response."""
 

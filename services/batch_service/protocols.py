@@ -11,7 +11,7 @@ from common_core.pipeline_models import ProcessingPipelineState
 # if not directly from common_core
 # If BatchUpload is a Pydantic model defined elsewhere (e.g., common_core.models.batch.BatchUpload)
 # then that should be imported instead.
-class BatchUpload: ... # Placeholder for actual BatchUpload Pydantic model
+class BatchUpload: ...  # Placeholder for actual BatchUpload Pydantic model
 
 
 class BatchRepositoryProtocol(Protocol):
@@ -43,7 +43,10 @@ class BatchEventPublisherProtocol(Protocol):
 
 class EssayLifecycleClientProtocol(Protocol):
     async def request_essay_phase_initiation(
-        self, batch_id: str, essay_ids: List[str], phase: str  # phase might be an Enum too
+        self,
+        batch_id: str,
+        essay_ids: List[str],
+        phase: str,  # phase might be an Enum too
     ) -> None:
         """Requests the Essay Lifecycle Service to initiate a processing phase for essays."""
         ...

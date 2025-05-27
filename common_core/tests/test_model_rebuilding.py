@@ -95,19 +95,12 @@ class TestEventEnvelopeSchemaVersion:
         # Dummy data for the envelope
         dummy_data = BaseEventData(
             event_name=ProcessingEvent.PROCESSING_STARTED,
-            entity_ref=EntityReference(
-                entity_id="test_entity",
-                entity_type="test"
-            )
+            entity_ref=EntityReference(entity_id="test_entity", entity_type="test"),
         )
 
         # 1. Test default value upon creation
-        envelope_new = EventEnvelope[
-            BaseEventData
-        ] (
-            event_type="test.event.v1",
-            source_service="test_service",
-            data=dummy_data
+        envelope_new = EventEnvelope[BaseEventData](
+            event_type="test.event.v1", source_service="test_service", data=dummy_data
         )
         assert envelope_new.schema_version == 1
 
@@ -127,8 +120,9 @@ class TestEventEnvelopeSchemaVersion:
             "event_type": "test.oldevent.v1",
             "event_timestamp": datetime.now(timezone.utc).isoformat(),
             "source_service": "old_service",
-            "data": dummy_data.model_dump() # Pydantic will handle parsing this to BaseEventData
+            "data": dummy_data.model_dump(),  # Pydantic will handle parsing this to BaseEventData
         }
         envelope_from_old_payload = EventEnvelope[BaseEventData].model_validate(old_payload_dict)
-        assert envelope_from_old_payload.schema_version == 1, \
+        assert envelope_from_old_payload.schema_version == 1, (
             "Schema version should default to 1 when parsing an old payload without it."
+        )

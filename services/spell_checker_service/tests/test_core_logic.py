@@ -63,10 +63,7 @@ class TestDefaultImplementations:
 
         # Act
         result = await default_fetch_content_impl(
-            mock_session,
-            sample_storage_id,
-            "http://test-service",
-            sample_essay_id
+            mock_session, sample_storage_id, "http://test-service", sample_essay_id
         )
 
         # Assert
@@ -89,10 +86,7 @@ class TestDefaultImplementations:
         # Act
         with pytest.raises(Exception, match="HTTP 404"):
             await default_fetch_content_impl(
-                mock_session,
-                sample_storage_id,
-                "http://test-service",
-                sample_essay_id
+                mock_session, sample_storage_id, "http://test-service", sample_essay_id
             )
 
         # Assert
@@ -114,10 +108,7 @@ class TestDefaultImplementations:
 
         # Act
         result = await default_store_content_impl(
-            mock_session,
-            content_to_store,
-            "http://test-service",
-            sample_essay_id
+            mock_session, content_to_store, "http://test-service", sample_essay_id
         )
 
         # Assert
@@ -140,10 +131,7 @@ class TestDefaultImplementations:
         # Act
         with pytest.raises(Exception, match="HTTP 500"):
             await default_store_content_impl(
-                mock_session,
-                content_to_store,
-                "http://test-service",
-                sample_essay_id
+                mock_session, content_to_store, "http://test-service", sample_essay_id
             )
 
         # Assert

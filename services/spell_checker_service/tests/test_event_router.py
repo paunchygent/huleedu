@@ -83,9 +83,9 @@ class TestProcessSingleMessage:
 
             # Verify protocol calls
             mock_content_client.fetch_content.assert_called_once_with(
-                storage_id=json.loads(
-                    kafka_message.value.decode('utf-8')
-                )["data"]["text_storage_id"],
+                storage_id=json.loads(kafka_message.value.decode("utf-8"))["data"][
+                    "text_storage_id"
+                ],
                 http_session=mock_http_session,
             )
 
@@ -94,9 +94,9 @@ class TestProcessSingleMessage:
 
             # Verify that DefaultSpellLogic (via result_store mock) stored the corrected text
             mock_result_store.store_content.assert_called_once_with(
-                original_storage_id=json.loads(
-                    kafka_message.value.decode('utf-8')
-                )["data"]["text_storage_id"],
+                original_storage_id=json.loads(kafka_message.value.decode("utf-8"))["data"][
+                    "text_storage_id"
+                ],
                 content_type=ContentType.CORRECTED_TEXT,
                 content=corrected_text,
                 http_session=mock_http_session,
@@ -113,19 +113,18 @@ class TestProcessSingleMessage:
             assert published_event_data.status == EssayStatus.SPELLCHECKED_SUCCESS
             assert published_event_data.corrections_made == corrections_count
             assert (
-                published_event_data.original_text_storage_id ==
-                json.loads(kafka_message.value.decode('utf-8'))["data"]["text_storage_id"]
+                published_event_data.original_text_storage_id
+                == json.loads(kafka_message.value.decode("utf-8"))["data"]["text_storage_id"]
             )
             assert published_event_data.storage_metadata is not None
             assert (
-                published_event_data.storage_metadata.references[CORRECTED_TEXT_TYPE]["default"] ==
-                mock_corrected_storage_id
+                published_event_data.storage_metadata.references[CORRECTED_TEXT_TYPE]["default"]
+                == mock_corrected_storage_id
             )
             assert published_event_data.entity_ref.entity_id == sample_essay_id
             assert published_event_data.event_name == ESSAY_RESULT_EVENT
             assert (
-                published_event_data.system_metadata.processing_stage ==
-                ProcessingStage.COMPLETED
+                published_event_data.system_metadata.processing_stage == ProcessingStage.COMPLETED
             )
 
     @pytest.mark.asyncio
@@ -158,7 +157,7 @@ class TestProcessSingleMessage:
                 mock_http_session,
                 mock_content_client,
                 mock_result_store,
-                mock_event_publisher
+                mock_event_publisher,
             )
 
             # Assert
@@ -166,7 +165,9 @@ class TestProcessSingleMessage:
 
             # Verify fetch was attempted
             mock_content_client.fetch_content.assert_called_once_with(
-                storage_id=json.loads(kafka_message.value.decode('utf-8'))["data"]["text_storage_id"],
+                storage_id=json.loads(kafka_message.value.decode("utf-8"))["data"][
+                    "text_storage_id"
+                ],
                 http_session=mock_http_session,
             )
 
@@ -237,9 +238,9 @@ class TestProcessSingleMessage:
 
             # Verify store_content was attempted
             mock_result_store.store_content.assert_called_once_with(
-                original_storage_id=json.loads(
-                    kafka_message.value.decode('utf-8')
-                )["data"]["text_storage_id"],
+                original_storage_id=json.loads(kafka_message.value.decode("utf-8"))["data"][
+                    "text_storage_id"
+                ],
                 content_type=ContentType.CORRECTED_TEXT,
                 content=corrected_text,
                 http_session=mock_http_session,
@@ -260,10 +261,10 @@ class TestProcessSingleMessage:
             assert "Exception storing corrected text" in error_message
             assert "Failed to store content" in error_message or "validation error" in error_message
             # Original text ID should still be there
-            json_data = json.loads(kafka_message.value.decode('utf-8'))
+            json_data = json.loads(kafka_message.value.decode("utf-8"))
             assert (
-                published_event_data.original_text_storage_id ==
-                json_data["data"]["text_storage_id"]
+                published_event_data.original_text_storage_id
+                == json_data["data"]["text_storage_id"]
             )
             # Storage metadata for corrected text should be None because storing failed
             assert published_event_data.storage_metadata is None
@@ -434,6 +435,8 @@ class TestProcessSingleMessage:
             assert published_event_data_attempt.corrections_made == corrections_count
             assert published_event_data_attempt.storage_metadata is not None
             assert (
-                published_event_data_attempt.storage_metadata.references[CORRECTED_TEXT_TYPE]["default"]
+                published_event_data_attempt.storage_metadata.references[CORRECTED_TEXT_TYPE][
+                    "default"
+                ]
                 == mock_corrected_storage_id
             )

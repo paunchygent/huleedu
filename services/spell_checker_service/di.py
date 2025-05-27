@@ -82,6 +82,7 @@ class DefaultContentClient:
     async def fetch_content(self, storage_id: str, http_session: ClientSession) -> str:
         """Fetch content using the core logic implementation."""
         from .config import settings
+
         return await default_fetch_content_impl(
             http_session, storage_id, settings.CONTENT_SERVICE_URL
         )
@@ -133,6 +134,7 @@ class DefaultResultStore:
     ) -> str:
         """Store content using the core logic implementation."""
         from .config import settings
+
         return await default_store_content_impl(http_session, content, settings.CONTENT_SERVICE_URL)
 
 

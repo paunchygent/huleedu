@@ -69,11 +69,7 @@ class MockBatchRepository:
     async def get_batch_by_id(self, batch_id: str) -> dict | None:
         """Mock implementation - returns placeholder data."""
         # Note: In production this would return a proper BatchUpload model
-        return {
-            "id": batch_id,
-            "status": "pending",
-            "processing_metadata": {}
-        }
+        return {"id": batch_id, "status": "pending", "processing_metadata": {}}
 
     async def create_batch(self, batch_data: dict) -> dict:
         """Mock implementation - returns the batch data with an ID."""
@@ -84,9 +80,7 @@ class MockBatchRepository:
         """Mock implementation - always succeeds."""
         return True
 
-    async def save_processing_pipeline_state(
-        self, batch_id: str, pipeline_state: dict
-    ) -> bool:
+    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
         """Mock implementation - always succeeds."""
         return True
 

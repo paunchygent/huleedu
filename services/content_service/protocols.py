@@ -11,7 +11,7 @@ class ContentRepositoryProtocol(Protocol):
         self,
         content_type: ContentType,
         content_data: bytes,
-        user_id: Optional[str] = None # Optional user context
+        user_id: Optional[str] = None,  # Optional user context
     ) -> str:
         """Stores content data and returns a unique storage ID."""
         ...
