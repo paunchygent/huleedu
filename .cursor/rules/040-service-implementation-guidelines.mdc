@@ -6,34 +6,64 @@ alwaysApply: false
 # 040: Service Implementation Guidelines
 
 ## 1. Core Stack
-- **Framework**: Quart for async HTTP services
+- **Framework**: Quart for async HTTP services, direct `asyncio` and `aiokafka` for worker services.
 - **Dependencies**: PDM exclusively (`pyproject.toml`, `pdm.lock`)
 - **Programming**: `async/await` for all I/O operations
 
-## 2. Async Patterns
+## 2. Async Patterns & Structure
 
-### 2.1. Dependency Injection
+### 2.1. Dependency Contracts & Protocols
+- **MUST** define internal behavioral contracts using `typing.Protocol` in a `<service_name>/protocols.py` file.
+- Business logic components (e.g., in `event_router.py` or Quart route handlers) **MUST** depend on these protocols, not concrete implementations directly.
+- Concrete implementations of protocols are provided at the service entry point (e.g., in `worker_main.py` or `app.py`), ideally via a DI framework like Dishka.
+
+### 2.2. Dependency Injection (Manual Example, Dishka Preferred)
+- While Dishka is the target (see Δ-2), the principle is to inject dependencies.
+- Example of passing protocol implementations (manually): 
 ```python
-async def process_single_message(
-    msg: ConsumerRecord,
-    producer: AIOKafkaProducer,
-    http_session: aiohttp.ClientSession,
-    fetch_content_func: FetchContentFunc,
-    store_content_func: StoreContentFunc,
-    perform_processing_func: ProcessingFunc,
-) -> bool:
+# In worker_main.py or app.py (simplified)
+content_client_impl = DefaultContentClient(...)
+result_store_impl = DefaultResultStore(...)
+# ... other implementations
+
+# When calling a processing function:
+await process_single_message(
+    msg,
+    kafka_producer_instance, # Direct instance
+    http_session_instance,   # Direct instance
+    content_client=content_client_impl, # Protocol implementation
+    result_store=result_store_impl,     # Protocol implementation
+    # ... other protocol implementations
+)
 ```
 
-### 2.2. Resource Management
+### 2.3. Worker Service Structure Pattern (Example: Spell Checker)
+- **`worker_main.py`**: Handles service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes/injects dependencies.
+- **`event_router.py`**: Contains logic for deserializing messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
+- **`core_logic.py`**: Houses fundamental, reusable business logic, algorithms, and direct interactions with external systems (e.g., HTTP calls), implemented as standalone functions or simple classes.
+- **`protocols.py`**: Defines `typing.Protocol` interfaces.
+
+### 2.4. Resource Management (e.g., Kafka Clients, HTTP Sessions)
+- **MUST** use `asynccontextmanager` for managing resources that require explicit setup and teardown (e.g., Kafka clients, `aiohttp.ClientSession`).
 ```python
 @asynccontextmanager
+async def managed_http_session() -> AsyncIterator[aiohttp.ClientSession]:
+    async with aiohttp.ClientSession() as session:
+        yield session
+
+@asynccontextmanager
 async def kafka_clients(
-    input_topic: str,
-    consumer_group_id: str,
-    client_id_prefix: str,
-    bootstrap_servers: str,
-) -> Any:
-    # Setup/teardown logic
+    # ... kafka config args ...
+) -> AsyncIterator[tuple[AIOKafkaConsumer, AIOKafkaProducer]]:
+    consumer = AIOKafkaConsumer(...)
+    producer = AIOKafkaProducer(...)
+    await consumer.start()
+    await producer.start()
+    try:
+        yield consumer, producer
+    finally:
+        await consumer.stop()
+        await producer.stop()
 ```
 
 ## 3. State Management

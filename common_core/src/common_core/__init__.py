@@ -29,7 +29,6 @@ from .metadata_models import (
     EntityReference,
     StorageReferenceMetadata,
     SystemProcessingMetadata,
-    TaskProcessingMetadata,
     UserActivityMetadata,
 )
 from .pipeline_models import (
@@ -54,7 +53,6 @@ __all__ = [
     "BatchProcessingMetadata",
     "AIFeedbackMetadata",
     "StorageReferenceMetadata",
-    "TaskProcessingMetadata",
     "UserActivityMetadata",
     "CancellationMetadata",
     # Pipeline Models

@@ -28,6 +28,10 @@ alwaysApply: true
 - **MUST** pass `pdm run typecheck`
 - **FORBIDDEN**: `typing.Any` where precise type possible
 
+### 3.2. Dependency Injection Principle
+- Business logic **MUST** depend on abstractions (`typing.Protocol`), not concrete implementations.
+- Concrete implementations are provided at service entry points (e.g., `worker_main.py`, `app.py`), ideally via a DI framework (Dishka is the target).
+
 ## 4. Documentation
 
 ### 4.1. Google-Style Docstrings
@@ -46,8 +50,9 @@ alwaysApply: true
 - Private: `_private_member`
 
 ## 6. Code Structure
-- **Imports**: Use absolute imports
+- **Imports**: Use absolute imports for modules outside the current service. Use relative imports (e.g., `from . import foo`, `from ..bar import baz`) for intra-service imports.
 - **Error Handling**: Catch specific exceptions, use domain-specific exceptions
-- **Line Length**: 100 characters
+- **Line Length**: Max 100 characters (hard limit enforced by CI where possible).
+- **File Size**: Max 400 lines of code (LoC) per Python file (hard limit enforced by CI where possible, e.g., via `scripts/loc_guard.sh`).
 - **Blank Lines**: Per PEP 8
 ===

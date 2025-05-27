@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from uuid import UUID, uuid4
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -19,7 +18,6 @@ __all__ = [
     "BatchProcessingMetadata",
     "AIFeedbackMetadata",
     "StorageReferenceMetadata",
-    "TaskProcessingMetadata",
     "UserActivityMetadata",
     "CancellationMetadata",
 ]
@@ -42,7 +40,6 @@ class SystemProcessingMetadata(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     event: Optional[str] = None  # Actual event name string, e.g., from ProcessingEvent enum
-    events_trail: List[Dict[str, Any]] = Field(default_factory=list, alias="events")  # Audit trail
     error_info: Dict[str, Any] = Field(default_factory=dict)
     model_config = {"populate_by_name": True}
 
@@ -92,12 +89,6 @@ class StorageReferenceMetadata(BaseModel):
         self, ctype: ContentType, storage_id: str, path_hint: Optional[str] = None
     ) -> None:
         self.references[ctype] = {"storage_id": storage_id, "path": path_hint or ""}
-
-
-class TaskProcessingMetadata(BaseModel):
-    task_id: UUID = Field(default_factory=uuid4)
-    retries: int = 0
-    last_retry_at: Optional[datetime] = None
 
 
 class UserActivityMetadata(BaseModel):

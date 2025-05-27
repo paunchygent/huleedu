@@ -61,16 +61,16 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 * **Key Implementation Details**:
     1. **Worker Refactoring**: Successfully implemented dependency injection pattern:
 
-       ```python
-       async def process_single_message(
-           msg: ConsumerRecord,
-           producer: AIOKafkaProducer,
-           http_session: aiohttp.ClientSession,
-           fetch_content_func: FetchContentFunc,
-           store_content_func: StoreContentFunc,
-           perform_spell_check_func: PerformSpellCheckFunc,
-       ) -> bool:
-       ```
+```python
+async def process_single_message(
+    msg: ConsumerRecord,
+    producer: AIOKafkaProducer,
+    http_session: aiohttp.ClientSession,
+    fetch_content_func: FetchContentFunc,
+    store_content_func: StoreContentFunc,
+    perform_spell_check_func: PerformSpellCheckFunc,
+) -> bool:
+```
 
     2. **Async Context Manager**: Implemented `kafka_clients` for proper Kafka lifecycle management:
 
@@ -167,56 +167,97 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 
 ---
 
-### B.3. Implement Prometheus Scrape Endpoints (with Queue Latency Metric) [NOT COMPLETED]
+### B.3.1 – Phase 1.2 Δ: Contracts & Containers (NEW)
+
+This sub-phase introduces the protocol-based DI layer and prepares all services for observability and further pipelines.
+
+PHASE 1 · 2 · 1 — "Contracts & Containers"
+Sprint 1 extension · Version 1.0 · 2025-05-27
+Status: Planned (all tasks NOT STARTED unless otherwise noted)
+
+This micro-phase plugs in after Core B.5 of PHASE_1.2.md and
+before "Key Architectural Nudges".
+It lands the protocol-first DI layer, shrinks oversized modules,
+and lays a metrics foundation required by B.3/B.5.
+
+#### 0. Goals & Rationale 🎯
+
+##### 1. Typed behavioural contracts (using typing.Protocol) in every running service
+
+* **Why it matters**: Makes dependencies explicit, unlocks reliable mocks, raises MyPy's safety-net.
+
+##### 2. Dishka DI container across Batch & Spell-Checker
+
+* **Why it matters**: Replaces ad-hoc factories, leading to simpler wiring and consistent tests.
+
+##### 3. File-size compliance (< 400 LoC, ≤ 100 chars/line)
+
+* **Why it matters**: Keeps code legible and reviewable as features accrete.
+
+##### 4. Unified metrics registry injected via DI
+
+* **Why it matters**: Enables queue-latency Histogram now and future counters with zero refactor.
+
+##### 5. EventEnvelope.schema_version + semantic package bump
+
+* **Why it matters**: Formalizes future compatibility story.
+
+#### 1. Task Matrix 📋
+
+| Δ-ID | Title | Lead | Effort | Blockers | Status |
+|------|-------|------|--------|----------|--------|
+| Δ-5 | Add schema_version:int to EventEnvelope | Common-core | 0.5 d | — | ✅ |
+| Δ-1 | Define service-local protocols.py bundles | Core team | 2-3 d | — | ✅ |
+| Δ-3 | Refactor services/spell_checker_service/worker.py into ≤ 400 LoC siblings | Spell-Checker maint. | 1 d | Δ-1 | ✅ |
+| Δ-2 | Wire Dishka providers in Batch & Spell-Checker | Core team | 1-2 d | Δ-1, Δ-3 | 🔴 |
+| Δ-4 | Inject Prometheus registry + queue-latency metric | Infra guild | 1 d | Δ-2 | 🔴 |
+| Δ-6 | Bump all internal packages to 0.2.0 (PDM) | Release eng. | 0.5 d | Δ-5 | 🔴 |
+
+### B.4. Implement Prometheus Scrape Endpoints (with Queue Latency Metric) [NOT COMPLETED]
 
 * **Status**: NOT COMPLETED
-* **Objective**: Expose Prometheus metrics from HTTP services, including a "queue latency" metric for Kafka-consumed events where applicable.
+* **DEPENDS ON**: Δ-4 (Metrics Registry & Queue Latency)
+* **Objective**: Expose Prometheus metrics from HTTP services, using the DI-managed metrics registry established in Δ-4.
 * **README.md Link/Rationale**: Supports **Scalability & Maintainability** (README Sec 1) via observability for **Autonomous Services** (README Sec 1). Queue latency is a key operational metric.
 
 * **Implementation Guide for HTTP Services (`content_service`, `batch_service`)**:
-    1. Follow guide from previous ticket response (Task 3) to add `prometheus-client`, `REQUESTS_TOTAL`, `REQUEST_LATENCY_SECONDS`, and the `/metrics` endpoint using `app.mount("/metrics", make_asgi_app(registry=REGISTRY))` for Quart apps.
+    1. Add `prometheus-client` to the respective `pyproject.toml` files. Implement the `/metrics` endpoint in each service's Quart `app.py`. This typically involves creating a `CollectorRegistry` (or using the default one), defining metrics like `REQUESTS_TOTAL` and `REQUEST_LATENCY_SECONDS`, and mounting the metrics application (e.g., `app.mount("/metrics", make_asgi_app(registry=REGISTRY))`). Refer to `prometheus-client` documentation for specific implementation details.
 * **Implementation Guide for "Queue Latency" (Example in `spell_checker_service`)**:
   * This metric makes most sense in services that *consume* from Kafka and then process.
   * **File**: `services/spell_checker_service/worker.py`
   * **Add Metric Definition**:
 
     ```python
-        # services/spell_checker_service/worker.py (additions)
-        from prometheus_client import Histogram # Assuming you'll expose metrics from worker
-        # ...
-        # This requires a way to expose metrics from the worker.
-        # Could be start_http_server from prometheus_client in a separate thread/task,
-        # or if the worker has any incidental HTTP component.
-        # For now, let's define it. Exposition method is a sub-problem.
-        KAFKA_QUEUE_LATENCY = Histogram(
-            'kafka_message_queue_latency_seconds',
-            'Latency between event timestamp and processing start',
-            ['topic', 'consumer_group']
-        )
+    from prometheus_client import Histogram # Assuming you'll expose metrics from worker
+    # ...
+    # This requires a way to expose metrics from the worker.
+    # Could be start_http_server from prometheus_client in a separate thread/task,
+    # or if the worker has any incidental HTTP component.
+    # For now, let's define it. Exposition method is a sub-problem.
+    KAFKA_QUEUE_LATENCY = Histogram(
+        'kafka_message_queue_latency_seconds',
+        'Latency between event timestamp and processing start',
+        ['topic', 'consumer_group']
+    )
     ```
 
   * **Record Metric in `process_single_message`**:
 
-```python
-        # services/spell_checker_service/worker.py (inside process_single_message)
-        # async def process_single_message(...):
-        #     # ...
-        #     processing_started_at = datetime.now(timezone.utc) # Already there
-        #     try:
-        #         envelope = EventEnvelope[SpellcheckRequestedDataV1].model_validate(json.loads(msg.value.decode('utf-8')))
-        #         
-        #         # Calculate and record queue latency
-        #         if hasattr(envelope, 'event_timestamp') and isinstance(envelope.event_timestamp, datetime):
-        #             # Ensure event_timestamp is timezone-aware if processing_started_at is
-        #             # Pydantic models from common_core should ensure UTC.
-        #             queue_latency_seconds = (processing_started_at - envelope.event_timestamp).total_seconds()
-        #             if queue_latency_seconds >= 0: # Avoid negative if clocks are skewed
-        #                 KAFKA_QUEUE_LATENCY.labels(
-        #                     topic=msg.topic, 
-        #                     consumer_group=CONSUMER_GROUP_ID # Ensure CONSUMER_GROUP_ID is accessible
-        #                 ).observe(queue_latency_seconds)
-        #         # ... rest of the processing
-```
+    ```python
+    # services/spell_checker_service/worker.py (inside process_single_message)
+    # async def process_single_message(...):
+    #     processing_started_at = datetime.now(timezone.utc) # Already there
+    #     try:
+    #         envelope = EventEnvelope[SpellcheckRequestedDataV1].model_validate(json.loads(msg.value.decode('utf-8')))
+    #         # ... (existing validation, extraction) ...
+    #         if hasattr(envelope, 'event_timestamp') and isinstance(envelope.event_timestamp, datetime):
+    #             # Record queue latency metric
+    #             queue_latency_seconds = (processing_started_at - envelope.event_timestamp).total_seconds()
+    #             if queue_latency_seconds >= 0: # Avoid negative if clocks are skewed
+    #                 KAFKA_QUEUE_LATENCY.labels(
+    #                     topic=msg.topic,
+    #                     consumer_group=CONSUMER_GROUP_ID # Ensure CONSUMER_GROUP_ID is accessible
+    ```
 
    **Exposing Metrics from Worker**: The `spell_checker_service` is a non-HTTP worker. To expose Prometheus metrics:
         1. Option A: In `spell_checker_worker_main`, start a simple HTTP server in a separate async task using `prometheus_client.start_http_server(port, addr)`.
@@ -248,7 +289,7 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 
 ---
 
-### B.4. Implement CI Smoke Test (with Docker Layer Caching) [NOT COMPLETED]
+### B.5. Implement CI Smoke Test (with Docker Layer Caching) [NOT COMPLETED]
 
 * **Status**: NOT COMPLETED
 * **🌐 NETWORK ACCESS REQUIRED**: Requires GitHub Actions setup, Docker Hub access, and CI/CD operations
@@ -259,58 +300,49 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
     1. Implement GitHub Actions workflow (`.github/workflows/smoke_test.yml`) and Python smoke test script (`tests/smoke/run_core_flow_smoke_test.py`) as per previous detailed response.
     2. **Add Docker Layer Caching to GitHub Actions workflow**:
 
-        ```yaml
-        # .github/workflows/smoke_test.yml (excerpt showing caching)
-        # name: Smoke Test
-        # on: [push] # Or pull_request
-        # jobs:
-        #   smoke-test:
-        #     runs-on: ubuntu-latest
-        #     steps:
-        #       - name: Checkout code
-        #         uses: actions/checkout@v3
+    ```yaml
+    # .github/workflows/smoke_test.yml (excerpt showing caching)
+    # name: Smoke Test
+    # on: [push] # Or pull_request
+    # jobs:
+    #   smoke-test:
+    #     runs-on: ubuntu-latest
+    #     steps:
+    #       - name: Checkout code
+    #         uses: actions/checkout@v3
 
-        #       - name: Set up QEMU (for multi-platform builds, optional but good practice)
-        #         uses: docker/setup-qemu-action@v2
-        
-        #       - name: Set up Docker Buildx
-        #         uses: docker/setup-buildx-action@v2
+    #       - name: Set up QEMU (for multi-platform builds, optional but good practice)
+    #         uses: docker/setup-qemu-action@v2
+    
+    #       - name: Set up Docker Buildx
+    #         uses: docker/setup-buildx-action@v2
 
-        #       - name: Cache Docker layers
-        #         uses: actions/cache@v3
-        #         with:
-        #           path: /tmp/.buildx-cache # Directory where buildx stores cache
-        #           # Key includes hash of all Dockerfiles and relevant pyproject/lock files
-        #           # This is a simplified example; a more robust key might involve hashing individual lock files too.
-        #           key: ${{ runner.os }}-buildx-${{ github.sha }}-${{ hashFiles('**/Dockerfile', '**/pyproject.toml', '**/pdm.lock') }}
-        #           restore-keys: |
-        #             ${{ runner.os }}-buildx-${{ github.sha }}-
-        #             ${{ runner.os }}-buildx-
-        
-        #       - name: Login to Docker Hub (if using private images, optional)
-        #         # uses: docker/login-action@v2
-        #         # with:
-        #         #   username: ${{ secrets.DOCKERHUB_USERNAME }}
-        #         #   password: ${{ secrets.DOCKERHUB_TOKEN }}
+    #       - name: Cache Docker layers
+    #         uses: actions/cache@v3
+    #         with:
+    #           path: /tmp/.buildx-cache # Directory where buildx stores cache
+    #           # Key includes hash of all Dockerfiles and relevant pyproject/lock files
+    #           # This is a simplified example; a more robust key might involve hashing individual lock files too.
+    #           key: ${{ runner.os }}-buildx-${{ github.sha }}-${{ hashFiles('**/Dockerfile', '**/pyproject.toml', '**/pdm.lock') }}
+    #           restore-keys: |
+    #             ${{ runner.os }}-buildx-${{ github.sha }}-
+    #             ${{ runner.os }}-buildx-
+    
+    #       - name: Login to Docker Hub (if using private images, optional)
+    #         # uses: docker/login-action@v2
+    #         # with:
+    #         #   username: ${{ secrets.DOCKERHUB_USERNAME }}
+    #         #   password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-        #       - name: Set up Python and PDM
-        #         # ... (your existing PDM setup steps) ...
+    #       - name: Set up Python and PDM
+    #         # ... (your existing PDM setup steps) ...
 
-        #       - name: Build Docker images with cache
-        #         run: |
-        #           pdm run docker-build --build-arg BUILDKIT_INLINE_CACHE=1 # For BuildKit to use the cache
-        #         # Ensure your `docker-build` script (pdm run docker compose build) uses BuildKit
-        #         # And export cache to /tmp/.buildx-cache
-        #         # Example: DOCKER_BUILDKIT=1 docker compose build --pull --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max
-        #         # After build, mv /tmp/.buildx-cache-new /tmp/.buildx-cache if changes occurred
-        #         # This part needs careful setup of the build command to use actions/cache correctly.
-        #         # A simpler but less effective Docker layer cache is often handled by BuildKit on self-hosted runners or Docker's own layer caching if using same runner.
-        #         # For `actions/cache`, you need to explicitly manage the cache source/target for `docker buildx build`.
+    #       - name: Build Docker images with cache
+    #         run: |
+    #           pdm run docker-build --build-arg BUILDKIT_INLINE_CACHE=1 # For BuildKit to use the cache
+    ```
 
-        #       # ... (rest of the steps: docker compose up, run smoke test, docker compose down) ...
-        ```
-
-        *Note: Effective Docker layer caching with `actions/cache` and `docker buildx` can be complex. Ensure your `docker-build` PDM script (which runs `docker compose build`) is compatible with Buildx cache export/import if you use this method. Simpler GitHub-managed Docker layer caching might apply if your runners provide it. The key is to investigate and implement the best caching strategy for your CI environment.*
+    *Note: Effective Docker layer caching with `actions/cache` and `docker buildx` can be complex. Ensure your `docker-build` PDM script (which runs `docker compose build`) is compatible with Buildx cache export/import if you use this method. Simpler GitHub-managed Docker layer caching might apply if your runners provide it. The key is to investigate and implement the best caching strategy for your CI environment.*
 * **Key Files to Modify**:
   * `.github/workflows/smoke_test.yml` (Add caching steps).
   * `tests/smoke/run_core_flow_smoke_test.py`
@@ -321,14 +353,15 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
 
 ---
 
-### B.5. Implement 'EssayLifecycleService' (ELS) Skeleton (with Stub State Store) [NOT COMPLETED]
+### B.6. Implement 'EssayLifecycleService' (ELS) Skeleton (with Stub State Store) [NOT COMPLETED]
 
 * **Status**: NOT COMPLETED
-* **Objective**: Create the ELS skeleton, now including a basic in-memory or SQLite stub state store to simulate essay state updates.
+* **DEPENDS ON**: Δ-1, Δ-2, Δ-3 (Protocols & DI Infrastructure)
+* **Objective**: Create the ELS skeleton using the protocol-based DI architecture established in B.3, including a basic in-memory or SQLite stub state store to simulate essay state updates.
 * **README.md Link/Rationale**: Initiates **ELS** implementation (README Sec 2), addresses **Batch/Essay Service Separation** (README Sec 2), and prepares for ELS's role in managing essay states (README Sec 4.B). A stub store allows for more meaningful initial logic.
 
 * **Implementation Guide (`services/essay_lifecycle_service/worker.py`)**:
-    1. Follow the previous ELS skeleton setup guide (Task 5 from prior ticket).
+    1. Set up the basic ELS service structure: create `services/essay_lifecycle_service` directory with `worker.py`, `pyproject.toml` (including dependencies like `huleedu-common-core`, `aiokafka`, `pydantic-settings`), and a `Dockerfile`. Ensure it's added to the root `docker-compose.yml` and `pyproject.toml` for PDM visibility and an entrypoint script (e.g. `run-els-worker` in root pdm scripts that maps to `pdm run -p services/essay_lifecycle_service start_worker`) is created.
     2. **Add Stub State Store**:
         * For simplicity, start with an in-memory Python dictionary: `essay_states = {}` (global or class member in the worker).
         * Alternatively, for persistence across worker restarts (useful for local dev, but still a stub), use `sqlite3`.
@@ -339,8 +372,6 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
             * Log the update and the current (stubbed) state of the essay.
 
         ```python
-        # services/essay_lifecycle_service/worker.py (conceptual additions for stub store)
-        # ... (imports as before) ...
         # For an in-memory stub:
         essay_stub_store: Dict[str, Dict[str, Any]] = {} # essay_id -> {details}
 
@@ -356,7 +387,6 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
         #         "last_updated_els": datetime.now(timezone.utc).isoformat()
         #     }
         #     logger.info(f"ELS: Updated stub store for Essay ID: {essay_id}. Current stubbed state: {essay_stub_store.get(essay_id)}")
-            # ... (rest of handler logic from previous skeleton)
         ```
 
 * **Key Files to Modify**:
@@ -366,6 +396,241 @@ This ticket outlines the implementation of key Phase 1.2 tasks, building upon th
   * ELS skeleton service consumes events (e.g., `SpellcheckResultDataV1`).
   * Updates its in-memory/SQLite stub state store with the essay's ID and new status/details.
   * Logs these updates.
+
+---
+
+### B.3 – Phase 1.2 Δ: Contracts & Containers (FOUNDATIONAL REFACTORING)
+
+This sub-phase introduces the protocol-based DI layer and prepares all services for observability and further pipelines. **CRITICAL**: Must be completed before B.4-B.6 as those tasks depend on this infrastructure.
+
+**PHASE 1 · 2 · 1 — "Contracts & Containers"**  
+Sprint 1 extension · Version 1.0 · 2025-05-27  
+Status: Planned (all tasks NOT STARTED unless otherwise noted)
+
+This micro-phase establishes the foundational architecture for DI, protocols, metrics, and file-size compliance that enables the subsequent implementation tasks.
+
+#### 0. Goals & Rationale 🎯
+
+##### 1. Typed behavioural contracts (using typing.Protocol) in every running service
+
+* **Why it matters**: Makes dependencies explicit, unlocks reliable mocks, raises MyPy's safety-net.
+
+##### 2. Dishka DI container across Batch & Spell-Checker
+
+* **Why it matters**: Replaces ad-hoc factories, leading to simpler wiring and consistent tests.
+
+##### 3. File-size compliance (< 400 LoC, ≤ 100 chars/line)
+
+* **Why it matters**: Keeps code legible and reviewable as features accrete.
+
+##### 4. Unified metrics registry injected via DI
+
+* **Why it matters**: Enables queue-latency Histogram now and future counters with zero refactor.
+
+##### 5. EventEnvelope.schema_version + semantic package bump
+
+* **Why it matters**: Formalizes future compatibility story.
+
+#### 1. Task Matrix 📋
+
+| Δ-ID | Title | Lead | Effort | Blockers | Status |
+|------|-------|------|--------|----------|--------|
+| Δ-5 | Add schema_version:int to EventEnvelope | Common-core | 0.5 d | — | ✅ |
+| Δ-1 | Define service-local protocols.py bundles | Core team | 2-3 d | — | ✅ |
+| Δ-3 | Refactor services/spell_checker_service/worker.py into ≤ 400 LoC siblings | Spell-Checker maint. | 1 d | Δ-1 | ✅ |
+| Δ-2 | Wire Dishka providers in Batch & Spell-Checker | Core team | 1-2 d | Δ-1, Δ-3 | 🔴 |
+| Δ-4 | Inject Prometheus registry + queue-latency metric | Infra guild | 1 d | Δ-2 | 🔴 |
+| Δ-6 | Bump all internal packages to 0.2.0 (PDM) | Release eng. | 0.5 d | Δ-5 | 🔴 |
+
+**Legend**: 🔴 = Not started · 🟡 = In progress · ✅ = Done
+
+#### 2. Detailed Task Break-down
+
+**Δ-5 · EventEnvelope Version Field**
+
+* In `common_core/src/common_core/events/envelope.py`:
+
+    ```python
+    from pydantic import BaseModel, Field
+    from typing import TypeVar, Generic, Optional # ensure all needed imports
+    from uuid import UUID, uuid4
+    from datetime import datetime, timezone
+    from enum import Enum # if used in model_config
+
+    T_EventData = TypeVar("T_EventData", bound=BaseModel)
+
+    class EventEnvelope(BaseModel, Generic[T_EventData]):
+        event_id: UUID = Field(default_factory=uuid4)
+        event_type: str
+        event_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+        source_service: str
+        schema_version: int = 1 # Added field with default value
+        correlation_id: Optional[UUID] = None
+        data_schema_uri: Optional[str] = None # Existing field
+        data: T_EventData
+        model_config = { # Existing model_config
+            "populate_by_name": True,
+            "json_encoders": {Enum: lambda v: v.value},
+        }
+    ```
+
+* Add `common_core/tests/test_event_envelope.py::test_schema_version_roundtrip` (or similar test file, perhaps in `common_core/tests/test_model_rebuilding.py`).
+
+**Δ-1 · Protocols Everywhere**
+
+* **Status**: ✅ Done
+* **Objective**: Each running service owns a protocols.py exporting its key abstractions. Batch ➜ BatchRepositoryProtocol, BatchEventPublisherProtocol, Spell-Checker ➜ ContentClientProtocol, SpellLogicProtocol, etc.
+* **Implementation Summary**:
+  * Created `services/spell_checker_service/protocols.py` defining `ContentClientProtocol`, `SpellLogicProtocol`, `ResultStoreProtocol`, and `SpellcheckEventPublisherProtocol`.
+  * Created `services/batch_service/protocols.py` defining `BatchRepositoryProtocol`, `BatchEventPublisherProtocol`, and `EssayLifecycleClientProtocol`.
+  * Created `services/content_service/protocols.py` defining `ContentRepositoryProtocol` and `ContentEventPublisherProtocol`.
+  * Protocols use concrete types (e.g., `AIOKafkaProducer`, `aiohttp.ClientSession`) where appropriate.
+  * MyPy checks pass for these files and related services.
+* **Implementation hints**:
+  * Place in `services/<svc>/protocols.py`, no runtime code, just Protocol classes.
+  * Run `pdm run mypy --strict --disallow-any-generics` monorepo-wide.
+* **Acceptance**: CI passes; importing a service without its concrete deps under MyPy shows no errors.
+
+**Δ-3 · Slim Worker**
+
+* **Status**: ✅ Done
+* Split current `services/spell_checker_service/worker.py` into:
+  * `worker_main.py` (start, DI, metrics server) - 191 LoC
+  * `event_router.py` (deserialise + dispatch, protocol implementations) - 338 LoC
+  * `core_logic.py` (spell algorithm, HTTP helpers) - 105 LoC
+* **Implementation Summary**:
+  * Original `worker.py` (approx. 402 LoC) was successfully refactored and deleted.
+  * `core_logic.py`: Contains fundamental, reusable functions for content fetching/storing and the spell check algorithm.
+  * `event_router.py`: Handles main message processing (`process_single_message`), includes default protocol implementations, and routes Kafka records.
+  * `worker_main.py`: Manages service startup, Kafka client lifecycle, signal handling, and the main consumption loop.
+  * All new files are well under the 400 LoC limit.
+  * No `from ... import *` used.
+  * MyPy checks pass for `services/spell_checker_service/`.
+  * All 13 unit tests in `services/spell_checker_service/tests/test_worker.py` were refactored for the new architecture and pass.
+* Helper modules ≤ 150 LoC each.
+* Remove any `from … import *`.
+
+## Δ-2 · Dishka Wiring
+
+* **Objective**: Replace manual factories.
+* **Batch Service**
+  * new `batch_service/di.py`
+  * `BatchProvider(Provider)` binds KafkaBus, MetricsRegistry, BatchRepository…
+  * `app.py` creates `container = make_container(BatchProvider())`.
+* **Spell-Checker**
+  * new `spell_checker_service/di.py` + change `worker_main.py` to `async with container.create_context()`.
+* **Tests**: use `TestProvider` that binds mocks/stubs.
+* **Commands**: `pdm run pytest -q` and `pdm run mypy --strict` must stay green.
+
+## Δ-4 · Metrics Registry & Queue Latency
+
+* **Registry binding**:
+
+    ```python
+    from dishka import Provider, provide
+    from prometheus_client import CollectorRegistry
+
+    class MetricsProvider(Provider):
+        @provide(scope="singleton") # Or appropriate scope
+        def registry(self) -> CollectorRegistry:
+            return CollectorRegistry() # Or your custom registry
+    ```
+
+* **Worker metric** (example for `spell_checker_service/core_metrics.py`):
+
+    ```python
+    from prometheus_client import CollectorRegistry, Histogram
+
+    def create_kafka_queue_latency_metric(registry: CollectorRegistry) -> Histogram:
+        # This function would be defined in a metrics-specific module
+        # and the resulting Histogram object would be provided by Dishka.
+        return Histogram(
+            'kafka_message_queue_latency_seconds',
+            'Lag from event_timestamp to consume-start',
+            ['topic', 'consumer_group'],
+            registry=registry, # Injected registry
+        )
+    ```
+
+* In `spell_checker_service/di.py`, inject `CollectorRegistry` into `create_kafka_queue_latency_metric` and provide the Histogram.
+* Start HTTP exposition via `prometheus_client.start_http_server` in `spell_checker_service/worker_main.py` on `$SPELLCHECKER_METRICS_PORT` (default 8001).
+* Verify with `curl localhost:8001/metrics | grep kafka_message_queue_latency_seconds`.
+
+## Δ-6 · Package Version Bump
+
+* Edit each relevant `pyproject.toml` (common_core, service_libs, all services):
+
+    ```toml
+    [project]
+    version = "0.2.0"
+    ```
+
+* Run `pdm update --no-lock` to update metadata without changing locked dependencies if not necessary.
+* Create a root `CHANGELOG.md` if one does not exist, or update the existing one with a summary of changes for v0.2.0, detailing the introduction of protocols, DI, metrics foundation, and EventEnvelope schema versioning.
+
+#### 3. Sequencing 🗺️
+
+```mermaid
+graph TD
+  S[Δ-5 Envelope Version] --> T[Δ-6 Package Bump];
+  S --> A[Δ-1 Define Protocols];
+  A --> C[Δ-3 Slim Worker];
+  C --> B[Δ-2 Dishka Wiring];
+  B --> D[Δ-4 Metrics Registry & Latency];
+
+  subgraph "Enables Later Tasks"
+    G[B.4 Prometheus Endpoints];
+    H[B.5 ELS Skeleton];
+  end
+  
+  D -.-> G; // Δ-4 enables B.4
+  B -.-> H; // Δ-2 (and by extension Δ-1, Δ-3) enables B.5
+```
+
+* Δ-5 ("Envelope Version") is a prerequisite for Δ-6 ("Package Bump").
+* Δ-1 ("Define Protocols") is the foundational step for Δ-3, Δ-2, and Δ-4.
+* Δ-3 ("Slim Worker") should be done after protocols (Δ-1) are defined to guide the refactoring.
+* Δ-2 ("Dishka Wiring") depends on protocols (Δ-1) and the refactored structure (Δ-3).
+* Δ-4 ("Metrics Registry & Latency") depends on Dishka (Δ-2) for DI.
+* The completion of this entire B.3 sub-phase, particularly Δ-4 and Δ-2/Δ-3, enables the subsequent B.4 and B.5 tasks respectively.
+
+#### 4. Exit Criteria ✅
+
+* `pdm run pytest`, `pdm run mypy --strict`, and `docker build` (or `pdm run docker-build`) in CI are green.
+* Batch & Spell-Checker services start and log messages indicating Dishka container has bound providers (e.g., `dishka.container INFO Bound XX providers (schema_version=1)` or similar).
+* `curl localhost:8001/metrics` (spell-checker metrics port) reports Prometheus text format, showing `kafka_message_queue_latency_seconds`.
+* No Python file in the services exceeds 400 lines of code (LoC). A script like `scripts/loc_guard.sh` should be created and pass.
+* Running `pdm show huleedu-common-core` (and for other updated packages) shows version 0.2.0.
+
+#### 5. Rule-Book Amendments 📚
+
+(These amendments will be applied to the respective rule files as detailed below, standardizing practices introduced or reinforced by the B.3 sub-phase)
+
+Copy these bullets into `.cursor/rules/050-python-coding-standards.mdc` and `.cursor/rules/040-service-implementation-guidelines.mdc`.
+
+**Dependency Injection** (relevant to `050-python-coding-standards.mdc` and `040-service-implementation-guidelines.mdc`)
+
+* Use Dishka; every provider lives in `<service>/di.py` (ensures consistent DI setup introduced in Δ-2).
+* Never import concrete classes inside business logic; depend on `typing.Protocol` (formalizes interface-based design from Δ-1).
+
+**File Size & Line Length** (relevant to `050-python-coding-standards.mdc`)
+
+* Hard ceiling: 400 LoC per `.py`, 100 chars per line (including docstrings) (enforces outcome of Δ-3).
+* CI guard script: `scripts/loc_guard.sh` (automates compliance for file size).
+
+**Metrics** (relevant to `040-service-implementation-guidelines.mdc`)
+
+* Expose via `prometheus-client` only (standardizes metrics approach from Δ-4).
+* Registry injected through DI, not instantiated ad-hoc (leverages DI setup from Δ-2 for metrics).
+
+**PDM Commands** (relevant to `040-service-implementation-guidelines.mdc` or a new PDM-specific rule if preferred)
+
+* Static checks: `pdm run mypy --strict`; tests: `pdm run pytest` (standardizes common development commands).
+* Build images: `pdm run docker-build` (wrapper around `docker compose build`) (provides a consistent build interface).
+
+**Versioning** (relevant to `081-pdm-dependency-management.mdc` or a general versioning rule)
+
+* Increment `[project]` version on any additive change to Pydantic models or envelope (formalizes practice for Δ-5, Δ-6).
 
 ---
 
@@ -405,14 +670,10 @@ These are general improvements to be applied across services or to `common_core`
 
 * **Objective**: Establish practices for semantic versioning of packages and add schema versioning to the `EventEnvelope`.
 * **Actions**:
-    1. **Semantic Versioning**: Once ELS skeleton (Task B.5) is in and Phase 1.2 tasks are complete, plan to bump the versions of `huleedu-common-core` and all services from `0.1.0` to `0.2.0` (assuming these additions are non-breaking for existing consumers of 0.1.0 functionality). Document this decision and the trigger for future version bumps.
-    2. **`EventEnvelope` Schema Version**: Add a `schema_version` field to `common_core/src/common_core/events/envelope.py`.
+    1. **Semantic Versioning**: Once ELS skeleton (Task B.6 - new numbering) is in and Phase 1.2 tasks are complete, plan to bump the versions of `huleedu-common-core` and all services from `0.1.0` to `0.2.0` (assuming these additions are non-breaking for existing consumers of 0.1.0 functionality). Document this decision and the trigger for future version bumps.
+    2. **`EventEnvelope` Schema Version**: Add a `schema_version` field to `common_core/src/common_core/events/envelope.py`. (This is covered by Δ-5, so this part is duplicative but harmless here as a reminder of the principle).
 
         ```python
-        # common_core/src/common_core/events/envelope.py (modification)
-        # from pydantic import BaseModel, Field # , UUID, datetime, TypeVar, Generic, Optional
-        # ...
-
         class EventEnvelope(BaseModel, Generic[T_EventData]):
             event_id: UUID = Field(default_factory=uuid4)
             event_type: str
@@ -433,3 +694,5 @@ These are general improvements to be applied across services or to `common_core`
 ---
 
 This expanded ticket should provide the necessary detail and context for these next crucial steps.
+
+### 🛠️ Potential Approaches/Implementation Details (Task B.3 Δ-8)

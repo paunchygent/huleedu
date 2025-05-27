@@ -15,6 +15,7 @@ class EventEnvelope(BaseModel, Generic[T_EventData]):
     event_type: str  # e.g., "huleedu.essay.spellcheck_completed.v1"
     event_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     source_service: str
+    schema_version: int = 1
     correlation_id: Optional[UUID] = None
     data_schema_uri: Optional[str] = None
     data: T_EventData

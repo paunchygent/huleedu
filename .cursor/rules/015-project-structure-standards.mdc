@@ -32,16 +32,35 @@ scripts/
 ```
 services/
 ├── libs/                          # Shared service libraries
-├── content_service/               # Individual microservice
-│   ├── app.py
+├── content_service/               # Individual microservice (example Quart app)
+│   ├── app.py                     # Quart application entry point
 │   ├── pyproject.toml
 │   ├── Dockerfile
-│   ├── tests/                     
-│   └── docs/                      
-├── batch_service/
-├── spell_checker_service/
-└── essay_service/                 
+│   ├── tests/
+│   ├── protocols.py               # Optional: For defining service-specific behavioral contracts
+│   └── docs/
+├── batch_service/                 # Example service
+│   ├── app.py                     # Quart application entry point
+│   ├── pyproject.toml
+│   ├── protocols.py               # For defining service-specific behavioral contracts
+│   └── ...
+├── spell_checker_service/         # Example Kafka worker service
+│   ├── worker_main.py             # Main entry point, DI setup, Kafka consumer loop
+│   ├── event_router.py            # Event deserialization, protocol implementations, logic orchestration
+│   ├── core_logic.py              # Core algorithms and helper functions
+│   ├── protocols.py               # For defining service-specific behavioral contracts
+│   ├── pyproject.toml
+│   ├── Dockerfile
+│   ├── tests/
+│   └── docs/
+└── essay_service/                 # Example, potentially more complex structure
 ```
+
+**Note on Worker Service Structure (e.g., `spell_checker_service`):**
+- `worker_main.py`: Handles service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes DI container.
+- `event_router.py`: Contains logic for deserializing incoming messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
+- `core_logic.py`: Houses the fundamental, reusable business logic, algorithms, and interactions with external systems (like HTTP calls to other services), implemented as standalone functions or simple classes.
+- `protocols.py`: Defines `typing.Protocol` interfaces for key internal dependencies and behavioral contracts, facilitating DI and testability.
 
 ## 4. Common Core Structure
 
