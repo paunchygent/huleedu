@@ -119,9 +119,7 @@ namespace_packages = true
 exclude = [
     "common_core/src/",
     "services/libs/huleedu_service_libs/",
-    ".venv/",
-    "__pypackages__/",
-    ".pdm-build/"
+    "cj_essay_assessment/",
 ]
 
 # Per-module settings for new microservices (stricter)
@@ -132,6 +130,7 @@ module = [
     "services.content_service.*",
     "services.spell_checker_service.*",
     "services.batch_orchestrator_service.*",
+    "services.essay_lifecycle_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true
@@ -145,8 +144,6 @@ module = [
     "quart_dishka.*",
 ]
 ignore_missing_imports = true
-# Note: These external libraries lack official type stubs on PyPI
-# We maintain strict typing for our own code while allowing flexibility for external deps
 
 # Service-local config modules
 [[tool.mypy.overrides]]
@@ -159,17 +156,6 @@ module = [
     "batch_command_handlers",
 ]
 ignore_missing_imports = true
-
-# Existing code (less strict initially)
-[[tool.mypy.overrides]]
-module = [
-    "server_web_app.*",
-    "ai_feedback_svenska.*",
-    "common.*",
-    "CJ_ESSAY_ASSESSMENT.*",
-]
-ignore_missing_imports = true
-disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 testpaths = [
