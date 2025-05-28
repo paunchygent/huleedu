@@ -13,8 +13,8 @@ from uuid import uuid4
 from common_core.enums import ProcessingEvent
 from common_core.events.base_event_models import (
     BaseEventData,
-    EnhancedProcessingUpdate,
     EventTracker,
+    ProcessingUpdate,
 )
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import (
@@ -34,7 +34,7 @@ class TestModelRebuilding:
         """Test that base event models can be rebuilt without errors."""
         # These should not raise any exceptions
         BaseEventData.model_rebuild(raise_errors=True)
-        EnhancedProcessingUpdate.model_rebuild(raise_errors=True)
+        ProcessingUpdate.model_rebuild(raise_errors=True)
         EventTracker.model_rebuild(raise_errors=True)
 
     def test_spellcheck_models_rebuild(self) -> None:
@@ -70,8 +70,8 @@ class TestModelRebuilding:
             processing_stage=ProcessingStage.PENDING,
         )
 
-        # Create an EnhancedProcessingUpdate with Union status
-        update = EnhancedProcessingUpdate(
+        # Create a ProcessingUpdate with Union status
+        update = ProcessingUpdate(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
             entity_ref=entity_ref,
             status=EssayStatus.AWAITING_SPELLCHECK,  # This uses the Union type

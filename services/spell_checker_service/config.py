@@ -65,7 +65,9 @@ class Settings(BaseSettings):
         """Get effective master dictionary path."""
         if self.L2_EXTERNAL_DATA_PATH:
             return f"{self.L2_EXTERNAL_DATA_PATH}/nortvig_master_SWE_L2_corrections.txt"
-        return str(self._service_dir / "data" / "l2_error_dict" / "nortvig_master_SWE_L2_corrections.txt")
+        return str(
+            self._service_dir / "data" / "l2_error_dict" / "nortvig_master_SWE_L2_corrections.txt"
+        )
 
     @property
     def effective_filtered_dict_path(self) -> str:

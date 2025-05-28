@@ -7,14 +7,14 @@ from typing import Optional
 from pydantic import Field
 
 from ..metadata_models import StorageReferenceMetadata
-from .base_event_models import EnhancedProcessingUpdate
+from .base_event_models import ProcessingUpdate
 
 
-class SpellcheckRequestedDataV1(EnhancedProcessingUpdate):
+class SpellcheckRequestedDataV1(ProcessingUpdate):
     """
     Data for requesting a spellcheck.
     'event_name' (from BaseEventData) should be ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED.value
-    'status' (from EnhancedProcessingUpdate) should be EssayStatus.AWAITING_SPELLCHECK.value
+    'status' (from ProcessingUpdate) should be EssayStatus.AWAITING_SPELLCHECK.value
     'system_metadata' provides context for this request event.
     """
 
@@ -22,12 +22,12 @@ class SpellcheckRequestedDataV1(EnhancedProcessingUpdate):
     # No need to repeat system_metadata, it's inherited.
 
 
-class SpellcheckResultDataV1(EnhancedProcessingUpdate):
+class SpellcheckResultDataV1(ProcessingUpdate):
     """
     Data representing the result of a spellcheck.
     'event_name' (from BaseEventData) should be
         ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED.value
-    'status' (from EnhancedProcessingUpdate) indicates outcome
+    'status' (from ProcessingUpdate) indicates outcome
         (e.g., SPELLCHECKED_SUCCESS or _FAILED).
     'system_metadata' provides context for this result event, including error_info if failed.
     """

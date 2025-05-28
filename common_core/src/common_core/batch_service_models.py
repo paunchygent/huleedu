@@ -24,35 +24,34 @@ class BatchServiceSpellcheckInitiateCommandDataV1(BaseEventData):
     """Command data for Batch Orchestrator Service to initiate spellcheck phase for a batch."""
 
     essays_to_process: List[EssayProcessingInputRefV1]
-    language: str
+    language: str # infered from course_code
 
 
 class BatchServiceNLPInitiateCommandDataV1(BaseEventData):
     """Command data for Batch Orchestrator Service to initiate NLP phase for a batch."""
 
     essays_to_process: List[EssayProcessingInputRefV1]
-    language: str
+    language: str # infered from course_code
 
 
 class BatchServiceAIFeedbackInitiateCommandDataV1(BaseEventData):
     """Command data for Batch Orchestrator Service to initiate AI feedback phase for a batch."""
 
     essays_to_process: List[EssayProcessingInputRefV1]
-    language: str
+    language: str # infered from course_code
     # AI feedback specific fields
-    course_code: str
-    teacher_name: str
-    class_designation: str
-    essay_instructions: str
+    course_code: str # form input at upload
+    teacher_name: str # infered from user_id of batch_owner first_name and last_name
+    class_designation: str # form input at upload
+    essay_instructions: str # form input at upload
 
 
 class BatchServiceCJAssessmentInitiateCommandDataV1(BaseEventData):
     """Command data for Batch Orchestrator Service to initiate CJ assessment phase for a batch."""
 
-    essays_for_cj: List[EssayProcessingInputRefV1]
-    language: str
+    essays_to_process: List[EssayProcessingInputRefV1]
+    language: str # infered from course_code
     # CJ assessment specific context
-    course_code: str
-    teacher_name: str
-    class_designation: str
-    essay_instructions: str
+    course_code: str # form input at upload
+    class_designation: str # form input at upload
+    essay_instructions: str # form input at upload

@@ -29,8 +29,8 @@ from .essay_service_models import (
 from .events.ai_feedback_events import AIFeedbackInputDataV1
 from .events.base_event_models import (
     BaseEventData,
-    EnhancedProcessingUpdate,
     EventTracker,
+    ProcessingUpdate,
 )
 from .events.envelope import EventEnvelope
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
@@ -75,7 +75,7 @@ __all__ = [
     # Event Infrastructure
     "EventEnvelope",
     "BaseEventData",
-    "EnhancedProcessingUpdate",
+    "ProcessingUpdate",
     "EventTracker",
     # Specific Event Data Models
     "SpellcheckRequestedDataV1",
@@ -95,7 +95,7 @@ __all__ = [
 # Rebuild models to resolve forward references after all imports
 # Now that all enums are imported above, forward references should resolve successfully
 BaseEventData.model_rebuild(raise_errors=True)
-EnhancedProcessingUpdate.model_rebuild(raise_errors=True)
+ProcessingUpdate.model_rebuild(raise_errors=True)
 EventTracker.model_rebuild(raise_errors=True)
 SpellcheckRequestedDataV1.model_rebuild(raise_errors=True)
 SpellcheckResultDataV1.model_rebuild(raise_errors=True)

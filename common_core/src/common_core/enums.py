@@ -18,7 +18,7 @@ class ProcessingStage(str, Enum):
     PENDING = "pending"
     INITIALIZED = "initialized"
     PROCESSING = "processing"
-    COMPLETED = "completed"
+    COMPLETED = "concluded"
     FAILED = "failed"
     CANCELLED = "cancelled"
 
@@ -28,7 +28,7 @@ class ProcessingStage(str, Enum):
 
     @classmethod
     def active(cls) -> Set["ProcessingStage"]:
-        return {cls.PENDING, cls.INITIALIZED, cls.PROCESSING}
+        return {cls.COMPLETED, cls.INITIALIZED, cls.PROCESSING}
 
 
 # ---------------------------------------------------------------------------
@@ -42,9 +42,6 @@ class ProcessingEvent(str, Enum):
     BATCH_PHASE_INITIATED = "batch.phase.initiated"
     BATCH_PIPELINE_PROGRESS_UPDATED = "batch.pipeline.progress.updated"
     BATCH_PHASE_CONCLUDED = "batch.phase.concluded"
-    BATCH_LIFECYCLE_COMPLETED = "batch.lifecycle.completed"
-    BATCH_LIFECYCLE_FAILED = "batch.lifecycle.failed"
-    BATCH_LIFECYCLE_PARTIALLY_COMPLETED = "batch.lifecycle.partially_completed"
 
     # -------------  Essay lifecycle  -------------#
     ESSAY_PHASE_INITIATION_REQUESTED = "essay.phase.initiation.requested"
@@ -64,7 +61,7 @@ class ProcessingEvent(str, Enum):
 
     # -------------  Generic -------------#
     PROCESSING_STARTED = "processing.started"
-    PROCESSING_COMPLETED = "processing.completed"
+    PROCESSING_CONCLUDED = "processing.concluded"
     PROCESSING_FAILED = "processing.failed"
 
 
@@ -127,26 +124,25 @@ class EssayStatus(str, Enum):
     SPELLCHECK_FAILED = "spellcheck_failed"
     AWAITING_NLP = "awaiting_nlp"
     NLP_IN_PROGRESS = "nlp_processing_in_progress"
-    NLP_COMPLETED_SUCCESS = "nlp_completed_success"
+    NLP_SUCCESS = "nlp_success"
     NLP_FAILED = "nlp_failed"
     AWAITING_AI_FEEDBACK = "awaiting_ai_feedback"
     AI_FEEDBACK_IN_PROGRESS = "ai_feedback_processing_in_progress"
-    AI_FEEDBACK_COMPLETED_SUCCESS = "ai_feedback_completed_success"
+    AI_FEEDBACK_SUCCESS = "ai_feedback_success"
     AI_FEEDBACK_FAILED = "ai_feedback_failed"
     AWAITING_EDITOR_REVISION = "awaiting_editor_revision"
     EDITOR_REVISION_IN_PROGRESS = "editor_revision_processing_in_progress"
-    EDITOR_REVISION_COMPLETED_SUCCESS = "editor_revision_completed_success"
+    EDITOR_REVISION_SUCCESS = "editor_revision_success"
     EDITOR_REVISION_FAILED = "editor_revision_failed"
     AWAITING_GRAMMAR_CHECK = "awaiting_grammar_check"
     GRAMMAR_CHECK_IN_PROGRESS = "grammar_check_processing_in_progress"
-    GRAMMAR_CHECK_COMPLETED_SUCCESS = "grammar_check_completed_success"
+    GRAMMAR_CHECK_SUCCESS = "grammar_check_success"
     GRAMMAR_CHECK_FAILED = "grammar_check_failed"
-    AWAITING_CJ_INCLUSION = "awaiting_cj_inclusion"
-    CJ_PROCESSING_ACTIVE = "cj_processing_active"
-    CJ_RANKING_COMPLETED = "cj_ranking_completed"
-    CJ_PROCESSING_FAILED = "cj_processing_failed"
-    ESSAY_ALL_PROCESSING_COMPLETED = "essay_all_processing_completed"
-    ESSAY_PARTIALLY_PROCESSED_WITH_FAILURES = "essay_partially_processed_with_failures"
+    AWAITING_CJ_ASSESSMENT = "awaiting_cj_assessment"
+    CJ_ASSESSMENT_IN_PROGRESS = "cj_assessment_processing_in_progress"
+    CJ_ASSESSMENT_SUCCESS = "cj_assessment_success"
+    CJ_ASSESSMENT_FAILED = "cj_assessment_failed"
+    # Status for critical failures do to other reasons than pipeline failures
     ESSAY_CRITICAL_FAILURE = "essay_critical_failure"
 
 
@@ -156,17 +152,37 @@ class EssayStatus(str, Enum):
 
 
 class BatchStatus(str, Enum):
-    UPLOADED = "uploaded"
-    PARTIALLY_UPLOADED = "partially_uploaded"
-    PENDING_CONFIGURATION = "pending_configuration"
-    PENDING_PROCESSING_INITIATION = "pending_processing_initiation"
-    PROCESSING_CONTENT_ENRICHMENT = "processing_content_enrichment"
-    AWAITING_CJ_ASSESSMENT = "awaiting_cj_assessment"
-    PROCESSING_CJ_ASSESSMENT = "processing_cj_assessment"
-    COMPLETED = "completed"
-    PARTIALLY_COMPLETED = "partially_completed"
-    FAILED = "failed"
+    # Initial Ingestion & Validation Phase (BOS awaiting
+    # a full content readiness report from ELS/FileService)
+
+    AWAITING_CONTENT_VALIDATION = "awaiting_content_validation"
+    # Batch created, content being ingested/validated.
+
+    # Terminal states for the initial ingestion/validation phase
+    CONTENT_INGESTION_FAILED = "content_ingestion_failed"   # Critical issue with content, batch
+    # cannot proceed. (Terminal for this path)
+    AWAITING_PIPELINE_CONFIGURATION = "awaiting_pipeline_configuration"
+    # All content successfully ingested & validated by ELS/FileService;
+    # Batch is now awaiting user to define/confirm the specific processing pipelines.
+    # This replaces PENDING_CONFIGURATION to be more descriptive of what's next.
+
+    # Configuration Complete, Ready for Processing Pipelines
+    READY_FOR_PIPELINE_EXECUTION = "ready_for_pipeline_execution"
+    # User has defined pipelines; batch is queued for BOS to start the first pipeline.
+
+    # Active Processing Phase
+    PROCESSING_PIPELINES = "processing_pipelines"
+    # BOS is actively orchestrating one or more requested pipelines via ELS.
+
+    # Terminal States for the Entire Batch Processing Lifecycle
+    COMPLETED_SUCCESSFULLY = "completed_successfully"
+    # All requested pipelines completed successfully.
+    COMPLETED_WITH_FAILURES = "completed_with_failures"
+    # All requested pipelines finished, but some had non-critical essay/pipeline failures.
+    FAILED_CRITICALLY = "failed_critically"
+    # A critical failure stopped batch processing.
     CANCELLED = "cancelled"
+    # Batch processing was explicitly cancelled.
 
 
 # ---------------------------------------------------------------------------

@@ -18,7 +18,7 @@ from aiokafka import AIOKafkaProducer, ConsumerRecord
 
 # CRITICAL: Import ALL enum types FIRST to ensure they're available for forward reference resolution
 # Note: We need BatchStatus even though spell checker doesn't use it directly,
-# because EnhancedProcessingUpdate has Union["EssayStatus", "BatchStatus"] annotation
+# because ProcessingUpdate has Union["EssayStatus", "BatchStatus"] annotation
 from common_core.enums import (
     EssayStatus,
     ProcessingEvent,
@@ -28,8 +28,8 @@ from common_core.enums import (
 # Import base event models that also need rebuilding
 from common_core.events.base_event_models import (
     BaseEventData,
-    EnhancedProcessingUpdate,
     EventTracker,
+    ProcessingUpdate,
 )
 
 # THEN import the models that depend on these enums
@@ -46,7 +46,7 @@ from common_core.metadata_models import (
 # This ensures forward references like "ProcessingEvent", "EssayStatus", "BatchStatus" can be
 # resolved
 BaseEventData.model_rebuild(raise_errors=True)
-EnhancedProcessingUpdate.model_rebuild(raise_errors=True)
+ProcessingUpdate.model_rebuild(raise_errors=True)
 EventTracker.model_rebuild(raise_errors=True)
 SpellcheckRequestedDataV1.model_rebuild(raise_errors=True)
 EventEnvelope.model_rebuild(raise_errors=True)

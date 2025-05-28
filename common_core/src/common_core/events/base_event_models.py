@@ -20,7 +20,7 @@ class BaseEventData(BaseModel):
     # SystemProcessingMetadata is now part of the concrete event data models below
 
 
-class EnhancedProcessingUpdate(BaseEventData):
+class ProcessingUpdate(BaseEventData):
     status: Union["EssayStatus", "BatchStatus"]  # New status of the entity using proper enum types
     system_metadata: SystemProcessingMetadata  # Context of THIS event's creation
 

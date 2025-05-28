@@ -1,4 +1,3 @@
-
 # HuleEdu Processing Pipeline: Master Product Requirements Document
 
 **Version:** 2.0
@@ -81,7 +80,7 @@ huledu-reboot/
 │       │
 │       └── events/                         (Specific result data models from SS, and common event bases)
 │           ├── __init__.py                 (~40-80 LoC - exports)
-│           ├── base_event_models.py        (~60-100 LoC - BaseEventData, EnhancedProcessingUpdate, EventTracker)
+│           ├── base_event_models.py        (~60-100 LoC - BaseEventData, ProcessingUpdate, EventTracker)
 │           ├── envelope.py                 (~30-50 LoC - EventEnvelope)
 │           ├── common_pipeline_events.py   (~60-120 LoC - Optional: Base models for shared BS->ELS commands or ELS->SS requests if inputs are truly identical)
 │           ├── spellcheck_events.py        (~40-80 LoC - e.g., EssaySpellcheckConcludedDataV1)
@@ -163,7 +162,7 @@ This section details the interaction for each processing pipeline, emphasizing t
 * **`common_core.metadata_models.EntityReference`**: (`entity_id`, `entity_type`, `parent_id`) - Identifies entities.
 * **`common_core.metadata_models.EssayProcessingInputRefV1`**: (`essay_id`, `text_storage_id`) - Points to an essay and its text for processing.
 * **`common_core.events.base_event_models.BaseEventData`**: Base for event payloads (`event_name`, `entity_ref`, `timestamp`).
-* **`common_core.events.base_event_models.EnhancedProcessingUpdate`**: Extends `BaseEventData` with `status` and `system_metadata` (an instance of `common_core.metadata_models.SystemProcessingMetadata`).
+* **`common_core.events.base_event_models.ProcessingUpdate`**: Extends `BaseEventData` with `status` and `system_metadata` (an instance of `common_core.metadata_models.SystemProcessingMetadata`).
 * **`common_core.metadata_models.StorageReferenceMetadata`**: Carries references to stored artifacts.
 
 ### 6.2. Pipeline 1: Spell Checking
@@ -191,7 +190,7 @@ This section details the interaction for each processing pipeline, emphasizing t
     * `EventEnvelope.data` (Type: `EssayLifecycleSpellcheckRequestV1` from `common_core.essay_service_models`):
 
         ```python
-        # From EnhancedProcessingUpdate: entity_ref (Essay), event_name (ESSAY_SPELLCHECK_REQUESTED), status (AWAITING_SPELLCHECK), system_metadata
+        # From ProcessingUpdate: entity_ref (Essay), event_name (ESSAY_SPELLCHECK_REQUESTED), status (AWAITING_SPELLCHECK), system_metadata
         text_storage_id: str 
         language: str
         ```
@@ -203,7 +202,7 @@ This section details the interaction for each processing pipeline, emphasizing t
     * `EventEnvelope.data` (Type: `EssaySpellcheckConcludedV1` from `common_core.events.spellcheck_events`):
 
         ```python
-        # From EnhancedProcessingUpdate: entity_ref (Essay), event_name (ESSAY_SPELLCHECK_RESULT_RECEIVED), status (SPELLCHECKED_SUCCESS/_FAILED), system_metadata
+        # From ProcessingUpdate: entity_ref (Essay), event_name (ESSAY_SPELLCHECK_RESULT_RECEIVED), status (SPELLCHECKED_SUCCESS/_FAILED), system_metadata
         original_text_storage_id: str
         storage_metadata: Optional[StorageReferenceMetadata] 
         corrections_made: Optional[int]
@@ -236,7 +235,7 @@ This section details the interaction for each processing pipeline, emphasizing t
     * `EventEnvelope.data` (Type: `EssayLifecycleNLPRequestV1` from `common_core.essay_service_models` - or shared `EssayLifecycleTextProcessRequestV1`):
 
         ```python
-        # From EnhancedProcessingUpdate: entity_ref (Essay), event_name (ESSAY_NLP_REQUESTED), status (AWAITING_NLP), system_metadata
+        # From ProcessingUpdate: entity_ref (Essay), event_name (ESSAY_NLP_REQUESTED), status (AWAITING_NLP), system_metadata
         text_storage_id: str # ID of spell-corrected text
         language: str
         ```
@@ -246,7 +245,7 @@ This section details the interaction for each processing pipeline, emphasizing t
     * `EventEnvelope.data` (Type: `EssayNLPConcludedDataV1` from `common_core.events.nlp_events`):
 
         ```python
-        # From EnhancedProcessingUpdate: entity_ref (Essay), event_name (ESSAY_NLP_RESULT_RECEIVED), status (NLP_COMPLETED_SUCCESS/_FAILED), system_metadata
+        # From ProcessingUpdate: entity_ref (Essay), event_name (ESSAY_NLP_RESULT_RECEIVED), status (NLP_COMPLETED_SUCCESS/_FAILED), system_metadata
         original_text_storage_id: str
         storage_metadata: StorageReferenceMetadata # Ref to NLP metrics JSON
         ```
@@ -284,7 +283,7 @@ This section details the interaction for each processing pipeline, emphasizing t
     * `EventEnvelope.data` (Type: `EssayLifecycleAIFeedbackRequestV1` from `common_core.essay_service_models`):
 
         ```python
-        # From EnhancedProcessingUpdate: entity_ref (Essay), event_name (ESSAY_AIFEEDBACK_REQUESTED), status (AWAITING_AI_FEEDBACK), system_metadata
+        # From ProcessingUpdate: entity_ref (Essay), event_name (ESSAY_AIFEEDBACK_REQUESTED), status (AWAITING_AI_FEEDBACK), system_metadata
         processing_input: AIFeedbackInputDataV1 # Defined in common_core.events.ai_feedback_events
         ```
 
@@ -300,7 +299,7 @@ This section details the interaction for each processing pipeline, emphasizing t
     * `EventEnvelope.data` (Type: `EssayAIFeedbackConcludedDataV1` from `common_core.events.ai_feedback_events`):
 
         ```python
-        # From EnhancedProcessingUpdate: entity_ref (Essay), event_name (ESSAY_AIFEEDBACK_RESULT_RECEIVED), status (AI_FEEDBACK_COMPLETED_SUCCESS/_FAILED), system_metadata
+        # From ProcessingUpdate: entity_ref (Essay), event_name (ESSAY_AIFEEDBACK_RESULT_RECEIVED), status (AI_FEEDBACK_COMPLETED_SUCCESS/_FAILED), system_metadata
         original_text_storage_id: str
         ai_feedback_metadata: AIFeedbackMetadata # common_core.metadata_models
         storage_metadata: StorageReferenceMetadata
@@ -337,7 +336,7 @@ This section details the interaction for each processing pipeline, emphasizing t
     * `EventEnvelope.data` (Type: `CJAssessmentBatchConcludedDataV1` from `common_core.events.cj_assessment_events`):
 
         ```python
-        # From EnhancedProcessingUpdate: entity_ref (Batch), event_name (CJ_ASSESSMENT_BATCH_CONCLUDED), status (CJ-specific outcome string), system_metadata
+        # From ProcessingUpdate: entity_ref (Batch), event_name (CJ_ASSESSMENT_BATCH_CONCLUDED), status (CJ-specific outcome string), system_metadata
         cj_output_metadata: CJAssessmentOutputMetadata # common_core.events.cj_assessment_events
         ```
 
@@ -347,7 +346,7 @@ This section details the interaction for each processing pipeline, emphasizing t
 
 ## 7. Key Pydantic Model Definitions (Summary)
 
-* **Core Contracts:** `EventEnvelope`, `BaseEventData`, `EnhancedProcessingUpdate`, `EntityReference`, `SystemProcessingMetadata`, `StorageReferenceMetadata`, `EssayProcessingInputRefV1`.
+* **Core Contracts:** `EventEnvelope`, `BaseEventData`, `ProcessingUpdate`, `EntityReference`, `SystemProcessingMetadata`, `StorageReferenceMetadata`, `EssayProcessingInputRefV1`.
 * **Pipeline State:** `ProcessingPipelineState`, `PipelineStateDetail`, `EssayProcessingCounts`.
 * **Specific Event Data Models:** As detailed in Section 6 for each pipeline command and result (e.g., `BatchServiceSpellcheckInitiateCommandDataV1`, `EssayLifecycleSpellcheckRequestV1`, `EssaySpellcheckConcludedDataV1`, etc.).
 * **Specific Output Metadata:** `AIFeedbackMetadata`, `CJAssessmentOutputMetadata`.

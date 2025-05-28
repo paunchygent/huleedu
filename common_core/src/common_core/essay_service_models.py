@@ -8,7 +8,7 @@ that ELS dispatches to specialized services based on batch commands.
 from __future__ import annotations
 
 from .events.ai_feedback_events import AIFeedbackInputDataV1
-from .events.base_event_models import EnhancedProcessingUpdate
+from .events.base_event_models import ProcessingUpdate
 
 __all__ = [
     "EssayLifecycleSpellcheckRequestV1",
@@ -17,21 +17,21 @@ __all__ = [
 ]
 
 
-class EssayLifecycleSpellcheckRequestV1(EnhancedProcessingUpdate):
+class EssayLifecycleSpellcheckRequestV1(ProcessingUpdate):
     """Request data for ELS to request spellcheck processing for an individual essay."""
 
     text_storage_id: str
     language: str
 
 
-class EssayLifecycleNLPRequestV1(EnhancedProcessingUpdate):
+class EssayLifecycleNLPRequestV1(ProcessingUpdate):
     """Request data for ELS to request NLP processing for an individual essay."""
 
     text_storage_id: str
     language: str
 
 
-class EssayLifecycleAIFeedbackRequestV1(EnhancedProcessingUpdate):
+class EssayLifecycleAIFeedbackRequestV1(ProcessingUpdate):
     """Request data for ELS to request AI feedback processing for an individual essay."""
 
     processing_input: AIFeedbackInputDataV1
