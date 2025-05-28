@@ -286,8 +286,8 @@ async def retry_essay_processing(
             "essay_id": essay_id,
             "phase": retry_request.phase,
             "target_status": target_status.value,
-            "message": "Batch Service will detect and re-initiate processing"
-        }
+            "message": "Batch Service will detect and re-initiate processing",
+        },
     )
 
     # Record metrics

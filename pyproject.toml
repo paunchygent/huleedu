@@ -37,7 +37,7 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/libs",
     "-e file:///${PROJECT_ROOT}/services/content_service",
     "-e file:///${PROJECT_ROOT}/services/spell_checker_service",
-    "-e file:///${PROJECT_ROOT}/services/batch_service",
+    "-e file:///${PROJECT_ROOT}/services/batch_orchestrator_service",
     "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service"
 ]
 
@@ -60,7 +60,7 @@ docker-restart = {composite = ["docker compose down", "docker compose up -d --bu
 
 # Individual service development
 dev-content = "pdm run -p services/content_service dev"
-dev-batch = "pdm run -p services/batch_service dev"
+dev-batch = "pdm run -p services/batch_orchestrator_service dev"
 run-spellchecker = "pdm run -p services/spell_checker_service start_worker"
 
 # Build common_core wheel
@@ -131,7 +131,7 @@ module = [
     "services.libs.*",
     "services.content_service.*",
     "services.spell_checker_service.*",
-    "services.batch_service.*",
+    "services.batch_orchestrator_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true
@@ -154,6 +154,9 @@ module = [
     "config",
     "di",
     "protocols",
+    "core_logic",
+    "state_store",
+    "batch_command_handlers",
 ]
 ignore_missing_imports = true
 
@@ -173,14 +176,14 @@ testpaths = [
     "common_core/tests",
     "services/content_service/tests",
     "services/spell_checker_service/tests",
-    "services/batch_service/tests",
+    "services/batch_orchestrator_service/tests",
     "services/essay_lifecycle_service/tests",
     "tests"
 ]
 pythonpath = [
     "services/spell_checker_service",
     "services/content_service", 
-    "services/batch_service",
+    "services/batch_orchestrator_service",
     "services/essay_lifecycle_service"
 ]
 python_files = "test_*.py *_test.py"

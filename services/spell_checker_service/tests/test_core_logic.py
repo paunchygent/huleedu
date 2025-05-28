@@ -40,12 +40,16 @@ class TestDefaultImplementations:
             text_with_errors, sample_essay_id
         )
 
-        # Assert - The dummy implementation only fixes "teh" -> "the" and "recieve" -> "receive"
+        # Assert - The real L2 + pyspellchecker implementation corrects multiple errors
         assert "the" in corrected_text  # "teh" should be corrected to "the"
         assert "receive" in corrected_text  # "recieve" should be corrected to "receive"
         assert (
-            corrections_count == 2
-        )  # Should count the two corrections made by dummy implementation
+            "set" in corrected_text
+        )  # "tset" should be corrected to "set" (pyspellchecker behavior)
+        assert (
+            corrections_count >= 2
+        )  # Should count at least the corrections made by real implementation
+        # Note: Exact count may vary based on pyspellchecker behavior and L2 dictionary availability
 
     @pytest.mark.asyncio
     async def test_default_fetch_content_success(

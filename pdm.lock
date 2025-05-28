@@ -5,7 +5,7 @@
 groups = ["default", "dev", "monorepo-tools"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:d20ba453ab47fdd29067496c1e8093431e3497b3fbd4088126774ee9246c87e1"
+content_hash = "sha256:db22900b395ec3ae68d8a2814043415f4475cac317a8f2e9c0eb55cc63177c03"
 
 [[metadata.targets]]
 requires_python = ">=3.11"
@@ -578,7 +578,7 @@ name = "huleedu-batch-service"
 version = "0.1.0"
 requires_python = ">=3.11"
 editable = true
-path = "./services/batch_service"
+path = "./services/batch_orchestrator_service"
 summary = "HuleEdu Batch Orchestration Service (MVP)"
 groups = ["dev"]
 dependencies = [
@@ -678,15 +678,16 @@ path = "./services/spell_checker_service"
 summary = "HuleEdu Spell Checker Service (MVP)"
 groups = ["dev"]
 dependencies = [
-    "aiohttp>=3.9.0",
-    "aiokafka>=0.10.0",
+    "aiohttp",
+    "aiokafka",
     "dishka",
     "huleedu-common-core",
     "huleedu-service-libs",
     "prometheus-client",
     "pydantic",
     "pydantic-settings",
-    "python-dotenv>=1.0.0",
+    "pyspellchecker",
+    "python-dotenv",
 ]
 
 [[package]]
@@ -1229,6 +1230,17 @@ dependencies = [
 files = [
     {file = "pydantic-2.11.5-py3-none-any.whl", hash = "sha256:f9c26ba06f9747749ca1e5c94d6a85cb84254577553c8785576fd38fa64dc0f7"},
     {file = "pydantic-2.11.5.tar.gz", hash = "sha256:7f853db3d0ce78ce8bbb148c401c2cdd6431b3473c0cdff2755c7690952a7b7a"},
+]
+
+[[package]]
+name = "pyspellchecker"
+version = "0.8.3"
+requires_python = ">=3.8"
+summary = "Pure python spell checker based on work by Peter Norvig"
+groups = ["dev"]
+files = [
+    {file = "pyspellchecker-0.8.3-py3-none-any.whl", hash = "sha256:e993076e98b0da5a99b7cc31085c3022c77a9dc37c5e95f5cf6304b5dbb8b9d2"},
+    {file = "pyspellchecker-0.8.3.tar.gz", hash = "sha256:cb06eeafe124837f321e0d02f8e21deab713e966e28e0360319a28a089c43978"},
 ]
 
 [[package]]

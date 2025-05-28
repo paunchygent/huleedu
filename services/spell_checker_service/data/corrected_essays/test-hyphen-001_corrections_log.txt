@@ -1,0 +1,46 @@
+Correction Analysis for Essay ID: test-hyphen-001
+================================================================================
+
+Section 1: Original Text Snippet:
+--------------------------------------------------------------------------------
+It's a well-writen artical that's verry intresting.
+
+Section 2: Initial L2 Corrections Applied:
+--------------------------------------------------------------------------------
+Total initial L2 corrections applied: 3
+  - 'well-writen' -> 'well-written' at indices 7-17 (Rule: L2 dictionary)
+  - 'verry' -> 'very' at indices 34-38 (Rule: L2 dictionary)
+  - 'intresting' -> 'interesting' at indices 40-49 (Rule: L2 dictionary)
+
+Diff Original -> Initial L2 Corrected:
+--- Original Text
++++ Initial L2 Corrected Text
+@@ -1 +1 @@
+-It's a well-writen artical that's verry intresting.
++It's a well-written artical that's very interesting.
+
+Section 2b: Contextual L2 Reversions (Simplified Logging):
+--------------------------------------------------------------------------------
+Number of L2 corrections reverted by contextual validation: 0
+(Note: With the current simplified L2 flow, this count is expected to be 0.)
+
+Section 3: Text Entering Main Spell Checker (Initial L2 Corrected Text):
+--------------------------------------------------------------------------------
+It's a well-written artical that's very interesting.
+
+Section 4: Main Spell Checker Corrections (Applied to Initial L2 Corrected Text):
+--------------------------------------------------------------------------------
+  - 'artical' -> 'article' (indices 20-26)
+
+Diff Initial L2 Corrected -> Final Corrected (Caller Perspective):
+--- Initial L2 Corrected Text
++++ Final Corrected Text (Caller)
+@@ -1 +1 @@
+-It's a well-written artical that's very interesting.
++It's a well-written article that's very interesting.
+
+Section 5: Final Texts Overview:
+--------------------------------------------------------------------------------
+Original: It's a well-writen artical that's verry intresting.
+Initial L2 Corrected: It's a well-written artical that's very interesting.
+Final Main Checker Corrected (from Caller): It's a well-written article that's very interesting.

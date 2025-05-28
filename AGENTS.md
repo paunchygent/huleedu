@@ -31,7 +31,7 @@
 ```
 huledu-reboot/
 ├── services/
-│   ├── batch_service/          # Batch Orchestration Service (✅ Active)
+│   ├── batch_orchestrator_service/  # Batch Orchestration Service (✅ Active)
 │   ├── content_service/        # Content Management Service (✅ Active)
 │   ├── spell_checker_service/  # Spell Checking Service (✅ Active)
 │   ├── essay_service/          # Essay Lifecycle Service (🚧 Placeholder)
@@ -55,7 +55,7 @@ pdm run test-all        # pytest test suite (REQUIRED)
 ### Service Development
 ```bash
 pdm run dev-content     # Run content service in development mode
-pdm run dev-batch       # Run batch service in development mode
+pdm run dev-batch       # Run batch orchestrator service in development mode
 pdm run -p services/spell_checker_service start_worker  # Start spell checker worker
 ```
 
@@ -144,14 +144,14 @@ if task_requires_network_access:
 **Phase 1.2**: Testing, observability, and architectural refinements
 
 ### Key Domain Concepts (Reference: `.cursor/rules/100-terminology-and-definitions.mdc`)
-- **BatchUpload**: Collection of essays for processing (Batch Service)
+- **BatchUpload**: Collection of essays for processing (Batch Orchestrator Service)
 - **ProcessedEssay**: Individual essay in lifecycle (Essay Service)
 - **EssayStatus**: Lifecycle state enum (RECEIVED, VALIDATING, etc.)
 - **EventEnvelope**: Standard event wrapper with correlation_id
 - **Contract**: Versioned Pydantic models for inter-service communication
 
 ### Service Responsibilities
-- **Batch Service**: Orchestrates essay processing pipelines
+- **Batch Orchestrator Service**: Orchestrates essay processing pipelines
 - **Content Service**: Manages essay content and metadata
 - **Spell Checker Service**: Provides spell checking capabilities
 - **Essay Service**: 🚧 **PLACEHOLDER** - Not yet implemented

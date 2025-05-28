@@ -7,6 +7,8 @@ including Kafka connection settings, service URLs, and consumer/producer configu
 
 from __future__ import annotations
 
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +27,39 @@ class Settings(BaseSettings):
     CONSUMER_GROUP: str = "spellchecker-service-group-v1.1"
     PRODUCER_CLIENT_ID: str = "spellchecker-service-producer"
     CONSUMER_CLIENT_ID: str = "spellchecker-service-consumer"
+
+    # L2 Correction Settings - Service-local paths for autonomy
+    L2_MASTER_DICT_PATH: str = "./data/l2_error_dict/nortvig_master_SWE_L2_corrections.txt"
+    L2_FILTERED_DICT_PATH: str = "./data/l2_error_dict/filtered_l2_dictionary.txt"
+    L2_DATA_DIR: str = "./data/l2_error_dict"  # Base directory for L2 data
+    ENABLE_L2_CORRECTIONS: bool = True
+
+    # Spell Checker Settings
+    DEFAULT_LANGUAGE: str = "en"
+    ENABLE_CORRECTION_LOGGING: bool = True
+    CORRECTION_LOG_OUTPUT_DIR: str = "data/corrected_essays"
+
+    # Environment-specific overrides (for containerized deployments)
+    L2_EXTERNAL_DATA_PATH: Optional[str] = None  # Override for mounted volumes
+
+    @property
+    def effective_l2_data_dir(self) -> str:
+        """Get effective L2 data directory, supporting external mounts."""
+        return self.L2_EXTERNAL_DATA_PATH or self.L2_DATA_DIR
+
+    @property
+    def effective_master_dict_path(self) -> str:
+        """Get effective master dictionary path."""
+        if self.L2_EXTERNAL_DATA_PATH:
+            return f"{self.L2_EXTERNAL_DATA_PATH}/nortvig_master_SWE_L2_corrections.txt"
+        return self.L2_MASTER_DICT_PATH
+
+    @property
+    def effective_filtered_dict_path(self) -> str:
+        """Get effective filtered dictionary path."""
+        if self.L2_EXTERNAL_DATA_PATH:
+            return f"{self.L2_EXTERNAL_DATA_PATH}/filtered_l2_dictionary.txt"
+        return self.L2_FILTERED_DICT_PATH
 
     model_config = SettingsConfigDict(
         env_file=".env",

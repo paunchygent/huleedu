@@ -1,0 +1,39 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    ENV_TYPE=docker \
+    QUART_APP=app:app \
+    QUART_ENV=production \
+    LOG_LEVEL=INFO \
+    PORT=5000 \
+    KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+    CONTENT_SERVICE_URL=http://content_service:8000/v1/content \
+    PDM_USE_VENV=false
+
+# Set base WORKDIR for the application
+WORKDIR /app
+
+# Install PDM globally in the image
+RUN pip install --no-cache-dir pdm
+
+# Copy shared local dependencies first
+COPY common_core/ /app/common_core/
+COPY services/libs/ /app/services/libs/
+
+# Now, handle the specific service
+COPY services/batch_orchestrator_service/ /app/services/batch_orchestrator_service/
+
+# Set working directory to the service
+WORKDIR /app/services/batch_orchestrator_service
+
+# Install dependencies for the batch_orchestrator_service using its own pyproject.toml
+RUN pdm install --prod
+
+RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
+USER appuser
+
+EXPOSE ${PORT}
+
+# Command to run the application from service directory
+CMD ["pdm", "run", "start"] 

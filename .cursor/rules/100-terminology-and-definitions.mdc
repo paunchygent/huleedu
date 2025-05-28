@@ -20,7 +20,7 @@ alwaysApply: true
 
 ## 2. HuleEdu-Specific Terms
 
-- **BatchUpload**: Collection of essays for processing (Batch Service)
+- **BatchUpload**: Collection of essays for processing (Batch Orchestrator Service)
 - **ProcessingPipelineState**: Tracks pipeline progress within BatchUpload
 - **ProcessedEssay**: Individual essay entity (Essay Lifecycle Service)
 - **EssayStatus**: Lifecycle state enum for ProcessedEssay

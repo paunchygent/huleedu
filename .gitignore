@@ -6,3 +6,7 @@ __pycache__/
 .pdm-python
 .venv/
 **/.env
+
+# temp_folders and temp_files used for testing or development
+cj_essay_assessment/
+/*.xml

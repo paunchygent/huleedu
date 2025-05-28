@@ -16,9 +16,9 @@ from aiokafka import AIOKafkaConsumer
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 
+from batch_command_handlers import process_single_message
 from config import settings
 from di import EssayLifecycleServiceProvider
-from event_router import process_single_message
 from protocols import (
     EssayStateStore,
     EventPublisher,

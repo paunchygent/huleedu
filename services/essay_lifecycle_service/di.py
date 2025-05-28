@@ -7,9 +7,17 @@ from uuid import UUID
 
 from aiohttp import ClientSession
 from aiokafka import AIOKafkaProducer
+from common_core.batch_service_models import (
+    BatchServiceAIFeedbackInitiateCommandDataV1,
+    BatchServiceCJAssessmentInitiateCommandDataV1,
+    BatchServiceNLPInitiateCommandDataV1,
+    BatchServiceSpellcheckInitiateCommandDataV1,
+)
 from common_core.enums import ContentType, EssayStatus
-from common_core.metadata_models import EntityReference
+from common_core.events.ai_feedback_events import AIFeedbackInputDataV1
+from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CollectorRegistry
 
 from config import Settings, settings
@@ -101,7 +109,7 @@ class EssayLifecycleServiceProvider(Provider):
         self,
         state_store: EssayStateStore,
         request_dispatcher: SpecializedServiceRequestDispatcher,
-        event_publisher: EventPublisher
+        event_publisher: EventPublisher,
     ) -> BatchCommandHandler:
         """Provide batch command handler implementation."""
         return DefaultBatchCommandHandler(state_store, request_dispatcher, event_publisher)
@@ -159,7 +167,7 @@ class DefaultEventPublisher:
         completed_count: int,
         failed_count: int,
         total_essays_in_phase: int,
-        correlation_id: UUID | None = None
+        correlation_id: UUID | None = None,
     ) -> None:
         """Report aggregated progress of a specific phase for a batch to BS."""
         import json
@@ -170,10 +178,7 @@ class DefaultEventPublisher:
         from common_core.metadata_models import EntityReference
 
         # Create batch progress event data
-        batch_ref = EntityReference(
-            entity_id=batch_id,
-            entity_type="batch"
-        )
+        batch_ref = EntityReference(entity_id=batch_id, entity_type="batch")
 
         event_data = {
             "event_name": "batch.phase.progress.v1",
@@ -206,7 +211,7 @@ class DefaultEventPublisher:
         phase: str,
         status: str,
         details: dict[str, Any],
-        correlation_id: UUID | None = None
+        correlation_id: UUID | None = None,
     ) -> None:
         """Report the final conclusion of a phase for a batch to BS."""
         import json
@@ -217,10 +222,7 @@ class DefaultEventPublisher:
         from common_core.metadata_models import EntityReference
 
         # Create batch conclusion event data
-        batch_ref = EntityReference(
-            entity_id=batch_id,
-            entity_type="batch"
-        )
+        batch_ref = EntityReference(entity_id=batch_id, entity_type="batch")
 
         event_data = {
             "event_name": "batch.phase.concluded.v1",
@@ -343,7 +345,7 @@ class DefaultBatchCommandHandler:
         self,
         state_store: EssayStateStore,
         request_dispatcher: SpecializedServiceRequestDispatcher,
-        event_publisher: EventPublisher
+        event_publisher: EventPublisher,
     ) -> None:
         self.state_store = state_store
         self.request_dispatcher = request_dispatcher
@@ -351,42 +353,47 @@ class DefaultBatchCommandHandler:
 
     async def process_initiate_spellcheck_command(
         self,
-        command_data: Any,  # BatchServiceSpellcheckInitiateCommandDataV1
-        correlation_id: UUID | None = None
+        command_data: BatchServiceSpellcheckInitiateCommandDataV1,
+        correlation_id: UUID | None = None,
     ) -> None:
-        """Process spellcheck phase initiation command from Batch Service."""
-        # TODO: Implement spellcheck command processing
+        """Process spellcheck initiation command from Batch Orchestrator Service."""
+        # TODO: Implement batch command processing
         # 1. Update essay states to AWAITING_SPELLCHECK
-        # 2. Dispatch individual requests to Spellcheck Service
-        # 3. Track batch progress
-        pass
+        # 2. Dispatch individual requests to Spell Checker Service
+        # 3. Track batch progress and report to BS
+        logger = create_service_logger("batch_command_handler")
+        logger.info(
+            "Received spellcheck initiation command (STUB)",
+            extra={"batch_id": command_data.entity_ref.entity_id, "correlation_id": correlation_id},
+        )
 
     async def process_initiate_nlp_command(
-        self,
-        command_data: Any,  # BatchServiceNLPInitiateCommandDataV1
-        correlation_id: UUID | None = None
+        self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID | None = None
     ) -> None:
-        """Process NLP phase initiation command from Batch Service."""
-        # TODO: Implement NLP command processing
-        pass
+        """Process NLP initiation command from Batch Orchestrator Service."""
+        # TODO: Implement when NLP Service is available
+        logger = create_service_logger("batch_command_handler")
+        logger.info("Received NLP initiation command (STUB)")
 
     async def process_initiate_ai_feedback_command(
         self,
-        command_data: Any,  # BatchServiceAIFeedbackInitiateCommandDataV1
-        correlation_id: UUID | None = None
+        command_data: BatchServiceAIFeedbackInitiateCommandDataV1,
+        correlation_id: UUID | None = None,
     ) -> None:
-        """Process AI feedback phase initiation command from Batch Service."""
-        # TODO: Implement AI feedback command processing
-        pass
+        """Process AI feedback initiation command from Batch Orchestrator Service."""
+        # TODO: Implement when AI Feedback Service is available
+        logger = create_service_logger("batch_command_handler")
+        logger.info("Received AI feedback initiation command (STUB)")
 
     async def process_initiate_cj_assessment_command(
         self,
-        command_data: Any,  # BatchServiceCJAssessmentInitiateCommandDataV1
-        correlation_id: UUID | None = None
+        command_data: BatchServiceCJAssessmentInitiateCommandDataV1,
+        correlation_id: UUID | None = None,
     ) -> None:
-        """Process CJ assessment phase initiation command from Batch Service."""
-        # TODO: Implement CJ assessment command processing
-        pass
+        """Process CJ assessment initiation command from Batch Orchestrator Service."""
+        # TODO: Implement when CJ Assessment Service is available
+        logger = create_service_logger("batch_command_handler")
+        logger.info("Received CJ assessment initiation command (STUB)")
 
 
 class DefaultSpecializedServiceRequestDispatcher:
@@ -398,32 +405,38 @@ class DefaultSpecializedServiceRequestDispatcher:
 
     async def dispatch_spellcheck_requests(
         self,
-        essays_to_process: list[Any],  # List[EssayProcessingInputRefV1]
+        essays_to_process: list[EssayProcessingInputRefV1],
         language: str,
-        batch_correlation_id: UUID | None = None
+        batch_correlation_id: UUID | None = None,
     ) -> None:
-        """Dispatch spellcheck requests to Spellcheck Service."""
+        """Dispatch individual spellcheck requests to Spell Checker Service."""
         # TODO: Implement spellcheck request dispatching
         # Create EssayLifecycleSpellcheckRequestV1 for each essay
-        # Publish to spellcheck service topic
-        pass
+        # Publish to spell checker service topic
+        logger = create_service_logger("specialized_service_dispatcher")
+        logger.info(
+            "Dispatching spellcheck requests (STUB)",
+            extra={"essay_count": len(essays_to_process), "language": language},
+        )
 
     async def dispatch_nlp_requests(
         self,
-        essays_to_process: list[Any],  # List[EssayProcessingInputRefV1]
+        essays_to_process: list[EssayProcessingInputRefV1],
         language: str,
-        batch_correlation_id: UUID | None = None
+        batch_correlation_id: UUID | None = None,
     ) -> None:
-        """Dispatch NLP requests to NLP Service."""
-        # TODO: Implement NLP request dispatching
-        pass
+        """Dispatch individual NLP requests to NLP Service."""
+        # TODO: Implement when NLP Service is available
+        logger = create_service_logger("specialized_service_dispatcher")
+        logger.info("Dispatching NLP requests (STUB)")
 
     async def dispatch_ai_feedback_requests(
         self,
-        essays_to_process: list[Any],  # List[EssayProcessingInputRefV1]
-        context: Any,  # AIFeedbackBatchContextDataV1
-        batch_correlation_id: UUID | None = None
+        essays_to_process: list[EssayProcessingInputRefV1],
+        context: AIFeedbackInputDataV1,
+        batch_correlation_id: UUID | None = None,
     ) -> None:
-        """Dispatch AI feedback requests to AI Feedback Service."""
-        # TODO: Implement AI feedback request dispatching
-        pass
+        """Dispatch individual AI feedback requests to AI Feedback Service."""
+        # TODO: Implement when AI Feedback Service is available
+        logger = create_service_logger("specialized_service_dispatcher")
+        logger.info("Dispatching AI feedback requests (STUB)")

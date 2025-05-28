@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     # External Service URLs
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
-    BATCH_SERVICE_URL: str = "http://batch_service:8000/v1"
+    BATCH_ORCHESTRATOR_SERVICE_URL: str = "http://batch_orchestrator_service:8000/v1"
 
     # State Storage Configuration
     DATABASE_PATH: str = "./essay_lifecycle.db"

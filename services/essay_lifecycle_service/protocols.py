@@ -69,7 +69,7 @@ class EventPublisher(Protocol):
         completed_count: int,
         failed_count: int,
         total_essays_in_phase: int,
-        correlation_id: UUID | None = None
+        correlation_id: UUID | None = None,
     ) -> None:
         """Report aggregated progress of a specific phase for a batch to BS."""
         ...
@@ -80,7 +80,7 @@ class EventPublisher(Protocol):
         phase: str,
         status: str,
         details: dict[str, Any],
-        correlation_id: UUID | None = None
+        correlation_id: UUID | None = None,
     ) -> None:
         """Report the final conclusion of a phase for a batch to BS."""
         ...
@@ -92,7 +92,7 @@ class BatchCommandHandler(Protocol):
     async def process_initiate_spellcheck_command(
         self,
         command_data: Any,  # BatchServiceSpellcheckInitiateCommandDataV1
-        correlation_id: UUID | None = None
+        correlation_id: UUID | None = None,
     ) -> None:
         """Process spellcheck phase initiation command from Batch Service."""
         ...
@@ -100,7 +100,7 @@ class BatchCommandHandler(Protocol):
     async def process_initiate_nlp_command(
         self,
         command_data: Any,  # BatchServiceNLPInitiateCommandDataV1
-        correlation_id: UUID | None = None
+        correlation_id: UUID | None = None,
     ) -> None:
         """Process NLP phase initiation command from Batch Service."""
         ...
@@ -108,7 +108,7 @@ class BatchCommandHandler(Protocol):
     async def process_initiate_ai_feedback_command(
         self,
         command_data: Any,  # BatchServiceAIFeedbackInitiateCommandDataV1
-        correlation_id: UUID | None = None
+        correlation_id: UUID | None = None,
     ) -> None:
         """Process AI feedback phase initiation command from Batch Service."""
         ...
@@ -116,7 +116,7 @@ class BatchCommandHandler(Protocol):
     async def process_initiate_cj_assessment_command(
         self,
         command_data: Any,  # BatchServiceCJAssessmentInitiateCommandDataV1
-        correlation_id: UUID | None = None
+        correlation_id: UUID | None = None,
     ) -> None:
         """Process CJ assessment phase initiation command from Batch Service."""
         ...
@@ -129,7 +129,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: str,
-        batch_correlation_id: UUID | None = None
+        batch_correlation_id: UUID | None = None,
     ) -> None:
         """Dispatch spellcheck requests to Spellcheck Service."""
         ...
@@ -138,7 +138,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: str,
-        batch_correlation_id: UUID | None = None
+        batch_correlation_id: UUID | None = None,
     ) -> None:
         """Dispatch NLP requests to NLP Service."""
         ...
@@ -147,7 +147,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         context: Any,  # AIFeedbackBatchContextDataV1 (to be defined)
-        batch_correlation_id: UUID | None = None
+        batch_correlation_id: UUID | None = None,
     ) -> None:
         """Dispatch AI feedback requests to AI Feedback Service."""
         ...

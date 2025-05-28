@@ -14,6 +14,43 @@
 - **Implementation**: Updated `/retry` endpoint in `app.py` to only update essay state
 - **Result**: Endpoint now complies with batch-centric orchestration (no direct SS publishing)
 
+### **Fix 3: Architectural Naming Correction** ✅
+
+- **Status**: COMPLETED
+- **Implementation**: Renamed `event_router.py` → `batch_command_handlers.py`
+- **Rationale**: Previous name incorrectly suggested ELS was an orchestrator like Batch Orchestrator Service
+- **Updated References**: 
+  - `worker_main.py` import statement
+  - Logger name updated to match new module name
+  - All references now correctly reflect ELS's command-driven, subordinate role
+- **Result**: Module name now accurately represents batch-centric architecture
+
+### **Fix 4: Service Naming Architectural Improvement** ✅
+
+- **Status**: COMPLETED  
+- **Implementation**: Renamed `batch_service` → `batch_orchestrator_service`
+- **Rationale**: "batch_service" was too generic for the primary system orchestrator
+- **Scope of Changes**:
+  - Directory: `services/batch_service/` → `services/batch_orchestrator_service/`
+  - Docker: Container name and dockerfile paths updated
+  - Configuration: Environment variable prefixes updated
+  - Documentation: All references to "Batch Service" → "Batch Orchestrator Service"
+  - Event naming: Updated TODO comments to use `batchorchestrator` prefix
+- **Preserved for Compatibility**: Pydantic model names remain as `BatchService*` to avoid breaking changes
+- **Result**: Service name now clearly indicates its role as primary orchestrator
+
+### **Fix 5: Type Stubs and MyPy Configuration** ✅
+
+- **Status**: COMPLETED
+- **Implementation**: Fixed all missing type stubs and proper mypy configuration
+- **Changes Made**:
+  - **DI Module**: Replaced all `Any` type comments with proper type annotations
+  - **Service Models**: Added imports for `BatchService*`, `EssayLifecycle*`, and `AIFeedback*` models
+  - **MyPy Configuration**: Added `core_logic`, `state_store`, and `batch_command_handlers` to root pyproject.toml
+  - **Type Safety**: All method signatures now use explicit types instead of generic `Any`
+- **Avoided Anti-pattern**: Did not create local `py.typed` files (properly handled via root configuration)
+- **Result**: Complete type safety with 9 source files passing mypy without errors
+
 ## ✅ **PHASE 2: COMMON CORE MODELS - COMPLETED**
 
 ### **Added Missing Pydantic Models** ✅

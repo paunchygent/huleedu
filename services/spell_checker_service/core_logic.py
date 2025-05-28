@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Optional, Tuple
 
 import aiohttp  # For ClientSession type hint
@@ -88,24 +87,188 @@ async def default_store_content_impl(
 
 
 async def default_perform_spell_check_algorithm(
-    text: str, essay_id: Optional[str] = None
+    text: str, essay_id: Optional[str] = None, language: str = "en"
 ) -> Tuple[str, int]:
     """
-    Core spell check algorithm.
-    This is a simple placeholder implementation. Returns (corrected_text, corrections_count).
+    Complete L2 + pyspellchecker pipeline implementation.
+
+    Pipeline:
+    1. Load/filter L2 error dictionary
+    2. Apply L2 corrections to input text
+    3. Run pyspellchecker on L2-corrected text
+    4. Log detailed correction information
+    5. Return final corrected text + correction count
     """
     log_prefix = f"Essay {essay_id}: " if essay_id else ""
     logger.info(
-        f"{log_prefix}Performing DUMMY spell check algorithm for text (length: {len(text)})"
+        f"{log_prefix}Performing L2 + pyspellchecker algorithm for text (length: {len(text)})"
     )
-    await asyncio.sleep(0.1)  # Simulate work
 
-    # Simple dummy corrections - replace with actual spell check logic
-    corrected_text = text.replace("teh", "the").replace("recieve", "receive")
-    corrections_count = text.count("teh") + text.count("recieve")
+    try:
+        # Import the migrated modules (local to service)
+        import re
 
-    logger.info(f"{log_prefix}Dummy spell check algorithm made {corrections_count} corrections.")
-    return corrected_text, corrections_count
+        from spellchecker import SpellChecker
+
+        from .config import settings
+        from .spell_logic.l2_dictionary_loader import apply_l2_corrections, load_l2_errors
+
+        # 1. Load L2 dictionaries using environment-aware configuration
+        logger.debug(
+            f"{log_prefix}Loading L2 error dictionary from: {settings.effective_filtered_dict_path}"
+        )
+        l2_errors = load_l2_errors(settings.effective_filtered_dict_path, filter_entries=False)
+
+        if not l2_errors and settings.ENABLE_L2_CORRECTIONS:
+            logger.warning(f"{log_prefix}L2 dictionary is empty but L2 corrections are enabled")
+
+        # 2. Apply L2 corrections
+        l2_corrected_text, l2_corrections = apply_l2_corrections(text, l2_errors)
+        l2_correction_count = len(l2_corrections)
+
+        if l2_correction_count > 0:
+            logger.debug(f"{log_prefix}Applied {l2_correction_count} L2 corrections")
+
+        # 3. Initialize pyspellchecker
+        logger.debug(f"{log_prefix}Initializing SpellChecker for language: {language}")
+        try:
+            spell_checker = SpellChecker(language=language)
+        except Exception as e:
+            logger.error(
+                f"{log_prefix}Failed to initialize SpellChecker for language '{language}': {e}"
+            )
+            # Fallback to L2 corrections only
+            return l2_corrected_text, l2_correction_count
+
+        # 4. Apply pyspellchecker corrections
+        logger.debug(f"{log_prefix}Running pyspellchecker on L2-corrected text")
+
+        # Tokenize using pattern from prototype
+        token_pattern = re.compile(r"\w+(?:[-']\w+)*|[^\s\w]+|\s+")
+        word_pattern = re.compile(r"^\w+(?:[-']\w+)*$")
+
+        tokens = token_pattern.findall(l2_corrected_text)
+        pyspellchecker_corrections = []
+        final_corrected_tokens = []
+        current_pos = 0
+
+        # Collect words for spell checking
+        words_to_check = []
+        word_indices_map = {}
+        temp_word_idx = 0
+
+        for i, token_text in enumerate(tokens):
+            if word_pattern.fullmatch(token_text):
+                words_to_check.append(token_text)
+                word_indices_map[temp_word_idx] = {
+                    "original_token_idx": i,
+                    "text": token_text,
+                    "start": current_pos,
+                }
+                temp_word_idx += 1
+            current_pos += len(token_text)
+
+        # Find misspelled words - check lowercase versions for consistency
+        lowercase_words = [word.lower() for word in words_to_check]
+        misspelled_lowercase = spell_checker.unknown(lowercase_words)
+
+        # Map back to original case words that need correction
+        misspelled_words = set()
+        for i, lowercase_word in enumerate(lowercase_words):
+            if lowercase_word in misspelled_lowercase:
+                misspelled_words.add(words_to_check[i])  # Add original case word
+
+        # Apply corrections
+        current_pos = 0
+        word_idx_counter = 0
+
+        for token_text in tokens:
+            token_len = len(token_text)
+            if word_pattern.fullmatch(token_text):
+                original_word = words_to_check[word_idx_counter]
+
+                if original_word in misspelled_words:
+                    corrected_word = spell_checker.correction(original_word.lower())
+
+                    if corrected_word and corrected_word.lower() != original_word.lower():
+                        # Preserve case
+                        if original_word.isupper() and len(original_word) > 1:
+                            corrected_word = corrected_word.upper()
+                        elif original_word.istitle():
+                            corrected_word = corrected_word.title()
+                        elif original_word[0].isupper():
+                            corrected_word = corrected_word[0].upper() + corrected_word[1:]
+
+                        if corrected_word != original_word:
+                            pyspellchecker_corrections.append(
+                                {
+                                    "original_word": original_word,
+                                    "corrected_word": corrected_word,
+                                    "start": current_pos,
+                                    "end": current_pos + token_len - 1,
+                                    "rule": "pyspellchecker",
+                                }
+                            )
+                            final_corrected_tokens.append(corrected_word)
+                        else:
+                            final_corrected_tokens.append(original_word)
+                    else:
+                        final_corrected_tokens.append(original_word)
+                else:
+                    final_corrected_tokens.append(original_word)
+                word_idx_counter += 1
+            else:
+                final_corrected_tokens.append(token_text)
+            current_pos += token_len
+
+        final_corrected_text = "".join(final_corrected_tokens)
+        pyspell_correction_count = len(pyspellchecker_corrections)
+        total_corrections = l2_correction_count + pyspell_correction_count
+
+        # 5. Log correction details if enabled
+        if settings.ENABLE_CORRECTION_LOGGING and essay_id:
+            try:
+                from .spell_logic.correction_logger import log_essay_corrections
+
+                # Convert L2 corrections to expected format
+                l2_corrections_formatted = []
+                for corr in l2_corrections:
+                    l2_corrections_formatted.append(
+                        {
+                            "original_word": corr.get("original_word", ""),
+                            "corrected_word": corr.get("corrected_word", ""),
+                            "start": corr.get("start", 0),
+                            "end": corr.get("end", 0),
+                            "rule": corr.get("rule", "L2"),
+                        }
+                    )
+
+                log_essay_corrections(
+                    essay_id=essay_id,
+                    original_text=text,
+                    initial_l2_corrected_text=l2_corrected_text,
+                    final_corrected_text=final_corrected_text,
+                    applied_initial_l2_corrections=l2_corrections_formatted,
+                    main_checker_corrections=pyspellchecker_corrections,
+                    l2_context_reverted_count=0,  # Not implemented in simplified flow
+                    output_dir=settings.CORRECTION_LOG_OUTPUT_DIR,
+                )
+                logger.debug(f"{log_prefix}Detailed correction logging completed")
+            except Exception as e:
+                logger.warning(f"{log_prefix}Failed to log detailed corrections: {e}")
+
+        logger.info(
+            f"{log_prefix}L2 + pyspellchecker algorithm completed: "
+            f"{l2_correction_count} L2 corrections, {pyspell_correction_count} pyspellchecker corrections, "
+            f"{total_corrections} total corrections"
+        )
+
+        return final_corrected_text, total_corrections
+
+    except Exception as e:
+        logger.error(f"{log_prefix}Error in spell check algorithm: {e}", exc_info=True)
+        # Fallback to original text
+        return text, 0
 
 
 # The classes ContentClient, ResultStore, SpellLogic that implement the protocols

@@ -1,0 +1,86 @@
+Correction Analysis for Essay ID: test-long-001
+================================================================================
+
+Section 1: Original Text Snippet:
+--------------------------------------------------------------------------------
+Thiss is a documment that containns many errrors. The spellchecker should
+        be abel to handl all of thees misstakes efficently. It's importent that
+        the algorythm workss wel with longr te...
+
+Section 2: Initial L2 Corrections Applied:
+--------------------------------------------------------------------------------
+Total initial L2 corrections applied: 4
+  - 'abel' -> 'able' at indices 85-88 (Rule: L2 dictionary)
+  - 'misstakes' -> 'mistakes' at indices 112-120 (Rule: L2 dictionary)
+  - 'importent' -> 'important' at indices 139-147 (Rule: L2 dictionary)
+  - 'becouse' -> 'because' at indices 205-211 (Rule: L2 dictionary)
+
+Diff Original -> Initial L2 Corrected:
+--- Original Text
++++ Initial L2 Corrected Text
+@@ -1,5 +1,5 @@
+ Thiss is a documment that containns many errrors. The spellchecker should
+-        be abel to handl all of thees misstakes efficently. It's importent that
+-        the algorythm workss wel with longr textes becouse essayss can bee quit
++        be able to handl all of thees mistakes efficently. It's important that
++        the algorythm workss wel with longr textes because essayss can bee quit
+         lenghty. We nede to ensur that performanc remainss gud even with 
+         substantil amounts of contnt.
+
+Section 2b: Contextual L2 Reversions (Simplified Logging):
+--------------------------------------------------------------------------------
+Number of L2 corrections reverted by contextual validation: 0
+(Note: With the current simplified L2 flow, this count is expected to be 0.)
+
+Section 3: Text Entering Main Spell Checker (Initial L2 Corrected Text):
+--------------------------------------------------------------------------------
+Thiss is a documment that containns many errrors. The spellchecker should
+        be able to handl all of thees mistakes efficently. It's important that
+        the algorythm workss wel with longr tex...
+
+Section 4: Main Spell Checker Corrections (Applied to Initial L2 Corrected Text):
+--------------------------------------------------------------------------------
+  - 'Thiss' -> 'This' (indices 0-4)
+  - 'documment' -> 'document' (indices 11-19)
+  - 'containns' -> 'contains' (indices 26-34)
+  - 'errrors' -> 'errors' (indices 41-47)
+  - 'handl' -> 'hands' (indices 93-97)
+  - 'efficently' -> 'efficiently' (indices 121-130)
+  - 'algorythm' -> 'algorithm' (indices 165-173)
+  - 'workss' -> 'works' (indices 175-180)
+  - 'wel' -> 'we' (indices 182-184)
+  - 'longr' -> 'long' (indices 191-195)
+  - 'textes' -> 'texts' (indices 197-202)
+  - 'essayss' -> 'essays' (indices 212-218)
+  - 'lenghty' -> 'lengthy' (indices 241-247)
+  - 'nede' -> 'need' (indices 253-256)
+  - 'ensur' -> 'ensure' (indices 261-265)
+  - 'performanc' -> 'performance' (indices 272-281)
+  - 'remainss' -> 'remains' (indices 283-290)
+  - 'gud' -> 'guy' (indices 292-294)
+  - 'substantil' -> 'substantial' (indices 315-324)
+  - 'contnt' -> 'content' (indices 337-342)
+
+Diff Initial L2 Corrected -> Final Corrected (Caller Perspective):
+--- Initial L2 Corrected Text
++++ Final Corrected Text (Caller)
+@@ -1,5 +1,5 @@
+-Thiss is a documment that containns many errrors. The spellchecker should
+-        be able to handl all of thees mistakes efficently. It's important that
+-        the algorythm workss wel with longr textes because essayss can bee quit
+-        lenghty. We nede to ensur that performanc remainss gud even with 
+-        substantil amounts of contnt.
++This is a document that contains many errors. The spellchecker should
++        be able to hands all of thees mistakes efficiently. It's important that
++        the algorithm works we with long texts because essays can bee quit
++        lengthy. We need to ensure that performance remains guy even with 
++        substantial amounts of content.
+
+Section 5: Final Texts Overview:
+--------------------------------------------------------------------------------
+Original: Thiss is a documment that containns many errrors. The spellchecker should
+        be abel to handl a...
+Initial L2 Corrected: Thiss is a documment that containns many errrors. The spellchecker should
+        be able to handl a...
+Final Main Checker Corrected (from Caller): This is a document that contains many errors. The spellchecker should
+        be able to hands all o...

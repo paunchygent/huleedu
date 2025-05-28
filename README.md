@@ -31,15 +31,15 @@ Based on your existing codebase and future needs, the following core microservic
     * **Key Interaction**: It does *not* directly manage individual essays but tells an Essay Lifecycle Service (or equivalent) which essays in a batch need to enter a new processing phase.
 
 * **Essay Lifecycle Service (ELS)**:
-    * **Conceptual Service**: This might initially be a tightly coupled logical component within the Batch Service or evolve into a fully separate microservice.
+    * **Conceptual Service**: This might initially be a tightly coupled logical component within the Batch Orchestrator Service or evolve into a fully separate microservice.
     * **Owns**: The `ProcessedEssay` entity (from `common/models/batch.py`) and its detailed, fine-grained lifecycle status, governed by an extended `EssayStatus` enum (from `common/models/enums.py`).
     * **Responsibilities**:
         * Manages the canonical record for each essay, including references to its various text versions (original, spell-checked, AI-revised) and links to all associated processing artifacts (NLP metrics, AI feedback details, CJ scores).
-        * Consumes batch-level command events from the Batch Service (e.g., `INITIATE_SPELLCHECK_FOR_BATCH_V1`).
+        * Consumes batch-level command events from the Batch Orchestrator Service (e.g., `INITIATE_SPELLCHECK_FOR_BATCH_V1`).
         * For each relevant essay, updates its `ProcessedEssay.status` (e.g., to `EssayStatus.AWAITING_SPELLCHECK`) and publishes essay-specific *command events* to the appropriate Specialized Processing Service (e.g., `REQUEST_SPELLCHECK_FOR_ESSAY_V1`).
         * Consumes result events from Specialized Processing Services (e.g., `ESSAY_SPELLCHECK_CONCLUDED_V1`).
         * Updates its `ProcessedEssay.status` accordingly (e.g., to `EssayStatus.SPELLCHECKED`) and stores resulting artifact references.
-        * Publishes general `ESSAY_LIFECYCLE_STATE_UPDATED_V1` events, which the Batch Service consumes to track batch progress.
+        * Publishes general `ESSAY_LIFECYCLE_STATE_UPDATED_V1` events, which the Batch Orchestrator Service consumes to track batch progress.
 
 * **Specialized Processing Services (SS)**:
     * **SpellChecker Service**: Performs spell checking. Consumes `REQUEST_SPELLCHECK_FOR_ESSAY_V1`, publishes `ESSAY_SPELLCHECK_CONCLUDED_V1`. (Inspired by `src/cj_essay_assessment/spell_checker/spell_check_pipeline.py`).
@@ -99,11 +99,11 @@ This is the nervous system of the refactored application.
 
 * **Event Naming Conventions**:
     * Use a clear, hierarchical, past-tense naming convention that includes domain, entity, action, and version. Examples:
-        * `batch.orchestration.spellcheck_phase_initiated.v1` (from Batch Service)
+        * `batch.orchestration.spellcheck_phase_initiated.v1` (from Batch Orchestrator Service)
         * `essay.lifecycle.spellcheck_requested.v1` (from Essay Lifecycle Service)
         * `spellchecker.essay.correction_concluded.v1` (from SpellChecker Service)
         * `essay.lifecycle.state_updated.v1` (from Essay Lifecycle Service, carrying new `EssayStatus`)
-        * `batch.orchestration.pipeline_progress_updated.v1` (from Batch Service, for UI)
+        * `batch.orchestration.pipeline_progress_updated.v1` (from Batch Orchestrator Service, for UI)
 
 * **Thin Events + Callback APIs (Agreed Preference)**:
     * **Principle**: Events primarily signal *that something happened* and provide essential identifiers and key outcome data. They should not carry large data blobs like full essay texts.
@@ -116,7 +116,7 @@ This is the nervous system of the refactored application.
 
 This is where your existing enums and metadata models, evolved into Pydantic, become central.
 
-* **A. Batch Service State (`BatchUpload` Entity)**
+* **A. Batch Orchestrator Service State (`BatchUpload` Entity)**
     * **Primary Status**: Managed by the `BatchUpload.status` field, using values from an *extended* `common.models.enums.BatchStatus` enum. This enum will include distinct top-level states for major phases if they represent significant, externally observable states of the *entire batch* (e.g., `PENDING_INITIAL_PROCESSING`, `PROCESSING_CONTENT_ENRICHMENT` (covering Spellcheck, NLP, AI Feedback as a group), `AWAITING_CJ_ASSESSMENT`, `PROCESSING_CJ_ASSESSMENT`, `COMPLETED`, `FAILED`, `CANCELLED`). The decision for "AI Feedback" to be a top-level batch status depends on whether it's a distinct wait/active state for the *whole batch* from an orchestration perspective, similar to CJ Assessment. Given its complexity as you described (AI Feedback + Editor Revision + dependencies), it likely warrants such top-level representation.
         * *Alternative Considered & Refined*: Initially, we thought of keeping `BatchStatus.PROCESSING` very generic. However, if distinct major pipelines like "AI Feedback Pipeline" and "CJ Assessment Pipeline" are externally significant and the batch explicitly "waits" for them or is "actively in" them, then dedicated top-level `BatchStatus` members are clearer.
     * **Detailed Sub-Phase & Pipeline Tracking (`BatchUpload.processing_metadata` -> `ProcessingPipelineState` Pydantic Model)**:
@@ -125,7 +125,7 @@ This is where your existing enums and metadata models, evolved into Pydantic, be
         * It includes `EssayProcessingCounts` (total, successful, failed, pending) for each pipeline within the batch.
         * It tracks `requested_pipelines` (a list of strings like `["SPELLCHECK", "AI_FEEDBACK", "CJ_ASSESSMENT"]`) defined when the batch is configured for processing.
         * The BS's core orchestration logic iterates based on `requested_pipelines` and the current `status` of each pipeline in `ProcessingPipelineState`, respecting dependencies (e.g., NLP starts after SpellCheck `COMPLETED_SUCCESSFULLY`).
-    * **Event Publication for UI & System State (`Batch Service` is the publisher):**
+    * **Event Publication for UI & System State (`Batch Orchestrator Service` is the publisher):**
         1.  **Major `BatchStatus` Changes**: When `BatchUpload.status` transitions (e.g., from `PROCESSING_CONTENT_ENRICHMENT` to `AWAITING_CJ_ASSESSMENT`), the BS publishes an `EnhancedProcessingUpdate` based event (e.g., `BATCH_LIFECYCLE_PHASE_CHANGED_V1`).
             * Payload (`EventEnvelope.data` is a Pydantic equivalent of `EnhancedProcessingUpdate`):
                 * `event`: e.g., `ProcessingEvent.BATCH_STATUS_UPDATED`.
@@ -167,7 +167,7 @@ This is where your existing enums and metadata models, evolved into Pydantic, be
 
 * **C. Specialized Services (SS) Internal State**
     * Each SS (SpellChecker, NLP, AI Feedback, CJ Assessment using its `cj_essay_assessment.db.models_db.BatchStatusEnum` for its *batch-centric internal CJ workflow*) manages its own internal job/task states. These are opaque to other services.
-    * When an SS finishes its work on an essay (or a batch in CJ's case), it publishes its concluding event. The `.status` field in the `EnhancedProcessingUpdate`-based payload of this event will use a value from the common `EssayStatus` enum (e.g., `EssayStatus.SPELLCHECKED`) to indicate the *outcome of its processing on that essay in terms of the shared essay lifecycle*. For CJ, its concluding event about a batch will provide a CJ-specific outcome status string (e.g., "CJ_COMPLETED_STABLE") that the Batch Service interprets to set its overall `BatchUpload.status`.
+    * When an SS finishes its work on an essay (or a batch in CJ's case), it publishes its concluding event. The `.status` field in the `EnhancedProcessingUpdate`-based payload of this event will use a value from the common `EssayStatus` enum (e.g., `EssayStatus.SPELLCHECKED`) to indicate the *outcome of its processing on that essay in terms of the shared essay lifecycle*. For CJ, its concluding event about a batch will provide a CJ-specific outcome status string (e.g., "CJ_COMPLETED_STABLE") that the Batch Orchestrator Service interprets to set its overall `BatchUpload.status`.
 
 ---
 **5. Metadata Model Design and Data Propagation**
@@ -185,7 +185,7 @@ This builds upon our previous agreement, ensuring clarity and targeted data flow
     * When a Specialized Service completes its task for an essay, its result event's `EnhancedProcessingUpdate`-based payload will include an instance of its specific output metadata model (e.g., AI Feedback Service includes `AIFeedbackMetadata`).
 
 * **Propagation of Contextual Data (e.g., `course_code`, `teacher_name`, `essay_instructions`, `student_name`):**
-    1.  **Batch Service (BS)** owns batch-level context (`course_code`, `teacher_name` derived from `BatchUpload.user_id`, `class_designation`, `essay_instructions` from its `BatchUpload` entity).
+    1.  **Batch Orchestrator Service (BS)** owns batch-level context (`course_code`, `teacher_name` derived from `BatchUpload.user_id`, `class_designation`, `essay_instructions` from its `BatchUpload` entity).
     2.  When BS publishes a batch-level command to ELS (e.g., `INITIATE_AI_FEEDBACK_FOR_BATCH_V1`), the `BatchProcessingMetadata` within that event carries this batch context. The event also lists the essays to be processed.
     3.  **Essay Lifecycle Service (ELS)** consumes this. For *each* essay it needs to dispatch to a Specialized Service:
         * It fetches its own essay-specific data (like `student_name` for that essay from `ProcessedEssay.student_name`).
@@ -212,10 +212,10 @@ This builds upon our previous agreement, ensuring clarity and targeted data flow
 
 (This section remains largely consistent with previous good advice, emphasizing async initiation for batch processes).
 
-* **Batch Service APIs**:
+* **Batch Orchestrator Service APIs**:
     * `POST /v1/batches`: Create a new batch (upload essays). Returns `202 Accepted` with `batch_id` and status monitoring URL. Triggers internal processing and the `BatchStatus.UPLOADED` state.
     * `POST /v1/batches/{batch_id}/configure-pipelines`: (New) Allows user to specify `requested_pipelines` and any pipeline-specific configurations. Transitions batch to `BatchStatus.PENDING`.
-    * `POST /v1/batches/{batch_id}/start-processing`: (New) User explicitly starts the configured pipelines. Batch Service initiates the first phase.
+    * `POST /v1/batches/{batch_id}/start-processing`: (New) User explicitly starts the configured pipelines. Batch Orchestrator Service initiates the first phase.
     * `GET /v1/batches/{batch_id}`: Returns overall `BatchUpload` info, including current `BatchStatus` and the full `ProcessingPipelineState` from `processing_metadata`.
     * `GET /v1/batches/{batch_id}/essays`: Paginated list of `essay_id`s and their current `EssayStatus` (ELS might provide this data, or BS aggregates it).
 * **Essay Lifecycle Service APIs**:
@@ -241,11 +241,12 @@ This builds upon our previous agreement, ensuring clarity and targeted data flow
 * **Notification/WebSocket Service**: Central consumer of progress events from BS and ELS to relay to UI.
 * **File Upload/Ingestion**: This initial stage is critical. It must correctly create `BatchUpload` and `ProcessedEssay` records (likely via commands to BS/ELS) and store initial essay texts, generating the first `storage_id`s.
 * **Database Design**:
-    * Batch Service needs robust storage for `BatchUpload` including the JSONB `processing_metadata` (for `ProcessingPipelineState`).
+    * Batch Orchestrator Service needs robust storage for `BatchUpload` including the JSONB `processing_metadata` (for `ProcessingPipelineState`).
+    * Batch Orchestrator Service needs robust storage for `BatchUpload` including the JSONB `processing_metadata` (for `ProcessingPipelineState`).
     * Essay Lifecycle Service needs robust storage for `ProcessedEssay` including its `EssayStatus` and `content_metadata` (for storing results and artifact links from various SS).
     * Each SS owns its specific data if it needs to persist more than what it outputs in events.
 * **Refactoring Effort**:
-    * Definitively splitting `server_web_app` logic into a Batch Service and an Essay Lifecycle Service (or clearly demarcating these responsibilities within one service).
+    * Definitively splitting `server_web_app` logic into a Batch Orchestrator Service and an Essay Lifecycle Service (or clearly demarcating these responsibilities within one service).
     * Extending `common.models.enums.EssayStatus` and possibly `BatchStatus`.
     * Creating the Pydantic `ProcessingPipelineState` model and associated sub-phase enums.
     * Implementing the orchestration logic within BS to manage `ProcessingPipelineState` based on dependencies and incoming essay lifecycle events.
@@ -255,7 +256,7 @@ This builds upon our previous agreement, ensuring clarity and targeted data flow
 ---
 **9. Conclusion**
 
-This refined design provides a highly flexible, scalable, and observable event-driven system. By making the Batch Service an orchestrator of *processing pipelines* (whose states are tracked in detail within `ProcessingPipelineState`) rather than a manager of a rigid, linear batch status, you can accommodate complex and varying processing needs. The Essay Lifecycle Service manages the granular states of individual essays as they flow through these pipelines. Crucially, real-time UI updates are driven by events carrying detailed progress snapshots, fulfilling your core requirement for an interactive, asynchronous system. All inter-service communication is based on explicit, Pydantic-defined contracts derived from your well-structured common models.
+This refined design provides a highly flexible, scalable, and observable event-driven system. By making the Batch Orchestrator Service an orchestrator of *processing pipelines* (whose states are tracked in detail within `ProcessingPipelineState`) rather than a manager of a rigid, linear batch status, you can accommodate complex and varying processing needs. The Essay Lifecycle Service manages the granular states of individual essays as they flow through these pipelines. Crucially, real-time UI updates are driven by events carrying detailed progress snapshots, fulfilling your core requirement for an interactive, asynchronous system. All inter-service communication is based on explicit, Pydantic-defined contracts derived from your well-structured common models.
 
 
 ## Architectural Blueprint: Refactored HuleEdu Services in Practice
@@ -419,7 +420,7 @@ We assume your existing dataclasses from `common/models/` will be evolved into P
 ---
 **2. Service Definitions & Interactions (Conceptual Python-like Code with Type Hints)**
 
-We'll focus on Batch Service (BS), Essay Lifecycle Service (ELS), SpellChecker Service (SS_Spell), and AI Feedback Service (SS_AI).
+We'll focus on Batch Orchestrator Service (BS), Essay Lifecycle Service (ELS), SpellChecker Service (SS_Spell), and AI Feedback Service (SS_AI).
 
 ```python
 # --- common/events/publisher.py (Conceptual) ---
@@ -476,7 +477,7 @@ class EnhancedProcessingUpdateEventData(BaseEventData): # For events signifying 
 class EventTrackerEventData(BaseEventData): # For informational events not changing primary status
     pass
 
-# --- Batch Service specific event data models ---
+# --- Batch Orchestrator Service specific event data models ---
 class InitiatePipelineForBatchDataV1(EnhancedProcessingUpdateEventData):
     batch_metadata: BatchProcessingMetadata # Snapshot of batch context
     # Custom metadata for this specific event type

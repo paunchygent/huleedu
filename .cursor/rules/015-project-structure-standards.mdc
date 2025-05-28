@@ -39,7 +39,7 @@ services/
 │   ├── tests/
 │   ├── protocols.py               # Optional: For defining service-specific behavioral contracts
 │   └── docs/
-├── batch_service/                 # Example service
+├── batch_orchestrator_service/      # Individual microservice (primary orchestrator)
 │   ├── app.py                     # Quart application entry point
 │   ├── pyproject.toml
 │   ├── protocols.py               # For defining service-specific behavioral contracts

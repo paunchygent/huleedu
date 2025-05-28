@@ -111,11 +111,11 @@ services:
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - LOG_LEVEL=DEBUG
 
-  batch_service:
+  batch_orchestrator_service:
     build:
       context: .
-      dockerfile: services/batch_service/Dockerfile
-    container_name: huleedu_batch_service
+      dockerfile: services/batch_orchestrator_service/Dockerfile
+    container_name: huleedu_batch_orchestrator_service
     restart: unless-stopped
     depends_on:
       kafka_topic_setup:

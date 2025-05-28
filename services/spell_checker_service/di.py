@@ -93,8 +93,12 @@ class DefaultSpellLogic:
 
     async def perform_spell_check(self, text: str) -> SpellcheckResultDataV1:
         """Perform spell check using the core logic implementation."""
-        # Use core logic and create the SpellcheckResultDataV1 object
-        corrected_text, corrections_count = await default_perform_spell_check_algorithm(text)
+        from .config import settings
+
+        # Use core logic with language from settings
+        corrected_text, corrections_count = await default_perform_spell_check_algorithm(
+            text, language=settings.DEFAULT_LANGUAGE
+        )
 
         # Create a mock SpellcheckResultDataV1 for now
         # In production, this would be created properly with all required fields
