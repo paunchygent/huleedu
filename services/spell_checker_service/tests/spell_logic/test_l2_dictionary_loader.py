@@ -103,10 +103,9 @@ class TestApplySpecificCorrections:
 
         # Find actual positions of the words
         has_pos = text.find("has")
-        has_end = has_pos + len("has") - 1
+        has_pos + len("has") - 1
         overlapping_pos = text.find("overlapping")
         overlapping_end = overlapping_pos + len("overlapping") - 1
-        has_overlapping = "has overlapping"
         has_overlapping_pos = text.find("has overlapping")
         has_overlapping_end = has_overlapping_pos + len("has overlapping") - 1
 
@@ -119,7 +118,8 @@ class TestApplySpecificCorrections:
                 "end": overlapping_end,
             },
             {
-                # This would overlap with the previous correction (when sorted) and should be skipped
+                # This would overlap with the previous correction (when sorted)
+                # and should be skipped
                 "original_word": "has overlapping",
                 "corrected_word": "contained",
                 "rule": "test",
@@ -128,7 +128,8 @@ class TestApplySpecificCorrections:
             },
         ]
 
-        # Expected result - sorting will put has_overlapping (start:5) first, then overlapping (start:9)
+        # Expected result - sorting will put has_overlapping (start:5) first,
+        # then overlapping (start:9)
         # overlapping will be skipped due to overlap with already processed has_overlapping
         expected = "This contained corrections."
 
@@ -285,12 +286,17 @@ class TestApplyL2Corrections:
         errror_lower_explicit = "errror"  # 3 r's
 
         # Construct the input text using these three-'r' versions
-        text = f"This is AN {errror_upper_explicit}, another {errror_capitalized_explicit}, and one more {errror_lower_explicit}."
+        text = (
+            f"This is AN {errror_upper_explicit}, "
+            f"another {errror_capitalized_explicit}, "
+            f"and one more {errror_lower_explicit}."
+        )
 
         # The L2 errors dictionary should use the lowercase three-'r' misspelled form as the key
         l2_errors = {misspelled_form_three_r: correct_form_one_r}  # {"errror": "error"}
 
-        # Define the expected corrected text. Corrected words should preserve original capitalization.
+        # Define the expected corrected text. Corrected words should preserve
+        # original capitalization.
         expected_corrected_upper = correct_form_one_r.upper()  # "ERROR"
         # For "Errrror" -> "Error", the first letter of the correction should be capitalized
         expected_corrected_capitalized = (
@@ -298,7 +304,11 @@ class TestApplyL2Corrections:
         )  # "Error"
         expected_corrected_lower = correct_form_one_r  # "error"
 
-        expected_text = f"This is AN {expected_corrected_upper}, another {expected_corrected_capitalized}, and one more {expected_corrected_lower}."
+        expected_text = (
+            f"This is AN {expected_corrected_upper}, "
+            f"another {expected_corrected_capitalized}, "
+            f"and one more {expected_corrected_lower}."
+        )
 
         # Define expected correction details
         pos1 = text.find(errror_upper_explicit)

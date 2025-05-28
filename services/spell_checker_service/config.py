@@ -7,6 +7,7 @@ including Kafka connection settings, service URLs, and consumer/producer configu
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -43,23 +44,35 @@ class Settings(BaseSettings):
     L2_EXTERNAL_DATA_PATH: Optional[str] = None  # Override for mounted volumes
 
     @property
+    def _service_dir(self) -> Path:
+        """Get the service directory path (where this config.py file is located)."""
+        return Path(__file__).parent
+
+    @property
+    def effective_correction_log_dir(self) -> str:
+        """Get effective correction log output directory."""
+        return str(self._service_dir / "data" / "corrected_essays")
+
+    @property
     def effective_l2_data_dir(self) -> str:
         """Get effective L2 data directory, supporting external mounts."""
-        return self.L2_EXTERNAL_DATA_PATH or self.L2_DATA_DIR
+        if self.L2_EXTERNAL_DATA_PATH:
+            return self.L2_EXTERNAL_DATA_PATH
+        return str(self._service_dir / "data" / "l2_error_dict")
 
     @property
     def effective_master_dict_path(self) -> str:
         """Get effective master dictionary path."""
         if self.L2_EXTERNAL_DATA_PATH:
             return f"{self.L2_EXTERNAL_DATA_PATH}/nortvig_master_SWE_L2_corrections.txt"
-        return self.L2_MASTER_DICT_PATH
+        return str(self._service_dir / "data" / "l2_error_dict" / "nortvig_master_SWE_L2_corrections.txt")
 
     @property
     def effective_filtered_dict_path(self) -> str:
         """Get effective filtered dictionary path."""
         if self.L2_EXTERNAL_DATA_PATH:
             return f"{self.L2_EXTERNAL_DATA_PATH}/filtered_l2_dictionary.txt"
-        return self.L2_FILTERED_DICT_PATH
+        return str(self._service_dir / "data" / "l2_error_dict" / "filtered_l2_dictionary.txt")
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -5,7 +5,7 @@
 groups = ["default", "dev", "monorepo-tools"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:db22900b395ec3ae68d8a2814043415f4475cac317a8f2e9c0eb55cc63177c03"
+content_hash = "sha256:de7477c1dc6b8d1b2997a979a115eaa71e723f7680092f688aa789d5af60b666"
 
 [[metadata.targets]]
 requires_python = ">=3.11"
@@ -1290,6 +1290,20 @@ dependencies = [
 files = [
     {file = "pytest_cov-6.1.1-py3-none-any.whl", hash = "sha256:bddf29ed2d0ab6f4df17b4c55b0a657287db8684af9c42ea546b21b1041b3dde"},
     {file = "pytest_cov-6.1.1.tar.gz", hash = "sha256:46935f7aaefba760e716c2ebfbe1c216240b9592966e7da99ea8292d4d3e2a0a"},
+]
+
+[[package]]
+name = "pytest-mock"
+version = "3.14.1"
+requires_python = ">=3.8"
+summary = "Thin-wrapper around the mock package for easier use with pytest"
+groups = ["monorepo-tools"]
+dependencies = [
+    "pytest>=6.2.5",
+]
+files = [
+    {file = "pytest_mock-3.14.1-py3-none-any.whl", hash = "sha256:178aefcd11307d874b4cd3100344e7e2d888d9791a6a1d9bfe90fbc1b74fd1d0"},
+    {file = "pytest_mock-3.14.1.tar.gz", hash = "sha256:159e9edac4c451ce77a5cdb9fc5d1100708d2dd4ba3c3df572f14097351af80e"},
 ]
 
 [[package]]

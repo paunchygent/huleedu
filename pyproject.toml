@@ -25,6 +25,7 @@ monorepo-tools = [
     "ruff",
     "mypy",
     "pytest",
+    "pytest-mock",
     "pytest-cov",
     "pytest-asyncio",
     "pytest-xdist",

@@ -45,7 +45,8 @@ def log_essay_corrections(
                               have been applied to the initial_l2_corrected_text.
         applied_initial_l2_corrections: List of L2 corrections initially applied (dicts).
         main_checker_corrections: List of corrections (dicts) from the main spell checker
-                                  (e.g., {'original_word': str, 'corrected_word': str, 'start': int, 'end': int}).
+                                  (e.g., {'original_word': str, 'corrected_word': str,
+                                  'start': int, 'end': int}).
         l2_context_reverted_count: Number of L2 corrections reverted by contextual validation.
         output_dir: Directory to save the correction log file.
     """
@@ -67,7 +68,8 @@ def log_essay_corrections(
         )
         for corr in applied_initial_l2_corrections:
             log_buffer.write(
-                f"  - '{corr['original_word']}' -> '{corr['corrected_word']}' at indices {corr['start']}-{corr['end']} (Rule: {corr.get('rule', 'N/A')})\n"
+                f"  - '{corr['original_word']}' -> '{corr['corrected_word']}' "
+                f"at indices {corr['start']}-{corr['end']} (Rule: {corr.get('rule', 'N/A')})\n"
             )
         import difflib
 
@@ -85,7 +87,8 @@ def log_essay_corrections(
             log_buffer.write("\nDiff Original -> Initial L2 Corrected:\n" + diff1 + "\n")
         else:
             log_buffer.write(
-                "No textual changes from Original to Initial L2 Corrected (based on diff, check applied count).\n"
+                "No textual changes from Original to Initial L2 Corrected "
+                "(based on diff, check applied count).\n"
             )
     else:
         log_buffer.write("No initial L2 corrections were applied or data not provided.\n")
@@ -125,17 +128,20 @@ def log_essay_corrections(
 
             if original_word != corrected_word:
                 log_buffer.write(
-                    f"  - '{original_word}' -> '{corrected_word}' (indices {start_offset}-{end_offset})\n"
+                    f"  - '{original_word}' -> '{corrected_word}' "
+                    f"(indices {start_offset}-{end_offset})\n"
                 )
                 spell_changes_found = True
 
         if not spell_changes_found:
             log_buffer.write(
-                "No specific spell corrections made by the main spell checker relative to Initial L2 Corrected Text.\n"
+                "No specific spell corrections made by the main spell checker "
+                "relative to Initial L2 Corrected Text.\n"
             )
     else:
         log_buffer.write(
-            "No main spell checker corrections provided or available to process for detailed correction listing.\n"
+            "No main spell checker corrections provided or available to process "
+            "for detailed correction listing.\n"
         )
 
     import difflib
@@ -157,7 +163,8 @@ def log_essay_corrections(
         )
     else:
         log_buffer.write(
-            "No textual changes from Initial L2 Corrected to Final Corrected (Caller Perspective based on diff).\n"
+            "No textual changes from Initial L2 Corrected to Final Corrected "
+            "(Caller Perspective based on diff).\n"
         )
 
     # --- Section 5: Final Text Overview ---

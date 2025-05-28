@@ -251,15 +251,16 @@ async def default_perform_spell_check_algorithm(
                     applied_initial_l2_corrections=l2_corrections_formatted,
                     main_checker_corrections=pyspellchecker_corrections,
                     l2_context_reverted_count=0,  # Not implemented in simplified flow
-                    output_dir=settings.CORRECTION_LOG_OUTPUT_DIR,
+                    output_dir=settings.effective_correction_log_dir,
                 )
                 logger.debug(f"{log_prefix}Detailed correction logging completed")
             except Exception as e:
                 logger.warning(f"{log_prefix}Failed to log detailed corrections: {e}")
 
         logger.info(
-            f"{log_prefix}L2 + pyspellchecker algorithm completed: "
-            f"{l2_correction_count} L2 corrections, {pyspell_correction_count} pyspellchecker corrections, "
+            f"{log_prefix}L2 + pyspellchecker algorithm completed:\n"
+            f"{l2_correction_count} L2 corrections, "
+            f"{pyspell_correction_count} pyspellchecker corrections, "
             f"{total_corrections} total corrections"
         )
 

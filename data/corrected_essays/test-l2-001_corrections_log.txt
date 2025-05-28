@@ -1,0 +1,39 @@
+Correction Analysis for Essay ID: test-l2-001
+================================================================================
+
+Section 1: Original Text Snippet:
+--------------------------------------------------------------------------------
+I recieve the documment becouse it hapened yesterday.
+
+Section 2: Initial L2 Corrections Applied:
+--------------------------------------------------------------------------------
+No initial L2 corrections were applied or data not provided.
+
+Section 2b: Contextual L2 Reversions (Simplified Logging):
+--------------------------------------------------------------------------------
+Number of L2 corrections reverted by contextual validation: 0
+(Note: With the current simplified L2 flow, this count is expected to be 0.)
+
+Section 3: Text Entering Main Spell Checker (Initial L2 Corrected Text):
+--------------------------------------------------------------------------------
+I recieve the documment becouse it hapened yesterday.
+
+Section 4: Main Spell Checker Corrections (Applied to Initial L2 Corrected Text):
+--------------------------------------------------------------------------------
+  - 'recieve' -> 'receive' (indices 2-8)
+  - 'documment' -> 'document' (indices 14-22)
+  - 'becouse' -> 'because' (indices 24-30)
+  - 'hapened' -> 'happened' (indices 35-41)
+
+Diff Initial L2 Corrected -> Final Corrected (Caller Perspective):
+--- Initial L2 Corrected Text
++++ Final Corrected Text (Caller)
+@@ -1 +1 @@
+-I recieve the documment becouse it hapened yesterday.
++I receive the document because it happened yesterday.
+
+Section 5: Final Texts Overview:
+--------------------------------------------------------------------------------
+Original: I recieve the documment becouse it hapened yesterday.
+Initial L2 Corrected: I recieve the documment becouse it hapened yesterday.
+Final Main Checker Corrected (from Caller): I receive the document because it happened yesterday.

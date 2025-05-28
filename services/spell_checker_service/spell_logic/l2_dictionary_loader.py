@@ -26,7 +26,10 @@ else:
     except ImportError:
         logger.warning("L2 filter not available. Running without filtering.")
         FILTER_AVAILABLE = False
-        filter_l2_entries = lambda x: x  # type: ignore # No-op fallback
+
+        def filter_l2_entries(x):  # type: ignore
+            """No-op fallback when L2 filter is not available."""
+            return x
 
 
 def load_l2_errors(filename: str, filter_entries: bool = True) -> dict[str, str]:

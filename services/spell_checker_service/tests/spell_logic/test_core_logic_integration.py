@@ -178,7 +178,7 @@ class TestCoreLogicIntegration:
         Thiss is a documment that containns many errrors. The spellchecker should
         be abel to handl all of thees misstakes efficently. It's importent that
         the algorythm workss wel with longr textes becouse essayss can bee quit
-        lenghty. We nede to ensur that performanc remainss gud even with 
+        lenghty. We nede to ensur that performanc remainss gud even with
         substantil amounts of contnt.
         """.strip()
         essay_id = "test-long-001"

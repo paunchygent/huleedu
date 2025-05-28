@@ -169,13 +169,15 @@ The HuleEdu platform is evolving. The following services and capabilities are pl
 * **Architectural Blueprints & Task Tracking**: Further design documents, PRDs, and detailed task breakdowns can be found in the `Documentation/` folder.
 * **Service-Specific READMEs**: Each service in the `services/` directory contains its own `README.md` with more detailed information about its specific functionality, API (if any), and local development.
 
-## How to Contribute
+## How to Use
 
-1. **Understand the Architecture**: It is helpful to be familiar with the core principles and service boundaries.
-2. **Adhere to Standards**: Development activities align with the coding standards, testing practices, and architectural mandates defined in `.cursor/rules/`.
-3. **Write Tests**: New features and bug fixes are typically accompanied by relevant tests (unit, integration, contract).
-4. **Update Documentation**: READMEs, docstrings, and architectural documents are kept up-to-date with changes.
-5. **Communicate**: Proposed changes, especially those affecting service contracts or shared code, are generally discussed with the team.
+1. **Pull the Repository**: Clone the repository to your local machine.
+2. **Install Dependencies**: Run `setup_huledu_environment.sh` to install PDM and set up the project's dependencies.
+3. **Understand the Architecture**: It is helpful to be familiar with the core principles and service boundaries. Currently, we need help developing the statistical analysis tools, which will act as a check and balance system for the CJ Essay Service Rankings.
+4. **Adhere to Standards**: Development activities align with the coding standards, testing practices, and architectural mandates defined in `.cursor/rules/`.
+5. **Write Tests**: New features and bug fixes are typically accompanied by relevant tests (unit, integration, contract).
+6. **Update Documentation**: READMEs, docstrings, and architectural documents are kept up-to-date with changes.
+7. **Communicate**: Proposed changes, especially those affecting service contracts or shared code, are generally discussed with the team.
 
 ---
 

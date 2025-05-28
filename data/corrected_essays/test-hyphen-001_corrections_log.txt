@@ -1,0 +1,38 @@
+Correction Analysis for Essay ID: test-hyphen-001
+================================================================================
+
+Section 1: Original Text Snippet:
+--------------------------------------------------------------------------------
+It's a well-writen artical that's verry intresting.
+
+Section 2: Initial L2 Corrections Applied:
+--------------------------------------------------------------------------------
+No initial L2 corrections were applied or data not provided.
+
+Section 2b: Contextual L2 Reversions (Simplified Logging):
+--------------------------------------------------------------------------------
+Number of L2 corrections reverted by contextual validation: 0
+(Note: With the current simplified L2 flow, this count is expected to be 0.)
+
+Section 3: Text Entering Main Spell Checker (Initial L2 Corrected Text):
+--------------------------------------------------------------------------------
+It's a well-writen artical that's verry intresting.
+
+Section 4: Main Spell Checker Corrections (Applied to Initial L2 Corrected Text):
+--------------------------------------------------------------------------------
+  - 'artical' -> 'article' (indices 19-25)
+  - 'verry' -> 'very' (indices 34-38)
+  - 'intresting' -> 'interesting' (indices 40-49)
+
+Diff Initial L2 Corrected -> Final Corrected (Caller Perspective):
+--- Initial L2 Corrected Text
++++ Final Corrected Text (Caller)
+@@ -1 +1 @@
+-It's a well-writen artical that's verry intresting.
++It's a well-writen article that's very interesting.
+
+Section 5: Final Texts Overview:
+--------------------------------------------------------------------------------
+Original: It's a well-writen artical that's verry intresting.
+Initial L2 Corrected: It's a well-writen artical that's verry intresting.
+Final Main Checker Corrected (from Caller): It's a well-writen article that's very interesting.
