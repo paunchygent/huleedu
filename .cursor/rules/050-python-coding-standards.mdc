@@ -25,7 +25,7 @@ alwaysApply: true
 - **MUST** type-annotate all public functions, methods, class attributes
 - **MUST** use `from __future__ import annotations`
 - **MUST** prefer precise types over `typing.Any`
-- **MUST** pass `pdm run typecheck`
+- **MUST** pass `pdm run typecheck-all`
 - **FORBIDDEN**: `typing.Any` where precise type possible
 
 ### 3.2. Dependency Injection Principle

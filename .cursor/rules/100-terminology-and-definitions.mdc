@@ -8,29 +8,28 @@ alwaysApply: true
 
 ## 1. Core Concepts
 
-- **HuleEdu**: Overall platform and microservice ecosystem
-- **Microservice**: Independently deployable service mapping to a Bounded Context
-- **Bounded Context**: DDD logical boundary around specific business domain
-- **Contract**: Explicit, versioned agreement between services (Pydantic models)
-- **Event**: Notification of past occurrence, uses `EventEnvelope` structure
-- **Command**: Instruction to do something, causes state change
-- **Query**: Request for information, no side effects
-- **Pydantic Model**: Data validation/serialization, defines all contracts
-- **Correlation ID**: Unique identifier for tracing across services
+- **HuleEdu**: Microservice ecosystem for essay processing
+- **Microservice**: Independently deployable service per Bounded Context
+- **Bounded Context**: DDD domain boundary
+- **Contract**: Versioned Pydantic models for inter-service agreements
+- **Event**: Past occurrence notification via `EventEnvelope`
+- **Command**: State-changing instruction
+- **Query**: Read-only information request
+- **Correlation ID**: Cross-service tracing identifier
 
-## 2. HuleEdu-Specific Terms
+## 2. HuleEdu Domain Terms
 
-- **BatchUpload**: Collection of essays for processing (Batch Orchestrator Service)
-- **ProcessingPipelineState**: Tracks pipeline progress within BatchUpload
-- **ProcessedEssay**: Individual essay entity (Essay Lifecycle Service)
-- **EssayStatus**: Lifecycle state enum for ProcessedEssay
-- **StorageReferenceMetadata**: References to stored data (thin events)
+- **BatchUpload**: Essay collection for processing (BOS)
+- **ProcessingPipelineState**: Pipeline progress within BatchUpload
+- **ProcessedEssay**: Individual essay entity (ELS)
+- **EssayStatus**: Lifecycle state enum
+- **StorageReferenceMetadata**: Thin event data references
 
-## 3. AI Agent Interaction Modes
+## 3. AI Interaction Modes
 
-- **Planning Mode**: Task analysis and execution planning
-- **Coding Mode**: Code generation and modification
-- **Testing Mode**: Test creation, execution, and analysis
-- **Debugging Mode**: Issue identification and resolution
-- **Refactoring/Linting Mode**: Code structure and style improvements
+- **Planning**: Task analysis and execution planning
+- **Coding**: Code generation and modification  
+- **Testing**: Test creation, execution, analysis
+- **Debugging**: Issue identification and resolution
+- **Refactoring/Linting**: Code structure and style improvements
 ===

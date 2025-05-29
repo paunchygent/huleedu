@@ -40,7 +40,9 @@ class EssayContentReady(BaseModel):
     event: str = Field(default="essay.content.ready", description="Event type identifier")
     essay_id: str = Field(description="Essay identifier")
     batch_id: str = Field(description="Batch this essay belongs to")
-    content_storage_reference: StorageReferenceMetadata = Field(description="Reference to stored content")
+    content_storage_reference: StorageReferenceMetadata = Field(
+        description="Reference to stored content"
+    )
     entity: EntityReference = Field(description="Essay entity reference")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
 
@@ -48,7 +50,7 @@ class EssayContentReady(BaseModel):
 class BatchEssaysReady(BaseModel):
     """
     Event sent by ELS to BOS when all essays in a batch are ready for processing.
-    
+
     This triggers BOS to begin pipeline orchestration for the complete batch.
     """
 
@@ -63,7 +65,7 @@ class BatchEssaysReady(BaseModel):
 class BatchReadinessTimeout(BaseModel):
     """
     Event sent by ELS to BOS when batch readiness times out.
-    
+
     Allows BOS to handle partial batches or retry logic.
     """
 

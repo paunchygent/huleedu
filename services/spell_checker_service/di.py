@@ -7,23 +7,24 @@ from uuid import UUID
 
 from aiohttp import ClientSession
 from aiokafka import AIOKafkaProducer
-from config import Settings, settings
-from core_logic import (
+from dishka import Provider, Scope, provide
+from prometheus_client import CollectorRegistry
+
+from common_core.enums import ContentType
+from common_core.events.spellcheck_models import SpellcheckResultDataV1
+
+from .config import Settings, settings
+from .core_logic import (
     default_fetch_content_impl,
     default_perform_spell_check_algorithm,
     default_store_content_impl,
 )
-from dishka import Provider, Scope, provide
-from prometheus_client import CollectorRegistry
-from protocols import (
+from .protocols import (
     ContentClientProtocol,
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
     SpellLogicProtocol,
 )
-
-from common_core.enums import ContentType
-from common_core.events.spellcheck_models import SpellcheckResultDataV1
 
 
 class SpellCheckerServiceProvider(Provider):
@@ -132,7 +133,9 @@ class DefaultResultStore:
         http_session: ClientSession,
     ) -> str:
         """Store content using the core logic implementation."""
-        result = await default_store_content_impl(http_session, content, settings.CONTENT_SERVICE_URL)
+        result = await default_store_content_impl(
+            http_session, content, settings.CONTENT_SERVICE_URL
+        )
         return str(result)
 
 

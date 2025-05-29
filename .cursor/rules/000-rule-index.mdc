@@ -15,7 +15,7 @@ alwaysApply: true
 - [022-spell-checker-service-architecture.md](mdc:022-spell-checker-service-architecture.md): Spell Checker Service architecture and implementation
 - [023-batch-service-architecture.md](mdc:023-batch-service-architecture.md): Batch Service architecture and implementation
 - [024-common-core-architecture.md](mdc:024-common-core-architecture.md): Common Core package architecture and implementation
-- [025-essay-lifecycle-service-architecture.md](mdc:025-essay-lifecycle-service-architecture.md): Essay Lifecycle Service architecture and implementation *(TODO: Create rule)*
+- [025-essay-lifecycle-service-architecture.md](mdc:025-essay-lifecycle-service-architecture.md): Essay Lifecycle Service architecture and implementation
 - [026-file-service-architecture.md](mdc:026-file-service-architecture.md): File Service architecture and implementation *(TODO: Create rule)*
 - [030-event-driven-architecture-eda-standards.md](mdc:030-event-driven-architecture-eda-standards.md): Event-driven communication standards
 

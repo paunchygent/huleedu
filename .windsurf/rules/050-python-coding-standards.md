@@ -32,7 +32,7 @@ alwaysApply: true
   - Use specific types (`Protocol`, `Union`, `Optional`)
   - Avoid `typing.Any` in public interfaces
   - Use `TypedDict` for dictionaries with fixed schemas
-- **Check**: `pdm run typecheck`
+- **Check**: `pdm run typecheck-all`
 
 ## 3. Code Style
 

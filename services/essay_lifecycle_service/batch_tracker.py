@@ -27,7 +27,7 @@ logger = create_service_logger("batch_tracker")
 class BatchExpectation:
     """
     Tracks expectations for a specific batch.
-    
+
     Maintains the count-based coordination state between BOS and ELS.
     """
 
@@ -65,7 +65,7 @@ class BatchExpectation:
     def mark_essay_ready(self, essay_id: str) -> bool:
         """
         Mark an essay as ready.
-        
+
         Returns:
             True if this completes the batch, False otherwise
         """
@@ -85,7 +85,7 @@ class BatchExpectation:
 class BatchEssayTracker:
     """
     Manages batch readiness tracking across multiple batches.
-    
+
     Implements the ELS side of count-based batch coordination pattern.
     """
 
@@ -100,7 +100,7 @@ class BatchEssayTracker:
     async def register_batch(self, event: BatchEssaysRegistered) -> None:
         """
         Register batch expectations from BOS.
-        
+
         Args:
             event: BatchEssaysRegistered event from BOS
         """
@@ -128,10 +128,10 @@ class BatchEssayTracker:
     async def mark_essay_ready(self, event: EssayContentReady) -> BatchEssaysReady | None:
         """
         Mark essay as ready and check if batch is complete.
-        
+
         Args:
             event: EssayContentReady event from File Service
-            
+
         Returns:
             BatchEssaysReady event if batch is complete, None otherwise
         """

@@ -1,23 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 import aiohttp
 from aiokafka import AIOKafkaProducer, ConsumerRecord
-from core_logic import (
-    default_fetch_content_impl,
-    default_perform_spell_check_algorithm,
-    default_store_content_impl,
-)
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
-from protocols import (
-    ContentClientProtocol,
-    ResultStoreProtocol,
-    SpellcheckEventPublisherProtocol,
-    SpellLogicProtocol,
-)
 from pydantic import ValidationError
 
 from common_core.enums import (
@@ -35,6 +24,18 @@ from common_core.metadata_models import (
     EntityReference,
     StorageReferenceMetadata,
     SystemProcessingMetadata,
+)
+
+from .core_logic import (
+    default_fetch_content_impl,
+    default_perform_spell_check_algorithm,
+    default_store_content_impl,
+)
+from .protocols import (
+    ContentClientProtocol,
+    ResultStoreProtocol,
+    SpellcheckEventPublisherProtocol,
+    SpellLogicProtocol,
 )
 
 # Configuration constants (placeholders, should come from settings/DI)
@@ -62,7 +63,9 @@ class DefaultContentClient(ContentClientProtocol):
         # We assume process_single_message will have essay_id and pass it
         # to default_fetch_content_impl if desired.
         # Here, we call it without essay_id if the protocol doesn't provide it.
-        result = await default_fetch_content_impl(http_session, storage_id, self.content_service_url)
+        result = await default_fetch_content_impl(
+            http_session, storage_id, self.content_service_url
+        )
         return str(result)
 
 
@@ -217,6 +220,8 @@ async def process_single_message(
     content_client: ContentClientProtocol,
     result_store: ResultStoreProtocol,
     event_publisher: SpellcheckEventPublisherProtocol,
+    consumer_group_id: str = "spell-checker-group",
+    kafka_queue_latency_metric: Optional[Any] = None,
 ) -> bool:
     """Process a single Kafka message.
 
@@ -227,12 +232,12 @@ async def process_single_message(
         content_client: Client for fetching content
         result_store: Client for storing content
         event_publisher: Client for publishing events
+        consumer_group_id: Consumer group ID for metrics
+        kafka_queue_latency_metric: Optional Prometheus metric for queue latency
 
     Returns:
         bool: True if the message should be committed, False otherwise
     """
-    from worker_main import CONSUMER_GROUP_ID, KAFKA_QUEUE_LATENCY
-
     processing_started_at = datetime.now(timezone.utc)
     request_envelope: Optional[EventEnvelope[SpellcheckRequestedDataV1]] = None
     # Default if ID not parsed
@@ -244,14 +249,20 @@ async def process_single_message(
         request_data = request_envelope.data
 
         # Record queue latency metric if available
-        if KAFKA_QUEUE_LATENCY and hasattr(request_envelope, 'event_timestamp') and request_envelope.event_timestamp:
-            queue_latency_seconds = (processing_started_at - request_envelope.event_timestamp).total_seconds()
+        if (kafka_queue_latency_metric and
+            hasattr(request_envelope, 'event_timestamp') and
+            request_envelope.event_timestamp):
+            queue_latency_seconds = (
+                processing_started_at - request_envelope.event_timestamp
+            ).total_seconds()
             if queue_latency_seconds >= 0:  # Avoid negative values from clock skew
-                KAFKA_QUEUE_LATENCY.labels(
+                kafka_queue_latency_metric.labels(
                     topic=msg.topic,
-                    consumer_group=CONSUMER_GROUP_ID
+                    consumer_group=consumer_group_id
                 ).observe(queue_latency_seconds)
-                logger.debug(f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}")
+                logger.debug(
+                    f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}"
+                )
 
         # Set a more meaningful ID for logging if available
         if request_data.entity_ref and request_data.entity_ref.entity_id:

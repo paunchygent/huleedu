@@ -64,7 +64,7 @@ class TestProcessSingleMessage:
         # will call this algorithm.
         corrections_count = 1  # Example
         with patch(
-            "spell_checker_service.event_router.default_perform_spell_check_algorithm",
+            "services.spell_checker_service.event_router.default_perform_spell_check_algorithm",
             new_callable=AsyncMock,
             return_value=(corrected_text, corrections_count),
         ) as mock_spell_check_algo:
@@ -76,6 +76,8 @@ class TestProcessSingleMessage:
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
+                consumer_group_id="test-group",
+                kafka_queue_latency_metric=None,
             )
 
             # Assert
@@ -147,7 +149,7 @@ class TestProcessSingleMessage:
 
         # 2. Patch the core algorithm function (should not be called)
         with patch(
-            "spell_checker_service.event_router.default_perform_spell_check_algorithm",
+            "services.spell_checker_service.event_router.default_perform_spell_check_algorithm",
             new_callable=AsyncMock,
         ) as mock_spell_check_algo:
             # Act
@@ -158,6 +160,8 @@ class TestProcessSingleMessage:
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
+                consumer_group_id="test-group",
+                kafka_queue_latency_metric=None,
             )
 
             # Assert
@@ -215,7 +219,7 @@ class TestProcessSingleMessage:
         # 2. Patch the core algorithm function (should be called and succeed)
         corrections_count = 1
         with patch(
-            "spell_checker_service.event_router.default_perform_spell_check_algorithm",
+            "services.spell_checker_service.event_router.default_perform_spell_check_algorithm",
             new_callable=AsyncMock,
             return_value=(corrected_text, corrections_count),
         ) as mock_spell_check_algo:
@@ -227,6 +231,8 @@ class TestProcessSingleMessage:
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
+                consumer_group_id="test-group",
+                kafka_queue_latency_metric=None,
             )
 
             # Assert
@@ -292,7 +298,7 @@ class TestProcessSingleMessage:
         # 2. Patch the core algorithm function to simulate failure
         # Option B: Return values indicating failure (e.g., None for corrected_text)
         with patch(
-            "spell_checker_service.event_router.default_perform_spell_check_algorithm",
+            "services.spell_checker_service.event_router.default_perform_spell_check_algorithm",
             new_callable=AsyncMock,
             return_value=(None, 0),  # Simulate algorithm returning no corrected text
         ) as mock_spell_check_algo:
@@ -304,6 +310,8 @@ class TestProcessSingleMessage:
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
+                consumer_group_id="test-group",
+                kafka_queue_latency_metric=None,
             )
 
             # Assert
@@ -349,7 +357,7 @@ class TestProcessSingleMessage:
 
         # 2. Patch the core algorithm function (should not be called)
         with patch(
-            "spell_checker_service.event_router.default_perform_spell_check_algorithm",
+            "services.spell_checker_service.event_router.default_perform_spell_check_algorithm",
             new_callable=AsyncMock,
         ) as mock_spell_check_algo:
             # Act
@@ -360,6 +368,8 @@ class TestProcessSingleMessage:
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
+                consumer_group_id="test-group",
+                kafka_queue_latency_metric=None,
             )
 
             # Assert
@@ -401,7 +411,7 @@ class TestProcessSingleMessage:
         # 2. Patch the core algorithm function (should be called and succeed)
         corrections_count = 1
         with patch(
-            "spell_checker_service.event_router.default_perform_spell_check_algorithm",
+            "services.spell_checker_service.event_router.default_perform_spell_check_algorithm",
             new_callable=AsyncMock,
             return_value=(corrected_text, corrections_count),
         ) as mock_spell_check_algo:
@@ -413,6 +423,8 @@ class TestProcessSingleMessage:
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
+                consumer_group_id="test-group",
+                kafka_queue_latency_metric=None,
             )
 
             # Assert

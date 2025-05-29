@@ -1,0 +1,95 @@
+---
+description: Defines the architecture and implementation details of the HuleEdu Essay Lifecycle Service
+globs: 
+alwaysApply: false
+---
+# 025: Essay Lifecycle Service Architecture
+
+## 1. Service Identity
+- **Package**: `huleedu-essay-lifecycle-service`  
+- **HTTP Port**: 6000 (API), **Metrics Port**: 6001
+- **Stack**: Quart, aiokafka, aiosqlite, Hypercorn
+- **Purpose**: Essay state management and batch coordination
+
+## 2. Dual Architecture Pattern
+
+### 2.1. HTTP API (`app.py`)
+- **GET /healthz**: Service health
+- **GET /metrics**: Prometheus metrics
+- **Future**: Essay status queries, manual state transitions
+
+### 2.2. Kafka Worker (`worker_main.py`)  
+- **Consumer**: Batch coordination events
+- **Producer**: Essay lifecycle state updates
+- **Topics**: `huleedu.batch.coordination.*`
+
+## 3. Core Components
+
+### 3.1. State Management
+- **`state_store.py`**: SQLite-based essay state persistence
+- **`batch_tracker.py`**: Batch readiness and completion tracking
+- **Models**: `ProcessedEssay`, `BatchUpload`, `ProcessingPipelineState`
+
+### 3.2. Command Processing
+- **`batch_command_handlers.py`**: Handles batch initiation commands
+- **`core_logic.py`**: State transitions and business rules
+- **Pattern**: Command → State Change → Event Publication
+
+## 4. Event Integration
+
+### 4.1. Consumed Events
+- `BATCH_PIPELINE_REQUESTED`: Initiate essay processing pipeline
+- `BATCH_PHASE_INITIATED`: Track pipeline phase changes
+- `ESSAY_SPELLCHECK_RESULT_RECEIVED`: Update essay processing state
+
+### 4.2. Published Events  
+- `ESSAY_LIFECYCLE_STATE_UPDATED`: Essay status changes
+- `BATCH_PIPELINE_PROGRESS_UPDATED`: Batch progress notifications
+
+## 5. Configuration
+
+**Environment Variables**:
+- `HTTP_PORT` (default: 6000), `METRICS_PORT` (default: 6001)
+- `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_CONSUMER_GROUP_ID`
+- `DATABASE_PATH` (default: "essay_lifecycle.db")
+- `LOG_LEVEL`, `KAFKA_*` consumer settings
+
+## 6. Database Schema
+
+**SQLite Tables**:
+- `processed_essays`: Essay state and metadata
+- `batch_uploads`: Batch coordination data  
+- `processing_pipeline_states`: Pipeline progress tracking
+
+**Migrations**: Automatic on startup via `state_store.py`
+
+## 7. Dependencies
+
+**Core**: quart, hypercorn, aiokafka, aiosqlite
+**HuleEdu**: huleedu-common-core, huleedu-service-libs
+**DI**: dishka, quart-dishka
+
+## 8. Deployment
+
+**Docker**: Multi-stage with HTTP API and Kafka worker
+**Commands**: `pdm run start-http`, `pdm run start-worker`, `pdm run dev`
+**Health**: HTTP healthz endpoint and Kafka consumer health
+
+## 9. Error Handling
+
+**Database**: Connection failures, constraint violations
+**Kafka**: Consumer lag, deserialization errors
+**State**: Invalid transitions, missing entities
+**Response**: Structured error messages with correlation IDs
+
+## 10. Monitoring
+
+**Metrics**: HTTP requests, Kafka processing, database operations
+**Logging**: Correlation ID tracking, state change audit trail
+**Health**: Database connectivity, Kafka consumer lag
+
+## 11. Future Evolution
+
+**Planned**: REST API for essay queries, manual state overrides, batch analytics
+**Database**: Migration to PostgreSQL for production scalability
+**Events**: Fine-grained essay state change events for downstream services

@@ -68,7 +68,7 @@ class TestEventContractCompliance:
         # 2. Patch the core algorithm function
         corrections_count = 2  # Example
         with patch(
-            "spell_checker_service.event_router.default_perform_spell_check_algorithm",
+            "services.spell_checker_service.event_router.default_perform_spell_check_algorithm",
             new_callable=AsyncMock,
             return_value=(corrected_text, corrections_count),
         ):
@@ -80,6 +80,8 @@ class TestEventContractCompliance:
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
+                consumer_group_id="test-group",
+                kafka_queue_latency_metric=None,
             )
 
             # Assert
@@ -176,7 +178,7 @@ class TestEventContractCompliance:
         # 3. Patch the core algorithm function
         corrections_count = 3  # Example
         with patch(
-            "spell_checker_service.event_router.default_perform_spell_check_algorithm",
+            "services.spell_checker_service.event_router.default_perform_spell_check_algorithm",
             new_callable=AsyncMock,
             return_value=(corrected_text, corrections_count),
         ):
@@ -189,6 +191,8 @@ class TestEventContractCompliance:
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
+                consumer_group_id="test-group",
+                kafka_queue_latency_metric=None,
             )
 
             # Assert

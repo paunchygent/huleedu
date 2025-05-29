@@ -49,11 +49,25 @@ services/
 │   ├── event_router.py            # Event deserialization, protocol implementations, logic orchestration
 │   ├── core_logic.py              # Core algorithms and helper functions
 │   ├── protocols.py               # For defining service-specific behavioral contracts
+│   ├── config.py                  # Service configuration with Pydantic BaseSettings
+│   ├── di.py                      # Dishka dependency injection providers
 │   ├── pyproject.toml
 │   ├── Dockerfile
 │   ├── tests/
 │   └── docs/
-└── essay_lifecycle_service/                 # Example, potentially more complex structure
+└── essay_lifecycle_service/       # Hybrid HTTP + Kafka service
+    ├── app.py                     # Quart HTTP API entry point
+    ├── worker_main.py             # Kafka event consumer entry point
+    ├── state_store.py             # Essay state persistence layer
+    ├── batch_tracker.py           # Batch coordination and readiness tracking
+    ├── batch_command_handlers.py  # Command processing for batch operations
+    ├── core_logic.py              # Business logic and state transitions
+    ├── protocols.py               # Service behavioral contracts
+    ├── config.py                  # Service configuration
+    ├── di.py                      # Dependency injection setup
+    ├── pyproject.toml
+    ├── tests/
+    └── docs/
 ```
 
 **Note on Worker Service Structure (e.g., `spell_checker_service`):**

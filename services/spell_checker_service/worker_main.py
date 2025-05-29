@@ -8,10 +8,18 @@ from typing import Any, AsyncIterator  # Changed from Any to AsyncIterator for k
 import aiohttp
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, TopicPartition
 from aiokafka.errors import KafkaConnectionError
-from config import settings  # Assuming this is still the way to get settings
-from di import SpellCheckerServiceProvider
 from dishka import make_async_container
-from event_router import (
+from huleedu_service_libs.logging_utils import (
+    configure_service_logging,
+    create_service_logger,
+)
+from prometheus_client import CollectorRegistry, Histogram, start_http_server
+
+from common_core.enums import ProcessingEvent, topic_name
+
+from .config import settings  # Assuming this is still the way to get settings
+from .di import SpellCheckerServiceProvider
+from .event_router import (
     # Placeholder config values used in event_router, ideally pass them from here
     CONTENT_SERVICE_URL_CONFIG,
     KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED,
@@ -22,13 +30,6 @@ from event_router import (
     DefaultSpellcheckEventPublisher,
     process_single_message,
 )
-from huleedu_service_libs.logging_utils import (
-    configure_service_logging,
-    create_service_logger,
-)
-from prometheus_client import CollectorRegistry, Histogram, start_http_server
-
-from common_core.enums import ProcessingEvent, topic_name
 
 # Configure structured logging for the service (moved from original worker.py)
 configure_service_logging(
@@ -43,7 +44,7 @@ KAFKA_BOOTSTRAP_SERVERS = settings.KAFKA_BOOTSTRAP_SERVERS
 CONSUMER_GROUP_ID = settings.CONSUMER_GROUP
 PRODUCER_CLIENT_ID = settings.PRODUCER_CLIENT_ID
 CONSUMER_CLIENT_ID = settings.CONSUMER_CLIENT_ID
-METRICS_PORT = getattr(settings, 'METRICS_PORT', 8001)  # Default metrics port
+METRICS_PORT = settings.METRICS_PORT  # Now properly configured in Settings class
 
 INPUT_TOPIC = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
 # OUTPUT_TOPIC is KAFKA_OUTPUT_TOPIC_CONFIG from event_router which is
@@ -205,6 +206,8 @@ async def spell_checker_worker_main() -> None:
                                         result_store,  # Instantiated once
                                         # Instantiated by kafka_clients context mgr
                                         event_publisher_instance,
+                                        consumer_group_id=CONSUMER_GROUP_ID,
+                                        kafka_queue_latency_metric=KAFKA_QUEUE_LATENCY,
                                     )
                                     if should_commit:
                                         # Store offset for this specific message
