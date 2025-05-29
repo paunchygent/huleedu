@@ -120,8 +120,10 @@ class EssayStatus(str, Enum):
     UPLOADED = "uploaded"
     TEXT_EXTRACTED = "text_extracted"
     # Content Ingestion Statuses
-    CONTENT_INGESTER = "content_ingester"
+    CONTENT_INGESTING = "content_ingester"
     CONTENT_INGESTION_FAILED = "content_ingestion_failed"
+    # ELS Pipeline Management Statuses
+    READY_FOR_PROCESSING = "ready_for_processing"  # Content validated, awaiting pipeline assignment
     # Spellcheck Statuses
     AWAITING_SPELLCHECK = "awaiting_spellcheck"
     SPELLCHECKING_IN_PROGRESS = "spellchecking_in_progress"

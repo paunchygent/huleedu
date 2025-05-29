@@ -105,11 +105,14 @@ services:
         condition: service_started
     networks:
       - huleedu_internal_network
+    ports:
+      - "8002:8001"
     environment:
       - ENV_TYPE=docker
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - LOG_LEVEL=DEBUG
+      - METRICS_PORT=8001
 
   batch_orchestrator_service:
     build:
@@ -131,4 +134,26 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - PORT=5000
+      - LOG_LEVEL=INFO
+
+  essay_lifecycle_service:
+    build:
+      context: .
+      dockerfile: services/essay_lifecycle_service/Dockerfile
+    container_name: huleedu_essay_lifecycle_service
+    restart: unless-stopped
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      content_service:
+        condition: service_started
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "6001:6000"
+    environment:
+      - ENV_TYPE=docker
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
+      - HTTP_PORT=6000
       - LOG_LEVEL=INFO 

@@ -97,8 +97,8 @@ ignore = [
 ]
 
 [tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
+  quote-style = "double"
+  indent-style = "space"
 
 [tool.ruff.lint.per-file-ignores]
 # Allow imports after load_dotenv() in service entry points
@@ -148,14 +148,7 @@ ignore_missing_imports = true
 
 # Service-local config modules
 [[tool.mypy.overrides]]
-module = [
-    "config",
-    "di",
-    "protocols",
-    "core_logic",
-    "state_store",
-    "batch_command_handlers",
-]
+module = ["config", "worker_main", "core_logic", "event_router", "protocols", "di", "state_store", "batch_command_handlers"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

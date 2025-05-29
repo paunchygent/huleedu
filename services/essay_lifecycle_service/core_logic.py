@@ -21,11 +21,11 @@ class StateTransitionValidator:
     ensuring only valid transitions are allowed.
     """
 
-    # Define valid state transitions as a mapping
+    # Define valid state transitions as a mapping - Walking Skeleton: Spellcheck Pipeline Only
+    # NOTE: ELS receives essays from BOS in READY_FOR_PROCESSING state after File Service completes content ingestion
     _VALID_TRANSITIONS: dict[EssayStatus, set[EssayStatus]] = {
-        EssayStatus.UPLOADED: {EssayStatus.TEXT_EXTRACTED, EssayStatus.ESSAY_CRITICAL_FAILURE},
-        EssayStatus.TEXT_EXTRACTED: {
-            EssayStatus.AWAITING_SPELLCHECK,
+        EssayStatus.READY_FOR_PROCESSING: {
+            EssayStatus.AWAITING_SPELLCHECK,  # BOS assigns spellcheck pipeline
             EssayStatus.ESSAY_CRITICAL_FAILURE,
         },
         EssayStatus.AWAITING_SPELLCHECK: {
@@ -39,131 +39,13 @@ class StateTransitionValidator:
             EssayStatus.ESSAY_CRITICAL_FAILURE,
         },
         EssayStatus.SPELLCHECKED_SUCCESS: {
-            EssayStatus.AWAITING_NLP,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
+            EssayStatus.ESSAY_CRITICAL_FAILURE,  # Terminal success state for walking skeleton
         },
         EssayStatus.SPELLCHECK_FAILED: {
-            EssayStatus.AWAITING_SPELLCHECK,  # Retry
-            EssayStatus.AWAITING_NLP,  # Skip to next phase
-            EssayStatus.ESSAY_PARTIALLY_PROCESSED_WITH_FAILURES,
+            EssayStatus.AWAITING_SPELLCHECK,  # Allow retry
             EssayStatus.ESSAY_CRITICAL_FAILURE,
         },
-        EssayStatus.AWAITING_NLP: {
-            EssayStatus.NLP_IN_PROGRESS,
-            EssayStatus.NLP_FAILED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.NLP_IN_PROGRESS: {
-            EssayStatus.NLP_COMPLETED_SUCCESS,
-            EssayStatus.NLP_FAILED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.NLP_COMPLETED_SUCCESS: {
-            EssayStatus.AWAITING_AI_FEEDBACK,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.NLP_FAILED: {
-            EssayStatus.AWAITING_NLP,  # Retry
-            EssayStatus.AWAITING_AI_FEEDBACK,  # Skip to next phase
-            EssayStatus.ESSAY_PARTIALLY_PROCESSED_WITH_FAILURES,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.AWAITING_AI_FEEDBACK: {
-            EssayStatus.AI_FEEDBACK_IN_PROGRESS,
-            EssayStatus.AI_FEEDBACK_FAILED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.AI_FEEDBACK_IN_PROGRESS: {
-            EssayStatus.AI_FEEDBACK_COMPLETED_SUCCESS,
-            EssayStatus.AI_FEEDBACK_FAILED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.AI_FEEDBACK_COMPLETED_SUCCESS: {
-            EssayStatus.AWAITING_EDITOR_REVISION,
-            EssayStatus.AWAITING_GRAMMAR_CHECK,
-            EssayStatus.AWAITING_CJ_INCLUSION,
-            EssayStatus.ESSAY_ALL_PROCESSING_COMPLETED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.AI_FEEDBACK_FAILED: {
-            EssayStatus.AWAITING_AI_FEEDBACK,  # Retry
-            EssayStatus.AWAITING_EDITOR_REVISION,  # Skip to next phase
-            EssayStatus.AWAITING_GRAMMAR_CHECK,  # Skip to next phase
-            EssayStatus.AWAITING_CJ_INCLUSION,  # Skip to next phase
-            EssayStatus.ESSAY_PARTIALLY_PROCESSED_WITH_FAILURES,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        # Additional states for optional processing phases
-        EssayStatus.AWAITING_EDITOR_REVISION: {
-            EssayStatus.EDITOR_REVISION_IN_PROGRESS,
-            EssayStatus.EDITOR_REVISION_FAILED,
-            EssayStatus.AWAITING_GRAMMAR_CHECK,
-            EssayStatus.AWAITING_CJ_INCLUSION,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.EDITOR_REVISION_IN_PROGRESS: {
-            EssayStatus.EDITOR_REVISION_COMPLETED_SUCCESS,
-            EssayStatus.EDITOR_REVISION_FAILED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.EDITOR_REVISION_COMPLETED_SUCCESS: {
-            EssayStatus.AWAITING_GRAMMAR_CHECK,
-            EssayStatus.AWAITING_CJ_INCLUSION,
-            EssayStatus.ESSAY_ALL_PROCESSING_COMPLETED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.EDITOR_REVISION_FAILED: {
-            EssayStatus.AWAITING_EDITOR_REVISION,  # Retry
-            EssayStatus.AWAITING_GRAMMAR_CHECK,  # Skip
-            EssayStatus.AWAITING_CJ_INCLUSION,  # Skip
-            EssayStatus.ESSAY_PARTIALLY_PROCESSED_WITH_FAILURES,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.AWAITING_GRAMMAR_CHECK: {
-            EssayStatus.GRAMMAR_CHECK_IN_PROGRESS,
-            EssayStatus.GRAMMAR_CHECK_FAILED,
-            EssayStatus.AWAITING_CJ_INCLUSION,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.GRAMMAR_CHECK_IN_PROGRESS: {
-            EssayStatus.GRAMMAR_CHECK_COMPLETED_SUCCESS,
-            EssayStatus.GRAMMAR_CHECK_FAILED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.GRAMMAR_CHECK_COMPLETED_SUCCESS: {
-            EssayStatus.AWAITING_CJ_INCLUSION,
-            EssayStatus.ESSAY_ALL_PROCESSING_COMPLETED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.GRAMMAR_CHECK_FAILED: {
-            EssayStatus.AWAITING_GRAMMAR_CHECK,  # Retry
-            EssayStatus.AWAITING_CJ_INCLUSION,  # Skip
-            EssayStatus.ESSAY_PARTIALLY_PROCESSED_WITH_FAILURES,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.AWAITING_CJ_INCLUSION: {
-            EssayStatus.CJ_PROCESSING_ACTIVE,
-            EssayStatus.CJ_PROCESSING_FAILED,
-            EssayStatus.ESSAY_ALL_PROCESSING_COMPLETED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.CJ_PROCESSING_ACTIVE: {
-            EssayStatus.CJ_RANKING_COMPLETED,
-            EssayStatus.CJ_PROCESSING_FAILED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.CJ_RANKING_COMPLETED: {
-            EssayStatus.ESSAY_ALL_PROCESSING_COMPLETED,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        EssayStatus.CJ_PROCESSING_FAILED: {
-            EssayStatus.AWAITING_CJ_INCLUSION,  # Retry
-            EssayStatus.ESSAY_PARTIALLY_PROCESSED_WITH_FAILURES,
-            EssayStatus.ESSAY_CRITICAL_FAILURE,
-        },
-        # Terminal states (no transitions allowed)
-        EssayStatus.ESSAY_ALL_PROCESSING_COMPLETED: set(),
-        EssayStatus.ESSAY_PARTIALLY_PROCESSED_WITH_FAILURES: set(),
+        # Terminal states have no valid transitions
         EssayStatus.ESSAY_CRITICAL_FAILURE: set(),
     }
 
@@ -196,8 +78,7 @@ class StateTransitionValidator:
     def is_terminal_status(cls, status: EssayStatus) -> bool:
         """Check if a status is terminal (no further transitions allowed)."""
         return status in {
-            EssayStatus.ESSAY_ALL_PROCESSING_COMPLETED,
-            EssayStatus.ESSAY_PARTIALLY_PROCESSED_WITH_FAILURES,
+            EssayStatus.SPELLCHECKED_SUCCESS,  # Walking skeleton terminal success
             EssayStatus.ESSAY_CRITICAL_FAILURE,
         }
 
@@ -205,14 +86,13 @@ class StateTransitionValidator:
     def is_failure_status(cls, status: EssayStatus) -> bool:
         """Check if a status indicates a failure state."""
         return status.value.endswith("_failed") or status in {
-            EssayStatus.ESSAY_PARTIALLY_PROCESSED_WITH_FAILURES,
             EssayStatus.ESSAY_CRITICAL_FAILURE,
         }
 
     @classmethod
     def is_processing_status(cls, status: EssayStatus) -> bool:
         """Check if a status indicates active processing."""
-        return status.value.endswith("_in_progress") or status == EssayStatus.CJ_PROCESSING_ACTIVE
+        return status.value.endswith("_in_progress")
 
 
 def generate_correlation_id() -> UUID:

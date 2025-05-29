@@ -14,8 +14,15 @@ from config import settings
 from di import BatchOrchestratorServiceProvider
 from dishka import FromDishka, make_async_container
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 from protocols import BatchEventPublisherProtocol
-from quart import Quart, Response, jsonify
+from quart import Quart, Response, g, jsonify, request
 from quart_dishka import QuartDishka, inject
 
 from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage, topic_name
@@ -32,6 +39,11 @@ app = Quart(__name__)
 CONTENT_SERVICE_URL = settings.CONTENT_SERVICE_URL
 OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
 
+# Prometheus metrics (will be registered with DI-provided registry)
+REQUEST_COUNT: Optional[Counter] = None
+REQUEST_DURATION: Optional[Histogram] = None
+BATCH_OPERATIONS: Optional[Counter] = None
+
 
 @app.before_serving
 async def startup() -> None:
@@ -39,6 +51,12 @@ async def startup() -> None:
     try:
         container = make_async_container(BatchOrchestratorServiceProvider())
         QuartDishka(app=app, container=container)
+
+        # Initialize metrics with DI registry
+        async with container() as request_container:
+            registry = await request_container.get(CollectorRegistry)
+            _initialize_metrics(registry)
+
         logger.info(
             "Batch Orchestrator Service DI container and quart-dishka integration "
             "initialized successfully."
@@ -47,6 +65,76 @@ async def startup() -> None:
         logger.critical(
             f"Failed to initialize DI container for Batch Orchestrator Service: {e}", exc_info=True
         )
+
+
+def _initialize_metrics(registry: CollectorRegistry) -> None:
+    """Initialize Prometheus metrics with the provided registry."""
+    global REQUEST_COUNT, REQUEST_DURATION, BATCH_OPERATIONS
+
+    REQUEST_COUNT = Counter(
+        'http_requests_total',
+        'Total HTTP requests',
+        ['method', 'endpoint', 'status_code'],
+        registry=registry
+    )
+
+    REQUEST_DURATION = Histogram(
+        'http_request_duration_seconds',
+        'HTTP request duration in seconds',
+        ['method', 'endpoint'],
+        registry=registry
+    )
+
+    BATCH_OPERATIONS = Counter(
+        'batch_operations_total',
+        'Total batch operations',
+        ['operation', 'status'],
+        registry=registry
+    )
+
+
+@app.route("/metrics")
+@inject
+async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
+    """Prometheus metrics endpoint."""
+    try:
+        metrics_data = generate_latest(registry)
+        response = Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
+        return response
+    except Exception as e:
+        logger.error(f"Error generating metrics: {e}", exc_info=True)
+        return Response("Error generating metrics", status=500)
+
+
+@app.before_request
+async def before_request() -> None:
+    """Record request start time for duration metrics."""
+    import time
+    g.start_time = time.time()
+
+
+@app.after_request
+async def after_request(response: Response) -> Response:
+    """Record metrics after each request."""
+    try:
+        import time
+        start_time = getattr(g, 'start_time', None)
+        if start_time is not None and REQUEST_COUNT is not None and REQUEST_DURATION is not None:
+            duration = time.time() - start_time
+
+            # Get endpoint name (remove query parameters)
+            endpoint = request.path
+            method = request.method
+            status_code = str(response.status_code)
+
+            # Record metrics
+            REQUEST_COUNT.labels(method=method, endpoint=endpoint, status_code=status_code).inc()
+            REQUEST_DURATION.labels(method=method, endpoint=endpoint).observe(duration)
+
+    except Exception as e:
+        logger.error(f"Error recording request metrics: {e}")
+
+    return response
 
 
 @app.post("/v1/batches/trigger-spellcheck-test")
@@ -80,12 +168,16 @@ async def trigger_spellcheck_test_endpoint(
                     logger.error(
                         f"Failed to store dummy essay text: {response.status} - {error_text}"
                     )
+                    if BATCH_OPERATIONS:
+                        BATCH_OPERATIONS.labels(operation='test_spellcheck', status='failed').inc()
                     return (
                         jsonify({"error": f"Failed to store dummy essay: {response.status}"}),
                         500,
                     )
 
         if not original_text_storage_id:
+            if BATCH_OPERATIONS:
+                BATCH_OPERATIONS.labels(operation='test_spellcheck', status='failed').inc()
             return (
                 jsonify({"error": "Could not get storage_id for dummy essay text"}),
                 500,
@@ -122,6 +214,10 @@ async def trigger_spellcheck_test_endpoint(
             f"Published SpellcheckRequestedDataV1 for essay {essay_id_1}, "
             f"event_id {envelope.event_id}"
         )
+
+        if BATCH_OPERATIONS:
+            BATCH_OPERATIONS.labels(operation='test_spellcheck', status='success').inc()
+
         return (
             jsonify(
                 {
@@ -138,6 +234,8 @@ async def trigger_spellcheck_test_endpoint(
 
     except Exception as e:
         logger.error(f"Error in trigger_spellcheck_test: {e}", exc_info=True)
+        if BATCH_OPERATIONS:
+            BATCH_OPERATIONS.labels(operation='test_spellcheck', status='error').inc()
         return jsonify({"error": "Failed to trigger test spellcheck request."}), 500
 
 

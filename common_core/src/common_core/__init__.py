@@ -35,7 +35,6 @@ from .events.base_event_models import (
 from .events.envelope import EventEnvelope
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .metadata_models import (
-    AIFeedbackMetadata,
     CancellationMetadata,
     EntityReference,
     EssayProcessingInputRefV1,
@@ -62,7 +61,6 @@ __all__ = [
     # Metadata Models
     "EntityReference",
     "SystemProcessingMetadata",
-    "AIFeedbackMetadata",
     "StorageReferenceMetadata",
     "UserActivityMetadata",
     "CancellationMetadata",

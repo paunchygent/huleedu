@@ -1,16 +1,36 @@
-# Batch Orchestrator Service
+# Batch Orchestrator Service (BOS)
 
 ## Service Purpose and Role
 
-The **Batch Orchestrator Service** (formerly known as Batch Service) is a core component of the HuleEdu microservice ecosystem. It acts as the primary orchestrator for managing batches of essays and initiating their processing workflows through various specialized services.
+The **Batch Orchestrator Service** is the central coordinator for the HuleEdu essay processing pipeline. It implements the **BOS-centric architecture** where all batch processing decisions and orchestration flow through this primary service.
 
 Its key responsibilities include:
 
-* Accepting requests to process essays (currently individual, with batch processing planned).
-* Coordinating with the Content Service to store the initial essay content.
-* Publishing events to Kafka to trigger specific processing phases (e.g., spell checking).
-* (Planned) Sending commands to the Essay Lifecycle Service (ELS) to manage the state of essays within a batch and initiate different processing phases for entire batches.
-* (Planned) Providing API endpoints for creating and monitoring the status of essay batches.
+* **Batch Lifecycle Management**: Create, configure, and manage the complete lifecycle of essay batches
+* **Batch Readiness Coordination**: Implement count-based aggregation pattern to track when all essays are ready for processing
+* **Pipeline Orchestration**: Coordinate processing phases across specialized services (spellcheck, NLP, AI feedback, etc.)
+* **Processing Decision Authority**: All processing initiation, retry, and failure handling decisions originate from BOS
+* **Content Ingestion Coordination**: Work with Content Service and File Service to manage initial essay ingestion
+* **Progress Monitoring**: Track and expose batch processing progress to users and external systems
+
+## 🔄 Batch Coordination Architecture
+
+BOS implements the **Count-Based Aggregation Pattern** as the central orchestrator:
+
+### Coordination Flow:
+1. **Batch Creation**: BOS creates batch and registers expectations with ELS (`BatchEssaysRegistered`)
+2. **Content Ingestion**: BOS coordinates with File Service for essay content processing
+3. **Readiness Aggregation**: ELS tracks individual essay readiness and notifies BOS when complete (`BatchEssaysReady`)
+4. **Pipeline Execution**: BOS initiates processing phases (spellcheck, NLP, etc.) for ready batches
+5. **Progress Monitoring**: BOS tracks progress across all processing phases and provides status to clients
+
+### Service Boundary Responsibilities:
+- **BOS**: Owns batch lifecycle, processing decisions, and pipeline orchestration
+- **ELS**: Aggregates essay readiness, manages individual essay states
+- **File Service**: Processes individual essay content, reports readiness to ELS
+- **Specialized Services**: Execute specific processing tasks (spellcheck, NLP, etc.)
+
+This architecture ensures BOS maintains central control while leveraging other services for their domain expertise.
 
 ## Architecture Overview
 

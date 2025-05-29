@@ -12,15 +12,27 @@ from datetime import datetime
 from common_core.enums import ContentType, EssayStatus
 from dishka import FromDishka, make_async_container
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 from pydantic import BaseModel, ValidationError
-from quart import Quart, Response, jsonify, request
+from quart import Quart, Response, g, jsonify, request
 from quart_dishka import QuartDishka, inject
 
 from config import settings
 from di import EssayLifecycleServiceProvider
-from protocols import EssayStateStore, EventPublisher, MetricsCollector, StateTransitionValidator
+from protocols import EssayStateStore
 
 logger = create_service_logger("essay_api")
+
+# Prometheus metrics (will be registered with DI-provided registry)
+REQUEST_COUNT: Counter | None = None
+REQUEST_DURATION: Histogram | None = None
+ESSAY_OPERATIONS: Counter | None = None
 
 
 # Pydantic models for API requests and responses
@@ -46,13 +58,6 @@ class BatchStatusResponse(BaseModel):
     completion_percentage: float
 
 
-class RetryRequest(BaseModel):
-    """Request model for essay retry operations."""
-
-    phase: str  # "spellcheck", "nlp", "ai_feedback"
-    force: bool = False
-
-
 class ErrorResponse(BaseModel):
     """Standard error response model."""
 
@@ -75,9 +80,43 @@ def create_app() -> Quart:
     container = make_async_container(EssayLifecycleServiceProvider())
     QuartDishka(app=app, container=container)
 
+    # Initialize metrics with DI registry
+    @app.before_serving
+    async def initialize_metrics() -> None:
+        """Initialize Prometheus metrics with DI registry."""
+        async with container() as request_container:
+            registry = await request_container.get(CollectorRegistry)
+            _initialize_metrics(registry)
+
     logger.info("Quart application created with DI container")
 
     return app
+
+
+def _initialize_metrics(registry: CollectorRegistry) -> None:
+    """Initialize Prometheus metrics with the provided registry."""
+    global REQUEST_COUNT, REQUEST_DURATION, ESSAY_OPERATIONS
+
+    REQUEST_COUNT = Counter(
+        'http_requests_total',
+        'Total HTTP requests',
+        ['method', 'endpoint', 'status_code'],
+        registry=registry
+    )
+
+    REQUEST_DURATION = Histogram(
+        'http_request_duration_seconds',
+        'HTTP request duration in seconds',
+        ['method', 'endpoint'],
+        registry=registry
+    )
+
+    ESSAY_OPERATIONS = Counter(
+        'essay_operations_total',
+        'Total essay operations',
+        ['operation', 'status'],
+        registry=registry
+    )
 
 
 app = create_app()
@@ -113,6 +152,50 @@ async def health_check() -> Response:
     return jsonify({"status": "healthy", "service": settings.SERVICE_NAME})
 
 
+@app.route("/metrics")
+@inject
+async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
+    """Prometheus metrics endpoint."""
+    try:
+        metrics_data = generate_latest(registry)
+        response = Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
+        return response
+    except Exception as e:
+        logger.error(f"Error generating metrics: {e}", exc_info=True)
+        return Response("Error generating metrics", status=500)
+
+
+@app.before_request
+async def before_request() -> None:
+    """Record request start time for duration metrics."""
+    import time
+    g.start_time = time.time()
+
+
+@app.after_request
+async def after_request(response: Response) -> Response:
+    """Record metrics after each request."""
+    try:
+        import time
+        start_time = getattr(g, 'start_time', None)
+        if start_time is not None and REQUEST_COUNT is not None and REQUEST_DURATION is not None:
+            duration = time.time() - start_time
+
+            # Get endpoint name (remove query parameters)
+            endpoint = request.path
+            method = request.method
+            status_code = str(response.status_code)
+
+            # Record metrics
+            REQUEST_COUNT.labels(method=method, endpoint=endpoint, status_code=status_code).inc()
+            REQUEST_DURATION.labels(method=method, endpoint=endpoint).observe(duration)
+
+    except Exception as e:
+        logger.error(f"Error recording request metrics: {e}")
+
+    return response
+
+
 @app.route(f"/{settings.API_VERSION}/essays/<essay_id>/status", methods=["GET"])
 @inject
 async def get_essay_status(
@@ -124,6 +207,8 @@ async def get_essay_status(
 
     essay_state = await state_store.get_essay_state(essay_id)
     if essay_state is None:
+        if ESSAY_OPERATIONS:
+            ESSAY_OPERATIONS.labels(operation='get_status', status='not_found').inc()
         error_response = ErrorResponse(
             error="Essay Not Found", detail=f"Essay with ID {essay_id} does not exist"
         )
@@ -143,6 +228,8 @@ async def get_essay_status(
         updated_at=essay_state.updated_at,
     )
 
+    if ESSAY_OPERATIONS:
+        ESSAY_OPERATIONS.labels(operation='get_status', status='success').inc()
     return jsonify(status_response.model_dump(mode="json"))
 
 
@@ -157,6 +244,8 @@ async def get_essay_timeline(
 
     essay_state = await state_store.get_essay_state(essay_id)
     if essay_state is None:
+        if ESSAY_OPERATIONS:
+            ESSAY_OPERATIONS.labels(operation='get_timeline', status='not_found').inc()
         response = ErrorResponse(
             error="Essay Not Found", detail=f"Essay with ID {essay_id} does not exist"
         )
@@ -170,6 +259,8 @@ async def get_essay_timeline(
         "current_status": essay_state.current_status.value,
     }
 
+    if ESSAY_OPERATIONS:
+        ESSAY_OPERATIONS.labels(operation='get_timeline', status='success').inc()
     return jsonify(timeline_response)
 
 
@@ -185,6 +276,8 @@ async def get_batch_status(
     # Get all essays in the batch
     essays = await state_store.list_essays_by_batch(batch_id)
     if not essays:
+        if ESSAY_OPERATIONS:
+            ESSAY_OPERATIONS.labels(operation='get_batch_status', status='not_found').inc()
         response = ErrorResponse(
             error="Batch Not Found",
             detail=f"Batch with ID {batch_id} does not exist or has no essays",
@@ -197,8 +290,7 @@ async def get_batch_status(
 
     # Calculate completion percentage
     completed_statuses = {
-        EssayStatus.ESSAY_ALL_PROCESSING_COMPLETED,
-        EssayStatus.ESSAY_PARTIALLY_PROCESSED_WITH_FAILURES,
+        EssayStatus.SPELLCHECKED_SUCCESS,  # Walking skeleton terminal success
         EssayStatus.ESSAY_CRITICAL_FAILURE,
     }
     completed_count = sum(
@@ -216,145 +308,20 @@ async def get_batch_status(
     return jsonify(batch_response.model_dump(mode="json"))
 
 
-@app.route(f"/{settings.API_VERSION}/essays/<essay_id>/retry", methods=["POST"])
-@inject
-async def retry_essay_processing(
-    essay_id: str,
-    state_store: FromDishka[EssayStateStore],
-    event_publisher: FromDishka[EventPublisher],
-    transition_validator: FromDishka[StateTransitionValidator],
-    metrics_collector: FromDishka[MetricsCollector],
-) -> Response | tuple[Response, int]:
-    """Retry processing for a specific essay phase."""
-    logger.info(f"Retry requested for essay {essay_id}")
-
-    # Parse request body
-    try:
-        request_data = await request.get_json()
-        retry_request = RetryRequest.model_validate(request_data or {})
-    except ValidationError as e:
-        response = ErrorResponse(error="Invalid Request", detail=str(e))
-        return jsonify(response.model_dump()), 400
-
-    # Get current essay state
-    essay_state = await state_store.get_essay_state(essay_id)
-    if essay_state is None:
-        response = ErrorResponse(
-            error="Essay Not Found", detail=f"Essay with ID {essay_id} does not exist"
-        )
-        return jsonify(response.model_dump()), 404
-
-    # Determine the appropriate status for retry
-    retry_status_map = {
-        "spellcheck": EssayStatus.AWAITING_SPELLCHECK,
-        "nlp": EssayStatus.AWAITING_NLP,
-        "ai_feedback": EssayStatus.AWAITING_AI_FEEDBACK,
-    }
-
-    target_status = retry_status_map.get(retry_request.phase)
-    if target_status is None:
-        response = ErrorResponse(
-            error="Invalid Phase",
-            detail=f"Phase '{retry_request.phase}' is not supported for retry",
-        )
-        return jsonify(response.model_dump()), 400
-
-    # Validate transition (allow force if specified)
-    if not retry_request.force and not transition_validator.validate_transition(
-        essay_state.current_status, target_status
-    ):
-        response = ErrorResponse(
-            error="Invalid State Transition",
-            detail=f"Cannot retry {retry_request.phase} from current status {essay_state.current_status.value}",
-        )
-        return jsonify(response.model_dump()), 400
-
-    # Update state to retry status
-    retry_metadata = {
-        "retry_requested_at": datetime.now().isoformat(),
-        "retry_phase": retry_request.phase,
-        "retry_forced": retry_request.force,
-    }
-    await state_store.update_essay_state(essay_id, target_status, retry_metadata)
-
-    # NOTE: Under batch-centric orchestration, ELS only updates essay state
-    # The Batch Service is responsible for detecting retry-eligible essays
-    # and issuing appropriate batch commands to re-trigger processing
-    logger.info(
-        f"Essay {essay_id} marked for retry in phase {retry_request.phase}",
-        extra={
-            "essay_id": essay_id,
-            "phase": retry_request.phase,
-            "target_status": target_status.value,
-            "message": "Batch Service will detect and re-initiate processing",
-        },
-    )
-
-    # Record metrics
-    metrics_collector.record_state_transition(essay_state.current_status.value, target_status.value)
-    metrics_collector.increment_counter(
-        "operations", {"operation": "retry_requested", "phase": retry_request.phase}
-    )
-
-    return jsonify(
-        {
-            "message": f"Retry initiated for {retry_request.phase}",
-            "essay_id": essay_id,
-            "new_status": target_status.value,
-        }
-    )
-
-
 def _calculate_processing_progress(current_status: EssayStatus) -> dict[str, bool]:
-    """Calculate processing progress based on current status."""
-    progress = {
-        "uploaded": False,
-        "text_extracted": False,
-        "spellcheck_completed": False,
-        "nlp_completed": False,
-        "ai_feedback_completed": False,
-        "all_processing_completed": False,
+    """Calculate processing progress - walking skeleton version."""
+    return {
+        "essay_ready_for_processing": current_status in [
+            EssayStatus.READY_FOR_PROCESSING, EssayStatus.AWAITING_SPELLCHECK,
+            EssayStatus.SPELLCHECKING_IN_PROGRESS, EssayStatus.SPELLCHECKED_SUCCESS
+        ],
+        "pipeline_assigned": current_status in [
+            EssayStatus.AWAITING_SPELLCHECK, EssayStatus.SPELLCHECKING_IN_PROGRESS,
+            EssayStatus.SPELLCHECKED_SUCCESS
+        ],
+        "spellcheck_completed": current_status == EssayStatus.SPELLCHECKED_SUCCESS,
+        # Walking skeleton: only spellcheck pipeline progress tracked by ELS
     }
-
-    # Map status progression
-    status_progression = [
-        EssayStatus.UPLOADED,
-        EssayStatus.TEXT_EXTRACTED,
-        EssayStatus.SPELLCHECKED_SUCCESS,
-        EssayStatus.NLP_COMPLETED_SUCCESS,
-        EssayStatus.AI_FEEDBACK_COMPLETED_SUCCESS,
-        EssayStatus.ESSAY_ALL_PROCESSING_COMPLETED,
-    ]
-
-    progress_keys = list(progress.keys())
-
-    for i, status in enumerate(status_progression):
-        if current_status == status or _is_status_completed(current_status, status):
-            if i < len(progress_keys):
-                progress[progress_keys[i]] = True
-
-    return progress
-
-
-def _is_status_completed(current_status: EssayStatus, check_status: EssayStatus) -> bool:
-    """Check if a status stage has been completed based on current status."""
-    # Simple heuristic based on status values and progression
-    status_order = {
-        EssayStatus.UPLOADED: 1,
-        EssayStatus.TEXT_EXTRACTED: 2,
-        EssayStatus.AWAITING_SPELLCHECK: 3,
-        EssayStatus.SPELLCHECKED_SUCCESS: 4,
-        EssayStatus.AWAITING_NLP: 5,
-        EssayStatus.NLP_COMPLETED_SUCCESS: 6,
-        EssayStatus.AWAITING_AI_FEEDBACK: 7,
-        EssayStatus.AI_FEEDBACK_COMPLETED_SUCCESS: 8,
-        EssayStatus.ESSAY_ALL_PROCESSING_COMPLETED: 9,
-    }
-
-    current_order = status_order.get(current_status, 0)
-    check_order = status_order.get(check_status, 0)
-
-    return current_order >= check_order
 
 
 if __name__ == "__main__":

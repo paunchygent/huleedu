@@ -109,8 +109,7 @@ async def _route_event(
     """
     Route events to appropriate handlers based on event type.
 
-    NOTE: This is a temporary stub implementation. The autonomous event handlers
-    have been removed to comply with batch-centric orchestration. Batch command
+    NOTE: This is a temporary stub implementation. Batch command
     handlers will be implemented in Phase 3 to process commands from Batch Service.
 
     Args:

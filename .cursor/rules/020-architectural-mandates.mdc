@@ -1,7 +1,7 @@
 ---
-description: Read before any tasks related to schemas, models, or cross-service communication
+description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # 020: Architectural Mandates
 

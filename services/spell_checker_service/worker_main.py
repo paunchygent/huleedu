@@ -9,14 +9,9 @@ import aiohttp
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, TopicPartition
 from aiokafka.errors import KafkaConnectionError
 from config import settings  # Assuming this is still the way to get settings
-from huleedu_service_libs.logging_utils import (
-    configure_service_logging,
-    create_service_logger,
-)
-
-from common_core.enums import ProcessingEvent, topic_name
-
-from .event_router import (
+from di import SpellCheckerServiceProvider
+from dishka import make_async_container
+from event_router import (
     # Placeholder config values used in event_router, ideally pass them from here
     CONTENT_SERVICE_URL_CONFIG,
     KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED,
@@ -27,6 +22,13 @@ from .event_router import (
     DefaultSpellcheckEventPublisher,
     process_single_message,
 )
+from huleedu_service_libs.logging_utils import (
+    configure_service_logging,
+    create_service_logger,
+)
+from prometheus_client import CollectorRegistry, Histogram, start_http_server
+
+from common_core.enums import ProcessingEvent, topic_name
 
 # Configure structured logging for the service (moved from original worker.py)
 configure_service_logging(
@@ -41,10 +43,14 @@ KAFKA_BOOTSTRAP_SERVERS = settings.KAFKA_BOOTSTRAP_SERVERS
 CONSUMER_GROUP_ID = settings.CONSUMER_GROUP
 PRODUCER_CLIENT_ID = settings.PRODUCER_CLIENT_ID
 CONSUMER_CLIENT_ID = settings.CONSUMER_CLIENT_ID
+METRICS_PORT = getattr(settings, 'METRICS_PORT', 8001)  # Default metrics port
 
 INPUT_TOPIC = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
 # OUTPUT_TOPIC is KAFKA_OUTPUT_TOPIC_CONFIG from event_router which is
 # topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED)
+
+# Prometheus metrics (will be initialized with DI registry)
+KAFKA_QUEUE_LATENCY: Histogram | None = None
 
 
 @asynccontextmanager
@@ -98,7 +104,36 @@ async def kafka_clients(
         logger.info("Kafka consumer and producer stopped.")
 
 
+async def _start_metrics_server(registry: CollectorRegistry, port: int) -> None:
+    """Start the Prometheus metrics HTTP server in a background thread."""
+    global KAFKA_QUEUE_LATENCY
+
+    # Initialize queue latency metric
+    KAFKA_QUEUE_LATENCY = Histogram(
+        'kafka_message_queue_latency_seconds',
+        'Latency between event timestamp and processing start',
+        ['topic', 'consumer_group'],
+        registry=registry
+    )
+
+    # Start metrics server in a thread
+    def _start_server() -> None:
+        start_http_server(port, registry=registry)
+
+    await asyncio.to_thread(_start_server)
+    logger.info(f"Prometheus metrics server started on port {port}")
+
+
 async def spell_checker_worker_main() -> None:
+    # Initialize DI container and metrics server
+    container = make_async_container(SpellCheckerServiceProvider())
+
+    # Start metrics server
+    async with container() as request_container:
+        registry = await request_container.get(CollectorRegistry)
+        # Start metrics server in background
+        asyncio.create_task(_start_metrics_server(registry, METRICS_PORT))
+
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
 

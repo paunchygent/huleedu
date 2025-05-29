@@ -6,7 +6,18 @@ from uuid import UUID
 
 import aiohttp
 from aiokafka import AIOKafkaProducer, ConsumerRecord
+from core_logic import (
+    default_fetch_content_impl,
+    default_perform_spell_check_algorithm,
+    default_store_content_impl,
+)
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
+from protocols import (
+    ContentClientProtocol,
+    ResultStoreProtocol,
+    SpellcheckEventPublisherProtocol,
+    SpellLogicProtocol,
+)
 from pydantic import ValidationError
 
 from common_core.enums import (
@@ -24,18 +35,6 @@ from common_core.metadata_models import (
     EntityReference,
     StorageReferenceMetadata,
     SystemProcessingMetadata,
-)
-
-from .core_logic import (
-    default_fetch_content_impl,
-    default_perform_spell_check_algorithm,
-    default_store_content_impl,
-)
-from .protocols import (
-    ContentClientProtocol,
-    ResultStoreProtocol,
-    SpellcheckEventPublisherProtocol,
-    SpellLogicProtocol,
 )
 
 # Configuration constants (placeholders, should come from settings/DI)
@@ -63,7 +62,8 @@ class DefaultContentClient(ContentClientProtocol):
         # We assume process_single_message will have essay_id and pass it
         # to default_fetch_content_impl if desired.
         # Here, we call it without essay_id if the protocol doesn't provide it.
-        return await default_fetch_content_impl(http_session, storage_id, self.content_service_url)
+        result = await default_fetch_content_impl(http_session, storage_id, self.content_service_url)
+        return str(result)
 
 
 class DefaultResultStore(ResultStoreProtocol):
@@ -79,7 +79,8 @@ class DefaultResultStore(ResultStoreProtocol):
     ) -> str:
         # essay_id for default_store_content_impl logging can be passed by caller if needed.
         # original_storage_id and content_type are part of protocol but not used by current impl.
-        return await default_store_content_impl(http_session, content, self.content_service_url)
+        result = await default_store_content_impl(http_session, content, self.content_service_url)
+        return str(result)
 
 
 class DefaultSpellLogic(SpellLogicProtocol):
@@ -230,6 +231,8 @@ async def process_single_message(
     Returns:
         bool: True if the message should be committed, False otherwise
     """
+    from worker_main import CONSUMER_GROUP_ID, KAFKA_QUEUE_LATENCY
+
     processing_started_at = datetime.now(timezone.utc)
     request_envelope: Optional[EventEnvelope[SpellcheckRequestedDataV1]] = None
     # Default if ID not parsed
@@ -239,6 +242,16 @@ async def process_single_message(
         raw_message = msg.value.decode("utf-8")
         request_envelope = EventEnvelope[SpellcheckRequestedDataV1].model_validate_json(raw_message)
         request_data = request_envelope.data
+
+        # Record queue latency metric if available
+        if KAFKA_QUEUE_LATENCY and hasattr(request_envelope, 'event_timestamp') and request_envelope.event_timestamp:
+            queue_latency_seconds = (processing_started_at - request_envelope.event_timestamp).total_seconds()
+            if queue_latency_seconds >= 0:  # Avoid negative values from clock skew
+                KAFKA_QUEUE_LATENCY.labels(
+                    topic=msg.topic,
+                    consumer_group=CONSUMER_GROUP_ID
+                ).observe(queue_latency_seconds)
+                logger.debug(f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}")
 
         # Set a more meaningful ID for logging if available
         if request_data.entity_ref and request_data.entity_ref.entity_id:

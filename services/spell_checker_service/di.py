@@ -7,24 +7,23 @@ from uuid import UUID
 
 from aiohttp import ClientSession
 from aiokafka import AIOKafkaProducer
-from dishka import Provider, Scope, provide
-from prometheus_client import CollectorRegistry
-
-from common_core.enums import ContentType
-from common_core.events.spellcheck_models import SpellcheckResultDataV1
-
-from .config import Settings, settings
-from .core_logic import (
+from config import Settings, settings
+from core_logic import (
     default_fetch_content_impl,
     default_perform_spell_check_algorithm,
     default_store_content_impl,
 )
-from .protocols import (
+from dishka import Provider, Scope, provide
+from prometheus_client import CollectorRegistry
+from protocols import (
     ContentClientProtocol,
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
     SpellLogicProtocol,
 )
+
+from common_core.enums import ContentType
+from common_core.events.spellcheck_models import SpellcheckResultDataV1
 
 
 class SpellCheckerServiceProvider(Provider):
@@ -81,11 +80,10 @@ class DefaultContentClient:
 
     async def fetch_content(self, storage_id: str, http_session: ClientSession) -> str:
         """Fetch content using the core logic implementation."""
-        from .config import settings
-
-        return await default_fetch_content_impl(
+        result = await default_fetch_content_impl(
             http_session, storage_id, settings.CONTENT_SERVICE_URL
         )
+        return str(result)
 
 
 class DefaultSpellLogic:
@@ -93,9 +91,6 @@ class DefaultSpellLogic:
 
     async def perform_spell_check(self, text: str) -> SpellcheckResultDataV1:
         """Perform spell check using the core logic implementation."""
-        from .config import settings
-
-        # Use core logic with language from settings
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
             text, language=settings.DEFAULT_LANGUAGE
         )
@@ -137,9 +132,8 @@ class DefaultResultStore:
         http_session: ClientSession,
     ) -> str:
         """Store content using the core logic implementation."""
-        from .config import settings
-
-        return await default_store_content_impl(http_session, content, settings.CONTENT_SERVICE_URL)
+        result = await default_store_content_impl(http_session, content, settings.CONTENT_SERVICE_URL)
+        return str(result)
 
 
 class DefaultSpellcheckEventPublisher:

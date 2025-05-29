@@ -53,7 +53,7 @@ services/
 │   ├── Dockerfile
 │   ├── tests/
 │   └── docs/
-└── essay_service/                 # Example, potentially more complex structure
+└── essay_lifecycle_service/                 # Example, potentially more complex structure
 ```
 
 **Note on Worker Service Structure (e.g., `spell_checker_service`):**

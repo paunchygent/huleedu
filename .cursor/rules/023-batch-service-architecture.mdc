@@ -74,5 +74,5 @@ alwaysApply: false
 
 ## 11. Future Evolution
 
-**Planned**: Batch management, status tracking, event consumption, database integration
-**Service Splits**: Essay Lifecycle Service, Workflow Orchestration Service
+**Planned**: Batch management, advanced status tracking, multi-pipeline orchestration, database integration
+**Architectural Notes**: Essay Lifecycle Service (ELS) is implemented as a separate microservice for essay state management and batch coordination

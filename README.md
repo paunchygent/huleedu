@@ -34,6 +34,9 @@ The HuleEdu ecosystem currently comprises the following services:
 * **Content Service**:
   * **Description**: A Quart-based HTTP service responsible for content storage and retrieval, using a local filesystem backend.
   * **Location**: `services/content_service/`
+* **File Service**:
+  * **Description**: A Quart-based HTTP service with Kafka worker responsible for file upload handling, text extraction, and content ingestion coordination. Accepts multipart file uploads, processes files to extract text content, coordinates with Content Service for storage, and emits essay readiness events.
+  * **Location**: `services/file_service/` *(planned - walking skeleton implementation)*
 * **Spell Checker Service**:
   * **Description**: A Kafka consumer worker service that performs advanced spell checking on essays, including L2 error correction and standard spell checking using `pyspellchecker`.
   * **Location**: `services/spell_checker_service/`

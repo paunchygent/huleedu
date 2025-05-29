@@ -7,17 +7,28 @@ and results as specified in the PRD.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
 from ..enums import ProcessingEvent
-from ..metadata_models import AIFeedbackMetadata
 from .base_event_models import ProcessingUpdate
 
 __all__ = [
     "AIFeedbackInputDataV1",
+    "AIFeedbackResultDataV1",
 ]
+
+
+class AIFeedbackMetadata(BaseModel):
+    """Metadata about AI feedback generation and processing."""
+
+    model_version: str
+    generation_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    feedback_type: str  # e.g., "student_facing", "detailed_analysis", "editor_revision"
+    processing_time_seconds: Optional[float] = None
+
 
 class AIFeedbackInputDataV1(BaseModel):
     """Input data structure needed for AI feedback processing requests."""
