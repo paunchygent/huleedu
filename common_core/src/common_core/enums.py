@@ -116,28 +116,38 @@ def topic_name(event: ProcessingEvent) -> str:
 
 
 class EssayStatus(str, Enum):
+    # File Service Results Statuses
     UPLOADED = "uploaded"
     TEXT_EXTRACTED = "text_extracted"
+    # Content Ingestion Statuses
+    CONTENT_INGESTER = "content_ingester"
+    CONTENT_INGESTION_FAILED = "content_ingestion_failed"
+    # Spellcheck Statuses
     AWAITING_SPELLCHECK = "awaiting_spellcheck"
     SPELLCHECKING_IN_PROGRESS = "spellchecking_in_progress"
     SPELLCHECKED_SUCCESS = "spellchecked_success"
     SPELLCHECK_FAILED = "spellcheck_failed"
+    # NLP Statuses
     AWAITING_NLP = "awaiting_nlp"
     NLP_IN_PROGRESS = "nlp_processing_in_progress"
     NLP_SUCCESS = "nlp_success"
     NLP_FAILED = "nlp_failed"
+    # AI Feedback Statuses
     AWAITING_AI_FEEDBACK = "awaiting_ai_feedback"
     AI_FEEDBACK_IN_PROGRESS = "ai_feedback_processing_in_progress"
     AI_FEEDBACK_SUCCESS = "ai_feedback_success"
     AI_FEEDBACK_FAILED = "ai_feedback_failed"
+    # Editor Revision Statuses
     AWAITING_EDITOR_REVISION = "awaiting_editor_revision"
     EDITOR_REVISION_IN_PROGRESS = "editor_revision_processing_in_progress"
     EDITOR_REVISION_SUCCESS = "editor_revision_success"
     EDITOR_REVISION_FAILED = "editor_revision_failed"
+    # Grammar Check Statuses
     AWAITING_GRAMMAR_CHECK = "awaiting_grammar_check"
     GRAMMAR_CHECK_IN_PROGRESS = "grammar_check_processing_in_progress"
     GRAMMAR_CHECK_SUCCESS = "grammar_check_success"
     GRAMMAR_CHECK_FAILED = "grammar_check_failed"
+    # CJ Assessment Statuses
     AWAITING_CJ_ASSESSMENT = "awaiting_cj_assessment"
     CJ_ASSESSMENT_IN_PROGRESS = "cj_assessment_processing_in_progress"
     CJ_ASSESSMENT_SUCCESS = "cj_assessment_success"

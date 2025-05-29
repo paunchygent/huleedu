@@ -15,7 +15,6 @@ from .enums import (  # Assuming enums.py is in the same directory
 __all__ = [
     "EntityReference",
     "SystemProcessingMetadata",
-    "AIFeedbackMetadata",
     "StorageReferenceMetadata",
     "UserActivityMetadata",
     "CancellationMetadata",
@@ -42,21 +41,6 @@ class SystemProcessingMetadata(BaseModel):
     event: Optional[str] = None  # Actual event name string, e.g., from ProcessingEvent enum
     error_info: Dict[str, Any] = Field(default_factory=dict)
     model_config = {"populate_by_name": True}
-
-
-class AIFeedbackMetadata(BaseModel):
-    teacher_name: Optional[str] = None
-    course_code: Optional[str] = None
-    essay_instructions: Optional[str] = None
-    class_designation: Optional[str] = None
-    student_name: Optional[str] = None
-    student_email: Optional[EmailStr] = None
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    model_version: Optional[str] = None
-    generation_time_seconds: Optional[float] = None
-    has_feedback: bool = False
-    has_editor_revision: bool = False
-    has_metrics: bool = False
 
 
 class StorageReferenceMetadata(BaseModel):
