@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from aiohttp import ClientSession
 from aiokafka import AIOKafkaProducer
+from api_models import BatchRegistrationRequestV1
 from config import Settings, settings
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry
@@ -12,6 +15,8 @@ from protocols import (
     BatchRepositoryProtocol,
     EssayLifecycleClientProtocol,
 )
+
+from common_core.events.envelope import EventEnvelope
 
 
 class BatchOrchestratorServiceProvider(Provider):
@@ -66,6 +71,13 @@ class BatchOrchestratorServiceProvider(Provider):
 class MockBatchRepository:
     """Mock implementation of BatchRepositoryProtocol for Phase 1.2."""
 
+    def __init__(self) -> None:
+        """Initialize the mock repository with internal storage."""
+        # Storage for batch contexts (course_code, class_designation, etc.)
+        self.batch_contexts: dict[str, "BatchRegistrationRequestV1"] = {}
+        # Storage for pipeline states
+        self.pipeline_states: dict[str, dict] = {}
+
     async def get_batch_by_id(self, batch_id: str) -> dict | None:
         """Mock implementation - returns placeholder data."""
         # Note: In production this would return a proper BatchUpload model
@@ -81,8 +93,24 @@ class MockBatchRepository:
         return True
 
     async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
-        """Mock implementation - always succeeds."""
+        """Mock implementation - stores pipeline state in memory."""
+        self.pipeline_states[batch_id] = pipeline_state
         return True
+
+    async def get_processing_pipeline_state(self, batch_id: str) -> dict | None:
+        """Mock implementation - retrieves pipeline state from memory."""
+        return self.pipeline_states.get(batch_id)
+
+    async def store_batch_context(
+        self, batch_id: str, registration_data: "BatchRegistrationRequestV1"
+    ) -> bool:
+        """Store the full batch context including course info and essay instructions."""
+        self.batch_contexts[batch_id] = registration_data
+        return True
+
+    async def get_batch_context(self, batch_id: str) -> "BatchRegistrationRequestV1 | None":
+        """Retrieve the stored batch context for a given batch ID."""
+        return self.batch_contexts.get(batch_id)
 
 
 class DefaultBatchEventPublisher:
@@ -91,12 +119,11 @@ class DefaultBatchEventPublisher:
     def __init__(self, producer: AIOKafkaProducer) -> None:
         self.producer = producer
 
-    async def publish_batch_event(self, event_envelope: dict) -> None:
+    async def publish_batch_event(self, event_envelope: EventEnvelope[Any]) -> None:
         """Publish batch event to Kafka."""
-        import json
-
-        topic = "batch.events"  # TODO: Make this configurable
-        message = json.dumps(event_envelope).encode("utf-8")
+        topic = event_envelope.event_type
+        # Use Pydantic's model_dump_json() to properly serialize the EventEnvelope
+        message = event_envelope.model_dump_json().encode("utf-8")
 
         await self.producer.send_and_wait(topic, message)
 

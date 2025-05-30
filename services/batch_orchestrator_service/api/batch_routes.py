@@ -7,18 +7,22 @@ from datetime import datetime, timezone
 from typing import Optional, Union
 
 import aiohttp
+from api_models import BatchRegistrationRequestV1
 from config import settings
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import Counter
-from protocols import BatchEventPublisherProtocol
-from quart import Blueprint, Response, jsonify
+from protocols import BatchEventPublisherProtocol, BatchRepositoryProtocol
+from pydantic import ValidationError
+from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
 
 from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage, topic_name
+from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckRequestedDataV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.pipeline_models import ProcessingPipelineState
 
 logger = create_service_logger("bos.api.batch")
 batch_bp = Blueprint("batch_routes", __name__, url_prefix="/v1/batches")
@@ -34,6 +38,94 @@ def set_batch_operations_metric(metric: Counter) -> None:
     """Set the batch operations metric reference."""
     global BATCH_OPERATIONS
     BATCH_OPERATIONS = metric
+
+
+@batch_bp.route("/register", methods=["POST"])
+@inject
+async def register_batch(
+    event_publisher: FromDishka[BatchEventPublisherProtocol],
+    batch_repo: FromDishka[BatchRepositoryProtocol],
+) -> Union[Response, tuple[Response, int]]:
+    """Register a new batch for processing.
+
+    Accepts batch registration data, stores full context, and publishes
+    a lightweight BatchEssaysRegistered event to ELS for coordination.
+    """
+    correlation_id = uuid.uuid4()
+    try:
+        raw_request_data = await request.get_json()
+        if not raw_request_data:
+            return jsonify({"error": "Request body must be valid JSON"}), 400
+
+        validated_data = BatchRegistrationRequestV1(**raw_request_data)
+        batch_id = str(uuid.uuid4())
+
+        logger.info(
+            f"Registering new batch {batch_id} with {validated_data.expected_essay_count} essays. "
+            f"Correlation ID: {correlation_id}"
+        )
+
+        # 1. Persist Full Batch Context
+        await batch_repo.store_batch_context(batch_id, validated_data)
+
+        # Also store initial pipeline state
+        initial_pipeline_state = ProcessingPipelineState(
+            batch_id=batch_id,
+            requested_pipelines=[], # Spellcheck will be added when BatchEssaysReady is received
+        )
+        await batch_repo.save_processing_pipeline_state(batch_id, initial_pipeline_state)
+
+        # 2. Construct lightweight BatchEssaysRegistered event
+        batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
+        event_metadata = SystemProcessingMetadata(
+            entity=batch_entity_ref,
+            event=ProcessingEvent.BATCH_ESSAYS_REGISTERED.value,
+            timestamp=datetime.now(timezone.utc)
+        )
+        batch_registered_event_data = BatchEssaysRegistered(
+            batch_id=batch_id,
+            expected_essay_count=validated_data.expected_essay_count,
+            essay_ids=validated_data.essay_ids,
+            metadata=event_metadata
+        )
+
+        # 3. Create EventEnvelope
+        envelope = EventEnvelope[BatchEssaysRegistered](
+            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),
+            source_service=settings.SERVICE_NAME,
+            correlation_id=correlation_id,
+            data=batch_registered_event_data
+        )
+
+        # 4. Publish event
+        await event_publisher.publish_batch_event(envelope)
+
+        logger.info(
+            f"Published BatchEssaysRegistered event for batch {batch_id}, "
+            f"event_id {envelope.event_id}"
+        )
+        if BATCH_OPERATIONS:
+            BATCH_OPERATIONS.labels(operation="register_batch", status="success").inc()
+
+        return jsonify({
+            "batch_id": batch_id,
+            "correlation_id": str(correlation_id),
+            "status": "registered"
+        }), 202
+
+    except ValidationError as ve:
+        logger.warning(
+            f"Batch registration validation error. Correlation ID: {correlation_id}",
+            exc_info=True
+        )
+        if BATCH_OPERATIONS:
+            BATCH_OPERATIONS.labels(operation="register_batch", status="validation_error").inc()
+        return jsonify({"error": "Validation Error", "details": ve.errors()}), 400
+    except Exception:
+        logger.error(f"Error registering batch. Correlation ID: {correlation_id}", exc_info=True)
+        if BATCH_OPERATIONS:
+            BATCH_OPERATIONS.labels(operation="register_batch", status="error").inc()
+        return jsonify({"error": "Failed to register batch."}), 500
 
 
 """

@@ -5,6 +5,7 @@ This module implements the Batch Orchestrator Service REST API using Quart frame
 The service acts as the primary orchestrator for batch processing workflows.
 """
 
+import asyncio
 from typing import Optional
 
 # Import Blueprints
@@ -14,11 +15,13 @@ from config import settings
 from di import BatchOrchestratorServiceProvider
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from kafka_consumer import BatchKafkaConsumer
 from prometheus_client import (
     CollectorRegistry,
     Counter,
     Histogram,
 )
+from protocols import BatchEventPublisherProtocol, BatchRepositoryProtocol
 from quart import Quart, Response, g, request
 from quart_dishka import QuartDishka
 
@@ -33,10 +36,16 @@ REQUEST_COUNT: Optional[Counter] = None
 REQUEST_DURATION: Optional[Histogram] = None
 BATCH_OPERATIONS: Optional[Counter] = None
 
+# Global reference to Kafka consumer and background task
+kafka_consumer_instance: Optional[BatchKafkaConsumer] = None
+consumer_task: Optional[asyncio.Task] = None
+
 
 @app.before_serving
 async def startup() -> None:
-    """Initialize the DI container and setup quart-dishka integration."""
+    """Initialize the DI container, setup quart-dishka integration, and start Kafka consumer."""
+    global kafka_consumer_instance, consumer_task
+
     try:
         container = make_async_container(BatchOrchestratorServiceProvider())
         QuartDishka(app=app, container=container)
@@ -46,14 +55,53 @@ async def startup() -> None:
             registry = await request_container.get(CollectorRegistry)
             _initialize_metrics(registry)
 
+            # Get dependencies for Kafka consumer
+            event_publisher = await request_container.get(BatchEventPublisherProtocol)
+            batch_repo = await request_container.get(BatchRepositoryProtocol)
+
+            # Initialize Kafka consumer
+            kafka_consumer_instance = BatchKafkaConsumer(
+                kafka_bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+                consumer_group=f"{settings.SERVICE_NAME}-consumer",
+                event_publisher=event_publisher,
+                batch_repo=batch_repo,
+            )
+
+            # Start Kafka consumer as background task
+            consumer_task = asyncio.create_task(kafka_consumer_instance.start_consumer())
+            logger.info("Kafka consumer background task started")
+
         logger.info(
-            "Batch Orchestrator Service DI container and quart-dishka integration "
-            "initialized successfully."
+            "Batch Orchestrator Service DI container, quart-dishka integration, "
+            "and Kafka consumer initialized successfully."
         )
     except Exception as e:
         logger.critical(
-            f"Failed to initialize DI container for Batch Orchestrator Service: {e}", exc_info=True
+            f"Failed to initialize Batch Orchestrator Service: {e}", exc_info=True
         )
+
+
+@app.after_serving
+async def shutdown() -> None:
+    """Gracefully shutdown the Kafka consumer and background tasks."""
+    global kafka_consumer_instance, consumer_task
+
+    try:
+        if kafka_consumer_instance:
+            logger.info("Stopping Kafka consumer...")
+            await kafka_consumer_instance.stop_consumer()
+
+        if consumer_task and not consumer_task.done():
+            logger.info("Cancelling consumer background task...")
+            consumer_task.cancel()
+            try:
+                await consumer_task
+            except asyncio.CancelledError:
+                logger.info("Consumer background task cancelled successfully")
+
+        logger.info("Batch Orchestrator Service shutdown completed")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}", exc_info=True)
 
 
 def _initialize_metrics(registry: CollectorRegistry) -> None:

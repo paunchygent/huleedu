@@ -45,6 +45,7 @@ class ProcessingEvent(str, Enum):
 
     # -------------  Batch coordination events  -------------#
     BATCH_ESSAYS_REGISTERED = "batch.essays.registered"
+    BATCH_ESSAYS_READY = "batch.essays.ready"
 
     # -------------  Essay lifecycle  -------------#
     ESSAY_PHASE_INITIATION_REQUESTED = "essay.phase.initiation.requested"
@@ -52,6 +53,9 @@ class ProcessingEvent(str, Enum):
 
     # -------------  Essay content readiness  -------------#
     ESSAY_CONTENT_READY = "essay.content.ready"
+
+    # -------------  Specialized service commands  -------------#
+    BATCH_SPELLCHECK_INITIATE_COMMAND = "batch.spellcheck.initiate.command"
 
     # -------------  Results from specialised services -############
     ESSAY_SPELLCHECK_RESULT_RECEIVED = (
@@ -77,6 +81,8 @@ _TOPIC_MAPPING = {
     ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED: "huleedu.essay.spellcheck.completed.v1",
     ProcessingEvent.BATCH_ESSAYS_REGISTERED: "huleedu.batch.essays.registered.v1",
     ProcessingEvent.ESSAY_CONTENT_READY: "huleedu.file.essay.content.ready.v1",
+    ProcessingEvent.BATCH_ESSAYS_READY: "huleedu.els.batch.essays.ready.v1",
+    ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND: "huleedu.els.spellcheck.initiate.command.v1",
     # Add more mappings as needed for other events - EACH MUST BE EXPLICIT
 }
 

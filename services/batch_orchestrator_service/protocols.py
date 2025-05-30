@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, List, Protocol
+from typing import Any, List, Optional, Protocol
+
+# Import the new API model for batch context storage
+from api_models import BatchRegistrationRequestV1
 
 # Assuming common_core models might be used in signatures
 from common_core.events.envelope import EventEnvelope
@@ -32,6 +35,45 @@ class BatchRepositoryProtocol(Protocol):
         self, batch_id: str, pipeline_state: ProcessingPipelineState
     ) -> bool:
         """Saves or updates the detailed processing pipeline state for a batch."""
+        ...
+
+    async def get_processing_pipeline_state(
+        self, batch_id: str
+    ) -> dict | None:
+        """Retrieves the detailed processing pipeline state for a batch.
+
+        Args:
+            batch_id: Unique identifier for the batch
+
+        Returns:
+            The pipeline state dictionary if found, None otherwise
+        """
+        ...
+
+    async def store_batch_context(
+        self, batch_id: str, registration_data: BatchRegistrationRequestV1
+    ) -> bool:
+        """Stores the full batch context including course info and essay instructions.
+
+        Args:
+            batch_id: Unique identifier for the batch
+            registration_data: Complete batch registration data including course_code,
+                             class_designation, essay_instructions, etc.
+
+        Returns:
+            True if storage was successful, False otherwise
+        """
+        ...
+
+    async def get_batch_context(self, batch_id: str) -> Optional[BatchRegistrationRequestV1]:
+        """Retrieves the stored batch context for a given batch ID.
+
+        Args:
+            batch_id: Unique identifier for the batch
+
+        Returns:
+            The batch registration data if found, None otherwise
+        """
         ...
 
 

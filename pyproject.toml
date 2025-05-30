@@ -163,6 +163,8 @@ module = [
     "batch_tracker",
     "implementations.*",
     "api.*",
+    "api_models",
+    "kafka_consumer",
 ]
 ignore_missing_imports = true
 

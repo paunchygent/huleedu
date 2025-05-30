@@ -47,6 +47,11 @@ The service exposes the following HTTP API endpoints. (All endpoints are prefixe
 
 ### Current Endpoints
 
+* **`POST /v1/register`**:
+  * Accepts batch registration requests with essay IDs, course code, class designation, and instructions.
+  * Stores the full batch context internally.
+  * Publishes a `BatchEssaysRegistered` event to ELS for readiness tracking.
+  * Returns a 202 (Accepted) response with `batch_id` and `correlation_id`.
 * **`POST /v1/trigger-spellcheck`**:
   * Accepts essay text.
   * Stores the content via the Content Service.
@@ -57,7 +62,6 @@ The service exposes the following HTTP API endpoints. (All endpoints are prefixe
 
 ### Planned Endpoints
 
-* `POST /v1/batch`: For creating a new batch of essays.
 * `POST /v1/batch/{batch_id}/initiate-spellcheck`: To initiate spellchecking for an entire batch (likely by sending a command to ELS).
 * `GET /v1/batch/{batch_id}/status`: To get the processing status of a batch.
 
@@ -69,6 +73,26 @@ The service publishes events to Kafka to initiate processing tasks for other ser
   * **Data Model**: `SpellcheckRequestedDataV1`
   * **Topic**: Dynamically determined by `topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)` from `common_core.enums`.
   * **Trigger**: Typically published after a successful call to the `/v1/trigger-spellcheck` endpoint.
+
+* **Event**: `huleedu.batch.essays.registered.v1`
+  * **Data Model**: `BatchEssaysRegistered`
+  * **Topic**: Dynamically determined by `topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED)` from `common_core.enums`.
+  * **Trigger**: Published after successful batch registration via `/v1/register` endpoint.
+
+* **Event**: `huleedu.els.spellcheck.initiate.command.v1`
+  * **Data Model**: `BatchServiceSpellcheckInitiateCommandDataV1`
+  * **Topic**: Dynamically determined by `topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND)` from `common_core.enums`.
+  * **Trigger**: Published when consuming `BatchEssaysReady` events from ELS.
+
+## Event Consumption
+
+The service consumes events from Kafka to coordinate batch processing phases.
+
+* **Event**: `huleedu.els.batch.essays.ready.v1`
+  * **Data Model**: `BatchEssaysReady`
+  * **Consumer**: Kafka consumer running as background task (managed by Quart application lifecycle)
+  * **Handler**: Initiates spellcheck pipeline by retrieving batch context, inferring language from course code, and publishing spellcheck initiate commands
+  * **Walking Skeleton**: Uses mock `text_storage_id` pattern (`mock-storage-id-{essay_id}`) until File Service coordination is implemented
 
 ## Commands Sent (Planned)
 
