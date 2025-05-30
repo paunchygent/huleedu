@@ -7,25 +7,26 @@ essay processing workflows.
 
 from __future__ import annotations
 
-from datetime import datetime
-
-from common_core.enums import ContentType, EssayStatus
-from dishka import FromDishka, make_async_container
+from dishka import make_async_container
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from prometheus_client import (
-    CONTENT_TYPE_LATEST,
     CollectorRegistry,
     Counter,
     Histogram,
-    generate_latest,
 )
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 from quart import Quart, Response, g, jsonify, request
-from quart_dishka import QuartDishka, inject
+from quart_dishka import QuartDishka
 
 from config import settings
 from di import EssayLifecycleServiceProvider
-from protocols import EssayStateStore
+
+# Import Blueprints
+from .api.batch_routes import batch_bp
+from .api.batch_routes import set_essay_operations_metric as set_batch_essay_operations
+from .api.essay_routes import essay_bp
+from .api.essay_routes import set_essay_operations_metric as set_essay_essay_operations
+from .api.health_routes import health_bp
 
 logger = create_service_logger("essay_api")
 
@@ -35,35 +36,22 @@ REQUEST_DURATION: Histogram | None = None
 ESSAY_OPERATIONS: Counter | None = None
 
 
-# Pydantic models for API requests and responses
-class EssayStatusResponse(BaseModel):
-    """Response model for essay status queries."""
-
-    essay_id: str
-    current_status: EssayStatus
-    batch_id: str | None
-    processing_progress: dict[str, bool]
-    timeline: dict[str, datetime]
-    storage_references: dict[ContentType, str]
-    created_at: datetime
-    updated_at: datetime
-
-
-class BatchStatusResponse(BaseModel):
-    """Response model for batch status queries."""
-
-    batch_id: str
-    total_essays: int
-    status_breakdown: dict[EssayStatus, int]
-    completion_percentage: float
-
-
-class ErrorResponse(BaseModel):
+class ErrorResponse:
     """Standard error response model."""
 
-    error: str
-    detail: str | None = None
-    correlation_id: str | None = None
+    def __init__(self, error: str, detail: str | None = None, correlation_id: str | None = None):
+        self.error = error
+        self.detail = detail
+        self.correlation_id = correlation_id
+
+    def model_dump(self) -> dict:
+        """Convert to dictionary for JSON response."""
+        result = {"error": self.error}
+        if self.detail:
+            result["detail"] = self.detail
+        if self.correlation_id:
+            result["correlation_id"] = self.correlation_id
+        return result
 
 
 def create_app() -> Quart:
@@ -118,6 +106,10 @@ def _initialize_metrics(registry: CollectorRegistry) -> None:
         registry=registry
     )
 
+    # Share metrics with Blueprint modules
+    set_essay_essay_operations(ESSAY_OPERATIONS)
+    set_batch_essay_operations(ESSAY_OPERATIONS)
+
 
 app = create_app()
 
@@ -144,25 +136,6 @@ async def handle_general_error(error: Exception) -> Response | tuple[Response, i
     logger.error(f"Unexpected error: {error}")
     response = ErrorResponse(error="Internal Server Error", detail="An unexpected error occurred")
     return jsonify(response.model_dump()), 500
-
-
-@app.route("/healthz", methods=["GET"])
-async def health_check() -> Response:
-    """Health check endpoint."""
-    return jsonify({"status": "healthy", "service": settings.SERVICE_NAME})
-
-
-@app.route("/metrics")
-@inject
-async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
-    """Prometheus metrics endpoint."""
-    try:
-        metrics_data = generate_latest(registry)
-        response = Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
-        return response
-    except Exception as e:
-        logger.error(f"Error generating metrics: {e}", exc_info=True)
-        return Response("Error generating metrics", status=500)
 
 
 @app.before_request
@@ -196,132 +169,10 @@ async def after_request(response: Response) -> Response:
     return response
 
 
-@app.route(f"/{settings.API_VERSION}/essays/<essay_id>/status", methods=["GET"])
-@inject
-async def get_essay_status(
-    essay_id: str,
-    state_store: FromDishka[EssayStateStore],
-) -> Response | tuple[Response, int]:
-    """Get current status of an essay."""
-    logger.info(f"Getting status for essay {essay_id}")
-
-    essay_state = await state_store.get_essay_state(essay_id)
-    if essay_state is None:
-        if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(operation='get_status', status='not_found').inc()
-        error_response = ErrorResponse(
-            error="Essay Not Found", detail=f"Essay with ID {essay_id} does not exist"
-        )
-        return jsonify(error_response.model_dump()), 404
-
-    # Calculate processing progress
-    processing_progress = _calculate_processing_progress(essay_state.current_status)
-
-    status_response = EssayStatusResponse(
-        essay_id=essay_state.essay_id,
-        current_status=essay_state.current_status,
-        batch_id=essay_state.batch_id,
-        processing_progress=processing_progress,
-        timeline=essay_state.timeline,
-        storage_references=essay_state.storage_references,
-        created_at=essay_state.created_at,
-        updated_at=essay_state.updated_at,
-    )
-
-    if ESSAY_OPERATIONS:
-        ESSAY_OPERATIONS.labels(operation='get_status', status='success').inc()
-    return jsonify(status_response.model_dump(mode="json"))
-
-
-@app.route(f"/{settings.API_VERSION}/essays/<essay_id>/timeline", methods=["GET"])
-@inject
-async def get_essay_timeline(
-    essay_id: str,
-    state_store: FromDishka[EssayStateStore],
-) -> Response | tuple[Response, int]:
-    """Get detailed timeline for an essay."""
-    logger.info(f"Getting timeline for essay {essay_id}")
-
-    essay_state = await state_store.get_essay_state(essay_id)
-    if essay_state is None:
-        if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(operation='get_timeline', status='not_found').inc()
-        response = ErrorResponse(
-            error="Essay Not Found", detail=f"Essay with ID {essay_id} does not exist"
-        )
-        return jsonify(response.model_dump()), 404
-
-    # Return just the timeline and metadata
-    timeline_response = {
-        "essay_id": essay_state.essay_id,
-        "timeline": essay_state.timeline,
-        "processing_metadata": essay_state.processing_metadata,
-        "current_status": essay_state.current_status.value,
-    }
-
-    if ESSAY_OPERATIONS:
-        ESSAY_OPERATIONS.labels(operation='get_timeline', status='success').inc()
-    return jsonify(timeline_response)
-
-
-@app.route(f"/{settings.API_VERSION}/batches/<batch_id>/status", methods=["GET"])
-@inject
-async def get_batch_status(
-    batch_id: str,
-    state_store: FromDishka[EssayStateStore],
-) -> Response | tuple[Response, int]:
-    """Get status summary for a batch of essays."""
-    logger.info(f"Getting status for batch {batch_id}")
-
-    # Get all essays in the batch
-    essays = await state_store.list_essays_by_batch(batch_id)
-    if not essays:
-        if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(operation='get_batch_status', status='not_found').inc()
-        response = ErrorResponse(
-            error="Batch Not Found",
-            detail=f"Batch with ID {batch_id} does not exist or has no essays",
-        )
-        return jsonify(response.model_dump()), 404
-
-    # Get status breakdown
-    status_breakdown = await state_store.get_batch_status_summary(batch_id)
-    total_essays = len(essays)
-
-    # Calculate completion percentage
-    completed_statuses = {
-        EssayStatus.SPELLCHECKED_SUCCESS,  # Walking skeleton terminal success
-        EssayStatus.ESSAY_CRITICAL_FAILURE,
-    }
-    completed_count = sum(
-        count for status, count in status_breakdown.items() if status in completed_statuses
-    )
-    completion_percentage = (completed_count / total_essays) * 100 if total_essays > 0 else 0
-
-    batch_response = BatchStatusResponse(
-        batch_id=batch_id,
-        total_essays=total_essays,
-        status_breakdown=status_breakdown,
-        completion_percentage=completion_percentage,
-    )
-
-    return jsonify(batch_response.model_dump(mode="json"))
-
-
-def _calculate_processing_progress(current_status: EssayStatus) -> dict[str, bool]:
-    """Calculate processing progress - walking skeleton version."""
-    return {
-        "essay_ready_for_processing": current_status in [
-            EssayStatus.READY_FOR_PROCESSING, EssayStatus.AWAITING_SPELLCHECK,
-            EssayStatus.SPELLCHECKING_IN_PROGRESS, EssayStatus.SPELLCHECKED_SUCCESS
-        ],
-        "pipeline_assigned": current_status in [
-            EssayStatus.AWAITING_SPELLCHECK, EssayStatus.SPELLCHECKING_IN_PROGRESS,
-            EssayStatus.SPELLCHECKED_SUCCESS
-        ],
-        "spellcheck_completed": current_status == EssayStatus.SPELLCHECKED_SUCCESS,
-        # Walking skeleton: only spellcheck pipeline progress tracked by ELS
-    }
+# Register Blueprints
+app.register_blueprint(health_bp)
+app.register_blueprint(essay_bp)
+app.register_blueprint(batch_bp)
 
 
 if __name__ == "__main__":

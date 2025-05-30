@@ -32,23 +32,32 @@ scripts/
 ```
 services/
 ├── libs/                          # Shared service libraries
-├── content_service/               # Individual microservice (example Quart app)
-│   ├── app.py                     # Quart application entry point
+├── content_service/               # Individual microservice (Quart HTTP app)
+│   ├── app.py                     # Lean Quart application entry point (setup, DI, Blueprint registration)
+│   ├── api/                       # **REQUIRED**: Blueprint API routes directory
+│   │   ├── __init__.py
+│   │   ├── health_routes.py       # Standard health and metrics endpoints
+│   │   └── content_routes.py      # Domain-specific API routes
 │   ├── pyproject.toml
 │   ├── Dockerfile
+│   ├── config.py                  # Pydantic settings configuration
+│   ├── protocols.py               # Optional: Service-specific behavioral contracts
 │   ├── tests/
-│   ├── protocols.py               # Optional: For defining service-specific behavioral contracts
 │   └── docs/
-├── batch_orchestrator_service/      # Individual microservice (primary orchestrator)
-│   ├── app.py                     # Quart application entry point
+├── batch_orchestrator_service/    # Individual microservice (primary orchestrator)
+│   ├── app.py                     # Lean Quart application entry point
+│   ├── api/                       # **REQUIRED**: Blueprint API routes directory
+│   │   ├── __init__.py
+│   │   ├── health_routes.py       # Standard health and metrics endpoints
+│   │   └── batch_routes.py        # Domain-specific API routes
 │   ├── pyproject.toml
-│   ├── protocols.py               # For defining service-specific behavioral contracts
+│   ├── protocols.py               # Service-specific behavioral contracts
 │   └── ...
-├── spell_checker_service/         # Example Kafka worker service
+├── spell_checker_service/         # Example Kafka worker service (no HTTP API)
 │   ├── worker_main.py             # Main entry point, DI setup, Kafka consumer loop
 │   ├── event_router.py            # Event deserialization, protocol implementations, logic orchestration
 │   ├── core_logic.py              # Core algorithms and helper functions
-│   ├── protocols.py               # For defining service-specific behavioral contracts
+│   ├── protocols.py               # Service-specific behavioral contracts
 │   ├── config.py                  # Service configuration with Pydantic BaseSettings
 │   ├── di.py                      # Dishka dependency injection providers
 │   ├── pyproject.toml
@@ -56,7 +65,11 @@ services/
 │   ├── tests/
 │   └── docs/
 └── essay_lifecycle_service/       # Hybrid HTTP + Kafka service
-    ├── app.py                     # Quart HTTP API entry point
+    ├── app.py                     # Lean Quart HTTP API entry point
+    ├── api/                       # **REQUIRED**: Blueprint API routes directory
+    │   ├── __init__.py
+    │   ├── health_routes.py       # Standard health and metrics endpoints
+    │   └── essay_routes.py        # Essay status and lifecycle API routes
     ├── worker_main.py             # Kafka event consumer entry point
     ├── state_store.py             # Essay state persistence layer
     ├── batch_tracker.py           # Batch coordination and readiness tracking
@@ -70,13 +83,61 @@ services/
     └── docs/
 ```
 
+## 4. HTTP Service Blueprint Structure **MANDATORY**
+
+**For all HTTP services (Quart-based), the following structure is REQUIRED:**
+
+### 4.1. API Directory Requirements
+- **MUST** have `api/` directory containing all route definitions
+- **MUST** have `health_routes.py` with `/healthz` and `/metrics` endpoints
+- **MUST** have domain-specific route files (e.g., `content_routes.py`, `batch_routes.py`)
+- **MUST** have `__init__.py` in `api/` directory
+
+### 4.2. Blueprint Pattern Requirements
+- **Each route file MUST** define a Blueprint with appropriate name
+- **app.py MUST** register all Blueprints using `app.register_blueprint()`
+- **Route files MUST** be focused on HTTP handling, not business logic
+- **Dependencies MUST** be passed from app.py to Blueprints via module functions
+
+### 4.3. app.py Structure Requirements
+- **MUST** be lean (< 150 lines) focused on:
+  - Quart app initialization
+  - Dependency injection setup
+  - Blueprint registration
+  - Global middleware (metrics, logging)
+  - Startup/shutdown hooks
+- **FORBIDDEN**: Direct route definitions in app.py
+
+### 4.4. Standard Blueprint Files
+
+#### health_routes.py Template:
+```python
+"""Health and metrics routes for [Service Name]."""
+from quart import Blueprint, Response, jsonify
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+health_bp = Blueprint('health_routes', __name__)
+
+@health_bp.route("/healthz")
+async def health_check() -> Response:
+    """Health check endpoint."""
+    # Service-specific health logic
+    return jsonify({"status": "ok"}), 200
+
+@health_bp.route("/metrics")  
+async def metrics() -> Response:
+    """Prometheus metrics endpoint."""
+    metrics_data = generate_latest()
+    return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
+```
+
 **Note on Worker Service Structure (e.g., `spell_checker_service`):**
 - `worker_main.py`: Handles service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes DI container.
 - `event_router.py`: Contains logic for deserializing incoming messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
 - `core_logic.py`: Houses the fundamental, reusable business logic, algorithms, and interactions with external systems (like HTTP calls to other services), implemented as standalone functions or simple classes.
 - `protocols.py`: Defines `typing.Protocol` interfaces for key internal dependencies and behavioral contracts, facilitating DI and testability.
 
-## 4. Common Core Structure
+## 5. Common Core Structure
 
 ```
 common_core/
@@ -92,7 +153,7 @@ common_core/
 └── README.md                      
 ```
 
-## 5. Documentation Directory Structure
+## 6. Documentation Directory Structure
 
 ```
 Documentation/
@@ -105,15 +166,16 @@ Documentation/
 └── setup_environment/
 ```
 
-## 6. Documentation Placement Rules
+## 7. Documentation Placement Rules
 
 - **Root README.md**: Project overview and architecture
 - **Service README.md**: `services/{service_name}/README.md`
 - **Common Core README.md**: `common_core/README.md`
 - **FORBIDDEN**: README.md files in separate documentation folders
 
-## 7. File Creation Rules
+## 8. File Creation Rules
 
 **MUST** verify target directory exists and follows this structure before creating files.
 **MUST** create necessary parent directories if they don't exist.
 **FORBIDDEN**: Files that violate this structure.
+**HTTP Services**: MUST include api/ directory structure with Blueprint pattern.
