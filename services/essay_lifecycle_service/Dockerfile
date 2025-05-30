@@ -7,6 +7,7 @@ ENV PYTHONUNBUFFERED=1 \
     QUART_ENV=production \
     LOG_LEVEL=INFO \
     HTTP_PORT=6000 \
+    PROMETHEUS_PORT=9090 \
     KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
     CONTENT_SERVICE_URL=http://content_service:8000/v1/content \
     PDM_USE_VENV=false
@@ -38,8 +39,8 @@ RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-# Expose the port the app runs on
-EXPOSE ${HTTP_PORT}
+# Expose the ports the app runs on
+EXPOSE ${HTTP_PORT} ${PROMETHEUS_PORT}
 
 # Command to run the HTTP application from service directory
 # Note: Worker mode (worker_main.py) can be started separately if needed

@@ -45,6 +45,12 @@ class EssayContentReady(BaseModel):
     )
     entity: EntityReference = Field(description="Essay entity reference")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
+    student_name: Optional[str] = Field(
+        default=None, description="Parsed student name, if available (stubbed for skeleton)"
+    )
+    student_email: Optional[str] = Field(
+        default=None, description="Parsed student email, if available (stubbed for skeleton)"
+    )
 
 
 class BatchEssaysReady(BaseModel):

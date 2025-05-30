@@ -20,10 +20,12 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CollectorRegistry
 
+from batch_tracker import BatchEssayTracker as ConcreteBatchEssayTracker
 from config import Settings, settings
 from core_logic import StateTransitionValidator
 from protocols import (
     BatchCommandHandler,
+    BatchEssayTracker,
     ContentClient,
     EssayStateStore,
     EventPublisher,
@@ -113,6 +115,11 @@ class EssayLifecycleServiceProvider(Provider):
     ) -> BatchCommandHandler:
         """Provide batch command handler implementation."""
         return DefaultBatchCommandHandler(state_store, request_dispatcher, event_publisher)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_essay_tracker(self) -> BatchEssayTracker:
+        """Provide batch essay tracker implementation."""
+        return ConcreteBatchEssayTracker()
 
 
 # Concrete implementations

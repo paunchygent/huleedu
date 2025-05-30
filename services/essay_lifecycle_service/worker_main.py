@@ -13,6 +13,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from aiokafka import AIOKafkaConsumer
+from common_core.enums import ProcessingEvent, topic_name
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 
@@ -20,6 +21,7 @@ from batch_command_handlers import process_single_message
 from config import settings
 from di import EssayLifecycleServiceProvider
 from protocols import (
+    BatchEssayTracker,
     EssayStateStore,
     EventPublisher,
     MetricsCollector,
@@ -58,11 +60,15 @@ def setup_signal_handlers() -> None:
 @asynccontextmanager
 async def kafka_consumer_context() -> AsyncIterator[AIOKafkaConsumer]:
     """Context manager for Kafka consumer lifecycle."""
+    # Define topics using topic_name() function for consistency
+    topics = [
+        topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED),
+        topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),
+        topic_name(ProcessingEvent.ESSAY_CONTENT_READY),
+    ]
+
     consumer = AIOKafkaConsumer(
-        "essay.upload.events",
-        "essay.spellcheck.events",
-        "essay.nlp.events",
-        "essay.ai_feedback.events",
+        *topics,
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         group_id=settings.CONSUMER_GROUP,
         client_id=settings.CONSUMER_CLIENT_ID,
@@ -101,6 +107,7 @@ async def process_messages(
     event_publisher: EventPublisher,
     transition_validator: StateTransitionValidator,
     metrics_collector: MetricsCollector,
+    batch_essay_tracker: BatchEssayTracker,
 ) -> None:
     """Main message processing loop."""
     logger.info("Starting message processing loop")
@@ -118,6 +125,7 @@ async def process_messages(
                     event_publisher=event_publisher,
                     transition_validator=transition_validator,
                     metrics_collector=metrics_collector,
+                    batch_tracker=batch_essay_tracker,
                 )
 
                 if success:
@@ -162,6 +170,7 @@ async def run_worker() -> None:
             event_publisher = await request_container.get(EventPublisher)
             transition_validator = await request_container.get(StateTransitionValidator)
             metrics_collector = await request_container.get(MetricsCollector)
+            batch_essay_tracker = await request_container.get(BatchEssayTracker)
 
             logger.info("Dependencies injected successfully")
 
@@ -173,6 +182,7 @@ async def run_worker() -> None:
                     event_publisher=event_publisher,
                     transition_validator=transition_validator,
                     metrics_collector=metrics_collector,
+                    batch_essay_tracker=batch_essay_tracker,
                 )
 
     except Exception as e:

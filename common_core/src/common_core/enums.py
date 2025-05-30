@@ -43,9 +43,15 @@ class ProcessingEvent(str, Enum):
     BATCH_PIPELINE_PROGRESS_UPDATED = "batch.pipeline.progress.updated"
     BATCH_PHASE_CONCLUDED = "batch.phase.concluded"
 
+    # -------------  Batch coordination events  -------------#
+    BATCH_ESSAYS_REGISTERED = "batch.essays.registered"
+
     # -------------  Essay lifecycle  -------------#
     ESSAY_PHASE_INITIATION_REQUESTED = "essay.phase.initiation.requested"
     ESSAY_LIFECYCLE_STATE_UPDATED = "essay.lifecycle.state.updated"
+
+    # -------------  Essay content readiness  -------------#
+    ESSAY_CONTENT_READY = "essay.content.ready"
 
     # -------------  Results from specialised services -############
     ESSAY_SPELLCHECK_RESULT_RECEIVED = (
@@ -69,6 +75,8 @@ class ProcessingEvent(str, Enum):
 _TOPIC_MAPPING = {
     ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED: "huleedu.essay.spellcheck.requested.v1",
     ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED: "huleedu.essay.spellcheck.completed.v1",
+    ProcessingEvent.BATCH_ESSAYS_REGISTERED: "huleedu.batch.essays.registered.v1",
+    ProcessingEvent.ESSAY_CONTENT_READY: "huleedu.file.essay.content.ready.v1",
     # Add more mappings as needed for other events - EACH MUST BE EXPLICIT
 }
 
@@ -93,6 +101,8 @@ def topic_name(event: ProcessingEvent) -> str:
     ----------------------
     ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED ➜ "huleedu.essay.spellcheck.requested.v1"
     ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED ➜ "huleedu.essay.spellcheck.completed.v1"
+    ProcessingEvent.BATCH_ESSAYS_REGISTERED ➜ "huleedu.batch.essays.registered.v1"
+    ProcessingEvent.ESSAY_CONTENT_READY ➜ "huleedu.file.essay.content.ready.v1"
 
     Example:
         topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED) ->

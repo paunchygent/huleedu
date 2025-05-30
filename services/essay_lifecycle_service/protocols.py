@@ -7,6 +7,7 @@ proper dependency injection and testability.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -190,4 +191,30 @@ class MetricsCollector(Protocol):
 
     def increment_counter(self, metric_name: str, labels: dict[str, str] | None = None) -> None:
         """Increment a counter metric."""
+        ...
+
+
+class BatchEssayTracker(Protocol):
+    """Protocol for tracking batch readiness and coordination."""
+
+    async def register_batch(self, event: Any) -> None:  # BatchEssaysRegistered
+        """Register batch expectations from BOS."""
+        ...
+
+    async def mark_essay_ready(self, event: Any) -> Any | None:  # EssayContentReady -> BatchEssaysReady | None
+        """Mark essay as ready and check if batch is complete."""
+        ...
+
+    def get_batch_status(self, batch_id: str) -> dict[str, Any] | None:
+        """Get current status of a batch."""
+        ...
+
+    def list_active_batches(self) -> list[str]:
+        """Get list of currently tracked batch IDs."""
+        ...
+
+    def register_event_callback(
+        self, event_type: str, callback: Callable[[Any], Awaitable[None]]
+    ) -> None:
+        """Register callback for batch coordination events."""
         ...

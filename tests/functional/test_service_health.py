@@ -21,6 +21,8 @@ class TestServiceHealth:
         ("essay_lifecycle_service", 6001, ""),
     ]
 
+    @pytest.mark.docker
+    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_all_services_health_endpoints(self):
         """Test that all services respond to /healthz with HTTP 200."""
@@ -33,6 +35,8 @@ class TestServiceHealth:
                     response = await client.get(url, timeout=5.0)
                     health_results.append((service_name, response.status_code, response.json()))
                     assert response.status_code == 200, f"{service_name} health check failed"
+                except httpx.ConnectError:
+                    pytest.skip(f"{service_name} not accessible - services may not be running")
                 except Exception as e:
                     pytest.fail(f"{service_name} health check failed with exception: {e}")
 
@@ -40,6 +44,8 @@ class TestServiceHealth:
             for service_name, status_code, response_data in health_results:
                 print(f"✅ {service_name}: {status_code} - {response_data}")
 
+    @pytest.mark.docker
+    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_all_services_metrics_endpoints(self):
         """Test that all services respond to /metrics with HTTP 200 and Prometheus format."""
@@ -62,6 +68,8 @@ class TestServiceHealth:
                         f"{service_name} metrics missing TYPE declarations"
                     )
 
+                except httpx.ConnectError:
+                    pytest.skip(f"{service_name} not accessible - services may not be running")
                 except Exception as e:
                     pytest.fail(f"{service_name} metrics endpoint failed with exception: {e}")
 
@@ -69,6 +77,8 @@ class TestServiceHealth:
             for service_name, status_code, metrics_size in metrics_results:
                 print(f"📊 {service_name}: {status_code} - {metrics_size} chars of metrics data")
 
+    @pytest.mark.docker
+    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_service_response_times(self):
         """Test that all services respond within acceptable time limits."""
@@ -76,20 +86,25 @@ class TestServiceHealth:
             for service_name, port, base_path in self.HTTP_SERVICES:
                 url = f"http://localhost:{port}{base_path}/healthz"
 
-                start_time = asyncio.get_event_loop().time()
-                await client.get(url, timeout=5.0)
-                end_time = asyncio.get_event_loop().time()
+                try:
+                    start_time = asyncio.get_event_loop().time()
+                    await client.get(url, timeout=5.0)
+                    end_time = asyncio.get_event_loop().time()
 
-                response_time = end_time - start_time
-                assert response_time < 2.0, (
-                    f"{service_name} responded too slowly: {response_time:.2f}s"
-                )
-                print(f"⚡ {service_name}: {response_time:.3f}s response time")
+                    response_time = end_time - start_time
+                    assert response_time < 2.0, (
+                        f"{service_name} responded too slowly: {response_time:.2f}s"
+                    )
+                    print(f"⚡ {service_name}: {response_time:.3f}s response time")
+                except httpx.ConnectError:
+                    pytest.skip(f"{service_name} not accessible - services may not be running")
 
 
 class TestSpellCheckerServiceHealth:
     """Test suite for validating Kafka-based Spell Checker Service health."""
 
+    @pytest.mark.docker
+    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_spell_checker_metrics_endpoint(self):
         """Test that Spell Checker Service metrics endpoint is accessible."""
