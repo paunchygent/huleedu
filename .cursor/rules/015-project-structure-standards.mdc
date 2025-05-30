@@ -77,7 +77,14 @@ services/
     ├── core_logic.py              # Business logic and state transitions
     ├── protocols.py               # Service behavioral contracts
     ├── config.py                  # Service configuration
-    ├── di.py                      # Dependency injection setup
+    ├── di.py                      # Dependency injection setup (lean, ~114 lines)
+    ├── implementations/           # **CLEAN ARCHITECTURE**: Business logic implementations
+    │   ├── __init__.py
+    │   ├── content_client.py      # HTTP content storage operations
+    │   ├── event_publisher.py     # Kafka event publishing logic
+    │   ├── metrics_collector.py   # Prometheus metrics collection
+    │   ├── batch_command_handler_impl.py # Batch command processing
+    │   └── service_request_dispatcher.py # Specialized service request dispatching
     ├── pyproject.toml
     ├── tests/
     └── docs/
@@ -136,6 +143,11 @@ async def metrics() -> Response:
 - `event_router.py`: Contains logic for deserializing incoming messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
 - `core_logic.py`: Houses the fundamental, reusable business logic, algorithms, and interactions with external systems (like HTTP calls to other services), implemented as standalone functions or simple classes.
 - `protocols.py`: Defines `typing.Protocol` interfaces for key internal dependencies and behavioral contracts, facilitating DI and testability.
+
+**Note on ELS Refactored Structure:**
+- **implementations/ directory**: Contains all business logic implementations following SRP
+- **di.py**: Lean dependency injection configuration (under 150 lines)
+- **Clean separation**: Protocol interfaces in protocols.py, implementations in implementations/
 
 ## 5. Common Core Structure
 

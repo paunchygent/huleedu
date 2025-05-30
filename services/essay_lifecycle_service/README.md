@@ -68,8 +68,15 @@ ELS is a hybrid service combining a Kafka-based worker for asynchronous processi
 - **API Layer**: A Quart application (`app.py`) provides RESTful endpoints. It's served by Hypercorn.
 - **State Persistence**: Essay states are stored in an SQLite database, accessed asynchronously via `aiosqlite`. The `SQLiteEssayStateStore` in `state_store.py` manages database interactions.
 - **Dependency Injection**: Utilizes Dishka for managing dependencies. The `EssayLifecycleServiceProvider` in `di.py` defines providers for various components, which adhere to interfaces defined in `protocols.py`.
+- **Implementation Layer**: Business logic implementations are cleanly separated in the `implementations/` directory:
+  - `content_client.py`: HTTP content storage operations
+  - `event_publisher.py`: Kafka event publishing logic  
+  - `metrics_collector.py`: Prometheus metrics collection
+  - `batch_command_handler_impl.py`: Batch command processing
+  - `service_request_dispatcher.py`: Specialized service request dispatching
 - **Core Logic**: Business rules, such as state transition validation, are encapsulated in modules like `core_logic.py`.
 - **Command & Event Handling**: The `batch_command_handlers.py` module is responsible for routing incoming Kafka messages (commands from BOS, events from specialized services) to the appropriate processing logic.
+- **Batch Coordination**: The `batch_tracker.py` module implements count-based aggregation for coordinating batch readiness between File Service and BOS.
 
 Key technologies include Python 3.11+, Quart, AIOKafka, AIOSQLite, Pydantic, and Dishka.
 

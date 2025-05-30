@@ -188,9 +188,19 @@ huledu-reboot/
 │   ├── essay_lifecycle_service/            # Essay state management
 │   │   ├── app.py                          # Quart HTTP API (optional)
 │   │   ├── worker_main.py                  # Kafka consumer
-│   │   ├── event_router.py                 # Event handling
+│   │   ├── batch_command_handlers.py       # Event routing and processing
+│   │   ├── batch_tracker.py                # Batch coordination and readiness tracking
+│   │   ├── state_store.py                  # Essay state persistence layer
+│   │   ├── core_logic.py                   # Business logic and state transitions
 │   │   ├── protocols.py                    # Service interfaces
-│   │   └── [state management modules]      # Essay lifecycle logic
+│   │   ├── di.py                           # Dependency injection (lean, ~114 lines)
+│   │   ├── implementations/                # Business logic implementations
+│   │   │   ├── content_client.py           # HTTP content storage operations
+│   │   │   ├── event_publisher.py          # Kafka event publishing logic
+│   │   │   ├── metrics_collector.py        # Prometheus metrics collection
+│   │   │   ├── batch_command_handler_impl.py # Batch command processing
+│   │   │   └── service_request_dispatcher.py # Specialized service request dispatching
+│   │   └── [other modules]                 # Essay lifecycle logic
 │   │
 │   ├── batch_orchestrator_service/         # Batch coordination
 │   │   ├── app.py                          # Quart HTTP API

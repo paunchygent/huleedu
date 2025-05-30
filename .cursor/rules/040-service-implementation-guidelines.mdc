@@ -140,6 +140,27 @@ class ServiceProvider(Provider):
         return ConcreteImplementation()
 ```
 
+#### Clean DI Architecture Pattern (ELS Model):
+- **di.py MUST** be lean (< 150 lines) containing ONLY:
+  - Provider class with @provide methods
+  - Simple instantiation logic
+  - No business logic whatsoever
+- **implementations/ directory**: For services with multiple concrete implementations:
+  - Contains all business logic implementations following SRP
+  - Each implementation file: 50-100 lines (single responsibility)
+  - Protocol interfaces remain in protocols.py
+  - Import implementations in di.py only for provider methods
+```python
+# Example clean di.py structure
+from implementations.content_client import DefaultContentClient
+from implementations.event_publisher import DefaultEventPublisher
+
+class ServiceProvider(Provider):
+    @provide(scope=Scope.APP)
+    def provide_content_client(self, session: ClientSession) -> ContentClient:
+        return DefaultContentClient(session, settings)
+```
+
 ### 3.3. Worker Service Structure Pattern (Example: Spell Checker)
 - **`worker_main.py`**: Handles service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes/injects dependencies.
 - **`event_router.py`**: Contains logic for deserializing messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
