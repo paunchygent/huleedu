@@ -12,17 +12,15 @@ from config import settings
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import Counter
-from protocols import BatchEventPublisherProtocol, BatchRepositoryProtocol
+from protocols import BatchEventPublisherProtocol, BatchProcessingServiceProtocol
 from pydantic import ValidationError
 from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
 
 from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage, topic_name
-from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckRequestedDataV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
-from common_core.pipeline_models import ProcessingPipelineState
 
 logger = create_service_logger("bos.api.batch")
 batch_bp = Blueprint("batch_routes", __name__, url_prefix="/v1/batches")
@@ -43,13 +41,11 @@ def set_batch_operations_metric(metric: Counter) -> None:
 @batch_bp.route("/register", methods=["POST"])
 @inject
 async def register_batch(
-    event_publisher: FromDishka[BatchEventPublisherProtocol],
-    batch_repo: FromDishka[BatchRepositoryProtocol],
+    batch_processing_service: FromDishka[BatchProcessingServiceProtocol],
 ) -> Union[Response, tuple[Response, int]]:
     """Register a new batch for processing.
 
-    Accepts batch registration data, stores full context, and publishes
-    a lightweight BatchEssaysRegistered event to ELS for coordination.
+    Accepts batch registration data and delegates to the batch processing service.
     """
     correlation_id = uuid.uuid4()
     try:
@@ -58,52 +54,16 @@ async def register_batch(
             return jsonify({"error": "Request body must be valid JSON"}), 400
 
         validated_data = BatchRegistrationRequestV1(**raw_request_data)
-        batch_id = str(uuid.uuid4())
+
+        # Delegate business logic to service layer
+        batch_id = await batch_processing_service.register_new_batch(validated_data, correlation_id)
 
         logger.info(
-            f"Registering new batch {batch_id} with {validated_data.expected_essay_count} essays. "
-            f"Correlation ID: {correlation_id}"
+            f"Batch {batch_id} registered successfully via service layer",
+            extra={"correlation_id": str(correlation_id)}
         )
 
-        # 1. Persist Full Batch Context
-        await batch_repo.store_batch_context(batch_id, validated_data)
-
-        # Also store initial pipeline state
-        initial_pipeline_state = ProcessingPipelineState(
-            batch_id=batch_id,
-            requested_pipelines=[], # Spellcheck will be added when BatchEssaysReady is received
-        )
-        await batch_repo.save_processing_pipeline_state(batch_id, initial_pipeline_state)
-
-        # 2. Construct lightweight BatchEssaysRegistered event
-        batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
-        event_metadata = SystemProcessingMetadata(
-            entity=batch_entity_ref,
-            event=ProcessingEvent.BATCH_ESSAYS_REGISTERED.value,
-            timestamp=datetime.now(timezone.utc)
-        )
-        batch_registered_event_data = BatchEssaysRegistered(
-            batch_id=batch_id,
-            expected_essay_count=validated_data.expected_essay_count,
-            essay_ids=validated_data.essay_ids,
-            metadata=event_metadata
-        )
-
-        # 3. Create EventEnvelope
-        envelope = EventEnvelope[BatchEssaysRegistered](
-            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),
-            source_service=settings.SERVICE_NAME,
-            correlation_id=correlation_id,
-            data=batch_registered_event_data
-        )
-
-        # 4. Publish event
-        await event_publisher.publish_batch_event(envelope)
-
-        logger.info(
-            f"Published BatchEssaysRegistered event for batch {batch_id}, "
-            f"event_id {envelope.event_id}"
-        )
+        # Record metrics
         if BATCH_OPERATIONS:
             BATCH_OPERATIONS.labels(operation="register_batch", status="success").inc()
 

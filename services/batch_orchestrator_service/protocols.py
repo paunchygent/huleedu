@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any, List, Optional, Protocol
 
 # Import the new API model for batch context storage
@@ -91,4 +92,20 @@ class EssayLifecycleClientProtocol(Protocol):
         phase: str,  # phase might be an Enum too
     ) -> None:
         """Requests the Essay Lifecycle Service to initiate a processing phase for essays."""
+        ...
+
+
+class BatchProcessingServiceProtocol(Protocol):
+    async def register_new_batch(
+        self, registration_data: BatchRegistrationRequestV1, correlation_id: uuid.UUID
+    ) -> str:
+        """Register a new batch for processing.
+
+        Args:
+            registration_data: Validated batch registration request data
+            correlation_id: Correlation ID for tracking
+
+        Returns:
+            Generated batch ID
+        """
         ...

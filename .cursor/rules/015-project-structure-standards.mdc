@@ -46,13 +46,27 @@ services/
 │   └── docs/
 ├── batch_orchestrator_service/    # Individual microservice (primary orchestrator)
 │   ├── app.py                     # Lean Quart application entry point
+│   ├── startup_setup.py           # DI initialization, service lifecycle management  
+│   ├── metrics.py                 # Prometheus metrics middleware
 │   ├── api/                       # **REQUIRED**: Blueprint API routes directory
 │   │   ├── __init__.py
 │   │   ├── health_routes.py       # Standard health and metrics endpoints
-│   │   └── batch_routes.py        # Domain-specific API routes
-│   ├── pyproject.toml
+│   │   └── batch_routes.py        # Domain-specific API routes (thin HTTP adapters)
+│   ├── implementations/           # **CLEAN ARCHITECTURE**: Protocol implementations
+│   │   ├── __init__.py
+│   │   ├── batch_repository_impl.py       # MockBatchRepositoryImpl
+│   │   ├── event_publisher_impl.py        # DefaultBatchEventPublisherImpl
+│   │   ├── essay_lifecycle_client_impl.py # DefaultEssayLifecycleClientImpl
+│   │   └── batch_processing_service_impl.py # Service layer business logic
 │   ├── protocols.py               # Service-specific behavioral contracts
-│   └── ...
+│   ├── di.py                      # Dishka dependency injection providers
+│   ├── config.py                  # Pydantic settings configuration
+│   ├── api_models.py              # Request/response models
+│   ├── kafka_consumer.py          # Kafka event consumer
+│   ├── pyproject.toml
+│   ├── Dockerfile
+│   ├── tests/
+│   └── docs/
 ├── spell_checker_service/         # Example Kafka worker service (no HTTP API)
 │   ├── worker_main.py             # Main entry point, DI setup, Kafka consumer loop
 │   ├── event_processor.py         # Clean message processing logic with injected dependencies

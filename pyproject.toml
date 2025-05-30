@@ -167,6 +167,8 @@ module = [
     "api.*",
     "api_models",
     "kafka_consumer",
+    "metrics",
+    "startup_setup",
 ]
 ignore_missing_imports = true
 
