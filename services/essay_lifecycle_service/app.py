@@ -18,15 +18,14 @@ from pydantic import ValidationError
 from quart import Quart, Response, g, jsonify, request
 from quart_dishka import QuartDishka
 
+# Import Blueprints
+from api.batch_routes import batch_bp
+from api.batch_routes import set_essay_operations_metric as set_batch_essay_operations
+from api.essay_routes import essay_bp
+from api.essay_routes import set_essay_operations_metric as set_essay_essay_operations
+from api.health_routes import health_bp
 from config import settings
 from di import EssayLifecycleServiceProvider
-
-# Import Blueprints
-from .api.batch_routes import batch_bp
-from .api.batch_routes import set_essay_operations_metric as set_batch_essay_operations
-from .api.essay_routes import essay_bp
-from .api.essay_routes import set_essay_operations_metric as set_essay_essay_operations
-from .api.health_routes import health_bp
 
 logger = create_service_logger("essay_api")
 

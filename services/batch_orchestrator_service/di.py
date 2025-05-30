@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from aiohttp import ClientSession
 from aiokafka import AIOKafkaProducer
+from config import Settings, settings
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry
-
-from .config import Settings, settings
-from .protocols import (
+from protocols import (
     BatchEventPublisherProtocol,
     BatchRepositoryProtocol,
     EssayLifecycleClientProtocol,

@@ -108,10 +108,9 @@ async def default_perform_spell_check_algorithm(
         # Import the migrated modules (local to service)
         import re
 
+        from config import settings
+        from spell_logic.l2_dictionary_loader import apply_l2_corrections, load_l2_errors
         from spellchecker import SpellChecker
-
-        from .config import settings
-        from .spell_logic.l2_dictionary_loader import apply_l2_corrections, load_l2_errors
 
         # 1. Load L2 dictionaries using environment-aware configuration
         logger.debug(
@@ -228,7 +227,7 @@ async def default_perform_spell_check_algorithm(
         # 5. Log correction details if enabled
         if settings.ENABLE_CORRECTION_LOGGING and essay_id:
             try:
-                from .spell_logic.correction_logger import log_essay_corrections
+                from spell_logic.correction_logger import log_essay_corrections
 
                 # Convert L2 corrections to expected format
                 l2_corrections_formatted = []

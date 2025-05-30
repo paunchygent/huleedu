@@ -42,7 +42,7 @@ huleedu-common-core = "file:///app/common_core"
 huleedu-service-libs = "file:///app/services/libs"
 
 [tool.pdm.scripts]
-start_worker = "python worker.py"
+start_worker = "python worker_main.py"
 
 [tool.mypy]
 python_version = "3.11"

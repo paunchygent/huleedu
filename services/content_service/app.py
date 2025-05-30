@@ -7,14 +7,13 @@ error handling, logging, and health checks. Content is stored as files
 on the local filesystem with UUID-based identifiers.
 """
 
+# Import Blueprints
+from api.content_routes import content_bp, set_content_dependencies
+from api.health_routes import health_bp, set_store_root
 from config import settings
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from prometheus_client import Counter, Histogram
 from quart import Quart, Response, g, request
-
-# Import Blueprints
-from .api.content_routes import content_bp, set_content_dependencies
-from .api.health_routes import health_bp, set_store_root
 
 # Configure structured logging for the service
 configure_service_logging("content-service", log_level=settings.LOG_LEVEL)

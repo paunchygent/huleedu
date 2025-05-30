@@ -155,5 +155,5 @@ services:
       - ENV_TYPE=docker
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
-      - HTTP_PORT=6000
+      - ESSAY_LIFECYCLE_SERVICE_HTTP_PORT=6000
       - LOG_LEVEL=INFO 

@@ -7,6 +7,9 @@ The service acts as the primary orchestrator for batch processing workflows.
 
 from typing import Optional
 
+# Import Blueprints
+from api.batch_routes import batch_bp, set_batch_operations_metric
+from api.health_routes import health_bp
 from config import settings
 from di import BatchOrchestratorServiceProvider
 from dishka import make_async_container
@@ -18,10 +21,6 @@ from prometheus_client import (
 )
 from quart import Quart, Response, g, request
 from quart_dishka import QuartDishka
-
-# Import Blueprints
-from .api.batch_routes import batch_bp, set_batch_operations_metric
-from .api.health_routes import health_bp
 
 # Configure structured logging for the service
 configure_service_logging("batch-service", log_level=settings.LOG_LEVEL)

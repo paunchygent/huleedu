@@ -8,18 +8,10 @@ from typing import Any, AsyncIterator  # Changed from Any to AsyncIterator for k
 import aiohttp
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, TopicPartition
 from aiokafka.errors import KafkaConnectionError
+from config import settings  # Assuming this is still the way to get settings
+from di import SpellCheckerServiceProvider
 from dishka import make_async_container
-from huleedu_service_libs.logging_utils import (
-    configure_service_logging,
-    create_service_logger,
-)
-from prometheus_client import CollectorRegistry, Histogram, start_http_server
-
-from common_core.enums import ProcessingEvent, topic_name
-
-from .config import settings  # Assuming this is still the way to get settings
-from .di import SpellCheckerServiceProvider
-from .event_router import (
+from event_router import (
     # Placeholder config values used in event_router, ideally pass them from here
     CONTENT_SERVICE_URL_CONFIG,
     KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED,
@@ -30,6 +22,13 @@ from .event_router import (
     DefaultSpellcheckEventPublisher,
     process_single_message,
 )
+from huleedu_service_libs.logging_utils import (
+    configure_service_logging,
+    create_service_logger,
+)
+from prometheus_client import CollectorRegistry, Histogram, start_http_server
+
+from common_core.enums import ProcessingEvent, topic_name
 
 # Configure structured logging for the service (moved from original worker.py)
 configure_service_logging(

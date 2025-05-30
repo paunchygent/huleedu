@@ -20,9 +20,9 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CollectorRegistry
 
-from .config import Settings, settings
-from .core_logic import StateTransitionValidator
-from .protocols import (
+from config import Settings, settings
+from core_logic import StateTransitionValidator
+from protocols import (
     BatchCommandHandler,
     ContentClient,
     EssayStateStore,
@@ -30,10 +30,10 @@ from .protocols import (
     MetricsCollector,
     SpecializedServiceRequestDispatcher,
 )
-from .protocols import (
+from protocols import (
     StateTransitionValidator as StateTransitionValidatorProtocol,
 )
-from .state_store import SQLiteEssayStateStore
+from state_store import SQLiteEssayStateStore
 
 
 class EssayLifecycleServiceProvider(Provider):

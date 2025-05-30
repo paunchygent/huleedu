@@ -6,7 +6,18 @@ from uuid import UUID
 
 import aiohttp
 from aiokafka import AIOKafkaProducer, ConsumerRecord
+from core_logic import (
+    default_fetch_content_impl,
+    default_perform_spell_check_algorithm,
+    default_store_content_impl,
+)
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
+from protocols import (
+    ContentClientProtocol,
+    ResultStoreProtocol,
+    SpellcheckEventPublisherProtocol,
+    SpellLogicProtocol,
+)
 from pydantic import ValidationError
 
 from common_core.enums import (
@@ -24,18 +35,6 @@ from common_core.metadata_models import (
     EntityReference,
     StorageReferenceMetadata,
     SystemProcessingMetadata,
-)
-
-from .core_logic import (
-    default_fetch_content_impl,
-    default_perform_spell_check_algorithm,
-    default_store_content_impl,
-)
-from .protocols import (
-    ContentClientProtocol,
-    ResultStoreProtocol,
-    SpellcheckEventPublisherProtocol,
-    SpellLogicProtocol,
 )
 
 # Configuration constants (placeholders, should come from settings/DI)
