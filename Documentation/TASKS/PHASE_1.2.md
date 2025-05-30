@@ -433,25 +433,29 @@ These are general improvements to be applied across services or to `common_core`
 * **Status**: ✅ **COMPLETED & VALIDATED** - All services now expose Prometheus metrics with proper architectural patterns and full test coverage
 
 **Implementation Details**:
+
 * **Content Service**: Added REQUEST_COUNT, REQUEST_DURATION, CONTENT_OPERATIONS metrics with /metrics endpoint and proper Quart g context for type safety
 * **Batch Orchestrator Service**: Implemented DI-based metrics with CollectorRegistry injection and /metrics endpoint  
 * **Essay Lifecycle Service**: Added DI-based metrics initialization and /metrics endpoint with proper g context usage
 * **Spell Checker Service**: Implemented metrics HTTP server in worker_main.py, added queue latency metric (KAFKA_QUEUE_LATENCY), and proper configuration architecture
 
 **Architectural Validation**:
-* ✅ **Relative Import Architecture**: Services now use proper relative imports (`from .config import settings`) supporting microservice autonomy and containerized deployment
+
+* ✅ **Relative Import Architecture**: Services now use proper relative imports (`from .config import settings`) supporting microservice autonomy and containerized deployment while keeping intra-service imports absolute as is required by Docker.
 * ✅ **Configuration Completeness**: All Kafka consumer configuration attributes (KAFKA_MAX_POLL_RECORDS, KAFKA_MAX_POLL_INTERVAL_MS, etc.) properly defined in Settings classes
 * ✅ **Type Safety**: Eliminated all MyPy type safety violations by using proper Quart context patterns
 * ✅ **Dependency Injection**: All services follow DI patterns with CollectorRegistry injection for metrics
 * ✅ **Test Coverage**: All 77 tests passing, including contract compliance tests with proper mock paths
 
 **Infrastructure**: Updated docker-compose.yml to expose metrics ports:
+
 * Content: 8001:8000 (same port)
 * Spell checker: 8002:8001 (separate port)
 * Batch orchestrator: 5001:5000 (same port)
 * Essay lifecycle: 6001:6000 (same port)
 
 **Technical Excellence**:
+
 * **Import Architecture**: Services use relative imports for self-contained operation in containers
 * **Configuration Management**: Complete Kafka configuration with proper defaults and type safety
 * **Error Handling**: Eliminated all "limitation" dismissals through proper architectural analysis

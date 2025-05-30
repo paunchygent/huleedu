@@ -36,6 +36,11 @@ def set_batch_operations_metric(metric: Counter) -> None:
     BATCH_OPERATIONS = metric
 
 
+"""
+This endpoint is not used in production. It is used to test the DI functionality of
+the service. The request endpoints will be removed as soon as request events owned by
+Essay Lifecycle Service are implemented.
+"""
 @batch_bp.route("/trigger-spellcheck-test", methods=["POST"])
 @inject
 async def trigger_spellcheck_test_endpoint(

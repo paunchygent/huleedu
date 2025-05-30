@@ -17,18 +17,20 @@ Its key responsibilities include:
 
 BOS implements the **Count-Based Aggregation Pattern** as the central orchestrator:
 
-### Coordination Flow:
+### Coordination Flow
+
 1. **Batch Creation**: BOS creates batch and registers expectations with ELS (`BatchEssaysRegistered`)
 2. **Content Ingestion**: BOS coordinates with File Service for essay content processing
 3. **Readiness Aggregation**: ELS tracks individual essay readiness and notifies BOS when complete (`BatchEssaysReady`)
 4. **Pipeline Execution**: BOS initiates processing phases (spellcheck, NLP, etc.) for ready batches
 5. **Progress Monitoring**: BOS tracks progress across all processing phases and provides status to clients
 
-### Service Boundary Responsibilities:
-- **BOS**: Owns batch lifecycle, processing decisions, and pipeline orchestration
-- **ELS**: Aggregates essay readiness, manages individual essay states
-- **File Service**: Processes individual essay content, reports readiness to ELS
-- **Specialized Services**: Execute specific processing tasks (spellcheck, NLP, etc.)
+### Service Boundary Responsibilities
+
+* **BOS**: Owns batch lifecycle, processing decisions, and pipeline orchestration
+* **ELS**: Aggregates essay readiness, manages individual essay states
+* **File Service**: Processes individual essay content, reports readiness to ELS
+* **Specialized Services**: Execute specific processing tasks (spellcheck, NLP, etc.)
 
 This architecture ensures BOS maintains central control while leveraging other services for their domain expertise.
 
