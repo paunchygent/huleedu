@@ -1,7 +1,7 @@
 ---
-description: Read for all actions related to Testing and Quality Assurance, especially before writing tests
+description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 ===
 # 070: Testing and Quality Assurance
