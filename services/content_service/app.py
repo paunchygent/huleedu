@@ -21,21 +21,15 @@ logger = create_service_logger("content.app")
 
 # Prometheus metrics
 REQUEST_COUNT = Counter(
-    'http_requests_total',
-    'Total HTTP requests',
-    ['method', 'endpoint', 'status_code']
+    "http_requests_total", "Total HTTP requests", ["method", "endpoint", "status_code"]
 )
 
 REQUEST_DURATION = Histogram(
-    'http_request_duration_seconds',
-    'HTTP request duration in seconds',
-    ['method', 'endpoint']
+    "http_request_duration_seconds", "HTTP request duration in seconds", ["method", "endpoint"]
 )
 
 CONTENT_OPERATIONS = Counter(
-    'content_operations_total',
-    'Total content operations',
-    ['operation', 'status']
+    "content_operations_total", "Total content operations", ["operation", "status"]
 )
 
 # Determine store root from settings
@@ -69,6 +63,7 @@ async def startup() -> None:
 async def before_request() -> None:
     """Record request start time for duration metrics."""
     import time
+
     g.start_time = time.time()
 
 
@@ -77,7 +72,8 @@ async def after_request(response: Response) -> Response:
     """Record metrics after each request."""
     try:
         import time
-        start_time = getattr(g, 'start_time', None)
+
+        start_time = getattr(g, "start_time", None)
         if start_time is not None:
             duration = time.time() - start_time
 

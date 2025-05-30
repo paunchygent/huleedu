@@ -248,16 +248,17 @@ async def process_single_message(
         request_data = request_envelope.data
 
         # Record queue latency metric if available
-        if (kafka_queue_latency_metric and
-            hasattr(request_envelope, 'event_timestamp') and
-            request_envelope.event_timestamp):
+        if (
+            kafka_queue_latency_metric
+            and hasattr(request_envelope, "event_timestamp")
+            and request_envelope.event_timestamp
+        ):
             queue_latency_seconds = (
                 processing_started_at - request_envelope.event_timestamp
             ).total_seconds()
             if queue_latency_seconds >= 0:  # Avoid negative values from clock skew
                 kafka_queue_latency_metric.labels(
-                    topic=msg.topic,
-                    consumer_group=consumer_group_id
+                    topic=msg.topic, consumer_group=consumer_group_id
                 ).observe(queue_latency_seconds)
                 logger.debug(
                     f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}"

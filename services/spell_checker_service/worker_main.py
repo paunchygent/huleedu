@@ -110,10 +110,10 @@ async def _start_metrics_server(registry: CollectorRegistry, port: int) -> None:
 
     # Initialize queue latency metric
     KAFKA_QUEUE_LATENCY = Histogram(
-        'kafka_message_queue_latency_seconds',
-        'Latency between event timestamp and processing start',
-        ['topic', 'consumer_group'],
-        registry=registry
+        "kafka_message_queue_latency_seconds",
+        "Latency between event timestamp and processing start",
+        ["topic", "consumer_group"],
+        registry=registry,
     )
 
     # Start metrics server in a thread

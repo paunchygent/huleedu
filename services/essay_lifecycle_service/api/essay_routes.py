@@ -16,7 +16,7 @@ from config import settings
 from protocols import EssayStateStore
 
 logger = create_service_logger("els.api.essay")
-essay_bp = Blueprint('essay_routes', __name__, url_prefix=f'/{settings.API_VERSION}/essays')
+essay_bp = Blueprint("essay_routes", __name__, url_prefix=f"/{settings.API_VERSION}/essays")
 
 # Global metrics reference (initialized in app.py)
 ESSAY_OPERATIONS: Counter | None = None
@@ -52,13 +52,18 @@ class ErrorResponse(BaseModel):
 def _calculate_processing_progress(current_status: EssayStatus) -> dict[str, bool]:
     """Calculate processing progress - walking skeleton version."""
     return {
-        "essay_ready_for_processing": current_status in [
-            EssayStatus.READY_FOR_PROCESSING, EssayStatus.AWAITING_SPELLCHECK,
-            EssayStatus.SPELLCHECKING_IN_PROGRESS, EssayStatus.SPELLCHECKED_SUCCESS
+        "essay_ready_for_processing": current_status
+        in [
+            EssayStatus.READY_FOR_PROCESSING,
+            EssayStatus.AWAITING_SPELLCHECK,
+            EssayStatus.SPELLCHECKING_IN_PROGRESS,
+            EssayStatus.SPELLCHECKED_SUCCESS,
         ],
-        "pipeline_assigned": current_status in [
-            EssayStatus.AWAITING_SPELLCHECK, EssayStatus.SPELLCHECKING_IN_PROGRESS,
-            EssayStatus.SPELLCHECKED_SUCCESS
+        "pipeline_assigned": current_status
+        in [
+            EssayStatus.AWAITING_SPELLCHECK,
+            EssayStatus.SPELLCHECKING_IN_PROGRESS,
+            EssayStatus.SPELLCHECKED_SUCCESS,
         ],
         "spellcheck_completed": current_status == EssayStatus.SPELLCHECKED_SUCCESS,
         # Walking skeleton: only spellcheck pipeline progress tracked by ELS
@@ -77,7 +82,7 @@ async def get_essay_status(
     essay_state = await state_store.get_essay_state(essay_id)
     if essay_state is None:
         if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(operation='get_status', status='not_found').inc()
+            ESSAY_OPERATIONS.labels(operation="get_status", status="not_found").inc()
         error_response = ErrorResponse(
             error="Essay Not Found", detail=f"Essay with ID {essay_id} does not exist"
         )
@@ -98,7 +103,7 @@ async def get_essay_status(
     )
 
     if ESSAY_OPERATIONS:
-        ESSAY_OPERATIONS.labels(operation='get_status', status='success').inc()
+        ESSAY_OPERATIONS.labels(operation="get_status", status="success").inc()
     return jsonify(status_response.model_dump(mode="json"))
 
 
@@ -114,7 +119,7 @@ async def get_essay_timeline(
     essay_state = await state_store.get_essay_state(essay_id)
     if essay_state is None:
         if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(operation='get_timeline', status='not_found').inc()
+            ESSAY_OPERATIONS.labels(operation="get_timeline", status="not_found").inc()
         response = ErrorResponse(
             error="Essay Not Found", detail=f"Essay with ID {essay_id} does not exist"
         )
@@ -129,5 +134,5 @@ async def get_essay_timeline(
     }
 
     if ESSAY_OPERATIONS:
-        ESSAY_OPERATIONS.labels(operation='get_timeline', status='success').inc()
+        ESSAY_OPERATIONS.labels(operation="get_timeline", status="success").inc()
     return jsonify(timeline_response)

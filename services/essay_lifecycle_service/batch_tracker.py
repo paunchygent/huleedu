@@ -93,7 +93,9 @@ class BatchEssayTracker:
         self.batch_expectations: dict[str, BatchExpectation] = {}
         self._event_callbacks: dict[str, Callable[[Any], Awaitable[None]]] = {}
 
-    def register_event_callback(self, event_type: str, callback: Callable[[Any], Awaitable[None]]) -> None:
+    def register_event_callback(
+        self, event_type: str, callback: Callable[[Any], Awaitable[None]]
+    ) -> None:
         """Register callback for batch coordination events."""
         self._event_callbacks[event_type] = callback
 
@@ -146,7 +148,9 @@ class BatchEssayTracker:
 
         if expectation.mark_essay_ready(essay_id):
             # Batch is complete!
-            logger.info(f"Batch {batch_id} is complete with {len(expectation.ready_essay_ids)} essays")
+            logger.info(
+                f"Batch {batch_id} is complete with {len(expectation.ready_essay_ids)} essays"
+            )
 
             # Cancel timeout monitoring
             if expectation._timeout_task:
@@ -197,10 +201,7 @@ class BatchEssayTracker:
                     actual_count=len(expectation.ready_essay_ids),
                     timeout_duration_seconds=expectation.timeout_seconds,
                     metadata=SystemProcessingMetadata(
-                        entity=EntityReference(
-                            entity_id=expectation.batch_id,
-                            entity_type="batch"
-                        ),
+                        entity=EntityReference(entity_id=expectation.batch_id, entity_type="batch"),
                         timestamp=datetime.utcnow(),
                         event="batch.readiness.timeout",
                     ),

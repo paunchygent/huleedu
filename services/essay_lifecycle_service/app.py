@@ -85,24 +85,24 @@ def _initialize_metrics(registry: CollectorRegistry) -> None:
     global REQUEST_COUNT, REQUEST_DURATION, ESSAY_OPERATIONS
 
     REQUEST_COUNT = Counter(
-        'http_requests_total',
-        'Total HTTP requests',
-        ['method', 'endpoint', 'status_code'],
-        registry=registry
+        "http_requests_total",
+        "Total HTTP requests",
+        ["method", "endpoint", "status_code"],
+        registry=registry,
     )
 
     REQUEST_DURATION = Histogram(
-        'http_request_duration_seconds',
-        'HTTP request duration in seconds',
-        ['method', 'endpoint'],
-        registry=registry
+        "http_request_duration_seconds",
+        "HTTP request duration in seconds",
+        ["method", "endpoint"],
+        registry=registry,
     )
 
     ESSAY_OPERATIONS = Counter(
-        'essay_operations_total',
-        'Total essay operations',
-        ['operation', 'status'],
-        registry=registry
+        "essay_operations_total",
+        "Total essay operations",
+        ["operation", "status"],
+        registry=registry,
     )
 
     # Share metrics with Blueprint modules
@@ -141,6 +141,7 @@ async def handle_general_error(error: Exception) -> Response | tuple[Response, i
 async def before_request() -> None:
     """Record request start time for duration metrics."""
     import time
+
     g.start_time = time.time()
 
 
@@ -149,7 +150,8 @@ async def after_request(response: Response) -> Response:
     """Record metrics after each request."""
     try:
         import time
-        start_time = getattr(g, 'start_time', None)
+
+        start_time = getattr(g, "start_time", None)
         if start_time is not None and REQUEST_COUNT is not None and REQUEST_DURATION is not None:
             duration = time.time() - start_time
 

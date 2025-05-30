@@ -29,6 +29,7 @@ monorepo-tools = [
     "pytest-cov",
     "pytest-asyncio",
     "pytest-xdist",
+    "httpx",
     "pre-commit",
 ]
 
@@ -143,12 +144,24 @@ module = [
     "aiofiles.*",
     "dishka.*",
     "quart_dishka.*",
+    "httpx.*",
+    "spell_logic.*",
 ]
 ignore_missing_imports = true
 
-# Service-local config modules
+# Service-local config modules and API modules
 [[tool.mypy.overrides]]
-module = ["config", "worker_main", "core_logic", "event_router", "protocols", "di", "state_store", "batch_command_handlers"]
+module = [
+    "config", 
+    "worker_main", 
+    "core_logic", 
+    "event_router", 
+    "protocols", 
+    "di", 
+    "state_store", 
+    "batch_command_handlers",
+    "api.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

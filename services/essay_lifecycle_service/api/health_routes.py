@@ -9,7 +9,7 @@ from quart_dishka import inject
 from config import settings
 
 logger = create_service_logger("els.api.health")
-health_bp = Blueprint('health_routes', __name__)
+health_bp = Blueprint("health_routes", __name__)
 
 
 @health_bp.route("/healthz", methods=["GET"])

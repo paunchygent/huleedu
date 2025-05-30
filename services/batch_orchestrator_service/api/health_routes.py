@@ -11,7 +11,7 @@ from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
 logger = create_service_logger("bos.api.health")
-health_bp = Blueprint('health_routes', __name__)
+health_bp = Blueprint("health_routes", __name__)
 
 
 @health_bp.route("/healthz")

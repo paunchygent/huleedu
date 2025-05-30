@@ -21,7 +21,7 @@ from common_core.events.spellcheck_models import SpellcheckRequestedDataV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 
 logger = create_service_logger("bos.api.batch")
-batch_bp = Blueprint('batch_routes', __name__, url_prefix='/v1/batches')
+batch_bp = Blueprint("batch_routes", __name__, url_prefix="/v1/batches")
 
 CONTENT_SERVICE_URL = settings.CONTENT_SERVICE_URL
 OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
@@ -68,7 +68,7 @@ async def trigger_spellcheck_test_endpoint(
                         f"Failed to store dummy essay text: {response.status} - {error_text}"
                     )
                     if BATCH_OPERATIONS:
-                        BATCH_OPERATIONS.labels(operation='test_spellcheck', status='failed').inc()
+                        BATCH_OPERATIONS.labels(operation="test_spellcheck", status="failed").inc()
                     return (
                         jsonify({"error": f"Failed to store dummy essay: {response.status}"}),
                         500,
@@ -76,7 +76,7 @@ async def trigger_spellcheck_test_endpoint(
 
         if not original_text_storage_id:
             if BATCH_OPERATIONS:
-                BATCH_OPERATIONS.labels(operation='test_spellcheck', status='failed').inc()
+                BATCH_OPERATIONS.labels(operation="test_spellcheck", status="failed").inc()
             return (
                 jsonify({"error": "Could not get storage_id for dummy essay text"}),
                 500,
@@ -115,7 +115,7 @@ async def trigger_spellcheck_test_endpoint(
         )
 
         if BATCH_OPERATIONS:
-            BATCH_OPERATIONS.labels(operation='test_spellcheck', status='success').inc()
+            BATCH_OPERATIONS.labels(operation="test_spellcheck", status="success").inc()
 
         return (
             jsonify(
@@ -134,5 +134,5 @@ async def trigger_spellcheck_test_endpoint(
     except Exception as e:
         logger.error(f"Error in trigger_spellcheck_test: {e}", exc_info=True)
         if BATCH_OPERATIONS:
-            BATCH_OPERATIONS.labels(operation='test_spellcheck', status='error').inc()
+            BATCH_OPERATIONS.labels(operation="test_spellcheck", status="error").inc()
         return jsonify({"error": "Failed to trigger test spellcheck request."}), 500

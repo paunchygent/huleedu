@@ -171,7 +171,7 @@ class BatchStatus(str, Enum):
     # Batch created, content being ingested/validated.
 
     # Terminal states for the initial ingestion/validation phase
-    CONTENT_INGESTION_FAILED = "content_ingestion_failed"   # Critical issue with content, batch
+    CONTENT_INGESTION_FAILED = "content_ingestion_failed"  # Critical issue with content, batch
     # cannot proceed. (Terminal for this path)
     AWAITING_PIPELINE_CONFIGURATION = "awaiting_pipeline_configuration"
     # All content successfully ingested & validated by ELS/FileService;

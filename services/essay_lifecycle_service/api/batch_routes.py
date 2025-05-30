@@ -14,7 +14,7 @@ from config import settings
 from protocols import EssayStateStore
 
 logger = create_service_logger("els.api.batch")
-batch_bp = Blueprint('batch_routes', __name__, url_prefix=f'/{settings.API_VERSION}/batches')
+batch_bp = Blueprint("batch_routes", __name__, url_prefix=f"/{settings.API_VERSION}/batches")
 
 # Global metrics reference (initialized in app.py)
 ESSAY_OPERATIONS: Counter | None = None
@@ -56,7 +56,7 @@ async def get_batch_status(
     essays = await state_store.list_essays_by_batch(batch_id)
     if not essays:
         if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(operation='get_batch_status', status='not_found').inc()
+            ESSAY_OPERATIONS.labels(operation="get_batch_status", status="not_found").inc()
         response = ErrorResponse(
             error="Batch Not Found",
             detail=f"Batch with ID {batch_id} does not exist or has no essays",

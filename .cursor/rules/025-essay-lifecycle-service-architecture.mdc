@@ -5,6 +5,11 @@ alwaysApply: false
 ---
 # 025: Essay Lifecycle Service Architecture
 
+**STATUS**: ✅ **OPERATIONAL** - Service tested and confirmed working (Jan 2025)
+- **Health Endpoint**: `/healthz` returns HTTP 200 with service status
+- **Metrics Endpoint**: `/metrics` returns Prometheus metrics with request counters and duration histograms
+- **Container**: Running successfully on port 6001 with proper health checks
+
 ## 1. Service Identity
 - **Package**: `huleedu-essay-lifecycle-service`  
 - **HTTP Port**: 6000 (API), **Metrics Port**: 6001

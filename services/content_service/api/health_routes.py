@@ -9,7 +9,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from quart import Blueprint, Response, jsonify
 
 logger = create_service_logger("content.api.health")
-health_bp = Blueprint('health_routes', __name__)
+health_bp = Blueprint("health_routes", __name__)
 
 # Reference to store root (set by app.py)
 STORE_ROOT: Path | None = None
