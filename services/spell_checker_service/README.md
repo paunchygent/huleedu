@@ -20,16 +20,21 @@ The Spell Checker Service is a Kafka consumer worker service responsible for app
 
 ### **Internal Structure**
 
-The service's logic is organized as follows:
+The service follows a clean architecture pattern with clear separation of concerns:
 
-* **`worker_main.py`**: Handles the service lifecycle (startup, shutdown), Kafka client management (consumer/producer), signal handling, and the primary message consumption loop. It initializes and manages the Dishka DI container.
-* **`event_router.py`**: Contains `process_single_message()` which handles incoming `ConsumerRecord` objects. It deserializes the `EventEnvelope[SpellcheckRequestedDataV1]`, then orchestrates the fetch-spellcheck-store-publish flow by calling appropriate protocol methods. It also includes default implementations of the defined protocols, composing functions from `core_logic.py`.
+* **`worker_main.py`**: Handles the service lifecycle (startup, shutdown), Kafka client management (consumer/producer), signal handling, and the primary message consumption loop. Initializes and manages the Dishka DI container.
+* **`event_processor.py`**: Contains `process_single_message()` which handles incoming `ConsumerRecord` objects. It deserializes the `EventEnvelope[SpellcheckRequestedDataV1]`, then orchestrates the fetch-spellcheck-store-publish flow by calling appropriate protocol methods. **Clean Architecture**: Depends ONLY on injected protocol interfaces.
+* **`protocols.py`**: Defines `typing.Protocol` interfaces for internal dependencies like content fetching, spell checking logic, result storage, and event publishing.
 * **`core_logic.py`**: Provides the fundamental, reusable business logic functions:
   * `default_fetch_content_impl()`: Fetches content via HTTP from the Content Service.
   * `default_store_content_impl()`: Stores content via HTTP to the Content Service.
   * `default_perform_spell_check_algorithm()`: The core spell check logic, implementing the L2 + `pyspellchecker` pipeline.
-* **`protocols.py`**: Defines `typing.Protocol` interfaces for internal dependencies like content fetching, spell checking logic, result storage, and event publishing.
-* **`di.py`**: Contains the Dishka `Provider` (`SpellCheckerServiceProvider`) for setting up and providing dependencies.
+* **`di.py`**: Contains the Dishka `Provider` (`SpellCheckerServiceProvider`) for setting up and providing dependencies. Imports implementations from `protocol_implementations/`.
+* **`protocol_implementations/`**: Directory containing canonical protocol implementations:
+  * **`content_client_impl.py`**: HTTP content fetching with constructor-injected dependencies
+  * **`result_store_impl.py`**: HTTP content storage with constructor-injected dependencies
+  * **`spell_logic_impl.py`**: Spell checking orchestration using `core_logic` functions
+  * **`event_publisher_impl.py`**: Kafka event publishing with constructor-injected producer
 * **`spell_logic/`**: Sub-package containing modules for L2 dictionary loading (`l2_dictionary_loader.py`), L2 filtering (`l2_filter.py`), and correction logging (`correction_logger.py`).
 
 ### **Processing Pipeline**
@@ -51,7 +56,7 @@ The service's logic is organized as follows:
 
 ### **Produces**
 
-* **Event Type String in Envelope**: `huleedu.spellchecker.essay.concluded.v1` (defined as `KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED` in `event_router.py`).
+* **Event Type String in Envelope**: `huleedu.spellchecker.essay.concluded.v1` (defined as `KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED` in `event_processor.py`).
   * **Topic**: Dynamically determined by `topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED)`.
   * **Data Model**: `EventEnvelope[SpellcheckResultDataV1]`.
   * Contains correction results and storage references.
@@ -185,7 +190,7 @@ The service expects L2 dictionary data to be available. Default paths are relati
 ### **Test Coverage**
 
 * **Core Spell Logic (`spell_logic/`)**: L2 corrections, L2 filtering, `pyspellchecker` integration, and core algorithm (`default_perform_spell_check_algorithm`).
-* **Event Processing (`event_router.py`)**: Kafka message handling, protocol compliance with mocked dependencies.
+* **Event Processing (`event_processor.py`)**: Kafka message handling, protocol compliance with mocked dependencies.
 * **Contract Compliance (`test_contract_compliance.py`)**: Ensures published events adhere to Pydantic schemas and correlation IDs are propagated.
 * **Error Handling**: Tests for network failures, invalid input, and internal spell checker errors.
 
@@ -208,7 +213,14 @@ The Docker image is built and run as part of the `docker-compose.yml` setup.
 
 ## **Recent Updates**
 
-* **Refactoring (Phase 1.2 Δ-3)**: The original `worker.py` has been refactored into `worker_main.py`, `event_router.py`, and `core_logic.py` to improve modularity and adhere to file size limits.
+* **Refactoring (Phase 1.2 Δ-3)**: The original `worker.py` has been refactored into `worker_main.py`, `event_processor.py`, and `core_logic.py` to improve modularity and adhere to file size limits.
 * **DI with Dishka (Phase 1.2 Δ-2)**: The service now uses Dishka for dependency injection, with providers defined in `di.py` and behavioral contracts in `protocols.py`.
 * **Full Spell Check Pipeline**: Integrated the L2 + `pyspellchecker` pipeline from the prototype into `core_logic.default_perform_spell_check_algorithm`.
 * **Comprehensive Tests**: Migrated and updated tests for the core spell checking logic and event processing.
+* **✅ Architectural Debt Remediation (2025-05-30)**: Completed major refactoring to eliminate SRP violations and implement clean architecture:
+  * **Created `protocol_implementations/` directory** with canonical protocol implementations
+  * **Replaced `event_router.py` with `event_processor.py`** for clean message processing
+  * **Eliminated code duplication** between `di.py` and message processing
+  * **Implemented proper dependency injection** with constructor injection patterns
+  * **Maintained 100% test coverage** through all architectural changes
+  * **All 71 tests pass** with the new clean architecture

@@ -2,28 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Optional
-from uuid import UUID
-
 from aiohttp import ClientSession
 from aiokafka import AIOKafkaProducer
 from config import Settings, settings
-from core_logic import (
-    default_fetch_content_impl,
-    default_perform_spell_check_algorithm,
-    default_store_content_impl,
-)
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry
+from protocol_implementations.content_client_impl import DefaultContentClient
+from protocol_implementations.event_publisher_impl import DefaultSpellcheckEventPublisher
+from protocol_implementations.result_store_impl import DefaultResultStore
 from protocols import (
     ContentClientProtocol,
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
-    SpellLogicProtocol,
 )
-
-from common_core.enums import ContentType
-from common_core.events.spellcheck_models import SpellcheckResultDataV1
 
 
 class SpellCheckerServiceProvider(Provider):
@@ -55,113 +46,25 @@ class SpellCheckerServiceProvider(Provider):
         return ClientSession()
 
     @provide(scope=Scope.APP)
-    def provide_content_client(self) -> ContentClientProtocol:
+    def provide_content_client(self, app_settings: Settings) -> ContentClientProtocol:
         """Provide content client implementation."""
-        return DefaultContentClient()
+        return DefaultContentClient(content_service_url=app_settings.CONTENT_SERVICE_URL)
 
     @provide(scope=Scope.APP)
-    def provide_spell_logic(self) -> SpellLogicProtocol:
-        """Provide spell check logic implementation."""
-        return DefaultSpellLogic()
-
-    @provide(scope=Scope.APP)
-    def provide_result_store(self) -> ResultStoreProtocol:
+    def provide_result_store(self, app_settings: Settings) -> ResultStoreProtocol:
         """Provide result store implementation."""
-        return DefaultResultStore()
+        return DefaultResultStore(content_service_url=app_settings.CONTENT_SERVICE_URL)
 
     @provide(scope=Scope.APP)
-    def provide_spellcheck_event_publisher(self) -> SpellcheckEventPublisherProtocol:
+    def provide_spellcheck_event_publisher(
+        self, app_settings: Settings
+    ) -> SpellcheckEventPublisherProtocol:
         """Provide spellcheck event publisher implementation."""
-        return DefaultSpellcheckEventPublisher()
-
-
-class DefaultContentClient:
-    """Default implementation of ContentClientProtocol."""
-
-    async def fetch_content(self, storage_id: str, http_session: ClientSession) -> str:
-        """Fetch content using the core logic implementation."""
-        result = await default_fetch_content_impl(
-            http_session, storage_id, settings.CONTENT_SERVICE_URL
-        )
-        return str(result)
-
-
-class DefaultSpellLogic:
-    """Default implementation of SpellLogicProtocol."""
-
-    async def perform_spell_check(self, text: str) -> SpellcheckResultDataV1:
-        """Perform spell check using the core logic implementation."""
-        corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, language=settings.DEFAULT_LANGUAGE
+        return DefaultSpellcheckEventPublisher(
+            kafka_event_type="huleedu.spellchecker.essay.concluded.v1",
+            source_service_name="spell-checker-service",
+            kafka_output_topic="huleedu.essay.spellcheck.completed.v1"
         )
 
-        # Create a mock SpellcheckResultDataV1 for now
-        # In production, this would be created properly with all required fields
-        from datetime import datetime, timezone
-
-        from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage
-        from common_core.metadata_models import EntityReference, SystemProcessingMetadata
-
-        # Mock data for Phase 1.2
-        entity_ref = EntityReference(entity_id="mock-essay-id", entity_type="essay")
-        system_meta = SystemProcessingMetadata(
-            entity=entity_ref,
-            event=ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED,
-            timestamp=datetime.now(timezone.utc),
-            processing_stage=ProcessingStage.COMPLETED,
-        )
-
-        return SpellcheckResultDataV1(
-            event_name=ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED,
-            entity_ref=entity_ref,
-            status=EssayStatus.SPELLCHECKED_SUCCESS,
-            system_metadata=system_meta,
-            original_text_storage_id="mock-storage-id",  # Will be set properly when integrated
-            corrections_made=corrections_count,
-        )
-
-
-class DefaultResultStore:
-    """Default implementation of ResultStoreProtocol."""
-
-    async def store_content(
-        self,
-        original_storage_id: str,
-        content_type: ContentType,
-        content: str,
-        http_session: ClientSession,
-    ) -> str:
-        """Store content using the core logic implementation."""
-        result = await default_store_content_impl(
-            http_session, content, settings.CONTENT_SERVICE_URL
-        )
-        return str(result)
-
-
-class DefaultSpellcheckEventPublisher:
-    """Default implementation of SpellcheckEventPublisherProtocol."""
-
-    async def publish_spellcheck_result(
-        self,
-        producer: AIOKafkaProducer,
-        event_data: SpellcheckResultDataV1,
-        correlation_id: Optional[UUID],
-    ) -> None:
-        """Publish spellcheck result event to Kafka."""
-        # Import here to avoid circular imports
-        import json
-
-        from common_core.enums import ProcessingEvent, topic_name
-        from common_core.events.envelope import EventEnvelope
-
-        topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED)
-
-        envelope = EventEnvelope[SpellcheckResultDataV1](
-            event_type=topic,
-            source_service="spell-checker-service",
-            correlation_id=correlation_id,
-            data=event_data,
-        )
-
-        message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-        await producer.send_and_wait(topic, message)
+    # Note: SpellLogicProtocol will be provided per-message since it needs message-specific data
+    # This will be handled in the event processor or worker_main

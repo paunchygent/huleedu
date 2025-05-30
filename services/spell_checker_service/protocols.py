@@ -24,7 +24,9 @@ class ContentClientProtocol(Protocol):
 
 
 class SpellLogicProtocol(Protocol):
-    async def perform_spell_check(self, text: str) -> SpellcheckResultDataV1:
+    async def perform_spell_check(
+        self, text: str, essay_id: Optional[str]
+    ) -> SpellcheckResultDataV1:
         """Performs spell check and returns a SpellcheckResultDataV1."""
         ...
 

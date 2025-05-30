@@ -8,52 +8,69 @@ alwaysApply: false
 ## 1. Service Identity
 - **Package**: `huleedu-spell-checker-service`
 - **Type**: Kafka Consumer Worker (no HTTP API)
-- **Stack**: aiokafka, aiohttp, Python asyncio, Dishka (for DI - planned in Δ-2)
+- **Stack**: aiokafka, aiohttp, Python asyncio, Dishka (for DI)
 - **Purpose**: Event-driven spell checking service
 
-## 2. Internal Structure (Refactored in Δ-3)
-- **`worker_main.py`**: Handles service lifecycle (startup, shutdown), Kafka client management (consumer/producer via `kafka_clients` context manager), signal handling, and the primary message consumption loop. Initializes protocol implementations (manually for now, will use Dishka) and passes them to `process_single_message`.
-- **`event_router.py`**: 
-    - Contains `process_single_message()`: Handles incoming `ConsumerRecord`, deserializes the `EventEnvelope[SpellcheckRequestedDataV1]`, orchestrates the fetch-spellcheck-store-publish flow by calling appropriate protocol methods.
-    - Implements `DefaultContentClient`, `DefaultResultStore`, `DefaultSpellLogic`, `DefaultSpellcheckEventPublisher` which adhere to the contracts in `protocols.py` and compose functions from `core_logic.py`.
-- **`core_logic.py`**: Provides fundamental, reusable functions:
-    - `default_fetch_content_impl()`: Fetches content via HTTP.
-    - `default_store_content_impl()`: Stores content via HTTP.
-    - `default_perform_spell_check_algorithm()`: The core (currently dummy) spell check logic.
+## 2. Internal Structure (✅ Refactored - Clean Architecture)
+
+### 2.1. Core Components
+- **`worker_main.py`**: Service lifecycle (startup, shutdown), Kafka client management (consumer/producer via `kafka_clients` context manager), signal handling, and the primary message consumption loop. Initializes Dishka DI container and passes protocol instances to `process_single_message`.
+- **`event_processor.py`**: Clean message processing logic that depends ONLY on injected protocol interfaces. Contains `process_single_message()` which handles incoming `ConsumerRecord`, deserializes `EventEnvelope[SpellcheckRequestedDataV1]`, and orchestrates the fetch-spellcheck-store-publish flow.
 - **`protocols.py`**: Defines `typing.Protocol` interfaces for internal dependencies:
     - `ContentClientProtocol`
-    - `SpellLogicProtocol`
+    - `SpellLogicProtocol` 
     - `ResultStoreProtocol`
     - `SpellcheckEventPublisherProtocol`
+- **`core_logic.py`**: Fundamental, reusable business logic functions:
+    - `default_fetch_content_impl()`: Fetches content via HTTP
+    - `default_store_content_impl()`: Stores content via HTTP  
+    - `default_perform_spell_check_algorithm()`: Core L2 + pyspellchecker spell checking algorithm
+- **`di.py`**: Dishka dependency injection providers that import implementations from `protocol_implementations/` and configure them with constructor dependencies
+
+### 2.2. Protocol Implementations (Clean Architecture)
+- **`protocol_implementations/`**: Directory containing canonical protocol implementations:
+    - **`content_client_impl.py`**: `DefaultContentClientImpl` - HTTP content fetching with constructor-injected dependencies
+    - **`result_store_impl.py`**: `DefaultResultStoreImpl` - HTTP content storage with constructor-injected dependencies
+    - **`spell_logic_impl.py`**: `DefaultSpellLogicImpl` - Spell checking orchestration using `core_logic` functions
+    - **`event_publisher_impl.py`**: `DefaultSpellcheckEventPublisherImpl` - Kafka event publishing with constructor-injected producer
+
+### 2.3. Architecture Benefits
+- ✅ **Single Responsibility**: Each file has one clear purpose
+- ✅ **Dependency Injection**: All business logic depends on abstractions, not concrete implementations  
+- ✅ **No Code Duplication**: Single canonical source for each protocol implementation
+- ✅ **Clean Separation**: Message processing ↔ Protocol implementations ↔ Business logic
 
 ## 3. Event-Driven Architecture
 
-**Consumes**: `essay.spellcheck.requested.v1` (`SpellcheckRequestedDataV1`)
-**Publishes**: `essay.spellcheck.completed.v1` (via `DefaultSpellcheckEventPublisher` using `SpellcheckResultDataV1`)
-**Consumer Group**: `spellchecker-service-group` (from settings)
+**Consumes**: `huleedu.essay.spellcheck.requested.v1` (`SpellcheckRequestedDataV1`)
+**Publishes**: `huleedu.essay.spellcheck.completed.v1` (via `DefaultSpellcheckEventPublisherImpl` using `SpellcheckResultDataV1`)
+**Consumer Group**: `spellchecker-service-group-v1.1` (from settings)
 
-**Flow**: `worker_main.py` consumes message ➜ `process_single_message` in `event_router.py` orchestrates: `ContentClientProtocol.fetch_content` ➜ `SpellLogicProtocol.perform_spell_check` (which uses `default_perform_spell_check_algorithm`) ➜ `ResultStoreProtocol.store_content` ➜ `SpellcheckEventPublisherProtocol.publish_spellcheck_result` ➜ `worker_main.py` commits offset.
+**Flow**: `worker_main.py` consumes message ➜ `process_single_message` in `event_processor.py` orchestrates: `ContentClientProtocol.fetch_content` ➜ `SpellLogicProtocol.perform_spell_check` ➜ `ResultStoreProtocol.store_content` ➜ `SpellcheckEventPublisherProtocol.publish_spellcheck_result` ➜ `worker_main.py` commits offset.
 
 ## 4. Integration Points
 
-- **Content Service**: HTTP REST API via aiohttp.ClientSession
+- **Content Service**: HTTP REST API via aiohttp.ClientSession (injected into protocol implementations)
 - **Kafka**: AIOKafkaConsumer/Producer with manual offset management
+- **Metrics**: Prometheus metrics server on port 8002
 
 ## 5. Spell Checking Implementation
 
-**Current**: Dummy implementation with simple replacements ("teh" → "the")
-**Future**: pyspellchecker, symspellpy, or SparkNLP integration
+**Current**: L2 + pyspellchecker dual-algorithm approach:
+- **L2 Error Dictionary**: 4886 common ESL learner corrections 
+- **PySpellChecker**: General English spell checking with contextual suggestions
+- **Correction Logging**: Detailed correction logs saved to `data/corrected_essays/`
 
 ## 6. Configuration
 
-**Environment**: `KAFKA_BOOTSTRAP_SERVERS`, `CONTENT_SERVICE_URL`, `LOG_LEVEL`
-**Dependencies**: aiokafka, aiohttp, huleedu-common-core, huleedu-service-libs
+**Environment**: `KAFKA_BOOTSTRAP_SERVERS`, `CONTENT_SERVICE_URL`, `LOG_LEVEL`, `KAFKA_CONSUMER_GROUP_ID`
+**Dependencies**: aiokafka, aiohttp, pyspellchecker, huleedu-common-core, huleedu-service-libs
 
 ## 7. Error Handling
 
-**Scenarios**: Content Service unavailable, invalid event format, spell check failure
-**Pattern**: Log error, commit offset, skip/publish failure event
-**Future**: Circuit breaker, dead letter queue, retry logic
+**Scenarios**: Content Service unavailable, invalid event format, spell check failure, Kafka producer errors
+**Pattern**: Comprehensive error handling with failure event publishing and correlation ID tracking
+**Resilience**: Service continues processing after individual message failures
 
 ## 8. Data Models
 
@@ -62,10 +79,22 @@ alwaysApply: false
 
 ## 9. Deployment
 
-**Docker**: `python:3.11-slim` base, PDM, `python -m services.spell_checker_service.worker_main` (updated entry point if module execution is preferred)
-**Command**: `pdm run -p services/spell_checker_service start_worker` (assuming `start_worker` script in `pyproject.toml` points to `python -m services.spell_checker_service.worker_main` or similar)
+**Docker**: `python:3.11-slim` base, PDM, entry point: `python -m services.spell_checker_service.worker_main`
+**Port**: 8002 (Prometheus metrics)
+**Health**: Kafka consumer health monitoring
 
-## 10. Future Enhancements
+## 10. Testing
 
-**Security**: Service auth, message encryption, input sanitization
-**Performance**: Parallel processing, content caching, batch spell checking
+**Coverage**: 71 tests covering all architectural components
+- Unit tests for core logic and protocol implementations
+- Contract compliance tests for event schemas
+- Integration tests for end-to-end message processing
+- All tests pass with architectural refactoring
+
+## 11. Architecture Evolution
+
+**Completed**: Architectural debt remediation (2025-05-30)
+- Eliminated SRP violations and code duplication
+- Implemented clean dependency injection patterns
+- Created proper separation of concerns
+- Maintained full test coverage and functionality

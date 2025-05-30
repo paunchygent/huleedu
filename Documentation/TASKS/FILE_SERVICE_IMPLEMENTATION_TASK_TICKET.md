@@ -338,7 +338,8 @@ This section outlines the creation of the new **File Service**. It will be an HT
     * **Action**: Create this file.
     * **Instruction**:
         * Define `[project]` section with `name = "huleedu-file-service"`, version, description, authors, `requires-python = ">=3.11"`.
-        * `dependencies`: `quart`, `hypercorn`, `aiokafka`, `aiohttp`, `python-dotenv`, `pydantic`, `pydantic-settings`, `prometheus-client`, `dishka`, `quart-dishka`. Crucially, include local path dependencies:
+        * `dependencies`: List all required libraries such as `quart`, `hypercorn`, `aiokafka`, `aiohttp`, `python-dotenv`, `pydantic`, `pydantic-settings`, `prometheus-client`, `dishka`, `quart-dishka`.
+        * **Local Development Dependencies**: For local development using PDM directly, include local path dependencies for shared packages:
 
             ```toml
             huleedu-common-core = {path = "../../common_core", editable = true}
@@ -347,9 +348,17 @@ This section outlines the creation of the new **File Service**. It will be an HT
 
         * `[tool.pdm.scripts]`:
             * `start = "hypercorn app:app --config python:hypercorn_config"`
-            * `dev = "quart --app app:app --debug run -p {FILE_SERVICE_HTTP_PORT_VALUE_HERE}"` (e.g., 7001)
-        * `[tool.pdm.resolution.overrides]`: For Docker builds, similar to other services, you'll need overrides if your Dockerfile structure results in these paths being different at build time (e.g., `huleedu-common-core = "file:///app/common_core"`). The local path dependencies are for PDM development environments. The overrides are more for when `pdm install` is run inside a Docker container where the relative paths might not resolve correctly if not flattened to `/app/`.
-        * Include MyPy configuration, similar to other services, ignoring missing imports for `dishka.*`, `quart_dishka.*` etc. if necessary.
+            * `dev = "quart --app app:app --debug run -p {FILE_SERVICE_HTTP_PORT_VALUE_HERE}"` (e.g., use the value from your File Service `config.py`, like 7001).
+        * **Docker Build Overrides**: For building the Docker image, where `common_core` and `libs` are copied to specific locations (e.g., under `/app/`), PDM needs hints to find them during `pdm install --prod` inside the container. Add these to `[tool.pdm.resolution.overrides]`, mirroring other services like `content_service`:
+
+            ```toml
+            [tool.pdm.resolution.overrides]
+            huleedu-common-core = "file:///app/common_core"
+            huleedu-service-libs = "file:///app/services/libs"
+            ```
+
+            *(Ensure these override paths match where your File Service `Dockerfile` copies these shared dependencies relative to its `/app` WORKDIR before running `pdm install`)*.
+        * Include MyPy configuration, similar to other services, potentially ignoring missing imports for third-party libraries like `dishka.*`, `quart_dishka.*` if official stubs are unavailable.
 
 11. **Create `hypercorn_config.py` (`services/file_service/hypercorn_config.py`)**:
     * **Action**: Create this file.

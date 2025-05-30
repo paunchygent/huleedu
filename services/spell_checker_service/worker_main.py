@@ -11,22 +11,15 @@ from aiokafka.errors import KafkaConnectionError
 from config import settings  # Assuming this is still the way to get settings
 from di import SpellCheckerServiceProvider
 from dishka import make_async_container
-from event_router import (
-    # Placeholder config values used in event_router, ideally pass them from here
-    CONTENT_SERVICE_URL_CONFIG,
-    KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED,
-    KAFKA_OUTPUT_TOPIC_CONFIG,
-    SOURCE_SERVICE_NAME_CONFIG,
-    DefaultContentClient,
-    DefaultResultStore,
-    DefaultSpellcheckEventPublisher,
-    process_single_message,
-)
+from event_processor import process_single_message
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
     create_service_logger,
 )
 from prometheus_client import CollectorRegistry, Histogram, start_http_server
+from protocol_implementations.content_client_impl import DefaultContentClient
+from protocol_implementations.event_publisher_impl import DefaultSpellcheckEventPublisher
+from protocol_implementations.result_store_impl import DefaultResultStore
 
 from common_core.enums import ProcessingEvent, topic_name
 
@@ -46,8 +39,12 @@ CONSUMER_CLIENT_ID = settings.CONSUMER_CLIENT_ID
 METRICS_PORT = settings.METRICS_PORT  # Now properly configured in Settings class
 
 INPUT_TOPIC = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
-# OUTPUT_TOPIC is KAFKA_OUTPUT_TOPIC_CONFIG from event_router which is
-# topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED)
+OUTPUT_TOPIC = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED)
+
+# Configuration constants for protocol implementations
+CONTENT_SERVICE_URL_CONFIG = settings.CONTENT_SERVICE_URL
+KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED = "huleedu.spellchecker.essay.concluded.v1"
+SOURCE_SERVICE_NAME_CONFIG = "spell-checker-service"
 
 # Prometheus metrics (will be initialized with DI registry)
 KAFKA_QUEUE_LATENCY: Histogram | None = None
@@ -166,7 +163,7 @@ async def spell_checker_worker_main() -> None:
                 KAFKA_BOOTSTRAP_SERVERS,
                 KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED,  # from event_router
                 SOURCE_SERVICE_NAME_CONFIG,  # from event_router
-                KAFKA_OUTPUT_TOPIC_CONFIG,  # from event_router
+                OUTPUT_TOPIC,  # from event_router
             ) as (consumer, producer, event_publisher_instance):
                 retry_count = 0  # Reset retries on successful connection
                 logger.info("Kafka clients initialized. Starting message consumption loop...")

@@ -86,7 +86,7 @@ async def startup():
 
 ### 3.1. Dependency Contracts & Protocols
 - **MUST** define internal behavioral contracts using `typing.Protocol` in a `<service_name>/protocols.py` file.
-- Business logic components (e.g., in `event_router.py` or Blueprint route handlers) **MUST** depend on these protocols, not concrete implementations directly.
+- Business logic components (e.g., in `event_processor.py` or Blueprint route handlers) **MUST** depend on these protocols, not concrete implementations directly.
 - Concrete implementations of protocols are provided at the service entry point (e.g., in `worker_main.py` or `app.py`), ideally via a DI framework like Dishka.
 
 ### 3.2. Dependency Injection with Dishka
@@ -163,7 +163,7 @@ class ServiceProvider(Provider):
 
 ### 3.3. Worker Service Structure Pattern (Example: Spell Checker)
 - **`worker_main.py`**: Handles service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes/injects dependencies.
-- **`event_router.py`**: Contains logic for deserializing messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
+- **`event_processor.py`**: Contains logic for deserializing messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
 - **`core_logic.py`**: Houses fundamental, reusable business logic, algorithms, and direct interactions with external systems (e.g., HTTP calls), implemented as standalone functions or simple classes.
 - **`protocols.py`**: Defines `typing.Protocol` interfaces.
 

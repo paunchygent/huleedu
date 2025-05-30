@@ -55,11 +55,17 @@ services/
 │   └── ...
 ├── spell_checker_service/         # Example Kafka worker service (no HTTP API)
 │   ├── worker_main.py             # Main entry point, DI setup, Kafka consumer loop
-│   ├── event_router.py            # Event deserialization, protocol implementations, logic orchestration
+│   ├── event_processor.py         # Clean message processing logic with injected dependencies
 │   ├── core_logic.py              # Core algorithms and helper functions
 │   ├── protocols.py               # Service-specific behavioral contracts
 │   ├── config.py                  # Service configuration with Pydantic BaseSettings
 │   ├── di.py                      # Dishka dependency injection providers
+│   ├── protocol_implementations/  # **CLEAN ARCHITECTURE**: Protocol implementations
+│   │   ├── __init__.py
+│   │   ├── content_client_impl.py # HTTP content fetching implementation
+│   │   ├── result_store_impl.py   # HTTP content storage implementation
+│   │   ├── spell_logic_impl.py    # Spell checking orchestration implementation
+│   │   └── event_publisher_impl.py # Kafka event publishing implementation
 │   ├── pyproject.toml
 │   ├── Dockerfile
 │   ├── tests/
@@ -140,14 +146,9 @@ async def metrics() -> Response:
 
 **Note on Worker Service Structure (e.g., `spell_checker_service`):**
 - `worker_main.py`: Handles service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes DI container.
-- `event_router.py`: Contains logic for deserializing incoming messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
+- `event_processor.py`: Contains logic for deserializing incoming messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
 - `core_logic.py`: Houses the fundamental, reusable business logic, algorithms, and interactions with external systems (like HTTP calls to other services), implemented as standalone functions or simple classes.
 - `protocols.py`: Defines `typing.Protocol` interfaces for key internal dependencies and behavioral contracts, facilitating DI and testability.
-
-**Note on ELS Refactored Structure:**
-- **implementations/ directory**: Contains all business logic implementations following SRP
-- **di.py**: Lean dependency injection configuration (under 150 lines)
-- **Clean separation**: Protocol interfaces in protocols.py, implementations in implementations/
 
 ## 5. Common Core Structure
 
