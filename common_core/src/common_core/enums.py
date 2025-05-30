@@ -18,7 +18,7 @@ class ProcessingStage(str, Enum):
     PENDING = "pending"
     INITIALIZED = "initialized"
     PROCESSING = "processing"
-    COMPLETED = "concluded"
+    COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
 
