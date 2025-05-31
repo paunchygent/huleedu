@@ -4,168 +4,104 @@ globs:
   - "services/spell_checker_service/**/*.py"
 alwaysApply: true
 ---
+
+---
+description: defines the architecture and implementation details of the HuleEdu Spell Checker Service
+globs: 
+alwaysApply: false
+---
 # 022: Spell Checker Service Architecture
 
-## 1. Overview
+## 1. Service Identity
+- **Package**: `huleedu-spell-checker-service`
+- **Type**: Kafka Consumer Worker (no HTTP API)
+- **Stack**: aiokafka, aiohttp, Python asyncio, Dishka (for DI)
+- **Purpose**: Event-driven spell checking service
 
-Event-driven worker service for spell checking essays. Consumes from Kafka, processes text, and publishes results.
+## 2. Internal Structure (✅ Refactored - Clean Architecture)
 
-## 2. Service Identity
+### 2.1. Core Components
+- **`worker_main.py`**: Service lifecycle (startup, shutdown), Kafka client management (consumer/producer via `kafka_clients` context manager), signal handling, and the primary message consumption loop. Initializes Dishka DI container and passes protocol instances to `process_single_message`.
+- **`event_processor.py`**: Clean message processing logic that depends ONLY on injected protocol interfaces. Contains `process_single_message()` which handles incoming `ConsumerRecord`, deserializes `EventEnvelope[SpellcheckRequestedDataV1]`, and orchestrates the fetch-spellcheck-store-publish flow.
+- **`protocols.py`**: Defines `typing.Protocol` interfaces for internal dependencies:
+    - `ContentClientProtocol`
+    - `SpellLogicProtocol` 
+    - `ResultStoreProtocol`
+    - `SpellcheckEventPublisherProtocol`
+- **`core_logic.py`**: Fundamental, reusable business logic functions:
+    - `default_fetch_content_impl()`: Fetches content via HTTP
+    - `default_store_content_impl()`: Stores content via HTTP  
+    - `default_perform_spell_check_algorithm()`: Core L2 + pyspellchecker spell checking algorithm
+- **`di.py`**: Dishka dependency injection providers that import implementations from `protocol_implementations/` and configure them with constructor dependencies
 
-- **Name**: `huleedu-spell-checker-service`
-- **Type**: Kafka Consumer Worker
-- **Stack**: aiokafka, aiohttp, asyncio
+### 2.2. Protocol Implementations (Clean Architecture)
+- **`protocol_implementations/`**: Directory containing canonical protocol implementations:
+    - **`content_client_impl.py`**: `DefaultContentClientImpl` - HTTP content fetching with constructor-injected dependencies
+    - **`result_store_impl.py`**: `DefaultResultStoreImpl` - HTTP content storage with constructor-injected dependencies
+    - **`spell_logic_impl.py`**: `DefaultSpellLogicImpl` - Spell checking orchestration using `core_logic` functions
+    - **`event_publisher_impl.py`**: `DefaultSpellcheckEventPublisherImpl` - Kafka event publishing with constructor-injected producer
 
-## 3. Event Flow
+### 2.3. Architecture Benefits
+- ✅ **Single Responsibility**: Each file has one clear purpose
+- ✅ **Dependency Injection**: All business logic depends on abstractions, not concrete implementations  
+- ✅ **No Code Duplication**: Single canonical source for each protocol implementation
+- ✅ **Clean Separation**: Message processing ↔ Protocol implementations ↔ Business logic
 
-### 3.1. Input
+## 3. Event-Driven Architecture
 
-- **Topic**: `essay.spellcheck.requested.v1`
-- **Model**: `SpellcheckRequestedDataV1`
-- **Group**: `spellchecker-service-group`
+**Consumes**: `huleedu.essay.spellcheck.requested.v1` (`SpellcheckRequestedDataV1`)
+**Publishes**: `huleedu.essay.spellcheck.completed.v1` (via `DefaultSpellcheckEventPublisherImpl` using `SpellcheckResultDataV1`)
+**Consumer Group**: `spellchecker-service-group-v1.1` (from settings)
 
-### 3.2. Output
+**Flow**: `worker_main.py` consumes message ➜ `process_single_message` in `event_processor.py` orchestrates: `ContentClientProtocol.fetch_content` ➜ `SpellLogicProtocol.perform_spell_check` ➜ `ResultStoreProtocol.store_content` ➜ `SpellcheckEventPublisherProtocol.publish_spellcheck_result` ➜ `worker_main.py` commits offset.
 
-- **Topic**: `essay.spellcheck.completed.v1`
-- **Model**: `SpellcheckResultDataV1`
+## 4. Integration Points
 
-### 3.3. Processing Steps
+- **Content Service**: HTTP REST API via aiohttp.ClientSession (injected into protocol implementations)
+- **Kafka**: AIOKafkaConsumer/Producer with manual offset management
+- **Metrics**: Prometheus metrics server on port 8002
 
-1. Consume event from Kafka
-2. Fetch text from Content Service
-3. Apply spell checking
-4. Store corrected text
-5. Publish results
-6. Commit offset
+## 5. Spell Checking Implementation
 
-## 4. Integrations
-
-### 4.1. Content Service
-
-- **Protocol**: HTTP REST
-- **Endpoints**:
-  - `GET {CONTENT_SERVICE_URL}/{id}`
-  - `POST {CONTENT_SERVICE_URL}`
-
-### 4.2. Kafka
-
-- **Consumer**: AIOKafkaConsumer
-- **Producer**: AIOKafkaProducer
-- **Serialization**: JSON + Pydantic
-
-## 5. Implementation
-
-### 5.1. Current (MVP)
-
-- Simple string replacements
-- Example: "teh" → "the"
-
-### 5.2. Future
-
-- Advanced spell checking
-- Grammar checking
-- Language detection
+**Current**: L2 + pyspellchecker dual-algorithm approach:
+- **L2 Error Dictionary**: 4886 common ESL learner corrections 
+- **PySpellChecker**: General English spell checking with contextual suggestions
+- **Correction Logging**: Detailed correction logs saved to `data/corrected_essays/`
 
 ## 6. Configuration
 
-### 6.1. Env Vars
-
-- `KAFKA_BOOTSTRAP_SERVERS=kafka:9092`
-- `CONTENT_SERVICE_URL=http://content_service:8000/v1/content`
-- `LOG_LEVEL=INFO`
-
-### 6.2. Dependencies
-
-- `aiokafka>=0.10.0`
-- `aiohttp>=3.9.0`
-- `huleedu-common-core`
-- `huleedu-service-libs`
+**Environment**: `KAFKA_BOOTSTRAP_SERVERS`, `CONTENT_SERVICE_URL`, `LOG_LEVEL`, `KAFKA_CONSUMER_GROUP_ID`
+**Dependencies**: aiokafka, aiohttp, pyspellchecker, huleedu-common-core, huleedu-service-libs
 
 ## 7. Error Handling
 
-### 7.1. Error Cases
-
-- Content Service down
-- Invalid events
-- Processing failures
-- Storage issues
-
-### 7.2. Resilience
-
-- Manual offset commits
-- Future: Circuit breakers, DLQ, retries
+**Scenarios**: Content Service unavailable, invalid event format, spell check failure, Kafka producer errors
+**Pattern**: Comprehensive error handling with failure event publishing and correlation ID tracking
+**Resilience**: Service continues processing after individual message failures
 
 ## 8. Data Models
 
-### 8.1. Input Event
+**Input**: `SpellcheckRequestedDataV1` with entity_ref, system_metadata, text_storage_id
+**Output**: `SpellcheckResultDataV1` with entity_ref, system_metadata, storage_metadata, corrections_made
 
-```python
-class SpellcheckRequestedDataV1:
-    event: str
-    entity_ref: EntityReference
-    status: str
-    system_metadata: SystemProcessingMetadata
-    text_storage_id: str
-```
+## 9. Deployment
 
-### 8.2. Output Event
+**Docker**: `python:3.11-slim` base, PDM, entry point: `python -m services.spell_checker_service.worker_main`
+**Port**: 8002 (Prometheus metrics)
+**Health**: Kafka consumer health monitoring
 
-```python
-class SpellcheckResultDataV1:
-    event: str
-    entity_ref: EntityReference
-    status: str
-    system_metadata: SystemProcessingMetadata
-    storage_metadata: StorageReferenceMetadata
-    corrections_made: int
-```
+## 10. Testing
 
-## 9. Monitoring
+**Coverage**: 71 tests covering all architectural components
+- Unit tests for core logic and protocol implementations
+- Contract compliance tests for event schemas
+- Integration tests for end-to-end message processing
+- All tests pass with architectural refactoring
 
-### 9.1. Logging
+## 11. Architecture Evolution
 
-- Structured format
-- Correlation IDs
-- INFO/ERROR levels
-
-### 9.2. Metrics (Future)
-
-- Throughput
-- Latency
-- Success rate
-
-## 10. Deployment
-
-### 10.1. Docker
-
-- `python:3.11-slim`
-- PDM for dependencies
-- `python worker.py` entrypoint
-
-## 11. Security
-
-### 11.1. Current
-
-- No auth (dev only)
-- No encryption (dev only)
-- Pydantic validation only
-
-### 11.2. Future
-
-- Service auth
-- Message encryption
-- Input sanitization
-
-## 12. Performance
-
-### 12.1. Current
-
-- Single-threaded async
-- HTTP-bound performance
-
-### 12.2. Optimizations
-
-- Parallel processing
-- Caching
-- Batch processing
-- Connection pooling
+**Completed**: Architectural debt remediation (2025-05-30)
+- Eliminated SRP violations and code duplication
+- Implemented clean dependency injection patterns
+- Created proper separation of concerns
+- Maintained full test coverage and functionality

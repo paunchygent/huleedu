@@ -3,86 +3,258 @@ trigger: model_decision
 description: "Implementation patterns for HuleEdu services. Follow when developing or modifying services to ensure consistency and maintainability."
 ---
 
-===
-
+---
+description: Read before all work on web framework, I/O, API etc
+globs: 
+alwaysApply: false
+---
 # 040: Service Implementation Guidelines
 
-## 1. Purpose
+## 1. Core Stack
+- **Framework**: Quart for async HTTP services, direct `asyncio` and `aiokafka` for worker services.
+- **Dependencies**: PDM exclusively (`pyproject.toml`, `pdm.lock`)
+- **Programming**: `async/await` for all I/O operations
 
-These guidelines standardize HuleEdu microservice implementation. You (AI agent) **MUST** adhere to these when generating/modifying service code.
+## 2. HTTP Service Blueprint Architecture **MANDATORY**
 
-## 2. Frameworks & Libraries
+### 2.1. Blueprint Pattern Requirements
+**ALL HTTP services (Quart-based) MUST follow this architecture:**
 
-### 2.1. Rule: Quart for Service Implementation
+- **app.py MUST** be lean (< 150 lines) and focused on:
+  - Quart app initialization
+  - Dependency injection setup with Dishka
+  - Blueprint registration
+  - Global middleware (metrics, logging, error handling)
+  - Startup/shutdown hooks
+- **FORBIDDEN**: Direct route definitions in app.py
 
-    - **Framework**: Quart **SHALL** be your primary web framework for async microservices.
-    - **Asynchronous**: You **MUST** use Quart's native async capabilities for all request handling and I/O.
+### 2.2. API Directory Structure **REQUIRED**
+```python
+services/<service_name>/
+├── app.py                          # Lean application setup
+├── api/                            # **REQUIRED** Blueprint routes directory
+│   ├── __init__.py
+│   ├── health_routes.py            # **REQUIRED** /healthz, /metrics endpoints
+│   └── <domain>_routes.py          # Domain-specific routes (e.g., content_routes.py)
+├── config.py                       # Pydantic settings
+├── protocols.py                    # Service behavioral contracts
+└── di.py                          # Dishka DI providers (if needed)
+```
 
-### 2.2. Rule: PDM for Dependency Management
+### 2.3. Blueprint Implementation Standards
 
-    - **Tool**: Manage Python dependencies exclusively with PDM (`pyproject.toml`, `pdm.lock`).
-    - **Your Action**: Add/update dependencies using PDM commands, ensuring `pdm.lock` is current.
+#### health_routes.py - **REQUIRED** for all HTTP services:
+```python
+"""Health and metrics routes for [Service Name]."""
+from quart import Blueprint, Response, jsonify
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-## 3. Asynchronous Programming
+health_bp = Blueprint('health_routes', __name__)
 
-### 3.1. Rule: Embrace `async/await`
+@health_bp.route("/healthz")
+async def health_check() -> Response:
+    """Health check endpoint."""
+    # Service-specific health validation logic
+    return jsonify({"status": "ok", "message": "[Service] is healthy"}), 200
 
-    - All I/O-bound operations (network, DB, file system) **MUST** use `async/await` and async-compatible libraries.
-    - You **MUST** avoid blocking calls in async code paths.
+@health_bp.route("/metrics")
+async def metrics() -> Response:
+    """Prometheus metrics endpoint."""
+    metrics_data = generate_latest()
+    return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
+```
 
-### 3.2. Rule: Proper Async Context Management
+#### Domain-specific route files:
+- **MUST** define Blueprint with descriptive name (e.g., `content_bp`, `batch_bp`)
+- **MUST** focus on HTTP request/response handling only
+- **MUST** delegate business logic to protocol implementations
+- **Dependencies MUST** be injected via module functions from app.py
 
-    - Use `async with` for async context managers. Manage task lifecycles and cancellation correctly.
+#### app.py Blueprint Registration Pattern:
+```python
+# Import Blueprints
+from .api.health_routes import health_bp
+from .api.content_routes import content_bp, set_content_dependencies
 
-## 4. State Management (Per Architectural Blueprint)
+# Register Blueprints
+app.register_blueprint(health_bp)
+app.register_blueprint(content_bp)
 
-### 4.1. Rule: Batch Orchestration Service State
+# Share dependencies with Blueprints
+@app.before_serving
+async def startup():
+    # Initialize dependencies
+    set_content_dependencies(store_root, metrics)
+```
 
-    - **Responsibility**: This service exclusively manages `BatchUpload.status` and `BatchUpload.processing_metadata` (holding `ProcessingPipelineState`).
-    - **Your Action**: When coding for this service, strictly follow the state transition logic and `ProcessingPipelineState` updates from the Architectural Design Blueprint.
+## 3. Async Patterns & Structure
 
-### 4.2. Rule: Essay Lifecycle Service State
+### 3.1. Dependency Contracts & Protocols
+- **MUST** define internal behavioral contracts using `typing.Protocol` in a `<service_name>/protocols.py` file.
+- Business logic components (e.g., in `event_processor.py` or Blueprint route handlers) **MUST** depend on these protocols, not concrete implementations directly.
+- Concrete implementations of protocols are provided at the service entry point (e.g., in `worker_main.py` or `app.py`), ideally via a DI framework like Dishka.
 
-    - **Responsibility**: This service exclusively manages `ProcessedEssay.status`.
-    - **Your Action**: When coding for this service, strictly follow the `EssayStatus` enum and transition logic from the Architectural Design Blueprint.
+### 3.2. Dependency Injection with Dishka
+- **MUST** use Dishka DI framework for all services
+- **HTTP Services**: Use `quart-dishka` integration with `@inject` decorator and `FromDishka[T]` annotations
+- **Worker Services**: Use Dishka container with manual scoping for Kafka message processing
 
-### 4.3. Rule: Clear State Ownership & Eventing
+#### HTTP Service Pattern (Quart + quart-dishka):
+```python
+# app.py
+from dishka import make_async_container
+from quart_dishka import QuartDishka, inject
+from di import ServiceProvider
 
-    - Each service owns its primary entities' state. Significant state changes **MUST** be communicated via events published by the owning service (see [030-*.md](mdc:030-event-driven-architecture-eda-standards.md)).
+@app.before_serving
+async def startup():
+    container = make_async_container(ServiceProvider())
+    QuartDishka(app=app, container=container)
 
-## 5. Internal API Design (If Applicable)
+# In Blueprint route file
+@content_bp.post("/endpoint")
+@inject
+async def handler(dependency: FromDishka[Protocol]) -> Response:
+    # Use dependency directly
+    pass
+```
 
-    - If a service exposes synchronous APIs (use sparingly):
-        - **MUST** follow RESTful principles.
-        - **MUST** use Pydantic models (from `common/` or service-specific) for request/response schemas.
-        - **MUST** include API versioning (e.g., `/v1/...`).
-        - **MUST** use `ErrorInfoModel` (from `common/`) for standardized error responses.
+#### Worker Service Pattern:
+```python
+# worker_main.py
+from dishka import make_async_container
+
+async def main():
+    container = make_async_container(ServiceProvider())
+    async with container() as request_container:
+        dependency = await request_container.get(Protocol)
+        # Use dependency
+```
+
+#### DI Provider Pattern:
+- **MUST** create `<service>/di.py` with service-specific `Provider` class
+- **MUST** use `@provide` decorator with appropriate scopes (`Scope.APP`, `Scope.REQUEST`)
+- **MUST** return protocol interfaces, not concrete classes from business logic
+```python
+# di.py
+from dishka import Provider, Scope, provide
+
+class ServiceProvider(Provider):
+    @provide(scope=Scope.APP)
+    def provide_protocol(self) -> ProtocolInterface:
+        return ConcreteImplementation()
+```
+
+#### Clean DI Architecture Pattern (ELS Model):
+- **di.py MUST** be lean (< 150 lines) containing ONLY:
+  - Provider class with @provide methods
+  - Simple instantiation logic
+  - No business logic whatsoever
+- **implementations/ directory**: For services with multiple concrete implementations:
+  - Contains all business logic implementations following SRP
+  - Each implementation file: 50-100 lines (single responsibility)
+  - Protocol interfaces remain in protocols.py
+  - Import implementations in di.py only for provider methods
+```python
+# Example clean di.py structure
+from implementations.content_client import DefaultContentClient
+from implementations.event_publisher import DefaultEventPublisher
+
+class ServiceProvider(Provider):
+    @provide(scope=Scope.APP)
+    def provide_content_client(self, session: ClientSession) -> ContentClient:
+        return DefaultContentClient(session, settings)
+```
+
+### 3.3. Worker Service Structure Pattern (Example: Spell Checker)
+- **`worker_main.py`**: Handles service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes/injects dependencies.
+- **`event_processor.py`**: Contains logic for deserializing messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
+- **`core_logic.py`**: Houses fundamental, reusable business logic, algorithms, and direct interactions with external systems (e.g., HTTP calls), implemented as standalone functions or simple classes.
+- **`protocols.py`**: Defines `typing.Protocol` interfaces.
+
+### 3.4. Resource Management (e.g., Kafka Clients, HTTP Sessions)
+- **MUST** use `asynccontextmanager` for managing resources that require explicit setup and teardown (e.g., Kafka clients, `aiohttp.ClientSession`).
+```python
+@asynccontextmanager
+async def managed_http_session() -> AsyncIterator[aiohttp.ClientSession]:
+    async with aiohttp.ClientSession() as session:
+        yield session
+
+@asynccontextmanager
+async def kafka_clients(
+    # ... kafka config args ...
+) -> AsyncIterator[tuple[AIOKafkaConsumer, AIOKafkaProducer]]:
+    consumer = AIOKafkaConsumer(...)
+    producer = AIOKafkaProducer(...)
+    await consumer.start()
+    await producer.start()
+    try:
+        yield consumer, producer
+    finally:
+        await consumer.stop()
+        await producer.stop()
+```
+
+## 4. State Management
+- Each service owns its primary entities' state
+- State changes **MUST** be communicated via events
+- Follow state transition logic from Architectural Design Blueprint
+
+## 5. API Design
+- RESTful principles
+- Pydantic models for request/response schemas
+- API versioning (`/v1/...`)
+- `ErrorInfoModel` for standardized error responses
 
 ## 6. Configuration Management
 
-### 6.1. Rule: Environment Variables & Pydantic Settings
+### 6.1. Standardized Pydantic Settings Pattern
+- **MUST** use `pydantic-settings` for all service configuration
+- **MUST** create `config.py` at service root with this pattern:
 
-    - Manage service configuration via environment variables, loaded and validated using Pydantic's `BaseSettings`.
-    - Sensitive info (credentials, API keys) **MUST NEVER** be hardcoded; supply via environment variables or secure secret stores.
+```python
+from __future__ import annotations
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    """Configuration settings for the [Service Name]."""
+    LOG_LEVEL: str = "INFO"
+    # Add typed fields with defaults
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        env_prefix="[SERVICE_NAME]_",
+    )
+
+settings = Settings()
+```
+
+### 6.2. Configuration Usage
+- Import settings: `from .config import settings`
+- Use `settings.FIELD_NAME` instead of `os.getenv()`
+- Sensitive info **MUST NEVER** be hardcoded
 
 ## 7. Logging
 
-### 7.1. Rule: Structured Logging (JSON)
+### 7.1. Centralized Logging Utility
+- **MUST** use `huleedu_service_libs.logging_utils` for all logging
+- **FORBIDDEN**: Standard library `logging` module in services
+- **Pattern**:
+```python
+from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 
-    - Use structured logging (e.g., `python-json-logger`) for machine-readable JSON logs.
+# Service initialization
+configure_service_logging("service-name", log_level=settings.LOG_LEVEL)
+logger = create_service_logger("component-name")
+```
 
-### 7.2. Rule: Mandatory Correlation IDs
+### 7.2. Mandatory Correlation IDs
+- For any operation chain (request/event), a `correlation_id` **MUST** be established or propagated
+- This `correlation_id` **MUST** be in all log messages across all involved services
+- Use `log_event_processing()` for EventEnvelope processing
 
-    - For any operation chain (request/event), a `correlation_id` **MUST** be established or propagated.
-    - This `correlation_id` **MUST** be in all log messages across all involved services.
-    - You **MUST** ensure your logging statements include the `correlation_id`.
-
-### 7.3. Rule: Consistent Log Levels & Clear Messages
-
-    - Use appropriate levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`).
-    - Log messages **MUST** be clear, concise, and contextual.
-
----
-
-**Adhering to these guidelines ensures operational consistency and aligns with HuleEdu's architectural goals.**
-===
+### 7.3. Consistent Log Levels & Clear Messages
+- Use appropriate levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`)
+- Log messages **MUST** be clear, concise, and contextual

@@ -4,88 +4,80 @@ globs:
   - "**/*.py"
 alwaysApply: true
 ---
+
+---
+description: 
+globs: 
+alwaysApply: true
+---
+===
 # 050: Python Coding Standards
 
-## 1. Core Principles
+## 1. Core Philosophy
+- Readability first. Explicit over implicit. Simple over complex.
+- SOLID, DRY, YAGNI principles.
 
-- **Readability First**: Clear, explicit, simple code
-- **SOLID/DRY/YAGNI**: Follow these design principles
-- **Type Safety**: Strict static typing with MyPy
-- **Consistency**: Follow standards across all Python code
+## 2. Tooling & Formatting
 
-## 2. Tooling (Ruff + MyPy)
+### 2.1. Ruff (Formatting and Linting)
+- **Commands**: `pdm run format-all`, `pdm run lint-all`
+- **Auto-fix**: `ruff check --fix --force-exclude .`
+- **Configuration**: `pyproject.toml` under `[tool.ruff]`
+- **MUST** use `--force-exclude` flag
+- **MUST** be Ruff compliant
 
-### 2.1. Ruff (Formatting & Linting)
+## 3. Static Typing (Mypy)
 
-- **Config**: `pyproject.toml` under `[tool.ruff]`
-- **Commands**:
-  - Format: `pdm run format-all`
-  - Lint: `pdm run lint-all`
-  - Fix: `ruff check --fix --force-exclude .`
-- **Critical**: Always use `--force-exclude` flag
+### 3.1. Type Hinting Rules
+- **MUST** type-annotate all public functions, methods, class attributes
+- **MUST** use `from __future__ import annotations`
+- **MUST** prefer precise types over `typing.Any`
+- **MUST** pass `pdm run typecheck-all`
+- **FORBIDDEN**: `typing.Any` where precise type possible
 
-### 2.2. Type Checking (MyPy)
-
-- **Requirement**: All public APIs must be typed
-- **File Header**: `from __future__ import annotations`
-- **Precision**:
-  - Use specific types (`Protocol`, `Union`, `Optional`)
-  - Avoid `typing.Any` in public interfaces
-  - Use `TypedDict` for dictionaries with fixed schemas
-- **Check**: `pdm run typecheck-all`
-
-## 3. Code Style
-
-### 3.1. Naming
-
-- Modules: `snake_case.py`
-- Classes: `PascalCase` (exceptions end with `Error`)
-- Functions/Vars: `snake_case`
-- Constants: `UPPER_SNAKE_CASE`
-- Private: `_private_member`
-
-### 3.2. Structure
-
-- Line length: 100 chars
-- Imports: Absolute imports only
-- Error Handling: Catch specific exceptions
-- Resources: Use `with` or `try/finally`
+### 3.2. Dependency Injection Principle
+- Business logic **MUST** depend on abstractions (`typing.Protocol`), not concrete implementations.
+- **MUST** use Dishka DI framework; every provider lives in `<service>/di.py`
+- HTTP services **MUST** use `quart-dishka` integration with `@inject` decorator
+- **FORBIDDEN**: Direct imports of concrete classes in business logic
 
 ## 4. Documentation
 
-### 4.1. Docstrings (Google Style)
-
-```python
-"""Module-level docstring.
-
-Public API overview and usage examples.
-"""
-
-def example(param: str) -> bool:
-    """Brief description.
-
-    Args:
-        param: Description of parameter
-              (type in signature)
-
-    Returns:
-        bool: Description of return value
-
-    Raises:
-        ValueError: When input is invalid
-    """
-```
+### 4.1. Google-Style Docstrings
+- **MUST** have docstrings for all public modules, classes, functions, methods
+- **Content**: Purpose, Args, Returns, Raises
+- **MUST** be Google-style format
 
 ### 4.2. Inline Comments
+- Use for non-obvious logic or "why" (not "what")
 
-- Explain "why" not "what"
-- Keep comments current with code
-- Remove obsolete comments
+## 5. Naming Conventions
+- Modules/Packages: `snake_case.py`
+- Classes/Exceptions: `PascalCase` (Exceptions end with `Error`)
+- Functions/Methods/Variables: `snake_case`
+- Constants: `UPPER_SNAKE_CASE`
+- Private: `_private_member`
 
-## 5. Best Practices
+## 6. Code Structure
+- **Imports**: Use absolute imports for modules outside the current service. **MUST** use absolute imports for intra-service modules.
+- **Error Handling**: Catch specific exceptions, use domain-specific exceptions
+- **Line Length**: Max 100 characters (hard limit enforced by CI where possible).
+- **File Size**: Max 400 lines of code (LoC) per Python file (hard limit enforced by CI where possible, e.g., via `scripts/loc_guard.sh`).
+- **Blank Lines**: Per PEP 8
 
-- **Immutability**: Prefer `dataclass(frozen=True)`
-- **Type Hints**: Required for all public APIs
-- **Error Handling**: Use custom exceptions
-- **Testing**: Write unit tests for all public functions
-- **Dependencies**: Keep them minimal and well-documented
+## 7. Import Standards for Containerized Services
+
+- **MUST** use absolute imports for all intra-service modules
+- **FORBIDDEN**: Relative imports (`from .api`, `from .config`) in containerized services
+- **Reason**: Container script context breaks relative import resolution
+
+```python
+# ✅ CORRECT
+from api.health_routes import health_bp
+from config import settings
+
+# ❌ FORBIDDEN  
+from .api.health_routes import health_bp
+from .config import settings
+```
+===

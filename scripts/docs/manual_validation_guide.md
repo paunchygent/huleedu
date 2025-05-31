@@ -61,6 +61,7 @@ curl -X POST \
 ```
 
 **Expected Response:**
+
 ```json
 {
   "batch_id": "uuid-generated-batch-id",
@@ -128,6 +129,7 @@ echo "Test essay content for validation" | curl -X POST \
 ```
 
 **Expected Response:**
+
 ```json
 {
   "storage_id": "generated-storage-id",
@@ -268,4 +270,4 @@ docker-compose down -v
 
 ## Next Steps
 
-With successful validation, the system is ready for File Service implementation as outlined in the FILE_SERVICE_IMPLEMENTATION_TASK_TICKET.md. 
+With successful validation, the system is ready for File Service implementation as outlined in the FILE_SERVICE_IMPLEMENTATION_TASK_TICKET.md.

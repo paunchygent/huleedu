@@ -24,6 +24,16 @@ The File Service is a new microservice in the HuleEdu ecosystem. Its creation an
 
 * **All imports must be absolute as per Rule 050-python-coding-standards.mdc.**
 
+* **Make sure that imports are from protocols, not concrete implementations.**
+
+* **importing protocols will lead to mypy issues (missing library stubs). Those are handled in by adding the import to root pyproject.toml exclusion list**
+
+* **Ensure that you do not mix concerns, add implementation classes to implementations/**
+
+* **No unit tests are written for the services yet, test by command line tests and scripts + live testing using root tests/**
+
+* **Make sure to clean up orphaned containers after Docker rebuilds and always run docker compose up -d --build, never restart (as it will just restart the old build)**
+
 ### E. File Service Implementation (Skeleton - `services/file_service/`)
 
 This section outlines the creation of the new **File Service**. It will be an HTTP service responsible for receiving file uploads, performing basic text extraction, coordinating with the Content Service for storage, and producing `EssayContentReady` Kafka events. For this walking skeleton, it will not include a Kafka consumer. Strict adherence to existing project rules and patterns observed in services like `content_service` and `batch_orchestrator_service` is required.

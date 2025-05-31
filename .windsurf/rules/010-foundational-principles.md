@@ -3,6 +3,12 @@ description: "Core principles for HuleEdu development. These take precedence ove
 globs: 
 alwaysApply: true
 ---
+
+---
+description: 
+globs: 
+alwaysApply: true
+---
 # 010: Foundational Principles
 
 ## 1. Purpose
@@ -38,4 +44,3 @@ These rules evolve. For clarifications, advise the user to consult project leads
 
 ---
 **Compliance is mandatory. This is the bedrock of a scalable HuleEdu platform.**
-

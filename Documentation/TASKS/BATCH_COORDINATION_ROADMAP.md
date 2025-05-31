@@ -18,10 +18,10 @@
 
 #### **PRIORITY 1: Fix ELS Containerization (BLOCKING)**
 
-- [ ] **ELS Dockerfile**: Create following established service patterns
-- [ ] **ELS docker-compose.yml Entry**: Add service with proper dependencies
-- [ ] **ELS Integration**: Ensure worker and API both containerized
-- [ ] **Dependency Chain**: content_service → essay_lifecycle_service → batch_orchestrator_service
+- [x] **ELS Dockerfile**: Create following established service patterns
+- [x] **ELS docker-compose.yml Entry**: Add service with proper dependencies
+- [x] **ELS Integration**: Ensure worker and API both containerized
+- [x] **Dependency Chain**: content_service → essay_lifecycle_service → batch_orchestrator_service
 
 #### **PRIORITY 2: File Service Skeleton (Architecturally Compliant)**
 

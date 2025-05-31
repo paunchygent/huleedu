@@ -461,7 +461,7 @@ These are general improvements to be applied across services or to `common_core`
 * **Error Handling**: Eliminated all "limitation" dismissals through proper architectural analysis
 * **Queue Metrics**: Spell checker service tracks Kafka queue latency from event timestamp to processing start
 
-### B.5: CI Smoke Test �� **NOT COMPLETED**
+### B.5: CI Smoke Test  **NOT COMPLETED**
 
 **Status**: 🔄 **NOT COMPLETED** - Requires implementation of GitHub Actions smoke test
 

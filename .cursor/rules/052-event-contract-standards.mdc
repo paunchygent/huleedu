@@ -1,6 +1,7 @@
 ---
-trigger: model_decision
-description: "Essential patterns for Common Core event handling, focusing on EventEnvelope structure, Thin Events, Callback APIs, and Kafka serialization."
+description: Always read before creating new event contracts or using them in code implementations
+globs: 
+alwaysApply: false
 ---
 
 # 035: Common Core Usage Patterns
@@ -70,20 +71,6 @@ async def fetch_content(
     async with http_client.get(url) as response:
         response.raise_for_status()
         return await response.read()
-```
-
-## 4. Kafka Integration
-
-### 4.1. Rule: Use `orjson` for Serialization
-
-Serialize events for Kafka using `orjson` after `model_dump()`.
-
-```python
-# from common_core.events import EventEnvelope
-# import orjson
-
-# def serialize_for_kafka(envelope: EventEnvelope) -> bytes:
-#     return orjson.dumps(envelope.model_dump(mode='json'))
 ```
 
 ---

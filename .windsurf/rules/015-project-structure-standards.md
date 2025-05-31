@@ -4,141 +4,212 @@ globs:
   - "**/*"
 alwaysApply: true
 ---
+
+---
+description: 
+globs: 
+alwaysApply: true
+---
 # 015: Project Structure Standards
 
-## 1. Purpose
-Mandatory file and folder organization standards for the HuleEdu monorepo.
+## 1. Root Directory Structure
 
-## 2. Root Directory
+**Permitted Root Files:**
+- `README.md`, `LICENSE`, `pyproject.toml`, `pdm.lock`, `docker-compose.yml`
+- `.gitignore`, `.pdm-python`, `.dockerignore`, `AGENTS.md`
 
-### 2.1. Allowed Root Files
-```
-README.md         # Project overview
-LICENSE           # Project license
-pyproject.toml    # PDM config
-pdm.lock         # PDM lock file
-docker-compose.yml # Docker config
-.gitignore        # Git ignore rules
-.pdm-python      # PDM Python version
-```
+**Permitted Root Directories:**
+- `.git/`, `.venv/`, `.mypy_cache/`, `__pycache__/`, `.cursor/`, `.ruff_cache/`, `.windsurf/`
+- `common_core/`, `services/`, `scripts/`, `Documentation/`
 
-### 2.2. Allowed Root Dirs
-```
-.git/           # Git data
-.venv/          # PDM venv
-.mypy_cache/    # Type checking
-__pycache__/    # Python cache
-.cursor/        # IDE config
-common_core/    # Shared package
-services/       # Microservices
-scripts/        # Project scripts
-TASKS/          # Project tasks
-```
+**FORBIDDEN**: Setup scripts, service-specific files, temporary files in root
 
-## 3. Scripts Directory
+## 2. Scripts Directory Structure
 
-### 3.1. Structure
 ```
 scripts/
-├── docs/                    # Script documentation
-│   ├── SETUP_GUIDE.md
-│   └── DEPLOYMENT_GUIDE.md
-├── setup_huledu_environment.sh
-├── deploy.sh
-└── utils/                   # Utilities
-    ├── backup.sh
-    └── maintenance.sh
+├── docs/                           # Script documentation
+├── README.md                      
+├── setup_huledu_environment.sh    
+└── utils/                         # Utility scripts
 ```
 
-### 3.2. Rules
-- Docs in `scripts/docs/` only
-- No script docs outside this dir
-- Include purpose/usage in docs
+## 3. Services Directory Structure
 
-## 4. Services Directory
-
-### 4.1. Structure
 ```
 services/
-├── libs/                    # Shared libs
-│   └── huleedu_service_libs/
-├── content_service/         # Example service
-│   ├── app.py
+├── libs/                          # Shared service libraries
+├── content_service/               # Individual microservice (Quart HTTP app)
+│   ├── app.py                     # Lean Quart application entry point (setup, DI, Blueprint registration)
+│   ├── api/                       # **REQUIRED**: Blueprint API routes directory
+│   │   ├── __init__.py
+│   │   ├── health_routes.py       # Standard health and metrics endpoints
+│   │   └── content_routes.py      # Domain-specific API routes
+│   ├── pyproject.toml
+│   ├── Dockerfile
+│   ├── config.py                  # Pydantic settings configuration
+│   ├── protocols.py               # Optional: Service-specific behavioral contracts
+│   ├── tests/
+│   └── docs/
+├── batch_orchestrator_service/    # Individual microservice (primary orchestrator)
+│   ├── app.py                     # Lean Quart application entry point
+│   ├── startup_setup.py           # DI initialization, service lifecycle management  
+│   ├── metrics.py                 # Prometheus metrics middleware
+│   ├── api/                       # **REQUIRED**: Blueprint API routes directory
+│   │   ├── __init__.py
+│   │   ├── health_routes.py       # Standard health and metrics endpoints
+│   │   └── batch_routes.py        # Domain-specific API routes (thin HTTP adapters)
+│   ├── implementations/           # **CLEAN ARCHITECTURE**: Protocol implementations
+│   │   ├── __init__.py
+│   │   ├── batch_repository_impl.py       # MockBatchRepositoryImpl
+│   │   ├── event_publisher_impl.py        # DefaultBatchEventPublisherImpl
+│   │   ├── essay_lifecycle_client_impl.py # DefaultEssayLifecycleClientImpl
+│   │   └── batch_processing_service_impl.py # Service layer business logic
+│   ├── protocols.py               # Service-specific behavioral contracts
+│   ├── di.py                      # Dishka dependency injection providers
+│   ├── config.py                  # Pydantic settings configuration
+│   ├── api_models.py              # Request/response models
+│   ├── kafka_consumer.py          # Kafka event consumer
 │   ├── pyproject.toml
 │   ├── Dockerfile
 │   ├── tests/
 │   └── docs/
-├── batch_service/
-└── spell_checker_service/
+├── spell_checker_service/         # Example Kafka worker service (no HTTP API)
+│   ├── worker_main.py             # Main entry point, DI setup, Kafka consumer loop
+│   ├── event_processor.py         # Clean message processing logic with injected dependencies
+│   ├── core_logic.py              # Core algorithms and helper functions
+│   ├── protocols.py               # Service-specific behavioral contracts
+│   ├── config.py                  # Service configuration with Pydantic BaseSettings
+│   ├── di.py                      # Dishka dependency injection providers
+│   ├── protocol_implementations/  # **CLEAN ARCHITECTURE**: Protocol implementations
+│   │   ├── __init__.py
+│   │   ├── content_client_impl.py # HTTP content fetching implementation
+│   │   ├── result_store_impl.py   # HTTP content storage implementation
+│   │   ├── spell_logic_impl.py    # Spell checking orchestration implementation
+│   │   └── event_publisher_impl.py # Kafka event publishing implementation
+│   ├── pyproject.toml
+│   ├── Dockerfile
+│   ├── tests/
+│   └── docs/
+└── essay_lifecycle_service/       # Hybrid HTTP + Kafka service
+    ├── app.py                     # Lean Quart HTTP API entry point
+    ├── api/                       # **REQUIRED**: Blueprint API routes directory
+    │   ├── __init__.py
+    │   ├── health_routes.py       # Standard health and metrics endpoints
+    │   └── essay_routes.py        # Essay status and lifecycle API routes
+    ├── worker_main.py             # Kafka event consumer entry point
+    ├── state_store.py             # Essay state persistence layer
+    ├── batch_tracker.py           # Batch coordination and readiness tracking
+    ├── batch_command_handlers.py  # Command processing for batch operations
+    ├── core_logic.py              # Business logic and state transitions
+    ├── protocols.py               # Service behavioral contracts
+    ├── config.py                  # Service configuration
+    ├── di.py                      # Dependency injection setup (lean, ~114 lines)
+    ├── implementations/           # **CLEAN ARCHITECTURE**: Business logic implementations
+    │   ├── __init__.py
+    │   ├── content_client.py      # HTTP content storage operations
+    │   ├── event_publisher.py     # Kafka event publishing logic
+    │   ├── metrics_collector.py   # Prometheus metrics collection
+    │   ├── batch_command_handler_impl.py # Batch command processing
+    │   └── service_request_dispatcher.py # Specialized service request dispatching
+    ├── pyproject.toml
+    ├── tests/
+    └── docs/
 ```
 
-### 4.2. Rules
-- Service `README.md` at root
-- Docs in `services/{name}/docs/`
-- No service docs in root
+## 4. HTTP Service Blueprint Structure **MANDATORY**
 
-## 5. Common Core
+**For all HTTP services (Quart-based), the following structure is REQUIRED:**
 
-### 5.1. Structure
+### 4.1. API Directory Requirements
+- **MUST** have `api/` directory containing all route definitions
+- **MUST** have `health_routes.py` with `/healthz` and `/metrics` endpoints
+- **MUST** have domain-specific route files (e.g., `content_routes.py`, `batch_routes.py`)
+- **MUST** have `__init__.py` in `api/` directory
+
+### 4.2. Blueprint Pattern Requirements
+- **Each route file MUST** define a Blueprint with appropriate name
+- **app.py MUST** register all Blueprints using `app.register_blueprint()`
+- **Route files MUST** be focused on HTTP handling, not business logic
+- **Dependencies MUST** be passed from app.py to Blueprints via module functions
+
+### 4.3. app.py Structure Requirements
+- **MUST** be lean (< 150 lines) focused on:
+  - Quart app initialization
+  - Dependency injection setup
+  - Blueprint registration
+  - Global middleware (metrics, logging)
+  - Startup/shutdown hooks
+- **FORBIDDEN**: Direct route definitions in app.py
+
+### 4.4. Standard Blueprint Files
+
+#### health_routes.py Template:
+```python
+"""Health and metrics routes for [Service Name]."""
+from quart import Blueprint, Response, jsonify
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+health_bp = Blueprint('health_routes', __name__)
+
+@health_bp.route("/healthz")
+async def health_check() -> Response:
+    """Health check endpoint."""
+    # Service-specific health logic
+    return jsonify({"status": "ok"}), 200
+
+@health_bp.route("/metrics")  
+async def metrics() -> Response:
+    """Prometheus metrics endpoint."""
+    metrics_data = generate_latest()
+    return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
+```
+
+**Note on Worker Service Structure (e.g., `spell_checker_service`):**
+- `worker_main.py`: Handles service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes DI container.
+- `event_processor.py`: Contains logic for deserializing incoming messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
+- `core_logic.py`: Houses the fundamental, reusable business logic, algorithms, and interactions with external systems (like HTTP calls to other services), implemented as standalone functions or simple classes.
+- `protocols.py`: Defines `typing.Protocol` interfaces for key internal dependencies and behavioral contracts, facilitating DI and testability.
+
+## 5. Common Core Structure
+
 ```
 common_core/
-├── src/common_core/
-│   ├── __init__.py
-│   ├── enums.py
-│   ├── metadata_models.py
-│   ├── pipeline_models.py
-│   └── events/
-├── tests/
-└── README.md
+├── src/
+│   └── common_core/
+│       ├── __init__.py
+│       ├── enums.py
+│       ├── metadata_models.py
+│       ├── events/
+│       └── py.typed
+├── tests/                         
+├── pyproject.toml
+└── README.md                      
 ```
 
-## 6. TASKS Directory
+## 6. Documentation Directory Structure
 
-### 6.1. Structure
 ```
-TASKS/
-├── PHASE_1.0.md           # Project tasks
-├── PHASE_1.1.md
-└── services/              # Service tasks
-    ├── content_service/
-    └── batch_service/
+Documentation/
+├── TASKS/
+│   ├── PHASE_1.0.md               
+│   ├── PHASE_1.1.md
+│   └── PHASE_1.2.md
+├── dependencies/
+├── PDR:s/
+└── setup_environment/
 ```
 
-### 6.2. Rules
-- Project tasks in root `TASKS/`
-- Service tasks in `TASKS/services/{name}/`
-- Clearly document scope
+## 7. Documentation Placement Rules
 
-## 7. Documentation
+- **Root README.md**: Project overview and architecture
+- **Service README.md**: `services/{service_name}/README.md`
+- **Common Core README.md**: `common_core/README.md`
+- **FORBIDDEN**: README.md files in separate documentation folders
 
-### 7.1. README Files
-- Root: Project overview
-- Services: `services/{name}/README.md`
-- Common Core: `common_core/README.md`
-- No READMEs in `docs/` dirs
+## 8. File Creation Rules
 
-## 8. File Management
-
-### 8.1. Creation Rules
-1. Verify target directory
-2. Follow structure standard
-3. Create parent dirs if needed
-4. Update rules for new patterns
-
-### 8.2. Maintenance
-- Update rules for new patterns
-- Keep structure consistent
-- Clean temporary files
-
-## 9. Enforcement
-
-### 9.1. AI Agent Rules
-- Enforce structure
-- Reject violations
-- Suggest fixes
-- Update rules as needed
-
-### 9.2. Validation
-- Validate before operations
-- Propose corrections
-- Maintain consistency
+**MUST** verify target directory exists and follows this structure before creating files.
+**MUST** create necessary parent directories if they don't exist.
+**FORBIDDEN**: Files that violate this structure.
+**HTTP Services**: MUST include api/ directory structure with Blueprint pattern.

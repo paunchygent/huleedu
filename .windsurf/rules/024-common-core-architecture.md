@@ -4,6 +4,12 @@ globs:
   - "**/common_core/**/*.py"
 alwaysApply: true
 ---
+
+---
+description: 
+globs: 
+alwaysApply: true
+---
 # 024: Common Core Architecture
 
 ## 1. Purpose
@@ -22,40 +28,64 @@ Defines HuleEdu's Common Core package with shared models, enums, and event schem
 
 ```
 common_core/
-├── enums.py           # Business enums
-├── metadata_models.py # Metadata/reference models
-├── pipeline_models.py # Pipeline state
-└── events/            # Event schemas
-    ├── envelope.py
-    └── spellcheck_models.py
+├── enums.py                    # Business enums, ProcessingEvent, topic mapping
+├── metadata_models.py          # Metadata/reference models  
+├── pipeline_models.py          # Pipeline state models
+├── essay_service_models.py     # ELS request models
+├── batch_service_models.py     # BOS command models
+└── events/                     # Event schemas
+    ├── envelope.py             # EventEnvelope wrapper
+    ├── base_event_models.py    # Base event classes
+    ├── spellcheck_models.py    # Spellcheck event data
+    ├── ai_feedback_events.py   # AI feedback event data
+    └── batch_coordination_events.py # Batch coordination events
 ```
 
 ## 3. Core Enums
 
 ### 3.1. ProcessingStage
 
-`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `CANCELLED`
+`PENDING`, `INITIALIZED`, `PROCESSING`, `CONCLUDED`, `FAILED`, `CANCELLED`
+
+- **Terminal States**: `CONCLUDED`, `FAILED`, `CANCELLED`
+- **Active States**: `CONCLUDED`, `INITIALIZED`, `PROCESSING`
 
 ### 3.2. ProcessingEvent
 
-- Lifecycle: upload, validation, completion
-- Phases: spellcheck, NLP, AI feedback
-- System: cancellation, errors
+- **Batch Orchestration**: `BATCH_PIPELINE_REQUESTED`, `BATCH_PHASE_INITIATED`, `BATCH_PIPELINE_PROGRESS_UPDATED`, `BATCH_PHASE_CONCLUDED`
+- **Essay Lifecycle**: `ESSAY_PHASE_INITIATION_REQUESTED`, `ESSAY_LIFECYCLE_STATE_UPDATED`
+- **Specialized Services**: `ESSAY_SPELLCHECK_REQUESTED`, `ESSAY_SPELLCHECK_RESULT_RECEIVED`, `ESSAY_NLP_RESULT_RECEIVED`, `ESSAY_AIFEEDBACK_RESULT_RECEIVED`, etc.
+- **Generic**: `PROCESSING_STARTED`, `PROCESSING_CONCLUDED`, `PROCESSING_FAILED`
 
 ### 3.3. EssayStatus
 
-- Upload: `uploaded`, `text_extracted`
-- Spellcheck: `awaiting_spellcheck`, `spellchecked_*`
-- Processing: `awaiting_nlp`, `nlp_*`
-- Final: `all_processing_completed`, `critical_failure`
+- **File Service**: `UPLOADED`, `TEXT_EXTRACTED`, `CONTENT_INGESTING`, `CONTENT_INGESTION_FAILED`
+- **ELS Pipeline**: `READY_FOR_PROCESSING`
+- **Spellcheck**: `AWAITING_SPELLCHECK`, `SPELLCHECKING_IN_PROGRESS`, `SPELLCHECKED_SUCCESS`, `SPELLCHECK_FAILED`
+- **NLP**: `AWAITING_NLP`, `NLP_IN_PROGRESS`, `NLP_SUCCESS`, `NLP_FAILED`
+- **AI Feedback**: `AWAITING_AI_FEEDBACK`, `AI_FEEDBACK_IN_PROGRESS`, `AI_FEEDBACK_SUCCESS`, `AI_FEEDBACK_FAILED`
+- **System**: `ESSAY_CRITICAL_FAILURE`
 
 ### 3.4. BatchStatus
 
-`created`, `uploading`, `processing`, `completed`, `failed`, `cancelled`
+- **Ingestion**: `AWAITING_CONTENT_VALIDATION`, `CONTENT_INGESTION_FAILED`, `AWAITING_PIPELINE_CONFIGURATION`
+- **Processing**: `READY_FOR_PIPELINE_EXECUTION`, `PROCESSING_PIPELINES`
+- **Terminal**: `COMPLETED_SUCCESSFULLY`, `COMPLETED_WITH_FAILURES`, `FAILED_CRITICALLY`, `CANCELLED`
 
 ### 3.5. ContentType
 
-`ORIGINAL_ESSAY`, `CORRECTED_TEXT`, `NLP_ANALYSIS`, `AI_FEEDBACK`
+`ORIGINAL_ESSAY`, `CORRECTED_TEXT`, `PROCESSING_LOG`, `NLP_METRICS_JSON`, `STUDENT_FACING_AI_FEEDBACK_TEXT`, `AI_EDITOR_REVISION_TEXT`, `AI_DETAILED_ANALYSIS_JSON`, `GRAMMAR_ANALYSIS_JSON`, `CJ_RESULTS_JSON`
+
+### 3.6. Topic Mapping Function
+
+```python
+def topic_name(event: ProcessingEvent) -> str:
+    """Convert ProcessingEvent to Kafka topic name with explicit mapping."""
+```
+
+**Current Mappings**:
+- `ESSAY_SPELLCHECK_REQUESTED` → `"huleedu.essay.spellcheck.requested.v1"`
+- `ESSAY_SPELLCHECK_RESULT_RECEIVED` → `"huleedu.essay.spellcheck.completed.v1"`
 
 ## 4. Models
 
@@ -63,23 +93,36 @@ common_core/
 
 ```python
 entity_id: str
-type: str
-parent_id: Optional[str]
+entity_type: str
+parent_id: Optional[str] = None
 ```
 
 ### 4.2. SystemProcessingMetadata
 
 ```python
 entity: EntityReference
-timeline: {started_at, completed_at, timestamp}
-stage: Optional[ProcessingStage]
-event: Optional[str]
+timestamp: datetime
+processing_stage: Optional[ProcessingStage] = None
+started_at: Optional[datetime] = None
+completed_at: Optional[datetime] = None
+event: Optional[str] = None
+error_info: Dict[str, Any] = Field(default_factory=dict)
 ```
 
-### 4.3. StorageReference
+### 4.3. StorageReferenceMetadata
 
 ```python
-references: Dict[ContentType, Dict[str, str]]
+references: Dict[ContentType, Dict[str, str]] = Field(default_factory=dict)
+
+def add_reference(self, ctype: ContentType, storage_id: str, path_hint: Optional[str] = None) -> None
+```
+
+### 4.4. EssayProcessingInputRefV1
+
+```python
+essay_id: str
+text_storage_id: str
+student_name: Optional[str] = None
 ```
 
 ## 5. Event System
@@ -87,46 +130,42 @@ references: Dict[ContentType, Dict[str, str]]
 ### 5.1. EventEnvelope
 
 ```python
-type: str           # Versioned ID
-source: str         # Service name
-correlation_id: str
-timestamp: datetime
-data: T             # Typed payload
+event_id: UUID = Field(default_factory=uuid4)
+event_type: str  # e.g., "huleedu.essay.spellcheck_completed.v1"
+event_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+source_service: str
+schema_version: int = 1
+correlation_id: Optional[UUID] = None
+data_schema_uri: Optional[str] = None
+data: T_EventData
 ```
 
-### 5.2. Base Event
+### 5.2. Base Event Models
 
-```python
-event: str
-entity: EntityReference
-status: str
-metadata: SystemProcessingMetadata
-```
+**BaseEventData**: Foundation for all event payloads
+**ProcessingUpdate**: Extends BaseEventData with status and metadata
+**EventTracker**: Event tracking capabilities
 
-### 5.3. Spellcheck Events
+### 5.3. Service Models
 
-```python
-class SpellcheckRequested:
-    text_storage_id: str
-
-class SpellcheckResult:
-    storage: StorageReference
-    corrections: int
-```
+**essay_service_models.py**: Request models from ELS to Specialized Services
+**batch_service_models.py**: Command models from BOS to ELS
 
 ## 6. Implementation
 
 ### 6.1. Pydantic
 
 - All models inherit `BaseModel`
-- Type hints required
+- Type hints required with `from __future__ import annotations`
 - Custom validators as needed
+- Frozen models where immutability required
 
 ### 6.2. Type Checking
 
 - MyPy with strict mode
 - No untyped definitions
-- No `Any` returns
+- No `Any` returns where avoidable
+- Generic TypeVar for EventEnvelope
 
 ### 6.3. Dependencies
 
@@ -138,4 +177,17 @@ class SpellcheckResult:
 - Semantic versioning (0.1.0)
 - Breaking changes = major version
 - Event models use V1, V2 suffixes
+- EventEnvelope includes schema_version field
 - Backward compatibility within major versions
+
+## 8. Error Handling
+
+### 8.1. ErrorCode Enum
+
+`UNKNOWN_ERROR`, `VALIDATION_ERROR`, `RESOURCE_NOT_FOUND`, `CONFIGURATION_ERROR`, `EXTERNAL_SERVICE_ERROR`, `KAFKA_PUBLISH_ERROR`, service-specific errors
+
+## 9. Future Event Files (Not Yet Implemented)
+
+- `nlp_events.py`: NLP service event models
+- `cj_assessment_events.py`: CJ assessment event models
+- Additional specialized service events as services are implemented

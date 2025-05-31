@@ -31,21 +31,35 @@ The project is organized as a monorepo managed by PDM:
 
 The HuleEdu ecosystem currently comprises the following services:
 
-* **Content Service**:
+* **Content Service** ✅ **IMPLEMENTED**:
   * **Description**: A Quart-based HTTP service responsible for content storage and retrieval, using a local filesystem backend.
+  * **Port**: 8001 (HTTP API)
   * **Location**: `services/content_service/`
-* **File Service**:
-  * **Description**: A Quart-based HTTP service with Kafka worker responsible for file upload handling, text extraction, and content ingestion coordination. Accepts multipart file uploads, processes files to extract text content, coordinates with Content Service for storage, and emits essay readiness events.
-  * **Location**: `services/file_service/` *(planned - walking skeleton implementation)*
-* **Spell Checker Service**:
+  * **API**: `/v1/content` endpoints for storage and retrieval
+
+* **Spell Checker Service** ✅ **IMPLEMENTED**:
   * **Description**: A Kafka consumer worker service that performs advanced spell checking on essays, including L2 error correction and standard spell checking using `pyspellchecker`.
+  * **Port**: 8002 (Metrics)
   * **Location**: `services/spell_checker_service/`
-* **Batch Orchestrator Service** (formerly Batch Service):
+  * **Architecture**: Clean architecture with DI, protocols, and comprehensive test coverage
+
+* **Batch Orchestrator Service** ✅ **IMPLEMENTED**:
   * **Description**: A Quart-based HTTP service that orchestrates essay processing workflows, initiating tasks by publishing events.
+  * **Port**: 5001 (HTTP API)
   * **Location**: `services/batch_orchestrator_service/`
-* **Essay Lifecycle Service (ELS)**:
-  * **Description**: A Kafka consumer worker service responsible for managing the state of individual essays throughout the processing pipeline. It listens to events from specialized services and batch commands to update essay states. Its core infrastructure (DI, protocols, state store) is implemented.
+  * **API**: `/v1/batches` endpoints for batch registration and coordination
+
+* **Essay Lifecycle Service (ELS)** ✅ **IMPLEMENTED**:
+  * **Description**: A dual-mode service (HTTP API + Kafka worker) responsible for managing the state of individual essays throughout the processing pipeline. Handles essay state transitions and batch coordination.
+  * **Ports**: 6001 (HTTP API), 9091 (Metrics)
   * **Location**: `services/essay_lifecycle_service/`
+  * **Architecture**: SQLite-based state management with event-driven coordination
+
+* **File Service** 🚧 **PENDING IMPLEMENTATION**:
+  * **Description**: A Quart-based HTTP service with Kafka event publishing for file upload handling, text extraction, and content ingestion coordination. Will accept multipart file uploads, process files to extract text content, coordinate with Content Service for storage, and emit essay readiness events.
+  * **Port**: 7001 (planned)
+  * **Location**: `services/file_service/` *(implementation in progress)*
+  * **Status**: Final component needed for Sprint 1 completion
 
 ## Key Technologies
 
@@ -59,6 +73,7 @@ The HuleEdu ecosystem currently comprises the following services:
 * **MyPy**: For static type checking.
 * **Pytest**: For testing (unit, integration, contract).
 * **Dishka**: For dependency injection.
+* **SQLite**: For service-local data persistence (ELS).
 
 ## Development Environment Setup
 
@@ -122,49 +137,48 @@ The entire HuleEdu system, including Kafka and all microservices, can be run loc
 
     This command will start all services defined in `docker-compose.yml` in detached mode. It includes Zookeeper, Kafka, the `kafka_topic_setup` one-shot service for automatic topic creation, and all HuleEdu microservices.
 
-## Current Development Status & Focus (Phase 1.2)
+## Current Development Status & Focus (Phase 1.2 → Sprint 1)
 
-The project is actively developed. Key recent achievements and ongoing work within Phase 1.2 include:
+The project is in the final stages of Phase 1.2, approaching Sprint 1 completion. Recent achievements include:
 
-* **Foundational Refinements**:
-  * Enhanced `topic_name()` helper in `common_core` for better diagnosability.
-  * MyPy configuration updated for external libraries without type stubs.
-  * Root `.dockerignore` file created for optimized Docker builds.
-  * Standardized Pydantic `BaseSettings` for configuration across services.
-* **Core Service Enhancements**:
-  * **Spell Checker Service**: Comprehensive unit tests implemented. The L2 + `pyspellchecker` pipeline from the prototype has been fully integrated, and the service worker was refactored into `worker_main.py`, `event_router.py`, and `core_logic.py`.
-  * **Kafka Topic Automation**: Implemented `scripts/kafka_topic_bootstrap.py` and integrated it as a one-shot Docker Compose service to ensure topics exist before other services start.
-* **Architectural Infrastructure (Phase 1.2 Δ - "Contracts & Containers")**:
-  * **Typed Behavioural Contracts**: Defined service-local `protocols.py` for all running services.
-  * **Dishka DI Integration**: Dishka DI containers wired across Batch Orchestrator and Spell Checker services.
-  * **File Size Compliance**: Refactored oversized modules to adhere to LoC limits.
-  * **`EventEnvelope` Versioning**: Added `schema_version` to `EventEnvelope`.
-* **Essay Lifecycle Service (ELS)**:
-  * Critical fixes, architectural naming corrections, and type stub completions have been addressed.
-  * All required Pydantic models for ELS interactions are in `common_core`.
-  * Batch-centric infrastructure (protocols, DI for command handlers and dispatchers) is complete.
-  * Implementation of spellcheck handlers in ELS is proceeding following the Spell Checker Service migration.
-* **Upcoming Work**:
-  * Implementation of Prometheus scrape endpoints for metrics (Δ-4).
-  * CI Smoke Test with Docker layer caching.
-  * Semantic version bump for internal packages to `0.2.0`.
+* **Core Services Implemented** ✅:
+  * **Content Service**: HTTP API with filesystem storage backend
+  * **Spell Checker Service**: Event-driven worker with L2 + pyspellchecker pipeline, comprehensive tests
+  * **Batch Orchestrator Service**: HTTP API with event publishing and DI architecture
+  * **Essay Lifecycle Service**: Dual-mode service with state management and batch coordination
+* **Foundational Architecture** ✅:
+  * **Clean Architecture**: Protocol-based DI across all services with Dishka
+  * **Event-Driven Communication**: Standardized EventEnvelope with Kafka integration
+  * **Contract Management**: Comprehensive Pydantic models in common_core
+  * **Testing Infrastructure**: Unit, integration, and contract tests with 71+ tests passing
+  * **Observability**: Prometheus metrics endpoints across services
+  * **Docker Integration**: Full containerization with automated topic setup
+* **Development Standards** ✅:
+  * **Code Quality**: Ruff formatting, MyPy type checking, 400 LOC file limits
+  * **Configuration**: Standardized Pydantic BaseSettings across services
+  * **Logging**: Centralized correlation ID tracking and structured logging
+  * **Dependency Management**: PDM monorepo with proper version resolution
 
-For detailed current tasks and progress, please refer to the documents in the `Documentation/TASKS/` directory.
+* **Sprint 1 Completion Requirements**:
+  * 🚧 **File Service Implementation**: The final missing component for complete batch processing workflow
+  * ✅ **All Other Components**: Implemented and tested
+
+For detailed current tasks and progress, please refer to the documents in the `Documentation/TASKS/` directory, particularly `FILE_SERVICE_IMPLEMENTATION_TASK_TICKET.md`.
 
 ## Planned Services and Enhancements
 
-The HuleEdu platform is evolving. The following services and capabilities are planned for future development:
+The HuleEdu platform continues evolving beyond Sprint 1. The following services and capabilities are planned for future development:
 
-* **Near-Term Service Integrations (coming weeks)**:
-  * **AI Judge powered CJ (Comparative Judgement) Assessment Service**: To facilitate AI-driven comparative judgement of essays.
-  * **AI Feedback Service**: To provide automated, AI-generated feedback on student essays.
-  * **NLP Metrics Service**: To extract and serve detailed Natural Language Processing metrics from essays.
-* **Future Architectural Components and Services**:
-  * **LLM-Caller Gateway**: A centralized service for managing interactions with various Large Language Models, handling model selection, and standardizing API calls.
-  * **API Gateway**: A single entry point for external clients to interact with the HuleEdu microservices.
-  * **React Frontend**: A modern user interface for students and educators.
-  * **User Service**: To manage user authentication, authorization, and profiles.
-  * **Result Aggregator**: A service to collect, aggregate, and present processing results and feedback from various services.
+* **Phase 2 - AI Processing Pipeline**:
+  * **AI Feedback Service**: AI-generated feedback on student essays
+  * **NLP Metrics Service**: Detailed Natural Language Processing metrics extraction
+  * **AI Judge powered CJ (Comparative Judgement) Assessment Service**: AI-driven comparative judgement of essays
+* **Future Architectural Components**:
+  * **LLM-Caller Gateway**: Centralized service for managing Large Language Model interactions
+  * **API Gateway**: Single entry point for external clients
+  * **React Frontend**: Modern user interface for students and educators
+  * **User Service**: Authentication, authorization, and user profiles
+  * **Result Aggregator**: Processing results collection and presentation
 
 ## Project Rules & Documentation
 

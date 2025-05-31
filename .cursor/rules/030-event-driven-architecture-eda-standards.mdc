@@ -3,7 +3,6 @@ description:
 globs: 
 alwaysApply: true
 ---
-===
 # 030: Event-Driven Architecture (EDA) Standards
 
 ## 1. Core Principle
@@ -39,4 +38,3 @@ Example: `huleedu.essay.spellcheck.requested.v1`
 ## 5. Schema Evolution
 - Additive, optional changes are safe
 - Breaking changes **REQUIRE** new event version
-===

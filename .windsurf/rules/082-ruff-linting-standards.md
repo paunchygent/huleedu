@@ -3,14 +3,16 @@ trigger: model_decision
 description: "Ruff linting standards. Follow when writing or reviewing Python code to ensure code quality and consistency through automated style enforcement."
 ---
 
+---
+description: Read whenever discussing linter settings
+globs: 
+alwaysApply: false
+---
 # 082: Ruff Linting Standards
 
-## 1. Purpose
-This rule defines Ruff configuration standards for the HuleEdu monorepo, validated against current Ruff capabilities.
+## 1. Ruff Configuration
 
-## 2. Ruff Configuration
-
-### 2.1. Rule: Core Settings
+### 1.1. Core Settings
 **REQUIRED** Ruff configuration in `pyproject.toml`:
 
 ```toml
@@ -30,7 +32,7 @@ exclude = [
 ]
 ```
 
-### 2.2. Rule: Lint Rules Selection
+### 1.2. Lint Rules Selection
 **REQUIRED** lint rules:
 
 ```toml
@@ -46,7 +48,7 @@ ignore = [
 ]
 ```
 
-### 2.3. Rule: Format Settings
+### 1.3. Format Settings
 **REQUIRED** format configuration:
 
 ```toml
@@ -55,9 +57,9 @@ quote-style = "double"
 indent-style = "space"
 ```
 
-## 3. Per-File Ignores
+## 2. Per-File Ignores
 
-### 3.1. Rule: Service Entry Points
+### 2.1. Service Entry Points
 **ALLOWED** imports after `load_dotenv()`:
 
 ```toml
@@ -66,9 +68,9 @@ indent-style = "space"
 "services/*/worker.py" = ["E402"]
 ```
 
-## 4. VS Code Integration
+## 3. VS Code Integration
 
-### 4.1. Rule: Modern VS Code Settings
+### 3.1. Modern VS Code Settings
 **REQUIRED** VS Code settings for 2025:
 
 ```json
@@ -82,11 +84,8 @@ indent-style = "space"
 }
 ```
 
-### 4.2. Rule: Deprecated Settings
+### 3.2. Deprecated Settings
 **FORBIDDEN** deprecated VS Code settings:
 - `ruff.format.args` (handled automatically)
 - `ruff.lint.args` (handled automatically)
 - `ruff.showNotifications` (use `ruff.logLevel`)
-
----
-**Ruff replaces Black, isort, and Flake8 with unified, fast tooling.**

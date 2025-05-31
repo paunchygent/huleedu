@@ -3,36 +3,33 @@ trigger: model_decision
 description: "PDM dependency management standards. Follow when adding, updating, or removing Python dependencies to ensure consistency and reproducibility."
 ---
 
+---
+description: MUST READ whenever working on or discussing pdm resolution, versioning, and .toml files
+globs: 
+alwaysApply: false
+---
 # 081: PDM Dependency Management Standards
 
-## 1. Purpose
+## 1. PDM Configuration Standards
 
-This rule defines PDM dependency management standards for the HuleEdu monorepo, validated against actual PDM capabilities.
-
-## 2. PDM Configuration Standards
-
-### 2.1. Rule: Minimal Configuration
-
-Your `pyproject.toml` **MUST** use minimal PDM configuration. PDM defaults are well-designed and optimal:
+### 1.1. Minimal Configuration
+**MUST** use minimal PDM configuration:
 
 ```toml
 [tool.pdm]
 distribution = false  # Application/library, not distributable package
 ```
 
-### 2.2. Rule: No Custom Resolution Settings
-
-**FORBIDDEN**: Do not add custom resolution settings. These are handled by PDM defaults:
-
+### 1.2. No Custom Resolution Settings
+**FORBIDDEN**: Custom resolution settings. PDM defaults are optimal:
 - `strategy.inherit_metadata = True` (DEFAULT)
 - `strategy.resolve_max_rounds = 10000` (DEFAULT)
 - `strategy.save = minimum` (DEFAULT)
 - `strategy.update = reuse` (DEFAULT)
 
-## 3. Dependency Version Strategy
+## 2. Dependency Version Strategy
 
-### 3.1. Rule: Let PDM Handle Versions
-
+### 2.1. Let PDM Handle Versions
 **REQUIRED**: Use unconstrained dependency specifications:
 
 ```toml
@@ -47,20 +44,17 @@ monorepo-tools = [
 ]
 ```
 
-**Why**: PDM resolves latest compatible versions and locks them in `pdm.lock`.
+PDM resolves latest compatible versions and locks them in `pdm.lock`.
 
-### 3.2. Rule: Version Constraints Only When Necessary
-
+### 2.2. Version Constraints Only When Necessary
 Only add version constraints for:
-
 - Breaking changes in major versions
 - Known incompatibilities
 - Security requirements
 
-## 4. Validation Commands
+## 3. Validation Commands
 
-### 4.1. Rule: Regular Validation
-
+### 3.1. Regular Validation
 **MUST** run these commands to validate configuration:
 
 ```bash
@@ -74,10 +68,9 @@ pdm update
 pdm install
 ```
 
-## 5. Scripts Configuration
+## 4. Scripts Configuration
 
-### 5.1. Rule: Standard Scripts
-
+### 4.1. Standard Scripts
 **REQUIRED** scripts for monorepo management:
 
 ```toml
@@ -88,6 +81,3 @@ lint-fix = "ruff check --fix --force-exclude ."
 typecheck-all = "mypy --config-file pyproject.toml ."
 test-all = "pytest -n auto"
 ```
-
----
-**PDM's defaults are optimal. Minimal configuration prevents issues.**
