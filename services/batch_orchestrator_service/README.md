@@ -40,7 +40,7 @@ BOS follows **Clean Architecture** patterns with strict separation of concerns:
 
 ### Service Structure
 
-```
+``` text
 services/batch_orchestrator_service/
 ├── app.py                         # Lean Quart entry point (< 50 lines)
 ├── startup_setup.py               # DI initialization, service lifecycle

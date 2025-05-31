@@ -168,11 +168,15 @@ sequenceDiagram
 
 #### 6.2.3. Service Boundary Responsibilities
 
-| **Service**      | **Responsibility**                                                                                                       | **Rationale**                                                        |
-| :--------------- | :------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------- |
-| **File Service** | File upload handling, text extraction, content ingestion coordination, emit `EssayContentReady` events                       | Dedicated service for file processing with proper service boundaries |
-| **ELS**          | Aggregate readiness from `EssayContentReady`, track batch expectations from `BatchEssaysRegistered`, coordinate with BOS via `BatchEssaysReady` | Natural essay state manager, has batch context                       |
-| **BOS**          | Batch orchestration, pipeline initiation upon `BatchEssaysReady`, overall batch state management                            | Primary orchestrator for batch processing workflows                  |
+```mermaid
+graph LR;
+    FileService["File Service<br/>Responsibility: File upload, text extraction, ingestion, emit EssayContentReady<br/>Rationale: Dedicated service for file processing"]
+    ELS["ELS<br/>Responsibility: Aggregate readiness from EssayContentReady, track BatchEssaysRegistered, coordinate with BOS via BatchEssaysReady<br/>Rationale: Natural essay state manager, has batch context"]
+    BOS["BOS<br/>Responsibility: Batch orchestration, pipeline initiation upon BatchEssaysReady, overall batch state management<br/>Rationale: Primary orchestrator for batch processing workflows"]
+
+    FileService --> ELS;
+    ELS --> BOS;
+```
 
 #### 6.2.4. Architectural Benefits
 
