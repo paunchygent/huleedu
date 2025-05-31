@@ -40,7 +40,8 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/content_service",
     "-e file:///${PROJECT_ROOT}/services/spell_checker_service",
     "-e file:///${PROJECT_ROOT}/services/batch_orchestrator_service",
-    "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service"
+    "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service",
+    "-e file:///${PROJECT_ROOT}/services/file_service"
 ]
 
 [tool.pdm.scripts]
@@ -63,6 +64,7 @@ docker-restart = {composite = ["docker compose down", "docker compose up -d --bu
 # Individual service development
 dev-content = "pdm run -p services/content_service dev"
 dev-batch = "pdm run -p services/batch_orchestrator_service dev"
+dev-file = "pdm run -p services/file_service dev"
 run-spellchecker = "pdm run -p services/spell_checker_service start_worker"
 
 # Build common_core wheel
@@ -133,6 +135,7 @@ module = [
     "services.spell_checker_service.*",
     "services.batch_orchestrator_service.*",
     "services.essay_lifecycle_service.*",
+    "services.file_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true
@@ -169,6 +172,8 @@ module = [
     "kafka_consumer",
     "metrics",
     "startup_setup",
+    "text_processing",
+    "hypercorn_config",
 ]
 ignore_missing_imports = true
 
@@ -179,13 +184,15 @@ testpaths = [
     "services/spell_checker_service/tests",
     "services/batch_orchestrator_service/tests",
     "services/essay_lifecycle_service/tests",
+    "services/file_service/tests",
     "tests"
 ]
 pythonpath = [
     "services/spell_checker_service",
     "services/content_service", 
     "services/batch_orchestrator_service",
-    "services/essay_lifecycle_service"
+    "services/essay_lifecycle_service",
+    "services/file_service"
 ]
 python_files = "test_*.py *_test.py"
 python_classes = "Test*"

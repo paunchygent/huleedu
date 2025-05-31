@@ -21,13 +21,23 @@ alwaysApply: true
 
 ```
 scripts/
+├── tests/                          # Test automation scripts (bash-based)
+│   ├── test_*.sh                   # Individual test scripts
+│   ├── functional_tests.sh         # Test runners
+│   └── trace_*.py                  # Analysis and tracing utilities
+├── utils/                          # General utility scripts
 ├── docs/                           # Script documentation
 ├── README.md                      
-├── setup_huledu_environment.sh    
-└── utils/                         # Utility scripts
+├── setup_huledu_environment.sh    # Environment setup
+└── kafka_topic_bootstrap.py       # Infrastructure setup
 ```
 
-## 3. Services Directory Structure
+**Test Script Organization Rules**:
+- **Integration Tests**: Use `tests/functional/` for Python pytest-based tests
+- **Shell Test Scripts**: Use `scripts/tests/` for bash-based automation and validation
+- **Test Utilities**: Use `scripts/tests/` for analysis, tracing, and test support tools
+
+## 3. Services Directory Structure **structural mandates**
 
 ```
 services/
@@ -84,6 +94,23 @@ services/
 │   ├── Dockerfile
 │   ├── tests/
 │   └── docs/
+├── file_service/                  # File upload and content ingestion service (HTTP + Kafka)
+│   ├── app.py                     # Lean Quart application entry point (setup, DI, Blueprint registration)
+│   ├── api/                       # **REQUIRED**: Blueprint API routes directory
+│   │   ├── __init__.py
+│   │   ├── health_routes.py       # Standard health and metrics endpoints
+│   │   └── file_routes.py         # File upload and batch processing API routes
+│   ├── config.py                  # Pydantic settings configuration
+│   ├── protocols.py               # Service-specific behavioral contracts
+│   ├── di.py                      # Dishka dependency injection providers
+│   ├── core_logic.py              # File processing workflow logic
+│   ├── text_processing.py         # Text extraction and student info parsing
+│   ├── hypercorn_config.py        # Hypercorn server configuration
+│   ├── pyproject.toml
+│   ├── Dockerfile
+│   ├── README.md
+│   ├── tests/
+│   └── docs/
 └── essay_lifecycle_service/       # Hybrid HTTP + Kafka service
     ├── app.py                     # Lean Quart HTTP API entry point
     ├── api/                       # **REQUIRED**: Blueprint API routes directory
@@ -114,19 +141,7 @@ services/
 
 **For all HTTP services (Quart-based), the following structure is REQUIRED:**
 
-### 4.1. API Directory Requirements
-- **MUST** have `api/` directory containing all route definitions
-- **MUST** have `health_routes.py` with `/healthz` and `/metrics` endpoints
-- **MUST** have domain-specific route files (e.g., `content_routes.py`, `batch_routes.py`)
-- **MUST** have `__init__.py` in `api/` directory
-
-### 4.2. Blueprint Pattern Requirements
-- **Each route file MUST** define a Blueprint with appropriate name
-- **app.py MUST** register all Blueprints using `app.register_blueprint()`
-- **Route files MUST** be focused on HTTP handling, not business logic
-- **Dependencies MUST** be passed from app.py to Blueprints via module functions
-
-### 4.3. app.py Structure Requirements
+### 4.1. app.py Structure Requirements
 - **MUST** be lean (< 150 lines) focused on:
   - Quart app initialization
   - Dependency injection setup
@@ -135,28 +150,7 @@ services/
   - Startup/shutdown hooks
 - **FORBIDDEN**: Direct route definitions in app.py
 
-### 4.4. Standard Blueprint Files
-
-#### health_routes.py Template:
-```python
-"""Health and metrics routes for [Service Name]."""
-from quart import Blueprint, Response, jsonify
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-
-health_bp = Blueprint('health_routes', __name__)
-
-@health_bp.route("/healthz")
-async def health_check() -> Response:
-    """Health check endpoint."""
-    # Service-specific health logic
-    return jsonify({"status": "ok"}), 200
-
-@health_bp.route("/metrics")  
-async def metrics() -> Response:
-    """Prometheus metrics endpoint."""
-    metrics_data = generate_latest()
-    return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
-```
+### 4.2. Standard Blueprint Files
 
 **Note on Worker Service Structure (e.g., `spell_checker_service`):**
 - `worker_main.py`: Handles service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes DI container.

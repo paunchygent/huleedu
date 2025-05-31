@@ -25,28 +25,24 @@
 
 #### **PRIORITY 2: File Service Skeleton (Architecturally Compliant)**
 
-- [ ] **Service Structure**: Create `services/file_service/` with complete service skeleton
-- [ ] **Core Components**:
-  - `app.py` - Quart HTTP API with file upload endpoints
-  - `worker_main.py` - Kafka event consumer (for batch registrations)
-  - `protocols.py` - All service protocol interfaces
-  - `di.py` - Dishka DI container setup
-  - `config.py` - Pydantic settings with env vars
-  - `pyproject.toml` - Service dependencies and scripts
-  - `Dockerfile` - Following established containerization patterns
-  - `hypercorn_config.py` - HTTP server configuration
-  - `__init__.py` - Service exports
-- [ ] **Event Integration**:
-  - Consume `BatchEssaysRegistered` from BOS
-  - Emit `EssayContentReady` events to ELS
-  - HTTP client for Content Service coordination
-- [ ] **Containerization**: Add to docker-compose.yml with proper dependencies
+* **File Service Skeleton** ✅ **COMPLETED**:
+  * **Service Structure**: Created `services/file_service/` with all core components
+  * **Event Integration**: Successfully consumes `BatchEssaysRegistered` and emits `EssayContentReady` events
+  * **Containerization**: Added to docker-compose.yml with proper dependencies
+  * **Testing**: Needs to validate end-to-end integration with other services
 
-#### **PRIORITY 3: End-to-End Integration**
+#### **PRIORITY 3: End-to-End Integration** ⏳ **IN PROGRESS**
 
-- [ ] **Event Flow Validation**: BOS → File Service → ELS → BOS coordination
+- [ ] **Event Flow Validation**: BOS → File Service → ELS → BOS coordination  
 - [ ] **Walking Skeleton Test**: Single batch, 2-3 essays, spellcheck-only pipeline
 - [ ] **Service Boundaries**: Verify proper separation of concerns
+
+**📋 TESTING PLAN CREATED**: Comprehensive end-to-end testing plan documented in [`Documentation/TASKS/WALKING_SKELETON_E2E_TESTING_PLAN.md`](./WALKING_SKELETON_E2E_TESTING_PLAN.md)
+
+**🗂️ SCRIPT ORGANIZATION UPDATED**: Project structure rules updated to clarify test script placement:
+- **Integration Tests**: `tests/functional/` (Python pytest-based)
+- **Shell Test Scripts**: `scripts/tests/` (Bash-based automation)
+- **Test Utilities**: `scripts/tests/` (Analysis and tracing tools)
 
 **Success Criteria**: Client → File Service (upload) → Content Service (storage) → ELS (aggregation) → BOS (orchestration) → Spell Checker (processing)
 

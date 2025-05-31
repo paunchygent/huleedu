@@ -55,11 +55,12 @@ The HuleEdu ecosystem currently comprises the following services:
   * **Location**: `services/essay_lifecycle_service/`
   * **Architecture**: SQLite-based state management with event-driven coordination
 
-* **File Service** 🚧 **PENDING IMPLEMENTATION**:
-  * **Description**: A Quart-based HTTP service with Kafka event publishing for file upload handling, text extraction, and content ingestion coordination. Will accept multipart file uploads, process files to extract text content, coordinate with Content Service for storage, and emit essay readiness events.
-  * **Port**: 7001 (planned)
-  * **Location**: `services/file_service/` *(implementation in progress)*
-  * **Status**: Final component needed for Sprint 1 completion
+* **File Service** ✅ **IMPLEMENTED**:
+  * **Description**: A Quart-based HTTP service with Kafka event publishing for file upload handling, text extraction, and content ingestion coordination. Accepts multipart file uploads, processes files to extract text content, coordinates with Content Service for storage, and emits essay readiness events.
+  * **Port**: 7001 (HTTP API), 9094 (Metrics)
+  * **Location**: `services/file_service/`
+  * **API**: `POST /v1/files/batch` for batch file uploads
+  * **Status**: Fully implemented and integrated into the walking skeleton
 
 ## Key Technologies
 

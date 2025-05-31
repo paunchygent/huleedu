@@ -1,7 +1,7 @@
 ---
-description: 
+description: Defines the all pydantic models: event contracts, enums, and Kafka topics. ALL IMPLEMENTATION MUST COMPLY TO THESE
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 # 024: Common Core Architecture
 

@@ -1,4 +1,6 @@
 .py[cod]
+.env
+.vscode/
 __pycache__/
 .mypy_cache/
 .pytest_cache/
@@ -6,7 +8,10 @@ __pycache__/
 .pdm-python
 .venv/
 **/.env
+.DS_Store
+.vscode/settings.json
 
 # temp_folders and temp_files used for testing or development
 cj_essay_assessment/
 /*.xml
+

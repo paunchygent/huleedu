@@ -61,8 +61,7 @@ alwaysApply: true
 ## 7. Import Standards for Containerized Services
 
 - **MUST** use absolute imports for all intra-service modules
-- **FORBIDDEN**: Relative imports (`from .api`, `from .config`) in containerized services
-- **Reason**: Container script context breaks relative import resolution
+- **Reason**: Container script context breaks relative import resolution between containers
 
 ```python
 # ✅ CORRECT

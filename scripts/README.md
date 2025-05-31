@@ -69,18 +69,30 @@ All scripts in this directory should:
 - Include usage documentation in comments
 - Handle both sandbox and local environments appropriately
 
-### Utility Scripts
+### Script Organization
 
-For utility scripts that don't warrant top-level placement, use the `utils/` subdirectory:
+Scripts are organized by purpose:
 
-``` markdown
+``` text
 scripts/
-├── utils/
+├── tests/                         # Test automation scripts
+│   ├── functional_tests.sh        # Existing functional test runner
+│   ├── quick_validation_test.sh   # Existing quick validation
+│   ├── test_*.sh                  # Individual test scripts
+│   └── trace_*.py                 # Analysis and tracing utilities
+├── utils/                         # General utility scripts
 │   ├── backup.sh
 │   ├── maintenance.sh
 │   └── cleanup.sh
-└── setup_huledu_environment.sh
+├── docs/                          # Script documentation
+├── setup_huledu_environment.sh   # Environment setup
+└── kafka_topic_bootstrap.py      # Infrastructure setup
 ```
+
+**Test Script Guidelines**:
+- **Integration Tests**: Use `tests/functional/` for Python pytest-based tests
+- **Shell Test Scripts**: Use `scripts/tests/` for bash-based automation
+- **Test Utilities**: Use `scripts/tests/` for analysis and tracing tools
 
 ## Integration with PDM
 

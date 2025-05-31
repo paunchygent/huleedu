@@ -91,7 +91,7 @@ The primary user journey for an Educator will involve:
 ### 6.1. Overview of Backend Microservices
 
 * **Batch Orchestrator Service (BOS):** The primary orchestrator of batch processing. Manages `ProcessingPipelineState` and initiates pipeline phases for entire batches. (Also referred to as Batch Service or BS in some contexts of the original PRD).
-* **File Service:** A dedicated microservice responsible for file upload handling, text extraction, and content ingestion coordination. Emits essay readiness events.
+* **File Service:** A Quart-based HTTP service with Kafka event publishing for file upload handling, text extraction, and content ingestion coordination. Fully implemented and integrated into the walking skeleton.
 * **Essay Lifecycle Service (ELS):** Manages the state and lifecycle of individual essays. Consumes batch phase initiation commands from BOS, dispatches requests to Specialized Services, consumes their results, updates essay states, and aggregates batch readiness for BOS.
 * **Content Service:** Stores and retrieves all textual content and binary artifacts. Accessed via a RESTful API.
 * **Specialized Services (SS):** Perform specific processing tasks. Examples: SpellChecker Service, NLP Service, AI Feedback Service, CJ Assessment Service.

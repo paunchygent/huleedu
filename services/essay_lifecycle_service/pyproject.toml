@@ -7,19 +7,19 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "quart>=0.20.0",
-    "hypercorn>=0.17.0",
-    "aiokafka>=0.10.0",
-    "aiosqlite>=0.20.0",
-    "aiohttp>=3.9.0",
-    "python-dotenv>=1.0.0",
+    "quart",
+    "hypercorn",
+    "aiokafka",
+    "aiosqlite",
+    "aiohttp",
+    "python-dotenv",
     "huleedu-common-core",
     "huleedu-service-libs",
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "prometheus-client>=0.20.0",
-    "dishka>=1.0.0",
-    "quart-dishka>=0.1.0",
+    "pydantic",
+    "pydantic-settings",
+    "prometheus-client",
+    "dishka",
+    "quart-dishka",
 ]
 
 [build-system]

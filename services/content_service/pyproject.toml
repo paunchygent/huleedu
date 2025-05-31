@@ -7,10 +7,10 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "quart>=0.19.4",
-    "aiofiles>=23.1.0",
-    "hypercorn>=0.16.0",
-    "python-dotenv>=1.0.0",
+    "quart",
+    "aiofiles",
+    "hypercorn",
+    "python-dotenv",
     "huleedu-common-core",
     "huleedu-service-libs",
     "pydantic",

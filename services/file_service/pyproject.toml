@@ -1,0 +1,66 @@
+[project]
+name = "huleedu-file-service"
+version = "0.1.0"
+description = "HuleEdu File Service for file upload handling and content ingestion"
+authors = [
+    {name = "HuleEdu Team", email = "dev@huledu.com"},
+]
+requires-python = ">=3.11"
+dependencies = [
+    "quart",
+    "hypercorn",
+    "aiokafka",
+    "aiohttp",
+    "python-dotenv",
+    "pydantic",
+    "pydantic-settings",
+    "prometheus-client",
+    "dishka",
+    "quart-dishka",
+    "huleedu-common-core",
+    "huleedu-service-libs",
+]
+
+[project.optional-dependencies]
+dev = [
+    "huleedu-common-core[dev]",
+    "huleedu-service-libs[dev]",
+]
+
+# Local development dependencies (editable installs)
+[tool.pdm.dev-dependencies]
+dev = [
+    "huleedu-common-core @ {path = \"../../common_core\", editable = true}",
+    "huleedu-service-libs @ {path = \"../libs\", editable = true}",
+]
+
+[tool.pdm.scripts]
+start = "hypercorn app:app --config python:hypercorn_config"
+dev = "quart --app app:app --debug run -p 7001"
+
+# Docker build overrides for containerized deployment
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/common_core"
+huleedu-service-libs = "file:///app/services/libs"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+check_untyped_defs = true
+ignore_missing_imports = true
+
+# Ignore missing imports for external libraries without stubs
+[[tool.mypy.overrides]]
+module = [
+    "aiokafka.*",
+    "aiohttp.*",
+    "dishka.*",
+    "quart_dishka.*",
+    "prometheus_client.*",
+]
+ignore_missing_imports = true
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend" 
