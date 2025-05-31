@@ -3,7 +3,6 @@ description:
 globs: 
 alwaysApply: true
 ---
-===
 # 070: Testing and Quality Assurance
 
 ## 1. Testing Pyramid

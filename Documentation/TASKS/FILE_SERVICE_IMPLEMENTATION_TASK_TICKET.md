@@ -390,50 +390,130 @@ This section outlines the creation of the new **File Service**. It will be an HT
 
 ## Definition of Done (File Service Implementation - HULEDU-FILESVC-001)
 
-### A. Service Structure and Core Files Created
+### F. Service Structure and Core Files Created
 
-The services/file_service/ directory and all specified core files (**init**.py, config.py, protocols.py, di.py, text_processing.py, core_logic.py, api/**init**.py, api/health_routes.py, api/file_routes.py, app.py) are created and populated according to the detailed instructions.
-File Service README.md is created and populated with essential service information.
-File Service hypercorn_config.py is created and correctly configured.
-Configuration and DI Implemented:
+### File Service Implementation Requirements
 
-config.py defines Pydantic Settings with a FILE_SERVICE_ prefix, and ESSAY_CONTENT_READY_TOPIC is correctly derived using topic_name(ProcessingEvent.ESSAY_CONTENT_READY) from common_core.enums.
-protocols.py defines ContentServiceClientProtocol, EventPublisherProtocol, and TextExtractorProtocol.
-di.py implements FileServiceProvider with concrete, working implementations for all defined protocols, including DefaultContentServiceClient that correctly calls the Content Service API (raw binary POST).
-Core Logic and API Endpoints Functional:
+#### 1. File Structure and Core Files
 
-text_processing.py contains the basic .txt text extraction and the stubbed parse_student_info function.
-core_logic.py implements process_single_file_upload which:
-Generates a unique essay_id.
-Calls text_extractor.extract_text.
-Calls the stubbed parse_student_info.
-Correctly calls content_client.store_content (sending only raw bytes to Content Service).
-Constructs the EssayContentReady event data (from common_core.events.batch_coordination_events) with all required fields, including stubbed student_name and student_email as None.
-Publishes the event via event_publisher.publish_essay_content_ready.
-api/health_routes.py provides functional /healthz and /metrics endpoints.
-api/file_routes.py implements the POST /v1/files/batch endpoint which:
-Accepts batch_id via form data and multiple file uploads.
-Uses asyncio.create_task to call process_single_file_upload for each file concurrently.
-Handles cases with no batch_id or no files.
-Returns a 202 Accepted response.
-Includes basic error logging for background tasks.
-app.py is lean, correctly sets up Dishka, registers file_bp and health_bp, and includes Prometheus metrics hooks.
-Containerization and Orchestration:
+Create `services/file_service/` directory with all specified core files:
 
-File Service Dockerfile is created, builds successfully, and follows project patterns (slim image, PDM, non-root user, correct CMD).
-File Service pyproject.toml is correctly configured with all dependencies (including local path dependencies for common_core and libs for dev, and Docker overrides if necessary) and PDM scripts (start, dev).
-File Service is added to the root docker-compose.yml with correct build context, ports, environment variables, and depends_on conditions.
-Adherence to Standards:
+* `__init__.py`
+* `config.py`
+* `protocols.py`
+* `di.py`
+* `text_processing.py`
+* `core_logic.py`
+* `api/__init__.py`
+* `api/health_routes.py`
+* `api/file_routes.py`
+* `app.py`
+* Create `README.md` with essential service information
+* Create properly configured `hypercorn_config.py`
 
-All new code (Python, Dockerfile, PDM scripts) adheres to project standards: absolute imports for Python, Ruff linting compliance, MyPy type checking success, file size limits (LoC < 400, line length <= 100), and SRP.
-Structured logging with correlation IDs is implemented for key operations.
-End-to-End Flow Verification (Manual):
+#### 2. Configuration and Dependency Injection
 
-The complete walking skeleton flow can be manually tested:
-Register a batch via BOS API (POST /v1/batches/register).
-Upload files for that batch_id via File Service API (POST /v1/files/batch).
-Observe ELS logs for consumption of EssayContentReady events and readiness aggregation (leading to BatchEssaysReady event emission).
-Observe BOS logs for consumption of BatchEssaysReady and subsequent emission of a pipeline command (e.g., BatchServiceSpellcheckInitiateCommandDataV1) to ELS.
-(If applicable and ELS command handling for spellcheck is stubbed/implemented) Observe ELS logs for dispatching requests to Spell Checker.
-Observe Spell Checker logs for processing initiation (if it consumes the ELS command).
-All services involved in this flow (common_core updates reflected, BOS, ELS API & Worker, File Service, Content Service, Kafka) start and run in Docker Compose without errors attributable to the File Service implementation or related preparatory changes.
+##### `config.py`
+
+* Define Pydantic Settings with `FILE_SERVICE_` prefix
+
+* Derive `ESSAY_CONTENT_READY_TOPIC` using `topic_name(ProcessingEvent.ESSAY_CONTENT_READY)` from `common_core.enums`
+
+##### `protocols.py`
+
+* Define:
+  * `ContentServiceClientProtocol`
+  * `EventPublisherProtocol`
+  * `TextExtractorProtocol`
+
+##### `di.py`
+
+* Implement `FileServiceProvider` with:
+  * Concrete implementations for all protocols
+  * `DefaultContentServiceClient` that correctly calls Content Service API (raw binary POST)
+
+#### 3. Core Logic and API Endpoints
+
+##### `text_processing.py`
+
+* Implement basic `.txt` text extraction
+
+* Include stubbed `parse_student_info` function
+
+##### `core_logic.py`
+
+* Implement `process_single_file_upload` that:
+  1. Generates unique `essay_id`
+  2. Calls `text_extractor.extract_text`
+  3. Calls stubbed `parse_student_info`
+  4. Calls `content_client.store_content` (sending raw bytes)
+  5. Constructs `EssayContentReady` event data (from `common_core.events.batch_coordination_events`) with required fields (stubbed `student_name` and `student_email` as `None`)
+  6. Publishes event via `event_publisher.publish_essay_content_ready`
+
+##### API Endpoints
+
+###### `api/health_routes.py`
+
+* Functional `/healthz` endpoint
+
+* Functional `/metrics` endpoint
+
+###### `api/file_routes.py`
+
+* Implement `POST /v1/files/batch` that:
+  * Accepts `batch_id` via form data and multiple file uploads
+  * Uses `asyncio.create_task` for concurrent processing
+  * Handles cases with no `batch_id` or no files
+  * Returns `202 Accepted` response
+  * Includes basic error logging for background tasks
+
+###### `app.py`
+
+* Lean implementation
+
+* Correctly sets up Dishka
+* Registers `file_bp` and `health_bp`
+* Includes Prometheus metrics hooks
+
+#### 4. Containerization and Orchestration
+
+* Create `Dockerfile` that:
+  * Builds successfully
+  * Follows project patterns (slim image, PDM, non-root user, correct CMD)
+
+* Configure `pyproject.toml` with:
+  * All dependencies (including local path dependencies for dev)
+  * Docker overrides if necessary
+  * PDM scripts (`start`, `dev`)
+* Add File Service to root `docker-compose.yml` with:
+  * Correct build context
+  * Proper port mappings
+  * Required environment variables
+  * Correct `depends_on` conditions
+
+#### 5. Adherence to Standards
+
+* All new code must:
+  * Use absolute imports
+  * Pass Ruff linting
+  * Pass MyPy type checking
+  * Follow file size limits (<400 LoC, line length ≤100)
+  * Follow Single Responsibility Principle
+
+* Implement structured logging with correlation IDs for key operations
+
+#### 6. End-to-End Flow Verification
+
+Manual testing should verify:
+
+1. Register batch via BOS API (`POST /v1/batches/register`)
+2. Upload files via File Service API (`POST /v1/files/batch`)
+3. Verify ELS logs for:
+   * Consumption of `EssayContentReady` events
+   * `BatchEssaysReady` event emission
+4. Verify BOS logs for:
+   * Consumption of `BatchEssaysReady`
+   * Emission of pipeline command (e.g., `BatchServiceSpellcheckInitiateCommandDataV1`)
+5. (If applicable) Verify ELS logs for spellcheck request dispatching
+6. (If applicable) Verify Spell Checker logs for processing initiation
+7. Confirm all services start and run in Docker Compose without File Service-related errors
