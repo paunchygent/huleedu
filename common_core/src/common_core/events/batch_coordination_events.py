@@ -3,17 +3,23 @@ Batch coordination event models for HuleEdu microservices.
 
 These events enable count-based aggregation pattern for batch readiness coordination:
 - BOS registers batch expectations with ELS
-- File Service reports individual essay readiness to ELS
 - ELS aggregates and reports batch readiness back to BOS
+- ELS handles excess content that cannot be assigned to batch slots
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ..metadata_models import EntityReference, StorageReferenceMetadata, SystemProcessingMetadata
+from ..metadata_models import (
+    EntityReference,
+    EssayProcessingInputRefV1,
+    SystemProcessingMetadata,
+)
 
 
 class BatchEssaysRegistered(BaseModel):
@@ -30,29 +36,6 @@ class BatchEssaysRegistered(BaseModel):
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
 
 
-class EssayContentReady(BaseModel):
-    """
-    Event sent by File Service to ELS when individual essay content is ready.
-
-    This triggers ELS to track readiness and potentially emit BatchEssaysReady.
-    """
-
-    event: str = Field(default="essay.content.ready", description="Event type identifier")
-    essay_id: str = Field(description="Essay identifier")
-    batch_id: str = Field(description="Batch this essay belongs to")
-    content_storage_reference: StorageReferenceMetadata = Field(
-        description="Reference to stored content"
-    )
-    entity: EntityReference = Field(description="Essay entity reference")
-    metadata: SystemProcessingMetadata = Field(description="Processing metadata")
-    student_name: Optional[str] = Field(
-        default=None, description="Parsed student name, if available (stubbed for skeleton)"
-    )
-    student_email: Optional[str] = Field(
-        default=None, description="Parsed student email, if available (stubbed for skeleton)"
-    )
-
-
 class BatchEssaysReady(BaseModel):
     """
     Event sent by ELS to BOS when all essays in a batch are ready for processing.
@@ -62,8 +45,9 @@ class BatchEssaysReady(BaseModel):
 
     event: str = Field(default="batch.essays.ready", description="Event type identifier")
     batch_id: str = Field(description="Batch identifier")
-    ready_essay_ids: list[str] = Field(description="List of essay IDs ready for processing")
-    total_count: int = Field(description="Total number of essays in the batch")
+    ready_essays: list[EssayProcessingInputRefV1] = Field(
+        description="List of essays ready for processing with their content references"
+    )
     batch_entity: EntityReference = Field(description="Batch entity reference")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
 
@@ -85,11 +69,27 @@ class BatchReadinessTimeout(BaseModel):
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
 
 
-# Event envelope integration for the new events
+class ExcessContentProvisionedV1(BaseModel):
+    """
+    Event sent by ELS when content cannot be assigned to any available slot.
+
+    This occurs when more files are uploaded than expected_essay_count for a batch.
+    """
+
+    event: str = Field(default="excess.content.provisioned", description="Event type identifier")
+    batch_id: str = Field(description="Batch identifier")
+    original_file_name: str = Field(description="Original uploaded file name")
+    text_storage_id: str = Field(description="Content Service storage ID")
+    reason: str = Field(description="Reason for excess content (e.g., 'NO_AVAILABLE_SLOT')")
+    correlation_id: Optional[UUID] = Field(default=None, description="Request correlation ID")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# Event envelope integration for batch coordination events
 class BatchCoordinationEventData(BaseModel):
     """Union type for all batch coordination event data types."""
 
     batch_essays_registered: Optional[BatchEssaysRegistered] = None
-    essay_content_ready: Optional[EssayContentReady] = None
     batch_essays_ready: Optional[BatchEssaysReady] = None
     batch_readiness_timeout: Optional[BatchReadinessTimeout] = None
+    excess_content_provisioned: Optional[ExcessContentProvisionedV1] = None

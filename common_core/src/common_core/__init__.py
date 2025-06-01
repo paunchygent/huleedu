@@ -36,9 +36,13 @@ from .events.batch_coordination_events import (
     BatchEssaysReady,
     BatchEssaysRegistered,
     BatchReadinessTimeout,
-    EssayContentReady,
+    ExcessContentProvisionedV1,
 )
 from .events.envelope import EventEnvelope
+from .events.file_events import (
+    EssayContentProvisionedV1,
+    EssayContentReady,
+)
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .metadata_models import (
     CancellationMetadata,
@@ -89,7 +93,10 @@ __all__ = [
     "BatchEssaysRegistered",
     "BatchEssaysReady",
     "BatchReadinessTimeout",
+    "ExcessContentProvisionedV1",
+    # File Service Event Models
     "EssayContentReady",
+    "EssayContentProvisionedV1",
     # Batch Service Command Models
     "BatchServiceSpellcheckInitiateCommandDataV1",
     "BatchServiceNLPInitiateCommandDataV1",
@@ -119,4 +126,6 @@ EssayLifecycleAIFeedbackRequestV1.model_rebuild(raise_errors=True)
 BatchEssaysRegistered.model_rebuild(raise_errors=True)
 BatchEssaysReady.model_rebuild(raise_errors=True)
 BatchReadinessTimeout.model_rebuild(raise_errors=True)
+ExcessContentProvisionedV1.model_rebuild(raise_errors=True)
 EssayContentReady.model_rebuild(raise_errors=True)
+EssayContentProvisionedV1.model_rebuild(raise_errors=True)

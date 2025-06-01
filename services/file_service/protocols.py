@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional, Protocol
 
-from common_core.events.batch_coordination_events import EssayContentReady
+from common_core.events.file_events import EssayContentReady
 
 
 class ContentServiceClientProtocol(Protocol):

@@ -1,1103 +1,589 @@
-# Essay ID Coordination Architecture Fix
-
-**Document**: Essay ID Coordination Architecture Enhancement  
-**Status**: ANALYSIS & DESIGN PHASE  
-**Created**: 2025-05-31  
-**Priority**: CRITICAL - Blocks Walking Skeleton Completion  
-**Category**: Architectural Enhancement  
-
-## 🎯 **EXECUTIVE SUMMARY**
-
-This document provides a comprehensive analysis and solution for the essay ID coordination issue discovered during Phase 2 of Walking Skeleton testing. The issue represents a **legitimate architectural gap** in the File Service API design that prevents proper coordination between batch registration expectations and file upload fulfillment.
-
-**Core Issue**: File Service generates random UUIDs instead of coordinating with batch-registered essay IDs, causing ELS aggregation to fail and blocking end-to-end pipeline progression.
-
-**Proposed Solution**: Implement **Two-Phase Essay Coordination Pattern** using industry-standard **Slot Reservation/Fulfillment** architecture.
-
-## 🔍 **CURRENT STATE ANALYSIS**
-
-### **Current Workflow (Broken)**
-
-```mermaid
-graph TD
-    A[Teacher Creates Batch] -->|essay_ids: ['essay-A', 'essay-B']| B[BOS Registration]
-    B -->|BatchEssaysRegistered Event| C[ELS Expects Specific IDs]
-    D[Student Uploads Files] -->|Random UUIDs Generated| E[File Service Processing]
-    E -->|EssayContentReady with UUID| F[ELS Receives Mismatched ID]
-    F -->|ID Mismatch| G[❌ Essay Rejected]
-    G --> H[❌ Batch Never Completes]
-```
-
-### **Current API Contracts**
-
-**BOS Registration API**:
-```json
-POST /v1/batches/register
-{
-  "expected_essay_count": 2,
-  "essay_ids": ["essay-A", "essay-B"],
-  "course_code": "ENG101",
-  "class_designation": "Fall2024",
-  "essay_instructions": "Write about education"
-}
-```
-
-**File Service Upload API**:
-```json
-POST /v1/files/batch
-Content-Type: multipart/form-data
-
-batch_id: "batch-123"
-files: [file1.txt, file2.txt]
-```
-
-**Gap**: File Service API has **NO coordination mechanism** for essay IDs.
-
-### **Current ID Generation Logic**
-
-**File Service** (`core_logic.py:58`):
-```python
-essay_id = str(uuid.uuid4())  # Always random UUID
-```
-
-**Problem**: Generated IDs have no relationship to registered expectations.
-
-## 🏗️ **PROPOSED SOLUTION ARCHITECTURE**
-
-### **Two-Phase Essay Coordination Pattern**
-
-```mermaid
-graph TD
-    subgraph "Phase 1: Slot Reservation"
-        A[Teacher Creates Assignment] -->|Predefined essay slots| B[BOS Registration]
-        B -->|BatchEssaysRegistered Event| C[ELS Reserves Slots]
-        C -->|Slots: ['essay-A', 'essay-B']| D[Slot Registry]
-    end
-    
-    subgraph "Phase 2: Slot Fulfillment"
-        E[Student Upload] -->|batch_id + slot_id| F[File Service API]
-        F -->|Validate Slot Exists| G[Process with Slot ID]
-        G -->|EssayContentReady Event| H[ELS Fulfills Slot]
-        H -->|All Slots Fulfilled| I[✅ Batch Complete]
-    end
-    
-    D --> F
-```
-
-### **Enhanced File Service API**
-
-**New Slot-Based Upload Endpoint**:
-```json
-POST /v1/files/batch/slot
-Content-Type: multipart/form-data
-
-batch_id: "batch-123"
-slot_id: "essay-A"
-file: essay_content.txt
-```
-
-**Backward Compatibility Endpoint**:
-```json
-POST /v1/files/batch
-Content-Type: multipart/form-data
-
-batch_id: "batch-123"
-files: [essay-A.txt, essay-B.txt]  # Derive slot_id from filename
-```
-
-## 📋 **DETAILED IMPLEMENTATION CHANGES**
-
-### **1. File Service API Enhancement**
-
-**New Route: `/v1/files/batch/slot`**
-
-```python
-@file_bp.route("/batch/slot", methods=["POST"])
-@inject
-async def upload_slot_file(
-    text_extractor: FromDishka[TextExtractorProtocol],
-    content_client: FromDishka[ContentServiceClientProtocol],
-    event_publisher: FromDishka[EventPublisherProtocol],
-    batch_service_client: FromDishka[BatchServiceClientProtocol]  # NEW
-) -> Union[Response, tuple[Response, int]]:
-    """
-    Handle slot-based file upload for predetermined essay IDs.
-    
-    This endpoint coordinates with batch expectations to ensure
-    uploaded files fulfill specific essay slots.
-    """
-    try:
-        form_data = await request.form
-        files = await request.files
-        
-        batch_id = form_data.get("batch_id")
-        slot_id = form_data.get("slot_id")
-        
-        if not batch_id or not slot_id:
-            return jsonify({
-                "error": "Both batch_id and slot_id are required"
-            }), 400
-            
-        # Validate slot exists and is unfulfilled
-        slot_validation = await batch_service_client.validate_slot(
-            batch_id, slot_id
-        )
-        if not slot_validation.valid:
-            return jsonify({
-                "error": f"Invalid slot: {slot_validation.reason}"
-            }), 400
-            
-        uploaded_file = files.get('file')
-        if not uploaded_file or not uploaded_file.filename:
-            return jsonify({"error": "File is required"}), 400
-            
-        main_correlation_id = uuid.uuid4()
-        
-        # Process with predetermined slot_id
-        result = await process_slot_fulfillment(
-            batch_id=batch_id,
-            slot_id=slot_id,  # Use provided slot ID
-            file_content=uploaded_file.read(),
-            file_name=uploaded_file.filename,
-            main_correlation_id=main_correlation_id,
-            text_extractor=text_extractor,
-            content_client=content_client,
-            event_publisher=event_publisher
-        )
-        
-        return jsonify({
-            "message": f"File uploaded to slot {slot_id} in batch {batch_id}",
-            "batch_id": batch_id,
-            "slot_id": slot_id,
-            "correlation_id": str(main_correlation_id),
-            "status": result["status"]
-        }), 202
-        
-    except Exception as e:
-        logger.error(f"Error in slot file upload: {e}", exc_info=True)
-        return jsonify({"error": "Internal server error"}), 500
-```
-
-**Enhanced Batch Upload with ID Derivation**:
-
-```python
-@file_bp.route("/batch", methods=["POST"])
-@inject  
-async def upload_batch_files(
-    # ... existing parameters ...
-    batch_service_client: FromDishka[BatchServiceClientProtocol]  # NEW
-) -> Union[Response, tuple[Response, int]]:
-    """
-    Enhanced batch upload with automatic slot ID derivation.
-    
-    Supports both:
-    1. Explicit slot assignment via form data
-    2. Automatic derivation from filename (essay-A.txt -> essay-A)
-    """
-    try:
-        form_data = await request.form
-        files = await request.files
-        
-        batch_id = form_data.get("batch_id")
-        if not batch_id:
-            return jsonify({"error": "batch_id is required"}), 400
-            
-        uploaded_files = files.getlist('files')
-        if not uploaded_files:
-            return jsonify({"error": "No files provided"}), 400
-            
-        # Get batch expectations for ID validation
-        batch_slots = await batch_service_client.get_available_slots(batch_id)
-        if not batch_slots.valid:
-            return jsonify({
-                "error": f"Invalid batch: {batch_slots.reason}"
-            }), 400
-            
-        main_correlation_id = uuid.uuid4()
-        tasks = []
-        slot_assignments = []
-        
-        for file_storage in uploaded_files:
-            if file_storage and file_storage.filename:
-                # Derive slot ID from filename or use next available
-                slot_id = derive_slot_id(
-                    file_storage.filename, 
-                    batch_slots.available_slots
-                )
-                
-                if not slot_id:
-                    logger.warning(
-                        f"No available slot for file {file_storage.filename} "
-                        f"in batch {batch_id}"
-                    )
-                    continue
-                    
-                slot_assignments.append({
-                    "filename": file_storage.filename,
-                    "slot_id": slot_id
-                })
-                
-                task = asyncio.create_task(
-                    process_slot_fulfillment(
-                        batch_id=batch_id,
-                        slot_id=slot_id,  # Use derived/assigned slot ID
-                        file_content=file_storage.read(),
-                        file_name=file_storage.filename,
-                        main_correlation_id=main_correlation_id,
-                        text_extractor=text_extractor,
-                        content_client=content_client,
-                        event_publisher=event_publisher
-                    )
-                )
-                tasks.append(task)
-                
-        return jsonify({
-            "message": f"{len(tasks)} files assigned to slots in batch {batch_id}",
-            "batch_id": batch_id,
-            "correlation_id": str(main_correlation_id),
-            "slot_assignments": slot_assignments
-        }), 202
-        
-    except Exception as e:
-        logger.error(f"Error in enhanced batch upload: {e}", exc_info=True)
-        return jsonify({"error": "Internal server error"}), 500
-
-
-def derive_slot_id(filename: str, available_slots: List[str]) -> Optional[str]:
-    """
-    Derive slot ID from filename using intelligent matching.
-    
-    Strategies:
-    1. Exact match: "essay-A.txt" -> "essay-A"
-    2. Pattern match: "student_essay_A.docx" -> "essay-A" 
-    3. Sequence match: First file -> first available slot
-    """
-    # Remove extension
-    base_name = filename.rsplit('.', 1)[0]
-    
-    # Strategy 1: Direct match
-    if base_name in available_slots:
-        return base_name
-        
-    # Strategy 2: Pattern matching
-    for slot in available_slots:
-        if slot.lower() in base_name.lower() or base_name.lower() in slot.lower():
-            return slot
-            
-    # Strategy 3: Next available slot
-    return available_slots[0] if available_slots else None
-```
-
-### **2. Core Logic Enhancement**
-
-**New Function: `process_slot_fulfillment`**
-
-```python
-async def process_slot_fulfillment(
-    batch_id: str,
-    slot_id: str,  # Predetermined essay ID
-    file_content: bytes,
-    file_name: str,
-    main_correlation_id: uuid.UUID,
-    text_extractor: TextExtractorProtocol,
-    content_client: ContentServiceClientProtocol,
-    event_publisher: EventPublisherProtocol,
-) -> Dict[str, Any]:
-    """
-    Process file upload for a specific essay slot.
-    
-    This replaces random UUID generation with predetermined slot coordination.
-    """
-    logger.info(
-        f"Fulfilling slot {slot_id} in batch {batch_id} with file {file_name}",
-        extra={"correlation_id": str(main_correlation_id)}
-    )
-    
-    try:
-        # Extract text content
-        text = await text_extractor.extract_text(file_content, file_name)
-        if not text:
-            return {
-                "slot_id": slot_id,
-                "file_name": file_name,
-                "status": "extraction_failed_or_empty"
-            }
-            
-        # Parse student info
-        student_name, student_email = await parse_student_info(text)
-        
-        # Store content
-        storage_id = await content_client.store_content(text.encode('utf-8'))
-        
-        # Construct metadata with slot ID
-        content_storage_ref = StorageReferenceMetadata()
-        content_storage_ref.add_reference(ContentType.ORIGINAL_ESSAY, storage_id)
-        
-        essay_entity_ref = EntityReference(
-            entity_id=slot_id,  # Use slot ID instead of UUID
-            entity_type="essay",
-            parent_id=batch_id
-        )
-        
-        event_sys_metadata = SystemProcessingMetadata(
-            entity=essay_entity_ref,
-            event=ProcessingEvent.ESSAY_CONTENT_READY.value,
-            timestamp=datetime.now(timezone.utc)
-        )
-        
-        # Create event with coordinated ID
-        essay_ready_event_data = EssayContentReady(
-            essay_id=slot_id,  # Use slot ID instead of UUID
-            batch_id=batch_id,
-            content_storage_reference=content_storage_ref,
-            entity=essay_entity_ref,
-            metadata=event_sys_metadata,
-            student_name=student_name,
-            student_email=student_email
-        )
-        
-        # Publish event
-        await event_publisher.publish_essay_content_ready(
-            essay_ready_event_data,
-            main_correlation_id
-        )
-        
-        logger.info(
-            f"Successfully fulfilled slot {slot_id} in batch {batch_id}",
-            extra={"correlation_id": str(main_correlation_id)}
-        )
-        
-        return {
-            "slot_id": slot_id,
-            "file_name": file_name,
-            "status": "slot_fulfilled"
-        }
-        
-    except Exception as e:
-        logger.error(
-            f"Error fulfilling slot {slot_id}: {e}",
-            extra={"correlation_id": str(main_correlation_id)},
-            exc_info=True
-        )
-        return {
-            "slot_id": slot_id,
-            "file_name": file_name,
-            "status": "fulfillment_error",
-            "detail": str(e)
-        }
-```
-
-### **3. New Protocol: BatchServiceClientProtocol**
-
-```python
-class SlotValidationResult(BaseModel):
-    valid: bool
-    reason: Optional[str] = None
-    slot_status: Optional[str] = None  # "available", "fulfilled", "reserved"
-
-
-class AvailableSlotsResult(BaseModel):
-    valid: bool
-    reason: Optional[str] = None
-    available_slots: List[str] = Field(default_factory=list)
-    fulfilled_slots: List[str] = Field(default_factory=list)
-
-
-class BatchServiceClientProtocol(Protocol):
-    """Protocol for File Service to coordinate with batch expectations."""
-    
-    async def validate_slot(
-        self, 
-        batch_id: str, 
-        slot_id: str
-    ) -> SlotValidationResult:
-        """
-        Validate that a slot exists and is available for fulfillment.
-        
-        Args:
-            batch_id: Batch identifier
-            slot_id: Essay slot identifier
-            
-        Returns:
-            Validation result with status
-        """
-        ...
-        
-    async def get_available_slots(
-        self, 
-        batch_id: str
-    ) -> AvailableSlotsResult:
-        """
-        Get list of available slots for a batch.
-        
-        Args:
-            batch_id: Batch identifier
-            
-        Returns:
-            Available and fulfilled slots for the batch
-        """
-        ...
-```
-
-### **4. Implementation: BatchServiceClientImpl**
-
-```python
-class BatchServiceClientImpl:
-    """HTTP client for coordinating with BOS/ELS for slot validation."""
-    
-    def __init__(self, els_base_url: str, bos_base_url: str):
-        self.els_base_url = els_base_url
-        self.bos_base_url = bos_base_url
-        self.http_client = httpx.AsyncClient()
-        self.logger = create_service_logger("file_service.batch_client")
-        
-    async def validate_slot(
-        self, 
-        batch_id: str, 
-        slot_id: str
-    ) -> SlotValidationResult:
-        """Query ELS for slot availability."""
-        try:
-            response = await self.http_client.get(
-                f"{self.els_base_url}/v1/batches/{batch_id}/slots/{slot_id}/status"
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                return SlotValidationResult(
-                    valid=data["available"],
-                    slot_status=data["status"]
-                )
-            elif response.status_code == 404:
-                return SlotValidationResult(
-                    valid=False,
-                    reason=f"Batch {batch_id} or slot {slot_id} not found"
-                )
-            else:
-                return SlotValidationResult(
-                    valid=False,
-                    reason=f"ELS returned HTTP {response.status_code}"
-                )
-                
-        except Exception as e:
-            self.logger.error(f"Error validating slot {slot_id}: {e}")
-            return SlotValidationResult(
-                valid=False,
-                reason=f"Communication error: {str(e)}"
-            )
-            
-    async def get_available_slots(
-        self, 
-        batch_id: str
-    ) -> AvailableSlotsResult:
-        """Query ELS for all batch slot status."""
-        try:
-            response = await self.http_client.get(
-                f"{self.els_base_url}/v1/batches/{batch_id}/slots"
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                return AvailableSlotsResult(
-                    valid=True,
-                    available_slots=data["available_slots"],
-                    fulfilled_slots=data["fulfilled_slots"]
-                )
-            elif response.status_code == 404:
-                return AvailableSlotsResult(
-                    valid=False,
-                    reason=f"Batch {batch_id} not found"
-                )
-            else:
-                return AvailableSlotsResult(
-                    valid=False,
-                    reason=f"ELS returned HTTP {response.status_code}"
-                )
-                
-        except Exception as e:
-            self.logger.error(f"Error getting slots for batch {batch_id}: {e}")
-            return AvailableSlotsResult(
-                valid=False,
-                reason=f"Communication error: {str(e)}"
-            )
-```
-
-## 🔐 **SECURITY IMPLICATIONS ANALYSIS**
-
-### **1. Input Validation Enhancement**
-
-**Slot ID Validation**:
-```python
-def validate_slot_id(slot_id: str) -> bool:
-    """
-    Validate slot ID format to prevent injection attacks.
-    
-    Rules:
-    - Alphanumeric, hyphens, underscores only
-    - Length: 3-50 characters
-    - No path traversal patterns
-    """
-    if not slot_id or len(slot_id) < 3 or len(slot_id) > 50:
-        return False
-        
-    # Only allow safe characters
-    if not re.match(r'^[a-zA-Z0-9_-]+$', slot_id):
-        return False
-        
-    # Prevent path traversal
-    if '..' in slot_id or '/' in slot_id or '\\' in slot_id:
-        return False
-        
-    return True
-```
-
-**Batch ID Cross-Validation**:
-```python
-async def validate_batch_authorization(
-    batch_id: str, 
-    user_context: UserContext
-) -> bool:
-    """
-    Ensure user has permission to upload to this batch.
-    
-    Security considerations:
-    - Prevent cross-batch contamination
-    - Validate user enrollment in course
-    - Check batch status (active, not expired)
-    """
-    # Implementation depends on authentication system
-    pass
-```
-
-### **2. Rate Limiting & Abuse Prevention**
-
-**Slot-Level Rate Limiting**:
-```python
-@rate_limit("10/minute", per="slot_id")
-@rate_limit("50/hour", per="user_id") 
-async def upload_slot_file():
-    # Prevent rapid-fire uploads to same slot
-    # Prevent user from overwhelming system
-    pass
-```
-
-**File Size & Type Validation**:
-```python
-def validate_upload_file(file: FileStorage, slot_id: str) -> ValidationResult:
-    """
-    Enhanced file validation for slot uploads.
-    
-    Security checks:
-    - File size limits (per slot/batch configuration)
-    - MIME type validation
-    - Virus scanning (if enabled)
-    - Content structure validation
-    """
-    pass
-```
-
-### **3. Audit Trail Enhancement**
-
-**Slot Fulfillment Logging**:
-```python
-async def log_slot_fulfillment(
-    batch_id: str,
-    slot_id: str, 
-    user_id: str,
-    file_hash: str,
-    correlation_id: uuid.UUID
-) -> None:
-    """
-    Comprehensive audit logging for slot fulfillment.
-    
-    Tracks:
-    - Who uploaded what to which slot
-    - File integrity (hash)
-    - Timestamp and correlation ID
-    - Overwrite detection
-    """
-    audit_event = SlotFulfillmentAuditEvent(
-        batch_id=batch_id,
-        slot_id=slot_id,
-        user_id=user_id,
-        file_hash=file_hash,
-        correlation_id=correlation_id,
-        timestamp=datetime.now(timezone.utc),
-        action="slot_fulfilled"
-    )
-    
-    await audit_logger.log_event(audit_event)
-```
-
-## 📁 **FILE HANDLING IMPLICATIONS**
-
-### **1. Storage Organization**
-
-**Slot-Based Storage Structure**:
-```
-content_storage/
-├── batches/
-│   ├── batch-123/
-│   │   ├── slots/
-│   │   │   ├── essay-A/
-│   │   │   │   ├── original.txt
-│   │   │   │   ├── processed.json
-│   │   │   │   └── metadata.json
-│   │   │   └── essay-B/
-│   │   │       ├── original.docx
-│   │   │       └── processed.json
-│   │   └── batch_metadata.json
-```
-
-**Benefits**:
-- Clear organization by batch and slot
-- Easy cleanup of incomplete batches
-- Simplified backup/restore operations
-- Natural partitioning for parallel processing
-
-### **2. File Overwrite Handling**
-
-**Slot Overwrite Policy**:
-```python
-class SlotOverwritePolicy(str, Enum):
-    REJECT = "reject"              # Reject subsequent uploads
-    REPLACE = "replace"            # Replace existing content
-    VERSION = "version"            # Keep versions (v1, v2, etc.)
-    ARCHIVE_AND_REPLACE = "archive_and_replace"  # Archive old, use new
-
-
-async def handle_slot_overwrite(
-    batch_id: str,
-    slot_id: str,
-    new_content: bytes,
-    policy: SlotOverwritePolicy = SlotOverwritePolicy.REPLACE
-) -> OverwriteResult:
-    """Handle uploads to already-fulfilled slots."""
-    pass
-```
-
-### **3. Content Validation**
-
-**Slot-Specific Validation**:
-```python
-async def validate_slot_content(
-    slot_id: str,
-    file_content: bytes,
-    file_name: str,
-    batch_context: BatchContext
-) -> ContentValidationResult:
-    """
-    Validate uploaded content meets slot requirements.
-    
-    Checks:
-    - File format compatibility
-    - Content length requirements
-    - Language detection (if specified)
-    - Assignment-specific validation rules
-    """
-    pass
-```
-
-## 🆔 **ID GENERATION STRATEGY**
-
-### **1. Slot ID Patterns**
-
-**Assignment-Based IDs**:
-```python
-def generate_assignment_slot_ids(
-    course_code: str,
-    assignment_id: str, 
-    expected_count: int
-) -> List[str]:
-    """
-    Generate meaningful slot IDs for assignments.
-    
-    Patterns:
-    - Sequential: ENG101_A1_001, ENG101_A1_002
-    - Named: essay-introduction, essay-conclusion  
-    - Student-based: ENG101_A1_student_{student_id}
-    """
-    return [
-        f"{course_code}_{assignment_id}_{i:03d}"
-        for i in range(1, expected_count + 1)
-    ]
-```
-
-**Flexible ID Strategies**:
-```python
-class SlotIDStrategy(str, Enum):
-    SEQUENTIAL = "sequential"      # essay-001, essay-002
-    NAMED = "named"               # introduction, body, conclusion
-    STUDENT_BASED = "student"     # student-{id}-essay
-    CUSTOM = "custom"             # User-provided IDs
-
-
-def generate_slot_ids(
-    strategy: SlotIDStrategy,
-    count: int,
-    context: Dict[str, Any]
-) -> List[str]:
-    """Generate slot IDs based on strategy."""
-    pass
-```
-
-### **2. ID Collision Prevention**
-
-**Uniqueness Validation**:
-```python
-async def ensure_slot_id_uniqueness(
-    batch_id: str,
-    proposed_slot_ids: List[str]
-) -> ValidationResult:
-    """
-    Ensure slot IDs are unique within batch and globally if needed.
-    
-    Checks:
-    - No duplicates within batch
-    - No conflicts with other active batches (if configured)
-    - Reserved ID patterns (system IDs)
-    """
-    pass
-```
-
-### **3. Legacy UUID Migration**
-
-**Migration Strategy for Existing Data**:
-```python
-async def migrate_uuid_to_slot_ids(
-    batch_id: str,
-    uuid_mapping: Dict[str, str]  # uuid -> slot_id
-) -> MigrationResult:
-    """
-    Migrate existing UUID-based essays to slot-based system.
-    
-    Process:
-    1. Create slot mapping for existing UUIDs
-    2. Update ELS expectations
-    3. Update content references
-    4. Maintain backward compatibility
-    """
-    pass
-```
-
-## 📤 **UPLOAD WORKFLOW MODIFICATIONS**
-
-### **1. Enhanced Upload Flow**
-
-```mermaid
-graph TD
-    A[Student Initiates Upload] --> B{Upload Method}
-    
-    B -->|Slot-Specific| C[POST /batch/slot]
-    B -->|Batch Upload| D[POST /batch]
-    
-    C --> E[Validate Slot ID]
-    D --> F[Derive Slot from Filename]
-    
-    E --> G{Slot Valid?}
-    F --> G
-    
-    G -->|Yes| H[Process File Upload]
-    G -->|No| I[Return Error]
-    
-    H --> J[Extract Text Content]
-    J --> K[Store in Content Service]
-    K --> L[Publish EssayContentReady with Slot ID]
-    L --> M[ELS Validates Slot Match]
-    M --> N{All Slots Fulfilled?}
-    
-    N -->|Yes| O[ELS Emits BatchEssaysReady]
-    N -->|No| P[Wait for More Uploads]
-    
-    O --> Q[BOS Initiates Pipeline Processing]
-```
-
-### **2. Error Handling Enhancement**
-
-**Slot-Specific Error Responses**:
-```python
-class SlotError(Exception):
-    """Base class for slot-related errors."""
-    pass
-
-
-class SlotNotFoundError(SlotError):
-    """Slot ID not found in batch expectations."""
-    pass
-
-
-class SlotAlreadyFulfilledError(SlotError):
-    """Attempt to fulfill already completed slot."""
-    pass
-
-
-class SlotValidationError(SlotError):
-    """Slot content doesn't meet requirements."""
-    pass
-
-
-@app.errorhandler(SlotError)
-async def handle_slot_error(error: SlotError) -> Response:
-    """Return specific error responses for slot issues."""
-    return jsonify({
-        "error": "slot_error",
-        "error_type": error.__class__.__name__,
-        "message": str(error),
-        "retry_possible": isinstance(error, SlotValidationError)
-    }), 400
-```
-
-### **3. Progress Tracking**
-
-**Batch Progress API**:
-```python
-@file_bp.route("/batch/<batch_id>/progress", methods=["GET"])
-async def get_batch_progress(batch_id: str) -> Response:
-    """
-    Get upload progress for a batch.
-    
-    Returns:
-    - Total slots
-    - Fulfilled slots
-    - Remaining slots
-    - Upload status per slot
-    """
-    pass
-```
-
-## 🧪 **TESTING STRATEGY**
-
-### **1. Unit Tests**
-
-**Slot ID Validation Tests**:
-```python
-def test_slot_id_validation():
-    """Test slot ID format validation."""
-    assert validate_slot_id("essay-A") == True
-    assert validate_slot_id("essay_001") == True  
-    assert validate_slot_id("../../../etc/passwd") == False
-    assert validate_slot_id("essay<script>") == False
-
-
-def test_slot_id_derivation():
-    """Test filename to slot ID derivation."""
-    available_slots = ["essay-A", "essay-B", "conclusion"]
-    
-    assert derive_slot_id("essay-A.txt", available_slots) == "essay-A"
-    assert derive_slot_id("student_essay_A.docx", available_slots) == "essay-A"
-    assert derive_slot_id("conclusion.pdf", available_slots) == "conclusion"
-```
-
-**Core Logic Tests**:
-```python
-async def test_process_slot_fulfillment():
-    """Test slot fulfillment replaces UUID generation."""
-    result = await process_slot_fulfillment(
-        batch_id="test-batch",
-        slot_id="essay-test-001",  # Predetermined ID
-        file_content=b"test content",
-        file_name="test.txt",
-        main_correlation_id=uuid.uuid4(),
-        text_extractor=mock_extractor,
-        content_client=mock_client,
-        event_publisher=mock_publisher
-    )
-    
-    assert result["slot_id"] == "essay-test-001"
-    assert result["status"] == "slot_fulfilled"
-    
-    # Verify event published with correct ID
-    mock_publisher.publish_essay_content_ready.assert_called_once()
-    event_data = mock_publisher.publish_essay_content_ready.call_args[0][0]
-    assert event_data.essay_id == "essay-test-001"
-```
-
-### **2. Integration Tests**
-
-**End-to-End Slot Coordination**:
-```python
-async def test_slot_based_batch_completion():
-    """Test complete slot-based workflow."""
-    # 1. Register batch with specific slot IDs
-    batch_response = await register_batch({
-        "expected_essay_count": 2,
-        "essay_ids": ["essay-A", "essay-B"],
-        # ... other fields
-    })
-    batch_id = batch_response["batch_id"]
-    
-    # 2. Upload to specific slots
-    slot_a_response = await upload_to_slot(
-        batch_id=batch_id,
-        slot_id="essay-A",
-        file_content=b"Essay A content"
-    )
-    assert slot_a_response.status_code == 202
-    
-    slot_b_response = await upload_to_slot(
-        batch_id=batch_id, 
-        slot_id="essay-B",
-        file_content=b"Essay B content"
-    )
-    assert slot_b_response.status_code == 202
-    
-    # 3. Verify ELS emits BatchEssaysReady
-    await wait_for_kafka_event(
-        topic="huleedu.els.batch.essays.ready.v1",
-        filter_batch_id=batch_id,
-        timeout=30
-    )
-    
-    # 4. Verify BOS receives completion event
-    batch_status = await get_batch_status(batch_id)
-    assert batch_status["status"] == "ready_for_processing"
-```
-
-### **3. Security Tests**
-
-**Slot Injection Prevention**:
-```python
-def test_slot_id_injection_prevention():
-    """Test protection against malicious slot IDs."""
-    malicious_slot_ids = [
-        "../../../etc/passwd",
-        "essay-A; DROP TABLE batches;",
-        "essay-A<script>alert('xss')</script>",
-        "essay-A\x00\x01\x02"
-    ]
-    
-    for malicious_id in malicious_slot_ids:
-        response = upload_to_slot(
-            batch_id="test-batch",
-            slot_id=malicious_id,
-            file_content=b"test"
-        )
-        assert response.status_code == 400
-        assert "invalid slot_id" in response.json()["error"]
-```
-
-## 🔄 **MIGRATION STRATEGY**
-
-### **1. Backward Compatibility**
-
-**Dual API Support**:
-```python
-# Maintain existing /batch endpoint during transition
-# Add new /batch/slot endpoint for slot-based uploads
-# Gradual migration of clients to new endpoint
-```
-
-**Legacy UUID Handling**:
-```python
-async def handle_legacy_uuid_batches():
-    """Support existing batches with UUID-based essays."""
-    # Continue processing UUID-based events
-    # Don't break existing incomplete batches
-    # Provide migration utilities for active batches
-```
-
-### **2. Deployment Strategy**
-
-**Phase 1: Infrastructure Setup**
-- Deploy enhanced File Service with both endpoints
-- Add BatchServiceClient for slot validation
-- Update ELS with slot status APIs
-
-**Phase 2: Client Migration**
-- Update test scripts to use slot-based uploads
-- Migrate web UI to new upload workflow
-- Update documentation and examples
-
-**Phase 3: Legacy Cleanup**
-- Remove UUID generation fallback
-- Simplify API to slot-only approach
-- Remove compatibility code
-
-### **3. Data Migration**
-
-**Existing Batch Handling**:
-```python
-async def migrate_active_batches():
-    """
-    Handle batches in progress during deployment.
-    
-    Strategy:
-    1. Complete existing UUID-based batches normally
-    2. New batches use slot-based coordination
-    3. Provide tools to convert incomplete batches
-    """
-    pass
-```
-
-## 📊 **IMPACT ASSESSMENT**
-
-### **1. Performance Implications**
-
-**Additional Network Calls**:
-- Slot validation requires ELS query: +50-100ms per upload
-- Batch slot lookup: +20-50ms per upload
-- Overall impact: Minimal for normal use cases
-
-**Caching Strategy**:
-```python
-# Cache slot status locally for 5-10 minutes
-# Reduce ELS queries for repeated uploads
-# Background refresh of slot availability
-```
-
-### **2. Complexity Analysis**
-
-**Added Complexity**:
-- ✅ **Positive**: Clear coordination pattern, better error handling
-- ⚠️ **Neutral**: Additional API endpoints and validation logic  
-- ❌ **Negative**: More service-to-service communication
-
-**Mitigation**:
-- Comprehensive testing of coordination flows
-- Clear error messages for slot-related issues
-- Fallback mechanisms for service unavailability
-
-### **3. Operational Considerations**
-
-**Monitoring Requirements**:
-- Track slot fulfillment rates
-- Monitor coordination failures
-- Alert on batch timeout increases
-
-**Documentation Updates**:
-- API documentation for new endpoints
-- Integration guides for client applications
-- Troubleshooting guides for slot coordination issues
-
-## 🎯 **RECOMMENDATION**
-
-### **Immediate Action Plan**
-
-1. **Implement Core Changes** (2-3 days):
-   - Add slot-based upload endpoint
-   - Enhance File Service core logic
-   - Create BatchServiceClient protocol
-
-2. **Update Integration Points** (1-2 days):
-   - Add ELS slot status APIs
-   - Update test scripts for slot coordination
-   - Validate end-to-end flow
-
-3. **Complete Testing** (1 day):
-   - Unit tests for new functionality
-   - Integration tests for coordination
-   - Security validation
-
-### **Long-term Benefits**
-
-- ✅ **Architectural Integrity**: Proper coordination between services
-- ✅ **Business Logic Alignment**: Matches assignment-based workflows  
-- ✅ **Scalability**: Clear patterns for complex batch processing
-- ✅ **Error Handling**: Better failure modes and recovery
-- ✅ **Observability**: Improved tracking and debugging capabilities
-
-**This solution maintains your excellent orchestrator-pattern architecture while fixing the coordination gap in a production-ready manner.**
+# Task Ticket: Finalize Walking Skeleton End-to-End Workflow
+
+Ticket ID: HULEDU-PREP-002
+
+**Status**: TODO
+**Priority**: CRITICAL
+**Sprint**: Current (Walking Skeleton Completion)
+**Reporter**: Python Coding Companion
+**Assignee**: HuleEdu Development Team
+
+**1. Description:**
+This ticket outlines the final set of changes required to achieve a fully functional end-to-end "walking skeleton" for the HuleEdu essay processing pipeline. It addresses previously identified gaps in `essay_id` coordination, `text_storage_id` propagation, and inter-service command handling, primarily between the Batch Orchestrator Service (BOS), File Service, and Essay Lifecycle Service (ELS).
+The adopted solution is the **"ELS Assigns ID to Provisioned Content" model**: teachers upload arbitrarily named files to a batch, and ELS assigns persistent, HuleEdu-internal `essay_id`s (pre-defined "slots" for the batch, generated by BOS) to this provisioned content.
+
+**2. Goals:**
+
+* Implement a robust and user-friendly workflow for batch creation and file upload where teachers do not need to manage HuleEdu-internal `essay_id`s or rename files.
+* Ensure unique, HuleEdu-internal `essay_id`s (slots generated by BOS during batch registration) are correctly and **idempotently** assigned by ELS to content provisioned by File Service.
+* Enable the accurate flow of actual `text_storage_id`s (from Content Service) from File Service -> ELS -> BOS -> ELS -> Specialized Services (e.g., Spell Checker).
+* Fully enable ELS to subscribe to, process, and act upon pipeline initiation commands from BOS (specifically `BatchServiceSpellcheckInitiateCommandDataV1` for this ticket).
+* Update the Spell Checker Service to consume the correctly typed event from ELS, including `language` information.
+* All changes must align with existing HuleEdu architectural principles: EDA, SRP, asynchronous communication, and defined development rules.
+
+**3. Acceptance Criteria:**
+
+* **BOS**: On batch registration (based on `expected_essay_count`), generates a list of unique HuleEdu-internal `essay_id`s (slots) and includes them in the `BatchEssaysRegistered.expected_essay_ids` field sent to ELS.
+* **File Service**:
+  * Accepts batch uploads (`batch_id` + list of files with arbitrary original names) via `POST /v1/files/batch`.
+  * For each successfully sanitized and processed file: extracts text, stores it in Content Service (obtaining a `text_storage_id`), and publishes an `EssayContentProvisionedV1` event. This event contains `batch_id`, `original_file_name`, and `text_storage_id` (it does not contain a HuleEdu-internal `essay_id`).
+* **ELS - Content Assignment & Validation**:
+  * Consumes `BatchEssaysRegistered` to know the HuleEdu-internal `essay_id`s (slots) expected for each batch.
+  * Consumes `EssayContentProvisionedV1` from File Service.
+  * **Idempotently** assigns an available HuleEdu-internal `essay_id` (slot) for the given `batch_id` to the provisioned content. If the content (`text_storage_id`) has already been assigned a slot for this batch, the event is acknowledged without re-assignment or error.
+  * Stores the mapping (HuleEdu-internal `essay_id`, `original_file_name`, `text_storage_id`) in its `EssayStateStore`, updating the essay status to `READY_FOR_PROCESSING`.
+  * If no HuleEdu-internal `essay_id` (slot) is available for assignment (e.g., more files uploaded than `expected_essay_count`), ELS publishes an `ExcessContentProvisionedV1` event.
+* **ELS - `BatchEssaysReady` Event**:
+  * When all expected HuleEdu-internal `essay_id`s (slots) for a batch have been assigned provisioned content, ELS publishes `BatchEssaysReady`.
+  * This event contains `ready_essays: List[EssayProcessingInputRefV1]`, where each `essay_id` is the HuleEdu-internal assigned ID, and `text_storage_id` is the actual ID from Content Service.
+* **BOS - Command Generation**:
+  * Consumes the `BatchEssaysReady` event.
+  * Uses the actual HuleEdu-internal `essay_id`s and `text_storage_id`s from `ready_essays` to construct `BatchServiceSpellcheckInitiateCommandDataV1`.
+* **ELS - Command Processing & Dispatch**:
+  * ELS worker subscribes to and processes `BatchServiceSpellcheckInitiateCommandDataV1` from BOS.
+  * ELS's `BatchCommandHandler` updates states for the specified HuleEdu-internal `essay_id`s (e.g., to `AWAITING_SPELLCHECK`).
+  * ELS's `SpecializedServiceRequestDispatcher` publishes `EssayLifecycleSpellcheckRequestV1` events to the Spell Checker Service, containing the actual `text_storage_id` and `language`.
+* **Spell Checker Service**:
+  * Consumes `EventEnvelope[EssayLifecycleSpellcheckRequestV1]` and uses the `language` field.
+* **End-to-End Test**: A defined test scenario successfully demonstrates the complete flow from batch registration and file upload to Spell Checker Service receiving the processing request with correct identifiers and context.
+
+---
+**4. Tasks & Justified Decisions:**
+
+**4.1. Common Core Modifications (`common_core/src/common_core/`)**
+
+* **(Task 1.1) Define `EssayContentProvisionedV1` event model**
+  * File: `events/batch_coordination_events.py` (or a new `events/file_events.py`).
+  * Payload: `batch_id: str`, `original_file_name: str`, `text_storage_id: str` (for extracted text), `file_size_bytes: int`, `content_md5_hash: Optional[str]`, `correlation_id: Optional[UUID]`, `timestamp: datetime`.
+  * Justification: Decouples File Service from needing to know/generate HuleEdu-internal `essay_id`s. It simply announces that content has been successfully processed and stored for a batch. `file_size_bytes` and `content_md5_hash` added for better traceability and potential future validation.
+* **(Task 1.2) Define `ExcessContentProvisionedV1` event model**
+  * File: `events/batch_coordination_events.py` (or a new `events/file_events.py`).
+  * Payload: `batch_id: str`, `original_file_name: str`, `text_storage_id: str`, `reason: str` (e.g., "NO_AVAILABLE_SLOT"), `correlation_id: Optional[UUID]`, `timestamp: datetime`.
+  * Justification: Provides asynchronous feedback when ELS cannot assign provisioned content to an expected slot.
+* **(Task 1.3) Modify `events/batch_coordination_events.py:BatchEssaysRegistered`**
+  * Ensure it contains `batch_id: str` and `expected_essay_ids: List[str]`. The `expected_essay_ids` are the HuleEdu-internal `essay_id`s/slots generated by BOS.
+  * Justification: This is critical for ELS to know the pre-defined slots it needs to fill. Current model `BatchEssaysRegistered` already includes `essay_ids` which will serve this purpose. Field name `essay_ids` is clear.
+* **(Task 1.4) Modify `events/batch_coordination_events.py:BatchEssaysReady`**
+  * Change field `ready_essay_ids: list[str]` to `ready_essays: List[EssayProcessingInputRefV1]`.
+  * Justification: Provides BOS with the necessary `text_storage_id` for each HuleEdu-internal `essay_id` directly, avoiding synchronous queries and aligning with events carrying essential identifiers.
+* **(Task 1.5) Confirm `essay_service_models.py:EssayLifecycleSpellcheckRequestV1`**
+  * This model, containing `text_storage_id` and `language`, is correct for ELS to command the Spell Checker Service.
+  * Justification: It already supports the required data propagation.
+* **(Task 1.6) Add new `ProcessingEvent` enum members in `enums.py`**
+  * Add `ESSAY_CONTENT_PROVISIONED` and `EXCESS_CONTENT_PROVISIONED`.
+  * Map them to Kafka topics in `topic_name()` function, e.g.:
+    * `ESSAY_CONTENT_PROVISIONED` -> `"huleedu.file.essay.content.provisioned.v1"`
+    * `EXCESS_CONTENT_PROVISIONED` -> `"huleedu.els.excess.content.provisioned.v1"`
+  * Justification: Standard way to manage event types and topic names.
+
+**4.2. File Service Modifications (`services/file_service/`)**
+
+* **(Task 2.1) In `core_logic.py:process_single_file_upload`** (called by `api/file_routes.py:upload_batch_files`):
+  * Remove any HuleEdu-internal `essay_id` generation.
+  * After successful file processing and storing content (obtaining `text_storage_id` from Content Service):
+    * Construct and publish the new `EssayContentProvisionedV1` event using `EventPublisherProtocol`. The event includes `batch_id` (from upload request), `original_file_name` (from `FileStorage`), the actual `text_storage_id`, and other relevant fields like `file_size_bytes` and `content_md5_hash` (hash calculation to be added).
+  * Justification: Simplifies File Service's responsibility to technical file processing, decoupling it from HuleEdu's internal `essay_id` logic.
+* **(Task 2.2) In `api/file_routes.py:upload_batch_files`**:
+  * Ensure `original_file_name` and raw `file_content` (bytes) are passed to `core_logic`.
+  * Consider calculating MD5 hash of `file_content` here and passing it to `core_logic`.
+  * Justification: Ensures `core_logic` has all necessary data from the uploaded file.
+
+**4.3. Essay Lifecycle Service (ELS) Modifications (`services/essay_lifecycle_service/`)**
+
+* **(Task 3.1) Event Consumption (`worker_main.py`, `batch_command_handlers.py`)**:
+  * Subscribe ELS worker to `topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED)`.
+  * Add routing in `_route_event` for `EssayContentProvisionedV1` to a new handler function.
+  * Justification: Enables ELS to react to newly provisioned content.
+* **(Task 3.2) New Handler for `EssayContentProvisionedV1` (in `batch_command_handlers.py`)**:
+  * **Idempotency Check**:
+    * Before assigning a slot, query `EssayStateStore` (e.g., via a new method `get_essay_by_text_storage_id_and_batch_id(batch_id, text_storage_id)`) to see if the `text_storage_id` from the event has already been assigned an essay slot for this `batch_id`. If yes, log a warning and acknowledge the event without further processing.
+  * **Slot Assignment**:
+    * Use `BatchEssayTracker` to get the next available pre-registered HuleEdu-internal `essay_id` (slot) for the `event_data.batch_id`.
+    * If a slot is available:
+      * Call `EssayStateStore.create_or_update_essay_state_for_slot_assignment` (new method) for this HuleEdu-internal `essay_id`, persisting its association with `event_data.text_storage_id`, `event_data.original_file_name`, `event_data.file_size_bytes`, `event_data.content_md5_hash`, and setting its status to `READY_FOR_PROCESSING`.
+      * Notify `BatchEssayTracker` that this HuleEdu-internal `essay_id` (slot) is now fulfilled (passing the `text_storage_id` and HuleEdu-internal `essay_id` for its internal mapping).
+    * If no slot is available: Log the issue and publish an `ExcessContentProvisionedV1` event using `EventPublisherProtocol`.
+  * **Trigger `BatchEssaysReady` Check**: After successfully assigning content to a slot (or acknowledging an idempotent case), check with `BatchEssayTracker` if the batch is now complete. If `BatchEssayTracker.mark_essay_ready()` (or a similar updated method signifying slot fulfillment) indicates batch completion and returns a populated `BatchEssaysReady` event object, publish it using `EventPublisherProtocol`.
+  * Justification: ELS manages the assignment of HuleEdu-internal `essay_id`s to actual content. Idempotency ensures robustness. Direct transition to `READY_FOR_PROCESSING` simplifies state. Publishing `BatchEssaysReady` from here completes Gap 2.
+* **(Task 3.3) `BatchEssayTracker` Enhancements (`batch_tracker.py`)**:
+  * Method `register_batch(event: BatchEssaysRegistered)`: Store the list of `event.expected_essay_ids` (HuleEdu-internal slots) for the batch.
+  * Method `assign_slot_to_content(batch_id: str, text_storage_id: str, original_file_name: str) -> Optional[str]`:
+    * Finds the next unassigned HuleEdu-internal `essay_id` for the `batch_id`.
+    * If available, marks it as assigned (e.g., stores the `text_storage_id` and `original_file_name` against it internally or signals for `EssayStateStore` to do so). Returns the assigned HuleEdu-internal `essay_id`.
+    * If no slot is available, returns `None`.
+  * Method `mark_slot_fulfilled(batch_id: str, internal_essay_id: str, text_storage_id: str)`: Called by the event handler after `EssayStateStore` persistence.
+  * Update `is_complete` logic to check if all `expected_essay_ids` have been fulfilled.
+  * When constructing `BatchEssaysReady`: Iterate through the fulfilled HuleEdu-internal `essay_id`s. Retrieve the associated `text_storage_id` for each (this might come from its internal tracking, which was populated during `mark_slot_fulfilled`). Populate `BatchEssaysReady.ready_essays` with `EssayProcessingInputRefV1` instances.
+  * **Note on identical `original_file_name`s**: The current sequential slot assignment based on event arrival order implicitly handles distinct uploads even with identical original filenames. The `original_file_name` is stored for traceability. Log a warning if duplicate `original_file_name`s are detected for the same batch if this becomes a concern, but the core logic relies on distinct `text_storage_id`s and filling available slots.
+* **(Task 3.4) `EssayStateStore` Enhancements (`protocols.py:EssayStateStore`, `state_store.py:SQLiteEssayStateStore`)**:
+  * Add method: `async def create_or_update_essay_state_for_slot_assignment(self, internal_essay_id: str, batch_id: str, text_storage_id: str, original_file_name: str, file_size: int, content_hash: Optional[str], initial_status: EssayStatus) -> EssayState:`. This method will create a new record for the `internal_essay_id` or update it if it was pre-registered, linking it to the `text_storage_id` and other metadata.
+  * Add method: `async def get_essay_by_text_storage_id_and_batch_id(self, batch_id: str, text_storage_id: str) -> Optional[EssayState]:` for the idempotency check.
+  * Ensure `storage_references` in `EssayState` can correctly store the `text_storage_id` for `ContentType.ORIGINAL_ESSAY`.
+* **(Task 3.5) `EventPublisher` Enhancements (`protocols.py:EventPublisher`, `implementations/event_publisher.py`)**:
+  * Add method `async def publish_excess_content_provisioned(self, event_data: ExcessContentProvisionedV1, correlation_id: Optional[UUID]) -> None:`.
+  * Ensure `publish_batch_essays_ready` uses the new `BatchEssaysReady` structure.
+* **(Task 3.6) BOS Command Consumption & Processing (`BatchServiceSpellcheckInitiateCommandDataV1`)**:
+  * Ensure subscription, routing, and handling for `BatchServiceSpellcheckInitiateCommandDataV1` are fully implemented in `worker_main.py` and `batch_command_handlers.py`.
+  * Implement `DefaultBatchCommandHandler.process_initiate_spellcheck_command`:
+    * For each `EssayProcessingInputRefV1` in the command's `essays_to_process` list:
+      * Update the state of the HuleEdu-internal `essay_id` in `EssayStateStore` to `AWAITING_SPELLCHECK`.
+    * Call `DefaultSpecializedServiceRequestDispatcher.dispatch_spellcheck_requests` with the list of `EssayProcessingInputRefV1` and `language` from the command.
+  * Implement `DefaultSpecializedServiceRequestDispatcher.dispatch_spellcheck_requests`:
+    * For each `EssayProcessingInputRefV1`:
+      * Construct an `EssayLifecycleSpellcheckRequestV1` event using its `essay_id` (which is the HuleEdu-internal ID), `text_storage_id`, and the `language`.
+      * Publish this event to the Spell Checker Service topic (`topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)` needs to be correctly mapped or a new event like `ESSAY_LIFECYCLE_SPELLCHECK_REQUESTED` should be used for this specific command from ELS to Spell Checker).
+  * Justification: Completes the command processing loop within ELS and ensures `text_storage_id` is used for actual content operations by specialized services.
+
+**4.4. Batch Orchestrator Service (BOS) Modifications (`services/batch_orchestrator_service/`)**
+
+* **(Task 4.1) In `implementations/batch_processing_service_impl.py:register_new_batch`**:
+  * When BOS registers a new batch, it **must** generate a list of unique HuleEdu-internal `essay_id`s (e.g., UUIDs) based on `registration_data.expected_essay_count`.
+  * These HuleEdu-internal `essay_id`s **must** be included in the `BatchEssaysRegistered.essay_ids` field (renaming from `expected_essay_ids` for clarity if necessary, but current `essay_ids` field is suitable if defined as the list of slots).
+  * Justification: BOS is the source of truth for the batch structure and the "slots" ELS will fill.
+* **(Task 4.2) In `kafka_consumer.py:_handle_message` (handler for `BatchEssaysReady`)**:
+  * Update logic to consume the modified `BatchEssaysReady` (with `ready_essays: List[EssayProcessingInputRefV1]`).
+  * Use the HuleEdu-internal `essay_id`s and actual `text_storage_id`s from `ready_essays` when constructing `BatchServiceSpellcheckInitiateCommandDataV1.essays_to_process`.
+  * The `language` will be inferred using `_infer_language_from_course_code` as currently implemented, using the `batch_context` fetched from `batch_repo`.
+  * Justification: Ensures BOS commands ELS with the correct content references for further processing.
+* **(Task 4.3) `ExcessContentProvisionedV1` Handling (TODO Marker)**:
+  * In `kafka_consumer.py`, add a TODO comment indicating that BOS should eventually subscribe to `ExcessContentProvisionedV1` events. The handling logic could involve logging, alerting, or updating batch metadata. For the walking skeleton, logging might be sufficient.
+
+**4.5. Spell Checker Service Modifications (`services/spell_checker_service/`)**
+
+* **(Task 5.1) In `event_processor.py:process_single_message`**:
+  * Update the expected event model for deserialization from `EventEnvelope[SpellcheckRequestedDataV1]` to `EventEnvelope[EssayLifecycleSpellcheckRequestV1]`. This event is sent by ELS.
+  * Extract and use `event_data.language` when calling the spell checking logic.
+  * The `text_storage_id` will be correctly received from ELS through this event.
+  * Justification: Aligns with ELS dispatching a richer, context-aware event to specialized services. The topic consumed by Spell Checker should match the topic ELS publishes `EssayLifecycleSpellcheckRequestV1` to. This might need a new `ProcessingEvent` enum like `ESSAY_LIFECYCLE_SPELLCHECK_COMMANDED` and its topic mapping if it's different from the current `ESSAY_SPELLCHECK_REQUESTED` used by BOS. Given ELS now commands the spellchecker, a new specific event type from ELS is cleaner.
+    * **Clarification**: For the walking skeleton, ELS will publish `EssayLifecycleSpellcheckRequestV1`. The Spell Checker Service's input topic should align with this. `common_core/enums.py`'s `topic_name` for `ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED` is currently `"huleedu.essay.spellcheck.requested.v1"`. ELS should publish to this, or a new topic/event enum needs to be defined if this topic is reserved for BOS->SpellChecker (which is no longer the direct path for this command). *Decision*: ELS will publish `EssayLifecycleSpellcheckRequestV1` to the existing `huleedu.essay.spellcheck.requested.v1` topic, and Spell Checker will now expect this richer payload from ELS.
+
+---
+**5. Affected Files Summary:**
+
+* `common_core/src/common_core/enums.py`
+* `common_core/src/common_core/events/batch_coordination_events.py` (or new `file_events.py`)
+* `common_core/src/common_core/metadata_models.py` (confirm `EssayProcessingInputRefV1`)
+* `common_core/src/common_core/essay_service_models.py` (confirm `EssayLifecycleSpellcheckRequestV1`)
+* `services/file_service/core_logic.py`
+* `services/file_service/api/file_routes.py`
+* `services/file_service/protocols.py` (if MD5 hash calculation implies changes)
+* `services/essay_lifecycle_service/worker_main.py`
+* `services/essay_lifecycle_service/batch_command_handlers.py`
+* `services/essay_lifecycle_service/batch_tracker.py`
+* `services/essay_lifecycle_service/protocols.py`
+* `services/essay_lifecycle_service/state_store.py`
+* `services/essay_lifecycle_service/implementations/event_publisher.py`
+* `services/essay_lifecycle_service/implementations/batch_command_handler_impl.py`
+* `services/essay_lifecycle_service/implementations/service_request_dispatcher.py`
+* `services/batch_orchestrator_service/implementations/batch_processing_service_impl.py`
+* `services/batch_orchestrator_service/kafka_consumer.py`
+* `services/spell_checker_service/event_processor.py`
+* `services/spell_checker_service/protocols.py` (if method signatures change due to language, though likely not)
+
+---
+**6. Involved Enums, Pydantic Models, and Kafka Topics:**
+
+* **New Enums (`ProcessingEvent`)**:
+  * `ESSAY_CONTENT_PROVISIONED`
+  * `EXCESS_CONTENT_PROVISIONED`
+* **New Pydantic Models**:
+  * `EssayContentProvisionedV1` (Fields: `batch_id`, `original_file_name`, `text_storage_id`, `file_size_bytes`, `content_md5_hash`, `correlation_id`, `timestamp`)
+  * `ExcessContentProvisionedV1` (Fields: `batch_id`, `original_file_name`, `text_storage_id`, `reason`, `correlation_id`, `timestamp`)
+* **Modified Pydantic Models**:
+  * `BatchEssaysRegistered`: Ensure field `essay_ids: List[str]` correctly represents the HuleEdu-internal slots generated by BOS.
+  * `BatchEssaysReady`: Payload changed to `ready_essays: List[EssayProcessingInputRefV1]`.
+* **Key Involved Pydantic Models**:
+  * `common_core.metadata_models.EssayProcessingInputRefV1` (payload of `BatchEssaysReady.ready_essays`)
+  * `common_core.events.envelope.EventEnvelope`
+  * `common_core.batch_service_models.BatchServiceSpellcheckInitiateCommandDataV1` (BOS to ELS)
+  * `common_core.essay_service_models.EssayLifecycleSpellcheckRequestV1` (ELS to Spell Checker)
+* **New Kafka Topics** (example names):
+  * `huleedu.file.essay.content.provisioned.v1` (for `EssayContentProvisionedV1`)
+  * `huleedu.els.excess.content.provisioned.v1` (for `ExcessContentProvisionedV1`)
+* **Key Involved Kafka Topics**:
+  * `huleedu.batch.essays.registered.v1` (BOS to ELS)
+  * `huleedu.els.batch.essays.ready.v1` (ELS to BOS)
+  * Topic for `BatchServiceSpellcheckInitiateCommandDataV1` (BOS to ELS) - *Need to define if not existing, e.g., `huleedu.bos.els.command.v1`*
+  * `huleedu.essay.spellcheck.requested.v1` (ELS to Spell Checker, carrying `EssayLifecycleSpellcheckRequestV1`)
+
+---
+**7. Compatibility of Status/Event Logic with Internal Essay ID:**
+
+The introduction of a HuleEdu-internal `essay_id` (slot) managed by BOS and ELS is a fundamental shift but compatible if implemented as described:
+
+* **File Service**: No longer deals with HuleEdu-internal `essay_id`s. It processes files and emits `EssayContentProvisionedV1` with its own context (`batch_id`, `original_file_name`, `text_storage_id`). This simplifies File Service.
+* **ELS**:
+  * `EssayState` will now be primarily keyed or identified by the HuleEdu-internal `essay_id`.
+  * The `batch_tracker` will track fulfillment of these internal `essay_id` slots.
+  * When consuming `EssayContentProvisionedV1`, ELS assigns an internal `essay_id` to the `text_storage_id` and `original_file_name`. The essay status for this internal `essay_id` becomes `READY_FOR_PROCESSING`.
+  * When consuming commands from BOS (like `BatchServiceSpellcheckInitiateCommandDataV1`), ELS will use the HuleEdu-internal `essay_id`s specified in the command to update its `EssayStateStore` (e.g., to `AWAITING_SPELLCHECK`).
+  * When ELS dispatches tasks to specialized services (e.g., `EssayLifecycleSpellcheckRequestV1` to Spell Checker), it will still use the HuleEdu-internal `essay_id` for the `entity_ref` within the event payload for context, but critically, it will provide the `text_storage_id` for the specialized service to fetch the actual content. The `language` parameter will also be passed.
+* **BOS**:
+  * Generates HuleEdu-internal `essay_id`s upon batch registration.
+  * Receives `BatchEssaysReady` containing these internal `essay_id`s mapped to their respective `text_storage_id`s.
+  * Commands ELS using these internal `essay_id`s and passing the `text_storage_id`s where necessary for ELS to then relay to specialized services.
+* **Spell Checker Service**:
+  * Receives `EssayLifecycleSpellcheckRequestV1` from ELS. This event will contain the `text_storage_id` (which it uses to fetch content) and the `language`. The `entity_ref` within the event will use the HuleEdu-internal `essay_id`. This is consistent.
+
+This approach maintains a clear distinction:
+
+* **HuleEdu-internal `essay_id`**: Used for tracking, state management within ELS, and as the primary essay identifier in commands between BOS and ELS.
+* **`text_storage_id`**: Used by any service that needs to fetch the actual content of an essay from the Content Service.
+
+The overall event logic and status transitions can adapt to this. For instance, ELS's `StateTransitionValidator` will operate based on the status of the HuleEdu-internal `essay_id`.
+
+This refined task ticket should provide a very clear and actionable plan.
 
 ---
 
-**Next Steps**: Review this analysis and approve implementation of the slot-based coordination pattern to complete the walking skeleton validation. 
+# PHASED IMPLEMENTATION PLAN
+
+**Status**: IN PROGRESS  
+**Current Phase**: Phase 1 - Common Core Foundation ✅ COMPLETED  
+**Last Updated**: 2025-01-30  
+**User Feedback Addressed**: ✅ Document cleanup & Event contract separation
+
+## 📋 **IMPLEMENTATION STRATEGY**
+
+This task will be implemented in 6 carefully orchestrated phases with mandatory checkpoints between each phase. Each phase must be completed fully and validated before proceeding to the next phase.
+
+### **EXECUTION PRINCIPLES:**
+- **Sequential Validation**: Each phase must pass all checkpoints before proceeding
+- **Incremental Testing**: Test at each phase boundary to prevent issue accumulation  
+- **Documentation Updates**: Update this document with implementation details after each phase
+- **Rollback Capability**: Each phase can be reverted if critical issues arise
+- **Best Practices**: All code must pass `pdm run lint-all` and `pdm run typecheck-all`
+- **✅ Mandatory Phase Cleanup**: Remove detailed instructions from completed phases to keep document manageable
+- **✅ Architectural Integrity**: Ensure proper separation of concerns in all implementations
+
+---
+
+## 🔧 **PHASE 1: Common Core Foundation** 
+**Status**: ✅ COMPLETED  
+**Estimated Time**: 2-3 hours  
+**Actual Time**: 1.5 hours  
+**Dependencies**: None (blocking for all other phases)  
+**Completed**: 2025-01-30 (Phase completion timestamp)
+
+### **Phase 1 Implementation Details:**
+**✅ COMPLETED** - 2025-01-30
+
+#### **Successfully Implemented:**
+
+1. **Task 1.1: ProcessingEvent Enums** ✅
+   - **File**: `common_core/src/common_core/enums.py`
+   - **Added**: `ESSAY_CONTENT_PROVISIONED = "essay.content.provisioned"`
+   - **Added**: `EXCESS_CONTENT_PROVISIONED = "excess.content.provisioned"`
+   - **Updated**: `_TOPIC_MAPPING` with correct topic names:
+     - `ESSAY_CONTENT_PROVISIONED` → `"huleedu.file.essay.content.provisioned.v1"`
+     - `EXCESS_CONTENT_PROVISIONED` → `"huleedu.els.excess.content.provisioned.v1"`
+
+2. **Task 1.2: EssayContentProvisionedV1 Event Model** ✅
+   - **File**: `common_core/src/common_core/events/file_events.py` (NEW FILE - proper separation of concerns)
+   - **Added**: Complete model with all required fields
+   - **Includes**: `batch_id`, `original_file_name`, `text_storage_id`, `file_size_bytes`
+   - **Optional**: `content_md5_hash`, `correlation_id`
+   - **Auto-generated**: `timestamp` with UTC timezone
+
+3. **Task 1.3: ExcessContentProvisionedV1 Event Model** ✅
+   - **File**: `common_core/src/common_core/events/batch_coordination_events.py`
+   - **Added**: Complete model for handling excess content
+   - **Includes**: `batch_id`, `original_file_name`, `text_storage_id`, `reason`
+   - **Optional**: `correlation_id`
+   - **Auto-generated**: `timestamp` with UTC timezone
+
+4. **Task 1.4: Modified BatchEssaysReady Event Model** ✅
+   - **File**: `common_core/src/common_core/events/batch_coordination_events.py`
+   - **Changed**: `ready_essay_ids: list[str]` → `ready_essays: list[EssayProcessingInputRefV1]`
+   - **Removed**: `total_count: int` field (derivable from ready_essays length)
+
+5. **Task 1.5: Validated Dependent Models** ✅
+   - **Confirmed**: `EssayProcessingInputRefV1` has required fields: `essay_id`, `text_storage_id`, `student_name`
+   - **Confirmed**: `EssayLifecycleSpellcheckRequestV1` has required fields: `text_storage_id`, `language`
+
+#### **Architecture Improvements (Addressing User Feedback):**
+
+1. **✅ Proper Separation of Concerns**:
+   - **File Events** (`file_events.py`): File Service domain events (`EssayContentReady`, `EssayContentProvisionedV1`)
+   - **Batch Coordination** (`batch_coordination_events.py`): BOS/ELS coordination events (`BatchEssaysRegistered`, `BatchEssaysReady`, `ExcessContentProvisionedV1`)
+   - **Domain Clarity**: Each event file now serves a single domain responsibility
+
+2. **✅ Updated Import Structure**:
+   - Fixed all service imports to use correct event file locations
+   - Updated `common_core/__init__.py` with proper exports
+   - Added proper union types for each event domain
+
+3. **✅ Documentation Cleanup**:
+   - Removed detailed task instructions from completed Phase 1 (mandatory after completion)
+   - Kept only implementation summary and architectural notes
+   - Document now remains manageable and focused on outcomes
+
+#### **All Checkpoints Passed:**
+✅ **Code Quality**: `pdm run lint-all` & `pdm run typecheck-all` - All passed  
+✅ **Import Validation**: New models import successfully from correct files  
+✅ **Enum Validation**: New enums and topic mappings work correctly  
+✅ **Schema Validation**: Models instantiate and validate properly  
+✅ **Architecture Review**: Event contracts properly separated by domain
+
+#### **Important Notes:**
+- Temporary implementation in `batch_tracker.py` for `BatchEssaysReady` construction (Phase 4 will fix)
+- Event contracts properly separated by domain concerns per architectural best practices
+- All common core contracts in place for remaining phases
+- **Phase cleanup completed**: Detailed instructions removed to keep document manageable
+
+#### **Files Created/Modified:**
+- **NEW**: `common_core/src/common_core/events/file_events.py`
+- **MODIFIED**: `common_core/src/common_core/events/batch_coordination_events.py`
+- **MODIFIED**: `common_core/src/common_core/__init__.py`
+- **MODIFIED**: Multiple service import statements updated
+
+#### **Ready for Next Phase:**
+All common core contracts are now in place with proper architectural separation. Phase 2 (File Service) and Phase 3 (BOS) can proceed in parallel.
+
+---
+
+## 🔄 **PHASE 2: File Service Updates**
+
+**Status**: READY TO START (Phase 1 complete)  
+**Estimated Time**: 1-2 hours  
+**Dependencies**: Phase 1 complete ✅
+
+### **Phase 2 Objectives:**
+
+Remove essay ID generation from File Service and replace event publishing with new EssayContentProvisionedV1 events.
+
+### **Phase 2 Tasks:**
+
+#### **Task 2.1: Update Core Logic**
+
+- **File**: `services/file_service/core_logic.py`
+* **Changes**:
+  * Remove `essay_id = str(uuid.uuid4())` line
+  * Add MD5 hash calculation for file content
+  * Replace `EssayContentReady` event construction with `EssayContentProvisionedV1`
+  * Update event publisher call
+
+#### **Task 2.2: Update Event Publisher Protocol**
+
+- **File**: `services/file_service/protocols.py`
+* **Add Method**:
+
+```python
+async def publish_essay_content_provisioned(
+    self, 
+    event_data: EssayContentProvisionedV1,
+    correlation_id: Optional[uuid.UUID]
+) -> None:
+```
+
+#### **Task 2.3: Update Event Publisher Implementation**
+
+- **File**: `services/file_service/di.py`
+* **Add Method** to `DefaultEventPublisher` class
+
+#### **Task 2.4: Update Configuration**
+
+- **File**: `services/file_service/config.py`
+* **Add**: `ESSAY_CONTENT_PROVISIONED_TOPIC` setting
+
+### **Phase 2 Mandatory Checkpoints:**
+
+**🚨 CRITICAL: These checkpoints CANNOT be skipped**
+
+1. **Service Health Check**:
+
+   ```bash
+   docker-compose up -d file_service
+   curl http://localhost:7001/healthz
+   ```
+
+   **Success Criteria**: HTTP 200 response with healthy status
+
+2. **Code Quality**:
+
+   ```bash
+   pdm run lint-all
+   pdm run typecheck-all  
+   ```
+
+   **Success Criteria**: Both commands pass without errors
+
+3. **Event Publishing Test**:
+   * Upload test file via File Service API
+   * Verify `EssayContentProvisionedV1` event published to Kafka
+   * Verify no `EssayContentReady` events published
+
+4. **Documentation Update**:
+   * Update this document with Phase 2 implementation details
+   * Mark Phase 2 as "COMPLETED"
+
+### **Phase 2 Implementation Details:**
+
+*Will be filled in after Phase 2 completion*
+
+### **Current Status:**
+- [x] Phase 1: ✅ COMPLETED (2025-01-30)
+- [ ] Phase 2: READY TO START  
+- [ ] Phase 3: READY TO START (can run parallel with Phase 2)  
+- [ ] Phase 4: BLOCKED (Waiting for Phase 1) → READY TO START
+- [ ] Phase 5: BLOCKED (Waiting for Phase 1 & 4)  
+- [ ] Phase 6: BLOCKED (Waiting for Phases 1-5)
+
+---
+
+## 🎛️ **PHASE 3: BOS Updates**
+
+**Status**: BLOCKED (Waiting for Phase 1)  
+**Estimated Time**: 2-3 hours  
+**Dependencies**: Phase 1 complete (can run parallel with Phase 2)  
+
+### **Phase 3 Objectives:**
+
+Update BOS to generate internal essay IDs and consume modified BatchEssaysReady events.
+
+### **Phase 3 Tasks:**
+
+#### **Task 3.1: Update Batch Registration**
+
+- **File**: `services/batch_orchestrator_service/implementations/batch_processing_service_impl.py`
+* **Changes**: Generate internal essay_id slots, replace user essay_ids in BatchEssaysRegistered
+
+#### **Task 3.2: Update Event Consumption**
+
+- **File**: `services/batch_orchestrator_service/kafka_consumer.py`
+* **Changes**: Handle new BatchEssaysReady structure with ready_essays
+
+#### **Task 3.3: Add Excess Content Handling**
+
+- **File**: `services/batch_orchestrator_service/kafka_consumer.py`
+* **Add**: TODO marker for ExcessContentProvisionedV1 handling
+
+### **Phase 3 Mandatory Checkpoints:**
+
+**🚨 CRITICAL: These checkpoints CANNOT be skipped**
+
+1. **Service Health Check**:
+
+   ```bash
+   curl http://localhost:5001/healthz
+   ```
+
+2. **Batch Registration Test**:
+   * Register test batch via BOS API
+   * Verify BatchEssaysRegistered event contains generated internal essay_ids
+   * Verify internal essay_ids are UUIDs, not user-provided IDs
+
+3. **Code Quality**:
+
+   ```bash
+   pdm run lint-all
+   pdm run typecheck-all
+   ```
+
+4. **Documentation Update**:
+   * Update this document with Phase 3 implementation details
+
+### **Phase 3 Implementation Details:**
+
+*Will be filled in after Phase 3 completion*
+
+---
+
+## ⚙️ **PHASE 4: ELS Major Overhaul**
+
+**Status**: BLOCKED (Waiting for Phase 1)  
+**Estimated Time**: 6-8 hours  
+**Dependencies**: Phase 1 complete  
+
+### **Phase 4 Objectives:**
+
+Implement slot assignment logic, new event handlers, and command processing in ELS.
+
+### **Phase 4 Tasks:**
+
+[Detailed tasks as outlined in original plan]
+
+### **Phase 4 Mandatory Checkpoints:**
+
+**🚨 CRITICAL: These checkpoints CANNOT be skipped**
+
+1. **ELS Worker Health**: Verify ELS worker continues processing events
+2. **Slot Assignment Test**: Verify idempotent slot assignment works
+3. **Batch Completion Test**: Verify BatchEssaysReady emission with correct structure
+4. **Command Processing Test**: Verify BOS→ELS command handling
+5. **Code Quality**: `pdm run lint-all && pdm run typecheck-all`
+
+### **Phase 4 Implementation Details:**
+
+*Will be filled in after Phase 4 completion*
+
+---
+
+## 🔤 **PHASE 5: Spell Checker Updates**
+
+**Status**: BLOCKED (Waiting for Phase 1 & 4)  
+**Estimated Time**: 1 hour  
+**Dependencies**: Phase 1 and 4 complete  
+
+### **Phase 5 Objectives:**
+
+Update Spell Checker to consume EssayLifecycleSpellcheckRequestV1 events.
+
+### **Phase 5 Mandatory Checkpoints:**
+
+**🚨 CRITICAL: These checkpoints CANNOT be skipped**
+
+1. **Event Consumption Test**: Verify Spell Checker processes new event format
+2. **Language Field Usage**: Verify language parameter utilized in spell checking
+3. **Code Quality**: `pdm run lint-all && pdm run typecheck-all`
+
+### **Phase 5 Implementation Details:**
+
+*Will be filled in after Phase 5 completion*
+
+---
+
+## 🧪 **PHASE 6: Integration Testing & Validation**
+
+**Status**: BLOCKED (Waiting for Phases 1-5)  
+**Estimated Time**: 3-4 hours  
+**Dependencies**: All previous phases complete  
+
+### **Phase 6 Objectives:**
+
+Comprehensive end-to-end testing and validation of complete workflow.
+
+### **Phase 6 Mandatory Checkpoints:**
+
+**🚨 CRITICAL: These checkpoints CANNOT be skipped**
+
+1. **End-to-End Test**: Complete flow from batch registration to spell checker
+2. **Existing Test Validation**: All existing tests still pass
+3. **Performance Validation**: No significant performance degradation
+4. **Documentation Update**: Final implementation summary
+
+### **Phase 6 Implementation Details:**
+
+*Will be filled in after Phase 6 completion*
+
+---
+
+## 📊 **IMPLEMENTATION TRACKING**
+
+### **Current Status:**
+
+- [x] Phase 1: ✅ COMPLETED (2025-01-30)
+- [ ] Phase 2: READY TO START  
+- [ ] Phase 3: READY TO START (can run parallel with Phase 2)  
+- [ ] Phase 4: BLOCKED (Waiting for Phase 1) → READY TO START
+- [ ] Phase 5: BLOCKED (Waiting for Phase 1 & 4)  
+- [ ] Phase 6: BLOCKED (Waiting for Phases 1-5)
+
+### **Risk Mitigation:**
+
+- Each phase has rollback capability
+* Checkpoints prevent issue accumulation
+* Parallel development where possible
+* Clear documentation for handoff
+
+**🚨 IMPORTANT**: No phase may be skipped, and all checkpoints are mandatory. Any phase that fails checkpoints must be fixed before proceeding.

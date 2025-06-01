@@ -13,11 +13,9 @@ from uuid import UUID
 
 from aiokafka import ConsumerRecord
 from common_core.enums import ProcessingEvent, topic_name
-from common_core.events.batch_coordination_events import (
-    BatchEssaysRegistered,
-    EssayContentReady,
-)
+from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.envelope import EventEnvelope
+from common_core.events.file_events import EssayContentReady
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from protocols import (

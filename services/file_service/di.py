@@ -19,8 +19,8 @@ from protocols import (
 )
 from text_processing import extract_text_from_file
 
-from common_core.events.batch_coordination_events import EssayContentReady
 from common_core.events.envelope import EventEnvelope
+from common_core.events.file_events import EssayContentReady
 
 logger = create_service_logger("file_service.di")
 

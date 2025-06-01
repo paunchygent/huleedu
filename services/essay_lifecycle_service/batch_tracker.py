@@ -16,8 +16,8 @@ from common_core.events.batch_coordination_events import (
     BatchEssaysReady,
     BatchEssaysRegistered,
     BatchReadinessTimeout,
-    EssayContentReady,
 )
+from common_core.events.file_events import EssayContentReady
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -157,10 +157,21 @@ class BatchEssayTracker:
                 expectation._timeout_task.cancel()
 
             # Create completion event
+            # TODO: This is a temporary implementation for Phase 1 - will be updated in Phase 4
+            # to properly populate EssayProcessingInputRefV1 objects with text_storage_id
+            from common_core.metadata_models import EssayProcessingInputRefV1
+            ready_essays = [
+                EssayProcessingInputRefV1(
+                    essay_id=essay_id,
+                    text_storage_id=f"TODO-storage-{essay_id}",  # Will be properly mapped in Phase 4
+                    student_name=None
+                )
+                for essay_id in expectation.ready_essay_ids
+            ]
+
             batch_ready_event = BatchEssaysReady(
                 batch_id=batch_id,
-                ready_essay_ids=list(expectation.ready_essay_ids),
-                total_count=len(expectation.ready_essay_ids),
+                ready_essays=ready_essays,
                 batch_entity=EntityReference(
                     entity_id=batch_id,
                     entity_type="batch",

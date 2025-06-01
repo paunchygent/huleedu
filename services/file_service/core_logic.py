@@ -20,7 +20,7 @@ from protocols import (
 from text_processing import parse_student_info
 
 from common_core.enums import ContentType, ProcessingEvent
-from common_core.events.batch_coordination_events import EssayContentReady
+from common_core.events.file_events import EssayContentReady
 from common_core.metadata_models import (
     EntityReference,
     StorageReferenceMetadata,
