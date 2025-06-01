@@ -92,6 +92,12 @@ services:
       - CONTENT_STORE_ROOT_PATH=/data/huleedu_content_store
       - PORT=8000
       - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   spell_checker_service:
     build:
@@ -103,7 +109,7 @@ services:
       kafka_topic_setup:
         condition: service_completed_successfully
       content_service:
-        condition: service_started
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:
@@ -114,6 +120,7 @@ services:
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - LOG_LEVEL=DEBUG
       - METRICS_PORT=8001
+    # Note: spell_checker_service is a worker service with metrics endpoint only, no health check needed
 
   batch_orchestrator_service:
     build:
@@ -125,9 +132,9 @@ services:
       kafka_topic_setup:
         condition: service_completed_successfully
       content_service:
-        condition: service_started
+        condition: service_healthy
       essay_lifecycle_api:
-        condition: service_started
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:
@@ -138,6 +145,12 @@ services:
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - PORT=5000
       - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   essay_lifecycle_api:
     build:
@@ -150,9 +163,9 @@ services:
       kafka_topic_setup:
         condition: service_completed_successfully
       content_service:
-        condition: service_started
+        condition: service_healthy
       file_service:
-        condition: service_started
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:
@@ -168,6 +181,12 @@ services:
       - LOG_LEVEL=INFO
     volumes:
       - essay_lifecycle_data:/data/essay_lifecycle
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6000/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   essay_lifecycle_worker:
     build:
@@ -180,9 +199,9 @@ services:
       kafka_topic_setup:
         condition: service_completed_successfully
       content_service:
-        condition: service_started
+        condition: service_healthy
       file_service:
-        condition: service_started
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     environment:
@@ -193,6 +212,7 @@ services:
       - LOG_LEVEL=INFO
     volumes:
       - essay_lifecycle_data:/data/essay_lifecycle
+    # Note: essay_lifecycle_worker is a worker service, no health check needed
 
   file_service:
     build:
@@ -204,7 +224,7 @@ services:
       kafka_topic_setup:
         condition: service_completed_successfully
       content_service:
-        condition: service_started
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:
@@ -218,3 +238,9 @@ services:
       - FILE_SERVICE_PROMETHEUS_PORT=9094
       - FILE_SERVICE_HOST=0.0.0.0
       - FILE_SERVICE_LOG_LEVEL=INFO 
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:7001/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s 

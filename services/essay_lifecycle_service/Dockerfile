@@ -15,8 +15,10 @@ ENV PYTHONUNBUFFERED=1 \
 # Set base WORKDIR for the application
 WORKDIR /app
 
-# Install PDM globally in the image
-RUN pip install --no-cache-dir pdm
+# Install curl for health checks and PDM globally in the image
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir pdm
 
 # Copy shared local dependencies first
 COPY common_core/ /app/common_core/
