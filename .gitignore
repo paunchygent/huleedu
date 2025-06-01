@@ -13,5 +13,6 @@ __pycache__/
 
 # temp_folders and temp_files used for testing or development
 cj_essay_assessment/
+cj_ai_essay_assessment/*.xml
 /*.xml
 
