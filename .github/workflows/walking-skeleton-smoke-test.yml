@@ -2,9 +2,10 @@ name: Walking Skeleton Smoke Test
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]      # Auto-run on main only
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]      # Auto-run on PRs to main
+  workflow_dispatch:        # Manual trigger anytime
 
 jobs:
   smoke-test:
