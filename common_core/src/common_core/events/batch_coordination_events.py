@@ -61,7 +61,7 @@ class BatchReadinessTimeout(BaseModel):
 
     event: str = Field(default="batch.readiness.timeout", description="Event type identifier")
     batch_id: str = Field(description="Batch identifier")
-    ready_essay_ids: list[str] = Field(description="Essays that are ready")
+    ready_essays: list[EssayProcessingInputRefV1] = Field(description="Essays that are ready")
     missing_essay_ids: list[str] = Field(description="Essays still pending")
     expected_count: int = Field(description="Originally expected essay count")
     actual_count: int = Field(description="Actual ready essay count")

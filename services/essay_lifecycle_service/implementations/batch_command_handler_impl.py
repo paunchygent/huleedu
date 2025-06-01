@@ -46,15 +46,81 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         correlation_id: UUID | None = None,
     ) -> None:
         """Process spellcheck initiation command from Batch Orchestrator Service."""
-        # TODO: Implement batch command processing
-        # 1. Update essay states to AWAITING_SPELLCHECK
-        # 2. Dispatch individual requests to Spell Checker Service
-        # 3. Track batch progress and report to BS
         logger = create_service_logger("batch_command_handler")
+
+        batch_id = command_data.entity_ref.entity_id
+        essays_to_process = command_data.essays_to_process
+        language = command_data.language
+
         logger.info(
-            "Received spellcheck initiation command (STUB)",
-            extra={"batch_id": command_data.entity_ref.entity_id, "correlation_id": correlation_id},
+            "Processing spellcheck initiation command from BOS",
+            extra={
+                "batch_id": batch_id,
+                "essays_count": len(essays_to_process),
+                "language": language,
+                "correlation_id": str(correlation_id),
+            },
         )
+
+        # Step 1: Update essay states to AWAITING_SPELLCHECK
+        from common_core.enums import EssayStatus
+
+        for essay_ref in essays_to_process:
+            essay_id = essay_ref.essay_id
+            try:
+                # Update the essay state to AWAITING_SPELLCHECK
+                essay_state = await self.state_store.get_essay_state(essay_id)
+                if essay_state is None:
+                    logger.error(
+                        f"Essay {essay_id} not found in state store",
+                        extra={"batch_id": batch_id, "correlation_id": str(correlation_id)},
+                    )
+                    continue
+
+                # Update essay status
+                await self.state_store.update_essay_status(essay_id, EssayStatus.AWAITING_SPELLCHECK)
+
+                logger.info(
+                    f"Updated essay {essay_id} status to AWAITING_SPELLCHECK",
+                    extra={"batch_id": batch_id, "correlation_id": str(correlation_id)},
+                )
+
+            except Exception as e:
+                logger.error(
+                    f"Failed to update essay {essay_id} status",
+                    extra={
+                        "error": str(e),
+                        "batch_id": batch_id,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+
+        # Step 2: Dispatch requests to Spell Checker Service
+        try:
+            await self.request_dispatcher.dispatch_spellcheck_requests(
+                essays_to_process=essays_to_process,
+                language=language,
+                correlation_id=correlation_id,
+            )
+
+            logger.info(
+                "Successfully dispatched spellcheck requests",
+                extra={
+                    "batch_id": batch_id,
+                    "essays_count": len(essays_to_process),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+        except Exception as e:
+            logger.error(
+                "Failed to dispatch spellcheck requests",
+                extra={
+                    "error": str(e),
+                    "batch_id": batch_id,
+                    "correlation_id": str(correlation_id),
+                },
+            )
 
     async def process_initiate_nlp_command(
         self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID | None = None

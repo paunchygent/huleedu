@@ -2,17 +2,18 @@
 
 ## 🎯 Service Purpose
 
-ELS acts as a **stateful command handler** in the essay processing pipeline, operating strictly under the direction of the **Batch Orchestrator Service (BOS)**. It manages individual essay states, coordinates with specialized processing services, and implements the **batch readiness aggregation pattern** to enable BOS-centric orchestration.
+ELS acts as a **slot assignment coordinator** and **command processor** in the essay processing pipeline, working in coordination with the **Batch Orchestrator Service (BOS)**. It manages essay slot assignment, processes batch commands, and coordinates specialized service requests through event-driven architecture.
 
 ## 🔄 Batch Coordination Architecture
 
-ELS implements the **Count-Based Aggregation Pattern** for coordinating batch readiness:
+ELS implements the **Slot Assignment Pattern** for coordinating content with batch processing:
 
 ### Coordination Flow
 
-1. **Registration**: BOS informs ELS about batch expectations (`BatchEssaysRegistered`)
-2. **Aggregation**: ELS tracks individual essay readiness from File Service (`EssayContentReady`)
-3. **Completion**: ELS notifies BOS when entire batch is ready (`BatchEssaysReady`)
+1. **Slot Registration**: BOS informs ELS about batch slots (`BatchEssaysRegistered`) 
+2. **Content Assignment**: ELS assigns incoming content to available slots (`EssayContentProvisionedV1`)
+3. **Batch Completion**: ELS notifies BOS when all slots are filled (`BatchEssaysReady`)
+4. **Command Processing**: ELS processes batch commands from BOS (`BatchSpellcheckInitiateCommand`)
 
 ### State Transition Model
 
@@ -37,14 +38,14 @@ This architecture ensures clean service boundaries: File Service owns content in
 ELS participates in these communication patterns:
 
 - **Consumes from Kafka**:
-  - **Batch Registration**: Receives batch expectations from BOS (`BatchEssaysRegistered`)
-  - **Essay Readiness**: Receives individual essay readiness from File Service (`EssayContentReady`)
-  - **Batch Commands**: Receives commands from BOS (e.g., `BatchServiceSpellcheckInitiateCommandDataV1`) to start processing phases
+  - **Batch Registration**: Receives batch slot definitions from BOS (`BatchEssaysRegistered`) 
+  - **Content Provisioning**: Receives content from File Service (`EssayContentProvisionedV1`)
+  - **Batch Commands**: Receives commands from BOS (`BatchServiceSpellcheckInitiateCommandDataV1`) to start processing phases
   - **Specialized Service Results**: Consumes results from specialized services indicating processing outcomes
 - **Publishes to Kafka**:
-  - **Batch Readiness**: Notifies BOS when all essays in batch are ready (`BatchEssaysReady`)
-  - **Essay State Updates**: Individual essay status changes
-  - **Batch Phase Conclusions**: Aggregated results sent back to BOS when all essays in a batch complete a pipeline
+  - **Batch Readiness**: Notifies BOS when all slots are filled (`BatchEssaysReady`)
+  - **Excess Content**: Notifies BOS of content overflow (`ExcessContentProvisionedV1`)
+  - **Service Requests**: Dispatches requests to specialized services (`EssayLifecycleSpellcheckRequestV1`)
 - **HTTP API**:
   - **Query-Only**: Provides read-only access to essay and batch state information
   - **No Control Operations**: Does not accept processing commands via HTTP

@@ -14,7 +14,7 @@ alwaysApply: false
 - **Package**: `huleedu-essay-lifecycle-service`  
 - **HTTP Port**: 6000 (API), **Metrics Port**: 6001
 - **Stack**: Quart, aiokafka, aiosqlite, Hypercorn
-- **Purpose**: Essay state management and batch coordination
+- **Purpose**: Essay slot assignment, state management, and command processing
 
 ## 2. Dual Architecture Pattern
 
@@ -30,26 +30,28 @@ alwaysApply: false
 
 ## 3. Core Components
 
-### 3.1. State Management
-- **`state_store.py`**: SQLite-based essay state persistence
-- **`batch_tracker.py`**: Batch readiness and completion tracking
-- **Models**: `ProcessedEssay`, `BatchUpload`, `ProcessingPipelineState`
+### 3.1. Slot Assignment Architecture
+- **`batch_tracker.py`**: Slot-based coordination (BOS slots → content assignment)
+- **`state_store.py`**: SQLite essay state persistence with slot assignment methods
+- **Pattern**: BOS generates slots → ELS assigns content → publishes `BatchEssaysReady`
 
 ### 3.2. Command Processing
-- **`batch_command_handlers.py`**: Handles batch initiation commands
-- **`core_logic.py`**: State transitions and business rules
-- **Pattern**: Command → State Change → Event Publication
+- **`batch_command_handlers.py`**: BOS command routing and event handlers
+- **`implementations/batch_command_handler_impl.py`**: Command processing logic
+- **`implementations/service_request_dispatcher.py`**: ELS → specialized service dispatch
+- **Pattern**: BOS command → essay state updates → specialized service requests
 
 ## 4. Event Integration
 
 ### 4.1. Consumed Events
-- `BATCH_PIPELINE_REQUESTED`: Initiate essay processing pipeline
-- `BATCH_PHASE_INITIATED`: Track pipeline phase changes
-- `ESSAY_SPELLCHECK_RESULT_RECEIVED`: Update essay processing state
+- `BATCH_ESSAYS_REGISTERED`: BOS slot registration
+- `ESSAY_CONTENT_PROVISIONED`: File Service content provisioning
+- `BATCH_SPELLCHECK_INITIATE_COMMAND`: BOS spellcheck commands
 
 ### 4.2. Published Events  
-- `ESSAY_LIFECYCLE_STATE_UPDATED`: Essay status changes
-- `BATCH_PIPELINE_PROGRESS_UPDATED`: Batch progress notifications
+- `BATCH_ESSAYS_READY`: Complete batch readiness notification
+- `EXCESS_CONTENT_PROVISIONED`: Content overflow notifications
+- `ESSAY_LIFECYCLE_SPELLCHECK_REQUEST`: Spellcheck requests to specialized services
 
 ## 5. Configuration
 

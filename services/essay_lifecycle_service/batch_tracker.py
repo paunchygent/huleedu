@@ -83,7 +83,7 @@ class BatchExpectation:
     def assign_next_slot(self, text_storage_id: str, original_file_name: str) -> str | None:
         """
         Assign content to the next available slot.
-        
+
         Returns:
             The internal essay ID if assignment successful, None if no slots available
         """
@@ -116,7 +116,7 @@ class BatchExpectation:
     def mark_slot_fulfilled(self, internal_essay_id: str, text_storage_id: str) -> bool:
         """
         Mark a slot as fulfilled after successful persistence.
-        
+
         Returns:
             True if this completes the batch, False otherwise
         """
@@ -195,12 +195,12 @@ class BatchEssayTracker:
     ) -> str | None:
         """
         Assign an available slot to content.
-        
+
         Args:
             batch_id: The batch ID
             text_storage_id: Storage ID for the essay content
             original_file_name: Original name of uploaded file
-            
+
         Returns:
             The assigned internal essay ID if successful, None if no slots available
         """
@@ -216,12 +216,12 @@ class BatchEssayTracker:
     ) -> BatchEssaysReady | None:
         """
         Mark a slot as fulfilled and check if batch is complete.
-        
+
         Args:
             batch_id: The batch ID
             internal_essay_id: The internal essay ID slot that was fulfilled
             text_storage_id: The text storage ID that fulfilled the slot
-            
+
         Returns:
             BatchEssaysReady event if batch is complete, None otherwise
         """
@@ -279,9 +279,10 @@ class BatchEssayTracker:
                 )
 
                 # Create timeout event
+                ready_essays = expectation.get_ready_essays()
                 timeout_event = BatchReadinessTimeout(
                     batch_id=expectation.batch_id,
-                    ready_essay_ids=list(expectation.slot_assignments.keys()),
+                    ready_essays=ready_essays,
                     missing_essay_ids=expectation.missing_slot_ids,
                     expected_count=expectation.expected_count,
                     actual_count=len(expectation.slot_assignments),
@@ -312,7 +313,7 @@ class BatchEssayTracker:
             "batch_id": batch_id,
             "expected_count": expectation.expected_count,
             "ready_count": len(expectation.slot_assignments),
-            "ready_essay_ids": list(expectation.slot_assignments.keys()),
+            "ready_essays": expectation.get_ready_essays(),
             "missing_essay_ids": expectation.missing_slot_ids,
             "is_complete": expectation.is_complete,
             "is_timeout_due": expectation.is_timeout_due,

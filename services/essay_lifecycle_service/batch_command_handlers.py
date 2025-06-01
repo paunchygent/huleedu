@@ -12,13 +12,15 @@ from typing import Any
 from uuid import UUID
 
 from aiokafka import ConsumerRecord
+from common_core.batch_service_models import BatchServiceSpellcheckInitiateCommandDataV1
 from common_core.enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.envelope import EventEnvelope
-from common_core.events.file_events import EssayContentReady
+from common_core.events.file_events import EssayContentProvisionedV1
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from protocols import (
+    BatchCommandHandler,
     BatchEssayTracker,
     EssayStateStore,
     EventPublisher,
@@ -36,6 +38,7 @@ async def process_single_message(
     transition_validator: StateTransitionValidator,
     metrics_collector: MetricsCollector,
     batch_tracker: BatchEssayTracker,
+    batch_command_handler: BatchCommandHandler,
 ) -> bool:
     """
     Process a single Kafka message and update essay state accordingly.
@@ -75,6 +78,7 @@ async def process_single_message(
             transition_validator=transition_validator,
             metrics_collector=metrics_collector,
             batch_tracker=batch_tracker,
+            batch_command_handler=batch_command_handler,
         )
 
         if success:
@@ -114,6 +118,7 @@ async def _route_event(
     transition_validator: StateTransitionValidator,
     metrics_collector: MetricsCollector,
     batch_tracker: BatchEssayTracker,
+    batch_command_handler: BatchCommandHandler,
 ) -> bool:
     """
     Route events to appropriate handlers based on event type.
@@ -141,13 +146,22 @@ async def _route_event(
                 correlation_id=correlation_id,
             )
 
-        elif event_type == topic_name(ProcessingEvent.ESSAY_CONTENT_READY):
-            return await _handle_essay_content_ready(
+
+
+        elif event_type == topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED):
+            return await _handle_essay_content_provisioned(
                 envelope=envelope,
                 batch_tracker=batch_tracker,
                 event_publisher=event_publisher,
                 state_store=state_store,
-                transition_validator=transition_validator,
+                correlation_id=correlation_id,
+            )
+
+        # Handle BOS command events
+        elif event_type == topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND):
+            return await _handle_batch_spellcheck_initiate_command(
+                envelope=envelope,
+                batch_command_handler=batch_command_handler,
                 correlation_id=correlation_id,
             )
 
@@ -215,72 +229,185 @@ async def _handle_batch_essays_registered(
         return False
 
 
-async def _handle_essay_content_ready(
+
+async def _handle_essay_content_provisioned(
     envelope: EventEnvelope[Any],
     batch_tracker: BatchEssayTracker,
     event_publisher: EventPublisher,
     state_store: EssayStateStore,
-    transition_validator: StateTransitionValidator,
     correlation_id: UUID | None,
 ) -> bool:
-    """Handle EssayContentReady event."""
+    """Handle EssayContentProvisionedV1 event for slot assignment."""
     try:
         # Deserialize event data
-        event_data = EssayContentReady.model_validate(envelope.data)
+        event_data = EssayContentProvisionedV1.model_validate(envelope.data)
 
         logger.info(
-            "Processing EssayContentReady event",
+            "Processing EssayContentProvisionedV1 event",
             extra={
-                "essay_id": event_data.essay_id,
                 "batch_id": event_data.batch_id,
-                "student_name": event_data.student_name,
-                "student_email": event_data.student_email,
+                "text_storage_id": event_data.text_storage_id,
+                "original_file_name": event_data.original_file_name,
                 "correlation_id": str(correlation_id),
             },
         )
 
-        # Mark essay as ready and check if batch is complete
-        batch_ready_event = await batch_tracker.mark_essay_ready(event_data)
+        # **Step 1: Idempotency Check**
+        # Check if this content has already been assigned a slot for this batch
+        existing_essay = await state_store.get_essay_by_text_storage_id_and_batch_id(
+            event_data.batch_id, event_data.text_storage_id
+        )
 
-        # TODO: Implement idempotent essay state update to READY_FOR_PROCESSING
-        # This should:
-        # 1. Fetch current essay state from state_store
-        # 2. Use transition_validator to validate state change
-        # 3. Only update if transition is valid
-        # For now, we log this operation
+        if existing_essay is not None:
+            logger.warning(
+                "Content already assigned to slot, acknowledging idempotently",
+                extra={
+                    "batch_id": event_data.batch_id,
+                    "text_storage_id": event_data.text_storage_id,
+                    "assigned_essay_id": existing_essay.essay_id,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+            return True
+
+        # **Step 2: Slot Assignment**
+        # Try to assign an available slot to this content
+        assigned_essay_id = batch_tracker.assign_slot_to_content(
+            event_data.batch_id,
+            event_data.text_storage_id,
+            event_data.original_file_name
+        )
+
+        if assigned_essay_id is None:
+            # No slots available - publish ExcessContentProvisionedV1 event
+            logger.warning(
+                "No available slots for content, publishing excess content event",
+                extra={
+                    "batch_id": event_data.batch_id,
+                    "text_storage_id": event_data.text_storage_id,
+                    "original_file_name": event_data.original_file_name,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+            # Create ExcessContentProvisionedV1 event
+            from datetime import UTC, datetime
+
+            from common_core.events.batch_coordination_events import ExcessContentProvisionedV1
+
+            excess_event = ExcessContentProvisionedV1(
+                batch_id=event_data.batch_id,
+                original_file_name=event_data.original_file_name,
+                text_storage_id=event_data.text_storage_id,
+                reason="NO_AVAILABLE_SLOT",
+                correlation_id=correlation_id,
+                timestamp=datetime.now(UTC),
+            )
+
+            await event_publisher.publish_excess_content_provisioned(
+                event_data=excess_event,
+                correlation_id=correlation_id,
+            )
+
+            return True
+
+        # **Step 3: Persist Slot Assignment**
+        # Create or update essay state with slot assignment
+        from common_core.enums import EssayStatus
+
+        await state_store.create_or_update_essay_state_for_slot_assignment(
+            internal_essay_id=assigned_essay_id,
+            batch_id=event_data.batch_id,
+            text_storage_id=event_data.text_storage_id,
+            original_file_name=event_data.original_file_name,
+            file_size=event_data.file_size_bytes,
+            content_hash=event_data.content_md5_hash,
+            initial_status=EssayStatus.READY_FOR_PROCESSING,
+        )
+
         logger.info(
-            "TODO: Update essay state to READY_FOR_PROCESSING",
+            "Successfully assigned content to slot",
             extra={
-                "essay_id": event_data.essay_id,
+                "assigned_essay_id": assigned_essay_id,
+                "batch_id": event_data.batch_id,
+                "text_storage_id": event_data.text_storage_id,
                 "correlation_id": str(correlation_id),
             },
         )
 
-        # If batch is complete, publish BatchEssaysReady event
-        if batch_ready_event:
+        # **Step 4: Check Batch Completion**
+        # Mark slot as fulfilled and check if batch is complete
+        batch_ready_event = batch_tracker.mark_slot_fulfilled(
+            event_data.batch_id,
+            assigned_essay_id,
+            event_data.text_storage_id
+        )
+
+        # **Step 5: Publish BatchEssaysReady if complete**
+        if batch_ready_event is not None:
             logger.info(
                 "Batch is complete, publishing BatchEssaysReady event",
                 extra={
                     "batch_id": batch_ready_event.batch_id,
-                    "ready_count": batch_ready_event.total_count,
+                    "ready_count": len(batch_ready_event.ready_essays),
                     "correlation_id": str(correlation_id),
                 },
             )
-            # TODO: Publish BatchEssaysReady event using event_publisher
-            # For now, we just log this operation
-            logger.info(
-                "TODO: Publish BatchEssaysReady event",
-                extra={
-                    "batch_id": batch_ready_event.batch_id,
-                    "correlation_id": str(correlation_id),
-                },
+
+            await event_publisher.publish_batch_essays_ready(
+                event_data=batch_ready_event,
+                correlation_id=correlation_id,
             )
 
         return True
 
     except Exception as e:
         logger.error(
-            "Error handling EssayContentReady event",
+            "Error handling EssayContentProvisionedV1 event",
+            extra={"error": str(e), "correlation_id": str(correlation_id)},
+        )
+        return False
+
+
+async def _handle_batch_spellcheck_initiate_command(
+    envelope: EventEnvelope[Any],
+    batch_command_handler: BatchCommandHandler,
+    correlation_id: UUID | None,
+) -> bool:
+    """Handle BatchServiceSpellcheckInitiateCommandDataV1 command from BOS."""
+    try:
+        # Deserialize event data
+        command_data = BatchServiceSpellcheckInitiateCommandDataV1.model_validate(envelope.data)
+
+        logger.info(
+            "Processing BOS spellcheck initiate command",
+            extra={
+                "batch_id": command_data.entity_ref.entity_id,
+                "essays_count": len(command_data.essays_to_process),
+                "language": command_data.language,
+                "correlation_id": str(correlation_id),
+            },
+        )
+
+        # Process command using injected BatchCommandHandler
+        await batch_command_handler.process_initiate_spellcheck_command(
+            command_data=command_data,
+            correlation_id=correlation_id,
+        )
+
+        logger.info(
+            "BOS command processed successfully",
+            extra={
+                "batch_id": command_data.entity_ref.entity_id,
+                "correlation_id": str(correlation_id),
+            },
+        )
+
+        return True
+
+    except Exception as e:
+        logger.error(
+            "Error handling BatchServiceSpellcheckInitiateCommandDataV1 command",
             extra={"error": str(e), "correlation_id": str(correlation_id)},
         )
         return False

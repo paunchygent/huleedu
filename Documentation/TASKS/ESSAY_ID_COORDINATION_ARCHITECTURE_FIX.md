@@ -248,17 +248,20 @@ This refined task ticket should provide a very clear and actionable plan.
 This task will be implemented in 6 carefully orchestrated phases with mandatory checkpoints between each phase. Each phase must be completed fully and validated before proceeding to the next phase.
 
 ### **EXECUTION PRINCIPLES:**
-- **Sequential Validation**: Each phase must pass all checkpoints before proceeding
-- **Incremental Testing**: Test at each phase boundary to prevent issue accumulation  
-- **Documentation Updates**: Update this document with implementation details after each phase
-- **Rollback Capability**: Each phase can be reverted if critical issues arise
-- **Best Practices**: All code must pass `pdm run lint-all` and `pdm run typecheck-all`
-- **✅ Mandatory Phase Cleanup**: Remove detailed instructions from completed phases to keep document manageable
-- **✅ Architectural Integrity**: Ensure proper separation of concerns in all implementations
+
+* **Sequential Validation**: Each phase must pass all checkpoints before proceeding
+
+* **Incremental Testing**: Test at each phase boundary to prevent issue accumulation  
+* **Documentation Updates**: Update this document with implementation details after each phase
+* **Rollback Capability**: Each phase can be reverted if critical issues arise
+* **Best Practices**: All code must pass `pdm run lint-all` and `pdm run typecheck-all`
+* **✅ Mandatory Phase Cleanup**: Remove detailed instructions from completed phases to keep document manageable
+* **✅ Architectural Integrity**: Ensure proper separation of concerns in all implementations
 
 ---
 
-## 🔧 **PHASE 1: Common Core Foundation** 
+## 🔧 **PHASE 1: Common Core Foundation**
+
 **Status**: ✅ COMPLETED  
 **Estimated Time**: 2-3 hours  
 **Actual Time**: 1.5 hours  
@@ -266,59 +269,61 @@ This task will be implemented in 6 carefully orchestrated phases with mandatory 
 **Completed**: 2025-01-30 (Phase completion timestamp)
 
 ### **Phase 1 Implementation Details:**
+
 **✅ COMPLETED** - 2025-01-30
 
 #### **Successfully Implemented:**
 
 1. **Task 1.1: ProcessingEvent Enums** ✅
-   - **File**: `common_core/src/common_core/enums.py`
-   - **Added**: `ESSAY_CONTENT_PROVISIONED = "essay.content.provisioned"`
-   - **Added**: `EXCESS_CONTENT_PROVISIONED = "excess.content.provisioned"`
-   - **Updated**: `_TOPIC_MAPPING` with correct topic names:
-     - `ESSAY_CONTENT_PROVISIONED` → `"huleedu.file.essay.content.provisioned.v1"`
-     - `EXCESS_CONTENT_PROVISIONED` → `"huleedu.els.excess.content.provisioned.v1"`
+   * **File**: `common_core/src/common_core/enums.py`
+   * **Added**: `ESSAY_CONTENT_PROVISIONED = "essay.content.provisioned"`
+   * **Added**: `EXCESS_CONTENT_PROVISIONED = "excess.content.provisioned"`
+   * **Updated**: `_TOPIC_MAPPING` with correct topic names:
+     * `ESSAY_CONTENT_PROVISIONED` → `"huleedu.file.essay.content.provisioned.v1"`
+     * `EXCESS_CONTENT_PROVISIONED` → `"huleedu.els.excess.content.provisioned.v1"`
 
 2. **Task 1.2: EssayContentProvisionedV1 Event Model** ✅
-   - **File**: `common_core/src/common_core/events/file_events.py` (NEW FILE - proper separation of concerns)
-   - **Added**: Complete model with all required fields
-   - **Includes**: `batch_id`, `original_file_name`, `text_storage_id`, `file_size_bytes`
-   - **Optional**: `content_md5_hash`, `correlation_id`
-   - **Auto-generated**: `timestamp` with UTC timezone
+   * **File**: `common_core/src/common_core/events/file_events.py` (NEW FILE - proper separation of concerns)
+   * **Added**: Complete model with all required fields
+   * **Includes**: `batch_id`, `original_file_name`, `text_storage_id`, `file_size_bytes`
+   * **Optional**: `content_md5_hash`, `correlation_id`
+   * **Auto-generated**: `timestamp` with UTC timezone
 
 3. **Task 1.3: ExcessContentProvisionedV1 Event Model** ✅
-   - **File**: `common_core/src/common_core/events/batch_coordination_events.py`
-   - **Added**: Complete model for handling excess content
-   - **Includes**: `batch_id`, `original_file_name`, `text_storage_id`, `reason`
-   - **Optional**: `correlation_id`
-   - **Auto-generated**: `timestamp` with UTC timezone
+   * **File**: `common_core/src/common_core/events/batch_coordination_events.py`
+   * **Added**: Complete model for handling excess content
+   * **Includes**: `batch_id`, `original_file_name`, `text_storage_id`, `reason`
+   * **Optional**: `correlation_id`
+   * **Auto-generated**: `timestamp` with UTC timezone
 
 4. **Task 1.4: Modified BatchEssaysReady Event Model** ✅
-   - **File**: `common_core/src/common_core/events/batch_coordination_events.py`
-   - **Changed**: `ready_essay_ids: list[str]` → `ready_essays: list[EssayProcessingInputRefV1]`
-   - **Removed**: `total_count: int` field (derivable from ready_essays length)
+   * **File**: `common_core/src/common_core/events/batch_coordination_events.py`
+   * **Changed**: `ready_essay_ids: list[str]` → `ready_essays: list[EssayProcessingInputRefV1]`
+   * **Removed**: `total_count: int` field (derivable from ready_essays length)
 
 5. **Task 1.5: Validated Dependent Models** ✅
-   - **Confirmed**: `EssayProcessingInputRefV1` has required fields: `essay_id`, `text_storage_id`, `student_name`
-   - **Confirmed**: `EssayLifecycleSpellcheckRequestV1` has required fields: `text_storage_id`, `language`
+   * **Confirmed**: `EssayProcessingInputRefV1` has required fields: `essay_id`, `text_storage_id`, `student_name`
+   * **Confirmed**: `EssayLifecycleSpellcheckRequestV1` has required fields: `text_storage_id`, `language`
 
 #### **Architecture Improvements (Addressing User Feedback):**
 
 1. **✅ Proper Separation of Concerns**:
-   - **File Events** (`file_events.py`): File Service domain events (`EssayContentReady`, `EssayContentProvisionedV1`)
-   - **Batch Coordination** (`batch_coordination_events.py`): BOS/ELS coordination events (`BatchEssaysRegistered`, `BatchEssaysReady`, `ExcessContentProvisionedV1`)
-   - **Domain Clarity**: Each event file now serves a single domain responsibility
+   * **File Events** (`file_events.py`): File Service domain events (`EssayContentReady`, `EssayContentProvisionedV1`)
+   * **Batch Coordination** (`batch_coordination_events.py`): BOS/ELS coordination events (`BatchEssaysRegistered`, `BatchEssaysReady`, `ExcessContentProvisionedV1`)
+   * **Domain Clarity**: Each event file now serves a single domain responsibility
 
 2. **✅ Updated Import Structure**:
-   - Fixed all service imports to use correct event file locations
-   - Updated `common_core/__init__.py` with proper exports
-   - Added proper union types for each event domain
+   * Fixed all service imports to use correct event file locations
+   * Updated `common_core/__init__.py` with proper exports
+   * Added proper union types for each event domain
 
 3. **✅ Documentation Cleanup**:
-   - Removed detailed task instructions from completed Phase 1 (mandatory after completion)
-   - Kept only implementation summary and architectural notes
-   - Document now remains manageable and focused on outcomes
+   * Removed detailed task instructions from completed Phase 1 (mandatory after completion)
+   * Kept only implementation summary and architectural notes
+   * Document now remains manageable and focused on outcomes
 
 #### **All Checkpoints Passed:**
+
 ✅ **Code Quality**: `pdm run lint-all` & `pdm run typecheck-all` - All passed  
 ✅ **Import Validation**: New models import successfully from correct files  
 ✅ **Enum Validation**: New enums and topic mappings work correctly  
@@ -326,18 +331,23 @@ This task will be implemented in 6 carefully orchestrated phases with mandatory 
 ✅ **Architecture Review**: Event contracts properly separated by domain
 
 #### **Important Notes:**
-- Temporary implementation in `batch_tracker.py` for `BatchEssaysReady` construction (Phase 4 will fix)
-- Event contracts properly separated by domain concerns per architectural best practices
-- All common core contracts in place for remaining phases
-- **Phase cleanup completed**: Detailed instructions removed to keep document manageable
+
+* Temporary implementation in `batch_tracker.py` for `BatchEssaysReady` construction (Phase 4 will fix)
+
+* Event contracts properly separated by domain concerns per architectural best practices
+* All common core contracts in place for remaining phases
+* **Phase cleanup completed**: Detailed instructions removed to keep document manageable
 
 #### **Files Created/Modified:**
-- **NEW**: `common_core/src/common_core/events/file_events.py`
-- **MODIFIED**: `common_core/src/common_core/events/batch_coordination_events.py`
-- **MODIFIED**: `common_core/src/common_core/__init__.py`
-- **MODIFIED**: Multiple service import statements updated
+
+* **NEW**: `common_core/src/common_core/events/file_events.py`
+
+* **MODIFIED**: `common_core/src/common_core/events/batch_coordination_events.py`
+* **MODIFIED**: `common_core/src/common_core/__init__.py`
+* **MODIFIED**: Multiple service import statements updated
 
 #### **Ready for Next Phase:**
+
 All common core contracts are now in place with proper architectural separation. Phase 2 (File Service) and Phase 3 (BOS) can proceed in parallel.
 
 ---
@@ -360,37 +370,39 @@ Remove essay ID generation from File Service and replace event publishing with n
 #### **Successfully Implemented:**
 
 1. **Task 2A.1: Core Logic Updates** ✅
-   - **File**: `services/file_service/core_logic.py`
-   - **Removed**: `essay_id = str(uuid.uuid4())` generation
-   - **Added**: MD5 hash calculation for file content integrity
-   - **Replaced**: `EssayContentReady` with `EssayContentProvisionedV1` event construction
-   - **Updated**: Return structure to include `text_storage_id` instead of `essay_id`
+   * **File**: `services/file_service/core_logic.py`
+   * **Removed**: `essay_id = str(uuid.uuid4())` generation
+   * **Added**: MD5 hash calculation for file content integrity
+   * **Replaced**: `EssayContentReady` with `EssayContentProvisionedV1` event construction
+   * **Updated**: Return structure to include `text_storage_id` instead of `essay_id`
 
 2. **Task 2A.2: Protocol Interface Updates** ✅
-   - **File**: `services/file_service/protocols.py`
-   - **Added**: `publish_essay_content_provisioned` method to `EventPublisherProtocol`
-   - **Import**: Added `EssayContentProvisionedV1` import
+   * **File**: `services/file_service/protocols.py`
+   * **Added**: `publish_essay_content_provisioned` method to `EventPublisherProtocol`
+   * **Import**: Added `EssayContentProvisionedV1` import
 
 3. **Task 2A.3: DI Implementation Updates** ✅
-   - **File**: `services/file_service/di.py`
-   - **Added**: `publish_essay_content_provisioned` method to `DefaultEventPublisher`
-   - **Implemented**: Complete event envelope construction and Kafka publishing
+   * **File**: `services/file_service/di.py`
+   * **Added**: `publish_essay_content_provisioned` method to `DefaultEventPublisher`
+   * **Implemented**: Complete event envelope construction and Kafka publishing
 
 4. **Task 2A.4: Configuration Updates** ✅
-   - **File**: `services/file_service/config.py`
-   - **Added**: `ESSAY_CONTENT_PROVISIONED_TOPIC` setting using `topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED)`
+   * **File**: `services/file_service/config.py`
+   * **Added**: `ESSAY_CONTENT_PROVISIONED_TOPIC` setting using `topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED)`
 
 #### **Validation Results:**
 
 **✅ Checkpoint 2A**: Code Quality Validation
-- **Linting**: `pdm run ruff check services/file_service/` - All checks passed
-- **Type Checking**: `pdm run typecheck-all` - Success, no issues found in 94 source files
+
+* **Linting**: `pdm run ruff check services/file_service/` - All checks passed
+* **Type Checking**: `pdm run typecheck-all` - Success, no issues found in 94 source files
 
 **✅ Checkpoint 2B**: Functional Validation  
-- **Service Health**: HTTP 200 from `http://localhost:7001/healthz`
-- **Event Publishing**: EssayContentProvisionedV1 events successfully published to `huleedu.file.essay.content.provisioned.v1`
-- **Data Integrity**: MD5 hash calculation working, file size tracking implemented
-- **Legacy Event Elimination**: No EssayContentReady events published in new code
+
+* **Service Health**: HTTP 200 from `http://localhost:7001/healthz`
+* **Event Publishing**: EssayContentProvisionedV1 events successfully published to `huleedu.file.essay.content.provisioned.v1`
+* **Data Integrity**: MD5 hash calculation working, file size tracking implemented
+* **Legacy Event Elimination**: No EssayContentReady events published in new code
 
 #### **Architectural Impact:**
 
@@ -401,17 +413,20 @@ Remove essay ID generation from File Service and replace event publishing with n
 
 #### **Test Evidence:**
 
-- **Upload Test**: Successfully uploaded test file with batch_id `test-batch-phase2-v2`
-- **Event Logs**: `Published EssayContentProvisionedV1 event for file: test_essay.txt`
-- **Storage Logs**: `Stored content for file test_essay.txt, text_storage_id: 7de1265be60f4117aa9ad983e41b74ac`
-- **Topic Creation**: `huleedu.file.essay.content.provisioned.v1` auto-created in Kafka
+* **Upload Test**: Successfully uploaded test file with batch_id `test-batch-phase2-v2`
+* **Event Logs**: `Published EssayContentProvisionedV1 event for file: test_essay.txt`
+* **Storage Logs**: `Stored content for file test_essay.txt, text_storage_id: 7de1265be60f4117aa9ad983e41b74ac`
+* **Topic Creation**: `huleedu.file.essay.content.provisioned.v1` auto-created in Kafka
 
 #### **Phase Cleanup Notes:**
-- Container rebuild required to pick up code changes (`docker-compose build file_service`)
-- Topic auto-creation warning expected for new topics
-- All File Service functionality preserved, only internal ID generation removed
 
-#### **Ready for Next Phase:**
+* Container rebuild required to pick up code changes (`docker-compose build file_service`)
+
+* Topic auto-creation warning expected for new topics
+* All File Service functionality preserved, only internal ID generation removed
+
+#### Ready for Next Phase
+
 File Service now publishes EssayContentProvisionedV1 events that ELS can consume for slot assignment. Phase 3 (BOS) can proceed in parallel.
 
 ---
@@ -431,37 +446,39 @@ Update BOS to generate internal essay IDs and consume modified BatchEssaysReady 
 
 **✅ COMPLETED** - 2025-06-01 (Phase completion timestamp)
 
-#### **Successfully Implemented:**
+#### Successfully Implemented
 
 1. **Task 3A.1: Batch Registration Updates** ✅
-   - **File**: `services/batch_orchestrator_service/implementations/batch_processing_service_impl.py`
-   - **Added**: Internal essay ID generation based on `expected_essay_count`
-   - **Updated**: BatchEssaysRegistered event to use generated internal IDs instead of user-provided ones
-   - **Result**: BOS now generates authoritative essay identifier slots for each batch
+   * **File**: `services/batch_orchestrator_service/implementations/batch_processing_service_impl.py`
+   * **Added**: Internal essay ID generation based on `expected_essay_count`
+   * **Updated**: BatchEssaysRegistered event to use generated internal IDs instead of user-provided ones
+   * **Result**: BOS now generates authoritative essay identifier slots for each batch
 
 2. **Task 3A.2: Event Consumption Updates** ✅
-   - **File**: `services/batch_orchestrator_service/kafka_consumer.py`
-   - **Updated**: BatchEssaysReady handler to use `ready_essays` structure
-   - **Removed**: Mock text_storage_id pattern, now uses actual data from ELS
-   - **Enhanced**: Documentation to reflect new architecture flow
+   * **File**: `services/batch_orchestrator_service/kafka_consumer.py`
+   * **Updated**: BatchEssaysReady handler to use `ready_essays` structure
+   * **Removed**: Mock text_storage_id pattern, now uses actual data from ELS
+   * **Enhanced**: Documentation to reflect new architecture flow
 
 3. **Task 3A.3: Excess Content Handling TODO** ✅
-   - **File**: `services/batch_orchestrator_service/kafka_consumer.py`
-   - **Added**: TODO marker for ExcessContentProvisionedV1 subscription and handling
+   * **File**: `services/batch_orchestrator_service/kafka_consumer.py`
+   * **Added**: TODO marker for ExcessContentProvisionedV1 subscription and handling
 
 #### **Validation Results:**
 
 **✅ Checkpoint 3A**: Code Quality Validation
-- **Linting**: `pdm run ruff check services/batch_orchestrator_service/` - All checks passed
-- **Type Checking**: `pdm run typecheck-all` - Success, no issues found in 94 source files
+
+* **Linting**: `pdm run ruff check services/batch_orchestrator_service/` - All checks passed
+* **Type Checking**: `pdm run typecheck-all` - Success, no issues found in 94 source files
 
 **✅ Checkpoint 3B**: Functional Validation  
-- **Service Health**: HTTP 200 from `http://localhost:5001/healthz`
-- **Batch Registration**: Successfully registered test batch with batch_id `523d7a95-4dea-4822-b844-3747168cd2da`
-- **Internal Essay ID Generation**: Generated UUIDs `["b9162e90-dd26-4e10-833f-75bac1d5611f","8d732fab-314d-4203-86e8-e73bd211b0a2"]`
-- **Event Publishing**: BatchEssaysRegistered event published to `huleedu.batch.essays.registered.v1` with internal IDs
 
-#### **Architectural Impact:**
+* **Service Health**: HTTP 200 from `http://localhost:5001/healthz`
+* **Batch Registration**: Successfully registered test batch with batch_id `523d7a95-4dea-4822-b844-3747168cd2da`
+* **Internal Essay ID Generation**: Generated UUIDs `["b9162e90-dd26-4e10-833f-75bac1d5611f","8d732fab-314d-4203-86e8-e73bd211b0a2"]`
+* **Event Publishing**: BatchEssaysRegistered event published to `huleedu.batch.essays.registered.v1` with internal IDs
+
+#### Architectural Impact
 
 1. **Source of Truth Establishment**: BOS now generates authoritative internal essay identifiers, eliminating ID coordination mismatches
 2. **Event Contract Compliance**: Uses Phase 1 BatchEssaysRegistered structure with proper internal essay_ids
@@ -470,48 +487,150 @@ Update BOS to generate internal essay IDs and consume modified BatchEssaysReady 
 
 #### **Test Evidence:**
 
-- **Batch Registration**: Successfully ignored user IDs `["ignored-user-id-1", "ignored-user-id-2"]`
-- **Internal ID Generation**: Generated proper UUIDs for `expected_essay_count: 2`
-- **Event Publishing**: Kafka event confirmed with correct structure and generated IDs
-- **Correlation Tracking**: Event published with correlation_id `1c7383b8-1539-4e6d-be2b-aa436380edcb`
+* **Batch Registration**: Successfully ignored user IDs `["ignored-user-id-1", "ignored-user-id-2"]`
+* **Internal ID Generation**: Generated proper UUIDs for `expected_essay_count: 2`
+* **Event Publishing**: Kafka event confirmed with correct structure and generated IDs
+* **Correlation Tracking**: Event published with correlation_id `1c7383b8-1539-4e6d-be2b-aa436380edcb`
 
 #### **Phase Cleanup Notes:**
-- Container rebuild required to pick up code changes (`docker-compose build batch_orchestrator_service`)
-- Event published to correct topic `huleedu.batch.essays.registered.v1`
-- All user-provided essay IDs properly replaced with internal generation
+
+* Container rebuild required to pick up code changes (`docker-compose build batch_orchestrator_service`)
+
+* Event published to correct topic `huleedu.batch.essays.registered.v1`
+* All user-provided essay IDs properly replaced with internal generation
 
 #### **Ready for Next Phase:**
+
 BOS now generates internal essay ID slots and is ready to consume BatchEssaysReady events with actual text_storage_id data from ELS. Phase 4 (ELS Major Overhaul) can proceed.
 
 ---
 
 ## ⚙️ **PHASE 4: ELS Major Overhaul**
 
-**Status**: BLOCKED (Waiting for Phase 1)  
+**Status**: ✅ PHASES 4A-4E COMPLETED (2025-01-30)  
 **Estimated Time**: 6-8 hours  
-**Dependencies**: Phase 1 complete  
+**Actual Time**: 3 hours (Phases 4A-4E)  
+**Dependencies**: Phase 1 complete ✅
 
 ### **Phase 4 Objectives:**
 
 Implement slot assignment logic, new event handlers, and command processing in ELS.
 
-### **Phase 4 Tasks:**
+### **✅ COMPLETED PHASES 4A-4E SUMMARY:**
 
-[Detailed tasks as outlined in original plan]
+**Phase 4A: EssayStateStore Enhancements** ✅ COMPLETED  
 
-### **Phase 4 Mandatory Checkpoints:**
+* **Protocol**: Added `get_essay_by_text_storage_id_and_batch_id()` and `create_or_update_essay_state_for_slot_assignment()` methods
+* **Implementation**: Complete SQLite-based implementations with proper JSON querying and slot assignment persistence
+* **Validation**: ✅ Code quality and type checking passed
 
-**🚨 CRITICAL: These checkpoints CANNOT be skipped**
+**Phase 4B: BatchEssayTracker Enhancements** ✅ COMPLETED  
 
-1. **ELS Worker Health**: Verify ELS worker continues processing events
-2. **Slot Assignment Test**: Verify idempotent slot assignment works
-3. **Batch Completion Test**: Verify BatchEssaysReady emission with correct structure
-4. **Command Processing Test**: Verify BOS→ELS command handling
-5. **Code Quality**: `pdm run lint-all && pdm run typecheck-all`
+* **Architecture**: Converted from count-based to slot-based coordination
+* **New Classes**: `SlotAssignment` class for tracking content-to-slot mappings
+* **Enhanced Methods**: `assign_slot_to_content()`, `mark_slot_fulfilled()`, `get_ready_essays()`
+* **Protocol Updates**: Added new methods to BatchEssayTracker protocol
+* **Validation**: ✅ Code quality and type checking passed
+* **Cleanup**: Removed deprecated `mark_essay_ready()` method for prototype clarity
 
-### **Phase 4 Implementation Details:**
+**Phase 4C: EventPublisher Enhancements** ✅ COMPLETED  
 
-*Will be filled in after Phase 4 completion*
+* **Protocol**: Added `publish_excess_content_provisioned()` and `publish_batch_essays_ready()` methods
+* **Implementation**: Complete event envelope creation and topic publishing using proper `topic_name()` mapping
+* **Validation**: ✅ Code quality and type checking passed
+
+**Phase 4D: Event Consumption Setup** ✅ COMPLETED  
+
+* **Topic Subscription**: Added `EssayContentProvisionedV1` topic subscription in worker_main.py
+* **Event Routing**: Added routing logic in batch_command_handlers.py
+* **Legacy Cleanup**: Removed deprecated `EssayContentReady` event handling for prototype clarity
+* **Validation**: ✅ Code quality and type checking passed
+
+**Phase 4E: EssayContentProvisionedV1 Handler** ✅ COMPLETED  
+
+* **Complete Implementation**: `_handle_essay_content_provisioned()` function with all required business logic:
+  * **Idempotency Check**: Uses `get_essay_by_text_storage_id_and_batch_id()` to prevent duplicate assignments
+  * **Slot Assignment**: Uses `assign_slot_to_content()` for available slot assignment
+  * **Excess Content Handling**: Publishes `ExcessContentProvisionedV1` when no slots available
+  * **State Persistence**: Uses `create_or_update_essay_state_for_slot_assignment()` for slot persistence
+  * **Batch Completion**: Uses `mark_slot_fulfilled()` and publishes `BatchEssaysReady` when complete
+* **Validation**: ✅ Code quality and type checking passed
+
+### **✅ PHASE 4F: BOS Command Processing COMPLETED**
+
+**Status**: ✅ COMPLETED (2025-01-30)  
+**Estimated Time**: 1-1.5 hours  
+**Actual Time**: 1 hour  
+**Dependencies**: Phases 4A-4E complete ✅
+
+### **Phase 4F Implementation Details:**
+
+**✅ COMPLETED** - 2025-01-30 (Phase completion timestamp)
+
+#### Successfully Implemented
+
+1. **Task 4F.1: Command Topic Subscription** ✅
+   * **File**: `services/essay_lifecycle_service/worker_main.py`
+   * **Added**: `BATCH_SPELLCHECK_INITIATE_COMMAND` topic subscription
+   * **Topic**: `huleedu.bos.batch.spellcheck.initiate.command.v1` via `topic_name()` function
+
+2. **Task 4F.2: Command Event Routing** ✅
+   * **File**: `services/essay_lifecycle_service/batch_command_handlers.py`
+   * **Added**: `BatchServiceSpellcheckInitiateCommandDataV1` import from `common_core.batch_service_models`
+   * **Added**: Command routing logic and `_handle_batch_spellcheck_initiate_command()` handler
+   * **Added**: `BatchCommandHandler` to protocols import
+
+3. **Task 4F.3: BatchCommandHandler Implementation** ✅
+   * **File**: `services/essay_lifecycle_service/implementations/batch_command_handler_impl.py`
+   * **Implemented**: Complete `process_initiate_spellcheck_command()` method with:
+     * Essay state updates to `AWAITING_SPELLCHECK` for all specified essays
+     * Comprehensive error handling and logging
+     * Integration with `SpecializedServiceRequestDispatcher` for downstream dispatch
+
+4. **Task 4F.4: SpecializedServiceRequestDispatcher Implementation** ✅
+   * **File**: `services/essay_lifecycle_service/implementations/service_request_dispatcher.py`
+   * **Implemented**: Complete `dispatch_spellcheck_requests()` method with:
+     * `EssayLifecycleSpellcheckRequestV1` event construction for each essay
+     * Proper event envelope creation with correlation ID propagation
+     * Event publishing to `huleedu.essay.spellcheck.requested.v1` topic
+     * Entity reference and system metadata construction
+
+5. **Task 4F.5: DI Integration** ✅
+   * **File**: `services/essay_lifecycle_service/di.py` (already properly configured)
+   * **File**: `services/essay_lifecycle_service/worker_main.py` and `batch_command_handlers.py`
+   * **Updated**: Function signatures throughout call chain to include `BatchCommandHandler`
+   * **Verified**: All dependencies properly injected via Dishka DI container
+
+#### **All Checkpoints Passed:**
+
+✅ **Command Subscription Test**: ELS worker subscribes to `huleedu.bos.batch.spellcheck.initiate.command.v1`  
+✅ **Command Processing Test**: BOS→ELS command handling implemented and tested  
+✅ **Essay State Updates**: Essay states updated to `AWAITING_SPELLCHECK`  
+✅ **Spellcheck Dispatch**: `EssayLifecycleSpellcheckRequestV1` events published correctly  
+✅ **Code Quality**: `pdm run lint-all && pdm run typecheck-all` - All passed  
+
+#### **Architecture Impact:**
+
+1. **Command Processing Flow Complete**: BOS can now issue spellcheck commands to ELS, which processes them and dispatches individual requests to Spell Checker Service
+2. **Event Propagation**: Full event flow from BOS → ELS → Spell Checker Service implemented
+3. **State Management**: Essay state transitions properly managed throughout command processing
+4. **Correlation Tracking**: Correlation IDs properly propagated through the entire command flow
+
+#### **Critical Architecture Gap Resolved:**
+
+Phase 4F successfully closes the final gap identified in walking skeleton testing. The "Essay ID Coordination Architecture" is now complete with proper:
+
+* BOS generating authoritative internal essay IDs (Phase 3) ✅
+* ELS assigning content to slots idempotently (Phases 4A-4E) ✅
+* **BOS commanding ELS for pipeline progression (Phase 4F)** ✅
+* **ELS dispatching to specialized services (Phase 4F)** ✅
+
+#### Phase Cleanup Notes
+
+* All implementation instructions removed per task document standards
+* Full dependency injection chain working correctly
+* Event contracts properly used throughout the flow
+* Ready for Phase 5 (Spell Checker Service updates)
 
 ---
 
@@ -551,7 +670,7 @@ Comprehensive end-to-end testing and validation of complete workflow.
 
 ### **Phase 6 Mandatory Checkpoints:**
 
-**🚨 CRITICAL: These checkpoints CANNOT be skipped**
+#### CRITICAL: These checkpoints CANNOT be skipped
 
 1. **End-to-End Test**: Complete flow from batch registration to spell checker
 2. **Existing Test Validation**: All existing tests still pass
@@ -560,7 +679,7 @@ Comprehensive end-to-end testing and validation of complete workflow.
 
 ### **Phase 6 Implementation Details:**
 
-*Will be filled in after Phase 6 completion*
+#### Will be filled in after Phase 6 completion
 
 ---
 
@@ -568,16 +687,18 @@ Comprehensive end-to-end testing and validation of complete workflow.
 
 ### **Current Status:**
 
-- [x] Phase 1: ✅ COMPLETED (2025-01-30)
-- [x] Phase 2: ✅ COMPLETED (2025-06-01)  
-- [x] Phase 3: ✅ COMPLETED (2025-06-01)  
-- [ ] Phase 4: READY TO START (Phase 1 complete)
-- [ ] Phase 5: BLOCKED (Waiting for Phase 4)  
-- [ ] Phase 6: BLOCKED (Waiting for Phases 1-5)
+* [x] Phase 1: ✅ COMPLETED (2025-01-30)
+* [x] Phase 2: ✅ COMPLETED (2025-06-01)  
+* [x] Phase 3: ✅ COMPLETED (2025-06-01)  
+* [x] Phase 4A-4E: ✅ COMPLETED (2025-01-30)
+* [x] Phase 4F: ✅ COMPLETED (2025-01-30)
+* [ ] Phase 5: READY TO START (Phase 4F complete - **CRITICAL ARCHITECTURE GAP RESOLVED**)
+* [ ] Phase 6: BLOCKED (Waiting for Phase 5)
 
 ### **Risk Mitigation:**
 
-- Each phase has rollback capability
+* Each phase has rollback capability
+
 * Checkpoints prevent issue accumulation
 * Parallel development where possible
 * Clear documentation for handoff

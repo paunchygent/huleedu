@@ -20,7 +20,7 @@ from protocols import (
 from text_processing import extract_text_from_file
 
 from common_core.events.envelope import EventEnvelope
-from common_core.events.file_events import EssayContentProvisionedV1, EssayContentReady
+from common_core.events.file_events import EssayContentProvisionedV1
 
 logger = create_service_logger("file_service.di")
 
@@ -64,38 +64,6 @@ class DefaultEventPublisher:
         self.producer = producer
         self.settings = settings
 
-    async def publish_essay_content_ready(
-        self,
-        event_data: EssayContentReady,
-        correlation_id: Optional[uuid.UUID]
-    ) -> None:
-        """Publish EssayContentReady event to Kafka."""
-        try:
-            # Construct EventEnvelope
-            envelope = EventEnvelope[EssayContentReady](
-                event_type=self.settings.ESSAY_CONTENT_READY_TOPIC,
-                source_service=self.settings.SERVICE_NAME,
-                correlation_id=correlation_id,
-                data=event_data
-            )
-
-            # Serialize to JSON
-            message_bytes = json.dumps(envelope.model_dump(mode="json")).encode('utf-8')
-
-            # Publish to Kafka
-            await self.producer.send(
-                self.settings.ESSAY_CONTENT_READY_TOPIC,
-                message_bytes
-            )
-
-            logger.info(
-                f"Published EssayContentReady event for essay {event_data.essay_id} "
-                f"to topic {self.settings.ESSAY_CONTENT_READY_TOPIC}"
-            )
-
-        except Exception as e:
-            logger.error(f"Error publishing EssayContentReady event: {e}")
-            raise
 
     async def publish_essay_content_provisioned(
         self,

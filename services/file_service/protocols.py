@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional, Protocol
 
-from common_core.events.file_events import EssayContentProvisionedV1, EssayContentReady
+from common_core.events.file_events import EssayContentProvisionedV1
 
 
 class ContentServiceClientProtocol(Protocol):
@@ -36,19 +36,7 @@ class ContentServiceClientProtocol(Protocol):
 class EventPublisherProtocol(Protocol):
     """Protocol for publishing Kafka events."""
 
-    async def publish_essay_content_ready(
-        self,
-        event_data: EssayContentReady,
-        correlation_id: Optional[uuid.UUID]
-    ) -> None:
-        """
-        Publish EssayContentReady event to Kafka.
 
-        Args:
-            event_data: EssayContentReady event payload
-            correlation_id: Optional correlation ID for request tracing
-        """
-        ...
 
     async def publish_essay_content_provisioned(
         self,

@@ -29,9 +29,10 @@ common_core/
 └── events/                     # Event schemas
     ├── envelope.py             # EventEnvelope wrapper
     ├── base_event_models.py    # Base event classes
+    ├── file_events.py          # File Service domain events
+    ├── batch_coordination_events.py # Batch coordination events
     ├── spellcheck_models.py    # Spellcheck event data
-    ├── ai_feedback_events.py   # AI feedback event data
-    └── batch_coordination_events.py # Batch coordination events
+    └── ai_feedback_events.py   # AI feedback event data
 ```
 
 ## 3. Core Enums
@@ -46,7 +47,10 @@ common_core/
 ### 3.2. ProcessingEvent
 
 - **Batch Orchestration**: `BATCH_PIPELINE_REQUESTED`, `BATCH_PHASE_INITIATED`, `BATCH_PIPELINE_PROGRESS_UPDATED`, `BATCH_PHASE_CONCLUDED`
+- **Batch Coordination**: `BATCH_ESSAYS_REGISTERED`, `BATCH_ESSAYS_READY`
 - **Essay Lifecycle**: `ESSAY_PHASE_INITIATION_REQUESTED`, `ESSAY_LIFECYCLE_STATE_UPDATED`
+- **Essay Content**: `ESSAY_CONTENT_PROVISIONED`, `EXCESS_CONTENT_PROVISIONED`
+- **Service Commands**: `BATCH_SPELLCHECK_INITIATE_COMMAND`
 - **Specialized Services**: `ESSAY_SPELLCHECK_REQUESTED`, `ESSAY_SPELLCHECK_RESULT_RECEIVED`, `ESSAY_NLP_RESULT_RECEIVED`, `ESSAY_AIFEEDBACK_RESULT_RECEIVED`, etc.
 - **Generic**: `PROCESSING_STARTED`, `PROCESSING_CONCLUDED`, `PROCESSING_FAILED`
 
@@ -79,6 +83,11 @@ def topic_name(event: ProcessingEvent) -> str:
 **Current Mappings**:
 - `ESSAY_SPELLCHECK_REQUESTED` → `"huleedu.essay.spellcheck.requested.v1"`
 - `ESSAY_SPELLCHECK_RESULT_RECEIVED` → `"huleedu.essay.spellcheck.completed.v1"`
+- `BATCH_ESSAYS_REGISTERED` → `"huleedu.batch.essays.registered.v1"`
+- `BATCH_ESSAYS_READY` → `"huleedu.els.batch.essays.ready.v1"`
+- `ESSAY_CONTENT_PROVISIONED` → `"huleedu.file.essay.content.provisioned.v1"`
+- `EXCESS_CONTENT_PROVISIONED` → `"huleedu.els.excess.content.provisioned.v1"`
+- `BATCH_SPELLCHECK_INITIATE_COMMAND` → `"huleedu.els.spellcheck.initiate.command.v1"`
 
 ## 4. Models
 
@@ -139,7 +148,12 @@ data: T_EventData
 **ProcessingUpdate**: Extends BaseEventData with status and metadata
 **EventTracker**: Event tracking capabilities
 
-### 5.3. Service Models
+### 5.3. Event Domain Models
+
+**file_events.py**: `EssayContentProvisionedV1` (File Service → ELS)
+**batch_coordination_events.py**: `BatchEssaysRegistered`, `BatchEssaysReady` (BOS ↔ ELS), `ExcessContentProvisionedV1` (ELS → BOS)
+
+### 5.4. Service Models
 
 **essay_service_models.py**: Request models from ELS to Specialized Services
 **batch_service_models.py**: Command models from BOS to ELS

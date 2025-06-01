@@ -14,37 +14,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ..metadata_models import EntityReference, StorageReferenceMetadata, SystemProcessingMetadata
-
-
-class EssayContentReady(BaseModel):
-    """
-    Event sent by File Service to ELS when individual essay content is ready.
-
-    This triggers ELS to track readiness and potentially emit BatchEssaysReady.
-    """
-
-    event: str = Field(default="essay.content.ready", description="Event type identifier")
-    essay_id: str = Field(description="Essay identifier")
-    batch_id: str = Field(description="Batch this essay belongs to")
-    content_storage_reference: StorageReferenceMetadata = Field(
-        description="Reference to stored content"
-    )
-    entity: EntityReference = Field(description="Essay entity reference")
-    metadata: SystemProcessingMetadata = Field(description="Processing metadata")
-    student_name: Optional[str] = Field(
-        default=None, description="Parsed student name, if available (stubbed for skeleton)"
-    )
-    student_email: Optional[str] = Field(
-        default=None, description="Parsed student email, if available (stubbed for skeleton)"
-    )
-
 
 class EssayContentProvisionedV1(BaseModel):
     """
     Event sent by File Service when content is successfully processed and stored.
 
-    This event replaces EssayContentReady to decouple File Service from internal
+    This event decouples File Service from internal
     essay ID management. File Service simply announces that content has been
     provisioned for a batch.
     """
@@ -63,5 +38,4 @@ class EssayContentProvisionedV1(BaseModel):
 class FileEventData(BaseModel):
     """Union type for all file service event data types."""
 
-    essay_content_ready: Optional[EssayContentReady] = None
     essay_content_provisioned: Optional[EssayContentProvisionedV1] = None

@@ -9,7 +9,7 @@ alwaysApply: false
 - **Package**: `huleedu-file-service`
 - **Port**: 7001 (HTTP API), 9094 (Prometheus)
 - **Stack**: Quart, aiohttp, Hypercorn, aiokafka
-- **Purpose**: File upload handling and content ingestion service
+- **Purpose**: File upload and content provisioning service
 - **Architecture**: Blueprint-based API with Kafka event publishing
 
 ## 2. Service Structure **BLUEPRINT PATTERN**
@@ -73,9 +73,9 @@ services/file_service/
 - **Error Handling**: Empty string return for unsupported formats
 
 ### 4.2. Workflow Logic (core_logic.py)
-- **Essay ID Generation**: UUID-based unique identifiers
-- **Content Storage**: Integration with Content Service via HTTP
-- **Event Publishing**: EssayContentReady events to Kafka
+- **Content Storage**: Integration with Content Service via HTTP (returns `text_storage_id`)
+- **Content Integrity**: MD5 hash calculation and file size tracking
+- **Event Publishing**: `EssayContentProvisionedV1` events to Kafka
 - **Correlation Tracking**: End-to-end traceability
 
 ## 5. Integration Points
@@ -86,10 +86,10 @@ services/file_service/
 - **Prometheus**: Metrics collection and exposure
 
 ### 5.2. Event Publishing
-- **Topic**: `huleedu.file.essay.content.ready.v1`
-- **Event Type**: `EssayContentReady` from common_core
+- **Topic**: `huleedu.file.essay.content.provisioned.v1`
+- **Event Type**: `EssayContentProvisionedV1` from `common_core.events.file_events`
+- **Data**: `batch_id`, `original_file_name`, `text_storage_id`, `file_size_bytes`, `content_md5_hash`
 - **Serialization**: `json.dumps(envelope.model_dump(mode="json"))` for UUID handling
-- **Correlation**: Propagated correlation IDs for batch tracking
 
 ## 6. Configuration
 

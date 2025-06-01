@@ -19,10 +19,10 @@ BOS implements the **Count-Based Aggregation Pattern** as the central orchestrat
 
 ### Coordination Flow
 
-1. **Batch Creation**: BOS creates batch and registers expectations with ELS (`BatchEssaysRegistered`)
-2. **Content Ingestion**: BOS coordinates with File Service for essay content processing
-3. **Readiness Aggregation**: ELS tracks individual essay readiness and notifies BOS when complete (`BatchEssaysReady`)
-4. **Pipeline Execution**: BOS initiates processing phases (spellcheck, NLP, etc.) for ready batches
+1. **Batch Creation**: BOS creates batch with internal essay ID slots and registers with ELS (`BatchEssaysRegistered`)
+2. **Content Coordination**: File Service provisions content to ELS for slot assignment
+3. **Readiness Notification**: ELS notifies BOS when all slots are filled (`BatchEssaysReady`)
+4. **Command Processing**: BOS generates commands with actual essay IDs and dispatches to ELS (`BatchSpellcheckInitiateCommand`)
 5. **Progress Monitoring**: BOS tracks progress across all processing phases and provides status to clients
 
 ### Service Boundary Responsibilities
@@ -97,12 +97,17 @@ services/batch_orchestrator_service/
 Published to Kafka topics for downstream coordination:
 
 * **`huleedu.batch.essays.registered.v1`**:
-  * **Data**: `BatchEssaysRegistered` with batch context and essay expectations
+  * **Data**: `BatchEssaysRegistered` with internal essay ID slots and batch context
   * **Trigger**: After successful batch registration
-  * **Consumer**: Essay Lifecycle Service for readiness tracking
+  * **Consumer**: Essay Lifecycle Service for slot assignment
+
+* **`huleedu.els.spellcheck.initiate.command.v1`**:
+  * **Data**: `BatchServiceSpellcheckInitiateCommandDataV1` with batch processing command
+  * **Trigger**: After receiving `BatchEssaysReady` event from ELS
+  * **Consumer**: Essay Lifecycle Service for command processing
 
 * **`huleedu.essay.spellcheck.requested.v1`**:
-  * **Data**: `SpellcheckRequestedDataV1` with essay content reference
+  * **Data**: `SpellcheckRequestedDataV1` with essay content reference  
   * **Trigger**: Test endpoint for integration validation
   * **Consumer**: Spell Checker Service
 
@@ -111,8 +116,8 @@ Published to Kafka topics for downstream coordination:
 Consumed from Kafka for batch coordination:
 
 * **`huleedu.els.batch.essays.ready.v1`**:
-  * **Data**: `BatchEssaysReady` indicating batch readiness for processing
-  * **Handler**: Initiates spellcheck pipeline by publishing spellcheck commands
+  * **Data**: `BatchEssaysReady` with ready essays including actual essay IDs and text_storage_ids
+  * **Handler**: Generates spellcheck commands with real essay data and publishes to ELS
   * **Implementation**: Kafka consumer running as background task
 
 ## Dependency Injection Architecture

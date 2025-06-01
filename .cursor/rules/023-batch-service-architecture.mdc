@@ -71,19 +71,19 @@ services/batch_orchestrator_service/
 
 ### 4.1. Event Publishing
 - **Topic**: `huleedu.batch.essays.registered.v1`
-  - **Data**: `BatchEssaysRegistered`
+  - **Data**: `BatchEssaysRegistered` (with internal essay ID slots)
   - **Trigger**: After batch registration
   - **Consumer**: Essay Lifecycle Service
 
-- **Topic**: `huleedu.essay.spellcheck.requested.v1`
-  - **Data**: `SpellcheckRequestedDataV1`
-  - **Trigger**: Test endpoint
-  - **Consumer**: Spell Checker Service
+- **Topic**: `huleedu.els.spellcheck.initiate.command.v1`
+  - **Data**: `BatchServiceSpellcheckInitiateCommandDataV1`
+  - **Trigger**: After `BatchEssaysReady` received
+  - **Consumer**: Essay Lifecycle Service
 
 ### 4.2. Event Consumption
 - **Topic**: `huleedu.els.batch.essays.ready.v1`
-  - **Data**: `BatchEssaysReady`
-  - **Handler**: Initiates spellcheck pipeline
+  - **Data**: `BatchEssaysReady` (with `ready_essays: List[EssayProcessingInputRefV1]`)
+  - **Handler**: Generates spellcheck commands with actual essay IDs and text_storage_ids
   - **Implementation**: Background Kafka consumer task
 
 ### 4.3. Event Flow

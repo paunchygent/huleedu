@@ -21,6 +21,7 @@ from batch_command_handlers import process_single_message
 from config import settings
 from di import EssayLifecycleServiceProvider
 from protocols import (
+    BatchCommandHandler,
     BatchEssayTracker,
     EssayStateStore,
     EventPublisher,
@@ -64,7 +65,8 @@ async def kafka_consumer_context() -> AsyncIterator[AIOKafkaConsumer]:
     topics = [
         topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED),
         topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),
-        topic_name(ProcessingEvent.ESSAY_CONTENT_READY),
+        topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED),
+        topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
     ]
 
     consumer = AIOKafkaConsumer(
@@ -108,6 +110,7 @@ async def process_messages(
     transition_validator: StateTransitionValidator,
     metrics_collector: MetricsCollector,
     batch_essay_tracker: BatchEssayTracker,
+    batch_command_handler: BatchCommandHandler,
 ) -> None:
     """Main message processing loop."""
     logger.info("Starting message processing loop")
@@ -126,6 +129,7 @@ async def process_messages(
                     transition_validator=transition_validator,
                     metrics_collector=metrics_collector,
                     batch_tracker=batch_essay_tracker,
+                    batch_command_handler=batch_command_handler,
                 )
 
                 if success:
@@ -171,6 +175,7 @@ async def run_worker() -> None:
             transition_validator = await request_container.get(StateTransitionValidator)
             metrics_collector = await request_container.get(MetricsCollector)
             batch_essay_tracker = await request_container.get(BatchEssayTracker)
+            batch_command_handler = await request_container.get(BatchCommandHandler)
 
             logger.info("Dependencies injected successfully")
 
@@ -183,6 +188,7 @@ async def run_worker() -> None:
                     transition_validator=transition_validator,
                     metrics_collector=metrics_collector,
                     batch_essay_tracker=batch_essay_tracker,
+                    batch_command_handler=batch_command_handler,
                 )
 
     except Exception as e:

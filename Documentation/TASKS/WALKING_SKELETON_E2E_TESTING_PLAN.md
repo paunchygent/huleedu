@@ -303,33 +303,9 @@ For each phase, the following research areas must be completed:
 
 ### **Phase 2 Next Steps & Recommendations** 🚀
 
-#### **Immediate Action Required**: Fix Essay ID Coordination
+#### **Immediate Action Required**: Fix Essay ID Coordination and associated impelementations
 
-**Option 1: Pre-determined Essay IDs** (Recommended for walking skeleton)
-
-- Modify test scripts to use predefined essay IDs in file uploads
-- Ensure File Service respects provided essay IDs rather than generating new ones
-
-**Option 2: Dynamic ID Updates** (Production approach)
-
-- Modify ELS to update batch expectations when receiving unexpected essay IDs
-- Implement ID reconciliation logic in batch tracker
-
-#### **Testing Continuity Strategy**
-
-1. **Quick Fix for Walking Skeleton**: Implement Option 1 for immediate Phase 3 progression
-2. **Phase 3 Readiness**: Essay ID coordination is the **only blocker** for end-to-end flow
-3. **Architecture Confidence**: High confidence in all other components
-
-#### **Phase 2 Success Metrics** ✅
-
-- **96% Test Success Rate**: 20/21 individual tests passed
-- **Event-Driven Architecture**: Fully validated across all service boundaries
-- **Error Handling**: Robust error responses and graceful degradation confirmed
-- **Observability**: Comprehensive logging and correlation ID tracking working
-- **Infrastructure**: Production-stable environment achieved
-
-**🎯 CONCLUSION**: Phase 2 demonstrates that the walking skeleton architecture is **fundamentally sound** with excellent event-driven coordination. The single Essay ID coordination issue is **easily resolvable** and doesn't indicate broader architectural problems.
+and implement the command handlers in ELS described in @ESSAY_ID_COORDINATION_ARCHITECTURE_FIX.md
 
 ## **PHASE 2: Individual Service Integration Testing** (45 minutes)
 

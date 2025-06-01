@@ -1,50 +1,94 @@
 # Batch Coordination Implementation Roadmap
 
-## 🎯 Walking Skeleton Scope (CURRENT)
+**Status**: Implementation COMPLETED ✅ | Testing VALIDATION PENDING ⚠️ | Next: Complete E2E Testing
 
-**Goal**: Prove count-based aggregation architecture with minimal spellcheck-only flow through proper inter-service coordination.
+## 🎯 Walking Skeleton Scope - Implementation vs Testing Status
 
-### ✅ Completed Architecture
+**Goal**: Prove slot assignment architecture with spellcheck command flow through proper inter-service coordination.
 
-- [x] Event models defined (`BatchEssaysRegistered`, `EssayContentReady`, `BatchEssaysReady`)
-- [x] ELS batch tracking logic (`BatchEssayTracker`, `BatchExpectation`)
-- [x] State machine updated with `READY_FOR_PROCESSING`
-- [x] PRD updated with coordination architecture
-- [x] Service README updates
+### ✅ Implementation Completed (Phase 1-4F)
 
-### 🚧 Walking Skeleton Implementation (PRIORITY ORDER)
+- [x] **Essay ID Coordination Architecture**: Complete slot assignment pattern implemented
+- [x] **Event Models**: Updated to `EssayContentProvisionedV1`, `BatchEssaysReady` with actual essay data
+- [x] **File Service**: Content provisioning service with MD5 validation  
+- [x] **ELS Slot Assignment**: Content assignment to BOS-generated essay ID slots
+- [x] **BOS Command Processing**: Command generation with actual essay IDs and text_storage_ids
+- [x] **ELS Command Handling**: BatchSpellcheckInitiateCommand processing and service dispatch
+- [x] **Containerization**: All services containerized and communicating via Kafka
 
-**Architectural Decision**: File Service will be implemented as a separate microservice to properly validate inter-service coordination patterns via Kafka events.
+### ⚠️ Testing Validation Status (Per E2E Testing Plan)
 
-#### **PRIORITY 1: Fix ELS Containerization (BLOCKING)**
-
-- [x] **ELS Dockerfile**: Create following established service patterns
-- [x] **ELS docker-compose.yml Entry**: Add service with proper dependencies
-- [x] **ELS Integration**: Ensure worker and API both containerized
-- [x] **Dependency Chain**: content_service → essay_lifecycle_service → batch_orchestrator_service
-
-#### **PRIORITY 2: File Service Skeleton (Architecturally Compliant)**
-
-* **File Service Skeleton** ✅ **COMPLETED**:
-  * **Service Structure**: Created `services/file_service/` with all core components
-  * **Event Integration**: Successfully consumes `BatchEssaysRegistered` and emits `EssayContentReady` events
-  * **Containerization**: Added to docker-compose.yml with proper dependencies
-  * **Testing**: Needs to validate end-to-end integration with other services
-
-#### **PRIORITY 3: End-to-End Integration** ⏳ **IN PROGRESS**
-
-- [ ] **Event Flow Validation**: BOS → File Service → ELS → BOS coordination  
-- [ ] **Walking Skeleton Test**: Single batch, 2-3 essays, spellcheck-only pipeline
-- [ ] **Service Boundaries**: Verify proper separation of concerns
+- [x] **Phase 1**: Infrastructure Validation COMPLETED
+- [x] **Phase 2**: Individual Service Integration COMPLETED with CRITICAL ISSUES
+  - ✅ BOS Registration Flow: 5/5 tests passed
+  - ✅ File Service Integration: 8/8 tests passed  
+  - ❌ **ELS Aggregation Logic: CRITICAL ISSUE** - Essay ID mismatch prevents batch completion
+- [ ] **Phase 3**: End-to-End Walking Skeleton Testing - NOT STARTED
+- [ ] **Phase 4**: Error Scenarios & Edge Cases - NOT STARTED  
+- [ ] **Phase 5**: Performance & Observability - NOT STARTED
 
 **📋 TESTING PLAN CREATED**: Comprehensive end-to-end testing plan documented in [`Documentation/TASKS/WALKING_SKELETON_E2E_TESTING_PLAN.md`](./WALKING_SKELETON_E2E_TESTING_PLAN.md)
 
 **🗂️ SCRIPT ORGANIZATION UPDATED**: Project structure rules updated to clarify test script placement:
+
 - **Integration Tests**: `tests/functional/` (Python pytest-based)
 - **Shell Test Scripts**: `scripts/tests/` (Bash-based automation)
 - **Test Utilities**: `scripts/tests/` (Analysis and tracing tools)
 
-**Success Criteria**: Client → File Service (upload) → Content Service (storage) → ELS (aggregation) → BOS (orchestration) → Spell Checker (processing)
+**⚠️ Success Criteria Pending Validation**: Client → File Service (upload) → Content Service (storage) → ELS (slot assignment) → BOS (command generation) → ELS (service dispatch) → Spell Checker (processing)
+
+**CRITICAL ISSUE**: Testing reveals Essay ID coordination mismatch between BOS expectations and File Service UUID generation prevents batch completion.
+
+### 🔍 Test Structure Assessment vs Implementation Changes
+
+**Implementation-Testing Misalignment Analysis**:
+
+Our Phase 1-4F implementation changes have potentially invalidated existing test scripts:
+
+#### **Event Model Changes**
+
+- **OLD**: Tests expect `EssayContentReady` events
+- **NEW**: Implementation uses `EssayContentProvisionedV1` events  
+- **TODO**: Update test scripts to consume correct event types
+
+#### **Essay ID Coordination**
+
+- **OLD**: Tests assume File Service generates essay IDs
+- **NEW**: Implementation uses BOS-generated internal essay ID slots assigned by ELS
+- **TODO**: Update test scripts to use slot assignment pattern
+
+#### **Batch Readiness Structure**
+
+- **OLD**: Tests expect `BatchEssaysReady` with simple essay ID list
+- **NEW**: Implementation uses `ready_essays: List[EssayProcessingInputRefV1]` with text_storage_ids
+- **TODO**: Update test validation to check new data structure
+
+#### **Command Processing Flow**
+
+- **OLD**: Tests expect direct BOS → Spell Checker commands  
+- **NEW**: Implementation uses BOS → ELS → Spell Checker command flow
+- **TODO**: Update test scripts to validate command processing through ELS
+
+#### **File Service Behavior**
+
+- **OLD**: Tests assume essay ID generation by File Service
+- **NEW**: Implementation focuses on content provisioning without essay ID generation
+- **TODO**: Update file upload tests to reflect content provisioning model
+
+#### **ELS Role Changes**
+
+- **OLD**: Tests expect simple aggregation behavior
+- **NEW**: Implementation includes slot assignment, command processing, and service dispatch
+- **TODO**: Create comprehensive ELS command processing tests
+
+**📋 Testing Script Status Assessment**:
+
+| Script | Current Status | Alignment with Implementation | Action Needed |
+|--------|---------------|------------------------------|---------------|
+| `test_bos_registration.sh` | ✅ Passing | ⚠️ Partial - event model changes | TODO: Update event validation |
+| `test_file_service_integration.sh` | ✅ Passing | ❌ Misaligned - wrong event types | TODO: Update to EssayContentProvisionedV1 |
+| `test_els_aggregation.sh` | ❌ Failing | ❌ Completely misaligned - old aggregation model | TODO: Rewrite for slot assignment |
+| Phase 3-5 scripts | ❌ Not executed | ❌ Unknown alignment | TODO: Review and update before execution |
 
 ### 🎯 File Service Specification
 
@@ -88,36 +132,37 @@
 - Content storage implementation (Content Service responsibility)
 - Processing pipeline execution (Specialized Services responsibility)
 
-### 🔄 Walking Skeleton Service Coordination Flow
+### ✅ Implemented Service Coordination Flow
 
 ```mermaid
 sequenceDiagram
     Client->>File Service: POST /v1/files/batch (upload essays)
     File Service->>Content Service: Store raw content
-    File Service->>ELS: EssayContentReady events
-    ELS->>BOS: BatchEssaysReady event
-    BOS->>Spell Checker: Initiate spellcheck pipeline
-    Spell Checker->>ELS: Processing results
-    ELS->>BOS: Pipeline completion events
+    File Service->>ELS: EssayContentProvisionedV1 events
+    ELS->>BOS: BatchEssaysReady event (with essay IDs)
+    BOS->>ELS: BatchSpellcheckInitiateCommand
+    ELS->>Spell Checker: EssayLifecycleSpellcheckRequestV1
 ```
 
-**Event-Driven Coordination Pattern:**
+**✅ Implemented Coordination Pattern:**
 
-1. **File Upload**: Client uploads batch to File Service
-2. **Content Storage**: File Service coordinates with Content Service
-3. **Essay Readiness**: File Service emits `EssayContentReady` per essay
-4. **Batch Aggregation**: ELS tracks essays, emits `BatchEssaysReady` when complete
-5. **Pipeline Initiation**: BOS receives batch ready, starts processing pipeline
+1. **Batch Registration**: BOS generates internal essay ID slots and registers with ELS
+2. **File Upload**: Client uploads batch to File Service  
+3. **Content Provisioning**: File Service stores content and emits `EssayContentProvisionedV1`
+4. **Slot Assignment**: ELS assigns content to available essay ID slots
+5. **Batch Readiness**: ELS emits `BatchEssaysReady` with actual essay IDs and text_storage_ids
+6. **Command Processing**: BOS generates commands with real data and sends to ELS
+7. **Service Dispatch**: ELS dispatches requests to specialized services with proper context
 
-### 🎯 Walking Skeleton Service Architecture
+### ✅ Implemented Service Architecture
 
-| **Service** | **Walking Skeleton Responsibility** | **Event Coordination** |
+| **Service** | **Implemented Responsibility** | **Event Coordination** |
 |-------------|-------------------------------------|------------------------|
-| **File Service** | File upload, text extraction, content coordination | Emit: `EssayContentReady` |
+| **File Service** | File upload, text extraction, content provisioning | Emit: `EssayContentProvisionedV1` |
 | **Content Service** | Raw content storage and retrieval | HTTP API only |
-| **ELS** | Essay state management, batch readiness aggregation | Consume: `EssayContentReady`, Emit: `BatchEssaysReady` |
-| **BOS** | Batch orchestration, pipeline management | Consume: `BatchEssaysReady`, Emit: pipeline commands |
-| **Spell Checker** | Spell checking processing | Standard processing events |
+| **ELS** | Slot assignment, command processing, service dispatch | Consume: `EssayContentProvisionedV1`, `BatchSpellcheckInitiateCommand`; Emit: `BatchEssaysReady`, `EssayLifecycleSpellcheckRequestV1` |
+| **BOS** | Slot generation, command processing, pipeline orchestration | Consume: `BatchEssaysReady`; Emit: `BatchEssaysRegistered`, `BatchSpellcheckInitiateCommand` |
+| **Spell Checker** | Spell checking processing | Consume: `EssayLifecycleSpellcheckRequestV1` |
 
 ---
 
@@ -294,12 +339,15 @@ class FileService:
 
 ## 📊 Success Metrics by Phase
 
-### Walking Skeleton
+### ⚠️ Walking Skeleton - IMPLEMENTATION COMPLETE, TESTING PENDING
 
-- [ ] All services containerized and communicating via Kafka events
-- [ ] Single batch processes end-to-end without manual intervention
-- [ ] File Service properly coordinates with Content Service and ELS
-- [ ] Event-driven coordination validated across service boundaries
+- [x] All services containerized and communicating via Kafka events
+- [x] File Service properly coordinates with Content Service and ELS
+- [x] Event-driven coordination implemented across service boundaries
+- [x] Essay ID coordination architecture implemented
+- [x] Command processing flow from BOS through ELS to specialized services implemented
+- [ ] **CRITICAL**: Single batch processes end-to-end without manual intervention - BLOCKED by Essay ID mismatch
+- [ ] **CRITICAL**: Complete end-to-end validation - PENDING Phase 3-5 testing
 
 ### Phase 2
 

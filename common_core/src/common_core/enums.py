@@ -52,7 +52,6 @@ class ProcessingEvent(str, Enum):
     ESSAY_LIFECYCLE_STATE_UPDATED = "essay.lifecycle.state.updated"
 
     # -------------  Essay content readiness  -------------#
-    ESSAY_CONTENT_READY = "essay.content.ready"
     ESSAY_CONTENT_PROVISIONED = "essay.content.provisioned"
     EXCESS_CONTENT_PROVISIONED = "excess.content.provisioned"
 
@@ -82,7 +81,6 @@ _TOPIC_MAPPING = {
     ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED: "huleedu.essay.spellcheck.requested.v1",
     ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED: "huleedu.essay.spellcheck.completed.v1",
     ProcessingEvent.BATCH_ESSAYS_REGISTERED: "huleedu.batch.essays.registered.v1",
-    ProcessingEvent.ESSAY_CONTENT_READY: "huleedu.file.essay.content.ready.v1",
     ProcessingEvent.ESSAY_CONTENT_PROVISIONED: "huleedu.file.essay.content.provisioned.v1",
     ProcessingEvent.EXCESS_CONTENT_PROVISIONED: "huleedu.els.excess.content.provisioned.v1",
     ProcessingEvent.BATCH_ESSAYS_READY: "huleedu.els.batch.essays.ready.v1",
@@ -112,7 +110,7 @@ def topic_name(event: ProcessingEvent) -> str:
     ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED ➜ "huleedu.essay.spellcheck.requested.v1"
     ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED ➜ "huleedu.essay.spellcheck.completed.v1"
     ProcessingEvent.BATCH_ESSAYS_REGISTERED ➜ "huleedu.batch.essays.registered.v1"
-    ProcessingEvent.ESSAY_CONTENT_READY ➜ "huleedu.file.essay.content.ready.v1"
+
 
     Example:
         topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED) ->

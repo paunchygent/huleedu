@@ -165,7 +165,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: str,
-        batch_correlation_id: UUID | None = None,
+        correlation_id: UUID | None = None,
     ) -> None:
         """Dispatch spellcheck requests to Spellcheck Service."""
         ...
