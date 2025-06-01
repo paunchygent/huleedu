@@ -186,14 +186,20 @@ class BatchKafkaConsumer:
 
             # 1. Idempotency Check
             current_pipeline_state = await self.batch_repo.get_processing_pipeline_state(batch_id)
-            if current_pipeline_state and current_pipeline_state.get("spellcheck_status") in [
-                "DISPATCH_INITIATED", "IN_PROGRESS", "COMPLETED", "FAILED"
-            ]:
-                logger.info(
-                    f"Spellcheck already initiated for batch {batch_id}, skipping",
-                    extra={"current_status": current_pipeline_state.get("spellcheck_status")},
-                )
-                return
+            if current_pipeline_state:
+                # Handle both dict and ProcessingPipelineState object cases
+                if hasattr(current_pipeline_state, 'spellcheck'):  # Pydantic object
+                    spellcheck_obj = current_pipeline_state.spellcheck
+                    spellcheck_status = spellcheck_obj.status.value if spellcheck_obj and spellcheck_obj.status else None
+                else:  # Dictionary
+                    spellcheck_status = current_pipeline_state.get("spellcheck_status")
+
+                if spellcheck_status in ["DISPATCH_INITIATED", "IN_PROGRESS", "COMPLETED", "FAILED"]:
+                    logger.info(
+                        f"Spellcheck already initiated for batch {batch_id}, skipping",
+                        extra={"current_status": spellcheck_status},
+                    )
+                    return
 
             # 2. Retrieve stored batch context
             batch_context = await self.batch_repo.get_batch_context(batch_id)
@@ -250,7 +256,12 @@ class BatchKafkaConsumer:
             )
 
             # 7. Update pipeline state
-            updated_pipeline_state = current_pipeline_state or {}
+            # Handle both dict and ProcessingPipelineState object cases
+            if current_pipeline_state and hasattr(current_pipeline_state, 'model_dump'):  # Pydantic object
+                updated_pipeline_state = current_pipeline_state.model_dump()
+            else:  # Dictionary or None
+                updated_pipeline_state = current_pipeline_state or {}
+
             updated_pipeline_state.update({
                 "spellcheck_status": "DISPATCH_INITIATED",
                 "spellcheck_initiated_at": datetime.now(timezone.utc).isoformat(),
