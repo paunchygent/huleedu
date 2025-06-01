@@ -30,21 +30,25 @@ jobs:
           max_retries=30
           retry_interval=10
           
+          # Expected healthy services (services that have health checks defined)
+          expected_healthy_services=("huleedu_batch_orchestrator_service" "huleedu_content_service" "huleedu_essay_lifecycle_api" "huleedu_file_service" "huleedu_kafka")
+          
           for ((i=1; i<=max_retries; i++)); do
             echo "Health check attempt $i/$max_retries"
             
-            # Check if all services with health checks are healthy
-            unhealthy_count=$(docker compose ps --format json | jq -r 'select(.Health != null and .Health != "healthy") | .Name' 2>/dev/null | wc -l)
+            # Count services that should be healthy but aren't
+            healthy_count=$(docker compose ps --format json | jq -r 'select(.Health == "healthy") | .Name' 2>/dev/null | wc -l)
             
-            if [ "$unhealthy_count" -eq 0 ]; then
-              echo "✅ All services are healthy"
-              docker compose ps
+            if [ "$healthy_count" -eq 5 ]; then
+              echo "✅ All 5 services with health checks are healthy"
+              docker compose ps --format json | jq -r 'select(.Health == "healthy") | "✅ \(.Name): \(.Health)"'
               break
             else
-              echo "⏳ Waiting for $unhealthy_count services to become healthy..."
+              echo "⏳ Waiting for services to become healthy ($healthy_count/5 ready)..."
+              docker compose ps --format json | jq -r 'select(.Health != null and .Health != "") | "   \(.Name): \(.Health)"'
               if [ $i -eq $max_retries ]; then
                 echo "❌ Services failed to become healthy after $max_retries attempts"
-                echo "Service status:"
+                echo "Final service status:"
                 docker compose ps
                 exit 1
               fi

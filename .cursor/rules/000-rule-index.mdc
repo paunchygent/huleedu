@@ -32,6 +32,7 @@ alwaysApply: false
 - [082-ruff-linting-standards.md](mdc:082-ruff-linting-standards.md): Ruff linting and formatting configuration
 - [083-pdm-standards-2025.mdc](mdc:.cursor/rules/083-pdm-standards-2025.mdc): Correct modern PDM syntax that must never be questioned
 - [084-docker-containerization-standards.mdc](mdc:.cursor/rules/084-docker-containerization-standards.mdc): Docker containerization patterns, import requirements, and troubleshooting
+- [085-docker-compose-v2-command-reference.mdc](mdc:.cursor/rules/085-docker-compose-v2-command-reference.mdc): Docker Compose v2 command reference
 - [090-documentation-standards.md](mdc:090-documentation-standards.md): Service, contract, and architectural documentation
 
 ## Terminology & Your Interaction Modes
