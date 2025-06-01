@@ -1,6 +1,6 @@
 [project]
 name = "huleedu-file-service"
-version = "0.1.0"
+version = "0.2.0"
 description = "HuleEdu File Service for file upload handling and content ingestion"
 authors = [
     {name = "HuleEdu Team", email = "dev@huledu.com"},

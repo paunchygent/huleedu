@@ -1,6 +1,6 @@
 [project]
 name = "huleedu-essay-lifecycle-service"
-version = "0.1.0"
+version = "0.2.0"
 description = "HuleEdu Essay Lifecycle Service - State Management and Processing Orchestration"
 authors = [
     { name = "Olof Larsson", email = "paunchygent@gmail.com" },

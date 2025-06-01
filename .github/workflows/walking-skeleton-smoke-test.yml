@@ -1,0 +1,190 @@
+name: Walking Skeleton Smoke Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Start HuleEdu Services
+        run: |
+          echo "Starting HuleEdu walking skeleton services..."
+          docker-compose up -d
+          echo "Services starting, waiting for health checks..."
+        
+      - name: Wait for Services to be Healthy
+        uses: jaracogmbh/docker-compose-health-check-action@v1.0.0
+        with:
+          max-retries: 30
+          retry-interval: 10
+          compose-file: "docker-compose.yml"
+          skip-exited: "true"
+          skip-no-healthcheck: "false"
+          
+      - name: Validate Service Health Endpoints
+        run: |
+          echo "=== Service Health Validation ==="
+          
+          # Define services and their health endpoints
+          declare -A services=(
+            ["content_service"]="http://localhost:8001/healthz"
+            ["batch_orchestrator_service"]="http://localhost:5001/healthz"
+            ["essay_lifecycle_service"]="http://localhost:6001/healthz"
+            ["file_service"]="http://localhost:7001/healthz"
+          )
+          
+          # Test each service health endpoint
+          for service in "${!services[@]}"; do
+            url="${services[$service]}"
+            echo "Testing $service health endpoint: $url"
+            
+            for attempt in {1..5}; do
+              if curl -f -s "$url" > /dev/null; then
+                echo "✅ $service: Health check passed"
+                break
+              else
+                echo "⏳ $service: Health check attempt $attempt failed, retrying..."
+                if [ $attempt -eq 5 ]; then
+                  echo "❌ $service: Health check failed after 5 attempts"
+                  exit 1
+                fi
+                sleep 5
+              fi
+            done
+          done
+          
+      - name: Validate Prometheus Metrics Endpoints
+        run: |
+          echo "=== Prometheus Metrics Validation ==="
+          
+          # Define services and their metrics endpoints
+          declare -A metrics_endpoints=(
+            ["content_service"]="http://localhost:8001/metrics"
+            ["batch_orchestrator_service"]="http://localhost:5001/metrics"
+            ["essay_lifecycle_service"]="http://localhost:6001/metrics"
+            ["file_service"]="http://localhost:7001/metrics"
+            ["spell_checker_service"]="http://localhost:8002/metrics"
+          )
+          
+          # Test each service metrics endpoint
+          for service in "${!metrics_endpoints[@]}"; do
+            url="${metrics_endpoints[$service]}"
+            echo "Testing $service metrics endpoint: $url"
+            
+            if curl -f -s "$url" | head -10; then
+              echo "✅ $service: Metrics endpoint accessible"
+            else
+              echo "⚠️ $service: Metrics endpoint may have issues (acceptable for walking skeleton)"
+            fi
+          done
+          
+      - name: Validate Kafka Infrastructure
+        run: |
+          echo "=== Kafka Infrastructure Validation ==="
+          
+          # Wait for Kafka to be ready
+          echo "Waiting for Kafka to be ready..."
+          for attempt in {1..10}; do
+            if docker exec huleedu_kafka kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1; then
+              echo "✅ Kafka is responding"
+              break
+            else
+              echo "⏳ Kafka not ready, attempt $attempt/10"
+              if [ $attempt -eq 10 ]; then
+                echo "❌ Kafka failed to respond after 10 attempts"
+                exit 1
+              fi
+              sleep 10
+            fi
+          done
+          
+          # Validate required topics exist
+          echo "Validating Kafka topics..."
+          required_topics=(
+            "huleedu.batch.essays.registered.v1"
+            "huleedu.file.essay.content.provisioned.v1"
+            "huleedu.els.batch.essays.ready.v1"
+            "huleedu.els.spellcheck.initiate.command.v1"
+            "huleedu.essay.spellcheck.requested.v1"
+            "huleedu.essay.spellcheck.completed.v1"
+          )
+          
+          topics_list=$(docker exec huleedu_kafka kafka-topics.sh --bootstrap-server localhost:9092 --list)
+          
+          for topic in "${required_topics[@]}"; do
+            if echo "$topics_list" | grep -q "$topic"; then
+              echo "✅ Topic exists: $topic"
+            else
+              echo "❌ Missing topic: $topic"
+              exit 1
+            fi
+          done
+          
+      - name: Test Basic Service Connectivity
+        run: |
+          echo "=== Basic Service Connectivity Test ==="
+          
+          # Test that services can communicate with each other
+          # This is a basic smoke test - just verify endpoints respond
+          
+          echo "Testing Content Service upload endpoint..."
+          if curl -f -X POST http://localhost:8001/v1/content \
+               -H "Content-Type: application/json" \
+               -d '{"content": "test", "content_type": "text/plain"}' > /dev/null; then
+            echo "✅ Content Service: Upload endpoint responds"
+          else
+            echo "❌ Content Service: Upload endpoint failed"
+            exit 1
+          fi
+          
+          echo "Testing Batch Orchestrator Service endpoints..."
+          # Test batch registration endpoint (expect validation error, but 400 is good)
+          if curl -X POST http://localhost:5001/v1/batches/register \
+               -H "Content-Type: application/json" \
+               -d '{}' | grep -q "error"; then
+            echo "✅ BOS: Registration endpoint responds with validation"
+          else
+            echo "❌ BOS: Registration endpoint failed"
+            exit 1
+          fi
+          
+      - name: Display Service Logs on Failure
+        if: failure()
+        run: |
+          echo "=== Service Logs for Debugging ==="
+          echo "--- Docker Compose Services Status ---"
+          docker-compose ps
+          
+          echo "--- Content Service Logs ---"
+          docker-compose logs --tail=50 content_service
+          
+          echo "--- Batch Orchestrator Service Logs ---"
+          docker-compose logs --tail=50 batch_orchestrator_service
+          
+          echo "--- Essay Lifecycle Service Logs ---"
+          docker-compose logs --tail=50 essay_lifecycle_api
+          
+          echo "--- File Service Logs ---"
+          docker-compose logs --tail=50 file_service
+          
+          echo "--- Kafka Logs ---"
+          docker-compose logs --tail=30 kafka
+          
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up Docker resources..."
+          docker-compose down --volumes --remove-orphans
+          docker system prune -f 

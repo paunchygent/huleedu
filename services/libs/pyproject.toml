@@ -1,6 +1,6 @@
 [project]
 name = "huleedu-service-libs"
-version = "0.1.0"
+version = "0.2.0"
 description = "HuleEdu Shared Service Libraries"
 authors = [
     { name = "Olof Larsson", email = "paunchygent@gmail.com" },

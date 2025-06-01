@@ -1,6 +1,6 @@
 [project]
 name = "huleedu-common-core"
-version = "0.1.0"
+version = "0.2.0"
 description = "HuleEdu Common Core Library for Microservices"
 authors = [
     { name = "Olof Larsson", email = "paunchygent@gmail.com" },

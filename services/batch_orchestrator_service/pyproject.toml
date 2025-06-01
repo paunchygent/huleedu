@@ -1,6 +1,6 @@
 [project]
 name = "huleedu-batch-service"
-version = "0.1.0"
+version = "0.2.0"
 description = "HuleEdu Batch Orchestration Service (MVP)"
 authors = [
     { name = "Olof Larsson", email = "paunchygent@gmail.com" },

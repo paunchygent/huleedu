@@ -1,6 +1,6 @@
 [project]
 name = "huleedu-spell-checker-service"
-version = "0.1.0"
+version = "0.2.0"
 description = "HuleEdu Spell Checker Service (MVP)"
 authors = [
     { name = "Olof Larsson", email = "paunchygent@gmail.com" },
