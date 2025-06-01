@@ -46,9 +46,16 @@ class BatchProcessingServiceImpl:
         """
         batch_id = str(uuid.uuid4())
 
+        # Generate internal essay_id slots based on expected_essay_count
+        # These become the authoritative essay identifiers for this batch
+        internal_essay_ids = [
+            str(uuid.uuid4()) for _ in range(registration_data.expected_essay_count)
+        ]
+
         self.logger.info(
             f"Registering new batch {batch_id} with "
-            f"{registration_data.expected_essay_count} essays",
+            f"{registration_data.expected_essay_count} essays. Generated internal essay IDs: "
+            f"{len(internal_essay_ids)} slots",
             extra={"correlation_id": str(correlation_id)}
         )
 
@@ -62,7 +69,7 @@ class BatchProcessingServiceImpl:
         )
         await self.batch_repo.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
-        # 2. Construct lightweight BatchEssaysRegistered event
+        # 2. Construct lightweight BatchEssaysRegistered event with internal essay IDs
         batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
         event_metadata = SystemProcessingMetadata(
             entity=batch_entity_ref,
@@ -72,7 +79,7 @@ class BatchProcessingServiceImpl:
         batch_registered_event_data = BatchEssaysRegistered(
             batch_id=batch_id,
             expected_essay_count=registration_data.expected_essay_count,
-            essay_ids=registration_data.essay_ids,
+            essay_ids=internal_essay_ids,  # Use generated internal IDs instead of user-provided
             metadata=event_metadata
         )
 
@@ -88,8 +95,8 @@ class BatchProcessingServiceImpl:
         await self.event_publisher.publish_batch_event(envelope)
 
         self.logger.info(
-            f"Published BatchEssaysRegistered event for batch {batch_id}, "
-            f"event_id {envelope.event_id}",
+            f"Published BatchEssaysRegistered event for batch {batch_id} with "
+            f"{len(internal_essay_ids)} internal essay slots, event_id {envelope.event_id}",
             extra={"correlation_id": str(correlation_id)}
         )
 

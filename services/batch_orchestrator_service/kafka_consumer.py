@@ -23,7 +23,6 @@ from common_core.events.batch_coordination_events import BatchEssaysReady
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
     EntityReference,
-    EssayProcessingInputRefV1,
 )
 
 logger = create_service_logger("bos.kafka.consumer")
@@ -77,6 +76,11 @@ class BatchKafkaConsumer:
         """Start the Kafka consumer and begin processing messages."""
         # Subscribe to BatchEssaysReady topic
         topics = [topic_name(ProcessingEvent.BATCH_ESSAYS_READY)]
+
+        # TODO: Add subscription to ExcessContentProvisionedV1 topic for handling
+        # excess content that couldn't be assigned to essay slots. Handler should
+        # log the event and potentially update batch metadata or alert administrators.
+        # topics.append(topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED))
 
         self.consumer = AIOKafkaConsumer(
             *topics,
@@ -152,28 +156,20 @@ class BatchKafkaConsumer:
         """
         Handle a single Kafka message containing BatchEssaysReady event.
 
-        WALKING SKELETON IMPLEMENTATION NOTE:
-        ====================================
-        This implementation uses mock text_storage_id values because the File Service
-        has not yet been implemented. In the complete architecture:
+        ARCHITECTURE IMPLEMENTATION:
+        ===========================
+        This implementation uses the new BatchEssaysReady structure with ready_essays
+        that contains actual essay_id and text_storage_id mappings from ELS:
 
         1. File Service processes uploaded files and stores content via Content Service
-        2. File Service emits EssayContentReady events containing real text_storage_id values
-        3. ELS receives and stores these storage references per essay
-        4. ELS emits BatchEssaysReady when all essays are ready (contains essay_ids only)
-        5. BOS needs the text_storage_id values to create
+        2. File Service emits EssayContentProvisionedV1 events containing text_storage_id values
+        3. ELS receives and assigns internal essay_ids to provisioned content
+        4. ELS emits BatchEssaysReady with ready_essays containing EssayProcessingInputRefV1 objects
+        5. BOS uses the actual text_storage_id values to create
            BatchServiceSpellcheckInitiateCommandDataV1
 
-        ARCHITECTURAL CHALLENGE:
-        BatchEssaysReady follows the "thin event" principle and only contains essay_ids,
-        not the text_storage_id values. The real implementation will need either:
-        - ELS to provide storage references via query mechanism, OR
-        - Expanded coordination event structure
-
-        CURRENT APPROACH:
-        Using consistent mock pattern "mock-storage-id-{essay_id}" following the
-        established codebase style (see: spell_checker_service/di.py).
-        This maintains architectural integrity while enabling end-to-end testing.
+        The BatchEssaysReady event now provides the necessary data mapping directly,
+        eliminating the need for additional queries or mock values.
         """
         try:
             # Deserialize the message
@@ -217,21 +213,18 @@ class BatchKafkaConsumer:
                 entity_type="batch"
             )
 
-            # Create EssayProcessingInputRefV1 objects for each essay
-            # NOTE: Walking skeleton implementation - using mock storage IDs
-            # In production: File Service → ELS coordination will provide real
-            # text_storage_id values. The BatchEssaysReady event only contains essay_ids,
-            # not storage references. Real flow: ELS stores storage_id from EssayContentReady
-            # events and would need to provide this data to BOS (either via expanded event
-            # or query mechanism)
-            essays_to_process = [
-                EssayProcessingInputRefV1(
-                    essay_id=essay_id,
-                    text_storage_id=f"mock-storage-id-{essay_id}",  # Walking skeleton pattern
-                    student_name=None  # Will be populated by File Service coordination
-                )
-                for essay_id in batch_context.essay_ids
-            ]
+            # Extract essays_to_process from BatchEssaysReady.ready_essays
+            # This contains the actual essay_id and text_storage_id mappings from ELS
+            essays_to_process = batch_essays_ready_data.ready_essays
+
+            # Validate that we received essay data
+            if not essays_to_process:
+                logger.error(f"BatchEssaysReady for batch {batch_id} contains no ready_essays")
+                return
+
+            logger.info(
+                f"Processing {len(essays_to_process)} ready essays for batch {batch_id}"
+            )
 
             spellcheck_command = BatchServiceSpellcheckInitiateCommandDataV1(
                 event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,

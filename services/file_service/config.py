@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     CONTENT_SERVICE_URL: str = "http://content_service:8001/v1/content"
     ESSAY_CONTENT_READY_TOPIC: str = topic_name(ProcessingEvent.ESSAY_CONTENT_READY)
+    ESSAY_CONTENT_PROVISIONED_TOPIC: str = topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED)
     HTTP_PORT: int = 7001
     PROMETHEUS_PORT: int = 9092
     HOST: str = "0.0.0.0"
