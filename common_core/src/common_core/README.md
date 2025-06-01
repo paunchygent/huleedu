@@ -86,11 +86,11 @@ These Pydantic models define the `data` field within the `EventEnvelope` for spe
 
 * **Request Models (ELS -> Specialized Services)**: Define what ELS sends to a specialized service for an individual essay.
   * Example: `EssayLifecycleSpellcheckRequestV1` (inherits `ProcessingUpdate`)
-    * `event_name`: `ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED`
+    * `event_name`: `ProcessingEvent.ESSAY_LIFECYCLE_SPELLCHECK_REQUESTED`
     * `entity_ref`: Identifies the essay (and its parent batch).
     * `status`: The current `EssayStatus` (e.g., `AWAITING_SPELLCHECK`).
     * `system_metadata`: Includes `processing_stage` (e.g., `PENDING`).
-    * `text_storage_id`, `language`.
+    * `text_storage_id`, `language` (for multilingual spell checking support).
 
 * **Result Models (Specialized Services -> ELS)**: Define what specialized services send back to ELS.
   * Example: `SpellcheckResultDataV1` (inherits `ProcessingUpdate`)
@@ -140,13 +140,14 @@ This illustrates how the `common_core` components are used in a typical (happy p
     * For each essay:
         * **ELS Internal State**: Sets `EssayState.current_status` to `AWAITING_SPELLCHECK`.
         * **ELS Publishes Request to SCS**:
-            * `EventEnvelope` with `event_type = "huleedu.els.spellcheck.request.v1"`.
+            * `EventEnvelope` with `event_type = "huleedu.essay_lifecycle.spellcheck.request.v1"`.
             * `data = EssayLifecycleSpellcheckRequestV1(...)` including:
-                * `event_name = ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED`
+                * `event_name = ProcessingEvent.ESSAY_LIFECYCLE_SPELLCHECK_REQUESTED`
                 * `entity_ref` for the essay.
                 * `status = EssayStatus.AWAITING_SPELLCHECK`
                 * `system_metadata.processing_stage = ProcessingStage.PENDING`
                 * `text_storage_id` (original text).
+                * `language` (for multilingual spell checking support).
         * **ELS Internal State**: Sets `EssayState.current_status` to `SPELLCHECK_IN_PROGRESS`.
 
 3. **SCS: Process Essay, Report Result to ELS**

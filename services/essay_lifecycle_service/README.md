@@ -10,7 +10,7 @@ ELS implements the **Slot Assignment Pattern** for coordinating content with bat
 
 ### Coordination Flow
 
-1. **Slot Registration**: BOS informs ELS about batch slots (`BatchEssaysRegistered`) 
+1. **Slot Registration**: BOS informs ELS about batch slots (`BatchEssaysRegistered`)
 2. **Content Assignment**: ELS assigns incoming content to available slots (`EssayContentProvisionedV1`)
 3. **Batch Completion**: ELS notifies BOS when all slots are filled (`BatchEssaysReady`)
 4. **Command Processing**: ELS processes batch commands from BOS (`BatchSpellcheckInitiateCommand`)
@@ -38,7 +38,7 @@ This architecture ensures clean service boundaries: File Service owns content in
 ELS participates in these communication patterns:
 
 - **Consumes from Kafka**:
-  - **Batch Registration**: Receives batch slot definitions from BOS (`BatchEssaysRegistered`) 
+  - **Batch Registration**: Receives batch slot definitions from BOS (`BatchEssaysRegistered`)
   - **Content Provisioning**: Receives content from File Service (`EssayContentProvisionedV1`)
   - **Batch Commands**: Receives commands from BOS (`BatchServiceSpellcheckInitiateCommandDataV1`) to start processing phases
   - **Specialized Service Results**: Consumes results from specialized services indicating processing outcomes

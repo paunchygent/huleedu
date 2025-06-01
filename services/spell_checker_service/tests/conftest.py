@@ -24,6 +24,7 @@ from common_core.enums import (
     ProcessingEvent,
     ProcessingStage,
 )
+from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 
 # Import base event models that also need rebuilding
 from common_core.events.base_event_models import (
@@ -35,7 +36,7 @@ from common_core.events.base_event_models import (
 # THEN import the models that depend on these enums
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import (
-    SpellcheckRequestedDataV1,
+    SpellcheckResultDataV1,
 )
 from common_core.metadata_models import (
     EntityReference,
@@ -48,7 +49,8 @@ from common_core.metadata_models import (
 BaseEventData.model_rebuild(raise_errors=True)
 ProcessingUpdate.model_rebuild(raise_errors=True)
 EventTracker.model_rebuild(raise_errors=True)
-SpellcheckRequestedDataV1.model_rebuild(raise_errors=True)
+SpellcheckResultDataV1.model_rebuild(raise_errors=True)
+EssayLifecycleSpellcheckRequestV1.model_rebuild(raise_errors=True)
 EventEnvelope.model_rebuild(raise_errors=True)
 SystemProcessingMetadata.model_rebuild(raise_errors=True)
 EntityReference.model_rebuild(raise_errors=True)
@@ -99,23 +101,24 @@ def spellcheck_request_data(
     entity_reference: EntityReference,
     system_metadata: SystemProcessingMetadata,
     sample_storage_id: str,
-) -> SpellcheckRequestedDataV1:
-    """Provide sample SpellcheckRequestedDataV1 for testing."""
-    return SpellcheckRequestedDataV1(
+) -> EssayLifecycleSpellcheckRequestV1:
+    """Provide sample EssayLifecycleSpellcheckRequestV1 for testing."""
+    return EssayLifecycleSpellcheckRequestV1(
         event_name=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
         entity_ref=entity_reference,
         status=EssayStatus.AWAITING_SPELLCHECK,
         system_metadata=system_metadata,
         text_storage_id=sample_storage_id,
+        language="en",  # Add required language field
     )
 
 
 @pytest.fixture
 def spellcheck_request_envelope(
-    spellcheck_request_data: SpellcheckRequestedDataV1,
-) -> EventEnvelope[SpellcheckRequestedDataV1]:
-    """Provide sample EventEnvelope with SpellcheckRequestedDataV1 for testing."""
-    return EventEnvelope[SpellcheckRequestedDataV1](
+    spellcheck_request_data: EssayLifecycleSpellcheckRequestV1,
+) -> EventEnvelope[EssayLifecycleSpellcheckRequestV1]:
+    """Provide sample EventEnvelope with EssayLifecycleSpellcheckRequestV1 for testing."""
+    return EventEnvelope[EssayLifecycleSpellcheckRequestV1](
         event_type="essay.spellcheck.requested.v1",
         source_service="test-service",
         correlation_id=uuid4(),
@@ -125,7 +128,7 @@ def spellcheck_request_envelope(
 
 @pytest.fixture
 def kafka_message(
-    spellcheck_request_envelope: EventEnvelope[SpellcheckRequestedDataV1],
+    spellcheck_request_envelope: EventEnvelope[EssayLifecycleSpellcheckRequestV1],
     sample_essay_id: str,
 ) -> ConsumerRecord:
     """Provide a mock Kafka ConsumerRecord for testing."""

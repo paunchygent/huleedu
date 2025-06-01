@@ -34,11 +34,11 @@ class DefaultSpellLogic(SpellLogicProtocol):
         self.initial_system_metadata = initial_system_metadata
 
     async def perform_spell_check(
-        self, text: str, essay_id: Optional[str]
+        self, text: str, essay_id: Optional[str], language: str = "en"
     ) -> SpellcheckResultDataV1:
         """Perform spell check using the core logic implementation."""
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, essay_id
+            text, essay_id, language=language
         )
 
         new_storage_id: Optional[str] = None

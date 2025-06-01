@@ -21,9 +21,9 @@ from protocols import (
 from pydantic import ValidationError
 
 from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage
+from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import (
-    SpellcheckRequestedDataV1,
     SpellcheckResultDataV1,
 )
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
@@ -57,13 +57,13 @@ async def process_single_message(
         bool: True if the message should be committed, False otherwise
     """
     processing_started_at = datetime.now(timezone.utc)
-    request_envelope: Optional[EventEnvelope[SpellcheckRequestedDataV1]] = None
+    request_envelope: Optional[EventEnvelope[EssayLifecycleSpellcheckRequestV1]] = None
     # Default if ID not parsed
     essay_id_for_logging: str = f"offset-{msg.offset}-partition-{msg.partition}"
 
     try:
         raw_message = msg.value.decode("utf-8")
-        request_envelope = EventEnvelope[SpellcheckRequestedDataV1].model_validate_json(
+        request_envelope = EventEnvelope[EssayLifecycleSpellcheckRequestV1].model_validate_json(
             raw_message
         )
         request_data = request_envelope.data
@@ -178,8 +178,13 @@ async def process_single_message(
             initial_system_metadata=request_data.system_metadata,
         )
 
+        # Extract language from the new event model
+        language = request_data.language if hasattr(request_data, 'language') else "en"
+
         # Perform the spell check
-        result_data = await spell_logic.perform_spell_check(original_text, essay_id_for_logging)
+        result_data = await spell_logic.perform_spell_check(
+            original_text, essay_id_for_logging, language
+        )
 
         # Publish the result
         await event_publisher.publish_spellcheck_result(

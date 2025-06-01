@@ -23,7 +23,7 @@ The Spell Checker Service is a Kafka consumer worker service responsible for app
 The service follows a clean architecture pattern with clear separation of concerns:
 
 * **`worker_main.py`**: Handles the service lifecycle (startup, shutdown), Kafka client management (consumer/producer), signal handling, and the primary message consumption loop. Initializes and manages the Dishka DI container.
-* **`event_processor.py`**: Contains `process_single_message()` which handles incoming `ConsumerRecord` objects. It deserializes the `EventEnvelope[SpellcheckRequestedDataV1]`, then orchestrates the fetch-spellcheck-store-publish flow by calling appropriate protocol methods. **Clean Architecture**: Depends ONLY on injected protocol interfaces.
+* **`event_processor.py`**: Contains `process_single_message()` which handles incoming `ConsumerRecord` objects. It deserializes the `EventEnvelope[EssayLifecycleSpellcheckRequestV1]`, extracts language parameters, then orchestrates the fetch-spellcheck-store-publish flow by calling appropriate protocol methods. **Clean Architecture**: Depends ONLY on injected protocol interfaces.
 * **`protocols.py`**: Defines `typing.Protocol` interfaces for internal dependencies like content fetching, spell checking logic, result storage, and event publishing.
 * **`core_logic.py`**: Provides the fundamental, reusable business logic functions:
   * `default_fetch_content_impl()`: Fetches content via HTTP from the Content Service.
@@ -48,10 +48,11 @@ The service follows a clean architecture pattern with clear separation of concer
 
 ### **Consumes**
 
-* **Event Type**: `huleedu.essay.spellcheck.requested.v1`
-  * **Topic**: Dynamically determined by `topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)`.
-  * **Data Model**: `EventEnvelope[SpellcheckRequestedDataV1]`.
-  * Contains essay entity reference and text storage ID.
+* **Event Type**: `huleedu.essay_lifecycle.spellcheck.request.v1`
+  * **Topic**: Dynamically determined by `topic_name(ProcessingEvent.ESSAY_LIFECYCLE_SPELLCHECK_REQUESTED)`.
+  * **Data Model**: `EventEnvelope[EssayLifecycleSpellcheckRequestV1]`.
+  * Contains essay entity reference, text storage ID, and language parameter for multilingual support.
+  * Triggered by Essay Lifecycle Service (ELS) after essay slot assignment coordination.
   * Triggers the spell checking workflow.
 
 ### **Produces**
@@ -76,9 +77,10 @@ The service follows a clean architecture pattern with clear separation of concer
 
 ### **`pyspellchecker` Integration**
 
-* **Multi-language Support**: Configurable language models (English default).
+* **Multi-language Support**: Configurable language models with dynamic language parameter from events (English default).
 * **Word Tokenization**: Advanced regex-based word boundary detection.
 * **Hyphenated Words**: Proper handling of contractions and hyphenated words.
+* **Language Parameter**: Supports per-essay language specification via event data.
 
 ### **Correction Logging**
 
@@ -224,3 +226,9 @@ The Docker image is built and run as part of the `docker-compose.yml` setup.
   * **Implemented proper dependency injection** with constructor injection patterns
   * **Maintained 100% test coverage** through all architectural changes
   * **All 71 tests pass** with the new clean architecture
+* **✅ Essay ID Coordination Integration (Phase 5 - 2025-06-01)**: Updated for Essay Lifecycle Service integration:
+  * **Event Model Migration**: Updated from `SpellcheckRequestedDataV1` to `EssayLifecycleSpellcheckRequestV1`
+  * **Language Parameter Support**: Enhanced `SpellLogicProtocol` and implementation with language parameter
+  * **ELS Integration**: Now receives spell check requests from Essay Lifecycle Service after essay slot coordination
+  * **Backward Compatibility**: Maintains fallback to English if language parameter is missing
+  * **All 71 tests pass** with new event model and language support

@@ -15,10 +15,10 @@ alwaysApply: false
 
 ### 2.1. Core Components
 - **`worker_main.py`**: Service lifecycle (startup, shutdown), Kafka client management (consumer/producer via `kafka_clients` context manager), signal handling, and the primary message consumption loop. Initializes Dishka DI container and passes protocol instances to `process_single_message`.
-- **`event_processor.py`**: Clean message processing logic that depends ONLY on injected protocol interfaces. Contains `process_single_message()` which handles incoming `ConsumerRecord`, deserializes `EventEnvelope[SpellcheckRequestedDataV1]`, and orchestrates the fetch-spellcheck-store-publish flow.
+- **`event_processor.py`**: Clean message processing logic that depends ONLY on injected protocol interfaces. Contains `process_single_message()` which handles incoming `ConsumerRecord`, deserializes `EventEnvelope[EssayLifecycleSpellcheckRequestV1]`, and orchestrates the fetch-spellcheck-store-publish flow with language parameter extraction.
 - **`protocols.py`**: Defines `typing.Protocol` interfaces for internal dependencies:
     - `ContentClientProtocol`
-    - `SpellLogicProtocol` 
+    - `SpellLogicProtocol` (enhanced with language parameter support)
     - `ResultStoreProtocol`
     - `SpellcheckEventPublisherProtocol`
 - **`core_logic.py`**: Fundamental, reusable business logic functions:
@@ -42,11 +42,13 @@ alwaysApply: false
 
 ## 3. Event-Driven Architecture
 
-**Consumes**: `huleedu.essay.spellcheck.requested.v1` (`SpellcheckRequestedDataV1`)
+**Consumes**: `huleedu.essay_lifecycle.spellcheck.request.v1` (`EssayLifecycleSpellcheckRequestV1`)
 **Publishes**: `huleedu.essay.spellcheck.completed.v1` (via `DefaultSpellcheckEventPublisherImpl` using `SpellcheckResultDataV1`)
 **Consumer Group**: `spellchecker-service-group-v1.1` (from settings)
 
-**Flow**: `worker_main.py` consumes message ➜ `process_single_message` in `event_processor.py` orchestrates: `ContentClientProtocol.fetch_content` ➜ `SpellLogicProtocol.perform_spell_check` ➜ `ResultStoreProtocol.store_content` ➜ `SpellcheckEventPublisherProtocol.publish_spellcheck_result` ➜ `worker_main.py` commits offset.
+**Integration**: Receives spellcheck requests from Essay Lifecycle Service (ELS) after essay slot assignment coordination with Batch Orchestrator Service (BOS).
+
+**Flow**: `worker_main.py` consumes message ➜ `process_single_message` in `event_processor.py` orchestrates: `ContentClientProtocol.fetch_content` ➜ `SpellLogicProtocol.perform_spell_check` (with language parameter) ➜ `ResultStoreProtocol.store_content` ➜ `SpellcheckEventPublisherProtocol.publish_spellcheck_result` ➜ `worker_main.py` commits offset.
 
 ## 4. Integration Points
 
@@ -74,7 +76,7 @@ alwaysApply: false
 
 ## 8. Data Models
 
-**Input**: `SpellcheckRequestedDataV1` with entity_ref, system_metadata, text_storage_id
+**Input**: `EssayLifecycleSpellcheckRequestV1` with entity_ref, system_metadata, text_storage_id, language (for multilingual support)
 **Output**: `SpellcheckResultDataV1` with entity_ref, system_metadata, storage_metadata, corrections_made
 
 ## 9. Deployment

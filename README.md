@@ -38,10 +38,10 @@ The HuleEdu ecosystem currently comprises the following services:
   * **API**: `/v1/content` endpoints for storage and retrieval
 
 * **Spell Checker Service** ✅ **IMPLEMENTED**:
-  * **Description**: A Kafka consumer worker service that performs advanced spell checking on essays, including L2 error correction and standard spell checking using `pyspellchecker`.
+  * **Description**: A Kafka consumer worker service that performs advanced spell checking on essays, including L2 error correction and standard spell checking using `pyspellchecker`. Integrated with Essay Lifecycle Service for essay slot coordination.
   * **Port**: 8002 (Metrics)
   * **Location**: `services/spell_checker_service/`
-  * **Architecture**: Clean architecture with DI, protocols, and comprehensive test coverage
+  * **Architecture**: Clean architecture with DI, protocols, language parameter support, and comprehensive test coverage
 
 * **Batch Orchestrator Service** ✅ **IMPLEMENTED**:
   * **Description**: A Quart-based HTTP service that orchestrates essay processing workflows, initiating tasks by publishing events.
@@ -151,7 +151,7 @@ The entire HuleEdu system, including Kafka and all microservices, can be run loc
 * **Essay ID Coordination Architecture** ✅:
   * **Slot Assignment Pattern**: BOS generates internal essay ID slots, ELS assigns content to slots
   * **Content Provisioning Flow**: File Service → ELS slot assignment → BOS command generation → ELS service dispatch
-  * **Command Processing**: Complete BOS→ELS→SpellChecker command flow with actual essay IDs and text_storage_ids
+  * **Command Processing**: Complete BOS→ELS→SpellChecker command flow with actual essay IDs, text_storage_ids, and language support
   * **Event-Driven Coordination**: `EssayContentProvisionedV1`, `BatchEssaysReady`, `BatchSpellcheckInitiateCommand` events
 * **Foundational Architecture** ✅:
   * **Clean Architecture**: Protocol-based DI across all services with Dishka
