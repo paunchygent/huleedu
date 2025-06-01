@@ -1,15 +1,15 @@
 """
 Batch readiness tracking for Essay Lifecycle Service.
 
-Implements count-based aggregation pattern for coordinating batch processing
-between BOS (Batch Orchestrator Service) and File Service.
+Implements slot-based coordination pattern for coordinating batch processing
+between BOS (Batch Orchestrator Service) and File Service via ELS slot assignment.
 """
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from common_core.events.batch_coordination_events import (
@@ -17,76 +17,141 @@ from common_core.events.batch_coordination_events import (
     BatchEssaysRegistered,
     BatchReadinessTimeout,
 )
-from common_core.events.file_events import EssayContentReady
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import (
+    EntityReference,
+    EssayProcessingInputRefV1,
+    SystemProcessingMetadata,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 
 logger = create_service_logger("batch_tracker")
 
 
+class SlotAssignment:
+    """Represents assignment of content to an internal essay ID slot."""
+
+    def __init__(
+        self,
+        internal_essay_id: str,
+        text_storage_id: str,
+        original_file_name: str,
+    ) -> None:
+        self.internal_essay_id = internal_essay_id
+        self.text_storage_id = text_storage_id
+        self.original_file_name = original_file_name
+        self.assigned_at = datetime.now(UTC)
+
+
 class BatchExpectation:
     """
-    Tracks expectations for a specific batch.
+    Tracks slot expectations for a specific batch.
 
-    Maintains the count-based coordination state between BOS and ELS.
+    Maintains the slot-based coordination state between BOS and ELS.
     """
 
     def __init__(
         self,
         batch_id: str,
-        expected_count: int,
-        essay_ids: list[str],
+        expected_essay_ids: list[str],  # Internal essay ID slots from BOS
         timeout_seconds: int = 300,  # 5 minutes default
     ) -> None:
         self.batch_id = batch_id
-        self.expected_count = expected_count
-        self.expected_essay_ids = set(essay_ids)
-        self.ready_essay_ids: set[str] = set()
-        self.created_at = datetime.utcnow()
+        self.expected_essay_ids = set(expected_essay_ids)
+        self.expected_count = len(expected_essay_ids)
+        self.available_slots = set(expected_essay_ids)  # Unassigned slots
+        self.slot_assignments: dict[str, SlotAssignment] = {}  # internal_essay_id -> SlotAssignment
+        self.created_at = datetime.now(UTC)
         self.timeout_seconds = timeout_seconds
         self._timeout_task: asyncio.Task[None] | None = None
 
     @property
     def is_complete(self) -> bool:
-        """Check if all expected essays are ready."""
-        return len(self.ready_essay_ids) >= self.expected_count
+        """Check if all expected slots are assigned."""
+        return len(self.slot_assignments) >= self.expected_count
 
     @property
     def is_timeout_due(self) -> bool:
         """Check if batch has exceeded timeout duration."""
-        elapsed = datetime.utcnow() - self.created_at
+        elapsed = datetime.now(UTC) - self.created_at
         return elapsed > timedelta(seconds=self.timeout_seconds)
 
     @property
-    def missing_essay_ids(self) -> list[str]:
-        """Get list of essays still pending."""
-        return list(self.expected_essay_ids - self.ready_essay_ids)
+    def missing_slot_ids(self) -> list[str]:
+        """Get list of internal essay ID slots still pending assignment."""
+        return list(self.available_slots)
 
-    def mark_essay_ready(self, essay_id: str) -> bool:
+    def assign_next_slot(self, text_storage_id: str, original_file_name: str) -> str | None:
         """
-        Mark an essay as ready.
+        Assign content to the next available slot.
+        
+        Returns:
+            The internal essay ID if assignment successful, None if no slots available
+        """
+        if not self.available_slots:
+            logger.warning(f"No available slots for batch {self.batch_id}")
+            return None
 
+        # Get next available slot (arbitrary order)
+        internal_essay_id = next(iter(self.available_slots))
+
+        # Create assignment
+        assignment = SlotAssignment(
+            internal_essay_id=internal_essay_id,
+            text_storage_id=text_storage_id,
+            original_file_name=original_file_name
+        )
+
+        # Update tracking state
+        self.available_slots.remove(internal_essay_id)
+        self.slot_assignments[internal_essay_id] = assignment
+
+        logger.info(
+            f"Assigned slot {internal_essay_id} to content {text_storage_id} "
+            f"(file: {original_file_name}) for batch {self.batch_id}. "
+            f"Progress: {len(self.slot_assignments)}/{self.expected_count}"
+        )
+
+        return internal_essay_id
+
+    def mark_slot_fulfilled(self, internal_essay_id: str, text_storage_id: str) -> bool:
+        """
+        Mark a slot as fulfilled after successful persistence.
+        
         Returns:
             True if this completes the batch, False otherwise
         """
-        if essay_id not in self.expected_essay_ids:
-            logger.warning(f"Essay {essay_id} not expected in batch {self.batch_id}")
+        if internal_essay_id not in self.slot_assignments:
+            logger.error(f"Slot {internal_essay_id} not assigned in batch {self.batch_id}")
             return False
 
-        self.ready_essay_ids.add(essay_id)
-        logger.info(
-            f"Essay {essay_id} ready for batch {self.batch_id}. "
-            f"Progress: {len(self.ready_essay_ids)}/{self.expected_count}"
-        )
+        assignment = self.slot_assignments[internal_essay_id]
+        if assignment.text_storage_id != text_storage_id:
+            logger.error(
+                f"Text storage ID mismatch for slot {internal_essay_id}: "
+                f"expected {assignment.text_storage_id}, got {text_storage_id}"
+            )
+            return False
 
+        logger.info(f"Slot {internal_essay_id} fulfilled for batch {self.batch_id}")
         return self.is_complete
+
+    def get_ready_essays(self) -> list[EssayProcessingInputRefV1]:
+        """Construct EssayProcessingInputRefV1 objects for completed assignments."""
+        return [
+            EssayProcessingInputRefV1(
+                essay_id=assignment.internal_essay_id,
+                text_storage_id=assignment.text_storage_id,
+                student_name=None  # Will be extracted later in the pipeline
+            )
+            for assignment in self.slot_assignments.values()
+        ]
 
 
 class BatchEssayTracker:
     """
-    Manages batch readiness tracking across multiple batches.
+    Manages batch slot assignment and readiness tracking across multiple batches.
 
-    Implements the ELS side of count-based batch coordination pattern.
+    Implements the ELS side of slot-based batch coordination pattern.
     """
 
     def __init__(self) -> None:
@@ -101,10 +166,10 @@ class BatchEssayTracker:
 
     async def register_batch(self, event: BatchEssaysRegistered) -> None:
         """
-        Register batch expectations from BOS.
+        Register batch slot expectations from BOS.
 
         Args:
-            event: BatchEssaysRegistered event from BOS
+            event: BatchEssaysRegistered event from BOS containing internal essay ID slots
         """
         batch_id = event.batch_id
 
@@ -113,8 +178,7 @@ class BatchEssayTracker:
 
         expectation = BatchExpectation(
             batch_id=batch_id,
-            expected_count=event.expected_essay_count,
-            essay_ids=event.essay_ids,
+            expected_essay_ids=event.essay_ids,  # These are internal essay ID slots from BOS
         )
 
         self.batch_expectations[batch_id] = expectation
@@ -123,51 +187,62 @@ class BatchEssayTracker:
         await self._start_timeout_monitoring(expectation)
 
         logger.info(
-            f"Registered batch {batch_id} expecting {event.expected_essay_count} essays: "
-            f"{event.essay_ids}"
+            f"Registered batch {batch_id} with {len(event.essay_ids)} slots: {event.essay_ids}"
         )
 
-    async def mark_essay_ready(self, event: EssayContentReady) -> BatchEssaysReady | None:
+    def assign_slot_to_content(
+        self, batch_id: str, text_storage_id: str, original_file_name: str
+    ) -> str | None:
         """
-        Mark essay as ready and check if batch is complete.
-
+        Assign an available slot to content.
+        
         Args:
-            event: EssayContentReady event from File Service
+            batch_id: The batch ID
+            text_storage_id: Storage ID for the essay content
+            original_file_name: Original name of uploaded file
+            
+        Returns:
+            The assigned internal essay ID if successful, None if no slots available
+        """
+        if batch_id not in self.batch_expectations:
+            logger.error(f"No expectation registered for batch {batch_id}")
+            return None
 
+        expectation = self.batch_expectations[batch_id]
+        return expectation.assign_next_slot(text_storage_id, original_file_name)
+
+    def mark_slot_fulfilled(
+        self, batch_id: str, internal_essay_id: str, text_storage_id: str
+    ) -> BatchEssaysReady | None:
+        """
+        Mark a slot as fulfilled and check if batch is complete.
+        
+        Args:
+            batch_id: The batch ID
+            internal_essay_id: The internal essay ID slot that was fulfilled
+            text_storage_id: The text storage ID that fulfilled the slot
+            
         Returns:
             BatchEssaysReady event if batch is complete, None otherwise
         """
-        batch_id = event.batch_id
-        essay_id = event.essay_id
-
         if batch_id not in self.batch_expectations:
             logger.error(f"No expectation registered for batch {batch_id}")
             return None
 
         expectation = self.batch_expectations[batch_id]
 
-        if expectation.mark_essay_ready(essay_id):
+        if expectation.mark_slot_fulfilled(internal_essay_id, text_storage_id):
             # Batch is complete!
             logger.info(
-                f"Batch {batch_id} is complete with {len(expectation.ready_essay_ids)} essays"
+                f"Batch {batch_id} is complete with {len(expectation.slot_assignments)} fulfilled slots"
             )
 
             # Cancel timeout monitoring
             if expectation._timeout_task:
                 expectation._timeout_task.cancel()
 
-            # Create completion event
-            # TODO: This is a temporary implementation for Phase 1 - will be updated in Phase 4
-            # to properly populate EssayProcessingInputRefV1 objects with text_storage_id
-            from common_core.metadata_models import EssayProcessingInputRefV1
-            ready_essays = [
-                EssayProcessingInputRefV1(
-                    essay_id=essay_id,
-                    text_storage_id=f"TODO-storage-{essay_id}",  # Will be properly mapped in Phase 4
-                    student_name=None
-                )
-                for essay_id in expectation.ready_essay_ids
-            ]
+            # Create completion event with actual text_storage_id mappings
+            ready_essays = expectation.get_ready_essays()
 
             batch_ready_event = BatchEssaysReady(
                 batch_id=batch_id,
@@ -178,7 +253,7 @@ class BatchEssayTracker:
                 ),
                 metadata=SystemProcessingMetadata(
                     entity=EntityReference(entity_id=batch_id, entity_type="batch"),
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(UTC),
                     event="batch.essays.ready",
                 ),
             )
@@ -200,20 +275,20 @@ class BatchEssayTracker:
             if expectation.batch_id in self.batch_expectations:
                 logger.warning(
                     f"Batch {expectation.batch_id} timed out. "
-                    f"Ready: {len(expectation.ready_essay_ids)}/{expectation.expected_count}"
+                    f"Ready: {len(expectation.slot_assignments)}/{expectation.expected_count}"
                 )
 
                 # Create timeout event
                 timeout_event = BatchReadinessTimeout(
                     batch_id=expectation.batch_id,
-                    ready_essay_ids=list(expectation.ready_essay_ids),
-                    missing_essay_ids=expectation.missing_essay_ids,
+                    ready_essay_ids=list(expectation.slot_assignments.keys()),
+                    missing_essay_ids=expectation.missing_slot_ids,
                     expected_count=expectation.expected_count,
-                    actual_count=len(expectation.ready_essay_ids),
+                    actual_count=len(expectation.slot_assignments),
                     timeout_duration_seconds=expectation.timeout_seconds,
                     metadata=SystemProcessingMetadata(
                         entity=EntityReference(entity_id=expectation.batch_id, entity_type="batch"),
-                        timestamp=datetime.utcnow(),
+                        timestamp=datetime.now(UTC),
                         event="batch.readiness.timeout",
                     ),
                 )
@@ -236,9 +311,9 @@ class BatchEssayTracker:
         return {
             "batch_id": batch_id,
             "expected_count": expectation.expected_count,
-            "ready_count": len(expectation.ready_essay_ids),
-            "ready_essay_ids": list(expectation.ready_essay_ids),
-            "missing_essay_ids": expectation.missing_essay_ids,
+            "ready_count": len(expectation.slot_assignments),
+            "ready_essay_ids": list(expectation.slot_assignments.keys()),
+            "missing_essay_ids": expectation.missing_slot_ids,
             "is_complete": expectation.is_complete,
             "is_timeout_due": expectation.is_timeout_due,
             "created_at": expectation.created_at,

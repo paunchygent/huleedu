@@ -155,3 +155,53 @@ class DefaultEventPublisher(EventPublisher):
             return "essay.ai_feedback.requests"
         else:
             return "essay.processing.requests"
+
+    async def publish_excess_content_provisioned(
+        self,
+        event_data: Any,  # ExcessContentProvisionedV1
+        correlation_id: UUID | None = None,
+    ) -> None:
+        """Publish ExcessContentProvisionedV1 event when no slots are available."""
+        import json
+        from uuid import uuid4
+
+        from common_core.enums import ProcessingEvent, topic_name
+        from common_core.events.envelope import EventEnvelope
+
+        # Create event envelope
+        envelope = EventEnvelope[Any](
+            event_type="huleedu.els.excess.content.provisioned.v1",
+            source_service=self.settings.SERVICE_NAME,
+            correlation_id=correlation_id or uuid4(),
+            data=event_data,
+        )
+
+        # Publish to the correct topic
+        topic = topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
+        message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
+        await self.producer.send_and_wait(topic, message)
+
+    async def publish_batch_essays_ready(
+        self,
+        event_data: Any,  # BatchEssaysReady
+        correlation_id: UUID | None = None,
+    ) -> None:
+        """Publish BatchEssaysReady event when batch is complete."""
+        import json
+        from uuid import uuid4
+
+        from common_core.enums import ProcessingEvent, topic_name
+        from common_core.events.envelope import EventEnvelope
+
+        # Create event envelope
+        envelope = EventEnvelope[Any](
+            event_type="huleedu.els.batch.essays.ready.v1",
+            source_service=self.settings.SERVICE_NAME,
+            correlation_id=correlation_id or uuid4(),
+            data=event_data,
+        )
+
+        # Publish to the correct topic for BatchEssaysReady
+        topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
+        message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
+        await self.producer.send_and_wait(topic, message)

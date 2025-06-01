@@ -53,6 +53,25 @@ class EssayStateStore(Protocol):
         """Get status count breakdown for a batch."""
         ...
 
+    async def get_essay_by_text_storage_id_and_batch_id(
+        self, batch_id: str, text_storage_id: str
+    ) -> EssayState | None:
+        """Retrieve essay state by text_storage_id and batch_id for idempotency checking."""
+        ...
+
+    async def create_or_update_essay_state_for_slot_assignment(
+        self,
+        internal_essay_id: str,
+        batch_id: str,
+        text_storage_id: str,
+        original_file_name: str,
+        file_size: int,
+        content_hash: str | None,
+        initial_status: EssayStatus,
+    ) -> EssayState:
+        """Create or update essay state for slot assignment with content metadata."""
+        ...
+
 
 class EventPublisher(Protocol):
     """Protocol for publishing events to Kafka."""
@@ -84,6 +103,22 @@ class EventPublisher(Protocol):
         correlation_id: UUID | None = None,
     ) -> None:
         """Report the final conclusion of a phase for a batch to BS."""
+        ...
+
+    async def publish_excess_content_provisioned(
+        self,
+        event_data: Any,  # ExcessContentProvisionedV1
+        correlation_id: UUID | None = None,
+    ) -> None:
+        """Publish ExcessContentProvisionedV1 event when no slots are available."""
+        ...
+
+    async def publish_batch_essays_ready(
+        self,
+        event_data: Any,  # BatchEssaysReady
+        correlation_id: UUID | None = None,
+    ) -> None:
+        """Publish BatchEssaysReady event when batch is complete."""
         ...
 
 
@@ -201,8 +236,18 @@ class BatchEssayTracker(Protocol):
         """Register batch expectations from BOS."""
         ...
 
-    async def mark_essay_ready(self, event: Any) -> Any | None:  # EssayContentReady -> BatchEssaysReady | None
-        """Mark essay as ready and check if batch is complete."""
+
+
+    def assign_slot_to_content(
+        self, batch_id: str, text_storage_id: str, original_file_name: str
+    ) -> str | None:
+        """Assign an available slot to content and return assigned internal essay ID."""
+        ...
+
+    def mark_slot_fulfilled(
+        self, batch_id: str, internal_essay_id: str, text_storage_id: str
+    ) -> Any | None:  # BatchEssaysReady | None
+        """Mark a slot as fulfilled and check if batch is complete."""
         ...
 
     def get_batch_status(self, batch_id: str) -> dict[str, Any] | None:
