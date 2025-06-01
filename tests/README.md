@@ -25,12 +25,14 @@ tests/
 ## Test Categories
 
 ### 🔍 **Service Health Testing** (`test_service_health.py`)
+
 - **Health Endpoints**: Validates `/healthz` endpoints across all HTTP services
 - **Metrics Endpoints**: Validates `/metrics` endpoints return Prometheus format
 - **Response Times**: Ensures services respond within acceptable time limits
 - **Kafka Service Health**: Special handling for Kafka-based services
 
 ### 📊 **Metrics Validation** (`test_metrics_endpoints.py`)
+
 - **Format Compliance**: Validates Prometheus metrics format requirements
 - **Standard Metrics**: Ensures HTTP services expose standard request metrics  
 - **Service-Specific Metrics**: Validates specialized metrics (e.g., Kafka queue latency)
@@ -38,12 +40,14 @@ tests/
 - **Live Data**: Validates metrics contain actual data values
 
 ### 🔗 **Container Integration** (Planned)
+
 - **Docker Compose Management**: Automated service startup/shutdown
 - **Service Dependencies**: Validates proper dependency ordering
 - **Health Waiting**: Waits for all services to be healthy before testing
 - **Isolated Environments**: Function-scoped test isolation
 
 ### 🔄 **End-to-End Workflows** (Planned)
+
 - **Content Upload → Spell Check → Results**: Complete processing pipeline
 - **Batch Coordination**: Multi-service batch processing workflows
 - **Event-Driven Flows**: Kafka event propagation validation
@@ -54,11 +58,13 @@ tests/
 ### Prerequisites
 
 1. **Docker Services Running**: Ensure all services are up and healthy
+
    ```bash
    docker-compose up -d
    ```
 
 2. **Dependencies Installed**: Install testing dependencies
+
    ```bash
    pdm install -G monorepo-tools
    ```
@@ -66,21 +72,25 @@ tests/
 ### Running Tests
 
 #### **All Functional Tests**
+
 ```bash
 pdm run test-all tests/functional/ -v
 ```
 
 #### **Service Health Only**
+
 ```bash
 pdm run test-all tests/functional/test_service_health.py -v
 ```
 
 #### **Specific Test**
+
 ```bash
 pdm run test-all tests/functional/test_service_health.py::TestServiceHealth::test_all_services_health_endpoints -s
 ```
 
 #### **With Live Output**
+
 ```bash
 pdm run test-all tests/functional/ -s -v
 ```
@@ -111,12 +121,14 @@ pdm run test-all tests/functional/ -s -v
 ## Configuration
 
 ### **Pytest Configuration** (`conftest.py`)
+
 - **Async Support**: Full pytest-asyncio integration
 - **Test Markers**: `functional`, `slow`, `docker` markers for test categorization
 - **Event Loop**: Session-scoped event loop for async tests
 - **Fixtures**: Global fixture imports and configuration
 
 ### **Service URLs** (Configurable via fixtures)
+
 ```python
 service_urls = {
     "content_service": "http://localhost:8001",
@@ -157,25 +169,29 @@ async def test_service_functionality(self):
 ```
 
 ### **Error Handling**
+
 - **Connection Errors**: Graceful handling for services that may not be running
-- **Timeouts**: Reasonable timeout values (5s default) 
+- **Timeouts**: Reasonable timeout values (5s default)
 - **Service-Specific Logic**: Different handling for HTTP vs Kafka services
 - **Skip vs Fail**: Use `pytest.skip()` for optional services, `pytest.fail()` for required ones
 
 ## Future Enhancements
 
 ### **Phase 1** (Immediate)
+
 - [ ] Complete `test_metrics_endpoints.py` implementation
 - [ ] Add container integration tests with DockerComposeManager
 - [ ] Add test data fixtures for common scenarios
 
 ### **Phase 2** (Short-term)
+
 - [ ] End-to-end workflow testing (content upload → spell check → results)
 - [ ] Kafka event validation and tracing
 - [ ] Performance benchmarking tests
 - [ ] Service dependency validation
 
 ### **Phase 3** (Medium-term)
+
 - [ ] Load testing capabilities
 - [ ] Chaos engineering tests (service failure scenarios)
 - [ ] Multi-environment testing (dev, staging, prod)
@@ -193,4 +209,4 @@ async def test_service_functionality(self):
 
 **Status**: ✅ **OPERATIONAL** - Framework tested and functional (Jan 2025)  
 **Coverage**: Health checks, metrics validation, response time testing  
-**Next**: Container integration and end-to-end workflow testing 
+**Next**: Container integration and end-to-end workflow testing

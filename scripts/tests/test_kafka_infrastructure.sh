@@ -57,7 +57,7 @@ check_kafka_connectivity() {
         return 0
     else
         log_error "Cannot connect to Kafka at ${KAFKA_BOOTSTRAP_SERVERS}"
-        log_info "Ensure Docker Compose services are running: docker-compose up -d"
+        log_info "Ensure Docker Compose services are running: docker compose up -d"
         return 1
     fi
 }

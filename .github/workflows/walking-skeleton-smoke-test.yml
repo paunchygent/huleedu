@@ -18,23 +18,39 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         
-      - name: Set up Docker Compose
-        uses: docker/setup-compose-action@v1
-        
       - name: Start HuleEdu Services
         run: |
           echo "Starting HuleEdu walking skeleton services..."
-          docker-compose up -d
+          docker compose up -d
           echo "Services starting, waiting for health checks..."
         
       - name: Wait for Services to be Healthy
-        uses: jaracogmbh/docker-compose-health-check-action@v1.0.0
-        with:
-          max-retries: 30
-          retry-interval: 10
-          compose-file: "docker-compose.yml"
-          skip-exited: "true"
-          skip-no-healthcheck: "false"
+        run: |
+          echo "Waiting for services to be healthy..."
+          max_retries=30
+          retry_interval=10
+          
+          for ((i=1; i<=max_retries; i++)); do
+            echo "Health check attempt $i/$max_retries"
+            
+            # Check if all services with health checks are healthy
+            unhealthy_count=$(docker compose ps --format json | jq -r 'select(.Health != null and .Health != "healthy") | .Name' 2>/dev/null | wc -l)
+            
+            if [ "$unhealthy_count" -eq 0 ]; then
+              echo "✅ All services are healthy"
+              docker compose ps
+              break
+            else
+              echo "⏳ Waiting for $unhealthy_count services to become healthy..."
+              if [ $i -eq $max_retries ]; then
+                echo "❌ Services failed to become healthy after $max_retries attempts"
+                echo "Service status:"
+                docker compose ps
+                exit 1
+              fi
+              sleep $retry_interval
+            fi
+          done
           
       - name: Validate Service Health Endpoints
         run: |
@@ -168,26 +184,26 @@ jobs:
         run: |
           echo "=== Service Logs for Debugging ==="
           echo "--- Docker Compose Services Status ---"
-          docker-compose ps
+          docker compose ps
           
           echo "--- Content Service Logs ---"
-          docker-compose logs --tail=50 content_service
+          docker compose logs --tail=50 content_service
           
           echo "--- Batch Orchestrator Service Logs ---"
-          docker-compose logs --tail=50 batch_orchestrator_service
+          docker compose logs --tail=50 batch_orchestrator_service
           
           echo "--- Essay Lifecycle Service Logs ---"
-          docker-compose logs --tail=50 essay_lifecycle_api
+          docker compose logs --tail=50 essay_lifecycle_api
           
           echo "--- File Service Logs ---"
-          docker-compose logs --tail=50 file_service
+          docker compose logs --tail=50 file_service
           
           echo "--- Kafka Logs ---"
-          docker-compose logs --tail=30 kafka
+          docker compose logs --tail=30 kafka
           
       - name: Cleanup
         if: always()
         run: |
           echo "Cleaning up Docker resources..."
-          docker-compose down --volumes --remove-orphans
+          docker compose down --volumes --remove-orphans
           docker system prune -f 

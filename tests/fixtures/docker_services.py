@@ -23,7 +23,7 @@ class DockerComposeManager:
     async def start_services(self, services: Optional[List[str]] = None) -> bool:
         """Start Docker Compose services and wait for them to be healthy."""
         try:
-            cmd = ["docker-compose", "-f", self.compose_file, "up", "-d"]
+            cmd = ["docker", "compose", "-f", self.compose_file, "up", "-d"]
             if services:
                 cmd.extend(services)
 
@@ -41,7 +41,7 @@ class DockerComposeManager:
     async def stop_services(self) -> bool:
         """Stop Docker Compose services."""
         try:
-            cmd = ["docker-compose", "-f", self.compose_file, "down"]
+            cmd = ["docker", "compose", "-f", self.compose_file, "down"]
             subprocess.run(cmd, capture_output=True, text=True, check=True)
             self.services_started = False
             return True

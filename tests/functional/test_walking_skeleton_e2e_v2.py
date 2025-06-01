@@ -428,7 +428,7 @@ async def test_walking_skeleton_e2e_architecture_fix():
 async def test_excess_content_handling():
     """
     Test ELS handling of excess content (more files than essay slots).
-    
+
     This validates the ExcessContentProvisionedV1 event emission.
     """
 

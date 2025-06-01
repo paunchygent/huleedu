@@ -21,7 +21,7 @@ echo "================================="
 
 # Test 1: Docker Compose Configuration
 log "Testing Docker Compose configuration..."
-if docker-compose config > /dev/null 2>&1; then
+if docker compose config > /dev/null 2>&1; then
     success "Docker Compose configuration is valid"
 else
     error "Docker Compose configuration has errors"
@@ -30,10 +30,10 @@ fi
 
 # Test 2: Check if services can build
 log "Testing service builds (this may take a few minutes)..."
-if docker-compose build > /dev/null 2>&1; then
+if docker compose build > /dev/null 2>&1; then
     success "All services build successfully"
 else
-    error "Service build failed - check docker-compose logs"
+    error "Service build failed - check docker compose logs"
     exit 1
 fi
 
@@ -59,7 +59,7 @@ done
 
 # Test 4: Quick service startup test
 log "Testing quick service startup (30 seconds)..."
-docker-compose up -d > /dev/null 2>&1
+docker compose up -d > /dev/null 2>&1
 
 sleep 30
 
@@ -125,10 +125,10 @@ else
     echo ""
     echo "📋 Next steps:"
     echo "   1. Wait a bit longer for services to fully start"
-    echo "   2. Check logs: docker-compose logs <service-name>"
+    echo "   2. Check logs: docker compose logs <service-name>"
     echo "   3. Run full validation: ./scripts/validate_batch_coordination.sh"
 fi
 
 echo ""
 log "Services left running for further testing"
-log "To stop: docker-compose down" 
+log "To stop: docker compose down" 

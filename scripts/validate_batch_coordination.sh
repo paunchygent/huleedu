@@ -63,11 +63,11 @@ check_docker_compose() {
     fi
     
     # Validate compose file
-    if docker-compose config > /dev/null 2>&1; then
+    if docker compose config > /dev/null 2>&1; then
         success "Docker Compose configuration is valid"
     else
         error "Docker Compose configuration has errors"
-        docker-compose config
+        docker compose config
         exit 1
     fi
 }
@@ -76,7 +76,7 @@ start_services() {
     log "Starting HuleEdu services..."
     
     # Start services in background
-    docker-compose up -d
+    docker compose up -d
     
     # Wait for services to be ready
     log "Waiting for services to start (30 seconds)..."
@@ -176,11 +176,11 @@ monitor_kafka_logs() {
     
     # Monitor ELS worker logs for BatchEssaysRegistered processing
     log "Checking ELS Worker logs for batch registration processing..."
-    docker-compose logs essay_lifecycle_worker | tail -20
+    docker compose logs essay_lifecycle_worker --tail=20
     
     # Monitor BOS logs for any processing
     log "Checking BOS logs..."
-    docker-compose logs batch_orchestrator_service | tail -20
+    docker compose logs batch_orchestrator_service --tail=20
     
     # Give time for event processing
     sleep 5
@@ -202,7 +202,7 @@ simulate_essay_content_ready() {
     
     # Monitor ELS logs to see if batch expectation was created
     log "Checking ELS logs for batch expectation creation..."
-    docker-compose logs essay_lifecycle_worker | grep -i "batch.*$BATCH_ID" || warning "No batch tracking logs found yet"
+    docker compose logs essay_lifecycle_worker | grep -i "batch.*$BATCH_ID" || warning "No batch tracking logs found yet"
     
     warning "EssayContentReady simulation requires File Service implementation"
     log "Current validation confirms BOS→ELS event flow is working"
@@ -217,7 +217,7 @@ assess_integration_readiness() {
     
     # Check Kafka topics
     log "Verifying Kafka topics exist..."
-    docker-compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --list | grep huleedu || warning "Some HuleEdu topics may be missing"
+    docker compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --list | grep huleedu || warning "Some HuleEdu topics may be missing"
     
     # Check service dependencies
     log "Verifying service dependencies..."
@@ -258,11 +258,11 @@ cleanup() {
     
     if [[ "${1:-}" == "--stop-services" ]]; then
         log "Stopping services..."
-        docker-compose down
+        docker compose down
         success "Services stopped"
     else
         log "Services left running for continued testing"
-        log "To stop services: docker-compose down"
+        log "To stop services: docker compose down"
     fi
 }
 
@@ -275,8 +275,13 @@ main() {
     log "=============================================="
     
     # Check prerequisites
-    if ! command -v docker-compose &> /dev/null; then
-        error "docker-compose is required but not installed"
+    if ! command -v docker &> /dev/null; then
+    error "docker is required but not installed"
+fi
+
+# Verify compose plugin is available
+if ! docker compose version &> /dev/null; then
+    error "docker compose plugin is required but not available"
         exit 1
     fi
     
