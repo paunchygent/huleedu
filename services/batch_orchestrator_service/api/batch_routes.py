@@ -12,9 +12,13 @@ from config import settings
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import Counter
-from protocols import BatchEventPublisherProtocol, BatchProcessingServiceProtocol
+from protocols import (
+    BatchEventPublisherProtocol,
+    BatchProcessingServiceProtocol,
+    BatchRepositoryProtocol,
+)
 from pydantic import ValidationError
-from quart import Blueprint, Response, jsonify, request
+from quart import Blueprint, Response, current_app, jsonify, request
 from quart_dishka import inject
 
 from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage, topic_name
@@ -192,3 +196,43 @@ async def trigger_spellcheck_test_endpoint(
         if BATCH_OPERATIONS:
             BATCH_OPERATIONS.labels(operation="test_spellcheck", status="error").inc()
         return jsonify({"error": "Failed to trigger test spellcheck request."}), 500
+
+
+@batch_bp.route("/v1/batches/<batch_id>/status", methods=["GET"])
+@inject
+async def get_batch_status(
+    batch_id: str,
+    batch_repo: BatchRepositoryProtocol,
+) -> Union[Response, tuple[Response, int]]:
+    """Get the current status and pipeline state of a batch."""
+    try:
+        # Get batch context and pipeline state
+        batch_context = await batch_repo.get_batch_context(batch_id)
+        pipeline_state = await batch_repo.get_processing_pipeline_state(batch_id)
+
+        if not batch_context:
+            return jsonify({"error": "Batch not found"}), 404
+
+        # Build response with batch info and pipeline status
+        response_data = {
+            "batch_id": batch_id,
+            "batch_context": {
+                "course_code": batch_context.course_code,
+                "class_designation": batch_context.class_designation,
+                "expected_essay_count": batch_context.expected_essay_count,
+                "enable_cj_assessment": batch_context.enable_cj_assessment,
+            },
+            "pipeline_state": pipeline_state or {},
+        }
+
+        return jsonify(response_data), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error getting batch status for {batch_id}: {e}")
+        return jsonify({"error": "Failed to get batch status"}), 500
+
+
+@batch_bp.route("/v1/test", methods=["GET"])
+async def test_endpoint() -> Union[Response, tuple[Response, int]]:
+    """Simple test endpoint for health checks."""
+    return jsonify({"message": "Batch service is working!"}), 200

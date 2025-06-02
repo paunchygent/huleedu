@@ -73,7 +73,8 @@ class TestServiceHealth:
                     else:
                         # Empty metrics registry is acceptable for walking skeleton
                         print(
-                            f"ℹ️  {service_name}: Empty metrics registry (acceptable for walking skeleton)"
+                            f"ℹ️  {service_name}: Empty metrics registry "
+                            f"(acceptable for walking skeleton)"
                         )
 
                 except httpx.ConnectError:

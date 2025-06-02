@@ -11,11 +11,12 @@ from typing import Any, Dict
 import choix
 import numpy as np
 from huleedu_service_libs.logging_utils import create_service_logger
-from models_api import ComparisonResult, EssayForComparison
-from models_db import ComparisonPair as CJ_ComparisonPair
-from models_db import ProcessedEssay as CJ_ProcessedEssay
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from services.cj_assessment_service.models_api import ComparisonResult, EssayForComparison
+from services.cj_assessment_service.models_db import ComparisonPair as CJ_ComparisonPair
+from services.cj_assessment_service.models_db import ProcessedEssay as CJ_ProcessedEssay
 
 logger = create_service_logger("cj_assessment_service.scoring_ranking")
 
@@ -39,8 +40,7 @@ async def record_comparisons_and_update_scores(
         Dictionary mapping essay IDs (strings) to updated BT scores
     """
     logger.info(
-        f"Recording {len(comparison_results)} comparison results for "
-        f"CJ Batch ID: {cj_batch_id}",
+        f"Recording {len(comparison_results)} comparison results for CJ Batch ID: {cj_batch_id}",
         extra={"cj_batch_id": str(cj_batch_id)},
     )
 
@@ -214,7 +214,7 @@ async def get_essay_rankings(
         .order_by(CJ_ProcessedEssay.current_bt_score.desc().nulls_last())
     )
     result = await db_session.execute(stmt)
-    essays_with_scores = result.all()
+    essays_with_scores = await result.all()
 
     rankings = []
     for rank, db_row in enumerate(essays_with_scores, 1):

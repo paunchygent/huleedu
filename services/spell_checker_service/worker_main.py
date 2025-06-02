@@ -8,10 +8,7 @@ from typing import Any, AsyncIterator  # Changed from Any to AsyncIterator for k
 import aiohttp
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, TopicPartition
 from aiokafka.errors import KafkaConnectionError
-from config import settings  # Assuming this is still the way to get settings
-from di import SpellCheckerServiceProvider
 from dishka import make_async_container
-from event_processor import process_single_message
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
     create_service_logger,
@@ -22,6 +19,11 @@ from protocol_implementations.event_publisher_impl import DefaultSpellcheckEvent
 from protocol_implementations.result_store_impl import DefaultResultStore
 
 from common_core.enums import ProcessingEvent, topic_name
+from services.spell_checker_service.config import (
+    settings,  # Assuming this is still the way to get settings
+)
+from services.spell_checker_service.di import SpellCheckerServiceProvider
+from services.spell_checker_service.event_processor import process_single_message
 
 # Configure structured logging for the service (moved from original worker.py)
 configure_service_logging(

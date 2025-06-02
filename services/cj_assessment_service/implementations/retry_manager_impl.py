@@ -15,7 +15,6 @@ from typing import Any
 import aiohttp
 from config import Settings
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import RetryManagerProtocol
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -23,6 +22,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
+from services.cj_assessment_service.protocols import RetryManagerProtocol
 
 logger = create_service_logger("cj_assessment_service.retry_manager_impl")
 
@@ -212,7 +213,7 @@ class RetryManagerImpl(RetryManagerProtocol):
                 return (
                     None,
                     f"API error: {last_exception.status} - "
-                    f"{last_exception.message} (after retries)"
+                    f"{last_exception.message} (after retries)",
                 )
             elif isinstance(last_exception, aiohttp.ClientError):
                 return None, f"API client error: {last_exception} (after retries)"

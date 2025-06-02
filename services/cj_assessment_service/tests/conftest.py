@@ -84,26 +84,20 @@ def llm_config_overrides() -> LLMConfigOverrides:
         model_override="gpt-4o",
         temperature_override=0.3,
         max_tokens_override=2000,
-        provider_override="openai"
+        provider_override="openai",
     )
 
 
 @pytest.fixture
 def llm_config_overrides_minimal() -> LLMConfigOverrides:
     """Provide minimal LLM configuration overrides with only model."""
-    return LLMConfigOverrides(
-        model_override="claude-3-sonnet-20240229"
-    )
+    return LLMConfigOverrides(model_override="claude-3-sonnet-20240229")
 
 
 @pytest.fixture
 def entity_reference(sample_batch_id: str) -> EntityReference:
     """Provide a sample EntityReference for batch."""
-    return EntityReference(
-        entity_id=sample_batch_id,
-        entity_type="batch",
-        parent_id=None
-    )
+    return EntityReference(entity_id=sample_batch_id, entity_type="batch", parent_id=None)
 
 
 @pytest.fixture
@@ -119,10 +113,7 @@ def system_metadata(entity_reference: EntityReference) -> SystemProcessingMetada
 @pytest.fixture
 def essay_processing_ref(sample_essay_id: str, sample_storage_id: str) -> EssayProcessingInputRefV1:
     """Provide sample EssayProcessingInputRefV1."""
-    return EssayProcessingInputRefV1(
-        essay_id=sample_essay_id,
-        text_storage_id=sample_storage_id
-    )
+    return EssayProcessingInputRefV1(essay_id=sample_essay_id, text_storage_id=sample_storage_id)
 
 
 @pytest.fixture
@@ -196,9 +187,9 @@ def kafka_message_with_overrides(
     sample_batch_id: str,
 ) -> ConsumerRecord:
     """Provide Kafka ConsumerRecord with LLM config overrides."""
-    message_value = json.dumps(
-        cj_request_envelope_with_overrides.model_dump(mode="json")
-    ).encode("utf-8")
+    message_value = json.dumps(cj_request_envelope_with_overrides.model_dump(mode="json")).encode(
+        "utf-8"
+    )
 
     record = MagicMock(spec=ConsumerRecord)
     record.topic = "els.cj_assessment.requested.v1"
@@ -216,9 +207,9 @@ def kafka_message_no_overrides(
     sample_batch_id: str,
 ) -> ConsumerRecord:
     """Provide Kafka ConsumerRecord without LLM config overrides."""
-    message_value = json.dumps(
-        cj_request_envelope_no_overrides.model_dump(mode="json")
-    ).encode("utf-8")
+    message_value = json.dumps(cj_request_envelope_no_overrides.model_dump(mode="json")).encode(
+        "utf-8"
+    )
 
     record = MagicMock(spec=ConsumerRecord)
     record.topic = "els.cj_assessment.requested.v1"
@@ -256,22 +247,43 @@ def mock_settings() -> MagicMock:
     settings.system_prompt = "You are a helpful AI assistant."
     settings.llm_request_timeout_seconds = 30
     settings.MAX_PAIRWISE_COMPARISONS = 100
+    # Add required Kafka and service configuration
+    settings.CJ_ASSESSMENT_COMPLETED_TOPIC = "huleedu.cj_assessment.completed.v1"
+    settings.CJ_ASSESSMENT_FAILED_TOPIC = "huleedu.cj_assessment.failed.v1"
+    settings.SERVICE_NAME = "cj-assessment-service"
     settings.LLM_PROVIDERS_CONFIG = {
         "openai": MagicMock(
             api_base="https://api.openai.com/v1",
             default_model="gpt-4o-mini",
             temperature=0.7,
             max_tokens=4000,
-            api_key_env_var="OPENAI_API_KEY"
+            api_key_env_var="OPENAI_API_KEY",
         ),
         "anthropic": MagicMock(
             api_base="https://api.anthropic.com",
             default_model="claude-3-haiku-20240307",
             temperature=0.7,
             max_tokens=4000,
-            api_key_env_var="ANTHROPIC_API_KEY"
-        )
+            api_key_env_var="ANTHROPIC_API_KEY",
+        ),
+        "google": MagicMock(
+            api_base="https://generativelanguage.googleapis.com/v1",
+            default_model="gemini-1.5-flash",
+            temperature=0.7,
+            max_tokens=4000,
+            api_key_env_var="GOOGLE_API_KEY",
+        ),
+        "openrouter": MagicMock(
+            api_base="https://openrouter.ai/api/v1",
+            default_model="mistralai/mistral-7b-instruct",
+            temperature=0.7,
+            max_tokens=4000,
+            api_key_env_var="OPENROUTER_API_KEY",
+        ),
     }
+    # Add missing attributes for LLM interaction tests
+    settings.max_concurrent_llm_requests = 10
+    settings.llm_request_timeout_seconds = 30
     return settings
 
 

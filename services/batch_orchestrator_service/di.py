@@ -8,14 +8,18 @@ from config import Settings, settings
 from dishka import Provider, Scope, provide
 from implementations.batch_processing_service_impl import BatchProcessingServiceImpl
 from implementations.batch_repository_impl import MockBatchRepositoryImpl
+from implementations.cj_assessment_initiator_impl import DefaultCJAssessmentInitiator
 from implementations.essay_lifecycle_client_impl import DefaultEssayLifecycleClientImpl
 from implementations.event_publisher_impl import DefaultBatchEventPublisherImpl
+from implementations.pipeline_phase_coordinator_impl import DefaultPipelinePhaseCoordinator
 from prometheus_client import CollectorRegistry
 from protocols import (
     BatchEventPublisherProtocol,
     BatchProcessingServiceProtocol,
     BatchRepositoryProtocol,
+    CJAssessmentInitiatorProtocol,
     EssayLifecycleClientProtocol,
+    PipelinePhaseCoordinatorProtocol,
 )
 
 
@@ -65,6 +69,24 @@ class BatchOrchestratorServiceProvider(Provider):
     ) -> EssayLifecycleClientProtocol:
         """Provide essay lifecycle service client implementation."""
         return DefaultEssayLifecycleClientImpl(http_session, settings)
+
+    @provide(scope=Scope.APP)
+    def provide_cj_assessment_initiator(
+        self,
+        event_publisher: BatchEventPublisherProtocol,
+        batch_repo: BatchRepositoryProtocol,
+    ) -> CJAssessmentInitiatorProtocol:
+        """Provide CJ assessment initiator implementation."""
+        return DefaultCJAssessmentInitiator(event_publisher, batch_repo)
+
+    @provide(scope=Scope.APP)
+    def provide_pipeline_phase_coordinator(
+        self,
+        batch_repo: BatchRepositoryProtocol,
+        cj_initiator: CJAssessmentInitiatorProtocol,
+    ) -> PipelinePhaseCoordinatorProtocol:
+        """Provide pipeline phase coordinator implementation."""
+        return DefaultPipelinePhaseCoordinator(batch_repo, cj_initiator)
 
     @provide(scope=Scope.APP)
     def provide_batch_processing_service(

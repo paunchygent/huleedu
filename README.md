@@ -62,6 +62,13 @@ The HuleEdu ecosystem currently comprises the following services:
   * **API**: `POST /v1/files/batch` for batch file uploads
   * **Status**: Fully implemented and integrated into the walking skeleton
 
+* **CJ Assessment Service** ✅ **IMPLEMENTED**:
+  * **Description**: A hybrid Kafka worker + HTTP API service for Comparative Judgment assessment of essays using Large Language Model (LLM) based pairwise comparisons. Features dynamic LLM configuration support with multi-provider capabilities (OpenAI, Anthropic, Google, OpenRouter).
+  * **Port**: 9090 (Health API & Metrics)
+  * **Location**: `services/cj_assessment_service/`
+  * **API**: `/healthz` and `/metrics` endpoints for health checks and observability
+  * **Architecture**: Concurrent execution with both Kafka worker and HTTP API, supports runtime LLM parameter overrides
+
 ## Key Technologies
 
 * **Python**: Version 3.11+
@@ -189,9 +196,9 @@ For detailed implementation and testing history, refer to:
 The HuleEdu platform continues evolving beyond Sprint 1. The following services and capabilities are planned for future development:
 
 * **Phase 2 - AI Processing Pipeline**:
-  * **AI Feedback Service**: AI-generated feedback on student essays
+  * **AI Feedback Service**: AI-generated feedback on student essays  
   * **NLP Metrics Service**: Detailed Natural Language Processing metrics extraction
-  * **AI Judge powered CJ (Comparative Judgement) Assessment Service**: AI-driven comparative judgement of essays
+  * ~~**CJ (Comparative Judgement) Assessment Service**~~: ✅ **IMPLEMENTED** - AI-driven comparative judgement of essays with dynamic LLM configuration
 * **Future Architectural Components**:
   * **LLM-Caller Gateway**: Centralized service for managing Large Language Model interactions
   * **API Gateway**: Single entry point for external clients

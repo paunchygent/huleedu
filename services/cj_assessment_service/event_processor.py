@@ -6,15 +6,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from aiokafka import ConsumerRecord
-from cj_core_logic import run_cj_assessment_workflow
-from config import Settings
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import (
-    CJDatabaseProtocol,
-    CJEventPublisherProtocol,
-    ContentClientProtocol,
-    LLMInteractionProtocol,
-)
 
 from common_core.enums import BatchStatus, ProcessingEvent, ProcessingStage
 from common_core.events.cj_assessment_events import (
@@ -24,6 +16,14 @@ from common_core.events.cj_assessment_events import (
 )
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
+from services.cj_assessment_service.cj_core_logic import run_cj_assessment_workflow
+from services.cj_assessment_service.config import Settings
+from services.cj_assessment_service.protocols import (
+    CJDatabaseProtocol,
+    CJEventPublisherProtocol,
+    ContentClientProtocol,
+    LLMInteractionProtocol,
+)
 
 logger = create_service_logger("event_processor")
 

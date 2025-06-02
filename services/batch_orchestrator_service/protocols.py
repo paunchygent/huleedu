@@ -1,14 +1,14 @@
+"""Protocol definitions for Batch Orchestrator Service."""
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, List, Optional, Protocol
+from typing import Any, Protocol
 
 # Import the new API model for batch context storage
 from api_models import BatchRegistrationRequestV1
 
 # Assuming common_core models might be used in signatures
-from common_core.events.envelope import EventEnvelope
-from common_core.pipeline_models import ProcessingPipelineState
 
 
 # Placeholder for a Pydantic model representing a BatchUpload entity
@@ -19,91 +19,111 @@ class BatchUpload: ...  # Placeholder for actual BatchUpload Pydantic model
 
 
 class BatchRepositoryProtocol(Protocol):
-    async def get_batch_by_id(self, batch_id: str) -> BatchUpload | None:
-        """Retrieves a batch by its ID."""
+    """Protocol for batch data persistence operations."""
+
+    async def get_batch_by_id(self, batch_id: str) -> dict | None:
+        """Retrieve a batch by its ID."""
         ...
 
-    async def create_batch(self, batch_data: BatchUpload) -> BatchUpload:
-        """Creates a new batch and returns the created entity."""
+    async def create_batch(self, batch_data: dict) -> dict:
+        """Create a new batch and return it with an ID."""
         ...
 
     async def update_batch_status(self, batch_id: str, new_status: str) -> bool:
-        """Updates the status of a batch."""
+        """Update the status of a batch."""
         # new_status would ideally be from common_core.enums.BatchStatus
         ...
 
-    async def save_processing_pipeline_state(
-        self, batch_id: str, pipeline_state: ProcessingPipelineState
-    ) -> bool:
-        """Saves or updates the detailed processing pipeline state for a batch."""
+    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
+        """Save the processing pipeline state for a batch."""
         ...
 
     async def get_processing_pipeline_state(self, batch_id: str) -> dict | None:
-        """Retrieves the detailed processing pipeline state for a batch.
-
-        Args:
-            batch_id: Unique identifier for the batch
-
-        Returns:
-            The pipeline state dictionary if found, None otherwise
-        """
+        """Retrieve the processing pipeline state for a batch."""
         ...
 
     async def store_batch_context(
         self, batch_id: str, registration_data: BatchRegistrationRequestV1
     ) -> bool:
-        """Stores the full batch context including course info and essay instructions.
-
-        Args:
-            batch_id: Unique identifier for the batch
-            registration_data: Complete batch registration data including course_code,
-                             class_designation, essay_instructions, etc.
-
-        Returns:
-            True if storage was successful, False otherwise
-        """
+        """Store the full batch context including course info and essay instructions."""
         ...
 
-    async def get_batch_context(self, batch_id: str) -> Optional[BatchRegistrationRequestV1]:
-        """Retrieves the stored batch context for a given batch ID.
-
-        Args:
-            batch_id: Unique identifier for the batch
-
-        Returns:
-            The batch registration data if found, None otherwise
-        """
+    async def get_batch_context(self, batch_id: str) -> BatchRegistrationRequestV1 | None:
+        """Retrieve the stored batch context for a given batch ID."""
         ...
 
 
 class BatchEventPublisherProtocol(Protocol):
-    async def publish_batch_event(self, event_envelope: EventEnvelope[Any]) -> None:
-        """Publishes a batch-related event to the event bus."""
+    """Protocol for publishing batch-related events."""
+
+    async def publish_batch_event(self, event_envelope: Any) -> None:
+        """Publish a batch event to the appropriate Kafka topic."""
         ...
 
 
 class EssayLifecycleClientProtocol(Protocol):
-    async def request_essay_phase_initiation(
-        self,
-        batch_id: str,
-        essay_ids: List[str],
-        phase: str,  # phase might be an Enum too
-    ) -> None:
-        """Requests the Essay Lifecycle Service to initiate a processing phase for essays."""
+    """Protocol for interacting with Essay Lifecycle Service."""
+
+    async def get_essay_status(self, essay_id: str) -> dict | None:
+        """Retrieve the current status of an essay from ELS."""
+        ...
+
+    async def update_essay_status(self, essay_id: str, new_status: str) -> bool:
+        """Update the status of an essay in ELS."""
         ...
 
 
 class BatchProcessingServiceProtocol(Protocol):
+    """Protocol for batch processing service operations."""
+
     async def register_new_batch(
         self, registration_data: BatchRegistrationRequestV1, correlation_id: uuid.UUID
     ) -> str:
-        """Register a new batch for processing.
+        """Register a new batch for processing and return the batch ID."""
+        ...
 
-        Args:
-            registration_data: Validated batch registration request data
-            correlation_id: Correlation ID for tracking
 
-        Returns:
-            Generated batch ID
-        """
+class PipelinePhaseCoordinatorProtocol(Protocol):
+    """Protocol for coordinating pipeline phase transitions."""
+
+    async def handle_phase_concluded(
+        self,
+        batch_id: str,
+        completed_phase: str,
+        phase_status: str,
+        correlation_id: str,
+    ) -> None:
+        """Handle completion of a pipeline phase and determine next actions."""
+        ...
+
+    async def update_phase_status(
+        self,
+        batch_id: str,
+        phase: str,
+        status: str,
+        completion_timestamp: str | None = None,
+    ) -> None:
+        """Update the status of a specific pipeline phase."""
+        ...
+
+
+class CJAssessmentInitiatorProtocol(Protocol):
+    """Protocol for initiating CJ assessment operations."""
+
+    async def initiate_cj_assessment(
+        self,
+        batch_id: str,
+        batch_context: BatchRegistrationRequestV1,
+        correlation_id: str,
+        essays_to_process: list[Any] | None = None,
+    ) -> None:
+        """Initiate CJ assessment for a batch with the given context."""
+        ...
+
+    async def can_initiate_cj_assessment(
+        self,
+        batch_context: BatchRegistrationRequestV1,
+        current_pipeline_state: dict,
+    ) -> bool:
+        """Check if CJ assessment can be initiated for the given batch context."""
         ...

@@ -8,9 +8,10 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
 
 ### Service Type
 
-- **Pattern**: Kafka Worker Service (Event-Driven)
-- **Framework**: Direct `asyncio` and `aiokafka` for message processing
+- **Pattern**: Hybrid Kafka Worker + HTTP API Service
+- **Framework**: Quart (HTTP API) + Direct `asyncio` and `aiokafka` for message processing
 - **Dependency Injection**: Dishka framework for clean architecture
+- **Concurrency**: Both HTTP API and Kafka worker run concurrently via `run_service.py`
 
 ### Key Internal Modules
 
@@ -21,7 +22,10 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
 - **`protocols.py`**: Defines behavioral contracts using `typing.Protocol` for all major dependencies
 - **`implementations/`**: Concrete implementations of all protocols (database, LLM providers, event publishing, content fetching)
 - **`event_processor.py`**: Processes individual Kafka messages and delegates to core workflow
-- **`worker_main.py`**: Service lifecycle management, DI container setup, Kafka consumer loop
+- **`worker_main.py`**: Kafka consumer lifecycle management and message processing
+- **`app.py`**: Lean Quart HTTP API application with health and metrics endpoints
+- **`run_service.py`**: Main service runner that orchestrates concurrent Kafka worker and HTTP API
+- **`api/health_routes.py`**: Blueprint containing `/healthz` and `/metrics` endpoints
 
 ### Dependencies
 
@@ -29,6 +33,48 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
 - **LLM Providers**: Multiple provider support (OpenAI, Anthropic, Google, OpenRouter)
 - **Database**: SQLite with async SQLAlchemy for CJ-specific data persistence
 - **Kafka**: Event consumption and publishing via EventEnvelope pattern
+
+## LLM Configuration & Dynamic Overrides
+
+### Multi-Provider Support
+
+The service supports multiple LLM providers with configurable defaults:
+
+- **OpenAI**: GPT models via OpenAI API
+- **Anthropic**: Claude models via Anthropic API  
+- **Google**: Gemini models via Google AI API
+- **OpenRouter**: Various models via OpenRouter proxy
+
+### Configuration Hierarchy
+
+LLM parameters follow a three-level fallback hierarchy:
+
+1. **Runtime Overrides**: Via `llm_config_overrides` in event data (highest priority)
+2. **Provider Defaults**: Configured per-provider in settings
+3. **Global Defaults**: System-wide fallback values
+
+### Supported Override Parameters
+
+```python
+class LLMConfigOverrides(BaseModel):
+    model_override: Optional[str] = None           # e.g., "gpt-4o", "claude-3-haiku"
+    temperature_override: Optional[float] = None   # 0.0-2.0
+    max_tokens_override: Optional[int] = None      # Positive integer
+    provider_override: Optional[str] = None        # "openai", "anthropic", etc.
+```
+
+### Usage Example
+
+```json
+{
+  "llm_config_overrides": {
+    "model_override": "gpt-4o",
+    "temperature_override": 0.3,
+    "max_tokens_override": 2000,
+    "provider_override": "openai"
+  }
+}
+```
 
 ## Event Architecture
 
@@ -38,6 +84,7 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
   - BOS batch reference (`entity_ref`)
   - List of essays for CJ assessment (`essays_for_cj`)
   - Assessment metadata (language, course_code, essay_instructions)
+  - **NEW**: Optional `llm_config_overrides` for runtime LLM parameter customization
 
 ### Events Produced
 
@@ -73,8 +120,13 @@ MAX_PAIRWISE_COMPARISONS=1000
 SCORE_STABILITY_THRESHOLD=0.05
 COMPARISONS_PER_STABILITY_CHECK_ITERATION=10
 
+# HTTP API Configuration 
+METRICS_PORT=9090          # Port for health and metrics endpoints
+
+# LLM Configuration Overrides Support
+# Default models and parameters can be overridden per-request via event data
+
 # Observability
-METRICS_PORT=9090
 LOG_LEVEL=INFO
 ```
 
@@ -129,8 +181,12 @@ pdm install
 cp .env.example .env
 # Edit .env with your configuration
 
-# Run the worker
-pdm run start_worker
+# Run the complete service (HTTP API + Kafka worker)
+pdm run start_service
+
+# Or run components separately:
+pdm run start_worker      # Kafka worker only
+pdm run start_health_api  # HTTP API only
 ```
 
 ### Testing
@@ -165,16 +221,36 @@ pdm run ruff check .
 # Type checking
 pdm run mypy .
 
-# Run worker locally
+# Run complete service locally
+pdm run python run_service.py
+
+# Run only Kafka worker 
 pdm run python worker_main.py
+
+# Run only health API
+pdm run python app.py
 ```
 
 ## Monitoring and Observability
 
-- **Metrics**: Prometheus metrics exposed on port 9090
+### HTTP Endpoints
+
+- **`GET /healthz`**: Service health check endpoint
+- **`GET /metrics`**: Prometheus metrics in OpenMetrics format
+
+### Observability Features
+
+- **Metrics**: Prometheus metrics exposed on configured `METRICS_PORT` (default: 9090)
 - **Logging**: Structured logging via `huleedu_service_libs.logging_utils`
-- **Health Checks**: Database connectivity and Kafka producer health
+- **Health Checks**: Service responsiveness (extensible to database/Kafka connectivity)
 - **Correlation IDs**: Full request tracing across service boundaries
+
+### Docker Health Checks
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:9090/healthz || exit 1
+```
 
 ## Integration Points
 

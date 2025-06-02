@@ -15,11 +15,16 @@ alwaysApply: false
 - Update contract tests when Pydantic models change
 - Write meaningful tests based on requirements, not coverage
 
-## 3. Debugging
+## 3. Mocking Boundaries
+- **MUST** mock only external boundaries: protocols, HTTP clients, databases
+- **FORBIDDEN**: Mocking internal business logic (core_logic.run_workflow = AsyncMock)
+- **FORBIDDEN**: Using pytest.importorskip to mock same-service functions
+
+## 4. Debugging
 - Use `pdm run pytest -s` for debug output
 - Analyze test failures and correlate with code changes
 - Fix application code, not tests
 
-## 4. Patterns
+## 5. Patterns
 - Follow [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc) Sections 3.9-3.11
 - Follow [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc) Section 8.2

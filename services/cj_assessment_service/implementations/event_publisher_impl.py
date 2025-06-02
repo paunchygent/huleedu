@@ -12,7 +12,8 @@ from uuid import UUID
 
 from aiokafka import AIOKafkaProducer
 from config import Settings
-from protocols import CJEventPublisherProtocol
+
+from services.cj_assessment_service.protocols import CJEventPublisherProtocol
 
 
 class CJEventPublisherImpl(CJEventPublisherProtocol):

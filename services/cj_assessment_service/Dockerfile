@@ -1,5 +1,14 @@
-# Multi-stage Dockerfile for CJ Assessment Service
-FROM python:3.11-slim AS base
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    ENV_TYPE=docker \
+    LOG_LEVEL=INFO \
+    KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+    CONTENT_SERVICE_URL=http://content_service:8000/v1/content \
+    SERVICE_NAME=cj_assessment_service \
+    PDM_USE_VENV=false
 
 # System dependencies
 RUN apt-get update && apt-get install -y \
@@ -7,40 +16,33 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Set base WORKDIR for the application
 WORKDIR /app
 
-# Install PDM
+# Install PDM globally in the image
 RUN pip install --no-cache-dir pdm
 
-# Copy dependency files
-COPY pyproject.toml pdm.lock ./
+# Copy shared local dependencies first
+COPY common_core/ /app/common_core/
+COPY services/libs/ /app/services/libs/
 
-# Copy common_core and service_libs 
-COPY common_core/ ./common_core/
-COPY services/libs/ ./services/libs/
+# Now, handle the specific service
+COPY services/cj_assessment_service/ /app/services/cj_assessment_service/
 
-# Install dependencies
-RUN pdm install --check --prod
+# Switch to service directory for dependency installation
+WORKDIR /app/services/cj_assessment_service
 
-# Copy service source code
-COPY services/cj_assessment_service/ ./services/cj_assessment_service/
+# Install dependencies for the cj_assessment_service using its own pyproject.toml
+# PDM will use the overrides to find local dependencies at the correct paths
+RUN pdm install --prod
 
-# Production stage
-FROM base AS production
-
-# Create non-root user
-RUN groupadd -r cjassessment && useradd -r -g cjassessment cjassessment
+RUN groupadd -r cjassessment && useradd --no-log-init -r -g cjassessment cjassessment \
+    && chown -R cjassessment:cjassessment /app
 USER cjassessment
 
-# Set service environment
-ENV PYTHONPATH=/app/services/cj_assessment_service
-ENV SERVICE_NAME=cj_assessment_service
-
-# Health check
+# Health check (now targets /healthz endpoint)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:9090/health || exit 1
+    CMD curl -f http://localhost:9090/healthz || exit 1
 
-# Default command (runs worker)
-WORKDIR /app/services/cj_assessment_service
-CMD ["pdm", "run", "start_worker"] 
+# Command to run the application from service directory
+CMD ["pdm", "run", "start_service"] 

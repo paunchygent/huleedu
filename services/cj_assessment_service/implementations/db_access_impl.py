@@ -14,9 +14,10 @@ from config import Settings
 from enums_db import CJBatchStatusEnum
 from models_api import ComparisonResult
 from models_db import Base, CJBatchUpload, ComparisonPair, ProcessedEssay
-from protocols import CJDatabaseProtocol
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from services.cj_assessment_service.protocols import CJDatabaseProtocol
 
 
 class CJDatabaseImpl(CJDatabaseProtocol):

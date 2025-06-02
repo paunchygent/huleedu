@@ -57,29 +57,29 @@ class Settings(BaseSettings):
             default_model="gpt-4o-mini",
             temperature=0.1,
             max_tokens=1000,
-            api_key_env_var="OPENAI_API_KEY"
+            api_key_env_var="OPENAI_API_KEY",
         ),
         "anthropic": LLMProviderSettings(
             api_base="https://api.anthropic.com/v1",
             default_model="claude-3-haiku-20240307",
             temperature=0.1,
             max_tokens=1000,
-            api_key_env_var="ANTHROPIC_API_KEY"
+            api_key_env_var="ANTHROPIC_API_KEY",
         ),
         "google": LLMProviderSettings(
             api_base="https://generativelanguage.googleapis.com/v1",
             default_model="gemini-1.5-flash",
             temperature=0.1,
             max_tokens=1000,
-            api_key_env_var="GOOGLE_API_KEY"
+            api_key_env_var="GOOGLE_API_KEY",
         ),
         "openrouter": LLMProviderSettings(
             api_base="https://openrouter.ai/api/v1",
             default_model="anthropic/claude-3-haiku",
             temperature=0.1,
             max_tokens=1000,
-            api_key_env_var="OPENROUTER_API_KEY"
-        )
+            api_key_env_var="OPENROUTER_API_KEY",
+        ),
     }
 
     # Global LLM configuration defaults (used as fallbacks)

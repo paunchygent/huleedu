@@ -37,23 +37,18 @@ class TestLLMInteractionImplOverrides:
         """Create mock LLM provider."""
         provider = AsyncMock(spec=LLMProviderProtocol)
 
-        # Mock successful response
+        # Mock successful response - correct format for LLMAssessmentResponseSchema
         mock_response = {
-            "winner": "A",
-            "reason": "Essay A demonstrates better structure and clarity.",
-            "confidence": 0.8
+            "winner": "Essay A",
+            "justification": "Essay A demonstrates better structure and clarity.",
+            "confidence": 4,  # 1-5 scale
         }
-        provider.generate_comparison = AsyncMock(
-            return_value=(mock_response, None)
-        )
+        provider.generate_comparison = AsyncMock(return_value=(mock_response, None))
         return provider
 
     @pytest.fixture
     def llm_interaction_impl(
-        self,
-        mock_cache_manager: AsyncMock,
-        mock_provider: AsyncMock,
-        mock_settings: MagicMock
+        self, mock_cache_manager: AsyncMock, mock_provider: AsyncMock, mock_settings: MagicMock
     ) -> LLMInteractionImpl:
         """Create LLMInteractionImpl instance for testing."""
         providers = {"openai": mock_provider}
@@ -65,26 +60,20 @@ class TestLLMInteractionImplOverrides:
 
     @pytest.fixture
     def sample_comparison_task(
-        self,
-        sample_essay_id: str,
-        sample_essay_text: str
+        self, sample_essay_id: str, sample_essay_text: str
     ) -> ComparisonTask:
         """Create sample comparison task."""
         essay_a = EssayForComparison(
-            id=sample_essay_id,
-            text_content=sample_essay_text,
-            current_bt_score=0.0
+            id=sample_essay_id, text_content=sample_essay_text, current_bt_score=0.0
         )
         essay_b = EssayForComparison(
-            id="essay_b_id",
-            text_content="Another essay text for comparison.",
-            current_bt_score=0.0
+            id="essay_b_id", text_content="Another essay text for comparison.", current_bt_score=0.0
         )
 
         return ComparisonTask(
             essay_a=essay_a,
             essay_b=essay_b,
-            prompt="Compare these two essays and determine which is better."
+            prompt="Compare these two essays and determine which is better.",
         )
 
     @pytest.mark.asyncio
@@ -109,7 +98,7 @@ class TestLLMInteractionImplOverrides:
         result = results[0]
         assert isinstance(result, ComparisonResult)
         assert result.llm_assessment is not None
-        assert result.llm_assessment.winner == "A"
+        assert result.llm_assessment.winner == "Essay A"
         assert result.from_cache is False
 
         # Verify provider was called with override parameters
@@ -123,8 +112,7 @@ class TestLLMInteractionImplOverrides:
 
         # Verify cache key generation includes override parameters
         expected_cache_key_input = (
-            f"{sample_comparison_task.prompt}|"
-            f"model:gpt-4o|temp:0.3|tokens:2000"
+            f"{sample_comparison_task.prompt}|model:gpt-4o|temp:0.3|tokens:2000"
         )
         mock_cache_manager.generate_hash.assert_called_with(expected_cache_key_input)
 
@@ -158,8 +146,7 @@ class TestLLMInteractionImplOverrides:
 
         # Verify cache key generation includes only provided overrides
         expected_cache_key_input = (
-            f"{sample_comparison_task.prompt}|"
-            f"model:claude-3-sonnet-20240229|temp:None|tokens:None"
+            f"{sample_comparison_task.prompt}|model:claude-3-sonnet-20240229|temp:None|tokens:None"
         )
         mock_cache_manager.generate_hash.assert_called_with(expected_cache_key_input)
 
@@ -191,8 +178,7 @@ class TestLLMInteractionImplOverrides:
 
         # Verify cache key generation includes None values
         expected_cache_key_input = (
-            f"{sample_comparison_task.prompt}|"
-            f"model:None|temp:None|tokens:None"
+            f"{sample_comparison_task.prompt}|model:None|temp:None|tokens:None"
         )
         mock_cache_manager.generate_hash.assert_called_with(expected_cache_key_input)
 
@@ -207,9 +193,9 @@ class TestLLMInteractionImplOverrides:
         """Test cache hit scenario with override parameters."""
         # Arrange - Set up cache hit
         cached_response = {
-            "winner": "B",
-            "reason": "Cached response with overrides",
-            "confidence": 0.9
+            "winner": "Essay B",
+            "justification": "Cached response with overrides",
+            "confidence": 5,
         }
         mock_cache_manager.get_from_cache = MagicMock(return_value=cached_response)
 
@@ -225,15 +211,14 @@ class TestLLMInteractionImplOverrides:
         assert len(results) == 1
         result = results[0]
         assert result.from_cache is True
-        assert result.llm_assessment.winner == "B"
+        assert result.llm_assessment.winner == "Essay B"
 
         # Verify provider was NOT called due to cache hit
         mock_provider.generate_comparison.assert_not_called()
 
         # Verify cache was checked with correct key including overrides
         expected_cache_key_input = (
-            f"{sample_comparison_task.prompt}|"
-            f"model:gpt-4o|temp:0.5|tokens:1500"
+            f"{sample_comparison_task.prompt}|model:gpt-4o|temp:0.5|tokens:1500"
         )
         mock_cache_manager.generate_hash.assert_called_with(expected_cache_key_input)
 
@@ -248,20 +233,14 @@ class TestLLMInteractionImplOverrides:
         """Test perform_comparisons with multiple tasks and overrides."""
         # Arrange - Create second task
         essay_c = EssayForComparison(
-            id="essay_c_id",
-            text_content="Third essay for comparison.",
-            current_bt_score=0.0
+            id="essay_c_id", text_content="Third essay for comparison.", current_bt_score=0.0
         )
         essay_d = EssayForComparison(
-            id="essay_d_id",
-            text_content="Fourth essay for comparison.",
-            current_bt_score=0.0
+            id="essay_d_id", text_content="Fourth essay for comparison.", current_bt_score=0.0
         )
 
         second_task = ComparisonTask(
-            essay_a=essay_c,
-            essay_b=essay_d,
-            prompt="Compare these other two essays."
+            essay_a=essay_c, essay_b=essay_d, prompt="Compare these other two essays."
         )
 
         tasks = [sample_comparison_task, second_task]
@@ -283,9 +262,9 @@ class TestLLMInteractionImplOverrides:
         # Check both calls had the same override parameters
         for call in mock_provider.generate_comparison.call_args_list:
             args, kwargs = call
-            assert kwargs['model_override'] == "claude-3-haiku-20240307"
-            assert kwargs['temperature_override'] == 0.7
-            assert kwargs['max_tokens_override'] == 3000
+            assert kwargs["model_override"] == "claude-3-haiku-20240307"
+            assert kwargs["temperature_override"] == 0.7
+            assert kwargs["max_tokens_override"] == 3000
 
         # Verify cache key generation was called for both tasks
         assert mock_cache_manager.generate_hash.call_count == 2

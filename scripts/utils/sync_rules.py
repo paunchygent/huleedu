@@ -138,7 +138,8 @@ def sync_directory(mdc_dir: str, md_dir: str, dry_run: bool) -> None:
     # Step 1: Sync existing .mdc files to .md files (create or update)
     if not os.path.exists(mdc_dir) or not os.path.isdir(mdc_dir):
         print(
-            f"⚠️ Source directory '{mdc_dir}' not found or not a directory. Will proceed to prune target directory if applicable."
+            f"⚠️ Source directory '{mdc_dir}' not found or not a directory. "
+            f"Will proceed to prune target directory if applicable."
         )
     else:
         print(f"\nProcessing files from '{mdc_dir}':")
@@ -188,7 +189,8 @@ if __name__ == "__main__":
             "- Preserves YAML frontmatter in existing target .md files.\n"
             "- Creates new .md files if corresponding .mdc files exist and target .md does not.\n"
             "  (New .md files will initially have no frontmatter; content is copied from .mdc).\n"
-            "- Deletes (prunes) .md files from target if corresponding .mdc files are removed from source.\n"
+            "- Deletes (prunes) .md files from target if corresponding .mdc files are "
+            "removed from source.\n"
             "- Creates the target directory if it doesn't exist."
         ),
         formatter_class=argparse.RawTextHelpFormatter,

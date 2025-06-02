@@ -7,10 +7,11 @@ using string-based essay IDs and protocol-based database access.
 from __future__ import annotations
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from models_api import ComparisonTask, EssayForComparison
-from models_db import ComparisonPair as CJ_ComparisonPair
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from services.cj_assessment_service.models_api import ComparisonTask, EssayForComparison
+from services.cj_assessment_service.models_db import ComparisonPair as CJ_ComparisonPair
 
 logger = create_service_logger("cj_assessment_service.pair_generation")
 
@@ -100,12 +101,12 @@ async def _fetch_existing_comparison_ids(
     """
     logger.debug(
         f"Fetching existing comparison pairs for CJ Batch ID: {cj_batch_id}",
-        extra={"cj_batch_id": str(cj_batch_id)}
+        extra={"cj_batch_id": str(cj_batch_id)},
     )
 
-    stmt = select(
-        CJ_ComparisonPair.essay_a_els_id, CJ_ComparisonPair.essay_b_els_id
-    ).where(CJ_ComparisonPair.cj_batch_id == cj_batch_id)
+    stmt = select(CJ_ComparisonPair.essay_a_els_id, CJ_ComparisonPair.essay_b_els_id).where(
+        CJ_ComparisonPair.cj_batch_id == cj_batch_id
+    )
 
     result = await db_session.execute(stmt)
     existing_pairs_db = result.all()  # Fetches list of (str, str) tuples

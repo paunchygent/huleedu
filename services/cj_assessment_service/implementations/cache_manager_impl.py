@@ -8,7 +8,8 @@ from typing import Any
 from config import Settings
 from diskcache import Cache
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import CacheProtocol
+
+from services.cj_assessment_service.protocols import CacheProtocol
 
 logger = create_service_logger("cj_assessment_service.cache_manager_impl")
 

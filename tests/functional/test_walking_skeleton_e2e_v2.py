@@ -291,10 +291,12 @@ async def test_walking_skeleton_e2e_architecture_fix():
                 TOPICS["content_provisioned"], test_data["batch_id"]
             )
             assert len(content_provisioned_events) == 2, (
-                f"Expected 2 EssayContentProvisionedV1 events, got {len(content_provisioned_events)}"
+                f"Expected 2 EssayContentProvisionedV1 events, "
+                f"got {len(content_provisioned_events)}"
             )
             logger.info(
-                "✓ EssayContentProvisionedV1 events emitted (File Service no longer generates essay IDs)"
+                "✓ EssayContentProvisionedV1 events emitted "
+                "(File Service no longer generates essay IDs)"
             )
 
             # Validate no excess content events (2 files for 2 slots)
@@ -333,7 +335,8 @@ async def test_walking_skeleton_e2e_architecture_fix():
             for essay_ref in ready_essays:
                 assert "essay_id" in essay_ref, "Essay reference missing essay_id"
                 assert "text_storage_id" in essay_ref, "Essay reference missing text_storage_id"
-                # Architecture Fix: BOS generates internal essay ID slots (UUIDs), not user-provided IDs
+                # Architecture Fix: BOS generates internal essay ID slots (UUIDs),
+                # not user-provided IDs
                 assert len(essay_ref["essay_id"]) == 36, (
                     f"Essay ID should be UUID format: {essay_ref['essay_id']}"
                 )
@@ -397,7 +400,8 @@ async def test_walking_skeleton_e2e_architecture_fix():
                 # Check for language parameter in spellcheck request
                 if "language" in request_data:
                     logger.info(
-                        f"✓ Spellcheck request includes language parameter: {request_data['language']}"
+                        f"✓ Spellcheck request includes language parameter: "
+                        f"{request_data['language']}"
                     )
                 else:
                     logger.warning("Spellcheck request missing language parameter")
@@ -420,7 +424,8 @@ async def test_walking_skeleton_e2e_architecture_fix():
                     logger.info(f"✓ Correlation ID tracked across {len(correlated_events)} events")
                 else:
                     logger.warning(
-                        "Correlation ID not found in events (may use different correlation strategy)"
+                        "Correlation ID not found in events "
+                        "(may use different correlation strategy)"
                     )
 
             # STEP 7: Architecture Fix Validation Summary

@@ -10,8 +10,9 @@ import aiohttp
 from config import Settings
 from huleedu_service_libs.logging_utils import create_service_logger
 from models_api import LLMAssessmentResponseSchema
-from protocols import LLMProviderProtocol, RetryManagerProtocol
 from pydantic import ValidationError
+
+from services.cj_assessment_service.protocols import LLMProviderProtocol, RetryManagerProtocol
 
 logger = create_service_logger("cj_assessment_service.openrouter_provider_impl")
 
@@ -54,7 +55,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
 
         # Fallback to legacy settings for backward compatibility
         if not api_key:
-            api_key = getattr(self.settings, 'OPENROUTER_API_KEY', None)
+            api_key = getattr(self.settings, "OPENROUTER_API_KEY", None)
 
         return api_key
 

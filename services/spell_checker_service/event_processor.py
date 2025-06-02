@@ -12,12 +12,6 @@ from typing import Any, Optional
 import aiohttp
 from aiokafka import AIOKafkaProducer, ConsumerRecord
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
-from protocol_implementations.spell_logic_impl import DefaultSpellLogic
-from protocols import (
-    ContentClientProtocol,
-    ResultStoreProtocol,
-    SpellcheckEventPublisherProtocol,
-)
 from pydantic import ValidationError
 
 from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage
@@ -27,6 +21,14 @@ from common_core.events.spellcheck_models import (
     SpellcheckResultDataV1,
 )
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
+    DefaultSpellLogic,
+)
+from services.spell_checker_service.protocols import (
+    ContentClientProtocol,
+    ResultStoreProtocol,
+    SpellcheckEventPublisherProtocol,
+)
 
 logger = create_service_logger("spell_checker_service.event_processor")
 

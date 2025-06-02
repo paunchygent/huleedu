@@ -29,10 +29,18 @@ class LLMConfigOverrides(BaseModel):
     overriding service defaults for specific assessment batches.
     """
 
-    model_override: Optional[str] = Field(default=None, description="LLM model to use (e.g., 'gpt-4o-mini')")
-    temperature_override: Optional[float] = Field(default=None, ge=0.0, le=2.0, description="Temperature for LLM generation")
-    max_tokens_override: Optional[int] = Field(default=None, gt=0, description="Maximum tokens for LLM response")
-    provider_override: Optional[str] = Field(default=None, description="LLM provider to use (e.g., 'openai', 'anthropic')")
+    model_override: Optional[str] = Field(
+        default=None, description="LLM model to use (e.g., 'gpt-4o-mini')"
+    )
+    temperature_override: Optional[float] = Field(
+        default=None, ge=0.0, le=2.0, description="Temperature for LLM generation"
+    )
+    max_tokens_override: Optional[int] = Field(
+        default=None, gt=0, description="Maximum tokens for LLM response"
+    )
+    provider_override: Optional[str] = Field(
+        default=None, description="LLM provider to use (e.g., 'openai', 'anthropic')"
+    )
 
 
 class ELS_CJAssessmentRequestV1(BaseEventData):
@@ -45,8 +53,7 @@ class ELS_CJAssessmentRequestV1(BaseEventData):
     course_code: str
     essay_instructions: str
     llm_config_overrides: Optional[LLMConfigOverrides] = Field(
-        default=None,
-        description="Optional LLM configuration overrides for this assessment batch"
+        default=None, description="Optional LLM configuration overrides for this assessment batch"
     )
     # class_designation: str  # Deferred (YAGNI)
 

@@ -1,19 +1,24 @@
-"""Database models for the CJ Assessment Service.
-
-This module defines SQLAlchemy ORM models for CJ Assessment data persistence.
-Adapted from the original prototype to focus on CJ assessment workflow with
-string-based ELS essay IDs and BOS batch integration.
-"""
+"""Database models for CJ Assessment Service."""
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from enums_db import CJBatchStatusEnum
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, String, Text, text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 
 
 class Base(AsyncAttrs, DeclarativeBase):

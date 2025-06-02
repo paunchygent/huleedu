@@ -62,14 +62,23 @@ class BatchProcessingServiceImpl:
         # 1. Persist Full Batch Context
         await self.batch_repo.store_batch_context(batch_id, registration_data)
 
-        # Also store initial pipeline state
+        # 2. Determine requested pipelines based on registration data (Sub-task 2.1.1)
+        requested_pipelines = ["spellcheck"]  # Default pipeline
+        if registration_data.enable_cj_assessment:
+            requested_pipelines.append("cj_assessment")
+            self.logger.info(
+                f"CJ assessment enabled for batch {batch_id}",
+                extra={"correlation_id": str(correlation_id)},
+            )
+
+        # Also store initial pipeline state with CJ assessment if enabled
         initial_pipeline_state = ProcessingPipelineState(
             batch_id=batch_id,
-            requested_pipelines=[],  # Spellcheck will be added when BatchEssaysReady is received
+            requested_pipelines=requested_pipelines,
         )
         await self.batch_repo.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
-        # 2. Construct lightweight BatchEssaysRegistered event with internal essay IDs
+        # 3. Construct lightweight BatchEssaysRegistered event with internal essay IDs
         batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
         event_metadata = SystemProcessingMetadata(
             entity=batch_entity_ref,
@@ -83,7 +92,7 @@ class BatchProcessingServiceImpl:
             metadata=event_metadata,
         )
 
-        # 3. Create EventEnvelope
+        # 4. Create EventEnvelope
         envelope = EventEnvelope[BatchEssaysRegistered](
             event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),
             source_service=self.settings.SERVICE_NAME,
@@ -91,12 +100,13 @@ class BatchProcessingServiceImpl:
             data=batch_registered_event_data,
         )
 
-        # 4. Publish event
+        # 5. Publish event
         await self.event_publisher.publish_batch_event(envelope)
 
         self.logger.info(
             f"Published BatchEssaysRegistered event for batch {batch_id} with "
-            f"{len(internal_essay_ids)} internal essay slots, event_id {envelope.event_id}",
+            f"{len(internal_essay_ids)} internal essay slots, pipelines: {requested_pipelines}, "
+            f"event_id {envelope.event_id}",
             extra={"correlation_id": str(correlation_id)},
         )
 

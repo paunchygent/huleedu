@@ -62,9 +62,14 @@ alwaysApply: true
 
 - **MUST** use absolute imports for all intra-service modules
 - **Reason**: Container script context breaks relative import resolution between containers
+- **For services in containers**: Use fully-qualified module paths (e.g., `services.cj_assessment_service.module`)
 
 ```python
-# ✅ CORRECT
+# ✅ CORRECT - For containerized services
+from services.cj_assessment_service.api.health_routes import health_bp
+from services.cj_assessment_service.config import settings
+
+# ✅ CORRECT - For non-containerized contexts
 from api.health_routes import health_bp
 from config import settings
 

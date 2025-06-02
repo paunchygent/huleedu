@@ -12,7 +12,11 @@ from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
 from kafka_consumer import BatchKafkaConsumer
 from prometheus_client import CollectorRegistry, Counter, Histogram
-from protocols import BatchEventPublisherProtocol, BatchRepositoryProtocol
+from protocols import (
+    BatchEventPublisherProtocol,
+    BatchRepositoryProtocol,
+    PipelinePhaseCoordinatorProtocol,
+)
 from quart import Quart
 from quart_dishka import QuartDishka
 
@@ -47,6 +51,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
             # Get dependencies for Kafka consumer
             event_publisher = await request_container.get(BatchEventPublisherProtocol)
             batch_repo = await request_container.get(BatchRepositoryProtocol)
+            phase_coordinator = await request_container.get(PipelinePhaseCoordinatorProtocol)
 
             # Initialize Kafka consumer
             kafka_consumer_instance = BatchKafkaConsumer(
@@ -54,6 +59,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
                 consumer_group=f"{settings.SERVICE_NAME}-consumer",
                 event_publisher=event_publisher,
                 batch_repo=batch_repo,
+                phase_coordinator=phase_coordinator,
             )
 
             # Start Kafka consumer as background task

@@ -4,13 +4,20 @@ from __future__ import annotations
 
 from aiohttp import ClientSession
 from aiokafka import AIOKafkaProducer
-from config import Settings, settings
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry
-from protocol_implementations.content_client_impl import DefaultContentClient
-from protocol_implementations.event_publisher_impl import DefaultSpellcheckEventPublisher
-from protocol_implementations.result_store_impl import DefaultResultStore
-from protocols import (
+
+from services.spell_checker_service.config import Settings, settings
+from services.spell_checker_service.protocol_implementations.content_client_impl import (
+    DefaultContentClient,
+)
+from services.spell_checker_service.protocol_implementations.event_publisher_impl import (
+    DefaultSpellcheckEventPublisher,
+)
+from services.spell_checker_service.protocol_implementations.result_store_impl import (
+    DefaultResultStore,
+)
+from services.spell_checker_service.protocols import (
     ContentClientProtocol,
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,

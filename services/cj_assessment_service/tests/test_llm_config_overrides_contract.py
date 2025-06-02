@@ -29,7 +29,7 @@ class TestLLMConfigOverridesContract:
             model_override="gpt-4o",
             temperature_override=0.3,
             max_tokens_override=2000,
-            provider_override="openai"
+            provider_override="openai",
         )
 
         # Assert
@@ -41,9 +41,7 @@ class TestLLMConfigOverridesContract:
     def test_llm_config_overrides_minimal_model(self) -> None:
         """Test LLMConfigOverrides with only model override."""
         # Arrange & Act
-        overrides = LLMConfigOverrides(
-            model_override="claude-3-sonnet-20240229"
-        )
+        overrides = LLMConfigOverrides(model_override="claude-3-sonnet-20240229")
 
         # Assert
         assert overrides.model_override == "claude-3-sonnet-20240229"
@@ -97,7 +95,7 @@ class TestLLMConfigOverridesContract:
             model_override="gpt-4o",
             temperature_override=0.8,
             max_tokens_override=3000,
-            provider_override="openai"
+            provider_override="openai",
         )
 
         # Act - Serialize and deserialize
@@ -124,9 +122,10 @@ class TestELSCJAssessmentRequestV1WithOverrides:
         """Test request event with LLM config overrides."""
         # Assert
         assert cj_assessment_request_data_with_overrides.llm_config_overrides is not None
-        assert cj_assessment_request_data_with_overrides.llm_config_overrides.model_override == "gpt-4o"
-        assert cj_assessment_request_data_with_overrides.llm_config_overrides.temperature_override == 0.3
-        assert cj_assessment_request_data_with_overrides.llm_config_overrides.max_tokens_override == 2000
+        llm_overrides = cj_assessment_request_data_with_overrides.llm_config_overrides
+        assert llm_overrides.model_override == "gpt-4o"
+        assert llm_overrides.temperature_override == 0.3
+        assert llm_overrides.max_tokens_override == 2000
 
     def test_request_without_llm_overrides(
         self,
@@ -177,9 +176,9 @@ class TestEventEnvelopeWithOverrides:
     ) -> None:
         """Test EventEnvelope serialization with LLM overrides."""
         # Act - Simulate Kafka serialization
-        serialized = json.dumps(
-            cj_request_envelope_with_overrides.model_dump(mode="json")
-        ).encode("utf-8")
+        serialized = json.dumps(cj_request_envelope_with_overrides.model_dump(mode="json")).encode(
+            "utf-8"
+        )
         parsed = json.loads(serialized.decode("utf-8"))
         reconstructed = EventEnvelope[ELS_CJAssessmentRequestV1].model_validate(parsed)
 
@@ -200,9 +199,9 @@ class TestEventEnvelopeWithOverrides:
     ) -> None:
         """Test EventEnvelope serialization without LLM overrides."""
         # Act - Simulate Kafka serialization
-        serialized = json.dumps(
-            cj_request_envelope_no_overrides.model_dump(mode="json")
-        ).encode("utf-8")
+        serialized = json.dumps(cj_request_envelope_no_overrides.model_dump(mode="json")).encode(
+            "utf-8"
+        )
         parsed = json.loads(serialized.decode("utf-8"))
         reconstructed = EventEnvelope[ELS_CJAssessmentRequestV1].model_validate(parsed)
 

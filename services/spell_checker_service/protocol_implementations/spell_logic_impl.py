@@ -6,8 +6,6 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import aiohttp
-from core_logic import default_perform_spell_check_algorithm
-from protocols import ResultStoreProtocol, SpellLogicProtocol
 
 from common_core.enums import ContentType, EssayStatus, ProcessingEvent, ProcessingStage
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
@@ -16,6 +14,8 @@ from common_core.metadata_models import (
     StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
+from services.spell_checker_service.core_logic import default_perform_spell_check_algorithm
+from services.spell_checker_service.protocols import ResultStoreProtocol, SpellLogicProtocol
 
 
 class DefaultSpellLogic(SpellLogicProtocol):

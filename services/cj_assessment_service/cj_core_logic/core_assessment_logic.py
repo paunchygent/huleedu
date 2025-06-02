@@ -7,13 +7,16 @@ from processing incoming requests to publishing final results.
 from __future__ import annotations
 
 from typing import Any, Dict, List
-from uuid import UUID
 
-from config import Settings
-from enums_db import CJBatchStatusEnum
 from huleedu_service_libs.logging_utils import create_service_logger
-from models_api import ComparisonResult, ComparisonTask, EssayForComparison
 
+from services.cj_assessment_service.config import Settings
+from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+from services.cj_assessment_service.models_api import (
+    ComparisonResult,
+    ComparisonTask,
+    EssayForComparison,
+)
 from services.cj_assessment_service.protocols import (
     CJDatabaseProtocol,
     CJEventPublisherProtocol,
@@ -67,7 +70,7 @@ async def run_cj_assessment_workflow(
             logger.info(
                 f"Using LLM overrides - model: {model_override}, "
                 f"temperature: {temperature_override}, max_tokens: {max_tokens_override}",
-                extra={"correlation_id": correlation_id}
+                extra={"correlation_id": correlation_id},
             )
 
         # Phase 1: Create CJ batch and setup
@@ -256,27 +259,11 @@ async def run_cj_assessment_workflow(
             # Get final rankings
             rankings = await scoring_ranking.get_essay_rankings(session, cj_batch_id)
 
-            # Prepare completion event data
-            completion_data = {
-                "bos_batch_id": bos_batch_id,
-                "cj_batch_id": cj_batch_id,
-                "essay_rankings": rankings,
-                "status": "completed_successfully",
-                "processing_metadata": {
-                    "total_essays": len(essays_to_process),
-                    "successful_essays": len(rankings),
-                    "total_comparisons": total_comparisons_performed,
-                    "iterations": current_iteration,
-                    "converged": scores_are_stable,
-                },
-            }
+            # Event publishing is handled by the event processor layer
+            # Core workflow focuses only on business logic
 
-            # Publish completion event
-            correlation_uuid = UUID(correlation_id) if correlation_id else None
-            await event_publisher.publish_assessment_completed(
-                completion_data=completion_data,
-                correlation_id=correlation_uuid,
-            )
+            # Event publishing is handled by the event processor layer
+            # Core workflow should focus only on business logic
 
             logger.info(
                 f"CJ assessment completed for batch {cj_batch_id}. "
@@ -302,21 +289,8 @@ async def run_cj_assessment_workflow(
             except Exception as update_error:
                 logger.error(f"Failed to update batch status to error: {update_error}")
 
-        # Publish failure event
-        try:
-            failure_data = {
-                "bos_batch_id": request_data.get("bos_batch_id"),
-                "cj_batch_id": cj_batch_id,
-                "error_message": str(e),
-                "status": "failed",
-            }
-            correlation_uuid = UUID(correlation_id) if correlation_id else None
-            await event_publisher.publish_assessment_failed(
-                failure_data=failure_data,
-                correlation_id=correlation_uuid,
-            )
-        except Exception as publish_error:
-            logger.error(f"Failed to publish failure event: {publish_error}")
+        # Event publishing is handled by the event processor layer
+        # Core workflow should focus only on business logic and re-raise for proper error handling
 
         # Re-raise the original exception
         raise

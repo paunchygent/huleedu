@@ -17,6 +17,10 @@ dependencies = [
     "pydantic-settings",
     "prometheus-client",
     "dishka",
+    # Web framework dependencies
+    "quart",
+    "quart-dishka",
+    "hypercorn",
     # Database dependencies
     "SQLAlchemy[asyncio]",
     "aiosqlite",
@@ -50,6 +54,8 @@ huleedu-service-libs = "file:///app/services/libs"
 
 [tool.pdm.scripts]
 start_worker = "python worker_main.py"
+start_service = "python run_service.py"
+start_health_api = "python app.py"
 
 [tool.mypy]
 python_version = "3.11"

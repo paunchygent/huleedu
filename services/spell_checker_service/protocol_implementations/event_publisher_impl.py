@@ -7,10 +7,10 @@ from typing import Optional
 from uuid import UUID
 
 from aiokafka import AIOKafkaProducer
-from protocols import SpellcheckEventPublisherProtocol
 
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
+from services.spell_checker_service.protocols import SpellcheckEventPublisherProtocol
 
 
 class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):

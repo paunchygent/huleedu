@@ -8,10 +8,19 @@ from __future__ import annotations
 
 import asyncio
 
-from config import Settings
 from huleedu_service_libs.logging_utils import create_service_logger
-from models_api import ComparisonResult, ComparisonTask, LLMAssessmentResponseSchema
-from protocols import CacheProtocol, LLMInteractionProtocol, LLMProviderProtocol
+
+from services.cj_assessment_service.config import Settings
+from services.cj_assessment_service.models_api import (
+    ComparisonResult,
+    ComparisonTask,
+    LLMAssessmentResponseSchema,
+)
+from services.cj_assessment_service.protocols import (
+    CacheProtocol,
+    LLMInteractionProtocol,
+    LLMProviderProtocol,
+)
 
 logger = create_service_logger("cj_assessment_service.llm_interaction_impl")
 

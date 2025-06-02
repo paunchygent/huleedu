@@ -10,7 +10,8 @@ import asyncio
 
 import aiohttp
 from config import Settings
-from protocols import ContentClientProtocol
+
+from services.cj_assessment_service.protocols import ContentClientProtocol
 
 
 class ContentClientImpl(ContentClientProtocol):

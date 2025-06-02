@@ -2,6 +2,7 @@
 Kafka consumer logic for Batch Orchestrator Service.
 
 Handles BatchEssaysReady events from ELS and initiates pipeline processing.
+Enhanced to support CJ assessment pipeline and phase transitions.
 
 TODO: Evaluate moving this Kafka consumer to a separate worker process
 if event volume or processing complexity increases, or for better resource isolation.
@@ -15,9 +16,15 @@ from typing import Any
 
 from aiokafka import AIOKafkaConsumer
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import BatchEventPublisherProtocol, BatchRepositoryProtocol
+from protocols import (
+    BatchEventPublisherProtocol,
+    BatchRepositoryProtocol,
+    PipelinePhaseCoordinatorProtocol,
+)
 
-from common_core.batch_service_models import BatchServiceSpellcheckInitiateCommandDataV1
+from common_core.batch_service_models import (
+    BatchServiceSpellcheckInitiateCommandDataV1,
+)
 from common_core.enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchEssaysReady
 from common_core.events.envelope import EventEnvelope
@@ -56,7 +63,7 @@ def _infer_language_from_course_code(course_code: str) -> str:
 
 
 class BatchKafkaConsumer:
-    """Kafka consumer for handling BatchEssaysReady events."""
+    """Kafka consumer for handling BatchEssaysReady events and phase transitions."""
 
     def __init__(
         self,
@@ -64,18 +71,23 @@ class BatchKafkaConsumer:
         consumer_group: str,
         event_publisher: BatchEventPublisherProtocol,
         batch_repo: BatchRepositoryProtocol,
+        phase_coordinator: PipelinePhaseCoordinatorProtocol,
     ) -> None:
         self.kafka_bootstrap_servers = kafka_bootstrap_servers
         self.consumer_group = consumer_group
         self.event_publisher = event_publisher
         self.batch_repo = batch_repo
+        self.phase_coordinator = phase_coordinator
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
 
     async def start_consumer(self) -> None:
         """Start the Kafka consumer and begin processing messages."""
-        # Subscribe to BatchEssaysReady topic
-        topics = [topic_name(ProcessingEvent.BATCH_ESSAYS_READY)]
+        # Subscribe to BatchEssaysReady topic and batch phase concluded topic (Sub-task 2.1.3)
+        topics = [
+            topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
+            "huleedu.els.batch_phase.concluded.v1",  # For phase transition handling
+        ]
 
         # TODO: Add subscription to ExcessContentProvisionedV1 topic for handling
         # excess content that couldn't be assigned to essay slots. Handler should
@@ -153,8 +165,22 @@ class BatchKafkaConsumer:
             raise
 
     async def _handle_message(self, msg: Any) -> None:
+        """Handle a single Kafka message based on topic type."""
+        try:
+            if msg.topic == topic_name(ProcessingEvent.BATCH_ESSAYS_READY):
+                await self._handle_batch_essays_ready(msg)
+            elif msg.topic == "huleedu.els.batch_phase.concluded.v1":
+                await self._handle_batch_phase_concluded(msg)
+            else:
+                logger.warning(f"Received message from unknown topic: {msg.topic}")
+
+        except Exception as e:
+            logger.error(f"Error handling message from topic {msg.topic}: {e}", exc_info=True)
+            raise
+
+    async def _handle_batch_essays_ready(self, msg: Any) -> None:
         """
-        Handle a single Kafka message containing BatchEssaysReady event.
+        Handle a BatchEssaysReady event to initiate the first pipeline phase (spellcheck).
 
         ARCHITECTURE IMPLEMENTATION:
         ===========================
@@ -281,4 +307,43 @@ class BatchKafkaConsumer:
 
         except Exception as e:
             logger.error(f"Error handling BatchEssaysReady message: {e}", exc_info=True)
+            raise
+
+    async def _handle_batch_phase_concluded(self, msg: Any) -> None:
+        """
+        Handle batch phase concluded events from ELS to trigger next pipeline phase.
+
+        This handles sub-task 2.1.3: Consumption of ELS Notifications & Batch State Update.
+        Delegates to the pipeline phase coordinator for proper phase transition logic.
+        """
+        try:
+            # Deserialize the batch phase concluded event
+            message_data = json.loads(msg.value.decode("utf-8"))
+
+            # Extract relevant data from the event
+            event_data = message_data.get("data", {})
+            batch_id = event_data.get("entity_ref", {}).get("entity_id")
+            completed_phase = event_data.get("phase")
+            phase_status = event_data.get("status")
+            correlation_id = message_data.get("correlation_id", "")
+
+            if not batch_id or not completed_phase:
+                logger.warning(
+                    "Received batch phase concluded event with missing batch_id or phase"
+                )
+                return
+
+            logger.info(
+                f"Received batch phase concluded: batch={batch_id}, "
+                f"phase={completed_phase}, status={phase_status}",
+                extra={"correlation_id": str(correlation_id)},
+            )
+
+            # Delegate to phase coordinator for proper handling
+            await self.phase_coordinator.handle_phase_concluded(
+                batch_id, completed_phase, phase_status, correlation_id
+            )
+
+        except Exception as e:
+            logger.error(f"Error handling batch phase concluded event: {e}", exc_info=True)
             raise

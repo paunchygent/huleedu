@@ -1,4 +1,4 @@
-"""Main entry point for CJ Assessment Service worker."""
+"""Kafka consumer worker main for CJ Assessment Service."""
 
 from __future__ import annotations
 
@@ -8,12 +8,13 @@ import sys
 from typing import Any
 
 from aiokafka import AIOKafkaConsumer
-from config import settings
-from di import CJAssessmentServiceProvider
 from dishka import make_async_container
-from event_processor import process_single_message
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
-from protocols import (
+
+from services.cj_assessment_service.config import settings
+from services.cj_assessment_service.di import CJAssessmentServiceProvider
+from services.cj_assessment_service.event_processor import process_single_message
+from services.cj_assessment_service.protocols import (
     CJDatabaseProtocol,
     CJEventPublisherProtocol,
     ContentClientProtocol,

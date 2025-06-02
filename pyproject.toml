@@ -198,12 +198,7 @@ testpaths = [
     "tests"
 ]
 pythonpath = [
-    "services/spell_checker_service",
-    "services/content_service", 
-    "services/batch_orchestrator_service",
-    "services/essay_lifecycle_service",
-    "services/file_service",
-    "services/cj_assessment_service"
+    "."
 ]
 python_files = "test_*.py *_test.py"
 python_classes = "Test*"

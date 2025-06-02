@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import aiohttp
-from core_logic import default_fetch_content_impl
-from protocols import ContentClientProtocol
+
+from services.spell_checker_service.core_logic import default_fetch_content_impl
+from services.spell_checker_service.protocols import ContentClientProtocol
 
 
 class DefaultContentClient(ContentClientProtocol):
