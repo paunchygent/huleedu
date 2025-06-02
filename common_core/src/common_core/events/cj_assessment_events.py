@@ -6,19 +6,33 @@ regarding Comparative Judgment (CJ) assessment processing.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from ..enums import ProcessingEvent
 from ..metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
 from .base_event_models import BaseEventData, ProcessingUpdate
 
 __all__ = [
+    "LLMConfigOverrides",
     "ELS_CJAssessmentRequestV1",
     "CJAssessmentCompletedV1",
     "CJAssessmentFailedV1",
 ]
+
+
+class LLMConfigOverrides(BaseModel):
+    """LLM configuration overrides for CJ assessment requests.
+
+    Allows dynamic configuration of LLM parameters at request time,
+    overriding service defaults for specific assessment batches.
+    """
+
+    model_override: Optional[str] = Field(default=None, description="LLM model to use (e.g., 'gpt-4o-mini')")
+    temperature_override: Optional[float] = Field(default=None, ge=0.0, le=2.0, description="Temperature for LLM generation")
+    max_tokens_override: Optional[int] = Field(default=None, gt=0, description="Maximum tokens for LLM response")
+    provider_override: Optional[str] = Field(default=None, description="LLM provider to use (e.g., 'openai', 'anthropic')")
 
 
 class ELS_CJAssessmentRequestV1(BaseEventData):
@@ -30,6 +44,10 @@ class ELS_CJAssessmentRequestV1(BaseEventData):
     language: str
     course_code: str
     essay_instructions: str
+    llm_config_overrides: Optional[LLMConfigOverrides] = Field(
+        default=None,
+        description="Optional LLM configuration overrides for this assessment batch"
+    )
     # class_designation: str  # Deferred (YAGNI)
 
 

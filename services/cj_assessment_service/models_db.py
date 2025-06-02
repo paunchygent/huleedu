@@ -9,12 +9,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from enums_db import CJBatchStatusEnum
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, String, Text, text
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
-from .enums_db import CJBatchStatusEnum
 
 
 class Base(AsyncAttrs, DeclarativeBase):

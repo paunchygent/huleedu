@@ -5,9 +5,10 @@ Here's a potential full implementation concept, outlining changes in `common_cor
 ## I. Common Core (`common_core`)
 
 Your `common_core` package is already quite well-equipped.
-1.  **`EssayStatus` Enum (`common_core/src/common_core/enums.py`)**: Ensure all necessary states as discussed previously are present (e.g., `AWAITING_AI_FEEDBACK`, `AI_FEEDBACK_IN_PROGRESS`, `AI_FEEDBACK_SUCCESS`, `AI_FEEDBACK_FAILED`, and similarly for NLP, CJ Assessment, and `ALL_PROCESSING_COMPLETED`). This was covered in the previous response.
-2.  **`ProcessingPipelineState` (`common_core/src/common_core/pipeline_models.py`)**: This model is key for BOS. BOS will use `requested_pipelines: List[str]` to store the desired sequence of stages (e.g., `["spellcheck", "ai_feedback", "nlp"]`) and update the corresponding `PipelineStateDetail` fields (e.g., `spellcheck`, `ai_feedback`) as stages are initiated and completed.
-3.  **Command and Event Models**: Ensure all necessary Pydantic models for BOS->ELS commands (e.g., `BatchServiceAIFeedbackInitiateCommandDataV1`) and ELS->SpecializedService requests/results are defined. These largely exist.
+
+1. **`EssayStatus` Enum (`common_core/src/common_core/enums.py`)**: Ensure all necessary states as discussed previously are present (e.g., `AWAITING_AI_FEEDBACK`, `AI_FEEDBACK_IN_PROGRESS`, `AI_FEEDBACK_SUCCESS`, `AI_FEEDBACK_FAILED`, and similarly for NLP, CJ Assessment, and `ALL_PROCESSING_COMPLETED`). This was covered in the previous response.
+2. **`ProcessingPipelineState` (`common_core/src/common_core/pipeline_models.py`)**: This model is key for BOS. BOS will use `requested_pipelines: List[str]` to store the desired sequence of stages (e.g., `["spellcheck", "ai_feedback", "nlp"]`) and update the corresponding `PipelineStateDetail` fields (e.g., `spellcheck`, `ai_feedback`) as stages are initiated and completed.
+3. **Command and Event Models**: Ensure all necessary Pydantic models for BOS->ELS commands (e.g., `BatchServiceAIFeedbackInitiateCommandDataV1`) and ELS->SpecializedService requests/results are defined. These largely exist.
 
 No major new files are anticipated for `common_core` for this specific change, mostly ensuring the enums are complete.
 
@@ -482,9 +483,11 @@ async def _handle_spellcheck_result_event(
         logger.warning(f"Essay {essay_id} could not transition via {trigger_to_fire} from {pydantic_essay_state.current_status.value}.")
         return True # Acknowledge message, but indicates a state logic issue
 ```
+
 **Note**: The `process_single_message` in `batch_command_handlers.py` would need to be refactored to correctly route different event types (BOS commands vs. Specialized Service results) to these new handlers, which then use the `EssayStateMachine`.
 
 ### 5. `services/essay_lifecycle_service/di.py`
+
 No major changes expected here, as `EssayStateMachine` is instantiated on-the-fly. `EssayStateStore` and `EventPublisher` remain crucial DI components.
 
 ---
@@ -494,9 +497,10 @@ No major changes expected here, as `EssayStateMachine` is instantiated on-the-fl
 BOS's role as the pipeline sequence owner becomes more explicit.
 
 ### 1. Pipeline Definition and Storage
+
 * **During Batch Registration (`implementations/batch_processing_service_impl.py`)**:
-    * BOS must determine and store the intended pipeline for the batch (e.g., from user input, a template, or default). This sequence (e.g., `["spellcheck", "ai_feedback", "nlp"]`) should be stored in the `requested_pipelines: List[str]` field of the `ProcessingPipelineState` model.
-    * The `ProcessingPipelineState` (from `common_core.pipeline_models`) should be initialized with all potential stages set to a default "not started" or "pending" status.
+  * BOS must determine and store the intended pipeline for the batch (e.g., from user input, a template, or default). This sequence (e.g., `["spellcheck", "ai_feedback", "nlp"]`) should be stored in the `requested_pipelines: List[str]` field of the `ProcessingPipelineState` model.
+  * The `ProcessingPipelineState` (from `common_core.pipeline_models`) should be initialized with all potential stages set to a default "not started" or "pending" status.
 
     ```python
     # services/batch_orchestrator_service/implementations/batch_processing_service_impl.py
@@ -532,16 +536,17 @@ BOS's role as the pipeline sequence owner becomes more explicit.
     ```
 
 ### 2. Orchestration Logic (`kafka_consumer.py` or a dedicated orchestrator module)
+
 * BOS consumes events from ELS indicating phase completion for essays/batches (e.g., `BatchPhaseConcluded`, or if all essays in a batch have reached `SPELLCHECKED_SUCCESS`).
 * Upon such notification:
-    1.  BOS retrieves the `ProcessingPipelineState` for the batch.
-    2.  It identifies the stage that just completed.
-    3.  It looks at `requested_pipelines` to find the *next* stage.
-    4.  If a next stage exists and hasn't been initiated:
+    1. BOS retrieves the `ProcessingPipelineState` for the batch.
+    2. It identifies the stage that just completed.
+    3. It looks at `requested_pipelines` to find the *next* stage.
+    4. If a next stage exists and hasn't been initiated:
         * BOS constructs the appropriate `BatchService<NextPhase>InitiateCommandDataV1`.
         * Publishes this command to ELS.
         * Updates its `ProcessingPipelineState` to mark the new phase as initiated.
-    5.  If all stages in `requested_pipelines` are complete, BOS marks the overall batch processing as complete.
+    5. If all stages in `requested_pipelines` are complete, BOS marks the overall batch processing as complete.
 
 ```python
 # services/batch_orchestrator_service/kafka_consumer.py (conceptual logic in _handle_message or a new method)
@@ -687,9 +692,11 @@ def _infer_language_from_course_code(course_code: str) -> str:
     return "en"
 
 ```
+
 **Note on `get_mock_batch_ready_data`**: This is a placeholder. In a real system, when ELS informs BOS that, for example, all essays in batch X have `SPELLCHECKED_SUCCESS`, that notification event from ELS to BOS should contain the list of `EssayProcessingInputRefV1` objects (with their latest `text_storage_id` if spellcheck modified content and stored a new version). BOS would then use *that* list for the *next* command.
 
 ### 3. Repository (`implementations/batch_repository_impl.py`)
+
 * `MockBatchRepositoryImpl` would need to correctly store and retrieve the `ProcessingPipelineState` Pydantic model (or its dictionary representation if you prefer to store JSON in a real DB later).
 
 This setup gives you the desired "mix and match" capability orchestrated by BOS, with ELS managing the state of each essay through each commanded phase using a more robust and declarative state machine. The complexity of *defining valid sequences* is shifted to BOS's configuration/logic for a batch, while ELS's state machine defines *valid transitions within and between any recognized processing stage*.

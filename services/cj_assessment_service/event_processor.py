@@ -3,9 +3,18 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
 from aiokafka import ConsumerRecord
+from cj_core_logic import run_cj_assessment_workflow
+from config import Settings
 from huleedu_service_libs.logging_utils import create_service_logger
+from protocols import (
+    CJDatabaseProtocol,
+    CJEventPublisherProtocol,
+    ContentClientProtocol,
+    LLMInteractionProtocol,
+)
 
 from common_core.enums import BatchStatus, ProcessingEvent, ProcessingStage
 from common_core.events.cj_assessment_events import (
@@ -15,15 +24,6 @@ from common_core.events.cj_assessment_events import (
 )
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
-
-from .config import Settings
-from .core_logic.core_assessment_logic import run_cj_assessment_workflow
-from .protocols import (
-    CJDatabaseProtocol,
-    CJEventPublisherProtocol,
-    ContentClientProtocol,
-    LLMInteractionProtocol,
-)
 
 logger = create_service_logger("event_processor")
 
@@ -96,6 +96,7 @@ async def process_single_message(
             "language": request_event_data.language,
             "course_code": request_event_data.course_code,
             "essay_instructions": request_event_data.essay_instructions,
+            "llm_config_overrides": request_event_data.llm_config_overrides,
         }
 
         # Run CJ assessment workflow with LLM interaction
@@ -125,8 +126,6 @@ async def process_single_message(
         )
 
         # The envelope for the outgoing event
-        from uuid import UUID
-
         correlation_uuid = (
             correlation_id if isinstance(correlation_id, UUID) else UUID(str(correlation_id))
         )

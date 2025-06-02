@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, cast
 
 import aiohttp
@@ -13,7 +14,10 @@ from pydantic import ValidationError
 
 
 class AnthropicProviderImpl(LLMProviderProtocol):
-    """Anthropic LLM provider implementation."""
+    """Anthropic LLM provider implementation.
+
+    Uses structured LLM provider configuration.
+    """
 
     def __init__(
         self,
@@ -25,27 +29,53 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         self.session = session
         self.settings = settings
         self.retry_manager = retry_manager
-        self.provider_name = "Anthropic"
-        self.api_key = getattr(settings, "anthropic_api_key", None)
-        provider_config = settings.llm_providers.get("anthropic")
-        self.api_base = provider_config.api_base if provider_config else None
+        self.provider_name = "anthropic"
+
+        # Get provider-specific configuration
+        self.provider_config = self.settings.LLM_PROVIDERS_CONFIG.get(self.provider_name)
+        if not self.provider_config:
+            raise ValueError(f"No configuration found for provider '{self.provider_name}'")
+
+        self.api_key = self._get_api_key()
+        self.api_base = self.provider_config.api_base
         self.model_name = self._get_model_name()
 
-    def _get_model_name(self) -> str:
-        """Get model name from settings."""
-        model_name = self.settings.comparison_model
-        if "/" in model_name:
-            parts = model_name.split("/", 1)
-            if len(parts) == 2 and parts[0].lower() == "anthropic":
-                model_name = parts[1]
-        return str(model_name)
+    def _get_api_key(self) -> str | None:
+        """Get API key from environment using structured configuration."""
+        if not self.provider_config:
+            return None
+
+        # Get API key from environment variable specified in config
+        api_key_env_var = self.provider_config.api_key_env_var
+        api_key = os.getenv(api_key_env_var)
+
+        # Fallback to legacy settings for backward compatibility
+        if not api_key:
+            api_key = getattr(self.settings, 'ANTHROPIC_API_KEY', None)
+
+        return api_key
+
+    def _get_model_name(self, model_override: str | None = None) -> str:
+        """Get model name from structured configuration with optional override."""
+        # Highest priority: runtime override
+        if model_override:
+            return model_override
+
+        if not self.provider_config:
+            return self.settings.DEFAULT_LLM_MODEL
+
+        # Use provider's default model unless overridden
+        return self.provider_config.default_model
 
     async def generate_comparison(
         self,
         user_prompt: str,
         system_prompt_override: str | None = None,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
     ) -> tuple[dict[str, Any] | None, str | None]:
-        """Generate a comparison by calling the Anthropic provider."""
+        """Generate a comparison by calling the Anthropic provider with optional overrides."""
         if not self.api_key:
             return None, f"{self.provider_name} API key not configured."
 
@@ -58,6 +88,9 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             api_request_func=lambda: self._make_provider_api_request(
                 final_system_prompt,
                 user_prompt,
+                model_override=model_override,
+                temperature_override=temperature_override,
+                max_tokens_override=max_tokens_override,
             ),
             provider_name=self.provider_name,
         )
@@ -67,8 +100,11 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         self,
         system_prompt: str,
         user_prompt: str,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
     ) -> tuple[dict[str, Any] | None, str | None]:
-        """Make API request to Anthropic provider."""
+        """Make API request to Anthropic provider with optional overrides."""
         if not self.api_base:
             raise ValueError(f"{self.provider_name} API base URL not configured.")
 
@@ -79,20 +115,29 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             "content-type": "application/json",
         }
 
-        provider_cfg = self.settings.llm_providers.get("anthropic")
-        max_tokens = (
-            provider_cfg.max_tokens
-            if provider_cfg and provider_cfg.max_tokens is not None
-            else self.settings.max_tokens_response
-        )
-        temperature = (
-            provider_cfg.temperature
-            if provider_cfg and provider_cfg.temperature is not None
-            else self.settings.temperature
-        )
+        # Apply fallback chain: runtime_override → provider_default → global_default
+        model_name = self._get_model_name(model_override)
+
+        # Temperature: runtime override → provider config → global setting
+        temperature = temperature_override
+        if temperature is None:
+            temperature = (
+                self.provider_config.temperature
+                if self.provider_config and self.provider_config.temperature is not None
+                else self.settings.TEMPERATURE
+            )
+
+        # Max tokens: runtime override → provider config → global setting
+        max_tokens = max_tokens_override
+        if max_tokens is None:
+            max_tokens = (
+                self.provider_config.max_tokens
+                if self.provider_config and self.provider_config.max_tokens is not None
+                else self.settings.MAX_TOKENS_RESPONSE
+            )
 
         payload = {
-            "model": self.model_name,
+            "model": model_name,
             "system": system_prompt,
             "messages": [{"role": "user", "content": user_prompt}],
             "max_tokens": max_tokens,
@@ -101,7 +146,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
 
         # Execute HTTP request
         timeout_config = aiohttp.ClientTimeout(
-            total=self.settings.llm_request_timeout_seconds,
+            total=self.settings.LLM_REQUEST_TIMEOUT_SECONDS,
         )
 
         try:

@@ -8,13 +8,12 @@ import sys
 from typing import Any
 
 from aiokafka import AIOKafkaConsumer
+from config import settings
+from di import CJAssessmentServiceProvider
 from dishka import make_async_container
+from event_processor import process_single_message
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
-
-from .config import settings
-from .di import CJAssessmentServiceProvider
-from .event_processor import process_single_message
-from .protocols import (
+from protocols import (
     CJDatabaseProtocol,
     CJEventPublisherProtocol,
     ContentClientProtocol,

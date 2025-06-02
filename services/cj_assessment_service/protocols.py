@@ -78,12 +78,18 @@ class LLMProviderProtocol(Protocol):
         self,
         user_prompt: str,
         system_prompt_override: Optional[str] = None,
+        model_override: Optional[str] = None,
+        temperature_override: Optional[float] = None,
+        max_tokens_override: Optional[int] = None,
     ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         """Generate a comparison assessment using the LLM.
 
         Args:
             user_prompt: The user prompt containing essay comparison request
             system_prompt_override: Optional system prompt override
+            model_override: Optional model name override
+            temperature_override: Optional temperature override (0.0-2.0)
+            max_tokens_override: Optional max tokens override
 
         Returns:
             Tuple of (response_data, error_message)
@@ -187,11 +193,20 @@ class CJEventPublisherProtocol(Protocol):
 class LLMInteractionProtocol(Protocol):
     """Protocol for performing LLM-based essay comparisons."""
 
-    async def perform_comparisons(self, tasks: List[Any]) -> List[Any]:
+    async def perform_comparisons(
+        self,
+        tasks: List[Any],
+        model_override: Optional[str] = None,
+        temperature_override: Optional[float] = None,
+        max_tokens_override: Optional[int] = None,
+    ) -> List[Any]:
         """Perform comparative judgment on a list of comparison tasks.
 
         Args:
             tasks: List of ComparisonTask objects
+            model_override: Optional model name override
+            temperature_override: Optional temperature override (0.0-2.0)
+            max_tokens_override: Optional max tokens override
 
         Returns:
             List of ComparisonResult objects

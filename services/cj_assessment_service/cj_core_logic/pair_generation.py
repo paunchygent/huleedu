@@ -8,10 +8,9 @@ from __future__ import annotations
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from models_api import ComparisonTask, EssayForComparison
+from models_db import ComparisonPair as CJ_ComparisonPair
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from ..models_db import ComparisonPair as CJ_ComparisonPair
 
 logger = create_service_logger("cj_assessment_service.pair_generation")
 

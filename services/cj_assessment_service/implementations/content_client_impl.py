@@ -9,9 +9,8 @@ from __future__ import annotations
 import asyncio
 
 import aiohttp
-
-from ..config import Settings
-from ..protocols import ContentClientProtocol
+from config import Settings
+from protocols import ContentClientProtocol
 
 
 class ContentClientImpl(ContentClientProtocol):

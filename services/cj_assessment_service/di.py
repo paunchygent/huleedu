@@ -1,4 +1,4 @@
-"""Dishka dependency injection providers for CJ Assessment Service."""
+"""Dependency injection configuration for CJ Assessment Service."""
 
 from __future__ import annotations
 
@@ -6,22 +6,21 @@ from typing import Dict
 
 import aiohttp
 from aiokafka import AIOKafkaProducer
+from config import Settings
+from config import settings as service_settings
 from dishka import Provider, Scope, provide
+from implementations.anthropic_provider_impl import AnthropicProviderImpl
+from implementations.cache_manager_impl import CacheManagerImpl
+from implementations.content_client_impl import ContentClientImpl
+from implementations.db_access_impl import CJDatabaseImpl
+from implementations.event_publisher_impl import CJEventPublisherImpl
+from implementations.google_provider_impl import GoogleProviderImpl
+from implementations.llm_interaction_impl import LLMInteractionImpl
+from implementations.openai_provider_impl import OpenAIProviderImpl
+from implementations.openrouter_provider_impl import OpenRouterProviderImpl
+from implementations.retry_manager_impl import RetryManagerImpl
 from prometheus_client import CollectorRegistry
-
-from .config import Settings
-from .config import settings as service_settings
-from .implementations.anthropic_provider_impl import AnthropicProviderImpl
-from .implementations.cache_manager_impl import CacheManagerImpl
-from .implementations.content_client_impl import ContentClientImpl
-from .implementations.db_access_impl import CJDatabaseImpl
-from .implementations.event_publisher_impl import CJEventPublisherImpl
-from .implementations.google_provider_impl import GoogleProviderImpl
-from .implementations.llm_interaction_impl import LLMInteractionImpl
-from .implementations.openai_provider_impl import OpenAIProviderImpl
-from .implementations.openrouter_provider_impl import OpenRouterProviderImpl
-from .implementations.retry_manager_impl import RetryManagerImpl
-from .protocols import (
+from protocols import (
     CacheProtocol,
     CJDatabaseProtocol,
     CJEventPublisherProtocol,

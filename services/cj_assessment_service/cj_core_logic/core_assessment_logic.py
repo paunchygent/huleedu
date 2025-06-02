@@ -9,17 +9,18 @@ from __future__ import annotations
 from typing import Any, Dict, List
 from uuid import UUID
 
+from config import Settings
+from enums_db import CJBatchStatusEnum
 from huleedu_service_libs.logging_utils import create_service_logger
 from models_api import ComparisonResult, ComparisonTask, EssayForComparison
 
-from ..config import Settings
-from ..enums_db import CJBatchStatusEnum
-from ..protocols import (
+from services.cj_assessment_service.protocols import (
     CJDatabaseProtocol,
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
 )
+
 from . import pair_generation, scoring_ranking
 
 logger = create_service_logger("cj_assessment_service.core_assessment_logic")
@@ -52,6 +53,23 @@ async def run_cj_assessment_workflow(
 
     cj_batch_id = None
     try:
+        # Extract LLM config overrides from request data
+        llm_config_overrides = request_data.get("llm_config_overrides")
+        model_override = None
+        temperature_override = None
+        max_tokens_override = None
+
+        if llm_config_overrides:
+            model_override = llm_config_overrides.model_override
+            temperature_override = llm_config_overrides.temperature_override
+            max_tokens_override = llm_config_overrides.max_tokens_override
+
+            logger.info(
+                f"Using LLM overrides - model: {model_override}, "
+                f"temperature: {temperature_override}, max_tokens: {max_tokens_override}",
+                extra={"correlation_id": correlation_id}
+            )
+
         # Phase 1: Create CJ batch and setup
         async with database.session() as session:
             # Extract data from request
@@ -165,7 +183,12 @@ async def run_cj_assessment_workflow(
                 # Process comparisons using LLMInteractionProtocol
                 llm_comparison_results: List[
                     ComparisonResult
-                ] = await llm_interaction.perform_comparisons(comparison_tasks_for_llm)
+                ] = await llm_interaction.perform_comparisons(
+                    comparison_tasks_for_llm,
+                    model_override=model_override,
+                    temperature_override=temperature_override,
+                    max_tokens_override=max_tokens_override,
+                )
 
                 # Filter out tasks that resulted in an error from the LLM
                 valid_llm_results = [

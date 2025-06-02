@@ -162,6 +162,7 @@ module = [
     "config", 
     "worker_main", 
     "core_logic", 
+    "core_logic.*",
     "event_router", 
     "event_processor",
     "protocols", 

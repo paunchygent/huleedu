@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, cast
 
 import aiohttp
@@ -16,7 +17,10 @@ logger = create_service_logger("cj_assessment_service.google_provider_impl")
 
 
 class GoogleProviderImpl(LLMProviderProtocol):
-    """Google LLM provider implementation."""
+    """Google LLM provider implementation.
+
+    Uses structured LLM provider configuration.
+    """
 
     def __init__(
         self,
@@ -28,27 +32,53 @@ class GoogleProviderImpl(LLMProviderProtocol):
         self.session = session
         self.settings = settings
         self.retry_manager = retry_manager
-        self.provider_name = "Google"
-        self.api_key = getattr(settings, "google_api_key", None)
-        provider_config = settings.llm_providers.get("google")
-        self.api_base = provider_config.api_base if provider_config else None
+        self.provider_name = "google"
+
+        # Get provider-specific configuration
+        self.provider_config = self.settings.LLM_PROVIDERS_CONFIG.get(self.provider_name)
+        if not self.provider_config:
+            raise ValueError(f"No configuration found for provider '{self.provider_name}'")
+
+        self.api_key = self._get_api_key()
+        self.api_base = self.provider_config.api_base
         self.model_name = self._get_model_name()
 
-    def _get_model_name(self) -> str:
-        """Get model name from settings."""
-        model_name = self.settings.comparison_model
-        if "/" in model_name:
-            parts = model_name.split("/", 1)
-            if len(parts) == 2 and parts[0].lower() == "google":
-                model_name = parts[1]
-        return str(model_name)
+    def _get_api_key(self) -> str | None:
+        """Get API key from environment using structured configuration."""
+        if not self.provider_config:
+            return None
+
+        # Get API key from environment variable specified in config
+        api_key_env_var = self.provider_config.api_key_env_var
+        api_key = os.getenv(api_key_env_var)
+
+        # Fallback to legacy settings for backward compatibility
+        if not api_key:
+            api_key = getattr(self.settings, 'GOOGLE_API_KEY', None)
+
+        return api_key
+
+    def _get_model_name(self, model_override: str | None = None) -> str:
+        """Get model name from structured configuration with optional override."""
+        # Highest priority: runtime override
+        if model_override:
+            return model_override
+
+        if not self.provider_config:
+            return self.settings.DEFAULT_LLM_MODEL
+
+        # Use provider's default model unless overridden
+        return self.provider_config.default_model
 
     async def generate_comparison(
         self,
         user_prompt: str,
         system_prompt_override: str | None = None,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
     ) -> tuple[dict[str, Any] | None, str | None]:
-        """Generate a comparison by calling the Google provider."""
+        """Generate a comparison by calling the Google provider with optional overrides."""
         if not self.api_key:
             return None, f"{self.provider_name} API key not configured."
 
@@ -61,6 +91,9 @@ class GoogleProviderImpl(LLMProviderProtocol):
             api_request_func=lambda: self._make_provider_api_request(
                 final_system_prompt,
                 user_prompt,
+                model_override=model_override,
+                temperature_override=temperature_override,
+                max_tokens_override=max_tokens_override,
             ),
             provider_name=self.provider_name,
         )
@@ -70,36 +103,42 @@ class GoogleProviderImpl(LLMProviderProtocol):
         self,
         system_prompt: str,
         user_prompt: str,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
     ) -> tuple[dict[str, Any] | None, str | None]:
-        """Make API request to Google provider."""
-        if not self.api_base:
-            raise ValueError(f"{self.provider_name} API base URL not configured.")
+        """Make API request to Google provider with optional overrides."""
+        # Apply fallback chain: runtime_override → provider_default → global_default
+        model_name = self._get_model_name(model_override)
 
-        endpoint = f"{self.api_base.rstrip('/')}/v1beta/models/{self.model_name}:generateContent"
-        headers = {
-            "Content-Type": "application/json",
-        }
+        # Temperature: runtime override → provider config → global setting
+        temperature = temperature_override
+        if temperature is None:
+            temperature = (
+                self.provider_config.temperature
+                if self.provider_config and self.provider_config.temperature is not None
+                else self.settings.TEMPERATURE
+            )
 
-        # Add API key to URL parameters for Google API
-        url_with_key = f"{endpoint}?key={self.api_key}"
+        # Max tokens: runtime override → provider config → global setting
+        max_tokens = max_tokens_override
+        if max_tokens is None:
+            max_tokens = (
+                self.provider_config.max_tokens
+                if self.provider_config and self.provider_config.max_tokens is not None
+                else self.settings.MAX_TOKENS_RESPONSE
+            )
 
-        provider_cfg = self.settings.llm_providers.get("google")
-        max_tokens = (
-            provider_cfg.max_tokens
-            if provider_cfg and provider_cfg.max_tokens is not None
-            else self.settings.max_tokens_response
-        )
-        temperature = (
-            provider_cfg.temperature
-            if provider_cfg and provider_cfg.temperature is not None
-            else self.settings.temperature
-        )
+        endpoint = f"{self.api_base.rstrip('/')}/models/{model_name}:generateContent"
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            endpoint += f"?key={self.api_key}"
 
-        # Combine system and user prompts for Gemini
-        combined_prompt = f"{system_prompt}\n\n{user_prompt}"
+        # Construct full prompt for Google's format
+        full_prompt = f"{system_prompt}\n\n{user_prompt}"
 
         payload = {
-            "contents": [{"parts": [{"text": combined_prompt}]}],
+            "contents": [{"parts": [{"text": full_prompt}]}],
             "generationConfig": {
                 "temperature": temperature,
                 "maxOutputTokens": max_tokens,
@@ -109,12 +148,12 @@ class GoogleProviderImpl(LLMProviderProtocol):
 
         # Execute HTTP request
         timeout_config = aiohttp.ClientTimeout(
-            total=self.settings.llm_request_timeout_seconds,
+            total=self.settings.LLM_REQUEST_TIMEOUT_SECONDS,
         )
 
         try:
             async with self.session.post(
-                url_with_key, headers=headers, json=payload, timeout=timeout_config
+                endpoint, headers=headers, json=payload, timeout=timeout_config
             ) as response:
                 if response.status == 200:
                     response_data = await response.json()

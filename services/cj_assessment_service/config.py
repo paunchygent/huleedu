@@ -2,7 +2,20 @@
 
 from __future__ import annotations
 
+from typing import Dict, Optional
+
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class LLMProviderSettings(BaseModel):
+    """Configuration settings for a specific LLM provider."""
+
+    api_base: str
+    default_model: str
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+    api_key_env_var: str  # Environment variable name for API key
 
 
 class Settings(BaseSettings):
@@ -28,12 +41,48 @@ class Settings(BaseSettings):
     # Database configuration
     DATABASE_URL_CJ: str = "sqlite+aiosqlite:///./cj_assessment.db"
 
-    # LLM provider settings
+    # Legacy LLM provider API keys (maintained for backward compatibility)
     ANTHROPIC_API_KEY: str | None = None
     OPENAI_API_KEY: str | None = None
     GOOGLE_API_KEY: str | None = None
 
-    # LLM configuration defaults
+    # Default LLM provider and model
+    DEFAULT_LLM_PROVIDER: str = "openai"
+    DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
+
+    # Structured LLM provider configuration
+    LLM_PROVIDERS_CONFIG: Dict[str, LLMProviderSettings] = {
+        "openai": LLMProviderSettings(
+            api_base="https://api.openai.com/v1",
+            default_model="gpt-4o-mini",
+            temperature=0.1,
+            max_tokens=1000,
+            api_key_env_var="OPENAI_API_KEY"
+        ),
+        "anthropic": LLMProviderSettings(
+            api_base="https://api.anthropic.com/v1",
+            default_model="claude-3-haiku-20240307",
+            temperature=0.1,
+            max_tokens=1000,
+            api_key_env_var="ANTHROPIC_API_KEY"
+        ),
+        "google": LLMProviderSettings(
+            api_base="https://generativelanguage.googleapis.com/v1",
+            default_model="gemini-1.5-flash",
+            temperature=0.1,
+            max_tokens=1000,
+            api_key_env_var="GOOGLE_API_KEY"
+        ),
+        "openrouter": LLMProviderSettings(
+            api_base="https://openrouter.ai/api/v1",
+            default_model="anthropic/claude-3-haiku",
+            temperature=0.1,
+            max_tokens=1000,
+            api_key_env_var="OPENROUTER_API_KEY"
+        )
+    }
+
+    # Global LLM configuration defaults (used as fallbacks)
     LLM_REQUEST_TIMEOUT_SECONDS: int = 30
     MAX_TOKENS_RESPONSE: int = 1000
     TEMPERATURE: float = 0.1

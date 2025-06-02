@@ -7,6 +7,7 @@ with protocol-based dependency injection.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, cast
 
 import aiohttp
@@ -23,6 +24,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
     """OpenAI LLM provider implementation.
 
     Handles request formatting and response parsing for OpenAI-based LLMs.
+    Uses structured LLM provider configuration.
     """
 
     def __init__(
@@ -41,9 +43,15 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         self.session = session
         self.settings = settings
         self.retry_manager = retry_manager
-        self.provider_name = "OpenAI"
+        self.provider_name = "openai"
+
+        # Get provider-specific configuration
+        self.provider_config = self.settings.LLM_PROVIDERS_CONFIG.get(self.provider_name)
+        if not self.provider_config:
+            raise ValueError(f"No configuration found for provider '{self.provider_name}'")
+
         self.api_key = self._get_api_key()
-        self.api_base = self._get_api_base()
+        self.api_base = self.provider_config.api_base
         self.model_name = self._get_model_name()
 
         if not self.api_key:
@@ -52,38 +60,41 @@ class OpenAIProviderImpl(LLMProviderProtocol):
             )
 
     def _get_api_key(self) -> str | None:
-        """Get API key from settings."""
-        api_key_name = f"{self.provider_name.lower()}_api_key"
-        api_key = getattr(self.settings, api_key_name, None)
-        return str(api_key) if api_key is not None else None
+        """Get API key from environment using structured configuration."""
+        if not self.provider_config:
+            return None
 
-    def _get_api_base(self) -> str | None:
-        """Get API base URL from settings."""
-        provider_config = self.settings.llm_providers.get(self.provider_name.lower())
-        if provider_config and provider_config.api_base:
-            return str(provider_config.api_base)
-        logger.warning(
-            f"API base URL for {self.provider_name} not found in llm_providers config.",
-        )
-        return None
+        # Get API key from environment variable specified in config
+        api_key_env_var = self.provider_config.api_key_env_var
+        api_key = os.getenv(api_key_env_var)
 
-    def _get_model_name(self) -> str:
-        """Get model name from settings."""
-        model_name = self.settings.comparison_model
+        # Fallback to legacy settings for backward compatibility
+        if not api_key:
+            api_key = getattr(self.settings, 'OPENAI_API_KEY', None)
 
-        # Strip provider prefix if model name includes it
-        if "/" in model_name:
-            parts = model_name.split("/", 1)
-            if len(parts) == 2 and parts[0].lower() == self.provider_name.lower():
-                model_name = parts[1]
-        return str(model_name)
+        return api_key
+
+    def _get_model_name(self, model_override: str | None = None) -> str:
+        """Get model name from structured configuration with optional override."""
+        # Highest priority: runtime override
+        if model_override:
+            return model_override
+
+        if not self.provider_config:
+            return self.settings.DEFAULT_LLM_MODEL
+
+        # Use provider's default model unless overridden
+        return self.provider_config.default_model
 
     def _prepare_request_details(
         self,
         system_prompt: str,
         user_prompt: str,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
     ) -> tuple[str, dict[str, str], dict[str, Any]]:
-        """Prepare OpenAI-specific request details."""
+        """Prepare OpenAI-specific request details with optional overrides."""
         if not self.api_base:
             raise ValueError(f"{self.provider_name} API base URL not configured.")
         if not self.api_key:
@@ -95,21 +106,29 @@ class OpenAIProviderImpl(LLMProviderProtocol):
             "Content-Type": "application/json",
         }
 
-        # Use provider-specific config if available, else fallback
-        provider_cfg = self.settings.llm_providers.get("openai")
-        max_tokens = (
-            provider_cfg.max_tokens
-            if provider_cfg and provider_cfg.max_tokens is not None
-            else self.settings.max_tokens_response
-        )
-        temperature = (
-            provider_cfg.temperature
-            if provider_cfg and provider_cfg.temperature is not None
-            else self.settings.temperature
-        )
+        # Apply fallback chain: runtime_override → provider_default → global_default
+        model_name = self._get_model_name(model_override)
+
+        # Temperature: runtime override → provider config → global setting
+        temperature = temperature_override
+        if temperature is None:
+            temperature = (
+                self.provider_config.temperature
+                if self.provider_config and self.provider_config.temperature is not None
+                else self.settings.TEMPERATURE
+            )
+
+        # Max tokens: runtime override → provider config → global setting
+        max_tokens = max_tokens_override
+        if max_tokens is None:
+            max_tokens = (
+                self.provider_config.max_tokens
+                if self.provider_config and self.provider_config.max_tokens is not None
+                else self.settings.MAX_TOKENS_RESPONSE
+            )
 
         payload = {
-            "model": self.model_name,
+            "model": model_name,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -230,9 +249,18 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         self,
         system_prompt: str,
         user_prompt: str,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
     ) -> tuple[dict[str, Any] | None, str | None]:
-        """Make API request to OpenAI provider."""
-        endpoint, headers, payload = self._prepare_request_details(system_prompt, user_prompt)
+        """Make API request to OpenAI provider with optional overrides."""
+        endpoint, headers, payload = self._prepare_request_details(
+            system_prompt,
+            user_prompt,
+            model_override=model_override,
+            temperature_override=temperature_override,
+            max_tokens_override=max_tokens_override,
+        )
 
         # Execute HTTP request
         response_data, error_message = await self._execute_http_request(endpoint, headers, payload)
@@ -255,8 +283,11 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         self,
         user_prompt: str,
         system_prompt_override: str | None = None,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
     ) -> tuple[dict[str, Any] | None, str | None]:
-        """Generate a comparison by calling the OpenAI provider."""
+        """Generate a comparison by calling the OpenAI provider with optional overrides."""
         if not self.api_key:
             return None, f"{self.provider_name} API key not configured."
 
@@ -269,6 +300,9 @@ class OpenAIProviderImpl(LLMProviderProtocol):
             api_request_func=lambda: self._make_provider_api_request(
                 final_system_prompt,
                 user_prompt,
+                model_override=model_override,
+                temperature_override=temperature_override,
+                max_tokens_override=max_tokens_override,
             ),
             provider_name=self.provider_name,
         )

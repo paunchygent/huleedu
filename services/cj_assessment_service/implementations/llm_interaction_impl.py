@@ -38,37 +38,36 @@ class LLMInteractionImpl(LLMInteractionProtocol):
 
     def _get_provider_for_model(self) -> LLMProviderProtocol:
         """Get the appropriate provider for the configured model."""
-        model_name = self.settings.comparison_model.lower()
-
-        # Determine provider from model name
-        if model_name.startswith("gpt") or "openai" in model_name:
-            provider_key = "openai"
-        elif model_name.startswith("claude") or "anthropic" in model_name:
-            provider_key = "anthropic"
-        elif model_name.startswith("gemini") or "google" in model_name:
-            provider_key = "google"
-        elif "/" in model_name:
-            # Model name includes provider prefix (e.g., "openai/gpt-4")
-            provider_key = model_name.split("/")[0].lower()
-        else:
-            # Default fallback or use configured provider
-            provider_key = "openai"
+        # Use the default provider from structured configuration
+        provider_key = self.settings.DEFAULT_LLM_PROVIDER.lower()
 
         if provider_key not in self.providers:
             available_providers = list(self.providers.keys())
             logger.warning(
-                f"Provider '{provider_key}' not available. Available providers: "
+                f"Default provider '{provider_key}' not available. Available providers: "
                 f"{available_providers}. Using first available provider."
             )
             provider_key = available_providers[0] if available_providers else "openai"
 
+        logger.debug(
+            f"Using provider '{provider_key}' with model '{self.settings.DEFAULT_LLM_MODEL}'"
+        )
         return self.providers[provider_key]
 
-    async def perform_comparisons(self, tasks: list[ComparisonTask]) -> list[ComparisonResult]:
+    async def perform_comparisons(
+        self,
+        tasks: list[ComparisonTask],
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
+    ) -> list[ComparisonResult]:
         """Perform multiple comparison tasks using configured LLM providers.
 
         Args:
             tasks: List of comparison tasks to process.
+            model_override: Optional model name override
+            temperature_override: Optional temperature override (0.0-2.0)
+            max_tokens_override: Optional max tokens override
 
         Returns:
             List of comparison results corresponding to the input tasks.
@@ -89,8 +88,10 @@ class LLMInteractionImpl(LLMInteractionProtocol):
         async def process_task(task: ComparisonTask) -> ComparisonResult:
             """Process a single comparison task with caching and error handling."""
             async with semaphore:
-                # Generate cache key from the prompt
-                cache_key = self.cache_manager.generate_hash(task.prompt)
+                # Generate cache key from the prompt and override parameters for proper caching
+                cache_key = self.cache_manager.generate_hash(
+                    f"{task.prompt}|model:{model_override}|temp:{temperature_override}|tokens:{max_tokens_override}"
+                )
 
                 # Check cache first
                 cached_response = self.cache_manager.get_from_cache(cache_key)
@@ -119,6 +120,9 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     response_data, error_message = await provider.generate_comparison(
                         user_prompt=task.prompt,
                         system_prompt_override=None,
+                        model_override=model_override,
+                        temperature_override=temperature_override,
+                        max_tokens_override=max_tokens_override,
                     )
 
                     if response_data:

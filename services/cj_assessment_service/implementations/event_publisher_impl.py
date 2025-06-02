@@ -11,9 +11,8 @@ from typing import Any
 from uuid import UUID
 
 from aiokafka import AIOKafkaProducer
-
-from ..config import Settings
-from ..protocols import CJEventPublisherProtocol
+from config import Settings
+from protocols import CJEventPublisherProtocol
 
 
 class CJEventPublisherImpl(CJEventPublisherProtocol):
