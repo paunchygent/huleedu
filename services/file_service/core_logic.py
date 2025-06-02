@@ -57,7 +57,7 @@ async def process_single_file_upload(
     """
     logger.info(
         f"Processing file {file_name} for batch {batch_id}",
-        extra={"correlation_id": str(main_correlation_id)}
+        extra={"correlation_id": str(main_correlation_id)},
     )
 
     try:
@@ -66,18 +66,15 @@ async def process_single_file_upload(
         if not text:
             logger.warning(
                 f"Text extraction failed or returned empty for {file_name}",
-                extra={"correlation_id": str(main_correlation_id)}
+                extra={"correlation_id": str(main_correlation_id)},
             )
-            return {
-                "file_name": file_name,
-                "status": "extraction_failed_or_empty"
-            }
+            return {"file_name": file_name, "status": "extraction_failed_or_empty"}
 
         # Store extracted text content via Content Service
-        text_storage_id = await content_client.store_content(text.encode('utf-8'))
+        text_storage_id = await content_client.store_content(text.encode("utf-8"))
         logger.info(
             f"Stored content for file {file_name}, text_storage_id: {text_storage_id}",
-            extra={"correlation_id": str(main_correlation_id)}
+            extra={"correlation_id": str(main_correlation_id)},
         )
 
         # Calculate MD5 hash of file content for integrity tracking
@@ -92,33 +89,28 @@ async def process_single_file_upload(
             file_size_bytes=file_size_bytes,
             content_md5_hash=content_md5_hash,
             correlation_id=main_correlation_id,
-            timestamp=datetime.now(timezone.utc)
+            timestamp=datetime.now(timezone.utc),
         )
 
         # Publish the event
         await event_publisher.publish_essay_content_provisioned(
-            content_provisioned_event_data,
-            main_correlation_id
+            content_provisioned_event_data, main_correlation_id
         )
         logger.info(
             f"Published EssayContentProvisionedV1 for file {file_name}",
-            extra={"correlation_id": str(main_correlation_id)}
+            extra={"correlation_id": str(main_correlation_id)},
         )
 
         return {
             "file_name": file_name,
             "text_storage_id": text_storage_id,
-            "status": "processing_initiated"
+            "status": "processing_initiated",
         }
 
     except Exception as e:
         logger.error(
             f"Error processing file {file_name}: {e}",
             extra={"correlation_id": str(main_correlation_id)},
-            exc_info=True
+            exc_info=True,
         )
-        return {
-            "file_name": file_name,
-            "status": "processing_error",
-            "detail": str(e)
-        }
+        return {"file_name": file_name, "status": "processing_error", "detail": str(e)}

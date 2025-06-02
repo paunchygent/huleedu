@@ -146,8 +146,6 @@ async def _route_event(
                 correlation_id=correlation_id,
             )
 
-
-
         elif event_type == topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED):
             return await _handle_essay_content_provisioned(
                 envelope=envelope,
@@ -229,7 +227,6 @@ async def _handle_batch_essays_registered(
         return False
 
 
-
 async def _handle_essay_content_provisioned(
     envelope: EventEnvelope[Any],
     batch_tracker: BatchEssayTracker,
@@ -273,9 +270,7 @@ async def _handle_essay_content_provisioned(
         # **Step 2: Slot Assignment**
         # Try to assign an available slot to this content
         assigned_essay_id = batch_tracker.assign_slot_to_content(
-            event_data.batch_id,
-            event_data.text_storage_id,
-            event_data.original_file_name
+            event_data.batch_id, event_data.text_storage_id, event_data.original_file_name
         )
 
         if assigned_essay_id is None:
@@ -338,9 +333,7 @@ async def _handle_essay_content_provisioned(
         # **Step 4: Check Batch Completion**
         # Mark slot as fulfilled and check if batch is complete
         batch_ready_event = batch_tracker.mark_slot_fulfilled(
-            event_data.batch_id,
-            assigned_essay_id,
-            event_data.text_storage_id
+            event_data.batch_id, assigned_essay_id, event_data.text_storage_id
         )
 
         # **Step 5: Publish BatchEssaysReady if complete**

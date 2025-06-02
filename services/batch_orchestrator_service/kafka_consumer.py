@@ -188,13 +188,22 @@ class BatchKafkaConsumer:
             current_pipeline_state = await self.batch_repo.get_processing_pipeline_state(batch_id)
             if current_pipeline_state:
                 # Handle both dict and ProcessingPipelineState object cases
-                if hasattr(current_pipeline_state, 'spellcheck'):  # Pydantic object
+                if hasattr(current_pipeline_state, "spellcheck"):  # Pydantic object
                     spellcheck_obj = current_pipeline_state.spellcheck
-                    spellcheck_status = spellcheck_obj.status.value if spellcheck_obj and spellcheck_obj.status else None
+                    spellcheck_status = (
+                        spellcheck_obj.status.value
+                        if spellcheck_obj and spellcheck_obj.status
+                        else None
+                    )
                 else:  # Dictionary
                     spellcheck_status = current_pipeline_state.get("spellcheck_status")
 
-                if spellcheck_status in ["DISPATCH_INITIATED", "IN_PROGRESS", "COMPLETED", "FAILED"]:
+                if spellcheck_status in [
+                    "DISPATCH_INITIATED",
+                    "IN_PROGRESS",
+                    "COMPLETED",
+                    "FAILED",
+                ]:
                     logger.info(
                         f"Spellcheck already initiated for batch {batch_id}, skipping",
                         extra={"current_status": spellcheck_status},
@@ -214,10 +223,7 @@ class BatchKafkaConsumer:
             )
 
             # 4. Construct spellcheck initiate command
-            batch_entity_ref = EntityReference(
-                entity_id=batch_id,
-                entity_type="batch"
-            )
+            batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
 
             # Extract essays_to_process from BatchEssaysReady.ready_essays
             # This contains the actual essay_id and text_storage_id mappings from ELS
@@ -228,9 +234,7 @@ class BatchKafkaConsumer:
                 logger.error(f"BatchEssaysReady for batch {batch_id} contains no ready_essays")
                 return
 
-            logger.info(
-                f"Processing {len(essays_to_process)} ready essays for batch {batch_id}"
-            )
+            logger.info(f"Processing {len(essays_to_process)} ready essays for batch {batch_id}")
 
             spellcheck_command = BatchServiceSpellcheckInitiateCommandDataV1(
                 event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
@@ -257,16 +261,20 @@ class BatchKafkaConsumer:
 
             # 7. Update pipeline state
             # Handle both dict and ProcessingPipelineState object cases
-            if current_pipeline_state and hasattr(current_pipeline_state, 'model_dump'):  # Pydantic object
+            if current_pipeline_state and hasattr(
+                current_pipeline_state, "model_dump"
+            ):  # Pydantic object
                 updated_pipeline_state = current_pipeline_state.model_dump()
             else:  # Dictionary or None
                 updated_pipeline_state = current_pipeline_state or {}
 
-            updated_pipeline_state.update({
-                "spellcheck_status": "DISPATCH_INITIATED",
-                "spellcheck_initiated_at": datetime.now(timezone.utc).isoformat(),
-                "language": language,
-            })
+            updated_pipeline_state.update(
+                {
+                    "spellcheck_status": "DISPATCH_INITIATED",
+                    "spellcheck_initiated_at": datetime.now(timezone.utc).isoformat(),
+                    "language": language,
+                }
+            )
             await self.batch_repo.save_processing_pipeline_state(batch_id, updated_pipeline_state)
 
             logger.info(f"Successfully initiated spellcheck pipeline for batch {batch_id}")

@@ -41,7 +41,8 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/spell_checker_service",
     "-e file:///${PROJECT_ROOT}/services/batch_orchestrator_service",
     "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service",
-    "-e file:///${PROJECT_ROOT}/services/file_service"
+    "-e file:///${PROJECT_ROOT}/services/file_service",
+    "-e file:///${PROJECT_ROOT}/services/cj_assessment_service"
 ]
 
 [tool.pdm.scripts]
@@ -149,6 +150,9 @@ module = [
     "quart_dishka.*",
     "httpx.*",
     "spell_logic.*",
+    "diskcache.*",
+    "choix.*",
+    "tenacity.*",
 ]
 ignore_missing_imports = true
 
@@ -169,11 +173,15 @@ module = [
     "protocol_implementations.*",
     "api.*",
     "api_models",
+    "models_api",
     "kafka_consumer",
     "metrics",
     "startup_setup",
     "text_processing",
     "hypercorn_config",
+    "pair_generation",
+    "scoring_ranking",
+    "core_assessment_logic",
 ]
 ignore_missing_imports = true
 
@@ -185,6 +193,7 @@ testpaths = [
     "services/batch_orchestrator_service/tests",
     "services/essay_lifecycle_service/tests",
     "services/file_service/tests",
+    "services/cj_assessment_service/tests",
     "tests"
 ]
 pythonpath = [
@@ -192,7 +201,8 @@ pythonpath = [
     "services/content_service", 
     "services/batch_orchestrator_service",
     "services/essay_lifecycle_service",
-    "services/file_service"
+    "services/file_service",
+    "services/cj_assessment_service"
 ]
 python_files = "test_*.py *_test.py"
 python_classes = "Test*"

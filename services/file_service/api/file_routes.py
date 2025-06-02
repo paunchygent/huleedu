@@ -18,7 +18,7 @@ from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
 
 logger = create_service_logger("file_service.api.file_routes")
-file_bp = Blueprint('file_routes', __name__, url_prefix='/v1/files')
+file_bp = Blueprint("file_routes", __name__, url_prefix="/v1/files")
 
 
 @file_bp.route("/batch", methods=["POST"])
@@ -26,7 +26,7 @@ file_bp = Blueprint('file_routes', __name__, url_prefix='/v1/files')
 async def upload_batch_files(
     text_extractor: FromDishka[TextExtractorProtocol],
     content_client: FromDishka[ContentServiceClientProtocol],
-    event_publisher: FromDishka[EventPublisherProtocol]
+    event_publisher: FromDishka[EventPublisherProtocol],
 ) -> Union[Response, tuple[Response, int]]:
     """
     Handle batch file upload endpoint.
@@ -43,7 +43,7 @@ async def upload_batch_files(
             logger.warning("Batch upload attempt without batch_id.")
             return jsonify({"error": "batch_id is required in form data."}), 400
 
-        uploaded_files = files.getlist('files')  # Assuming form field name is 'files'
+        uploaded_files = files.getlist("files")  # Assuming form field name is 'files'
         if not uploaded_files:
             logger.warning(f"No files provided for batch {batch_id}.")
             return jsonify({"error": "No files provided in 'files' field."}), 400
@@ -67,7 +67,7 @@ async def upload_batch_files(
                         main_correlation_id=main_correlation_id,
                         text_extractor=text_extractor,
                         content_client=content_client,
-                        event_publisher=event_publisher
+                        event_publisher=event_publisher,
                     )
                 )
                 tasks.append(task)
@@ -76,21 +76,22 @@ async def upload_batch_files(
         def _handle_task_result(task: asyncio.Task) -> None:
             if task.exception():
                 logger.error(
-                    f"Error processing uploaded file: {task.exception()}",
-                    exc_info=task.exception()
+                    f"Error processing uploaded file: {task.exception()}", exc_info=task.exception()
                 )
 
         for task in tasks:
             task.add_done_callback(_handle_task_result)
 
-        return jsonify({
-            "message": (
-                f"{len(uploaded_files)} files received for batch {batch_id} "
-                "and are being processed."
-            ),
-            "batch_id": batch_id,
-            "correlation_id": str(main_correlation_id)
-        }), 202
+        return jsonify(
+            {
+                "message": (
+                    f"{len(uploaded_files)} files received for batch {batch_id} "
+                    "and are being processed."
+                ),
+                "batch_id": batch_id,
+                "correlation_id": str(main_correlation_id),
+            }
+        ), 202
 
     except Exception as e:
         logger.error(f"Error in batch file upload endpoint: {e}", exc_info=True)

@@ -56,7 +56,7 @@ class BatchProcessingServiceImpl:
             f"Registering new batch {batch_id} with "
             f"{registration_data.expected_essay_count} essays. Generated internal essay IDs: "
             f"{len(internal_essay_ids)} slots",
-            extra={"correlation_id": str(correlation_id)}
+            extra={"correlation_id": str(correlation_id)},
         )
 
         # 1. Persist Full Batch Context
@@ -65,7 +65,7 @@ class BatchProcessingServiceImpl:
         # Also store initial pipeline state
         initial_pipeline_state = ProcessingPipelineState(
             batch_id=batch_id,
-            requested_pipelines=[], # Spellcheck will be added when BatchEssaysReady is received
+            requested_pipelines=[],  # Spellcheck will be added when BatchEssaysReady is received
         )
         await self.batch_repo.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -74,13 +74,13 @@ class BatchProcessingServiceImpl:
         event_metadata = SystemProcessingMetadata(
             entity=batch_entity_ref,
             event=ProcessingEvent.BATCH_ESSAYS_REGISTERED.value,
-            timestamp=datetime.now(timezone.utc)
+            timestamp=datetime.now(timezone.utc),
         )
         batch_registered_event_data = BatchEssaysRegistered(
             batch_id=batch_id,
             expected_essay_count=registration_data.expected_essay_count,
             essay_ids=internal_essay_ids,  # Use generated internal IDs instead of user-provided
-            metadata=event_metadata
+            metadata=event_metadata,
         )
 
         # 3. Create EventEnvelope
@@ -88,7 +88,7 @@ class BatchProcessingServiceImpl:
             event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id,
-            data=batch_registered_event_data
+            data=batch_registered_event_data,
         )
 
         # 4. Publish event
@@ -97,7 +97,7 @@ class BatchProcessingServiceImpl:
         self.logger.info(
             f"Published BatchEssaysRegistered event for batch {batch_id} with "
             f"{len(internal_essay_ids)} internal essay slots, event_id {envelope.event_id}",
-            extra={"correlation_id": str(correlation_id)}
+            extra={"correlation_id": str(correlation_id)},
         )
 
         return batch_id

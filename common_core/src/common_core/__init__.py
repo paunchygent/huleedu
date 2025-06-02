@@ -102,7 +102,6 @@ __all__ = [
     "BatchReadinessTimeout",
     "ExcessContentProvisionedV1",
     # File Service Event Models
-
     "EssayContentProvisionedV1",
     # Batch Service Command Models
     "BatchServiceSpellcheckInitiateCommandDataV1",

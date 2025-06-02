@@ -72,7 +72,9 @@ class TestServiceHealth:
                         )
                     else:
                         # Empty metrics registry is acceptable for walking skeleton
-                        print(f"ℹ️  {service_name}: Empty metrics registry (acceptable for walking skeleton)")
+                        print(
+                            f"ℹ️  {service_name}: Empty metrics registry (acceptable for walking skeleton)"
+                        )
 
                 except httpx.ConnectError:
                     pytest.skip(f"{service_name} not accessible - services may not be running")

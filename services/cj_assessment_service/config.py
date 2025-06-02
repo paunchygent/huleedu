@@ -44,8 +44,8 @@ class Settings(BaseSettings):
     SCORE_STABILITY_THRESHOLD: float = 0.05
 
     # Assessment prompt template
-    ASSESSMENT_PROMPT_TEMPLATE: str = """Compare these two essays and determine which is better written.
-
+    ASSESSMENT_PROMPT_TEMPLATE: str = """
+Compare these two essays and determine which is better written.
 Essay A (ID: {essay_a_id}):
 {essay_a_text}
 
@@ -53,13 +53,18 @@ Essay B (ID: {essay_b_id}):
 {essay_b_text}
 
 Please respond with a JSON object containing:
-- "winner": "Essay A" or "Essay B"
-- "justification": Brief explanation of your decision
-- "confidence": Rating from 1-5 (5 = very confident)
+- 'winner': 'Essay A' or 'Essay B'
+- 'justification': Brief explanation of your decision
+- 'confidence': Rating from 1-5 (5 = very confident)
+Based on clarity, structure, argument quality, and writing mechanics.
+Always respond with valid JSON.
 """
 
     # System prompt for LLM
-    SYSTEM_PROMPT: str = """You are an expert essay evaluator. Compare essays based on clarity, structure, argument quality, and writing mechanics. Always respond with valid JSON."""
+    SYSTEM_PROMPT: str = """
+You are an expert essay evaluator. Compare essays based on clarity, structure,
+argument quality, and writing mechanics. Always respond with valid JSON.
+"""
 
     # Metrics configuration
     METRICS_PORT: int = 9090

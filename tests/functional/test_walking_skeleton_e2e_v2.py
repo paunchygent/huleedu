@@ -5,7 +5,7 @@ This test validates the complete essay processing pipeline with the Essay ID Coo
 Architecture Fix implementation:
 
 1. BOS Registration → Creates essay ID slots
-2. File Upload → ELS assigns content to slots  
+2. File Upload → ELS assigns content to slots
 3. Batch Completion → ELS emits BatchEssaysReady with actual essay references
 4. Command Processing → BOS emits commands, ELS dispatches to services
 5. Spell Checker → Processes requests with language support
@@ -49,8 +49,6 @@ TOPICS: Dict[str, str] = {
 }
 
 
-
-
 class EventCollector:
     """Collects and manages Kafka events for validation."""
 
@@ -67,9 +65,9 @@ class EventCollector:
         consumer = AIOKafkaConsumer(
             *topics,
             bootstrap_servers=self.bootstrap_servers,
-            auto_offset_reset='earliest',
-            group_id=f'e2e_test_{uuid.uuid4().hex[:8]}',
-            value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+            auto_offset_reset="earliest",
+            group_id=f"e2e_test_{uuid.uuid4().hex[:8]}",
+            value_deserializer=lambda x: json.loads(x.decode("utf-8")),
         )
 
         try:
@@ -85,12 +83,14 @@ class EventCollector:
                 topic = msg.topic
                 event_data = msg.value
 
-                self.events[topic].append({
-                    'timestamp': datetime.now().isoformat(),
-                    'topic': topic,
-                    'data': event_data,
-                    'key': msg.key.decode('utf-8') if msg.key else None
-                })
+                self.events[topic].append(
+                    {
+                        "timestamp": datetime.now().isoformat(),
+                        "topic": topic,
+                        "data": event_data,
+                        "key": msg.key.decode("utf-8") if msg.key else None,
+                    }
+                )
 
                 logger.info(f"Collected event from {topic}: {json.dumps(event_data, indent=2)}")
 
@@ -110,33 +110,37 @@ class EventCollector:
 
         batch_events = []
         for event in self.events[topic]:
-            event_data = event['data']
+            event_data = event["data"]
 
             # Check if event contains our batch_id
             if isinstance(event_data, dict):
-                if 'data' in event_data and isinstance(event_data['data'], dict):
+                if "data" in event_data and isinstance(event_data["data"], dict):
                     # EventEnvelope format - check multiple possible locations
-                    inner_data = event_data['data']
+                    inner_data = event_data["data"]
 
                     # Direct batch_id field
-                    if inner_data.get('batch_id') == batch_id:
+                    if inner_data.get("batch_id") == batch_id:
                         batch_events.append(event)
                     # batch_id in entity_ref.entity_id (for command events)
-                    elif 'entity_ref' in inner_data and isinstance(inner_data['entity_ref'], dict):
-                        if inner_data['entity_ref'].get('entity_id') == batch_id:
+                    elif "entity_ref" in inner_data and isinstance(inner_data["entity_ref"], dict):
+                        if inner_data["entity_ref"].get("entity_id") == batch_id:
                             batch_events.append(event)
                     # batch_id in ready_essays for BatchEssaysReady
-                    elif 'ready_essays' in inner_data:
-                        ready_essays = inner_data.get('ready_essays', [])
-                        if any(essay.get('batch_id') == batch_id for essay in ready_essays if isinstance(essay, dict)):
+                    elif "ready_essays" in inner_data:
+                        ready_essays = inner_data.get("ready_essays", [])
+                        if any(
+                            essay.get("batch_id") == batch_id
+                            for essay in ready_essays
+                            if isinstance(essay, dict)
+                        ):
                             batch_events.append(event)
 
-                elif event_data.get('batch_id') == batch_id:
+                elif event_data.get("batch_id") == batch_id:
                     # Direct event format
                     batch_events.append(event)
                 # batch_id in entity_ref.entity_id (direct format)
-                elif 'entity_ref' in event_data and isinstance(event_data['entity_ref'], dict):
-                    if event_data['entity_ref'].get('entity_id') == batch_id:
+                elif "entity_ref" in event_data and isinstance(event_data["entity_ref"], dict):
+                    if event_data["entity_ref"].get("entity_id") == batch_id:
                         batch_events.append(event)
 
         return batch_events
@@ -148,14 +152,17 @@ class EventCollector:
 
         correlation_events = []
         for event in self.events[topic]:
-            event_data = event['data']
+            event_data = event["data"]
 
             # Check if event contains our correlation_id
             if isinstance(event_data, dict):
-                if 'correlation_id' in event_data and event_data['correlation_id'] == correlation_id:
+                if (
+                    "correlation_id" in event_data
+                    and event_data["correlation_id"] == correlation_id
+                ):
                     correlation_events.append(event)
-                elif 'data' in event_data and isinstance(event_data['data'], dict):
-                    if event_data['data'].get('correlation_id') == correlation_id:
+                elif "data" in event_data and isinstance(event_data["data"], dict):
+                    if event_data["data"].get("correlation_id") == correlation_id:
                         correlation_events.append(event)
 
         return correlation_events
@@ -165,10 +172,10 @@ class EventCollector:
 async def test_walking_skeleton_e2e_architecture_fix():
     """
     Comprehensive end-to-end test validating the Essay ID Coordination Architecture Fix.
-    
+
     Tests the complete workflow:
     1. BOS Registration with essay ID slots
-    2. File upload and ELS slot assignment  
+    2. File upload and ELS slot assignment
     3. Batch completion with actual essay references
     4. Command processing and service dispatch
     5. Spell checker processing with language support
@@ -181,7 +188,7 @@ async def test_walking_skeleton_e2e_architecture_fix():
         "essay_ids": ["e2e-test-essay-001", "e2e-test-essay-002"],
         "course_code": "ENG103",
         "class_designation": "Fall2024-E2E-ArchitectureFix",
-        "essay_instructions": "End-to-end test essay for architecture fix validation"
+        "essay_instructions": "End-to-end test essay for architecture fix validation",
     }
 
     # Create test files
@@ -189,19 +196,19 @@ async def test_walking_skeleton_e2e_architecture_fix():
         {
             "name": "essay1.txt",
             "content": "This is the first test essay for end-to-end architecture fix validation.\n"
-                      "It contains multiple sentences for comprehensive testing.\n"
-                      "The essay demonstrates the slot assignment pattern.\n"
-                      "Student: E2E Test Student One\n"
-                      f"Course: {test_data['course_code']}"
+            "It contains multiple sentences for comprehensive testing.\n"
+            "The essay demonstrates the slot assignment pattern.\n"
+            "Student: E2E Test Student One\n"
+            f"Course: {test_data['course_code']}",
         },
         {
             "name": "essay2.txt",
             "content": "This is the second test essay for complete pipeline validation.\n"
-                      "It includes spelling mistaks to test spellcheck integration.\n"
-                      "This essay validats the new event-driven coordination.\n"
-                      "Student: E2E Test Student Two\n"
-                      f"Course: {test_data['course_code']}"
-        }
+            "It includes spelling mistaks to test spellcheck integration.\n"
+            "This essay validats the new event-driven coordination.\n"
+            "Student: E2E Test Student Two\n"
+            f"Course: {test_data['course_code']}",
+        },
     ]
 
     # Start event collection
@@ -209,10 +216,7 @@ async def test_walking_skeleton_e2e_architecture_fix():
 
     # Collect events from all relevant topics
     collection_task = asyncio.create_task(
-        event_collector.start_collecting(
-            list(TOPICS.values()),
-            timeout=CONFIG["test_timeout"]
-        )
+        event_collector.start_collecting(list(TOPICS.values()), timeout=CONFIG["test_timeout"])
     )
 
     # Allow event collector to initialize
@@ -220,7 +224,6 @@ async def test_walking_skeleton_e2e_architecture_fix():
 
     try:
         async with aiohttp.ClientSession() as session:
-
             # STEP 1: BOS Registration (Creates essay ID slots)
             logger.info("=== STEP 1: BOS Registration (Essay ID Slots) ===")
 
@@ -229,12 +232,11 @@ async def test_walking_skeleton_e2e_architecture_fix():
                 "essay_ids": test_data["essay_ids"],
                 "course_code": test_data["course_code"],
                 "class_designation": test_data["class_designation"],
-                "essay_instructions": test_data["essay_instructions"]
+                "essay_instructions": test_data["essay_instructions"],
             }
 
             async with session.post(
-                f"{CONFIG['bos_url']}/v1/batches/register",
-                json=registration_payload
+                f"{CONFIG['bos_url']}/v1/batches/register", json=registration_payload
             ) as response:
                 assert response.status == 202, f"BOS registration failed: {await response.text()}"
 
@@ -262,19 +264,18 @@ async def test_walking_skeleton_e2e_architecture_fix():
 
             # Create multipart form data for file upload
             data = aiohttp.FormData()
-            data.add_field('batch_id', test_data["batch_id"])
+            data.add_field("batch_id", test_data["batch_id"])
 
             for test_file in test_files:
                 data.add_field(
-                    'files',
+                    "files",
                     test_file["content"],
                     filename=test_file["name"],
-                    content_type='text/plain'
+                    content_type="text/plain",
                 )
 
             async with session.post(
-                f"{CONFIG['file_service_url']}/v1/files/batch",
-                data=data
+                f"{CONFIG['file_service_url']}/v1/files/batch", data=data
             ) as response:
                 assert response.status == 202, f"File upload failed: {await response.text()}"
 
@@ -289,14 +290,20 @@ async def test_walking_skeleton_e2e_architecture_fix():
             content_provisioned_events = event_collector.get_events_for_batch(
                 TOPICS["content_provisioned"], test_data["batch_id"]
             )
-            assert len(content_provisioned_events) == 2, f"Expected 2 EssayContentProvisionedV1 events, got {len(content_provisioned_events)}"
-            logger.info("✓ EssayContentProvisionedV1 events emitted (File Service no longer generates essay IDs)")
+            assert len(content_provisioned_events) == 2, (
+                f"Expected 2 EssayContentProvisionedV1 events, got {len(content_provisioned_events)}"
+            )
+            logger.info(
+                "✓ EssayContentProvisionedV1 events emitted (File Service no longer generates essay IDs)"
+            )
 
             # Validate no excess content events (2 files for 2 slots)
             excess_content_events = event_collector.get_events_for_batch(
                 TOPICS["excess_content"], test_data["batch_id"]
             )
-            assert len(excess_content_events) == 0, f"Unexpected excess content events: {len(excess_content_events)}"
+            assert len(excess_content_events) == 0, (
+                f"Unexpected excess content events: {len(excess_content_events)}"
+            )
             logger.info("✓ No excess content events (correct slot assignment)")
 
             # STEP 3: Batch Completion (ELS emits BatchEssaysReady with actual essay references)
@@ -311,26 +318,32 @@ async def test_walking_skeleton_e2e_architecture_fix():
             assert len(batch_ready_events) >= 1, "BatchEssaysReady event not found"
 
             batch_ready_event = batch_ready_events[0]
-            batch_ready_data = batch_ready_event['data']
+            batch_ready_data = batch_ready_event["data"]
 
             # Validate new BatchEssaysReady structure with actual essay references
-            if 'data' in batch_ready_data and isinstance(batch_ready_data['data'], dict):
-                ready_essays = batch_ready_data['data'].get('ready_essays', [])
+            if "data" in batch_ready_data and isinstance(batch_ready_data["data"], dict):
+                ready_essays = batch_ready_data["data"].get("ready_essays", [])
             else:
-                ready_essays = batch_ready_data.get('ready_essays', [])
+                ready_essays = batch_ready_data.get("ready_essays", [])
 
             assert len(ready_essays) == 2, f"Expected 2 ready essays, got {len(ready_essays)}"
             logger.info("✓ BatchEssaysReady event emitted with actual essay references")
 
             # Validate essay references contain required fields
             for essay_ref in ready_essays:
-                assert 'essay_id' in essay_ref, "Essay reference missing essay_id"
-                assert 'text_storage_id' in essay_ref, "Essay reference missing text_storage_id"
+                assert "essay_id" in essay_ref, "Essay reference missing essay_id"
+                assert "text_storage_id" in essay_ref, "Essay reference missing text_storage_id"
                 # Architecture Fix: BOS generates internal essay ID slots (UUIDs), not user-provided IDs
-                assert len(essay_ref['essay_id']) == 36, f"Essay ID should be UUID format: {essay_ref['essay_id']}"
-                assert '-' in essay_ref['essay_id'], f"Essay ID should be UUID format: {essay_ref['essay_id']}"
+                assert len(essay_ref["essay_id"]) == 36, (
+                    f"Essay ID should be UUID format: {essay_ref['essay_id']}"
+                )
+                assert "-" in essay_ref["essay_id"], (
+                    f"Essay ID should be UUID format: {essay_ref['essay_id']}"
+                )
 
-            logger.info("✓ Essay references contain BOS-generated essay ID slots and storage references")
+            logger.info(
+                "✓ Essay references contain BOS-generated essay ID slots and storage references"
+            )
 
             # STEP 4: Command Processing (BOS → ELS → Service Dispatch)
             logger.info("=== STEP 4: Command Processing Chain ===")
@@ -351,29 +364,41 @@ async def test_walking_skeleton_e2e_architecture_fix():
             await asyncio.sleep(10)
 
             # For individual essay events, use correlation_id instead of batch_id
-            spellcheck_requested_events = event_collector.get_events_for_correlation(
-                TOPICS["spellcheck_requested"], test_data["correlation_id"]
-            ) if test_data["correlation_id"] else []
+            spellcheck_requested_events = (
+                event_collector.get_events_for_correlation(
+                    TOPICS["spellcheck_requested"], test_data["correlation_id"]
+                )
+                if test_data["correlation_id"]
+                else []
+            )
 
             # Fallback: check if any spellcheck request events exist for our test timeframe
             if len(spellcheck_requested_events) == 0:
-                all_spellcheck_events = event_collector.events.get(TOPICS["spellcheck_requested"], [])
-                recent_events = [e for e in all_spellcheck_events if 'correlation_id' in e.get('data', {})]
-                spellcheck_requested_events = recent_events[-2:] if len(recent_events) >= 2 else recent_events
+                all_spellcheck_events = event_collector.events.get(
+                    TOPICS["spellcheck_requested"], []
+                )
+                recent_events = [
+                    e for e in all_spellcheck_events if "correlation_id" in e.get("data", {})
+                ]
+                spellcheck_requested_events = (
+                    recent_events[-2:] if len(recent_events) >= 2 else recent_events
+                )
 
             assert len(spellcheck_requested_events) >= 1, "Spellcheck requested events not found"
 
             # Validate spellcheck requests contain language parameter (architecture fix feature)
             for event in spellcheck_requested_events:
-                event_data = event['data']
-                if 'data' in event_data and isinstance(event_data['data'], dict):
-                    request_data = event_data['data']
+                event_data = event["data"]
+                if "data" in event_data and isinstance(event_data["data"], dict):
+                    request_data = event_data["data"]
                 else:
                     request_data = event_data
 
                 # Check for language parameter in spellcheck request
-                if 'language' in request_data:
-                    logger.info(f"✓ Spellcheck request includes language parameter: {request_data['language']}")
+                if "language" in request_data:
+                    logger.info(
+                        f"✓ Spellcheck request includes language parameter: {request_data['language']}"
+                    )
                 else:
                     logger.warning("Spellcheck request missing language parameter")
 
@@ -386,13 +411,17 @@ async def test_walking_skeleton_e2e_architecture_fix():
                 # Check correlation ID propagation across events
                 correlated_events = []
                 for topic in TOPICS.values():
-                    topic_events = event_collector.get_events_for_correlation(topic, test_data["correlation_id"])
+                    topic_events = event_collector.get_events_for_correlation(
+                        topic, test_data["correlation_id"]
+                    )
                     correlated_events.extend(topic_events)
 
                 if len(correlated_events) > 0:
                     logger.info(f"✓ Correlation ID tracked across {len(correlated_events)} events")
                 else:
-                    logger.warning("Correlation ID not found in events (may use different correlation strategy)")
+                    logger.warning(
+                        "Correlation ID not found in events (may use different correlation strategy)"
+                    )
 
             # STEP 7: Architecture Fix Validation Summary
             logger.info("=== STEP 7: Architecture Fix Validation Summary ===")
@@ -404,7 +433,7 @@ async def test_walking_skeleton_e2e_architecture_fix():
                 "batch_completion_with_references": "WORKING",
                 "command_processing_chain": "FUNCTIONAL",
                 "service_dispatch": "SUCCESSFUL",
-                "event_model_updates": "DEPLOYED"
+                "event_model_updates": "DEPLOYED",
             }
 
             for check, status in validation_results.items():
@@ -436,15 +465,14 @@ async def test_excess_content_handling():
         "batch_id": None,
         "essay_ids": ["excess-test-essay-001"],  # Only 1 slot
         "course_code": "ENG104",
-        "class_designation": "Fall2024-ExcessContent-Test"
+        "class_designation": "Fall2024-ExcessContent-Test",
     }
 
     # Start event collection
     event_collector = EventCollector(CONFIG["kafka_bootstrap_servers"])
     collection_task = asyncio.create_task(
         event_collector.start_collecting(
-            [TOPICS["excess_content"], TOPICS["content_provisioned"]],
-            timeout=60
+            [TOPICS["excess_content"], TOPICS["content_provisioned"]], timeout=60
         )
     )
 
@@ -452,19 +480,17 @@ async def test_excess_content_handling():
 
     try:
         async with aiohttp.ClientSession() as session:
-
             # Register batch with 1 essay slot
             registration_payload = {
                 "expected_essay_count": 1,
                 "essay_ids": test_data["essay_ids"],
                 "course_code": test_data["course_code"],
                 "class_designation": test_data["class_designation"],
-                "essay_instructions": "Excess content test"
+                "essay_instructions": "Excess content test",
             }
 
             async with session.post(
-                f"{CONFIG['bos_url']}/v1/batches/register",
-                json=registration_payload
+                f"{CONFIG['bos_url']}/v1/batches/register", json=registration_payload
             ) as response:
                 assert response.status == 202
                 response_data = await response.json()
@@ -474,15 +500,16 @@ async def test_excess_content_handling():
 
             # Upload 3 files (2 excess)
             data = aiohttp.FormData()
-            data.add_field('batch_id', test_data["batch_id"])
+            data.add_field("batch_id", test_data["batch_id"])
 
             for i in range(3):
-                content = f"Test essay content {i+1} for excess handling validation"
-                data.add_field('files', content, filename=f'essay{i+1}.txt', content_type='text/plain')
+                content = f"Test essay content {i + 1} for excess handling validation"
+                data.add_field(
+                    "files", content, filename=f"essay{i + 1}.txt", content_type="text/plain"
+                )
 
             async with session.post(
-                f"{CONFIG['file_service_url']}/v1/files/batch",
-                data=data
+                f"{CONFIG['file_service_url']}/v1/files/batch", data=data
             ) as response:
                 assert response.status == 202
 
@@ -498,14 +525,18 @@ async def test_excess_content_handling():
             )
 
             # Should have 2 excess content events (3 files - 1 slot = 2 excess)
-            assert len(excess_events) == 2, f"Expected 2 excess content events, got {len(excess_events)}"
+            assert len(excess_events) == 2, (
+                f"Expected 2 excess content events, got {len(excess_events)}"
+            )
             logger.info("✓ Excess content properly handled with ExcessContentProvisionedV1 events")
 
             # Validate regular content provisioned events
             content_events = event_collector.get_events_for_batch(
                 TOPICS["content_provisioned"], batch_id_str
             )
-            assert len(content_events) == 3, f"Expected 3 content provisioned events, got {len(content_events)}"
+            assert len(content_events) == 3, (
+                f"Expected 3 content provisioned events, got {len(content_events)}"
+            )
             logger.info("✓ All content provisioned events emitted correctly")
 
     finally:

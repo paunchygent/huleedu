@@ -335,7 +335,9 @@ class SQLiteEssayStateStore:
                         existing_state.current_status.value,
                         json.dumps(existing_state.processing_metadata),
                         json.dumps({k: v.isoformat() for k, v in existing_state.timeline.items()}),
-                        json.dumps({k.value: v for k, v in existing_state.storage_references.items()}),
+                        json.dumps(
+                            {k.value: v for k, v in existing_state.storage_references.items()}
+                        ),
                         existing_state.updated_at.isoformat(),
                         internal_essay_id,
                     ),

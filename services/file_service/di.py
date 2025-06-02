@@ -36,8 +36,7 @@ class DefaultContentServiceClient:
         """Store content in Content Service and return storage ID."""
         try:
             async with self.http_session.post(
-                self.settings.CONTENT_SERVICE_URL,
-                data=content_bytes
+                self.settings.CONTENT_SERVICE_URL, data=content_bytes
             ) as response:
                 if response.status == 201:
                     result = await response.json()
@@ -64,11 +63,8 @@ class DefaultEventPublisher:
         self.producer = producer
         self.settings = settings
 
-
     async def publish_essay_content_provisioned(
-        self,
-        event_data: EssayContentProvisionedV1,
-        correlation_id: Optional[uuid.UUID]
+        self, event_data: EssayContentProvisionedV1, correlation_id: Optional[uuid.UUID]
     ) -> None:
         """Publish EssayContentProvisionedV1 event to Kafka."""
         try:
@@ -77,17 +73,14 @@ class DefaultEventPublisher:
                 event_type=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
                 source_service=self.settings.SERVICE_NAME,
                 correlation_id=correlation_id,
-                data=event_data
+                data=event_data,
             )
 
             # Serialize to JSON
-            message_bytes = json.dumps(envelope.model_dump(mode="json")).encode('utf-8')
+            message_bytes = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
 
             # Publish to Kafka
-            await self.producer.send(
-                self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
-                message_bytes
-            )
+            await self.producer.send(self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC, message_bytes)
 
             logger.info(
                 f"Published EssayContentProvisionedV1 event for file: "

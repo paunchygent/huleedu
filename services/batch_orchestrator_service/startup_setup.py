@@ -38,11 +38,11 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
             metrics = _create_metrics(registry)
 
             # Store metrics in app context (proper Quart pattern)
-            app.extensions = getattr(app, 'extensions', {})
-            app.extensions['metrics'] = metrics
+            app.extensions = getattr(app, "extensions", {})
+            app.extensions["metrics"] = metrics
 
             # Share batch operations metric with routes module (legacy support)
-            set_batch_operations_metric(metrics['batch_operations'])
+            set_batch_operations_metric(metrics["batch_operations"])
 
             # Get dependencies for Kafka consumer
             event_publisher = await request_container.get(BatchEventPublisherProtocol)
@@ -65,9 +65,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
             "and Kafka consumer initialized successfully."
         )
     except Exception as e:
-        logger.critical(
-            f"Failed to initialize Batch Orchestrator Service: {e}", exc_info=True
-        )
+        logger.critical(f"Failed to initialize Batch Orchestrator Service: {e}", exc_info=True)
         raise
 
 
@@ -96,19 +94,19 @@ async def shutdown_services() -> None:
 def _create_metrics(registry: CollectorRegistry) -> dict:
     """Create Prometheus metrics instances."""
     return {
-        'request_count': Counter(
+        "request_count": Counter(
             "http_requests_total",
             "Total HTTP requests",
             ["method", "endpoint", "status_code"],
             registry=registry,
         ),
-        'request_duration': Histogram(
+        "request_duration": Histogram(
             "http_request_duration_seconds",
             "HTTP request duration in seconds",
             ["method", "endpoint"],
             registry=registry,
         ),
-        'batch_operations': Counter(
+        "batch_operations": Counter(
             "batch_operations_total",
             "Total batch operations",
             ["operation", "status"],

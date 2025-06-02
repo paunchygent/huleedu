@@ -81,9 +81,7 @@ class TestProcessSingleMessage:
 
         # Verify protocol calls
         mock_content_client.fetch_content.assert_called_once_with(
-            storage_id=json.loads(kafka_message.value.decode("utf-8"))["data"][
-                "text_storage_id"
-            ],
+            storage_id=json.loads(kafka_message.value.decode("utf-8"))["data"]["text_storage_id"],
             http_session=mock_http_session,
         )
 

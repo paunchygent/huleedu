@@ -60,23 +60,20 @@ async def register_batch(
 
         logger.info(
             f"Batch {batch_id} registered successfully via service layer",
-            extra={"correlation_id": str(correlation_id)}
+            extra={"correlation_id": str(correlation_id)},
         )
 
         # Record metrics
         if BATCH_OPERATIONS:
             BATCH_OPERATIONS.labels(operation="register_batch", status="success").inc()
 
-        return jsonify({
-            "batch_id": batch_id,
-            "correlation_id": str(correlation_id),
-            "status": "registered"
-        }), 202
+        return jsonify(
+            {"batch_id": batch_id, "correlation_id": str(correlation_id), "status": "registered"}
+        ), 202
 
     except ValidationError as ve:
         logger.warning(
-            f"Batch registration validation error. Correlation ID: {correlation_id}",
-            exc_info=True
+            f"Batch registration validation error. Correlation ID: {correlation_id}", exc_info=True
         )
         if BATCH_OPERATIONS:
             BATCH_OPERATIONS.labels(operation="register_batch", status="validation_error").inc()
@@ -93,6 +90,8 @@ This endpoint is not used in production. It is used to test the DI functionality
 the service. The request endpoints will be removed as soon as request events owned by
 Essay Lifecycle Service are implemented.
 """
+
+
 @batch_bp.route("/trigger-spellcheck-test", methods=["POST"])
 @inject
 async def trigger_spellcheck_test_endpoint(

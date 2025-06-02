@@ -28,16 +28,15 @@ async def extract_text_from_file(file_content: bytes, file_name: str) -> str:
     Returns:
         Extracted text content as string
     """
-    if not file_name.lower().endswith('.txt'):
+    if not file_name.lower().endswith(".txt"):
         logger.warning(
-            f"Non-txt file received: {file_name}. "
-            f"Walking skeleton only supports .txt files."
+            f"Non-txt file received: {file_name}. Walking skeleton only supports .txt files."
         )
         return ""
 
     try:
         # Basic text extraction for .txt files
-        text = file_content.decode('utf-8', errors='ignore')
+        text = file_content.decode("utf-8", errors="ignore")
         logger.info(f"Successfully extracted {len(text)} characters from {file_name}")
         return text
     except Exception as e:

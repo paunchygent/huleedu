@@ -236,8 +236,6 @@ class BatchEssayTracker(Protocol):
         """Register batch expectations from BOS."""
         ...
 
-
-
     def assign_slot_to_content(
         self, batch_id: str, text_storage_id: str, original_file_name: str
     ) -> str | None:

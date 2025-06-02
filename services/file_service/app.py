@@ -26,15 +26,13 @@ app = Quart(__name__)
 
 # Prometheus metrics
 REQUEST_COUNT = Counter(
-    "file_service_requests_total",
-    "Total number of HTTP requests",
-    ["method", "endpoint", "status"]
+    "file_service_requests_total", "Total number of HTTP requests", ["method", "endpoint", "status"]
 )
 
 REQUEST_DURATION = Histogram(
     "file_service_request_duration_seconds",
     "HTTP request duration in seconds",
-    ["method", "endpoint"]
+    ["method", "endpoint"],
 )
 
 
@@ -90,15 +88,8 @@ async def after_request(response: Response) -> Response:
             status_code = str(response.status_code)
 
             # Record metrics
-            REQUEST_COUNT.labels(
-                method=method,
-                endpoint=endpoint,
-                status=status_code
-            ).inc()
-            REQUEST_DURATION.labels(
-                method=method,
-                endpoint=endpoint
-            ).observe(duration)
+            REQUEST_COUNT.labels(method=method, endpoint=endpoint, status=status_code).inc()
+            REQUEST_DURATION.labels(method=method, endpoint=endpoint).observe(duration)
 
     except Exception as e:
         logger.error(f"Error recording request metrics: {e}")

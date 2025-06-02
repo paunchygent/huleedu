@@ -3,8 +3,8 @@ import os
 _default_host = "0.0.0.0"
 _default_port = 7001  # Default port for File Service
 
-host = os.getenv('FILE_SERVICE_HOST', _default_host)
-port = int(os.getenv('FILE_SERVICE_HTTP_PORT', _default_port))
+host = os.getenv("FILE_SERVICE_HOST", _default_host)
+port = int(os.getenv("FILE_SERVICE_HTTP_PORT", _default_port))
 bind = f"{host}:{port}"
 workers = int(os.getenv("WEB_CONCURRENCY", 1))
 worker_class = "asyncio"

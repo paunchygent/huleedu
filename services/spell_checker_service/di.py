@@ -63,7 +63,7 @@ class SpellCheckerServiceProvider(Provider):
         return DefaultSpellcheckEventPublisher(
             kafka_event_type="huleedu.spellchecker.essay.concluded.v1",
             source_service_name="spell-checker-service",
-            kafka_output_topic="huleedu.essay.spellcheck.completed.v1"
+            kafka_output_topic="huleedu.essay.spellcheck.completed.v1",
         )
 
     # Note: SpellLogicProtocol will be provided per-message since it needs message-specific data

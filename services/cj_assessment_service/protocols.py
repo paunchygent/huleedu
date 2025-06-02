@@ -6,8 +6,7 @@ enabling clean architecture and testability.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Dict, List, Optional, Protocol
+from typing import Any, AsyncContextManager, Dict, List, Optional, Protocol, Tuple
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,30 +17,76 @@ class ContentClientProtocol(Protocol):
 
     async def fetch_content(self, storage_id: str) -> str:
         """Fetch essay text content by storage ID.
-        
+
         Args:
             storage_id: The storage reference ID for the essay text
-            
+
         Returns:
             The essay text content
-            
+
         Raises:
             Exception: If content cannot be fetched
         """
         ...
 
 
-class LLMInteractionProtocol(Protocol):
-    """Protocol for performing LLM-based essay comparisons."""
+class CacheProtocol(Protocol):
+    """Protocol for caching LLM responses."""
 
-    async def perform_comparisons(self, tasks: List[Any]) -> List[Any]:
-        """Perform comparative judgment on a list of comparison tasks.
-        
-        Args:
-            tasks: List of ComparisonTask objects
-            
+    def generate_hash(self, prompt: str) -> str:
+        """Generate a hash key for a given prompt."""
+        ...
+
+    def get_from_cache(self, cache_key: str) -> Dict[str, Any] | None:
+        """Retrieve data from cache using the provided key."""
+        ...
+
+    def add_to_cache(self, cache_key: str, data: Dict[str, Any]) -> None:
+        """Add data to cache with the provided key."""
+        ...
+
+    def clear_cache(self) -> None:
+        """Clear all cached data."""
+        ...
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        ...
+
+
+class RetryManagerProtocol(Protocol):
+    """Protocol for managing LLM API retry logic."""
+
+    async def with_retry(
+        self,
+        operation: Any,  # Callable coroutine
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tuple[Any, Optional[str]]:
+        """Execute operation with retry logic.
+
         Returns:
-            List of ComparisonResult objects
+            Tuple of (result, error_message)
+        """
+        ...
+
+
+class LLMProviderProtocol(Protocol):
+    """Protocol for individual LLM provider implementations."""
+
+    async def generate_comparison(
+        self,
+        user_prompt: str,
+        system_prompt_override: Optional[str] = None,
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+        """Generate a comparison assessment using the LLM.
+
+        Args:
+            user_prompt: The user prompt containing essay comparison request
+            system_prompt_override: Optional system prompt override
+
+        Returns:
+            Tuple of (response_data, error_message)
         """
         ...
 
@@ -49,10 +94,9 @@ class LLMInteractionProtocol(Protocol):
 class CJDatabaseProtocol(Protocol):
     """Protocol for all database interactions specific to CJ assessment."""
 
-    @asynccontextmanager
-    async def session(self) -> AsyncGenerator[AsyncSession, None]:
+    def session(self) -> AsyncContextManager[AsyncSession]:
         """Provide async database session context manager."""
-        ...
+        ...  # pragma: no cover
 
     async def create_new_cj_batch(
         self,
@@ -137,4 +181,19 @@ class CJEventPublisherProtocol(Protocol):
         self, failure_data: Any, correlation_id: Optional[UUID]
     ) -> None:
         """Publish CJ assessment failure event."""
+        ...
+
+
+class LLMInteractionProtocol(Protocol):
+    """Protocol for performing LLM-based essay comparisons."""
+
+    async def perform_comparisons(self, tasks: List[Any]) -> List[Any]:
+        """Perform comparative judgment on a list of comparison tasks.
+
+        Args:
+            tasks: List of ComparisonTask objects
+
+        Returns:
+            List of ComparisonResult objects
+        """
         ...

@@ -63,6 +63,7 @@ class DefaultSpellLogic(SpellLogicProtocol):
                     error_detail = "Failed to store corrected text (no storage_id returned)."
             except Exception as e:
                 from huleedu_service_libs.logging_utils import create_service_logger
+
                 logger = create_service_logger("spell_checker_service.spell_logic_impl")
                 logger.error(
                     f"Essay {essay_id}: Failed to store corrected text: {e}", exc_info=True

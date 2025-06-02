@@ -78,7 +78,9 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
                     continue
 
                 # Update essay status
-                await self.state_store.update_essay_status(essay_id, EssayStatus.AWAITING_SPELLCHECK)
+                await self.state_store.update_essay_status(
+                    essay_id, EssayStatus.AWAITING_SPELLCHECK
+                )
 
                 logger.info(
                     f"Updated essay {essay_id} status to AWAITING_SPELLCHECK",

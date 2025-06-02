@@ -15,24 +15,19 @@ class BatchRegistrationRequestV1(BaseModel):
     """
 
     expected_essay_count: int = Field(
-        ...,
-        description="Number of essays expected in this batch.",
-        gt=0
+        ..., description="Number of essays expected in this batch.", gt=0
     )
     essay_ids: List[str] = Field(
         ...,
         description="List of unique essay IDs that will be processed in this batch.",
-        min_length=1
+        min_length=1,
     )
     course_code: str = Field(
-        ...,
-        description="Course code associated with this batch (e.g., SV1, ENG5)."
+        ..., description="Course code associated with this batch (e.g., SV1, ENG5)."
     )
     class_designation: str = Field(
-        ...,
-        description="Class or group designation (e.g., 'Class 9A', 'Group Blue')."
+        ..., description="Class or group designation (e.g., 'Class 9A', 'Group Blue')."
     )
     essay_instructions: str = Field(
-        ...,
-        description="Instructions provided for the essay assignment."
+        ..., description="Instructions provided for the essay assignment."
     )

@@ -98,7 +98,7 @@ class BatchExpectation:
         assignment = SlotAssignment(
             internal_essay_id=internal_essay_id,
             text_storage_id=text_storage_id,
-            original_file_name=original_file_name
+            original_file_name=original_file_name,
         )
 
         # Update tracking state
@@ -141,7 +141,7 @@ class BatchExpectation:
             EssayProcessingInputRefV1(
                 essay_id=assignment.internal_essay_id,
                 text_storage_id=assignment.text_storage_id,
-                student_name=None  # Will be extracted later in the pipeline
+                student_name=None,  # Will be extracted later in the pipeline
             )
             for assignment in self.slot_assignments.values()
         ]

@@ -38,9 +38,7 @@ class BatchRepositoryProtocol(Protocol):
         """Saves or updates the detailed processing pipeline state for a batch."""
         ...
 
-    async def get_processing_pipeline_state(
-        self, batch_id: str
-    ) -> dict | None:
+    async def get_processing_pipeline_state(self, batch_id: str) -> dict | None:
         """Retrieves the detailed processing pipeline state for a batch.
 
         Args:

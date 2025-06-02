@@ -179,7 +179,7 @@ async def process_single_message(
         )
 
         # Extract language from the new event model
-        language = request_data.language if hasattr(request_data, 'language') else "en"
+        language = request_data.language if hasattr(request_data, "language") else "en"
 
         # Perform the spell check
         result_data = await spell_logic.perform_spell_check(

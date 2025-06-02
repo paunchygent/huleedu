@@ -36,12 +36,8 @@ class ContentServiceClientProtocol(Protocol):
 class EventPublisherProtocol(Protocol):
     """Protocol for publishing Kafka events."""
 
-
-
     async def publish_essay_content_provisioned(
-        self,
-        event_data: EssayContentProvisionedV1,
-        correlation_id: Optional[uuid.UUID]
+        self, event_data: EssayContentProvisionedV1, correlation_id: Optional[uuid.UUID]
     ) -> None:
         """
         Publish EssayContentProvisionedV1 event to Kafka.

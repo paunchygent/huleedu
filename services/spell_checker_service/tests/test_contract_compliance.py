@@ -136,9 +136,7 @@ class TestEventContractCompliance:
             published_event_data.storage_metadata.references[CORRECTED_TEXT_TYPE]["default"]
             == mock_corrected_storage_id
         )
-        assert (
-            published_event_data.system_metadata.processing_stage == ProcessingStage.COMPLETED
-        )
+        assert published_event_data.system_metadata.processing_stage == ProcessingStage.COMPLETED
 
     @pytest.mark.asyncio
     async def test_correlation_id_propagation(
