@@ -11,7 +11,7 @@ from models_api import ComparisonTask, EssayForComparison
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models_db import ComparisonPair as CJ_ComparisonPair
+from ..models_db import ComparisonPair as CJ_ComparisonPair
 
 logger = create_service_logger("cj_assessment_service.pair_generation")
 

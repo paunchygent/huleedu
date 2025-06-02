@@ -15,8 +15,8 @@ from models_api import ComparisonResult, EssayForComparison
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models_db import ComparisonPair as CJ_ComparisonPair
-from .models_db import ProcessedEssay as CJ_ProcessedEssay
+from ..models_db import ComparisonPair as CJ_ComparisonPair
+from ..models_db import ProcessedEssay as CJ_ProcessedEssay
 
 logger = create_service_logger("cj_assessment_service.scoring_ranking")
 

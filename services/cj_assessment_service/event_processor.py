@@ -17,7 +17,7 @@ from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
 
 from .config import Settings
-from .core_assessment_logic import run_cj_assessment_workflow
+from .core_logic.core_assessment_logic import run_cj_assessment_workflow
 from .protocols import (
     CJDatabaseProtocol,
     CJEventPublisherProtocol,

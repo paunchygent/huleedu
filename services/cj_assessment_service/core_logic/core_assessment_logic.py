@@ -12,15 +12,15 @@ from uuid import UUID
 from huleedu_service_libs.logging_utils import create_service_logger
 from models_api import ComparisonResult, ComparisonTask, EssayForComparison
 
-from . import pair_generation, scoring_ranking
-from .config import Settings
-from .enums_db import CJBatchStatusEnum
-from .protocols import (
+from ..config import Settings
+from ..enums_db import CJBatchStatusEnum
+from ..protocols import (
     CJDatabaseProtocol,
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
 )
+from . import pair_generation, scoring_ranking
 
 logger = create_service_logger("cj_assessment_service.core_assessment_logic")
 
