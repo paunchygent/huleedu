@@ -57,6 +57,7 @@ class ProcessingEvent(str, Enum):
 
     # -------------  Specialized service commands  -------------#
     BATCH_SPELLCHECK_INITIATE_COMMAND = "batch.spellcheck.initiate.command"
+    BATCH_CJ_ASSESSMENT_INITIATE_COMMAND = "batch.cj_assessment.initiate.command"
 
     # -------------  Results from specialised services -############
     ESSAY_SPELLCHECK_RESULT_RECEIVED = (
@@ -65,6 +66,9 @@ class ProcessingEvent(str, Enum):
     ESSAY_SPELLCHECK_REQUESTED = (
         "essay.spellcheck.requested"  # Input to spellchecker (added for clarity)
     )
+    ELS_CJ_ASSESSMENT_REQUESTED = "els.cj_assessment.requested"
+    CJ_ASSESSMENT_COMPLETED = "cj_assessment.completed"
+    CJ_ASSESSMENT_FAILED = "cj_assessment.failed"
     ESSAY_NLP_RESULT_RECEIVED = "essay.nlp.result.received"
     ESSAY_AIFEEDBACK_RESULT_RECEIVED = "essay.aifeedback.result.received"
     ESSAY_EDITOR_REVISION_RESULT_RECEIVED = "essay.editor_revision.result.received"
@@ -85,6 +89,12 @@ _TOPIC_MAPPING = {
     ProcessingEvent.EXCESS_CONTENT_PROVISIONED: "huleedu.els.excess.content.provisioned.v1",
     ProcessingEvent.BATCH_ESSAYS_READY: "huleedu.els.batch.essays.ready.v1",
     ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND: "huleedu.els.spellcheck.initiate.command.v1",
+    ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND: (
+        "huleedu.batch.cj_assessment.initiate.command.v1"
+    ),
+    ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED: "huleedu.els.cj_assessment.requested.v1",
+    ProcessingEvent.CJ_ASSESSMENT_COMPLETED: "huleedu.cj_assessment.completed.v1",
+    ProcessingEvent.CJ_ASSESSMENT_FAILED: "huleedu.cj_assessment.failed.v1",
     # Add more mappings as needed for other events - EACH MUST BE EXPLICIT
 }
 

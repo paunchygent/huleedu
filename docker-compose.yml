@@ -243,4 +243,27 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 20s 
+      start_period: 20s
+
+  cj_assessment_service:
+    build:
+      context: .
+      dockerfile: services/cj_assessment_service/Dockerfile
+    container_name: huleedu_cj_assessment_service
+    restart: unless-stopped
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      content_service:
+        condition: service_healthy
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "9095:9090"  # Metrics port
+    environment:
+      - ENV_TYPE=docker
+      - CJ_ASSESSMENT_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CJ_ASSESSMENT_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
+      - CJ_ASSESSMENT_SERVICE_LOG_LEVEL=INFO
+      - CJ_ASSESSMENT_SERVICE_METRICS_PORT=9090
+    # Note: cj_assessment_service is a worker service with metrics endpoint only 

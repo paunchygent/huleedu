@@ -51,7 +51,7 @@ This section outlines the creation of the new **File Service**. It will be an HT
         * `CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"`
         * `ESSAY_CONTENT_READY_TOPIC: str` - **✅ CORRECTLY DERIVED** using `topic_name(ProcessingEvent.ESSAY_CONTENT_READY)`
         * `HTTP_PORT: int = 7001`
-        * `PROMETHEUS_PORT: int = 9094` 
+        * `PROMETHEUS_PORT: int = 9094`
         * **📝 DEVIATION**: Changed Prometheus port from suggested 9092 to 9094 to avoid conflict with Kafka in docker-compose.yml
     * **✅ IMPLEMENTED**: `SettingsConfigDict` with `env_prefix="FILE_SERVICE_"` and `.env` file loading.
     * **✅ IMPLEMENTED**: Followed standard structure from existing services.
@@ -109,13 +109,13 @@ This section outlines the creation of the new **File Service**. It will be an HT
 7. **Implement API Routes (`services/file_service/api/`)** - ✅ COMPLETED:
     * **✅ IMPLEMENTED**: Created directory `services/file_service/api/` with `__init__.py`.
     * **✅ IMPLEMENTED**: `health_routes.py` following exact pattern from existing services:
-        * `health_bp = Blueprint('health_routes', __name__)` 
+        * `health_bp = Blueprint('health_routes', __name__)`
         * `/healthz` endpoint returning service status JSON
         * `/metrics` endpoint using `generate_latest` from `prometheus_client`
         * Proper integration with Dishka dependency injection
     * **✅ IMPLEMENTED**: `file_routes.py` with complete batch upload functionality:
         * **✅ FULLY IMPLEMENTED**: `POST /v1/files/batch` endpoint with complete functionality:
-            * Proper form data validation for `batch_id` and `files` 
+            * Proper form data validation for `batch_id` and `files`
             * Correlation ID generation for batch tracking
             * Concurrent file processing using `asyncio.create_task`
             * Error handling for missing batch_id or files
@@ -180,46 +180,52 @@ This section outlines the creation of the new **File Service**. It will be an HT
 ## Testing Results and Verification
 
 ### Linting and Type Checking - ✅ PASSED
+
 * **Command**: `pdm run lint-all` and `pdm run typecheck-all`
 * **Result**: All linting and type checking issues resolved
 * **Issues Fixed**:
-  - Line length violations in `hypercorn_config.py` 
-  - MyPy type annotation issues in `di.py` for JSON response handling
-  - Missing Response import and type annotation in `app.py`
+  * Line length violations in `hypercorn_config.py`
+  * MyPy type annotation issues in `di.py` for JSON response handling
+  * Missing Response import and type annotation in `app.py`
 
 ### Docker Container Build and Deployment - ✅ PASSED
-* **Commands**: 
-  - `docker-compose build file_service --no-cache`
-  - `docker-compose up -d`
+
+* **Commands**:
+  * `docker-compose build file_service --no-cache`
+  * `docker-compose up -d`
 * **Result**: Service builds and starts successfully
-* **Issues Fixed**: 
-  - Port conflict resolution (changed Prometheus port from 9092 to 9094)
-  - PDM dependency resolution conflicts resolved
+* **Issues Fixed**:
+  * Port conflict resolution (changed Prometheus port from 9092 to 9094)
+  * PDM dependency resolution conflicts resolved
 
 ### API Endpoint Testing - ✅ PASSED
 
 #### Health Endpoints
+
 * **`GET /healthz`**: ✅ Returns `{"message": "File Service is healthy", "status": "ok"}`
 * **`GET /metrics`**: ✅ Returns Prometheus metrics (empty initially, as expected)
 
 #### Batch Upload Endpoint Testing
+
 * **Valid Upload Test**: ✅ PASSED
-  - **Command**: `curl -X POST http://localhost:7001/v1/files/batch -F "batch_id=test-batch-final-001" -F "files=@test_uploads/essay1.txt" -F "files=@test_uploads/essay2.txt"`
-  - **Result**: HTTP 202 Accepted with proper JSON response including batch_id and correlation_id
-  - **Verification**: Service logs show successful text extraction, Content Service storage, and Kafka event publishing
+  * **Command**: `curl -X POST http://localhost:7001/v1/files/batch -F "batch_id=test-batch-final-001" -F "files=@test_uploads/essay1.txt" -F "files=@test_uploads/essay2.txt"`
+  * **Result**: HTTP 202 Accepted with proper JSON response including batch_id and correlation_id
+  * **Verification**: Service logs show successful text extraction, Content Service storage, and Kafka event publishing
 
 * **Error Handling Tests**: ✅ PASSED
-  - **Missing batch_id**: ✅ Returns HTTP 400 with `{"error": "batch_id is required in form data."}`
-  - **No files provided**: ✅ Returns HTTP 400 with `{"error": "No files provided in 'files' field."}`
-  - **Mixed file types**: ✅ Processes .txt files, logs warnings for non-.txt files
+  * **Missing batch_id**: ✅ Returns HTTP 400 with `{"error": "batch_id is required in form data."}`
+  * **No files provided**: ✅ Returns HTTP 400 with `{"error": "No files provided in 'files' field."}`
+  * **Mixed file types**: ✅ Processes .txt files, logs warnings for non-.txt files
 
 #### End-to-End Processing Verification
+
 * **Text Extraction**: ✅ Successfully extracts text from .txt files (207 and 204 characters logged)
 * **Content Storage**: ✅ Successfully stores content in Content Service (storage_ids received)
 * **Event Publishing**: ✅ Successfully publishes `EssayContentReady` events to Kafka topic `huleedu.file.essay.content.ready.v1`
 * **Correlation Tracking**: ✅ Proper correlation ID propagation through all processing steps
 
 ### Critical Issues Discovered and Fixed During Testing
+
 1. **📝 CRITICAL**: `await file_storage.read()` → `file_storage.read()` (Quart's synchronous file reading)
 2. **📝 CRITICAL**: `json.dumps(envelope.model_dump())` → `json.dumps(envelope.model_dump(mode="json"))` (UUID serialization)
 3. **📝 DEPLOYMENT**: Port conflict resolution in docker-compose.yml
@@ -341,12 +347,13 @@ Create `services/file_service/` directory with all specified core files:
 #### 6. End-to-End Flow Verification - 🔄 NEXT PHASE
 
 **✅ COMPLETED - File Service Integration**:
-- File Service successfully receives batch uploads
-- Text extraction and content storage working end-to-end
-- Kafka event publishing confirmed with proper event structure
-- All services start and run in Docker Compose without File Service-related errors
+* File Service successfully receives batch uploads
+* Text extraction and content storage working end-to-end
+* Kafka event publishing confirmed with proper event structure
+* All services start and run in Docker Compose without File Service-related errors
 
 **🔄 REMAINING - Full Walking Skeleton Flow** (Next Phase Testing):
+
 1. Register batch via BOS API (`POST /v1/batches/register`)
 2. Upload files via File Service API (`POST /v1/files/batch`) ✅ COMPLETED
 3. Verify ELS logs for:
@@ -361,11 +368,13 @@ Create `services/file_service/` directory with all specified core files:
 ## Next Steps and Recommendations
 
 ### Immediate Next Steps (Walking Skeleton Completion)
+
 1. **End-to-End Testing**: Execute the full walking skeleton flow from BOS batch registration through File Service upload to ELS processing
 2. **Event Flow Verification**: Confirm ELS properly consumes `EssayContentReady` events and produces `BatchEssaysReady` events
 3. **Integration Testing**: Verify BOS consumption of `BatchEssaysReady` and pipeline command emission
 
 ### Future Enhancements (Post-Walking Skeleton)
+
 1. **Student Info Parsing**: Replace stub implementation in `parse_student_info` with actual regex-based extraction
 2. **File Format Support**: Extend beyond .txt files to support .doc, .docx, .pdf formats
 3. **Batch Size Limits**: Implement configurable limits on batch size and file size
@@ -373,7 +382,8 @@ Create `services/file_service/` directory with all specified core files:
 5. **Comprehensive Testing**: Add unit tests, integration tests, and contract tests
 
 ### Quality Assurance Notes for Planning Team
+
 - **UUID Serialization**: Future Pydantic model serialization for Kafka events must use `mode="json"` parameter
-- **Quart File Handling**: File storage objects use synchronous `.read()` method, not async
-- **Port Management**: Ensure unique port allocation in docker-compose.yml to avoid conflicts
-- **PDM Dependencies**: Avoid version pinning in service dependencies to prevent resolution conflicts
+* **Quart File Handling**: File storage objects use synchronous `.read()` method, not async
+* **Port Management**: Ensure unique port allocation in docker-compose.yml to avoid conflicts
+* **PDM Dependencies**: Avoid version pinning in service dependencies to prevent resolution conflicts

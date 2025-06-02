@@ -1,0 +1,75 @@
+[project]
+name = "huleedu-cj-assessment-service"
+version = "0.1.0"
+description = "HuleEdu Comparative Judgment Assessment Service"
+authors = [
+    { name = "Olof Larsson", email = "paunchygent@gmail.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "aiokafka",
+    "aiohttp",
+    "python-dotenv",
+    # For common_core as a local path dependency:
+    "huleedu-common-core",
+    "huleedu-service-libs",
+    "pydantic",
+    "pydantic-settings",
+    "prometheus-client",
+    "dishka",
+    # Database dependencies
+    "SQLAlchemy[asyncio]",
+    "aiosqlite",
+    # CJ-specific dependencies
+    "cachetools",
+    "diskcache",
+    "choix",  # Bradley-Terry scoring
+    "numpy",
+    "tenacity",  # Retry logic
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = false
+
+# Package configuration for proper imports
+[tool.pdm.dev-dependencies]
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-mock",
+    "pytest-cov",
+]
+
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/common_core"
+huleedu-service-libs = "file:///app/services/libs"
+
+[tool.pdm.scripts]
+start_worker = "python worker_main.py"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+ignore_missing_imports = false
+check_untyped_defs = true
+
+# External libraries without official type stubs
+[[tool.mypy.overrides]]
+module = [
+    "dishka.*",
+    "choix.*",
+]
+ignore_missing_imports = true
+
+# Service-local modules
+[[tool.mypy.overrides]]
+module = [
+    "di",
+    "protocols",
+    "config",
+]
+ignore_missing_imports = true 

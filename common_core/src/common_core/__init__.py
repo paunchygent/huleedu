@@ -38,6 +38,11 @@ from .events.batch_coordination_events import (
     BatchReadinessTimeout,
     ExcessContentProvisionedV1,
 )
+from .events.cj_assessment_events import (
+    CJAssessmentCompletedV1,
+    CJAssessmentFailedV1,
+    ELS_CJAssessmentRequestV1,
+)
 from .events.envelope import EventEnvelope
 from .events.file_events import (
     EssayContentProvisionedV1,
@@ -88,6 +93,9 @@ __all__ = [
     "SpellcheckRequestedDataV1",
     "SpellcheckResultDataV1",
     "AIFeedbackInputDataV1",
+    "ELS_CJAssessmentRequestV1",
+    "CJAssessmentCompletedV1",
+    "CJAssessmentFailedV1",
     # Batch Coordination Event Models
     "BatchEssaysRegistered",
     "BatchEssaysReady",
@@ -128,3 +136,6 @@ BatchReadinessTimeout.model_rebuild(raise_errors=True)
 ExcessContentProvisionedV1.model_rebuild(raise_errors=True)
 
 EssayContentProvisionedV1.model_rebuild(raise_errors=True)
+ELS_CJAssessmentRequestV1.model_rebuild(raise_errors=True)
+CJAssessmentCompletedV1.model_rebuild(raise_errors=True)
+CJAssessmentFailedV1.model_rebuild(raise_errors=True)
