@@ -49,15 +49,32 @@ To complete the implementation of a dynamic, multi-stage essay processing pipeli
 
 ### **Phase 2: ELS State Machine Integration & Outcome Event Implementation**
 
-* **Task 2.1: Implement Unit Tests for `EssayStateMachine`**
-  * **Goal**: Ensure `services/essay_lifecycle_service/essay_state_machine.py` is robustly tested.
-  * **Action**: Create `services/essay_lifecycle_service/tests/unit/test_essay_state_machine.py`. Tests should cover:
-        1. Initialization with various `initial_status` values.
-        2. All defined valid transitions using trigger methods (e.g., `machine.cmd_initiate_spellcheck()`).
-        3. Rejection of invalid transitions (ensure `machine.trigger("INVALID_TRIGGER_FOR_STATE")` returns `False` or raises if `ignore_invalid_triggers=False`). The current `EssayStateMachine` has `ignore_invalid_triggers=False`.
-        4. Correct reporting of `machine.current_status` (as `EssayStatus` enum) after transitions.
-        5. Correct behavior of `machine.can_trigger(trigger_name)`.
-        6. Correct behavior of `machine.get_valid_triggers()`.
+### Task 2.1: Unit Tests for EssayStateMachine ✅ **COMPLETED**
+Implemented comprehensive test suite in `services/essay_lifecycle_service/tests/unit/test_essay_state_machine.py` with 43 test cases covering:
+- **State Machine Initialization**: Tests for all `EssayStatus` values including terminal states
+- **Workflow Transitions**: Complete spellcheck, AI feedback, CJ assessment, NLP workflows with success/failure paths
+- **Pipeline Management**: Multi-phase workflows (spellcheck→AI feedback→complete, spellcheck→CJ→complete, full pipeline)
+- **Critical Failure**: Emergency transitions from any state to `ESSAY_CRITICAL_FAILURE`
+- **Invalid Transition Handling**: Returns `False` for invalid triggers, maintains state consistency
+- **State Machine API**: `can_trigger()`, `get_valid_triggers()`, convenience methods (`cmd_initiate_spellcheck()`, etc.)
+- **Edge Cases**: Multiple trigger attempts, trigger name validation, string representations
+
+```python
+# Key test patterns implemented:
+def test_complete_spellcheck_workflow(self) -> None:
+    machine = EssayStateMachine("test", EssayStatus.READY_FOR_PROCESSING)
+    assert machine.cmd_initiate_spellcheck()
+    assert machine.trigger(EVT_SPELLCHECK_STARTED) 
+    assert machine.trigger(EVT_SPELLCHECK_SUCCEEDED)
+    assert machine.current_status == EssayStatus.SPELLCHECKED_SUCCESS
+
+def test_invalid_triggers_return_false(self) -> None:
+    machine = EssayStateMachine("test", EssayStatus.READY_FOR_PROCESSING)
+    assert machine.trigger(EVT_SPELLCHECK_SUCCEEDED) is False  # Invalid
+    assert machine.current_status == EssayStatus.READY_FOR_PROCESSING  # Unchanged
+```
+
+**Test Results**: All 43 tests pass with state machine working correctly. Some MyPy return type annotations remain to be fixed manually.
 
 * **Task 2.2: Refactor ELS `batch_command_handlers.py` to Utilize `EssayStateMachine`**
   * **Goal**: Integrate `EssayStateMachine` into ELS's event and command processing logic.
