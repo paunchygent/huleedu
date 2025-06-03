@@ -145,9 +145,9 @@ The entire HuleEdu system, including Kafka and all microservices, can be run loc
 
     This command will start all services defined in `docker-compose.yml` in detached mode. It includes Zookeeper, Kafka, the `kafka_topic_setup` one-shot service for automatic topic creation, and all HuleEdu microservices.
 
-## Current Development Status & Focus (Sprint 1 ✅ COMPLETED | Walking Skeleton PRODUCTION-READY → Phase 2 Ready)
+## Current Development Status & Focus (Dynamic Pipeline Orchestration - Phase 3 ✅ COMPLETED)
 
-🎉 **Walking Skeleton Completion & Validation Achieved** - The project has successfully completed Sprint 1 with a fully functional, tested, and validated end-to-end essay processing pipeline. Recent achievements include:
+🚀 **Dynamic Pipeline Orchestration Achieved** - The project has successfully implemented Phases 1-3 of the Dynamic Pipeline Orchestration with ELS State Machine refactoring. Current status includes:
 
 * **Core Services Implemented** ✅:
   * **Content Service**: HTTP API with filesystem storage backend
@@ -173,29 +173,34 @@ The entire HuleEdu system, including Kafka and all microservices, can be run loc
   * **Logging**: Centralized correlation ID tracking and structured logging
   * **Dependency Management**: PDM monorepo with proper version resolution
 
-* **Walking Skeleton Validation** ✅:
-  * **End-to-End Flow**: Batch registration → File upload → Content provisioning → Slot assignment → Command processing → Service dispatch
-  * **Infrastructure Health**: All services healthy and communicating via Kafka
-  * **Event Architecture**: Complete event flow validated with proper essay ID coordination
-  * **Comprehensive Testing**: Phase 6 integration testing completed with all critical issues resolved
-  * **Production Readiness**: System validated and ready for Phase 2 development
+* **Dynamic Pipeline Orchestration** ✅:
+  * **Phase 1**: Common core event contracts (`ELSBatchPhaseOutcomeV1`, topic mapping, enums)
+  * **Phase 2**: ELS State Machine (transitions library, `EssayStateMachine`, state validation)
+  * **Phase 3**: BOS Dynamic Pipeline Orchestration (pipeline state management, Kafka consumer updates)
+  * **Event Architecture**: `ELSBatchPhaseOutcomeV1` events enable dynamic multi-phase orchestration
+  * **Pipeline Sequences**: Support for flexible pipeline definitions (Spellcheck → CJ Assessment, etc.)
 
-* **Critical Issues Resolved** ✅:
-  * **Essay ID Coordination**: Architecture fix completely eliminates original coordination mismatch
-  * **BOS Kafka Consumer**: ProcessingPipelineState handling bug identified and fixed
-  * **Event Models**: All new contracts (`EssayContentProvisionedV1`, `BatchEssaysReady` v2) working correctly
-  * **Test Infrastructure**: File Service integration tests fixed and passing (8/8)
+* **Architecture Enhancements** ✅:
+  * **State Machine Integration**: Formal state transitions using transitions library in ELS
+  * **Pipeline State Management**: `ProcessingPipelineState` tracking through multi-phase sequences
+  * **Event-Driven Orchestration**: BOS consumes phase outcomes and triggers next-phase commands
+  * **Phase 4 Testing Ready**: Foundation tests (7/7) and testing strategy documented
 
 For detailed implementation and testing history, refer to:
 
-* `Documentation/TASKS/WALKING_SKELETON_E2E_TESTING_PLAN.md` (Testing validation)
-* `Documentation/TASKS/ESSAY_ID_COORDINATION_ARCHITECTURE_FIX.md` (Architecture implementation)
+* `Documentation/TASKS/ELS_AND_BOS_STATE_MACHINE_TASK_TICKET.md` (Current implementation status)
+* `Documentation/TASKS/PHASE_4_TESTING_STRATEGY.md` (E2E testing approach)
 
 ## Planned Services and Enhancements
 
-The HuleEdu platform continues evolving beyond Sprint 1. The following services and capabilities are planned for future development:
+The HuleEdu platform continues evolving with dynamic pipeline orchestration. The following capabilities are planned for future development:
 
-* **Phase 2 - AI Processing Pipeline**:
+* **Phase 4 - End-to-End Validation (In Progress)**:
+  * Enhanced E2E testing framework following walking skeleton methodology
+  * Multi-pipeline sequence validation (Spellcheck → CJ Assessment, etc.)
+  * Partial success scenario testing and essay filtering validation
+
+* **Future Enhancements - Extended Pipeline Services**:
   * **AI Feedback Service**: AI-generated feedback on student essays  
   * **NLP Metrics Service**: Detailed Natural Language Processing metrics extraction
   * ~~**CJ (Comparative Judgement) Assessment Service**~~: ✅ **IMPLEMENTED** - AI-driven comparative judgement of essays with dynamic LLM configuration

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class BatchRegistrationRequestV1(BaseModel):
@@ -17,9 +17,11 @@ class BatchRegistrationRequestV1(BaseModel):
     expected_essay_count: int = Field(
         ..., description="Number of essays expected in this batch.", gt=0
     )
-    essay_ids: List[str] = Field(
-        ...,
-        description="List of unique essay IDs that will be processed in this batch.",
+    essay_ids: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Optional list of unique essay IDs. If not provided, BOS will auto-generate IDs."
+        ),
         min_length=1,
     )
     course_code: str = Field(
@@ -27,6 +29,9 @@ class BatchRegistrationRequestV1(BaseModel):
     )
     class_designation: str = Field(
         ..., description="Class or group designation (e.g., 'Class 9A', 'Group Blue')."
+    )
+    teacher_name: str = Field(
+        ..., description="Name of the teacher or instructor for this batch."
     )
     essay_instructions: str = Field(
         ..., description="Instructions provided for the essay assignment."
@@ -41,6 +46,17 @@ class BatchRegistrationRequestV1(BaseModel):
     cj_default_temperature: Optional[float] = Field(
         default=None, ge=0.0, le=2.0, description="Default temperature for CJ assessment LLM."
     )
+
+    @model_validator(mode='after')
+    def validate_essay_count_consistency(self) -> 'BatchRegistrationRequestV1':
+        """Validate that essay_ids length matches expected_essay_count when provided."""
+        if self.essay_ids is not None:
+            if len(self.essay_ids) != self.expected_essay_count:
+                raise ValueError(
+                    f"Length of essay_ids ({len(self.essay_ids)}) must match "
+                    f"expected_essay_count ({self.expected_essay_count})"
+                )
+        return self
 
 
 class BatchStatusResponseV1(BaseModel):

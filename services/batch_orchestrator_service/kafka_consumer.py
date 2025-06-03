@@ -83,10 +83,10 @@ class BatchKafkaConsumer:
 
     async def start_consumer(self) -> None:
         """Start the Kafka consumer and begin processing messages."""
-        # Subscribe to BatchEssaysReady topic and batch phase concluded topic (Sub-task 2.1.3)
+        # Subscribe to BatchEssaysReady topic and ELS batch phase outcome topic (Phase 3)
         topics = [
             topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
-            "huleedu.els.batch_phase.concluded.v1",  # For phase transition handling
+            "huleedu.els.batch_phase.outcome.v1",  # ELSBatchPhaseOutcomeV1 events from ELS
         ]
 
         # TODO: Add subscription to ExcessContentProvisionedV1 topic for handling
@@ -169,8 +169,8 @@ class BatchKafkaConsumer:
         try:
             if msg.topic == topic_name(ProcessingEvent.BATCH_ESSAYS_READY):
                 await self._handle_batch_essays_ready(msg)
-            elif msg.topic == "huleedu.els.batch_phase.concluded.v1":
-                await self._handle_batch_phase_concluded(msg)
+            elif msg.topic == "huleedu.els.batch_phase.outcome.v1":
+                await self._handle_els_batch_phase_outcome(msg)
             else:
                 logger.warning(f"Received message from unknown topic: {msg.topic}")
 
@@ -309,41 +309,45 @@ class BatchKafkaConsumer:
             logger.error(f"Error handling BatchEssaysReady message: {e}", exc_info=True)
             raise
 
-    async def _handle_batch_phase_concluded(self, msg: Any) -> None:
+    async def _handle_els_batch_phase_outcome(self, msg: Any) -> None:
         """
-        Handle batch phase concluded events from ELS to trigger next pipeline phase.
+        Handle ELSBatchPhaseOutcomeV1 events from ELS for dynamic pipeline orchestration.
 
-        This handles sub-task 2.1.3: Consumption of ELS Notifications & Batch State Update.
-        Delegates to the pipeline phase coordinator for proper phase transition logic.
+        This implements Phase 3 Sub-task 2: Handle ELSBatchPhaseOutcomeV1 Event.
+        Upon receiving phase completion, determines next phase and publishes appropriate command.
         """
         try:
-            # Deserialize the batch phase concluded event
+            # Deserialize the ELSBatchPhaseOutcomeV1 event
             message_data = json.loads(msg.value.decode("utf-8"))
 
-            # Extract relevant data from the event
+            # Parse as EventEnvelope but access data directly since we don't have the
+            # ELSBatchPhaseOutcomeV1 import in this file
             event_data = message_data.get("data", {})
-            batch_id = event_data.get("entity_ref", {}).get("entity_id")
-            completed_phase = event_data.get("phase")
-            phase_status = event_data.get("status")
-            correlation_id = message_data.get("correlation_id", "")
+            batch_id = event_data.get("batch_id")
+            completed_phase = event_data.get("phase_name")
+            phase_status = event_data.get("phase_status")
+            processed_essays = event_data.get("processed_essays", [])
+            failed_essay_ids = event_data.get("failed_essay_ids", [])
+            correlation_id = message_data.get("correlation_id")
 
             if not batch_id or not completed_phase:
                 logger.warning(
-                    "Received batch phase concluded event with missing batch_id or phase"
+                    "Received ELSBatchPhaseOutcomeV1 event with missing batch_id or phase_name"
                 )
                 return
 
             logger.info(
-                f"Received batch phase concluded: batch={batch_id}, "
-                f"phase={completed_phase}, status={phase_status}",
+                f"Received ELS batch phase outcome: batch={batch_id}, "
+                f"phase={completed_phase}, status={phase_status}, "
+                f"processed={len(processed_essays)}, failed={len(failed_essay_ids)}",
                 extra={"correlation_id": str(correlation_id)},
             )
 
-            # Delegate to phase coordinator for proper handling
+            # Delegate to phase coordinator for pipeline orchestration
             await self.phase_coordinator.handle_phase_concluded(
                 batch_id, completed_phase, phase_status, correlation_id
             )
 
         except Exception as e:
-            logger.error(f"Error handling batch phase concluded event: {e}", exc_info=True)
+            logger.error(f"Error handling ELSBatchPhaseOutcomeV1 event: {e}", exc_info=True)
             raise

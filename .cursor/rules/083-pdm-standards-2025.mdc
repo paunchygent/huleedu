@@ -99,6 +99,12 @@ pdm update
 pdm install
 ```
 
+### 4.2. MyPy Missing Stubs Management
+- **FORBIDDEN**: Creating `py.typed` marker files for internal modules
+- **REQUIRED**: Add modules without type stubs to `[tool.mypy]` external libraries section
+- **Pattern**: Add to existing overrides with `ignore_missing_imports = true`
+- **Examples**: Third-party libraries like `"transitions.*"` or local modules like `"essay_state_machine"`
+
 ## 5. VS Code Configuration
 
 ### 5.1. Avoid Deprecated Ruff Extension Settings

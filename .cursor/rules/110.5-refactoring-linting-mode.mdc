@@ -80,6 +80,11 @@ touch implementations/py.typed
 - Use `ruff check --fix --force-exclude .` for auto-fixable issues first
 - Address MyPy errors with correct type hints
 
+### 4.1. MyPy Missing Stubs Pattern
+- **FORBIDDEN**: Creating `py.typed` marker files for internal modules
+- **REQUIRED**: Add modules without type stubs to `pyproject.toml` MyPy external libraries section
+- **Example**: `"transitions.*"`, `"essay_state_machine"` with `ignore_missing_imports = true`
+
 ## 5. Refactoring Best Practices
 - Improve readability and reduce complexity
 - Remove duplication without changing external behavior

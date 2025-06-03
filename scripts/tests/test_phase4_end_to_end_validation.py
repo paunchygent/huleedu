@@ -55,7 +55,7 @@ def test_pipeline_sequence_definitions():
         assert sequence_metadata['spellcheck_ai_nlp']['has_nlp']
         assert sequence_metadata['minimal']['stage_count'] == 1
 
-        print(f"✅ Pipeline sequence definitions validated for {len(test_sequences)} different scenarios")
+        print(f"✅ Pipeline sequence definitions validated for {len(test_sequences)} scenarios")
         return True, sequence_metadata
 
     except ImportError as e:
@@ -216,19 +216,23 @@ def test_event_envelope_integration():
     try:
         from common_core.enums import ProcessingEvent, topic_name
         from common_core.events.envelope import EventEnvelope
+        from common_core.metadata_models import EssayProcessingInputRefV1
 
-        # Test creating event envelope for existing events
-        test_data = {'test_field': 'test_value'}
+        # Test creating event envelope with proper Pydantic data
+        test_essay_data = EssayProcessingInputRefV1(
+            essay_id='test-essay-123',
+            text_storage_id='test-storage-456'
+        )
 
         envelope = EventEnvelope(
             event_type=topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
             source_service='test-service',
-            data=test_data
+            data=test_essay_data
         )
 
         assert envelope.event_type is not None
         assert envelope.source_service == 'test-service'
-        assert envelope.data == test_data
+        assert envelope.data.essay_id == 'test-essay-123'
         assert envelope.event_id is not None
         assert envelope.event_timestamp is not None
 
@@ -289,20 +293,20 @@ def test_integration_validation_checklist():
     }
 
     try:
-        # Check common_core models
-        from common_core.enums import EssayStatus, ProcessingEvent
+        # Check common_core models (test imports only)
+        import common_core.enums  # noqa: F401
         checklist['common_core_models'] = True
 
-        # Check pipeline models
-        from common_core.pipeline_models import ProcessingPipelineState
+        # Check pipeline models (test imports only)
+        import common_core.pipeline_models  # noqa: F401
         checklist['pipeline_models'] = True
 
-        # Check event infrastructure
-        from common_core.events.envelope import EventEnvelope
+        # Check event infrastructure (test imports only)
+        import common_core.events.envelope  # noqa: F401
         checklist['event_infrastructure'] = True
 
-        # Check metadata models
-        from common_core.metadata_models import EssayProcessingInputRefV1
+        # Check metadata models (test imports only)
+        import common_core.metadata_models  # noqa: F401
         checklist['metadata_models'] = True
 
     except ImportError as e:
