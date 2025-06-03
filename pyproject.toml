@@ -153,6 +153,8 @@ module = [
     "diskcache.*",
     "choix.*",
     "tenacity.*",
+    "transitions.*",  # State machine library without type stubs
+    "essay_state_machine",  # Local module without py.typed marker
 ]
 ignore_missing_imports = true
 

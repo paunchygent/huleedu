@@ -49,10 +49,10 @@ def test_pipeline_sequence_definitions():
 
         # Validate sequence properties
         assert sequence_metadata['spellcheck_cj']['stage_count'] == 2
-        assert sequence_metadata['spellcheck_cj']['has_cj'] == True
+        assert sequence_metadata['spellcheck_cj']['has_cj']
         assert sequence_metadata['spellcheck_ai_nlp']['stage_count'] == 3
-        assert sequence_metadata['spellcheck_ai_nlp']['has_ai'] == True
-        assert sequence_metadata['spellcheck_ai_nlp']['has_nlp'] == True
+        assert sequence_metadata['spellcheck_ai_nlp']['has_ai']
+        assert sequence_metadata['spellcheck_ai_nlp']['has_nlp']
         assert sequence_metadata['minimal']['stage_count'] == 1
 
         print(f"✅ Pipeline sequence definitions validated for {len(test_sequences)} different scenarios")

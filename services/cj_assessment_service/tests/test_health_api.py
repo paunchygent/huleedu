@@ -123,7 +123,7 @@ class TestAppCreation:
     async def test_app_error_handler_registration(self) -> None:
         """Test that global error handler is registered."""
         app = create_app()
-        client = app.test_client()
+        app.test_client()
 
         # Test that the error handler works by triggering an error
         # We'll test this indirectly by confirming the app doesn't crash

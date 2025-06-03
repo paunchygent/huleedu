@@ -4,7 +4,7 @@ Phase 2 Validation: ELS State Machine Implementation
 
 This script validates:
 1. transitions library dependency
-2. EssayStateMachine class implementation 
+2. EssayStateMachine class implementation
 3. State machine integration with ELS components
 4. Batch-level phase completion tracking
 
@@ -38,7 +38,7 @@ def test_transitions_library():
             initial='A'
         )
 
-        assert test_model.state == 'A'
+        assert test_model.state == 'A'  # type: ignore[attr-defined]
         print("✅ transitions library is properly installed and functional")
         return True
 

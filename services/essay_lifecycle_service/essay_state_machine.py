@@ -1,7 +1,7 @@
 """
 EssayStateMachine - Formal state machine for essay processing workflow.
 
-This module implements a formal state machine using the transitions library to manage 
+This module implements a formal state machine using the transitions library to manage
 essay status changes throughout the processing pipeline. It provides deterministic
 state transitions driven by triggers corresponding to BOS commands and service results.
 """
@@ -43,7 +43,7 @@ EVT_CRITICAL_FAILURE = "EVT_CRITICAL_FAILURE"
 class EssayStateMachine:
     """
     Formal state machine for essay processing workflow.
-    
+
     Uses the transitions library to provide deterministic state transitions
     based on triggers from BOS commands and specialized service results.
     Maintains compatibility with existing EssayStatus enum.
@@ -52,7 +52,7 @@ class EssayStateMachine:
     def __init__(self, essay_id: str, initial_status: EssayStatus):
         """
         Initialize state machine for an essay.
-        
+
         Args:
             essay_id: Unique identifier for the essay
             initial_status: Starting status from EssayStatus enum
@@ -231,10 +231,10 @@ class EssayStateMachine:
     def trigger(self, trigger_name: str) -> bool:
         """
         Trigger a state transition.
-        
+
         Args:
             trigger_name: Name of the trigger to fire
-            
+
         Returns:
             True if transition succeeded, False otherwise
         """
@@ -252,10 +252,10 @@ class EssayStateMachine:
     def can_trigger(self, trigger_name: str) -> bool:
         """
         Check if a trigger can be fired from current state.
-        
+
         Args:
             trigger_name: Name of the trigger to check
-            
+
         Returns:
             True if trigger is valid from current state
         """
@@ -264,7 +264,8 @@ class EssayStateMachine:
             may_method_name = f"may_{trigger_name}"
             may_method = getattr(self, may_method_name, None)
             if may_method and callable(may_method):
-                return may_method()
+                result = may_method()
+                return bool(result)
             return False
         except Exception:
             return False
@@ -272,7 +273,7 @@ class EssayStateMachine:
     def get_valid_triggers(self) -> list[str]:
         """
         Get list of valid triggers from current state.
-        
+
         Returns:
             List of trigger names that can be fired from current state
         """

@@ -53,10 +53,10 @@ class StateTransitionValidator:
         EssayStatus.ESSAY_CRITICAL_FAILURE: set(),
     }
 
-    def validate_transition(self, machine_or_status, trigger_or_target) -> bool:
+    def validate_transition(self, machine_or_status: EssayStateMachine | EssayStatus, trigger_or_target: str | EssayStatus) -> bool:
         """
         Validate if state transition is allowed.
-        
+
         Can be called in two ways:
         1. validate_transition(current_status: EssayStatus, target_status: EssayStatus) -> bool
         2. validate_transition(machine: EssayStateMachine, trigger: str) -> bool
@@ -67,21 +67,22 @@ class StateTransitionValidator:
         # Check if first argument is a state machine
         if hasattr(machine_or_status, 'can_trigger'):
             # State machine pattern: validate_transition(machine, trigger)
-            return machine_or_status.can_trigger(trigger_or_target)
+            result = machine_or_status.can_trigger(trigger_or_target)  # type: ignore[arg-type]
+            return bool(result)
         else:
             # Status pattern: validate_transition(current_status, target_status)
-            current_status = machine_or_status
-            target_status = trigger_or_target
+            current_status = machine_or_status  # type: ignore[assignment]
+            target_status = trigger_or_target  # type: ignore[assignment]
             return target_status in self._VALID_TRANSITIONS.get(current_status, set())
 
     def validate_transition_with_machine(self, machine: EssayStateMachine, trigger: str) -> bool:
         """
         Validate if trigger can be fired on state machine.
-        
+
         Args:
             machine: EssayStateMachine instance
             trigger: Name of the trigger to validate
-            
+
         Returns:
             True if trigger is valid from current state
         """
@@ -90,14 +91,16 @@ class StateTransitionValidator:
     def get_possible_triggers(self, machine: EssayStateMachine) -> list[str]:
         """
         Get list of possible triggers for state machine.
-        
+
         Args:
             machine: EssayStateMachine instance
-            
+
         Returns:
             List of trigger names that can be fired from current state
         """
-        return machine.get_valid_triggers()
+        # Cast to list[str] since we know get_valid_triggers returns this type
+        triggers = machine.get_valid_triggers()
+        return list(triggers) if triggers else []
 
     def get_next_valid_statuses(self, current_status: EssayStatus) -> list[EssayStatus]:
         """

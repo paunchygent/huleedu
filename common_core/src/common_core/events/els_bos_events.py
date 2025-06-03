@@ -18,13 +18,13 @@ from ..metadata_models import EssayProcessingInputRefV1
 class ELSBatchPhaseOutcomeV1(BaseModel):
     """
     Event published by ELS to notify BOS about the completion of a processing phase for a batch.
-    
+
     This event is critical for dynamic pipeline orchestration, allowing BOS to:
     1. Track phase completion across all essays in a batch
     2. Determine the next phase in the pipeline sequence
     3. Handle partial success scenarios (some essays succeed, others fail)
     4. Propagate only successful essays to the next phase
-    
+
     The event includes the list of successfully processed essays with their updated
     text_storage_id references, which BOS uses to initiate the next phase.
     """
