@@ -237,13 +237,17 @@ async def test_state_store_integration():
     print("🧪 Testing state store integration...")
 
     try:
+        import os
+
+        # Test with temporary database file (in-memory doesn't work across connections)
+        import tempfile
+
         from essay_state_machine import CMD_INITIATE_SPELLCHECK, EssayStateMachine
         from state_store import SQLiteEssayStateStore
 
         from common_core.enums import EssayStatus
-
-        # Test with in-memory database
-        store = SQLiteEssayStateStore(':memory:')
+        temp_db = tempfile.mktemp(suffix='.db')
+        store = SQLiteEssayStateStore(temp_db)
         await store.initialize()
 
         # Create initial essay state
@@ -270,6 +274,12 @@ async def test_state_store_integration():
         essay_state = await store.get_essay_state('test-store-essay')
         assert essay_state is not None
         assert essay_state.current_status == EssayStatus.AWAITING_SPELLCHECK
+
+        # Clean up temporary file
+        try:
+            os.unlink(temp_db)
+        except OSError:
+            pass
 
         print("✅ State store integration working correctly")
         return True

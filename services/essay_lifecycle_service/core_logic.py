@@ -7,10 +7,14 @@ state transition validation, and processing coordination.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from common_core.enums import EssayStatus
 from common_core.metadata_models import EntityReference
+
+if TYPE_CHECKING:
+    from essay_state_machine import EssayStateMachine
 
 
 class StateTransitionValidator:
@@ -49,18 +53,51 @@ class StateTransitionValidator:
         EssayStatus.ESSAY_CRITICAL_FAILURE: set(),
     }
 
-    def validate_transition(self, current_status: EssayStatus, target_status: EssayStatus) -> bool:
+    def validate_transition(self, machine_or_status, trigger_or_target) -> bool:
         """
         Validate if state transition is allowed.
-
-        Args:
-            current_status: Current essay status
-            target_status: Target essay status to transition to
+        
+        Can be called in two ways:
+        1. validate_transition(current_status: EssayStatus, target_status: EssayStatus) -> bool
+        2. validate_transition(machine: EssayStateMachine, trigger: str) -> bool
 
         Returns:
             True if transition is valid, False otherwise
         """
-        return target_status in self._VALID_TRANSITIONS.get(current_status, set())
+        # Check if first argument is a state machine
+        if hasattr(machine_or_status, 'can_trigger'):
+            # State machine pattern: validate_transition(machine, trigger)
+            return machine_or_status.can_trigger(trigger_or_target)
+        else:
+            # Status pattern: validate_transition(current_status, target_status)
+            current_status = machine_or_status
+            target_status = trigger_or_target
+            return target_status in self._VALID_TRANSITIONS.get(current_status, set())
+
+    def validate_transition_with_machine(self, machine: EssayStateMachine, trigger: str) -> bool:
+        """
+        Validate if trigger can be fired on state machine.
+        
+        Args:
+            machine: EssayStateMachine instance
+            trigger: Name of the trigger to validate
+            
+        Returns:
+            True if trigger is valid from current state
+        """
+        return bool(machine.can_trigger(trigger))
+
+    def get_possible_triggers(self, machine: EssayStateMachine) -> list[str]:
+        """
+        Get list of possible triggers for state machine.
+        
+        Args:
+            machine: EssayStateMachine instance
+            
+        Returns:
+            List of trigger names that can be fired from current state
+        """
+        return machine.get_valid_triggers()
 
     def get_next_valid_statuses(self, current_status: EssayStatus) -> list[EssayStatus]:
         """

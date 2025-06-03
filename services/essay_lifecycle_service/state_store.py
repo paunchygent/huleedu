@@ -180,13 +180,41 @@ class SQLiteEssayStateStore:
 
             await db.commit()
 
-    async def create_essay_record(self, essay_ref: EntityReference) -> EssayState:
-        """Create new essay record from entity reference."""
+    async def update_essay_status_via_machine(
+        self, essay_id: str, new_status: EssayStatus, metadata: dict[str, Any]
+    ) -> None:
+        """Update essay state using status from state machine."""
+        await self.update_essay_state(essay_id, new_status, metadata)
+
+    async def create_essay_record(
+        self,
+        essay_ref: EntityReference | None = None,
+        *,
+        essay_id: str | None = None,
+        slot_assignment: str | None = None,
+        batch_id: str | None = None,
+        initial_status: EssayStatus | None = None
+    ) -> EssayState:
+        """Create new essay record from entity reference or keyword arguments."""
+        # Handle both calling patterns
+        if essay_ref is not None:
+            # Legacy pattern with EntityReference
+            actual_essay_id = essay_ref.entity_id
+            actual_batch_id = essay_ref.parent_id
+            actual_status = EssayStatus.UPLOADED
+        else:
+            # New pattern with keyword arguments
+            if essay_id is None:
+                raise ValueError("essay_id is required when essay_ref is not provided")
+            actual_essay_id = essay_id
+            actual_batch_id = batch_id
+            actual_status = initial_status or EssayStatus.READY_FOR_PROCESSING
+
         essay_state = EssayState(
-            essay_id=essay_ref.entity_id,
-            batch_id=essay_ref.parent_id,
-            current_status=EssayStatus.UPLOADED,
-            timeline={"uploaded": datetime.now(UTC)},
+            essay_id=actual_essay_id,
+            batch_id=actual_batch_id,
+            current_status=actual_status,
+            timeline={actual_status.value: datetime.now(UTC)},
         )
 
         async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:

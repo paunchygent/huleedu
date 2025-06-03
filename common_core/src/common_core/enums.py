@@ -59,6 +59,9 @@ class ProcessingEvent(str, Enum):
     BATCH_SPELLCHECK_INITIATE_COMMAND = "batch.spellcheck.initiate.command"
     BATCH_CJ_ASSESSMENT_INITIATE_COMMAND = "batch.cj_assessment.initiate.command"
 
+    # -------------  ELS-BOS communication events  -------------#
+    ELS_BATCH_PHASE_OUTCOME = "els.batch.phase.outcome"
+
     # -------------  Results from specialised services -############
     ESSAY_SPELLCHECK_RESULT_RECEIVED = (
         "essay.spellcheck.result.received"  # Output from spellchecker
@@ -95,6 +98,7 @@ _TOPIC_MAPPING = {
     ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED: "huleedu.els.cj_assessment.requested.v1",
     ProcessingEvent.CJ_ASSESSMENT_COMPLETED: "huleedu.cj_assessment.completed.v1",
     ProcessingEvent.CJ_ASSESSMENT_FAILED: "huleedu.cj_assessment.failed.v1",
+    ProcessingEvent.ELS_BATCH_PHASE_OUTCOME: "huleedu.els.batch_phase.outcome.v1",
     # Add more mappings as needed for other events - EACH MUST BE EXPLICIT
 }
 
@@ -182,6 +186,8 @@ class EssayStatus(str, Enum):
     CJ_ASSESSMENT_IN_PROGRESS = "cj_assessment_processing_in_progress"
     CJ_ASSESSMENT_SUCCESS = "cj_assessment_success"
     CJ_ASSESSMENT_FAILED = "cj_assessment_failed"
+    # Pipeline Completion Status
+    ALL_PROCESSING_COMPLETED = "all_processing_completed"
     # Status for critical failures do to other reasons than pipeline failures
     ESSAY_CRITICAL_FAILURE = "essay_critical_failure"
 

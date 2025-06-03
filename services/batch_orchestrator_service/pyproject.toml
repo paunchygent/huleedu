@@ -19,6 +19,7 @@ dependencies = [
     "prometheus-client",
     "dishka",
     "quart-dishka",
+    "transitions",
 ]
 
 [build-system]
