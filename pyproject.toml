@@ -153,6 +153,8 @@ module = [
     "diskcache.*",
     "choix.*",
     "tenacity.*",
+    "enums_db",       # Database enum module without type stubs
+    "models_db",      # Database models module without type stubs
 ]
 ignore_missing_imports = true
 

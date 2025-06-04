@@ -66,10 +66,10 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
             return model_override
 
         if not self.provider_config:
-            return self.settings.DEFAULT_LLM_MODEL
+            return str(self.settings.DEFAULT_LLM_MODEL)
 
         # Use provider's default model unless overridden
-        return self.provider_config.default_model
+        return str(self.provider_config.default_model)
 
     async def generate_comparison(
         self,
@@ -88,14 +88,13 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
             final_system_prompt = ""
 
         # Use cast to help mypy understand the return type from retry_manager
-        result = await self.retry_manager.call_with_retry(
-            api_request_func=lambda: self._make_provider_api_request(
-                final_system_prompt,
-                user_prompt,
-                model_override=model_override,
-                temperature_override=temperature_override,
-                max_tokens_override=max_tokens_override,
-            ),
+        result = await self.retry_manager.with_retry(
+            operation=self._make_provider_api_request,
+            system_prompt=final_system_prompt,
+            user_prompt=user_prompt,
+            model_override=model_override,
+            temperature_override=temperature_override,
+            max_tokens_override=max_tokens_override,
             provider_name=self.provider_name,
         )
         return cast(tuple[dict[str, Any] | None, str | None], result)

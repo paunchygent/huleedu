@@ -7,6 +7,7 @@ to follow clean architecture with protocol-based dependency injection.
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -181,7 +182,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
             )
 
             # Handle any exceptions from gather
-            final_results = []
+            final_results: list[ComparisonResult] = []
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
                     logger.error(
@@ -198,7 +199,9 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         )
                     )
                 else:
-                    final_results.append(result)
+                    # Type guard: result is ComparisonResult at this point
+                    comparison_result = cast(ComparisonResult, result)
+                    final_results.append(comparison_result)
 
             # Log summary
             successful_tasks = sum(1 for r in final_results if r.llm_assessment is not None)

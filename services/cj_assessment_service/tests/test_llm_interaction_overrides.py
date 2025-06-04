@@ -211,6 +211,7 @@ class TestLLMInteractionImplOverrides:
         assert len(results) == 1
         result = results[0]
         assert result.from_cache is True
+        assert result.llm_assessment is not None
         assert result.llm_assessment.winner == "Essay B"
 
         # Verify provider was NOT called due to cache hit

@@ -10,7 +10,7 @@ import asyncio
 import importlib
 from collections.abc import Awaitable, Callable
 from functools import lru_cache
-from typing import Any
+from typing import Any, Optional, Tuple
 
 import aiohttp
 from config import Settings
@@ -113,6 +113,44 @@ class RetryManagerImpl(RetryManagerProtocol):
             settings: Application settings for retry configuration.
         """
         self.settings = settings
+
+    async def with_retry(
+        self,
+        operation: Any,  # Callable coroutine
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tuple[Any, Optional[str]]:
+        """Execute operation with retry logic.
+
+        Args:
+            operation: The async operation to execute with retry
+            *args: Arguments to pass to the operation
+            **kwargs: Keyword arguments to pass to the operation
+
+        Returns:
+            Tuple of (result, error_message)
+        """
+        # Extract provider_name from kwargs before passing to operation
+        provider_name = kwargs.pop("provider_name", "unknown")
+
+        # Create a wrapper function that matches call_with_retry expectations
+        async def operation_wrapper() -> tuple[dict[str, Any] | None, str | None]:
+            try:
+                result = await operation(*args, **kwargs)
+                # Normalize result to match expected return type
+                if isinstance(result, tuple) and len(result) == 2:
+                    return result
+                # If operation returns single value, wrap it as success
+                return result, None
+            except Exception as e:
+                # Convert exception to error format
+                return None, str(e)
+
+        # Use existing call_with_retry implementation
+        return await self.call_with_retry(
+            operation_wrapper,
+            provider_name=provider_name,
+        )
 
     async def call_with_retry(
         self,
