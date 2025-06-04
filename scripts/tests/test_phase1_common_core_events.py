@@ -24,7 +24,8 @@ def test_essay_status_completeness():
         from common_core.enums import EssayStatus
 
         # Test that ALL_PROCESSING_COMPLETED exists
-        assert hasattr(EssayStatus, 'ALL_PROCESSING_COMPLETED'), "ALL_PROCESSING_COMPLETED missing from EssayStatus"
+        msg = "ALL_PROCESSING_COMPLETED missing from EssayStatus"
+        assert hasattr(EssayStatus, 'ALL_PROCESSING_COMPLETED'), msg
 
         # Test all required CJ assessment states exist
         required_cj_states = [
@@ -139,7 +140,8 @@ def test_processing_event_updates():
         from common_core.enums import ProcessingEvent
 
         # Test that ELS_BATCH_PHASE_OUTCOME event exists
-        assert hasattr(ProcessingEvent, 'ELS_BATCH_PHASE_OUTCOME'), "ELS_BATCH_PHASE_OUTCOME missing from ProcessingEvent"
+        msg = "ELS_BATCH_PHASE_OUTCOME missing from ProcessingEvent"
+        assert hasattr(ProcessingEvent, 'ELS_BATCH_PHASE_OUTCOME'), msg
 
         # Test additional command events for AI feedback and NLP if they should exist
         potential_new_events = [
@@ -179,7 +181,8 @@ def test_topic_name_mapping():
         # Test new ELS batch phase outcome mapping
         if hasattr(ProcessingEvent, 'ELS_BATCH_PHASE_OUTCOME'):
             phase_outcome_topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
-            assert phase_outcome_topic is not None, "ELS_BATCH_PHASE_OUTCOME should have topic mapping"
+            msg = "ELS_BATCH_PHASE_OUTCOME should have topic mapping"
+            assert phase_outcome_topic is not None, msg
             print(f"✅ ELS_BATCH_PHASE_OUTCOME maps to: {phase_outcome_topic}")
 
         print("✅ Topic name mapping validation passed")

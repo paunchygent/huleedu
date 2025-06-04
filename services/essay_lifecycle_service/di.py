@@ -7,15 +7,32 @@ from aiokafka import AIOKafkaProducer
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry
 
-from batch_tracker import BatchEssayTracker as ConcreteBatchEssayTracker
-from config import Settings, settings
-from core_logic import StateTransitionValidator
-from implementations.batch_command_handler_impl import DefaultBatchCommandHandler
-from implementations.content_client import DefaultContentClient
-from implementations.event_publisher import DefaultEventPublisher
-from implementations.metrics_collector import DefaultMetricsCollector
-from implementations.service_request_dispatcher import DefaultSpecializedServiceRequestDispatcher
-from protocols import (
+from services.essay_lifecycle_service.batch_tracker import (
+    BatchEssayTracker as ConcreteBatchEssayTracker,
+)
+from services.essay_lifecycle_service.config import Settings
+from services.essay_lifecycle_service.config import settings as app_settings
+from services.essay_lifecycle_service.core_logic import (
+    StateTransitionValidator as ConcreteStateTransitionValidator,
+)
+from services.essay_lifecycle_service.implementations.batch_command_handler_impl import (
+    DefaultBatchCommandHandler,
+)
+from services.essay_lifecycle_service.implementations.batch_phase_coordinator_impl import (
+    DefaultBatchPhaseCoordinator,
+)
+from services.essay_lifecycle_service.implementations.content_client import DefaultContentClient
+from services.essay_lifecycle_service.implementations.event_publisher import DefaultEventPublisher
+from services.essay_lifecycle_service.implementations.metrics_collector import (
+    DefaultMetricsCollector,
+)
+from services.essay_lifecycle_service.implementations.service_request_dispatcher import (
+    DefaultSpecializedServiceRequestDispatcher,
+)
+from services.essay_lifecycle_service.implementations.service_result_handler_impl import (
+    DefaultServiceResultHandler,
+)
+from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
     BatchEssayTracker,
     BatchPhaseCoordinator,
@@ -25,11 +42,9 @@ from protocols import (
     MetricsCollector,
     ServiceResultHandler,
     SpecializedServiceRequestDispatcher,
+    StateTransitionValidator,
 )
-from protocols import (
-    StateTransitionValidator as StateTransitionValidatorProtocol,
-)
-from state_store import SQLiteEssayStateStore
+from services.essay_lifecycle_service.state_store import SQLiteEssayStateStore
 
 
 class EssayLifecycleServiceProvider(Provider):
@@ -38,7 +53,7 @@ class EssayLifecycleServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_settings(self) -> Settings:
         """Provide service settings."""
-        return settings
+        return app_settings
 
     @provide(scope=Scope.APP)
     def provide_metrics_registry(self) -> CollectorRegistry:
@@ -70,9 +85,9 @@ class EssayLifecycleServiceProvider(Provider):
         return store  # type: ignore[return-value]
 
     @provide(scope=Scope.APP)
-    def provide_state_transition_validator(self) -> StateTransitionValidatorProtocol:
+    def provide_state_transition_validator(self) -> StateTransitionValidator:
         """Provide state transition validator implementation."""
-        return StateTransitionValidator()
+        return ConcreteStateTransitionValidator()
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(
@@ -122,7 +137,6 @@ class EssayLifecycleServiceProvider(Provider):
         event_publisher: EventPublisher,
     ) -> BatchPhaseCoordinator:
         """Provide batch phase coordinator implementation."""
-        from implementations.batch_phase_coordinator_impl import DefaultBatchPhaseCoordinator
         return DefaultBatchPhaseCoordinator(state_store, event_publisher)
 
     @provide(scope=Scope.APP)
@@ -132,5 +146,4 @@ class EssayLifecycleServiceProvider(Provider):
         batch_coordinator: BatchPhaseCoordinator,
     ) -> ServiceResultHandler:
         """Provide service result handler implementation."""
-        from implementations.service_result_handler_impl import DefaultServiceResultHandler
         return DefaultServiceResultHandler(state_store, batch_coordinator)

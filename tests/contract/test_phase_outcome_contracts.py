@@ -62,7 +62,8 @@ class TestBatchServiceCommandContracts:
     """Test batch service command model contracts."""
 
     def test_cj_assessment_command_serialization_roundtrip(self):
-        """Test BatchServiceCJAssessmentInitiateCommandDataV1 JSON serialization and deserialization."""
+        """Test BatchServiceCJAssessmentInitiateCommandDataV1 JSON serialization
+        and deserialization."""
         batch_id = str(uuid4())
 
         # Create valid essays
@@ -94,11 +95,14 @@ class TestBatchServiceCommandContracts:
         assert "SV101" in json_data
 
         # Test deserialization
-        deserialized_command = BatchServiceCJAssessmentInitiateCommandDataV1.model_validate_json(json_data)
+        deserialized_command = (
+            BatchServiceCJAssessmentInitiateCommandDataV1.model_validate_json(json_data)
+        )
 
         # Verify all fields match
         assert deserialized_command.entity_ref.entity_id == original_command.entity_ref.entity_id
         assert deserialized_command.course_code == original_command.course_code
         assert deserialized_command.class_designation == original_command.class_designation
         assert deserialized_command.essay_instructions == original_command.essay_instructions
-        assert len(deserialized_command.essays_to_process) == len(original_command.essays_to_process)
+        assert len(deserialized_command.essays_to_process) == \
+               len(original_command.essays_to_process)

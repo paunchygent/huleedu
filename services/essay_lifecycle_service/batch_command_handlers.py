@@ -15,7 +15,7 @@ from common_core.enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from protocols import (
+from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
     BatchCoordinationHandler,
     ServiceResultHandler,

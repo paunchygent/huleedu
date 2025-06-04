@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from protocols import SpecializedServiceRequestDispatcher
+from services.essay_lifecycle_service.protocols import SpecializedServiceRequestDispatcher
 
 
 class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispatcher):

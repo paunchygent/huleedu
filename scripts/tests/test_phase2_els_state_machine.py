@@ -25,14 +25,14 @@ def test_transitions_library():
     print("🧪 Testing transitions library installation...")
 
     try:
-        from transitions import Machine, State
+        from transitions import Machine
 
         # Test basic machine creation
         class TestModel:
             pass
 
         test_model = TestModel()
-        machine = Machine(
+        Machine(
             model=test_model,
             states=['A', 'B'],
             initial='A'
@@ -72,7 +72,8 @@ def test_essay_state_machine_creation():
 
     except ImportError as e:
         print(f"❌ Failed to import EssayStateMachine: {e}")
-        print("💡 Hint: EssayStateMachine class needs to be created in services/essay_lifecycle_service/essay_state_machine.py")
+        print("💡 Hint: EssayStateMachine class needs to be created in "
+              "services/essay_lifecycle_service/essay_state_machine.py")
         return False
     except Exception as e:
         print(f"❌ Unexpected error creating EssayStateMachine: {e}")

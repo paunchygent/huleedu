@@ -36,22 +36,34 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
 
     phase_name: str = Field(
         ...,
-        description="Name of the phase that was completed (e.g., 'spellcheck', 'ai_feedback', 'cj_assessment')"
+        description=(
+            "Name of the phase that was completed (e.g., 'spellcheck', "
+            "'ai_feedback', 'cj_assessment')"
+        )
     )
 
     phase_status: str = Field(
         ...,
-        description="Overall status of the phase completion (e.g., 'COMPLETED_SUCCESSFULLY', 'COMPLETED_WITH_FAILURES', 'FAILED_CRITICALLY')"
+        description=(
+            "Overall status of the phase completion (e.g., 'COMPLETED_SUCCESSFULLY', "
+            "'COMPLETED_WITH_FAILURES', 'FAILED_CRITICALLY')"
+        )
     )
 
     processed_essays: List[EssayProcessingInputRefV1] = Field(
         ...,
-        description="List of essays that successfully completed this phase, with updated text_storage_id references for the next phase"
+        description=(
+            "List of essays that successfully completed this phase, with updated "
+            "text_storage_id references for the next phase"
+        )
     )
 
     failed_essay_ids: List[str] = Field(
         ...,
-        description="List of essay IDs that failed during this phase and should not be included in subsequent phases"
+        description=(
+            "List of essay IDs that failed during this phase and should not be "
+            "included in subsequent phases"
+        )
     )
 
     correlation_id: Optional[UUID] = Field(

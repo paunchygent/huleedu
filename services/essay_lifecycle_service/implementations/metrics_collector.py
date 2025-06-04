@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from prometheus_client import CollectorRegistry
 
-from protocols import MetricsCollector
+from services.essay_lifecycle_service.protocols import MetricsCollector
 
 
 class DefaultMetricsCollector(MetricsCollector):
