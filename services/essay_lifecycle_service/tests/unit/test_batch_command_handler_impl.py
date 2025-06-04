@@ -454,12 +454,15 @@ class TestDefaultBatchCommandHandler:
             )
 
             # Verify metadata update includes current_phase and proper commanded_phases
-            mock_state_store.update_essay_status_via_machine.assert_called_once_with(
-                essay_id,
-                EssayStatus.AWAITING_SPELLCHECK,
-                {
-                    "bos_command": "spellcheck_initiate",
-                    "current_phase": "spellcheck",
-                    "commanded_phases": ["spellcheck", "existing_phase"]  # New phase added first (implementation behavior)
-                }
-            )
+            mock_state_store.update_essay_status_via_machine.assert_called_once()
+            call_args = mock_state_store.update_essay_status_via_machine.call_args
+            assert call_args.args[0] == essay_id
+            assert call_args.args[1] == EssayStatus.AWAITING_SPELLCHECK
+
+            metadata = call_args.args[2]
+            assert metadata["bos_command"] == "spellcheck_initiate"
+            assert metadata["current_phase"] == "spellcheck"
+            # Check that both phases are present (order doesn't matter due to set() usage)
+            assert "existing_phase" in metadata["commanded_phases"]
+            assert "spellcheck" in metadata["commanded_phases"]
+            assert len(metadata["commanded_phases"]) == 2
