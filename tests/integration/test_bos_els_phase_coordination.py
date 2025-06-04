@@ -1,6 +1,6 @@
 """Integration tests for BOS-ELS phase coordination.
 
-Tests the communication flow between Batch Orchestrator Service (BOS) and 
+Tests the communication flow between Batch Orchestrator Service (BOS) and
 Essay Lifecycle Service (ELS) using real business logic components.
 
 Following 070-testing-and-quality-assurance.mdc:

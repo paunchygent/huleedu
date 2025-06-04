@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
     from config import Settings
 
-from protocols import ContentClient
+from services.essay_lifecycle_service.protocols import ContentClient
 
 
 class DefaultContentClient(ContentClient):

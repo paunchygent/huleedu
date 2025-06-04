@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     from config import Settings
 
-from protocols import EventPublisher
+from services.essay_lifecycle_service.protocols import EventPublisher
 
 
 class DefaultEventPublisher(EventPublisher):

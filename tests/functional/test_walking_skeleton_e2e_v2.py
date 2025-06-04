@@ -233,6 +233,7 @@ async def test_walking_skeleton_e2e_architecture_fix():
                 "course_code": test_data["course_code"],
                 "class_designation": test_data["class_designation"],
                 "essay_instructions": test_data["essay_instructions"],
+                "teacher_name": "Test Teacher",
             }
 
             async with session.post(
@@ -492,6 +493,7 @@ async def test_excess_content_handling():
                 "course_code": test_data["course_code"],
                 "class_designation": test_data["class_designation"],
                 "essay_instructions": "Excess content test",
+                "teacher_name": "Test Teacher",
             }
 
             async with session.post(

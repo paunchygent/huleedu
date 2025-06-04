@@ -71,7 +71,7 @@ class EssayProcessingInputRefV1(BaseModel):
     """Reference to an essay and its text content for processing requests.
 
     This is the minimal general-purpose contract for essay processing.
-    Specialized services should define their own input contracts when they 
+    Specialized services should define their own input contracts when they
     need additional metadata (following the pattern of AIFeedbackInputDataV1).
     """
 

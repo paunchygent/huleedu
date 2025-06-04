@@ -10,14 +10,12 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from common_core.events.batch_coordination_events import (
-        BatchEssaysRegistered,
-        EssayContentProvisionedV1,
-    )
+    from common_core.events.batch_coordination_events import BatchEssaysRegistered
+    from common_core.events.file_events import EssayContentProvisionedV1
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from protocols import (
+from services.essay_lifecycle_service.protocols import (
     BatchCoordinationHandler,
     BatchEssayTracker,
     EssayStateStore,

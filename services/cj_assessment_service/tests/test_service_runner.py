@@ -148,7 +148,7 @@ class TestConfigurationValidation:
         assert hasattr(settings, 'CONSUMER_GROUP_ID_CJ')
         assert hasattr(settings, 'PRODUCER_CLIENT_ID_CJ')
 
-        # Should have sensible defaults
-        assert settings.KAFKA_BOOTSTRAP_SERVERS == "kafka:9092"
+        # Should have sensible defaults (localhost for local development)
+        assert settings.KAFKA_BOOTSTRAP_SERVERS == "localhost:9092"
         assert len(settings.CONSUMER_GROUP_ID_CJ) > 0
         assert len(settings.PRODUCER_CLIENT_ID_CJ) > 0

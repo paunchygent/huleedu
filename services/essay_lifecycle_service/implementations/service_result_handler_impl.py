@@ -19,14 +19,18 @@ if TYPE_CHECKING:
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from essay_state_machine import (
+from services.essay_lifecycle_service.essay_state_machine import (
     EVT_CJ_ASSESSMENT_FAILED,
     EVT_CJ_ASSESSMENT_SUCCEEDED,
     EVT_SPELLCHECK_FAILED,
     EVT_SPELLCHECK_SUCCEEDED,
     EssayStateMachine,
 )
-from protocols import BatchPhaseCoordinator, EssayStateStore, ServiceResultHandler
+from services.essay_lifecycle_service.protocols import (
+    BatchPhaseCoordinator,
+    EssayStateStore,
+    ServiceResultHandler,
+)
 
 logger = create_service_logger("service_result_handler")
 
@@ -53,7 +57,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             logger.info(
                 "Processing spellcheck result",
                 extra={
-                    "essay_id": result_data.entity_ref,
+                    "essay_id": result_data.entity_ref.entity_id,
                     "status": result_data.status.value,
                     "success": is_success,
                     "correlation_id": str(correlation_id),
@@ -61,12 +65,12 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             )
 
             # Get current essay state
-            essay_state = await self.state_store.get_essay_state(result_data.entity_ref)
+            essay_state = await self.state_store.get_essay_state(result_data.entity_ref.entity_id)
             if essay_state is None:
                 logger.error(
                     "Essay not found for spellcheck result",
                     extra={
-                        "essay_id": result_data.entity_ref,
+                        "essay_id": result_data.entity_ref.entity_id,
                         "correlation_id": str(correlation_id),
                     },
                 )
@@ -74,7 +78,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
 
             # Create state machine and trigger appropriate event
             state_machine = EssayStateMachine(
-                essay_id=result_data.entity_ref, initial_status=essay_state.current_status
+                essay_id=result_data.entity_ref.entity_id, initial_status=essay_state.current_status
             )
 
             if is_success:
@@ -82,7 +86,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                 logger.info(
                     "Spellcheck succeeded, transitioning to success state",
                     extra={
-                        "essay_id": result_data.entity_ref,
+                        "essay_id": result_data.entity_ref.entity_id,
                         "current_status": essay_state.current_status.value,
                         "correlation_id": str(correlation_id),
                     },
@@ -92,7 +96,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                 logger.warning(
                     "Spellcheck failed, transitioning to failed state",
                     extra={
-                        "essay_id": result_data.entity_ref,
+                        "essay_id": result_data.entity_ref.entity_id,
                         "current_status": essay_state.current_status.value,
                         "error_info": result_data.system_metadata.error_info if result_data.system_metadata else None,
                         "correlation_id": str(correlation_id),
@@ -103,7 +107,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             if state_machine.trigger(trigger):
                 # Correct call to update_essay_status_via_machine
                 await self.state_store.update_essay_status_via_machine(
-                    essay_id=result_data.entity_ref,
+                    essay_id=result_data.entity_ref.entity_id,
                     new_status=state_machine.current_status,
                     metadata={
                         "spellcheck_result": {
@@ -122,14 +126,14 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                 logger.info(
                     "Successfully updated essay status via state machine",
                     extra={
-                        "essay_id": result_data.entity_ref,
+                        "essay_id": result_data.entity_ref.entity_id,
                         "new_status": state_machine.current_status.value,
                         "correlation_id": str(correlation_id),
                     },
                 )
             else:
                 logger.error(
-                    f"State machine trigger '{trigger}' failed for essay {result_data.entity_ref} "
+                    f"State machine trigger '{trigger}' failed for essay {result_data.entity_ref.entity_id} "
                     f"from status {essay_state.current_status.value}.",
                     extra={"correlation_id": str(correlation_id)},
                 )
@@ -138,14 +142,14 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             logger.info(
                 "Successfully processed spellcheck result",
                 extra={
-                    "essay_id": result_data.entity_ref,
+                    "essay_id": result_data.entity_ref.entity_id,
                     "new_status": state_machine.current_status.value,
                     "correlation_id": str(correlation_id),
                 },
             )
 
             # Check for batch phase completion after individual essay state update
-            updated_essay_state = await self.state_store.get_essay_state(result_data.entity_ref)
+            updated_essay_state = await self.state_store.get_essay_state(result_data.entity_ref.entity_id)
             if updated_essay_state:
                 await self.batch_coordinator.check_batch_completion(
                     essay_state=updated_essay_state,
@@ -159,7 +163,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             logger.error(
                 "Error handling spellcheck result",
                 extra={
-                    "essay_id": getattr(result_data, "entity_ref", "unknown"),
+                    "essay_id": getattr(result_data.entity_ref, "entity_id", "unknown"),
                     "error": str(e),
                     "correlation_id": str(correlation_id),
                 },
@@ -176,7 +180,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             logger.info(
                 "Processing CJ assessment completion for batch",
                 extra={
-                    "batch_id": result_data.entity_ref,
+                    "batch_id": result_data.entity_ref.entity_id,
                     "job_id": result_data.cj_assessment_job_id,
                     "correlation_id": str(correlation_id),
                 },
@@ -263,7 +267,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             logger.error(
                 "Error handling CJ assessment completion",
                 extra={
-                    "batch_id": getattr(result_data, "entity_ref", "unknown"),
+                    "batch_id": getattr(result_data.entity_ref, "entity_id", "unknown"),
                     "error": str(e),
                     "correlation_id": str(correlation_id),
                 },
@@ -280,7 +284,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             logger.error(
                 "Processing CJ assessment failure for batch",
                 extra={
-                    "batch_id": result_data.entity_ref,
+                    "batch_id": result_data.entity_ref.entity_id,
                     "job_id": result_data.cj_assessment_job_id,
                     "status": result_data.status.value if result_data.status else "unknown",
                     "correlation_id": str(correlation_id),
@@ -289,7 +293,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
 
             # CJ assessment failure affects all essays in the batch
             # Need to find all essays in this batch and mark them as failed
-            batch_essays = await self.state_store.list_essays_by_batch(result_data.entity_ref)
+            batch_essays = await self.state_store.list_essays_by_batch(result_data.entity_ref.entity_id)
 
             for essay_state in batch_essays:
                 # Only update essays that are currently awaiting CJ assessment
@@ -341,7 +345,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             logger.error(
                 "Error handling CJ assessment failure",
                 extra={
-                    "batch_id": getattr(result_data, "entity_ref", "unknown"),
+                    "batch_id": getattr(result_data.entity_ref, "entity_id", "unknown"),
                     "error": str(e),
                     "correlation_id": str(correlation_id),
                 },

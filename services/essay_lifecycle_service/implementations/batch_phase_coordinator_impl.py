@@ -15,7 +15,12 @@ if TYPE_CHECKING:
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from protocols import BatchPhaseCoordinator, EssayState, EssayStateStore, EventPublisher
+from services.essay_lifecycle_service.protocols import (
+    BatchPhaseCoordinator,
+    EssayState,
+    EssayStateStore,
+    EventPublisher,
+)
 
 logger = create_service_logger("batch_phase_coordinator")
 

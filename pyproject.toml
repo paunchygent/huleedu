@@ -153,8 +153,6 @@ module = [
     "diskcache.*",
     "choix.*",
     "tenacity.*",
-    "transitions.*",  # State machine library without type stubs
-    "essay_state_machine",  # Local module without py.typed marker
 ]
 ignore_missing_imports = true
 
@@ -185,6 +183,8 @@ module = [
     "pair_generation",
     "scoring_ranking",
     "core_assessment_logic",
+    "transitions.*",  # State machine library without type stubs
+    "essay_state_machine",  # Local module without py.typed marker
 ]
 ignore_missing_imports = true
 

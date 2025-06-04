@@ -53,9 +53,15 @@ class TestPipelineStateManagement:
         )
 
     async def test_spellcheck_to_cj_assessment_pipeline_progression(
-        self, pipeline_coordinator, batch_repository, mock_cj_initiator
+        self,
+        pipeline_coordinator,
+        batch_repository,
+        mock_cj_initiator,
     ):
-        """Test complete pipeline progression from spellcheck completion to CJ assessment initiation."""
+        """
+        Test complete pipeline progression from spellcheck completion
+        to CJ assessment initiation.
+        """
         batch_id = str(uuid4())
         correlation_id = str(uuid4())
 
@@ -97,9 +103,16 @@ class TestPipelineStateManagement:
         )
 
     async def test_pipeline_progression_with_cj_assessment_disabled(
-        self, pipeline_coordinator, batch_repository, mock_cj_initiator
+        self,
+        pipeline_coordinator,
+        batch_repository,
+        mock_cj_initiator,
     ):
-        """Test pipeline handling when CJ assessment is disabled - should not initiate next phase."""
+        """
+        Test pipeline handling when CJ assessment is disabled.
+
+        Should not initiate next phase.
+        """
         batch_id = str(uuid4())
         correlation_id = str(uuid4())
 

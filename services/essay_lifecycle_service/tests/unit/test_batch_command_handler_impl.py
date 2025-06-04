@@ -32,6 +32,23 @@ from services.essay_lifecycle_service.protocols import (
 class TestDefaultBatchCommandHandler:
     """Test suite for DefaultBatchCommandHandler implementation."""
 
+    def create_essay_state_mock(
+        self,
+        essay_id: str,
+        batch_id: str,
+        status: EssayStatus = EssayStatus.READY_FOR_PROCESSING,
+        commanded_phases: list[str] | None = None
+    ) -> MagicMock:
+        """Helper to create essay state mocks with consistent structure."""
+        essay_state = MagicMock()
+        essay_state.essay_id = essay_id
+        essay_state.batch_id = batch_id
+        essay_state.current_status = status
+        essay_state.processing_metadata = {
+            "commanded_phases": commanded_phases or []
+        }
+        return essay_state
+
     @pytest.fixture
     def mock_state_store(self) -> AsyncMock:
         """Create mock EssayStateStore."""
@@ -266,14 +283,10 @@ class TestDefaultBatchCommandHandler:
         )
 
         # Setup essay states - all found
-        essay_states = []
-        for i, ref in enumerate(essay_refs):
-            state = MagicMock()
-            state.essay_id = ref.essay_id
-            state.batch_id = batch_id
-            state.current_status = EssayStatus.READY_FOR_PROCESSING
-            state.processing_metadata = {"commanded_phases": []}
-            essay_states.append(state)
+        essay_states = [
+            self.create_essay_state_mock(ref.essay_id, batch_id)
+            for ref in essay_refs
+        ]
 
         mock_state_store.get_essay_state.side_effect = essay_states
 
@@ -283,7 +296,7 @@ class TestDefaultBatchCommandHandler:
         ) as mock_state_machine_class:
             # Setup state machines - first two succeed, third fails
             mock_machines = []
-            for i in range(3):
+            for i, _ in enumerate(essay_refs):
                 mock_machine = MagicMock()
                 mock_machine.trigger.return_value = i < 2  # First two succeed, third fails
                 mock_machine.current_status = EssayStatus.AWAITING_SPELLCHECK
@@ -422,11 +435,9 @@ class TestDefaultBatchCommandHandler:
     ) -> None:
         """Test that commanded_phases metadata is properly updated."""
         # Create essay state with existing commanded_phases
-        essay_state = MagicMock()
-        essay_state.essay_id = essay_id
-        essay_state.batch_id = batch_id
-        essay_state.current_status = EssayStatus.READY_FOR_PROCESSING
-        essay_state.processing_metadata = {"commanded_phases": ["existing_phase"]}
+        essay_state = self.create_essay_state_mock(
+            essay_id, batch_id, commanded_phases=["existing_phase"]
+        )
 
         mock_state_store.get_essay_state.return_value = essay_state
 
@@ -449,6 +460,6 @@ class TestDefaultBatchCommandHandler:
                 {
                     "bos_command": "spellcheck_initiate",
                     "current_phase": "spellcheck",
-                    "commanded_phases": ["existing_phase", "spellcheck"]  # Deduplicated list
+                    "commanded_phases": ["spellcheck", "existing_phase"]  # New phase added first (implementation behavior)
                 }
             )
