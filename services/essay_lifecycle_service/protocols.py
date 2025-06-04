@@ -41,6 +41,12 @@ class EssayStateStore(Protocol):
         """Update essay state with new status and metadata."""
         ...
 
+    async def update_essay_status_via_machine(
+        self, essay_id: str, new_status: EssayStatus, metadata: dict[str, Any]
+    ) -> None:
+        """Update essay state using status from state machine."""
+        ...
+
     async def create_essay_record(self, essay_ref: EntityReference) -> EssayState:
         """Create new essay record from entity reference."""
         ...
@@ -70,6 +76,10 @@ class EssayStateStore(Protocol):
         initial_status: EssayStatus,
     ) -> EssayState:
         """Create or update essay state for slot assignment with content metadata."""
+        ...
+
+    async def list_essays_by_batch_and_phase(self, batch_id: str, phase_name: str) -> list[EssayState]:
+        """List all essays in a batch that are part of a specific processing phase."""
         ...
 
 
@@ -121,6 +131,14 @@ class EventPublisher(Protocol):
         """Publish BatchEssaysReady event when batch is complete."""
         ...
 
+    async def publish_els_batch_phase_outcome(
+        self,
+        event_data: Any,  # ELSBatchPhaseOutcomeV1
+        correlation_id: UUID | None = None,
+    ) -> None:
+        """Publish ELSBatchPhaseOutcomeV1 event when batch phase is complete."""
+        ...
+
 
 class BatchCommandHandler(Protocol):
     """Protocol for handling batch processing commands from Batch Service."""
@@ -155,6 +173,77 @@ class BatchCommandHandler(Protocol):
         correlation_id: UUID | None = None,
     ) -> None:
         """Process CJ assessment phase initiation command from Batch Service."""
+        ...
+
+
+class BatchCoordinationHandler(Protocol):
+    """Protocol for handling batch coordination events."""
+
+    async def handle_batch_essays_registered(
+        self,
+        event_data: Any,  # BatchEssaysRegistered
+        correlation_id: UUID | None = None,
+    ) -> bool:
+        """Handle batch registration from BOS."""
+        ...
+
+    async def handle_essay_content_provisioned(
+        self,
+        event_data: Any,  # EssayContentProvisionedV1
+        correlation_id: UUID | None = None,
+    ) -> bool:
+        """Handle content provisioning and slot assignment."""
+        ...
+
+
+class ServiceResultHandler(Protocol):
+    """Protocol for handling specialized service result events."""
+
+    async def handle_spellcheck_result(
+        self,
+        result_data: Any,  # SpellcheckResultDataV1
+        correlation_id: UUID | None = None,
+    ) -> bool:
+        """Handle spellcheck result from Spell Checker Service."""
+        ...
+
+    async def handle_cj_assessment_completed(
+        self,
+        result_data: Any,  # CJAssessmentCompletedV1
+        correlation_id: UUID | None = None,
+    ) -> bool:
+        """Handle CJ assessment completion from CJ Assessment Service."""
+        ...
+
+    async def handle_cj_assessment_failed(
+        self,
+        result_data: Any,  # CJAssessmentFailedV1
+        correlation_id: UUID | None = None,
+    ) -> bool:
+        """Handle CJ assessment failure from CJ Assessment Service."""
+        ...
+
+
+class BatchPhaseCoordinator(Protocol):
+    """Protocol for coordinating batch-level phase completion and outcome publishing."""
+
+    async def check_batch_completion(
+        self,
+        essay_state: EssayState,
+        phase_name: str,
+        correlation_id: UUID | None = None,
+    ) -> None:
+        """
+        Check if all essays in a batch phase are complete and publish ELSBatchPhaseOutcomeV1 if so.
+
+        This method should be called after individual essay state updates to trigger
+        batch-level aggregation and outcome publishing when a phase is complete.
+
+        Args:
+            essay_state: The essay state that was just updated
+            phase_name: Name of the processing phase (e.g., 'spellcheck', 'cj_assessment')
+            correlation_id: Optional correlation ID for event tracking
+        """
         ...
 
 

@@ -205,3 +205,28 @@ class DefaultEventPublisher(EventPublisher):
         topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
         message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
         await self.producer.send_and_wait(topic, message)
+
+    async def publish_els_batch_phase_outcome(
+        self,
+        event_data: Any,  # ELSBatchPhaseOutcomeV1
+        correlation_id: UUID | None = None,
+    ) -> None:
+        """Publish ELSBatchPhaseOutcomeV1 event when batch phase is complete."""
+        import json
+        from uuid import uuid4
+
+        from common_core.enums import ProcessingEvent, topic_name
+        from common_core.events.envelope import EventEnvelope
+
+        # Create event envelope
+        envelope = EventEnvelope[Any](
+            event_type=topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
+            source_service=self.settings.SERVICE_NAME,
+            correlation_id=correlation_id or uuid4(),
+            data=event_data,
+        )
+
+        # Publish to the correct topic for ELSBatchPhaseOutcomeV1
+        topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
+        message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
+        await self.producer.send_and_wait(topic, message)

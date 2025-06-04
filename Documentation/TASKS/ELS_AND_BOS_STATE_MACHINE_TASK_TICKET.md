@@ -1,4 +1,4 @@
-# Okay, here's a detailed implementation ticket outlining the necessary steps and core logic to fully realize the dynamic pipeline orchestration based on our discussion and analysis.
+# Okay, here's a detailed implementation ticket outlining the necessary steps and core logic to fully realize the dynamic pipeline orchestration based on our discussion and analysis
 
 ---
 
@@ -29,20 +29,20 @@ To complete the implementation of a dynamic, multi-stage essay processing pipeli
 * **Task 1.1: Verify/Update `EssayStatus` Enum for CJ Assessment** ✅ **COMPLETED**
   * **Goal**: Ensure `EssayStatus` in `common_core/src/common_core/enums.py` is complete for all pipeline stages handled by ELS, particularly `AWAITING_CJ_ASSESSMENT`.
   * **Status**: ✅ **VERIFIED** - `AWAITING_CJ_ASSESSMENT = "awaiting_cj_assessment"` exists in `common_core.enums.EssayStatus` at line 184. All CJ Assessment related statuses are present:
-    - `AWAITING_CJ_ASSESSMENT`
-    - `CJ_ASSESSMENT_IN_PROGRESS`
-    - `CJ_ASSESSMENT_SUCCESS`
-    - `CJ_ASSESSMENT_FAILED`
+    * `AWAITING_CJ_ASSESSMENT`
+    * `CJ_ASSESSMENT_IN_PROGRESS`
+    * `CJ_ASSESSMENT_SUCCESS`
+    * `CJ_ASSESSMENT_FAILED`
 
 * **Task 1.2: Implement Unit Tests for `topic_name` Function** ✅ **COMPLETED**
   * **Goal**: Ensure the `topic_name()` function in `common_core/src/common_core/enums.py` has comprehensive unit tests.
   * **Status**: ✅ **IMPLEMENTED** - Created comprehensive unit test suite in `common_core/tests/unit/test_enums.py` with 25 test cases covering:
-    - ✅ Specific test for `ProcessingEvent.ELS_BATCH_PHASE_OUTCOME` mapping to `"huleedu.els.batch_phase.outcome.v1"`
-    - ✅ All currently mapped events in `_TOPIC_MAPPING`
-    - ✅ Error handling for unmapped events with helpful error messages
-    - ✅ Topic name format consistency validation
-    - ✅ Comprehensive enum value validation for all enum classes
-    - ✅ Private `_TOPIC_MAPPING` dictionary validation
+    * ✅ Specific test for `ProcessingEvent.ELS_BATCH_PHASE_OUTCOME` mapping to `"huleedu.els.batch_phase.outcome.v1"`
+    * ✅ All currently mapped events in `_TOPIC_MAPPING`
+    * ✅ Error handling for unmapped events with helpful error messages
+    * ✅ Topic name format consistency validation
+    * ✅ Comprehensive enum value validation for all enum classes
+    * ✅ Private `_TOPIC_MAPPING` dictionary validation
   * **Test Results**: All 25 tests pass, linter clean, MyPy type checking passes
 
 ---
@@ -50,14 +50,16 @@ To complete the implementation of a dynamic, multi-stage essay processing pipeli
 ### **Phase 2: ELS State Machine Integration & Outcome Event Implementation**
 
 ### Task 2.1: Unit Tests for EssayStateMachine ✅ **COMPLETED**
+
 Implemented comprehensive test suite in `services/essay_lifecycle_service/tests/unit/test_essay_state_machine.py` with 43 test cases covering:
-- **State Machine Initialization**: Tests for all `EssayStatus` values including terminal states
-- **Workflow Transitions**: Complete spellcheck, AI feedback, CJ assessment, NLP workflows with success/failure paths
-- **Pipeline Management**: Multi-phase workflows (spellcheck→AI feedback→complete, spellcheck→CJ→complete, full pipeline)
-- **Critical Failure**: Emergency transitions from any state to `ESSAY_CRITICAL_FAILURE`
-- **Invalid Transition Handling**: Returns `False` for invalid triggers, maintains state consistency
-- **State Machine API**: `can_trigger()`, `get_valid_triggers()`, convenience methods (`cmd_initiate_spellcheck()`, etc.)
-- **Edge Cases**: Multiple trigger attempts, trigger name validation, string representations
+
+* **State Machine Initialization**: Tests for all `EssayStatus` values including terminal states
+* **Workflow Transitions**: Complete spellcheck, AI feedback, CJ assessment, NLP workflows with success/failure paths
+* **Pipeline Management**: Multi-phase workflows (spellcheck→AI feedback→complete, spellcheck→CJ→complete, full pipeline)
+* **Critical Failure**: Emergency transitions from any state to `ESSAY_CRITICAL_FAILURE`
+* **Invalid Transition Handling**: Returns `False` for invalid triggers, maintains state consistency
+* **State Machine API**: `can_trigger()`, `get_valid_triggers()`, convenience methods (`cmd_initiate_spellcheck()`, etc.)
+* **Edge Cases**: Multiple trigger attempts, trigger name validation, string representations
 
 ```python
 # Key test patterns implemented:
@@ -76,89 +78,55 @@ def test_invalid_triggers_return_false(self) -> None:
 
 **Test Results**: All 43 tests pass with state machine working correctly. Some MyPy return type annotations remain to be fixed manually.
 
-* **Task 2.2: Refactor ELS `batch_command_handlers.py` to Utilize `EssayStateMachine`**
+* **Task 2.2: Refactor ELS `batch_command_handlers.py` to Utilize `EssayStateMachine`** ✅ **COMPLETED**
   * **Goal**: Integrate `EssayStateMachine` into ELS's event and command processing logic.
   * **File**: `services/essay_lifecycle_service/batch_command_handlers.py`
-  * **Core Logic**:
-        1. **Modify `_route_event` or individual handlers (e.g., `_handle_batch_spellcheck_initiate_command`, and create new handlers for specialized service results):**
-            * When a BOS command or specialized service result is received for an essay:
-                * Fetch the `EssayState` for the `essay_id` using `state_store.get_essay_state()`.
-                * If `EssayState` exists, instantiate `EssayStateMachine(essay_id=essay_state.essay_id, initial_status=essay_state.current_status)`.
-                * Determine the correct state machine `trigger_name` based on the incoming command/event (e.g., `CMD_INITIATE_SPELLCHECK` for `BatchServiceSpellcheckInitiateCommandDataV1`).
-                * Attempt the transition: `if essay_machine.trigger(trigger_name):`
-                    * Persist the new state: `await state_store.update_essay_status_via_machine(essay_id, essay_machine.current_status, relevant_metadata_updates)`.
-                    * If it's a command that initiates a new phase, dispatch the request to the appropriate specialized service using `request_dispatcher` (e.g., `self.request_dispatcher.dispatch_spellcheck_requests(...)` from `implementations/batch_command_handler_impl.py`).
-                    * Log success.
-                * Else (transition failed):
-                    * Log the error and potentially publish a failure notification or update essay state to a specific error status via the state machine.
+  * **Implementation Completed**:
+    * ✅ **Architectural refactoring** - Fixed 400-line file size violation by creating proper implementation structure
+    * ✅ **Protocol definitions** - Added `BatchCoordinationHandler` and `ServiceResultHandler` protocols
+    * ✅ **Implementation files created**:
+      * `implementations/batch_coordination_handler_impl.py` - Batch coordination events
+      * `implementations/service_result_handler_impl.py` - Specialized service results with state machine
+    * ✅ **State machine integration** in `_handle_batch_spellcheck_initiate_command`:
+      * Uses `EssayStateMachine` with `CMD_INITIATE_SPELLCHECK` trigger
+      * Updates essay states via `state_store.update_essay_status_via_machine()`
+      * Stores batch command metadata for aggregation
+      * Handles transition failures gracefully
+    * ✅ **Linter compliance** - All checks pass with `ruff`
+    * ✅ **FIXES APPLIED** (June 2025):
+      * Fixed `DefaultBatchCommandHandler.process_initiate_spellcheck_command` to use `EssayStateMachine` properly
+      * Corrected state machine instantiation with `essay_id` parameter
+      * Implemented proper state transition logic with `CMD_INITIATE_SPELLCHECK` trigger
+      * Added metadata tracking for batch phase coordination (`current_phase`, `commanded_phases`)
+      * Only dispatches requests to specialized services after successful state transitions
+      * Fixed `DefaultServiceResultHandler` to use correct `EssayStateMachine` instantiation
+      * Corrected calls to `update_essay_status_via_machine` with proper parameters
+      * Added `update_essay_status_via_machine` method to `EssayStateStore` protocol
+      * Fixed CJ assessment handlers for proper state machine usage
+      * All 43 state machine tests pass, linter clean
 
-        ```python
-        # Example snippet for _handle_batch_spellcheck_initiate_command
-        # in services/essay_lifecycle_service/batch_command_handlers.py
-
-        # from ..essay_state_machine import EssayStateMachine, CMD_INITIATE_SPELLCHECK # Adjust import
-        # ...
-        # async def _handle_batch_spellcheck_initiate_command(
-        #     envelope: EventEnvelope[BatchServiceSpellcheckInitiateCommandDataV1],
-        #     state_store: EssayStateStore,
-        #     request_dispatcher: SpecializedServiceRequestDispatcher, # Already in DefaultBatchCommandHandler
-        #     # ... other dependencies ...
-        # ) -> bool:
-        #     command_data = BatchServiceSpellcheckInitiateCommandDataV1.model_validate(envelope.data)
-        #     # ...
-        #     for essay_input_ref in command_data.essays_to_process:
-        #         essay_id = essay_input_ref.essay_id
-        #         pydantic_essay_state = await state_store.get_essay_state(essay_id)
-        #         if not pydantic_essay_state:
-        #             # ... handle error ...
-        #             continue
-        #
-        #         essay_machine = EssayStateMachine(essay_id, pydantic_essay_state.current_status)
-        #
-        #         if essay_machine.trigger(CMD_INITIATE_SPELLCHECK): # Or specific method
-        #             await state_store.update_essay_status_via_machine(
-        #                 essay_id,
-        #                 essay_machine.current_status,
-        #                 {"bos_command": "spellcheck_initiate"}
-        #             )
-        #             # Dispatch logic is in DefaultBatchCommandHandler, ensure it's called correctly
-        #             # This might involve passing the request_dispatcher to this handler
-        #             # or calling a method on batch_command_handler which uses its internal dispatcher.
-        #             # Based on DefaultBatchCommandHandler, it seems the dispatcher is part of it.
-        #             # So this function might need to be a method of a class that holds dispatcher.
-        #             # The current `batch_command_handlers.py` `_route_event` takes `batch_command_handler`
-        #             # which has the dispatcher.
-
-        #             # Example: Assuming this handler is part of a class or has access to request_dispatcher
-        #             # This dispatch logic likely moves into the DefaultBatchCommandHandler's methods.
-        #             # For example, after state update:
-        #             # await request_dispatcher.dispatch_spellcheck_requests(
-        #             #     essays_to_process=[essay_input_ref], # dispatch per essay after state change
-        #             #     language=command_data.language,
-        #             #     correlation_id=envelope.correlation_id
-        #             # )
-        #         else:
-        #             # ... log failed transition ...
-        #     return True # or reflect actual success
-        ```
-
-* **Task 2.3: Implement `ELSBatchPhaseOutcomeV1` Event Aggregation and Publishing in ELS**
+* **Task 2.3: Implement `ELSBatchPhaseOutcomeV1` Event Aggregation and Publishing in ELS** ✅ **COMPLETED**
   * **Goal**: ELS must track phase completion for all essays in a batch and publish `ELSBatchPhaseOutcomeV1`.
-  * **Location**: Likely within `services/essay_lifecycle_service/batch_command_handlers.py` (when processing specialized service results) or a new ELS-side batch phase coordinator module if logic becomes complex.
-  * **Core Logic**:
-        1. When ELS processes a result event from a specialized service (e.g., `SpellcheckResultDataV1` which would trigger `EVT_SPELLCHECK_SUCCEEDED` or `EVT_SPELLCHECK_FAILED` on the state machine):
-            * After updating the individual essay's state, check if this essay was part of a batch undergoing a specific commanded phase. This requires ELS to know which batch and phase an essay belongs to (likely stored in `EssayState.processing_metadata` when a BOS command is processed).
-            * Retrieve all other essays belonging to the same `batch_id` and `phase_name` from `state_store`.
-            * Check if all essays in this batch/phase have reached a terminal state for that phase (e.g., `SPELLCHECKED_SUCCESS` or `SPELLCHECK_FAILED`).
-        2. If all essays in the phase are complete:
-            * Aggregate results:
-                * `processed_essays: List[EssayProcessingInputRefV1]`: For all essays that successfully completed the phase, gather their `essay_id` and *current relevant `text_storage_id`*. The `text_storage_id` might be the original one, or a new one if the phase (like spellcheck) created a new version of the text. This needs to be fetched from `EssayState.storage_references`.
-                * `failed_essay_ids: List[str]`: List of `essay_id`s that failed the phase.
-                * `phase_status: str`: Overall status like "COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES", "FAILED_CRITICALLY".
-            * Construct the `ELSBatchPhaseOutcomeV1` event data (from `common_core.events.els_bos_events`).
-            * Create an `EventEnvelope`.
-            * Use `event_publisher.publish_batch_event()` (a new method on the protocol/implementation might be clearer, e.g., `publish_els_batch_phase_outcome()`) to send this event to the topic `huleedu.els.batch_phase.outcome.v1`.
-  * **File to Modify**: `services/essay_lifecycle_service/implementations/event_publisher.py` needs to be updated or a new method added to `EventPublisherProtocol` to handle publishing the correctly structured `ELSBatchPhaseOutcomeV1` to the topic `huleedu.els.batch_phase.outcome.v1`. The current `publish_batch_phase_concluded` is not suitable.
+  * **Implementation Completed**:
+    * ✅ **Clean architectural design** - Created `BatchPhaseCoordinator` protocol for separation of concerns
+    * ✅ **Protocol definition** - Added `BatchPhaseCoordinator` protocol to `protocols.py`
+    * ✅ **Implementation files created**:
+      * `implementations/batch_phase_coordinator_impl.py` - Dedicated batch aggregation logic
+      * Updated `service_result_handler_impl.py` - Integration with coordinator
+    * ✅ **Dependency injection** - Added providers in `di.py` for BatchPhaseCoordinator
+    * ✅ **Event publishing** - Added `publish_els_batch_phase_outcome()` method to EventPublisher
+    * ✅ **Batch completion logic**:
+      * Tracks essay batch/phase membership via processing_metadata
+      * Aggregates phase completion when all essays reach terminal states
+      * Publishes ELSBatchPhaseOutcomeV1 with correct processed_essays and text_storage_ids
+    * ✅ **Tests passing** - All 43 ELS unit tests pass with new architecture
+    * ✅ **IMPROVEMENTS APPLIED** (June 2025):
+      * Enhanced `_get_text_storage_id_for_phase` method with proper phase-specific logic
+      * Added comprehensive logging for missing storage references
+      * Improved fallback logic for text storage ID resolution
+      * Better handling of spellcheck output (CORRECTED_TEXT) vs. analysis phases
+      * Proper warning messages when expected storage references are missing
+      * Method now correctly maps phase outputs to next phase inputs
 
 * **Task 2.4: Unit/Integration Tests for ELS `batch_command_handlers.py` and Outcome Publishing**
   * **Goal**: Verify the refactored ELS logic.
@@ -313,31 +281,31 @@ def test_invalid_triggers_return_false(self) -> None:
   * **File**: Extend `tests/functional/test_walking_skeleton_e2e_v2.py` or create new E2E test files.
   * **Core Logic**:
         1. **Scenario 1 (e.g., Spellcheck -> CJ Assessment)**:
-            * Register a batch with `enable_cj_assessment=True`.
+            *Register a batch with `enable_cj_assessment=True`.
             * Upload files.
-            * Verify `BatchEssaysReady` from ELS.
+            *Verify `BatchEssaysReady` from ELS.
             * Verify BOS sends `BatchServiceSpellcheckInitiateCommandDataV1` to ELS.
-            * Verify ELS sends `EssayLifecycleSpellcheckRequestV1` to Spell Checker.
+            *Verify ELS sends `EssayLifecycleSpellcheckRequestV1` to Spell Checker.
             * **Simulate Spell Checker Service**: Have a mock Kafka consumer-producer that acts as Spell Checker:
-                * Consumes `EssayLifecycleSpellcheckRequestV1`.
+                *Consumes `EssayLifecycleSpellcheckRequestV1`.
                 * Creates dummy corrected content, stores it via Content Service (real call), gets new `text_storage_id_corrected`.
-                * Publishes `SpellcheckResultDataV1` back to ELS (simulating specialized service).
+                *Publishes `SpellcheckResultDataV1` back to ELS (simulating specialized service).
             * Verify ELS processes these results and (after implementing R2.3) publishes `ELSBatchPhaseOutcomeV1` for "spellcheck" with `processed_essays` containing the `text_storage_id_corrected`.
-            * Verify BOS consumes `ELSBatchPhaseOutcomeV1`.
+            *Verify BOS consumes `ELSBatchPhaseOutcomeV1`.
             * Verify BOS (after implementing R3.2) determines "cj_assessment" is next.
-            * Verify BOS publishes `BatchServiceCJAssessmentInitiateCommandDataV1` to ELS, ensuring it includes the `essays_to_process` list with the `text_storage_id_corrected` values.
+            *Verify BOS publishes `BatchServiceCJAssessmentInitiateCommandDataV1` to ELS, ensuring it includes the `essays_to_process` list with the `text_storage_id_corrected` values.
             * Verify ELS receives this command and (after R2.2) transitions states and dispatches `ELS_CJAssessmentRequestV1` (this part involves the CJ Assessment service, which can be mocked at Kafka level for this test if focusing only on BOS/ELS orchestration).
         2. **Scenario 2 (e.g., Spellcheck only)**:
-            * Register batch with `enable_cj_assessment=False`.
+            *Register batch with `enable_cj_assessment=False`.
             * Verify pipeline stops after spellcheck completion is processed by BOS.
 
 * **Task 4.2: Implement E2E Tests for Partial Success Scenarios**
   * **Goal**: Validate handling of phases where some essays succeed and others fail.
   * **Core Logic**:
         1. In an E2E test (e.g., Spellcheck phase):
-            * Simulate some essays processing successfully in the mock Spell Checker and some failing.
+            *Simulate some essays processing successfully in the mock Spell Checker and some failing.
             * Mock Spell Checker publishes both success and failure `SpellcheckResultDataV1` events.
-            * Verify ELS (after R2.3) correctly aggregates this into `ELSBatchPhaseOutcomeV1` with `phase_status="COMPLETED_WITH_FAILURES"`, and correctly populates `processed_essays` (with their new `text_storage_id`s) and `failed_essay_ids`.
+            *Verify ELS (after R2.3) correctly aggregates this into `ELSBatchPhaseOutcomeV1` with `phase_status="COMPLETED_WITH_FAILURES"`, and correctly populates `processed_essays` (with their new `text_storage_id`s) and `failed_essay_ids`.
             * Verify BOS consumes this and, when initiating the next phase (e.g., CJ Assessment), only includes the `essay_id`s from `processed_essays` in its command to ELS for the next stage.
 
 ---

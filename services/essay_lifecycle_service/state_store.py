@@ -408,3 +408,43 @@ class SQLiteEssayStateStore:
                 await db.commit()
 
             return essay_state
+
+    async def list_essays_by_batch_and_phase(self, batch_id: str, phase_name: str) -> list[EssayState]:
+        """List all essays in a batch that are part of a specific processing phase."""
+        async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM essay_states WHERE batch_id = ? ORDER BY created_at", (batch_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+                essay_states = []
+                for row in rows:
+                    processing_metadata = json.loads(row["processing_metadata"])
+
+                    # Check if this essay belongs to the specified phase
+                    # Phase information is stored in processing_metadata when BOS commands are processed
+                    current_phase = processing_metadata.get("current_phase")
+                    commanded_phases = processing_metadata.get("commanded_phases", [])
+
+                    # Essay belongs to this phase if it's currently in this phase or was commanded for this phase
+                    if current_phase == phase_name or phase_name in commanded_phases:
+                        essay_state = EssayState(
+                            essay_id=row["essay_id"],
+                            batch_id=row["batch_id"],
+                            current_status=EssayStatus(row["current_status"]),
+                            processing_metadata=processing_metadata,
+                            timeline={
+                                k: datetime.fromisoformat(v)
+                                for k, v in json.loads(row["timeline"]).items()
+                            },
+                            storage_references={
+                                ContentType(k): v
+                                for k, v in json.loads(row["storage_references"]).items()
+                            },
+                            created_at=datetime.fromisoformat(row["created_at"]),
+                            updated_at=datetime.fromisoformat(row["updated_at"]),
+                        )
+                        essay_states.append(essay_state)
+
+                return essay_states

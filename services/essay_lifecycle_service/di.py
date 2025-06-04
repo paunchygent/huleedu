@@ -18,10 +18,12 @@ from implementations.service_request_dispatcher import DefaultSpecializedService
 from protocols import (
     BatchCommandHandler,
     BatchEssayTracker,
+    BatchPhaseCoordinator,
     ContentClient,
     EssayStateStore,
     EventPublisher,
     MetricsCollector,
+    ServiceResultHandler,
     SpecializedServiceRequestDispatcher,
 )
 from protocols import (
@@ -112,3 +114,23 @@ class EssayLifecycleServiceProvider(Provider):
     def provide_batch_essay_tracker(self) -> BatchEssayTracker:
         """Provide batch essay tracker implementation."""
         return ConcreteBatchEssayTracker()
+
+    @provide(scope=Scope.APP)
+    def provide_batch_phase_coordinator(
+        self,
+        state_store: EssayStateStore,
+        event_publisher: EventPublisher,
+    ) -> BatchPhaseCoordinator:
+        """Provide batch phase coordinator implementation."""
+        from implementations.batch_phase_coordinator_impl import DefaultBatchPhaseCoordinator
+        return DefaultBatchPhaseCoordinator(state_store, event_publisher)
+
+    @provide(scope=Scope.APP)
+    def provide_service_result_handler(
+        self,
+        state_store: EssayStateStore,
+        batch_coordinator: BatchPhaseCoordinator,
+    ) -> ServiceResultHandler:
+        """Provide service result handler implementation."""
+        from implementations.service_result_handler_impl import DefaultServiceResultHandler
+        return DefaultServiceResultHandler(state_store, batch_coordinator)

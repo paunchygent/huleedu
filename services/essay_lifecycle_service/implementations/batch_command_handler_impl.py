@@ -19,7 +19,11 @@ if TYPE_CHECKING:
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from protocols import (
+from services.essay_lifecycle_service.essay_state_machine import (
+    CMD_INITIATE_SPELLCHECK,
+    EssayStateMachine,
+)
+from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
     EssayStateStore,
     EventPublisher,
@@ -53,7 +57,7 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         language = command_data.language
 
         logger.info(
-            "Processing spellcheck initiation command from BOS",
+            "Processing spellcheck initiation command from BOS with State Machine",
             extra={
                 "batch_id": batch_id,
                 "essays_count": len(essays_to_process),
@@ -62,34 +66,70 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
             },
         )
 
-        # Step 1: Update essay states to AWAITING_SPELLCHECK
-        from common_core.enums import EssayStatus
+        # Process each essay with state machine
+        successfully_transitioned_essays = []
 
         for essay_ref in essays_to_process:
             essay_id = essay_ref.essay_id
             try:
-                # Update the essay state to AWAITING_SPELLCHECK
-                essay_state = await self.state_store.get_essay_state(essay_id)
-                if essay_state is None:
+                essay_state_model = await self.state_store.get_essay_state(essay_id)
+                if essay_state_model is None:
                     logger.error(
-                        f"Essay {essay_id} not found in state store",
-                        extra={"batch_id": batch_id, "correlation_id": str(correlation_id)},
+                        f"Essay {essay_id} not found in state store for spellcheck command",
+                        extra={
+                            "batch_id": batch_id,
+                            "correlation_id": str(correlation_id),
+                        },
                     )
                     continue
 
-                # Update essay status
-                await self.state_store.update_essay_status(
-                    essay_id, EssayStatus.AWAITING_SPELLCHECK
+                # Instantiate EssayStateMachine with current status
+                essay_machine = EssayStateMachine(
+                    essay_id=essay_id,
+                    initial_status=essay_state_model.current_status
                 )
 
-                logger.info(
-                    f"Updated essay {essay_id} status to AWAITING_SPELLCHECK",
-                    extra={"batch_id": batch_id, "correlation_id": str(correlation_id)},
-                )
+                # Attempt to trigger the transition for initiating spellcheck
+                if essay_machine.trigger(CMD_INITIATE_SPELLCHECK):
+                    # Persist the new state from the machine
+                    await self.state_store.update_essay_status_via_machine(
+                        essay_id,
+                        essay_machine.current_status,
+                        {
+                            "bos_command": "spellcheck_initiate",
+                            "current_phase": "spellcheck",
+                            "commanded_phases": list(set(
+                                essay_state_model.processing_metadata.get(
+                                    "commanded_phases", []
+                                ) + ["spellcheck"]
+                            ))
+                        }
+                    )
 
+                    logger.info(
+                        f"Essay {essay_id} transitioned to "
+                        f"{essay_machine.current_status.value} via state machine.",
+                        extra={
+                            "batch_id": batch_id,
+                            "correlation_id": str(correlation_id),
+                        },
+                    )
+
+                    # Add to successfully transitioned list for dispatch
+                    successfully_transitioned_essays.append(essay_ref)
+                else:
+                    logger.warning(
+                        f"State machine trigger '{CMD_INITIATE_SPELLCHECK}' failed "
+                        f"for essay {essay_id} from status "
+                        f"{essay_state_model.current_status.value}.",
+                        extra={
+                            "batch_id": batch_id,
+                            "correlation_id": str(correlation_id),
+                        },
+                    )
             except Exception as e:
                 logger.error(
-                    f"Failed to update essay {essay_id} status",
+                    f"Failed to process essay {essay_id} with state machine",
                     extra={
                         "error": str(e),
                         "batch_id": batch_id,
@@ -97,35 +137,45 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
                     },
                 )
 
-        # Step 2: Dispatch requests to Spell Checker Service
-        try:
-            await self.request_dispatcher.dispatch_spellcheck_requests(
-                essays_to_process=essays_to_process,
-                language=language,
-                correlation_id=correlation_id,
-            )
+        # Dispatch requests to specialized services AFTER successful state transitions
+        if successfully_transitioned_essays:
+            try:
+                await self.request_dispatcher.dispatch_spellcheck_requests(
+                    essays_to_process=successfully_transitioned_essays,
+                    language=language,
+                    correlation_id=correlation_id,
+                )
 
-            logger.info(
-                "Successfully dispatched spellcheck requests",
-                extra={
-                    "batch_id": batch_id,
-                    "essays_count": len(essays_to_process),
-                    "correlation_id": str(correlation_id),
-                },
-            )
-
-        except Exception as e:
-            logger.error(
-                "Failed to dispatch spellcheck requests",
-                extra={
-                    "error": str(e),
-                    "batch_id": batch_id,
-                    "correlation_id": str(correlation_id),
-                },
+                logger.info(
+                    "Successfully dispatched spellcheck requests for transitioned essays",
+                    extra={
+                        "batch_id": batch_id,
+                        "transitioned_essays_count": len(
+                            successfully_transitioned_essays
+                        ),
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to dispatch spellcheck requests",
+                    extra={
+                        "error": str(e),
+                        "batch_id": batch_id,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+        else:
+            logger.warning(
+                f"No essays successfully transitioned to AWAITING_SPELLCHECK "
+                f"for batch {batch_id}. Skipping dispatch.",
+                extra={"correlation_id": str(correlation_id)}
             )
 
     async def process_initiate_nlp_command(
-        self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID | None = None
+        self,
+        command_data: BatchServiceNLPInitiateCommandDataV1,
+        correlation_id: UUID | None = None
     ) -> None:
         """Process NLP initiation command from Batch Orchestrator Service."""
         # TODO: Implement when NLP Service is available
