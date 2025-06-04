@@ -4,6 +4,12 @@ globs:
 alwaysApply: false
 ---
 
+---
+description: Always read before creating new event contracts or using them in code implementations
+globs: 
+alwaysApply: false
+---
+
 # 035: Common Core Usage Patterns
 
 ## 1. Purpose

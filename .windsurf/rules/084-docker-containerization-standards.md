@@ -3,6 +3,12 @@ description:
 globs: 
 alwaysApply: false
 ---
+
+---
+description: 
+globs: 
+alwaysApply: false
+---
 # 084: Docker Containerization Standards
 
 ## 1. Critical Import Requirements
@@ -104,13 +110,13 @@ environment:
 ### 5.1. Build Commands
 ```bash
 # Clean rebuild (development)
-docker-compose down --remove-orphans
-docker-compose build --no-cache
-docker-compose up -d
+docker compose down --remove-orphans
+docker compose build --no-cache
+docker compose up -d
 
 # Service-specific rebuild
-docker-compose build {service_name} --no-cache
-docker-compose up -d {service_name}
+docker compose build {service_name} --no-cache
+docker compose up -d {service_name}
 ```
 
 ### 5.2. Dependency Order
@@ -131,7 +137,7 @@ curl -f http://localhost:{port}/healthz
 curl -f http://localhost:{port}/metrics
 
 # Container status check
-docker-compose ps
+docker compose ps
 ```
 
 ### 6.2. Import Issue Prevention
@@ -153,13 +159,13 @@ docker-compose ps
 ### 7.2. Container Debug Commands
 ```bash
 # View service logs
-docker-compose logs {service_name} --tail=20
+docker compose logs {service_name} --tail=20
 
 # Execute inside container
-docker-compose exec {service_name} /bin/bash
+docker compose exec {service_name} /bin/bash
 
 # Rebuild specific service
-docker-compose build {service_name} --no-cache
+docker compose build {service_name} --no-cache
 ```
 
 ---

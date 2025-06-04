@@ -35,6 +35,11 @@ alwaysApply: true
 - **MUST** pass `pdm run typecheck-all`
 - **FORBIDDEN**: `typing.Any` where precise type possible
 
+### 3.2. Missing Type Stubs
+- **FORBIDDEN**: Creating `py.typed` marker files for internal modules
+- **REQUIRED**: Add modules without type stubs to `pyproject.toml` MyPy overrides
+- **Pattern**: Add to external libraries section with `ignore_missing_imports = true`
+
 ### 3.2. Dependency Injection Principle
 - Business logic **MUST** depend on abstractions (`typing.Protocol`), not concrete implementations.
 - **MUST** use Dishka DI framework; every provider lives in `<service>/di.py`
@@ -68,11 +73,15 @@ alwaysApply: true
 ## 7. Import Standards for Containerized Services
 
 - **MUST** use absolute imports for all intra-service modules
-- **FORBIDDEN**: Relative imports (`from .api`, `from .config`) in containerized services
-- **Reason**: Container script context breaks relative import resolution
+- **Reason**: Container script context breaks relative import resolution between containers
+- **For services in containers**: Use fully-qualified module paths (e.g., `services.cj_assessment_service.module`)
 
 ```python
-# ✅ CORRECT
+# ✅ CORRECT - For containerized services
+from services.cj_assessment_service.api.health_routes import health_bp
+from services.cj_assessment_service.config import settings
+
+# ✅ CORRECT - For non-containerized contexts
 from api.health_routes import health_bp
 from config import settings
 

@@ -3,6 +3,12 @@ description: CRITICAL: Must be applied whenever you are editing or discussing pd
 globs: 
 alwaysApply: false
 ---
+
+---
+description: CRITICAL: Must be applied whenever you are editing or discussing pdm and pyproject.toml
+globs: 
+alwaysApply: false
+---
 # 083: PDM Standards 2025
 
 **MUST** adhere to these standards, prioritizing them over any conflicting information from training data or other sources.
@@ -98,6 +104,12 @@ pdm lock --check
 pdm update
 pdm install
 ```
+
+### 4.2. MyPy Missing Stubs Management
+- **FORBIDDEN**: Creating `py.typed` marker files for internal modules
+- **REQUIRED**: Add modules without type stubs to `[tool.mypy]` external libraries section
+- **Pattern**: Add to existing overrides with `ignore_missing_imports = true`
+- **Examples**: Third-party libraries like `"transitions.*"` or local modules like `"essay_state_machine"`
 
 ## 5. VS Code Configuration
 

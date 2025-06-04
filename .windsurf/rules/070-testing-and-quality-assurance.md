@@ -8,7 +8,6 @@ description:
 globs: 
 alwaysApply: true
 ---
-===
 # 070: Testing and Quality Assurance
 
 ## 1. Testing Pyramid
@@ -44,6 +43,11 @@ async def mock_http_context_manager(mock_response: AsyncMock) -> Any:
 - **Command**: `pdm run pytest` (always use PDM)
 - **Debug**: `pdm run pytest -s` for print statements
 - **FORBIDDEN**: Simplifying tests to make them pass - fix underlying issues
+
+## 5. Type Checking Standards
+- **FORBIDDEN**: Creating `py.typed` marker files for internal modules
+- **REQUIRED**: Add missing type stubs to `pyproject.toml` MyPy external libraries section
+- **Pattern**: Use `ignore_missing_imports = true` in MyPy overrides for libraries without stubs
 
 ## 5. Anti-Patterns
 - **FORBIDDEN**: `try/except pass` blocks hiding model rebuilding failures

@@ -61,3 +61,9 @@ Service READMEs **MUST** include:
 ### 5.1. Documentation as Part of the Task
 - Updating relevant documentation (READMEs, rules index) **MUST** be integral part of any task that changes code or architecture
 - **MUST** include documentation updates in task completion steps
+
+### 5.2. Task Documentation Compression
+- **MUST** compress completed tasks in task documents to preserve only implementation summary
+- **MUST** use hyper-technical language with code examples, no promotional language
+- **MUST** maximize information density per token
+- Format: `### Task Name ✅ COMPLETED` with implementation summary containing essential technical details, code snippets, and remaining work only

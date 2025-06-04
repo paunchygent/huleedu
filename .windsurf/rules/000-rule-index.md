@@ -5,9 +5,9 @@ alwaysApply: true
 ---
 
 ---
-description: 
+description: Index of all .cursor/rules/
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 # HuleEdu Development Rules: Index
 
@@ -22,7 +22,7 @@ alwaysApply: true
 - [023-batch-service-architecture.md](mdc:023-batch-service-architecture.md): Batch Service architecture and implementation
 - [024-common-core-architecture.md](mdc:024-common-core-architecture.md): Common Core package architecture and implementation
 - [025-essay-lifecycle-service-architecture.md](mdc:025-essay-lifecycle-service-architecture.md): Essay Lifecycle Service architecture and implementation
-- [026-file-service-architecture.md](mdc:026-file-service-architecture.md): File Service architecture and implementation *(TODO: Create rule)*
+- [026-file-service-architecture.md](mdc:026-file-service-architecture.md): File Service architecture and implementation
 - [030-event-driven-architecture-eda-standards.md](mdc:030-event-driven-architecture-eda-standards.md): Event-driven communication standards
 
 ## Implementation & Coding Standards
@@ -38,6 +38,7 @@ alwaysApply: true
 - [082-ruff-linting-standards.md](mdc:082-ruff-linting-standards.md): Ruff linting and formatting configuration
 - [083-pdm-standards-2025.mdc](mdc:.cursor/rules/083-pdm-standards-2025.mdc): Correct modern PDM syntax that must never be questioned
 - [084-docker-containerization-standards.mdc](mdc:.cursor/rules/084-docker-containerization-standards.mdc): Docker containerization patterns, import requirements, and troubleshooting
+- [085-docker-compose-v2-command-reference.mdc](mdc:.cursor/rules/085-docker-compose-v2-command-reference.mdc): Docker Compose v2 command reference
 - [090-documentation-standards.md](mdc:090-documentation-standards.md): Service, contract, and architectural documentation
 
 ## Terminology & Your Interaction Modes
