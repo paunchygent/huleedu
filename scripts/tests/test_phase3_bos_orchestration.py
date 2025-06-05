@@ -29,6 +29,7 @@ from common_core.metadata_models import (
     EssayProcessingInputRefV1,
 )
 from common_core.pipeline_models import (
+    PhaseName,
     PipelineExecutionStatus,
     PipelineStateDetail,
     ProcessingPipelineState,
@@ -56,6 +57,7 @@ from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
     BatchRepositoryProtocol,
     CJAssessmentInitiatorProtocol,
+    PipelinePhaseInitiatorProtocol,
 )
 
 # Pytest asyncio marker
@@ -96,8 +98,7 @@ def mock_event_publisher() -> AsyncMock:
 def mock_cj_initiator() -> AsyncMock:
     """Mocks the CJAssessmentInitiatorProtocol."""
     mock = AsyncMock(spec=CJAssessmentInitiatorProtocol)
-    mock.initiate_cj_assessment = AsyncMock()
-    mock.can_initiate_cj_assessment = AsyncMock(return_value=True)
+    mock.initiate_phase = AsyncMock()
     return mock
 
 
@@ -120,8 +121,15 @@ def pipeline_phase_coordinator(
     mock_cj_initiator: AsyncMock,
 ) -> DefaultPipelinePhaseCoordinator:
     """Provides an instance of DefaultPipelinePhaseCoordinator with mocked dependencies."""
+    # Create mock phase_initiators_map for dynamic phase coordination
+    mock_phase_initiators_map = {
+        PhaseName.SPELLCHECK: AsyncMock(spec=PipelinePhaseInitiatorProtocol),
+        PhaseName.CJ_ASSESSMENT: mock_cj_initiator,
+        PhaseName.AI_FEEDBACK: AsyncMock(spec=PipelinePhaseInitiatorProtocol),
+        PhaseName.NLP: AsyncMock(spec=PipelinePhaseInitiatorProtocol),
+    }
     return DefaultPipelinePhaseCoordinator(
-        batch_repo=mock_batch_repo, cj_initiator=mock_cj_initiator
+        batch_repo=mock_batch_repo, phase_initiators_map=mock_phase_initiators_map
     )
 
 
@@ -274,20 +282,26 @@ class TestBOSOrchestration:
             phase_status="completed",
             correlation_id=correlation_id_str,
         )
-        mock_cj_initiator.initiate_cj_assessment.assert_called_once_with(
-            sample_batch_id,
-            sample_batch_registration_request_cj_enabled,
-            correlation_id_str,
-            # essays_to_process is not passed by current coordinator impl
+        mock_cj_initiator.initiate_phase.assert_called_once_with(
+            batch_id=sample_batch_id,
+            phase_to_initiate=PhaseName.CJ_ASSESSMENT,
+            correlation_id=correlation_id_str,
+            essays_for_processing=[],  # Empty list when no processed essays provided
+            batch_context=sample_batch_registration_request_cj_enabled,
         )
         # Check that pipeline state was updated for spellcheck completion
-        # and CJ initiation
-        saved_state_args = mock_batch_repo.save_processing_pipeline_state.call_args[0][
-            1
-        ]
-        assert saved_state_args["spellcheck_status"] == "COMPLETED"
+        # The coordinator makes multiple calls: first for spellcheck completion, then for CJ initiation
+        assert mock_batch_repo.save_processing_pipeline_state.call_count >= 2
 
-        mock_cj_initiator.initiate_cj_assessment.reset_mock()
+        # Check the first call (spellcheck completion)
+        first_call_args = mock_batch_repo.save_processing_pipeline_state.call_args_list[0][0][1]
+        assert first_call_args["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
+
+        # Check the second call (CJ initiation)
+        second_call_args = mock_batch_repo.save_processing_pipeline_state.call_args_list[1][0][1]
+        assert second_call_args["cj_assessment_status"] == "DISPATCH_INITIATED"
+
+        mock_cj_initiator.initiate_phase.reset_mock()
         mock_batch_repo.save_processing_pipeline_state.reset_mock()
 
         # Scenario 2: Spellcheck completes, CJ disabled
@@ -309,15 +323,15 @@ class TestBOSOrchestration:
             phase_status="completed",
             correlation_id=correlation_id_str,
         )
-        mock_cj_initiator.initiate_cj_assessment.assert_not_called()
+        mock_cj_initiator.initiate_phase.assert_not_called()
         saved_state_args_cj_disabled = (
             mock_batch_repo.save_processing_pipeline_state.call_args[0][1]
         )
-        assert saved_state_args_cj_disabled["spellcheck_status"] == "COMPLETED"
+        assert saved_state_args_cj_disabled["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
         # CJ assessment status not in pipeline state when disabled
         assert "cj_assessment_status" not in saved_state_args_cj_disabled
 
-        mock_cj_initiator.initiate_cj_assessment.reset_mock()
+        mock_cj_initiator.initiate_phase.reset_mock()
         mock_batch_repo.save_processing_pipeline_state.reset_mock()
 
         # Scenario 3: Spellcheck fails
@@ -338,7 +352,7 @@ class TestBOSOrchestration:
             phase_status="failed", # Phase failed
             correlation_id=correlation_id_str,
         )
-        mock_cj_initiator.initiate_cj_assessment.assert_not_called()
+        mock_cj_initiator.initiate_phase.assert_not_called()
         saved_state_args_spell_failed = (
             mock_batch_repo.save_processing_pipeline_state.call_args[0][1]
         )
@@ -366,11 +380,12 @@ class TestBOSOrchestration:
             ).model_dump()
         ) # Needed for _update_cj_assessment_status
 
-        await cj_assessment_initiator.initiate_cj_assessment(
+        await cj_assessment_initiator.initiate_phase(
             batch_id=sample_batch_id,
+            phase_to_initiate=PhaseName.CJ_ASSESSMENT,
+            correlation_id=sample_correlation_id,
+            essays_for_processing=sample_essay_refs,
             batch_context=sample_batch_registration_request_cj_enabled,
-            correlation_id=correlation_id_str,
-            essays_to_process=sample_essay_refs, # Explicitly pass essays
         )
 
         mock_event_publisher.publish_batch_event.assert_called_once()
@@ -397,12 +412,9 @@ class TestBOSOrchestration:
         )
         assert published_envelope.data.essays_to_process == sample_essay_refs
 
-        # Verify pipeline state was updated
-        mock_batch_repo.save_processing_pipeline_state.assert_called_once()
-        saved_state_args = mock_batch_repo.save_processing_pipeline_state.call_args[0][
-            1
-        ]
-        assert saved_state_args["cj_assessment_status"] == "DISPATCH_INITIATED"
+        # Verify that the CJ initiator no longer updates pipeline state
+        # (this is now handled by the coordinator)
+        mock_batch_repo.save_processing_pipeline_state.assert_not_called()
 
     async def test_pipeline_state_updates_on_phase_status_change(
         self,
@@ -475,17 +487,14 @@ class TestBOSOrchestration:
             correlation_id=correlation_id_str,
         )
 
-        # Assert that initiate_cj_assessment was called
-        mock_cj_initiator.initiate_cj_assessment.assert_called_once()
-        # Get the arguments passed to initiate_cj_assessment
-        call_args, call_kwargs = mock_cj_initiator.initiate_cj_assessment.call_args
-
-        # Current implementation of DefaultPipelinePhaseCoordinator._handle_spellcheck_completion
-        # calls cj_initiator.initiate_cj_assessment without passing essays_to_process.
-        # The DefaultCJAssessmentInitiator.initiate_cj_assessment has a default
-        # essays_to_process=None.
-        # So, we expect essays_to_process to be missing or None in the call.
-        assert "essays_to_process" not in call_kwargs or call_kwargs["essays_to_process"] is None
+        # Assert that initiate_phase was called with correct parameters
+        mock_cj_initiator.initiate_phase.assert_called_once_with(
+            batch_id=sample_batch_id,
+            phase_to_initiate=PhaseName.CJ_ASSESSMENT,
+            correlation_id=correlation_id_str,
+            essays_for_processing=[],  # Empty list when no processed essays provided
+            batch_context=sample_batch_registration_request_cj_enabled,
+        )
 
         # To further test the command generated by the initiator if essays_to_process was None:
         # We'd need to inspect the event_publisher mock from within a
@@ -531,22 +540,23 @@ class TestBOSOrchestration:
         )
 
         # CJ initiator should have been called once
-        mock_cj_initiator.initiate_cj_assessment.assert_called_once()
+        mock_cj_initiator.initiate_phase.assert_called_once()
         # Pipeline state should be updated to reflect CJ initiated
-        # The save_processing_pipeline_state mock will capture the state
-        # The DefaultCJAssessmentInitiator updates cj_assessment_status to DISPATCH_INITIATED
-        # The DefaultPipelinePhaseCoordinator updates spellcheck_status to COMPLETED
+        # The coordinator makes multiple calls: first for spellcheck completion, then for CJ initiation
+        assert mock_batch_repo.save_processing_pipeline_state.call_count >= 2
+
+        # Check the first call (spellcheck completion)
         first_update_args = mock_batch_repo.save_processing_pipeline_state.call_args_list[0].args[1]
-        assert first_update_args.get("spellcheck_status") == "COMPLETED"
+        assert first_update_args.get("spellcheck_status") == "COMPLETED_SUCCESSFULLY"
 
         # Setup repo mock to return the state where CJ is already initiated
         state_after_first_cj_init = initial_pipeline_state_dict.copy()
-        state_after_first_cj_init["spellcheck_status"] = "COMPLETED"
+        state_after_first_cj_init["spellcheck_status"] = "COMPLETED_SUCCESSFULLY"
         # BOS internal status
         state_after_first_cj_init["cj_assessment_status"] = "DISPATCH_INITIATED"
 
         mock_batch_repo.get_processing_pipeline_state.return_value = state_after_first_cj_init
-        mock_cj_initiator.initiate_cj_assessment.reset_mock() # Reset for the next assertion
+        mock_cj_initiator.initiate_phase.reset_mock() # Reset for the next assertion
 
 
         # Second, duplicate "spellcheck completed" event
@@ -558,4 +568,4 @@ class TestBOSOrchestration:
         )
 
         # CJ initiator should NOT have been called again
-        mock_cj_initiator.initiate_cj_assessment.assert_not_called()
+        mock_cj_initiator.initiate_phase.assert_not_called()

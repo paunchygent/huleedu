@@ -103,10 +103,10 @@ class BatchOrchestratorServiceProvider(Provider):
     def provide_pipeline_phase_coordinator(
         self,
         batch_repo: BatchRepositoryProtocol,
-        cj_initiator: CJAssessmentInitiatorProtocol,
+        phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol],
     ) -> PipelinePhaseCoordinatorProtocol:
         """Provide pipeline phase coordinator implementation."""
-        return DefaultPipelinePhaseCoordinator(batch_repo, cj_initiator)
+        return DefaultPipelinePhaseCoordinator(batch_repo, phase_initiators_map)
 
     @provide(scope=Scope.APP)
     def provide_batch_processing_service(

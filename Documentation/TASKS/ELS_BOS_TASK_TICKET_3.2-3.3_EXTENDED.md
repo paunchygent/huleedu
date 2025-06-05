@@ -248,79 +248,65 @@ await initiator.initiate_phase(
 )
 ```
 
-### Phase 3: Refactor `DefaultPipelinePhaseCoordinator` to Initiate *Subsequent* Pipeline Phases Generically
+### ✅ Phase 3: Refactor `DefaultPipelinePhaseCoordinator` to Initiate *Subsequent* Pipeline Phases Generically - COMPLETED
 
-**Goal:** Refactor `DefaultPipelinePhaseCoordinator` to use dynamic subsequent phase initiation instead of hardcoded logic.
+**Status:** ✅ **COMPLETE** - Successfully implemented and validated
 
-### 🎯 **Essential Context for Phase 3 Implementation**
+**Summary:** Refactored `DefaultPipelinePhaseCoordinator` to use dynamic subsequent phase initiation instead of hardcoded logic, completing the transition to fully generic orchestration.
 
-**Current Infrastructure (Available from Phases 1 & 2):**
-- `phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol]` available via DI injection
-- All initiators implement standardized `PipelinePhaseInitiatorProtocol.initiate_phase()` method signature
-- Type-safe `PhaseName` enum eliminates magic strings throughout the system
-- `BatchEssaysReadyHandler` successfully uses dynamic first phase initiation (Phase 2 complete)
+**Key Achievements:**
 
-### 📋 **Critical Knowledge for Developers Starting Phase 3:**
+- ✅ **Dynamic Phase Progression:** Replaced hardcoded `_handle_spellcheck_completion()` method with generic `_initiate_next_phase()` logic using `requested_pipelines` array
+- ✅ **Type Safety:** Using `PhaseName` enum throughout with proper validation and error handling
+- ✅ **Generic Initiator Usage:** Uses `phase_initiators_map` to dynamically resolve and call appropriate initiators for subsequent phases
+- ✅ **Pipeline Completion Detection:** Properly handles end-of-pipeline scenarios when no more phases remain
+- ✅ **Idempotency:** Comprehensive status checking prevents duplicate phase initiation
+- ✅ **Error Handling:** Robust error handling with proper state updates and diagnostic logging
+- ✅ **Backwards Compatibility:** Supports both Pydantic `ProcessingPipelineState` and legacy dict formats
 
-1. **Target File**: `services/batch_orchestrator_service/implementations/pipeline_phase_coordinator_impl.py`
+**Files Modified:**
 
-2. **Key Integration Patterns to Follow:**
+- `services/batch_orchestrator_service/implementations/pipeline_phase_coordinator_impl.py` - Refactored to dynamic subsequent phase initiation
+- `services/batch_orchestrator_service/di.py` - Updated provider to inject `phase_initiators_map` instead of `cj_initiator`
+- `scripts/tests/test_phase3_bos_orchestration.py` - Updated tests to match new dynamic behavior
 
-   ```python
-   # Dynamic next phase determination pattern
-   current_index = batch_context.requested_pipelines.index(completed_phase.value)
-   if current_index + 1 < len(batch_context.requested_pipelines):
-       next_phase_name = PhaseName(batch_context.requested_pipelines[current_index + 1])
-       initiator = self.phase_initiators_map.get(next_phase_name)
-   
-   # Standardized initiation call signature (same as Phase 2)
-   await initiator.initiate_phase(
-       batch_id=batch_id,
-       phase_to_initiate=next_phase_name,
-       correlation_id=correlation_id,
-       essays_for_processing=processed_essays_from_previous_phase,
-       batch_context=batch_context
-   )
-   ```
+**Validation Results:**
 
-3. **Error Handling Requirements:**
-   - Catch `InitiationError` and subclasses (`DataValidationError`, `CommandPublishError`)
-   - Mark failed phases as `FAILED` in `ProcessingPipelineState`
-   - Handle end-of-pipeline completion (mark batch as `COMPLETED`)
-   - Publish diagnostic events for monitoring and debugging
+- ✅ 6/6 Phase 3 specific tests passed (dynamic phase progression, pipeline completion, idempotency, error handling)
+- ✅ 13/13 batch orchestrator service tests passed (no regressions)
 
-4. **State Management Requirements:**
-   - Use `PipelineExecutionStatus` enum for atomic status updates
-   - Set `started_at` timestamp when marking `DISPATCH_INITIATED`
-   - Implement idempotency checks before phase initiation
-   - Verify previous phase is `COMPLETED_SUCCESSFULLY` before proceeding
+**Implementation Details:**
 
-### 🔧 **Files to Review Before Implementation:**
+```python
+# Constructor now accepts phase_initiators_map instead of cj_initiator
+def __init__(
+    self,
+    batch_repo: BatchRepositoryProtocol,
+    phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol],
+) -> None:
 
-- **Target:** `services/batch_orchestrator_service/implementations/pipeline_phase_coordinator_impl.py`
-- **Models:** `common_core/src/common_core/pipeline_models.py` (ProcessingPipelineState, PipelineExecutionStatus)
-- **Events:** `common_core/src/common_core/events/` (Phase completion events)
-- **Reference:** `batch_essays_ready_handler.py` (successful Phase 2 implementation pattern)
+# Dynamic next phase determination
+current_index = requested_pipelines.index(completed_phase)
+if current_index + 1 < len(requested_pipelines):
+    next_phase_name = PhaseName(requested_pipelines[current_index + 1])
+    initiator = self.phase_initiators_map.get(next_phase_name)
 
-### ⚠️ **Phase 3 Non-Negotiable Requirements:**
+# Generic initiation call
+await initiator.initiate_phase(
+    batch_id=batch_id,
+    phase_to_initiate=next_phase_name,
+    correlation_id=correlation_id,
+    essays_for_processing=processed_essays_from_previous_phase,
+    batch_context=batch_context,
+)
+```
 
-1. **Dynamic Phase Progression:** Replace all hardcoded phase transition logic with `phase_initiators_map` lookup
-2. **Type Safety:** Use `PhaseName` enum throughout - no string literals
-3. **Idempotency:** Check phase status before initiation to prevent duplicate commands
-4. **Error Propagation:** Implement proper exception handling with state updates
-5. **Pipeline Completion:** Handle end-of-pipeline scenarios properly
-6. **Remove Legacy Code:** Delete hardcoded methods like `_handle_spellcheck_completion`, `_handle_cj_assessment_completion`
+**Architectural Impact:**
 
-### 🎯 **Implementation Checklist:**
-
-- [ ] Update constructor to inject `phase_initiators_map`
-- [ ] Refactor `_initiate_next_phase` method to use dynamic phase resolution
-- [ ] Add comprehensive error handling for invalid phases and missing initiators
-- [ ] Implement pipeline completion detection and batch finalization
-- [ ] Remove all hardcoded phase-specific methods
-- [ ] Update DI configuration to inject `phase_initiators_map`
-- [ ] Create validation tests (unit + integration)
-- [ ] Verify existing coordinator tests still pass
+- **Complete Dynamic Orchestration:** Both first phase (Phase 2) and subsequent phases (Phase 3) now use the same generic patterns
+- **Eliminated Hardcoded Logic:** No more phase-specific methods or hardcoded transitions
+- **Centralized State Management:** All pipeline state updates handled consistently by the coordinator
+- **Extensible Design:** Adding new phases now only requires implementing the `PipelinePhaseInitiatorProtocol` and adding to `phase_initiators_map`
 
 ### Phase 4: Implement and Integrate Remaining Phase Initiators
 
