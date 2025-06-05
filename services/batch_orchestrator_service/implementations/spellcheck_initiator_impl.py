@@ -1,4 +1,4 @@
-"""CJ Assessment initiator implementation for batch processing."""
+"""Spellcheck initiator implementation for batch processing."""
 
 from __future__ import annotations
 
@@ -8,18 +8,17 @@ from api_models import BatchRegistrationRequestV1
 from huleedu_service_libs.logging_utils import create_service_logger
 from protocols import (
     BatchEventPublisherProtocol,
-    BatchRepositoryProtocol,
-    CJAssessmentInitiatorProtocol,
     DataValidationError,
+    SpellcheckInitiatorProtocol,
 )
 
-from common_core.batch_service_models import BatchServiceCJAssessmentInitiateCommandDataV1
+from common_core.batch_service_models import BatchServiceSpellcheckInitiateCommandDataV1
 from common_core.enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 
-logger = create_service_logger("bos.cj.initiator")
+logger = create_service_logger("bos.spellcheck.initiator")
 
 
 def _infer_language_from_course_code(course_code: str) -> str:
@@ -45,16 +44,14 @@ def _infer_language_from_course_code(course_code: str) -> str:
         return "en"
 
 
-class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):
-    """Default implementation for initiating CJ assessment operations."""
+class SpellcheckInitiatorImpl(SpellcheckInitiatorProtocol):
+    """Default implementation for initiating spellcheck operations."""
 
     def __init__(
         self,
         event_publisher: BatchEventPublisherProtocol,
-        batch_repo: BatchRepositoryProtocol,
     ) -> None:
         self.event_publisher = event_publisher
-        self.batch_repo = batch_repo
 
     async def initiate_phase(
         self,
@@ -65,65 +62,62 @@ class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):
         batch_context: BatchRegistrationRequestV1,
     ) -> None:
         """
-        Initiate CJ assessment phase for a batch with the given context.
+        Initiate spellcheck phase for a batch with the given context.
 
         This implements the standardized PipelinePhaseInitiatorProtocol interface
-        for CJ assessment operations.
+        for spellcheck operations.
         """
         try:
             logger.info(
-                f"Initiating CJ assessment for batch {batch_id}",
+                f"Initiating spellcheck for batch {batch_id}",
                 extra={"correlation_id": str(correlation_id)},
             )
 
             # Validate that this is the correct phase
-            if phase_to_initiate != PhaseName.CJ_ASSESSMENT:
+            if phase_to_initiate != PhaseName.SPELLCHECK:
                 raise DataValidationError(
-                    f"DefaultCJAssessmentInitiator received incorrect phase: {phase_to_initiate}"
+                    f"SpellcheckInitiatorImpl received incorrect phase: {phase_to_initiate}"
                 )
 
             # Validate required data
             if not essays_for_processing:
                 raise DataValidationError(
-                    f"No essays provided for CJ assessment initiation in batch {batch_id}"
+                    f"No essays provided for spellcheck initiation in batch {batch_id}"
                 )
 
             # Get language from course code
             language = _infer_language_from_course_code(batch_context.course_code)
 
-            # Construct CJ assessment command
+            # Construct spellcheck command
             batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
 
-            cj_command = BatchServiceCJAssessmentInitiateCommandDataV1(
-                event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
+            spellcheck_command = BatchServiceSpellcheckInitiateCommandDataV1(
+                event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
                 entity_ref=batch_entity_ref,
                 essays_to_process=essays_for_processing,
                 language=language,
-                course_code=batch_context.course_code,
-                class_designation=batch_context.class_designation,
-                essay_instructions=batch_context.essay_instructions,
             )
 
-            # Create EventEnvelope for CJ command
-            command_envelope = EventEnvelope[BatchServiceCJAssessmentInitiateCommandDataV1](
-                event_type=topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
+            # Create EventEnvelope for spellcheck command
+            command_envelope = EventEnvelope[BatchServiceSpellcheckInitiateCommandDataV1](
+                event_type=topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
                 source_service="batch-orchestrator-service",
                 correlation_id=correlation_id,
-                data=cj_command,
+                data=spellcheck_command,
             )
 
-            # Publish CJ assessment command
+            # Publish spellcheck command
             await self.event_publisher.publish_batch_event(command_envelope)
 
             logger.info(
-                f"Published CJ assessment initiate command for batch {batch_id}, "
+                f"Published spellcheck initiate command for batch {batch_id}, "
                 f"event_id {command_envelope.event_id}",
                 extra={"correlation_id": str(correlation_id)},
             )
 
         except Exception as e:
             logger.error(
-                f"Error initiating CJ assessment for batch {batch_id}: {e}",
+                f"Error initiating spellcheck for batch {batch_id}: {e}",
                 exc_info=True,
                 extra={"correlation_id": str(correlation_id)},
             )

@@ -1,10 +1,86 @@
 # Task: ELS & BOS - Phase 3.2 & 3.3 - Generic Orchestration and Testing Enhancement (Revised Plan)
 
-**Status:** 🟡 In Progress
+**Status:** 🟡 In Progress - Phase 1 ✅ Complete, Phase 2 🔄 Ready
 
-**Version:** 2.1 (Incorporating Detailed Design Review Feedback)
+**Version:** 2.2 (Phase 1 Complete, Updated for Phase 2 Context)
 
 **Core Goal:** Transition Batch Orchestrator Service (BOS) from hardcoded pipeline phase transitions to a dynamic, map-based orchestration logic. This will allow for flexible pipeline definitions and easier addition of new processing phases, ensuring correct initiation of the first processing phase and robust handling of subsequent phases, guided by type-safety, robust error handling, and clear architectural principles.
+
+---
+
+## Implementation Progress
+
+### ✅ Phase 1: Generic Initiator Framework - COMPLETED
+
+**Summary:** Successfully established foundational protocols and type-safe infrastructure for dynamic orchestration.
+
+**Key Achievements:**
+- ✅ `PhaseName` enum added to `common_core/pipeline_models.py` with values: `SPELLCHECK`, `AI_FEEDBACK`, `CJ_ASSESSMENT`, `NLP`
+- ✅ `PipelinePhaseInitiatorProtocol` implemented with standardized `initiate_phase()` interface
+- ✅ `SpellcheckInitiatorImpl` created and integrated with DI
+- ✅ `CJAssessmentInitiatorProtocol` directly refactored (no adapter) to implement standardized interface
+- ✅ `InitiationError` exception hierarchy established
+- ✅ `InitiatorMapProvider` added to DI providing `phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol]`
+
+**Files Modified:**
+- `common_core/src/common_core/pipeline_models.py` - Added `PhaseName` enum
+- `common_core/src/common_core/__init__.py` - Exported `PhaseName`
+- `services/batch_orchestrator_service/protocols.py` - Added protocols and exception hierarchy
+- `services/batch_orchestrator_service/implementations/spellcheck_initiator_impl.py` - New file
+- `services/batch_orchestrator_service/implementations/cj_assessment_initiator_impl.py` - Refactored to standardized interface
+- `services/batch_orchestrator_service/di.py` - Added providers and `InitiatorMapProvider`
+
+---
+
+## Phase 2: Developer Context & Prerequisites
+
+### 🎯 **Essential Context for Phase 2 Implementation**
+
+**Goal:** Refactor `BatchEssaysReadyHandler` to use dynamic first phase initiation instead of hardcoded logic.
+
+### 📋 **Critical Knowledge for Developers Starting Phase 2:**
+
+1. **Current Infrastructure (Available from Phase 1):**
+   - `phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol]` available via DI injection
+   - All initiators implement standardized `PipelinePhaseInitiatorProtocol.initiate_phase()` method signature
+   - Type-safe `PhaseName` enum eliminates magic strings throughout the system
+
+2. **Key Integration Patterns to Follow:**
+   ```python
+   # Type-safe phase resolution pattern
+   first_phase_name = PhaseName(batch_context.requested_pipelines[0])
+   initiator = self.phase_initiators_map.get(first_phase_name)
+   
+   # Standardized initiation call signature
+   await initiator.initiate_phase(
+       batch_id=batch_id,
+       phase_to_initiate=first_phase_name,
+       correlation_id=correlation_id,
+       essays_for_processing=essays_to_process,
+       batch_context=batch_context
+   )
+   ```
+
+3. **Error Handling Requirements:**
+   - Catch `InitiationError` and subclasses (`DataValidationError`, `CommandPublishError`)
+   - Mark failed phases as `FAILED` in `ProcessingPipelineState`
+   - Publish diagnostic events for monitoring and debugging
+
+4. **State Management Requirements:**
+   - Use `PipelineExecutionStatus` enum for atomic status updates
+   - Set `started_at` timestamp when marking `DISPATCH_INITIATED`
+   - Implement idempotency checks before phase initiation
+
+### 🔧 **Files to Review Before Implementation:**
+- **Target:** `services/batch_orchestrator_service/implementations/batch_essays_ready_handler.py`
+- **Models:** `common_core/src/common_core/pipeline_models.py` (ProcessingPipelineState, PipelineExecutionStatus)
+- **Events:** `common_core/src/common_core/batch_service_models.py` (Error event models)
+
+### ⚠️ **Phase 2 Non-Negotiable Requirements:**
+1. **Dynamic Phase Resolution:** Replace all hardcoded phase logic with `phase_initiators_map` lookup
+2. **Type Safety:** Use `PhaseName` enum throughout - no string literals
+3. **Idempotency:** Check phase status before initiation to prevent duplicate commands
+4. **Error Propagation:** Implement proper exception handling with state updates
 
 ---
 
@@ -40,22 +116,23 @@ To ensure a robust and maintainable implementation, the following principles and
 
 ## Revised Implementation Plan
 
-### Phase 1: Establish the Generic Initiator Framework
+### ✅ Phase 1: Establish the Generic Initiator Framework - COMPLETED
 
-This phase focuses on creating the foundational protocols and the first concrete initiator for BOS-managed processing phases.
+This phase focused on creating the foundational protocols and the first concrete initiator for BOS-managed processing phases.
 
-1. **Define Core Initiator Protocols & `PhaseName` Enum (`services/batch_orchestrator_service/protocols.py`, `common_core/pipeline_models.py`):**
-    * **`PhaseName(str, Enum)`** (in `common_core/pipeline_models.py` or a shared location):
-        * Define enum members for all known pipeline phases (e.g., `SPELLCHECK = "spellcheck"`, `AI_FEEDBACK = "ai_feedback"`, `CJ_ASSESSMENT = "cj_assessment"`).
-        * This enum is crucial for type-safe dictionary keys and phase identification throughout the system.
-    * **`PipelinePhaseInitiatorProtocol`** (in `protocols.py`):
-        * Standard method signature:
+1. **✅ Define Core Initiator Protocols & `PhaseName` Enum (`services/batch_orchestrator_service/protocols.py`, `common_core/pipeline_models.py`):**
+    * **✅ `PhaseName(str, Enum)`** (implemented in `common_core/pipeline_models.py`):
+        * **IMPLEMENTED:** Enum members defined for all known pipeline phases: `SPELLCHECK = "spellcheck"`, `AI_FEEDBACK = "ai_feedback"`, `CJ_ASSESSMENT = "cj_assessment"`, `NLP = "nlp"`.
+        * **IMPLEMENTED:** Added to `common_core/__init__.py` exports for project-wide usage.
+        * **RESULT:** Type-safe dictionary keys and phase identification throughout the system.
+    * **✅ `PipelinePhaseInitiatorProtocol`** (implemented in `protocols.py`):
+        * **IMPLEMENTED:** Standard method signature with type-safe `PhaseName` parameter:
 
             ```python
             async def initiate_phase(
                 self,
                 batch_id: str,
-                phase_to_initiate: PhaseName,  # Explicitly use the PhaseName enum
+                phase_to_initiate: PhaseName,  # Type-safe enum usage
                 correlation_id: uuid.UUID | None,
                 essays_for_processing: list[EssayProcessingInputRefV1],
                 batch_context: BatchRegistrationRequestV1
@@ -64,47 +141,40 @@ This phase focuses on creating the foundational protocols and the first concrete
                 ...
             ```
 
-        * Emphasize that `phase_to_initiate` uses the `PhaseName` enum.
-    * **`SpellcheckInitiatorProtocol(PipelinePhaseInitiatorProtocol)`** (in `protocols.py`):
-        * Inherits, providing specific type hinting if necessary, but primarily for semantic grouping.
-    * **CJ Assessment Initiator Refactor:**
-        * The `CJAssessmentInitiatorProtocol` and its implementation **must be directly refactored** to conform to `PipelinePhaseInitiatorProtocol` with the standardized `initiate_phase` signature.
-        * **No adapter or wrapper should be used.**
-        * This ensures a clean, consistent, and maintainable architecture and avoids unnecessary complexity.
+    * **✅ `SpellcheckInitiatorProtocol(PipelinePhaseInitiatorProtocol)`** (implemented in `protocols.py`):
+        * **IMPLEMENTED:** Inherits from base protocol for semantic grouping.
+    * **✅ CJ Assessment Initiator Refactor:**
+        * **IMPLEMENTED:** `CJAssessmentInitiatorProtocol` directly refactored to implement `PipelinePhaseInitiatorProtocol` with standardized `initiate_phase` signature.
+        * **ACHIEVED:** Clean, consistent architecture without adapter complexity.
 
-2. **Refactor `CJAssessmentInitiatorProtocol` to Implement `PipelinePhaseInitiatorProtocol`:**
-    * Refactor both the protocol and its implementation (e.g., `DefaultCJAssessmentInitiator`) to directly implement the new `PipelinePhaseInitiatorProtocol`.
-    * Ensure the `initiate_phase` method signature matches the protocol and uses all required parameters (`batch_id`, `phase_to_initiate: PhaseName`, `correlation_id`, `essays_for_processing`, `batch_context`).
-    * Remove any legacy or special-case logic that does not fit the generic orchestration model.
-    * Update all DI and handler references to use the refactored implementation.
-    * Add/adjust tests to cover the new interface and orchestration flow.
+2. **✅ Refactor `CJAssessmentInitiatorProtocol` to Implement `PipelinePhaseInitiatorProtocol`:**
+    * **IMPLEMENTED:** Both protocol and implementation (`DefaultCJAssessmentInitiator`) directly implement the new `PipelinePhaseInitiatorProtocol`.
+    * **IMPLEMENTED:** `initiate_phase` method signature matches protocol with all required parameters (`batch_id`, `phase_to_initiate: PhaseName`, `correlation_id`, `essays_for_processing`, `batch_context`).
+    * **COMPLETED:** Removed legacy `initiate_cj_assessment` method and helper methods that referenced non-existent imports.
+    * **RESULT:** Clean implementation focused on command construction and publishing.
 
-3. **Implement `SpellcheckInitiatorImpl` (`services/batch_orchestrator_service/implementations/spellcheck_initiator_impl.py` - New File):**
-    * Class `SpellcheckInitiatorImpl` implements `SpellcheckInitiatorProtocol`.
-    * **`initiate_phase` method:**
-        * Takes `phase_to_initiate: PhaseName` (will be `PhaseName.SPELLCHECK`).
-        * Constructs `BatchServiceSpellcheckInitiateCommandDataV1` using `essays_for_processing` and `batch_context` (e.g., for language).
-        * Publishes command via injected `BatchEventPublisherProtocol`.
-    * **Lean Implementation & Error Handling:**
-        * Adhere to the "Lean Initiator" principle: focus on command construction and publishing.
-        * Raise `InitiationError` (or specific subclass like `DataValidationError`, `CommandPublishError`) if initiation cannot proceed (e.g., language cannot be determined, critical data missing). This error will be caught by the calling orchestrator.
-    * **File Structure:** One `.py` file per concrete initiator (e.g., `spellcheck_initiator_impl.py`).
+3. **✅ Implement `SpellcheckInitiatorImpl` (`services/batch_orchestrator_service/implementations/spellcheck_initiator_impl.py` - New File):**
+    * **IMPLEMENTED:** Class `SpellcheckInitiatorImpl` implements `SpellcheckInitiatorProtocol`.
+    * **✅ `initiate_phase` method:**
+        * **IMPLEMENTED:** Validates `phase_to_initiate: PhaseName` matches `PhaseName.SPELLCHECK`.
+        * **IMPLEMENTED:** Constructs `BatchServiceSpellcheckInitiateCommandDataV1` using `essays_for_processing` and `batch_context`.
+        * **IMPLEMENTED:** Language inference from course code (`_infer_language_from_course_code` helper).
+        * **IMPLEMENTED:** Publishes command via injected `BatchEventPublisherProtocol`.
+    * **✅ Lean Implementation & Error Handling:**
+        * **IMPLEMENTED:** Focused on command construction and publishing only.
+        * **IMPLEMENTED:** Raises `DataValidationError` for missing data or incorrect phase.
+        * **IMPLEMENTED:** Comprehensive logging with correlation ID tracking.
 
-4. **Update Dependency Injection (`services/batch_orchestrator_service/di.py`):**
-    * Provide `SpellcheckInitiatorImpl` and `CJAssessmentInitiatorImpl` (direct implementation, no adapter).
-    * **Provide `phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol]`:**
-        * This map is central to dynamic dispatch.
-        * Keys **must** be `PhaseName` enum members.
-        * Example:
+4. **✅ Update Dependency Injection (`services/batch_orchestrator_service/di.py`):**
+    * **IMPLEMENTED:** `SpellcheckInitiatorImpl` provider added.
+    * **IMPLEMENTED:** `CJAssessmentInitiatorImpl` provider updated (no adapter).
+    * **✅ Provide `phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol]`:**
+        * **IMPLEMENTED:** `InitiatorMapProvider` class created with proper DI pattern:
 
             ```python
-            from dishka import Provider, Scope, provide
-            from common_core.pipeline_models import PhaseName # Assuming PhaseName location
-            # ... other imports ...
-
             class InitiatorMapProvider(Provider):
                 @provide(scope=Scope.APP)
-                def _provide_phase_initiators_map(
+                def provide_phase_initiators_map(
                     self,
                     spellcheck_initiator: SpellcheckInitiatorProtocol,
                     cj_assessment_initiator: CJAssessmentInitiatorProtocol
@@ -112,11 +182,14 @@ This phase focuses on creating the foundational protocols and the first concrete
                     return {
                         PhaseName.SPELLCHECK: spellcheck_initiator,
                         PhaseName.CJ_ASSESSMENT: cj_assessment_initiator,
-                        # Add other phase initiators here as they are implemented
+                        # Ready for additional phase initiators
                     }
             ```
 
-    * Ensure this map is injected into `BatchEssaysReadyHandler` and `DefaultPipelinePhaseCoordinator`.
+    * **✅ Exception Hierarchy:**
+        * **IMPLEMENTED:** `InitiationError` base class in `protocols.py`.
+        * **IMPLEMENTED:** `DataValidationError` for missing/invalid data.
+        * **IMPLEMENTED:** `CommandPublishError` for event publishing failures.
 
 ### Phase 2: Refactor `BatchEssaysReadyHandler` to Initiate the *First* Pipeline Phase Generically
 

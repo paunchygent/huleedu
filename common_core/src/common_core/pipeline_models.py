@@ -9,6 +9,20 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+class PhaseName(str, Enum):
+    """
+    Enum defining all valid pipeline phase names for type-safe orchestration.
+
+    This enum is used as keys in the phase_initiators_map, within ProcessingPipelineState,
+    and for validating requested_pipelines values, eliminating magic strings and
+    providing compile-time safety.
+    """
+    SPELLCHECK = "spellcheck"
+    AI_FEEDBACK = "ai_feedback"
+    CJ_ASSESSMENT = "cj_assessment"
+    NLP = "nlp"
+
+
 class PipelineExecutionStatus(str, Enum):
     REQUESTED_BY_USER = "requested_by_user"
     PENDING_DEPENDENCIES = "pending_dependencies"

@@ -8,7 +8,27 @@ from typing import Any, Protocol
 # Import the new API model for batch context storage
 from api_models import BatchRegistrationRequestV1
 
+# Import common_core models for standardized interfaces
+from common_core.metadata_models import EssayProcessingInputRefV1
+from common_core.pipeline_models import PhaseName
+
 # Assuming common_core models might be used in signatures
+
+
+# Exception hierarchy for phase initiation errors
+class InitiationError(Exception):
+    """Base exception for errors occurring during phase initiation."""
+    pass
+
+
+class DataValidationError(InitiationError):
+    """Raised when critical data is missing or invalid for phase initiation."""
+    pass
+
+
+class CommandPublishError(InitiationError):
+    """Raised when command publishing to event system fails."""
+    pass
 
 
 # Placeholder for a Pydantic model representing a BatchUpload entity
@@ -16,6 +36,49 @@ from api_models import BatchRegistrationRequestV1
 # If BatchUpload is a Pydantic model defined elsewhere (e.g., common_core.models.batch.BatchUpload)
 # then that should be imported instead.
 class BatchUpload: ...  # Placeholder for actual BatchUpload Pydantic model
+
+
+class PipelinePhaseInitiatorProtocol(Protocol):
+    """
+    Protocol for initiating pipeline phases with standardized interface.
+
+    This protocol provides a uniform interface for all phase initiators,
+    enabling dynamic dispatch through the phase_initiators_map.
+    All concrete initiators must implement this interface.
+    """
+
+    async def initiate_phase(
+        self,
+        batch_id: str,
+        phase_to_initiate: PhaseName,
+        correlation_id: uuid.UUID | None,
+        essays_for_processing: list[EssayProcessingInputRefV1],
+        batch_context: BatchRegistrationRequestV1,
+    ) -> None:
+        """
+        Initiate a specific pipeline phase for the batch.
+
+        Args:
+            batch_id: Unique identifier of the batch
+            phase_to_initiate: The phase to initiate (type-safe enum)
+            correlation_id: Optional correlation ID for event tracing
+            essays_for_processing: List of essays with their content references
+            batch_context: Full batch context from registration
+
+        Raises:
+            InitiationError: If phase initiation cannot proceed
+        """
+        ...
+
+
+class SpellcheckInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
+    """
+    Protocol for initiating spellcheck operations.
+
+    Inherits from PipelinePhaseInitiatorProtocol for standardized interface,
+    primarily for semantic grouping and potential future spellcheck-specific methods.
+    """
+    pass
 
 
 class BatchRepositoryProtocol(Protocol):
@@ -125,23 +188,11 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
         ...
 
 
-class CJAssessmentInitiatorProtocol(Protocol):
-    """Protocol for initiating CJ assessment operations."""
+class CJAssessmentInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
+    """
+    Protocol for initiating CJ assessment operations.
 
-    async def initiate_cj_assessment(
-        self,
-        batch_id: str,
-        batch_context: BatchRegistrationRequestV1,
-        correlation_id: str,
-        essays_to_process: list[Any] | None = None,
-    ) -> None:
-        """Initiate CJ assessment for a batch with the given context."""
-        ...
-
-    async def can_initiate_cj_assessment(
-        self,
-        batch_context: BatchRegistrationRequestV1,
-        current_pipeline_state: dict,
-    ) -> bool:
-        """Check if CJ assessment can be initiated for the given batch context."""
-        ...
+    Now implements the standardized PipelinePhaseInitiatorProtocol interface
+    for consistency with other phase initiators.
+    """
+    pass

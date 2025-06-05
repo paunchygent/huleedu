@@ -58,6 +58,7 @@ from .metadata_models import (
 )
 from .pipeline_models import (
     EssayProcessingCounts,
+    PhaseName,
     PipelineExecutionStatus,
     PipelineStateDetail,
     ProcessingPipelineState,
@@ -80,6 +81,7 @@ __all__ = [
     "CancellationMetadata",
     "EssayProcessingInputRefV1",
     # Pipeline Models
+    "PhaseName",
     "PipelineExecutionStatus",
     "EssayProcessingCounts",
     "PipelineStateDetail",

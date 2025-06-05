@@ -15,6 +15,7 @@ from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcome
 from implementations.essay_lifecycle_client_impl import DefaultEssayLifecycleClientImpl
 from implementations.event_publisher_impl import DefaultBatchEventPublisherImpl
 from implementations.pipeline_phase_coordinator_impl import DefaultPipelinePhaseCoordinator
+from implementations.spellcheck_initiator_impl import SpellcheckInitiatorImpl
 from kafka_consumer import BatchKafkaConsumer
 from prometheus_client import CollectorRegistry
 from protocols import (
@@ -24,7 +25,11 @@ from protocols import (
     CJAssessmentInitiatorProtocol,
     EssayLifecycleClientProtocol,
     PipelinePhaseCoordinatorProtocol,
+    PipelinePhaseInitiatorProtocol,
+    SpellcheckInitiatorProtocol,
 )
+
+from common_core.pipeline_models import PhaseName
 
 
 class BatchOrchestratorServiceProvider(Provider):
@@ -87,6 +92,14 @@ class BatchOrchestratorServiceProvider(Provider):
         return DefaultCJAssessmentInitiator(event_publisher, batch_repo)
 
     @provide(scope=Scope.APP)
+    def provide_spellcheck_initiator(
+        self,
+        event_publisher: BatchEventPublisherProtocol,
+    ) -> SpellcheckInitiatorProtocol:
+        """Provide spellcheck initiator implementation."""
+        return SpellcheckInitiatorImpl(event_publisher)
+
+    @provide(scope=Scope.APP)
     def provide_pipeline_phase_coordinator(
         self,
         batch_repo: BatchRepositoryProtocol,
@@ -136,3 +149,27 @@ class BatchOrchestratorServiceProvider(Provider):
             batch_essays_ready_handler=batch_essays_ready_handler,
             els_batch_phase_outcome_handler=els_batch_phase_outcome_handler,
         )
+
+
+class InitiatorMapProvider(Provider):
+    """Provider for phase initiators map for dynamic dispatch."""
+
+    @provide(scope=Scope.APP)
+    def provide_phase_initiators_map(
+        self,
+        spellcheck_initiator: SpellcheckInitiatorProtocol,
+        cj_assessment_initiator: CJAssessmentInitiatorProtocol,
+    ) -> dict[PhaseName, PipelinePhaseInitiatorProtocol]:
+        """
+        Provide phase initiators map for dynamic dispatch.
+
+        This map is central to the generic orchestration system,
+        enabling type-safe dynamic dispatch based on PhaseName enum.
+        """
+        return {
+            PhaseName.SPELLCHECK: spellcheck_initiator,
+            PhaseName.CJ_ASSESSMENT: cj_assessment_initiator,
+            # Add other phase initiators here as they are implemented
+            # PhaseName.AI_FEEDBACK: ai_feedback_initiator,
+            # PhaseName.NLP: nlp_initiator,
+        }
