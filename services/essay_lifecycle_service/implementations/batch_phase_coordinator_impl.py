@@ -17,8 +17,8 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.protocols import (
     BatchPhaseCoordinator,
+    EssayRepositoryProtocol,
     EssayState,
-    EssayStateStore,
     EventPublisher,
 )
 
@@ -28,8 +28,8 @@ logger = create_service_logger("batch_phase_coordinator")
 class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
     """Default implementation of BatchPhaseCoordinator protocol."""
 
-    def __init__(self, state_store: EssayStateStore, event_publisher: EventPublisher) -> None:
-        self.state_store = state_store
+    def __init__(self, repository: EssayRepositoryProtocol, event_publisher: EventPublisher) -> None:
+        self.repository = repository
         self.event_publisher = event_publisher
 
     async def check_batch_completion(
@@ -73,7 +73,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
             batch_id = essay_state.batch_id
 
             # Get all essays in this batch/phase
-            essays_in_phase = await self.state_store.list_essays_by_batch_and_phase(
+            essays_in_phase = await self.repository.list_essays_by_batch_and_phase(
                 batch_id=batch_id,
                 phase_name=phase_name
             )

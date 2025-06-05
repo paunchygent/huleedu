@@ -51,7 +51,10 @@ class TestLLMInteractionImplOverrides:
         self, mock_cache_manager: AsyncMock, mock_provider: AsyncMock, mock_settings: MagicMock
     ) -> LLMInteractionImpl:
         """Create LLMInteractionImpl instance for testing."""
-        providers = {"openai": mock_provider}
+        from typing import cast
+
+        from services.cj_assessment_service.protocols import LLMProviderProtocol
+        providers = cast(dict[str, LLMProviderProtocol], {"openai": mock_provider})
         return LLMInteractionImpl(
             cache_manager=mock_cache_manager,
             providers=providers,

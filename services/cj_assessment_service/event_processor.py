@@ -19,8 +19,8 @@ from common_core.metadata_models import SystemProcessingMetadata
 from services.cj_assessment_service.cj_core_logic import run_cj_assessment_workflow
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import (
-    CJDatabaseProtocol,
     CJEventPublisherProtocol,
+    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
 )
@@ -30,7 +30,7 @@ logger = create_service_logger("event_processor")
 
 async def process_single_message(
     msg: ConsumerRecord,  # Typed msg
-    database: CJDatabaseProtocol,
+    database: CJRepositoryProtocol,
     content_client: ContentClientProtocol,
     event_publisher: CJEventPublisherProtocol,
     llm_interaction: LLMInteractionProtocol,

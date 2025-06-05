@@ -33,7 +33,28 @@ alwaysApply: true
 - **REQUIRED**: Add modules without type stubs to `pyproject.toml` MyPy overrides
 - **Pattern**: Add to external libraries section with `ignore_missing_imports = true`
 
-### 3.2. Dependency Injection Principle
+### 3.3. Protocol Implementation Patterns
+- **MUST** use explicit protocol inheritance to resolve DI type issues
+- **PATTERN**: Use `TYPE_CHECKING` imports for protocol type aliases when needed
+
+```python
+# ✅ CORRECT - Explicit protocol implementation
+from services.my_service.protocols import MyProtocol
+
+class ConcreteImpl(MyProtocol):
+    # Implementation methods
+
+# ✅ CORRECT - TYPE_CHECKING pattern for type aliases
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from services.my_service.protocols import MyProtocol as ProtocolMyProtocol
+
+class ConcreteImpl:
+    def method(self) -> ConcreteMyType:  # Returns concrete type
+        # MyPy accepts this as implementing ProtocolMyProtocol
+```
+
+### 3.4. Dependency Injection Principle
 - Business logic **MUST** depend on abstractions (`typing.Protocol`), not concrete implementations.
 - **MUST** use Dishka DI framework; every provider lives in `<service>/di.py`
 - HTTP services **MUST** use `quart-dishka` integration with `@inject` decorator

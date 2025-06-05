@@ -22,7 +22,7 @@ class TestDefaultBatchPhaseCoordinator:
     """Test suite for DefaultBatchPhaseCoordinator."""
 
     @pytest.fixture
-    def mock_state_store(self) -> AsyncMock:
+    def mock_essay_repository(self) -> AsyncMock:
         """Mock EssayStateStore for testing."""
         return AsyncMock()
 
@@ -32,10 +32,10 @@ class TestDefaultBatchPhaseCoordinator:
         return AsyncMock()
 
     @pytest.fixture
-    def coordinator(self, mock_state_store: AsyncMock, mock_event_publisher: AsyncMock) -> DefaultBatchPhaseCoordinator:
+    def coordinator(self, mock_essay_repository: AsyncMock, mock_event_publisher: AsyncMock) -> DefaultBatchPhaseCoordinator:
         """Create DefaultBatchPhaseCoordinator instance for testing."""
         return DefaultBatchPhaseCoordinator(
-            state_store=mock_state_store,
+            repository=mock_essay_repository,
             event_publisher=mock_event_publisher
         )
 
@@ -64,7 +64,7 @@ class TestDefaultBatchPhaseCoordinator:
     async def test_check_batch_completion_all_succeed_triggers_outcome(
         self,
         coordinator: DefaultBatchPhaseCoordinator,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_event_publisher: AsyncMock
     ) -> None:
         """Test batch completion when all essays succeed triggers outcome event."""
@@ -92,13 +92,13 @@ class TestDefaultBatchPhaseCoordinator:
             }
         )
 
-        mock_state_store.list_essays_by_batch_and_phase.return_value = [essay1, essay2]
+        mock_essay_repository.list_essays_by_batch_and_phase.return_value = [essay1, essay2]
 
         # Execute
         await coordinator.check_batch_completion(test_essay_state, "spellcheck", correlation_id)
 
         # Verify
-        mock_state_store.list_essays_by_batch_and_phase.assert_called_once_with(
+        mock_essay_repository.list_essays_by_batch_and_phase.assert_called_once_with(
             batch_id="test-batch-1",
             phase_name="spellcheck"
         )
@@ -123,7 +123,7 @@ class TestDefaultBatchPhaseCoordinator:
     async def test_check_batch_completion_some_fail_triggers_outcome(
         self,
         coordinator: DefaultBatchPhaseCoordinator,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_event_publisher: AsyncMock
     ) -> None:
         """Test batch completion with mixed success/failure triggers outcome event."""
@@ -148,7 +148,7 @@ class TestDefaultBatchPhaseCoordinator:
             {ContentType.CORRECTED_TEXT: "corrected-3"}
         )
 
-        mock_state_store.list_essays_by_batch_and_phase.return_value = [
+        mock_essay_repository.list_essays_by_batch_and_phase.return_value = [
             essay1_success, essay2_failed, essay3_success
         ]
 
@@ -172,7 +172,7 @@ class TestDefaultBatchPhaseCoordinator:
     async def test_check_batch_completion_all_fail_triggers_outcome(
         self,
         coordinator: DefaultBatchPhaseCoordinator,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_event_publisher: AsyncMock
     ) -> None:
         """Test batch completion when all essays fail triggers outcome event."""
@@ -192,7 +192,7 @@ class TestDefaultBatchPhaseCoordinator:
             "essay-2", "test-batch-1", EssayStatus.SPELLCHECK_FAILED, "spellcheck"
         )
 
-        mock_state_store.list_essays_by_batch_and_phase.return_value = [essay1_failed, essay2_failed]
+        mock_essay_repository.list_essays_by_batch_and_phase.return_value = [essay1_failed, essay2_failed]
 
         # Execute
         await coordinator.check_batch_completion(test_essay_state, "spellcheck", correlation_id)
@@ -215,7 +215,7 @@ class TestDefaultBatchPhaseCoordinator:
     async def test_check_batch_completion_not_all_done_no_outcome(
         self,
         coordinator: DefaultBatchPhaseCoordinator,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_event_publisher: AsyncMock
     ) -> None:
         """Test batch completion when essays still processing - no outcome event."""
@@ -238,7 +238,7 @@ class TestDefaultBatchPhaseCoordinator:
             "essay-3", "test-batch-1", EssayStatus.AWAITING_SPELLCHECK, "spellcheck"
         )
 
-        mock_state_store.list_essays_by_batch_and_phase.return_value = [
+        mock_essay_repository.list_essays_by_batch_and_phase.return_value = [
             essay1_success, essay2_processing, essay3_waiting
         ]
 
@@ -251,7 +251,7 @@ class TestDefaultBatchPhaseCoordinator:
     async def test_check_batch_completion_essay_not_in_phase_no_outcome(
         self,
         coordinator: DefaultBatchPhaseCoordinator,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_event_publisher: AsyncMock
     ) -> None:
         """Test batch completion when essay not part of the specified phase - no outcome event."""
@@ -271,13 +271,13 @@ class TestDefaultBatchPhaseCoordinator:
         await coordinator.check_batch_completion(essay_state_wrong_phase, "spellcheck", correlation_id)
 
         # Verify - no database call or event publishing should occur
-        mock_state_store.list_essays_by_batch_and_phase.assert_not_called()
+        mock_essay_repository.list_essays_by_batch_and_phase.assert_not_called()
         mock_event_publisher.publish_els_batch_phase_outcome.assert_not_called()
 
     async def test_check_batch_completion_no_batch_id_no_outcome(
         self,
         coordinator: DefaultBatchPhaseCoordinator,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_event_publisher: AsyncMock
     ) -> None:
         """Test batch completion when essay has no batch ID - no outcome event."""
@@ -293,7 +293,7 @@ class TestDefaultBatchPhaseCoordinator:
         await coordinator.check_batch_completion(essay_state_no_batch, "spellcheck", correlation_id)
 
         # Verify - no database call or event publishing should occur
-        mock_state_store.list_essays_by_batch_and_phase.assert_not_called()
+        mock_essay_repository.list_essays_by_batch_and_phase.assert_not_called()
         mock_event_publisher.publish_els_batch_phase_outcome.assert_not_called()
 
     async def test_get_text_storage_id_for_phase_logic(
@@ -369,7 +369,7 @@ class TestDefaultBatchPhaseCoordinator:
     async def test_check_batch_completion_cj_assessment_phase(
         self,
         coordinator: DefaultBatchPhaseCoordinator,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_event_publisher: AsyncMock
     ) -> None:
         """Test batch completion for CJ assessment phase specifically."""
@@ -389,7 +389,7 @@ class TestDefaultBatchPhaseCoordinator:
             "essay-2", "test-batch-1", EssayStatus.CJ_ASSESSMENT_SUCCESS, "cj_assessment"
         )
 
-        mock_state_store.list_essays_by_batch_and_phase.return_value = [essay1_success, essay2_success]
+        mock_essay_repository.list_essays_by_batch_and_phase.return_value = [essay1_success, essay2_success]
 
         # Execute
         await coordinator.check_batch_completion(essay_state_cj, "cj_assessment", correlation_id)

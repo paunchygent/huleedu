@@ -22,7 +22,7 @@ class TestDefaultServiceResultHandler:
     """Test suite for DefaultServiceResultHandler."""
 
     @pytest.fixture
-    def mock_state_store(self) -> AsyncMock:
+    def mock_essay_repository(self) -> AsyncMock:
         """Mock EssayStateStore for testing."""
         return AsyncMock()
 
@@ -32,10 +32,10 @@ class TestDefaultServiceResultHandler:
         return AsyncMock()
 
     @pytest.fixture
-    def handler(self, mock_state_store: AsyncMock, mock_batch_coordinator: AsyncMock) -> DefaultServiceResultHandler:
+    def handler(self, mock_essay_repository: AsyncMock, mock_batch_coordinator: AsyncMock) -> DefaultServiceResultHandler:
         """Create DefaultServiceResultHandler instance for testing."""
         return DefaultServiceResultHandler(
-            state_store=mock_state_store,
+            repository=mock_essay_repository,
             batch_coordinator=mock_batch_coordinator
         )
 
@@ -85,7 +85,7 @@ class TestDefaultServiceResultHandler:
     async def test_handle_spellcheck_result_success(
         self,
         handler: DefaultServiceResultHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_batch_coordinator: AsyncMock,
         mock_essay_state: MagicMock,
         mock_spellcheck_result_success: MagicMock
@@ -93,25 +93,25 @@ class TestDefaultServiceResultHandler:
         """Test successful spellcheck result handling."""
         # Setup
         correlation_id = uuid4()
-        mock_state_store.get_essay_state.return_value = mock_essay_state
-        mock_state_store.update_essay_status_via_machine.return_value = None
+        mock_essay_repository.get_essay_state.return_value = mock_essay_state
+        mock_essay_repository.update_essay_status_via_machine.return_value = None
 
         # Create updated essay state for batch coordinator
         updated_essay_state = MagicMock()
         updated_essay_state.essay_id = "test-essay-1"
         updated_essay_state.current_status = EssayStatus.SPELLCHECKED_SUCCESS
-        mock_state_store.get_essay_state.side_effect = [mock_essay_state, updated_essay_state]
+        mock_essay_repository.get_essay_state.side_effect = [mock_essay_state, updated_essay_state]
 
         # Execute
         result = await handler.handle_spellcheck_result(mock_spellcheck_result_success, correlation_id)
 
         # Verify
         assert result is True
-        mock_state_store.get_essay_state.assert_called_with("test-essay-1")
-        mock_state_store.update_essay_status_via_machine.assert_called_once()
+        mock_essay_repository.get_essay_state.assert_called_with("test-essay-1")
+        mock_essay_repository.update_essay_status_via_machine.assert_called_once()
 
         # Check the call arguments
-        call_args = mock_state_store.update_essay_status_via_machine.call_args
+        call_args = mock_essay_repository.update_essay_status_via_machine.call_args
         assert call_args[1]["essay_id"] == "test-essay-1"
         assert call_args[1]["new_status"] == EssayStatus.SPELLCHECKED_SUCCESS
         assert "spellcheck_result" in call_args[1]["metadata"]
@@ -126,7 +126,7 @@ class TestDefaultServiceResultHandler:
     async def test_handle_spellcheck_result_failure(
         self,
         handler: DefaultServiceResultHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_batch_coordinator: AsyncMock,
         mock_essay_state: MagicMock,
         mock_spellcheck_result_failure: MagicMock
@@ -134,23 +134,23 @@ class TestDefaultServiceResultHandler:
         """Test failed spellcheck result handling."""
         # Setup
         correlation_id = uuid4()
-        mock_state_store.get_essay_state.return_value = mock_essay_state
-        mock_state_store.update_essay_status_via_machine.return_value = None
+        mock_essay_repository.get_essay_state.return_value = mock_essay_state
+        mock_essay_repository.update_essay_status_via_machine.return_value = None
 
         # Create updated essay state for batch coordinator
         updated_essay_state = MagicMock()
         updated_essay_state.current_status = EssayStatus.SPELLCHECK_FAILED
-        mock_state_store.get_essay_state.side_effect = [mock_essay_state, updated_essay_state]
+        mock_essay_repository.get_essay_state.side_effect = [mock_essay_state, updated_essay_state]
 
         # Execute
         result = await handler.handle_spellcheck_result(mock_spellcheck_result_failure, correlation_id)
 
         # Verify
         assert result is True
-        mock_state_store.update_essay_status_via_machine.assert_called_once()
+        mock_essay_repository.update_essay_status_via_machine.assert_called_once()
 
         # Check metadata includes error info
-        call_args = mock_state_store.update_essay_status_via_machine.call_args
+        call_args = mock_essay_repository.update_essay_status_via_machine.call_args
         assert call_args[1]["new_status"] == EssayStatus.SPELLCHECK_FAILED
         assert call_args[1]["metadata"]["spellcheck_result"]["error_info"] == {"error": "Spell checker timeout"}
 
@@ -159,28 +159,28 @@ class TestDefaultServiceResultHandler:
     async def test_handle_spellcheck_result_essay_not_found(
         self,
         handler: DefaultServiceResultHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_batch_coordinator: AsyncMock,
         mock_spellcheck_result_success: MagicMock
     ) -> None:
         """Test spellcheck result when essay not found."""
         # Setup
         correlation_id = uuid4()
-        mock_state_store.get_essay_state.return_value = None
+        mock_essay_repository.get_essay_state.return_value = None
 
         # Execute
         result = await handler.handle_spellcheck_result(mock_spellcheck_result_success, correlation_id)
 
         # Verify
         assert result is False
-        mock_state_store.get_essay_state.assert_called_once_with("test-essay-1")
-        mock_state_store.update_essay_status_via_machine.assert_not_called()
+        mock_essay_repository.get_essay_state.assert_called_once_with("test-essay-1")
+        mock_essay_repository.update_essay_status_via_machine.assert_not_called()
         mock_batch_coordinator.check_batch_completion.assert_not_called()
 
     async def test_handle_spellcheck_result_state_machine_trigger_fails(
         self,
         handler: DefaultServiceResultHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_batch_coordinator: AsyncMock,
         mock_essay_state: MagicMock,
         mock_spellcheck_result_success: MagicMock
@@ -189,15 +189,15 @@ class TestDefaultServiceResultHandler:
         # Setup - essay in wrong state for transition
         correlation_id = uuid4()
         mock_essay_state.current_status = EssayStatus.READY_FOR_PROCESSING  # Wrong state
-        mock_state_store.get_essay_state.return_value = mock_essay_state
+        mock_essay_repository.get_essay_state.return_value = mock_essay_state
 
         # Execute
         result = await handler.handle_spellcheck_result(mock_spellcheck_result_success, correlation_id)
 
         # Verify
         assert result is False
-        mock_state_store.get_essay_state.assert_called_once()
-        mock_state_store.update_essay_status_via_machine.assert_not_called()
+        mock_essay_repository.get_essay_state.assert_called_once()
+        mock_essay_repository.update_essay_status_via_machine.assert_not_called()
         mock_batch_coordinator.check_batch_completion.assert_not_called()
 
     @pytest.fixture
@@ -229,7 +229,7 @@ class TestDefaultServiceResultHandler:
     async def test_handle_cj_assessment_completed_success(
         self,
         handler: DefaultServiceResultHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_batch_coordinator: AsyncMock,
         mock_cj_assessment_completed: MagicMock
     ) -> None:
@@ -248,7 +248,7 @@ class TestDefaultServiceResultHandler:
 
         # The implementation calls get_essay_state for each ranking (2 essays)
         # then calls get_essay_state once more for the first essay to get batch representative state
-        mock_state_store.get_essay_state.side_effect = [
+        mock_essay_repository.get_essay_state.side_effect = [
             essay1_state,  # First essay get
             essay2_state,  # Second essay get
             essay1_state   # Batch representative state get
@@ -259,34 +259,34 @@ class TestDefaultServiceResultHandler:
 
         # Verify
         assert result is True
-        assert mock_state_store.get_essay_state.call_count == 3  # 2 essays + 1 batch representative
-        assert mock_state_store.update_essay_status_via_machine.call_count == 2
+        assert mock_essay_repository.get_essay_state.call_count == 3  # 2 essays + 1 batch representative
+        assert mock_essay_repository.update_essay_status_via_machine.call_count == 2
         assert mock_batch_coordinator.check_batch_completion.call_count == 1
 
     async def test_handle_cj_assessment_completed_essay_not_found(
         self,
         handler: DefaultServiceResultHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_batch_coordinator: AsyncMock,
         mock_cj_assessment_completed: MagicMock
     ) -> None:
         """Test CJ assessment completion when essay not found."""
         # Setup
         correlation_id = uuid4()
-        mock_state_store.get_essay_state.return_value = None
+        mock_essay_repository.get_essay_state.return_value = None
 
         # Execute
         result = await handler.handle_cj_assessment_completed(mock_cj_assessment_completed, correlation_id)
 
         # Verify - should still return True but skip missing essays
         assert result is True
-        mock_state_store.update_essay_status_via_machine.assert_not_called()
+        mock_essay_repository.update_essay_status_via_machine.assert_not_called()
         mock_batch_coordinator.check_batch_completion.assert_not_called()
 
     async def test_handle_cj_assessment_failed_success(
         self,
         handler: DefaultServiceResultHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_batch_coordinator: AsyncMock,
         mock_cj_assessment_failed: MagicMock
     ) -> None:
@@ -304,18 +304,18 @@ class TestDefaultServiceResultHandler:
         essay2_state.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT
 
         # Mock list_essays_by_batch call - implementation gets all essays then filters by status
-        mock_state_store.list_essays_by_batch.return_value = [essay1_state, essay2_state]
+        mock_essay_repository.list_essays_by_batch.return_value = [essay1_state, essay2_state]
 
         # Execute
         result = await handler.handle_cj_assessment_failed(mock_cj_assessment_failed, correlation_id)
 
         # Verify
         assert result is True
-        mock_state_store.list_essays_by_batch.assert_called_once_with("test-batch-1")
-        assert mock_state_store.update_essay_status_via_machine.call_count == 2
+        mock_essay_repository.list_essays_by_batch.assert_called_once_with("test-batch-1")
+        assert mock_essay_repository.update_essay_status_via_machine.call_count == 2
 
         # Check that failures were recorded properly
-        for call in mock_state_store.update_essay_status_via_machine.call_args_list:
+        for call in mock_essay_repository.update_essay_status_via_machine.call_args_list:
             assert call[1]["new_status"] == EssayStatus.CJ_ASSESSMENT_FAILED
             assert "cj_assessment_result" in call[1]["metadata"]
             assert call[1]["metadata"]["cj_assessment_result"]["success"] is False
@@ -324,19 +324,19 @@ class TestDefaultServiceResultHandler:
     async def test_handle_cj_assessment_failed_essay_not_found(
         self,
         handler: DefaultServiceResultHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_batch_coordinator: AsyncMock,
         mock_cj_assessment_failed: MagicMock
     ) -> None:
         """Test CJ assessment failure when essay not found."""
         # Setup
         correlation_id = uuid4()
-        mock_state_store.get_essay_state.return_value = None
+        mock_essay_repository.get_essay_state.return_value = None
 
         # Execute
         result = await handler.handle_cj_assessment_failed(mock_cj_assessment_failed, correlation_id)
 
         # Verify - should still return True but skip missing essays
         assert result is True
-        mock_state_store.update_essay_status_via_machine.assert_not_called()
+        mock_essay_repository.update_essay_status_via_machine.assert_not_called()
         mock_batch_coordinator.check_batch_completion.assert_not_called()

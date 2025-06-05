@@ -1,6 +1,6 @@
 """Database access implementation for the CJ Assessment Service.
 
-This module provides the concrete implementation of CJDatabaseProtocol,
+This module provides the concrete implementation of CJRepositoryProtocol,
 adapted from the original prototype to work with ELS string essay IDs
 and CJ assessment workflow requirements.
 """
@@ -10,26 +10,39 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import Any
 
-from config import Settings
-from enums_db import CJBatchStatusEnum
-from models_api import ComparisonResult
-from models_db import Base, CJBatchUpload, ComparisonPair, ProcessedEssay
+from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from services.cj_assessment_service.protocols import CJDatabaseProtocol
+from services.cj_assessment_service.config import Settings
+from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+from services.cj_assessment_service.models_api import ComparisonResult
+from services.cj_assessment_service.models_db import (
+    Base,
+    CJBatchUpload,
+    ComparisonPair,
+    ProcessedEssay,
+)
+from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
 
-class CJDatabaseImpl(CJDatabaseProtocol):
-    """Implementation of CJDatabaseProtocol for CJ Assessment Service."""
+class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
+    """PostgreSQL implementation of CJRepositoryProtocol for CJ Assessment Service."""
 
     def __init__(self, settings: Settings) -> None:
         """Initialize the database handler with connection settings."""
         self.settings = settings
+        self.logger = create_service_logger("cj_assessment.repository.postgres")
+
+        # Create async engine with enhanced connection pooling (following BOS/ELS pattern)
         self.engine = create_async_engine(
             settings.DATABASE_URL_CJ,
             echo=False,
             future=True,
+            pool_size=settings.DATABASE_POOL_SIZE,
+            max_overflow=settings.DATABASE_MAX_OVERFLOW,
+            pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+            pool_recycle=settings.DATABASE_POOL_RECYCLE,
         )
         self.async_session_maker = async_sessionmaker(
             self.engine,
@@ -41,6 +54,7 @@ class CJDatabaseImpl(CJDatabaseProtocol):
         """Create database tables if they don't exist."""
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        self.logger.info("CJ Assessment Service database schema initialized")
 
     @asynccontextmanager
     async def session(self):

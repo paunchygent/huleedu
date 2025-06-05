@@ -1,20 +1,26 @@
 """
-Essay state storage implementation for the Essay Lifecycle Service.
+Essay state management and SQLite storage implementation for Essay Lifecycle Service.
 
-This module provides the essay state model and SQLite-based persistence layer
-for managing essay lifecycle states and transitions.
+Provides the EssayState data model and SQLite-based persistence implementation
+that serves as the development/testing alternative to the PostgreSQL production
+implementation.
 """
 
 from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiosqlite
 from common_core.enums import ContentType, EssayStatus
 from common_core.metadata_models import EntityReference
 from pydantic import BaseModel, Field
+
+from services.essay_lifecycle_service.protocols import EssayRepositoryProtocol
+
+if TYPE_CHECKING:
+    from services.essay_lifecycle_service.protocols import EssayState as ProtocolEssayState
 
 
 class EssayState(BaseModel):
@@ -53,7 +59,7 @@ class EssayState(BaseModel):
             self.processing_metadata.update(metadata)
 
 
-class SQLiteEssayStateStore:
+class SQLiteEssayStateStore(EssayRepositoryProtocol):
     """
     SQLite-based implementation of essay state persistence.
 
@@ -241,7 +247,7 @@ class SQLiteEssayStateStore:
 
         return essay_state
 
-    async def list_essays_by_batch(self, batch_id: str) -> list[EssayState]:
+    async def list_essays_by_batch(self, batch_id: str) -> list[ProtocolEssayState]:
         """List all essays in a batch."""
         async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
             db.row_factory = aiosqlite.Row
@@ -250,8 +256,9 @@ class SQLiteEssayStateStore:
             ) as cursor:
                 rows = await cursor.fetchall()
 
-                return [
-                    EssayState(
+                essays: list[ProtocolEssayState] = []
+                for row in rows:
+                    essay_state = EssayState(
                         essay_id=row["essay_id"],
                         batch_id=row["batch_id"],
                         current_status=EssayStatus(row["current_status"]),
@@ -267,8 +274,9 @@ class SQLiteEssayStateStore:
                         created_at=datetime.fromisoformat(row["created_at"]),
                         updated_at=datetime.fromisoformat(row["updated_at"]),
                     )
-                    for row in rows
-                ]
+                    essays.append(essay_state)  # type: ignore[arg-type]
+
+                return essays
 
     async def get_batch_status_summary(self, batch_id: str) -> dict[EssayStatus, int]:
         """Get status count breakdown for a batch."""
@@ -409,7 +417,7 @@ class SQLiteEssayStateStore:
 
             return essay_state
 
-    async def list_essays_by_batch_and_phase(self, batch_id: str, phase_name: str) -> list[EssayState]:
+    async def list_essays_by_batch_and_phase(self, batch_id: str, phase_name: str) -> list[ProtocolEssayState]:
         """List all essays in a batch that are part of a specific processing phase."""
         async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
             db.row_factory = aiosqlite.Row
@@ -418,7 +426,7 @@ class SQLiteEssayStateStore:
             ) as cursor:
                 rows = await cursor.fetchall()
 
-                essay_states = []
+                essay_states: list[ProtocolEssayState] = []
                 for row in rows:
                     processing_metadata = json.loads(row["processing_metadata"])
 
@@ -445,6 +453,6 @@ class SQLiteEssayStateStore:
                             created_at=datetime.fromisoformat(row["created_at"]),
                             updated_at=datetime.fromisoformat(row["updated_at"]),
                         )
-                        essay_states.append(essay_state)
+                        essay_states.append(essay_state)  # type: ignore[arg-type]
 
                 return essay_states

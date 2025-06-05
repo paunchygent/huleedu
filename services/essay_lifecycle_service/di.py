@@ -18,10 +18,16 @@ from services.essay_lifecycle_service.core_logic import (
 from services.essay_lifecycle_service.implementations.batch_command_handler_impl import (
     DefaultBatchCommandHandler,
 )
+from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
+    DefaultBatchCoordinationHandler,
+)
 from services.essay_lifecycle_service.implementations.batch_phase_coordinator_impl import (
     DefaultBatchPhaseCoordinator,
 )
 from services.essay_lifecycle_service.implementations.content_client import DefaultContentClient
+from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
+    PostgreSQLEssayRepository,
+)
 from services.essay_lifecycle_service.implementations.event_publisher import DefaultEventPublisher
 from services.essay_lifecycle_service.implementations.metrics_collector import (
     DefaultMetricsCollector,
@@ -34,10 +40,11 @@ from services.essay_lifecycle_service.implementations.service_result_handler_imp
 )
 from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
+    BatchCoordinationHandler,
     BatchEssayTracker,
     BatchPhaseCoordinator,
     ContentClient,
-    EssayStateStore,
+    EssayRepositoryProtocol,
     EventPublisher,
     MetricsCollector,
     ServiceResultHandler,
@@ -76,13 +83,26 @@ class EssayLifecycleServiceProvider(Provider):
         return ClientSession()
 
     @provide(scope=Scope.APP)
-    async def provide_essay_state_store(self, settings: Settings) -> EssayStateStore:
-        """Provide essay state store implementation."""
-        store = SQLiteEssayStateStore(
-            database_path=settings.DATABASE_PATH, timeout=settings.DATABASE_TIMEOUT
-        )
-        await store.initialize()
-        return store  # type: ignore[return-value]
+    async def provide_essay_repository(self, settings: Settings) -> EssayRepositoryProtocol:
+        """
+        Provide essay repository implementation with environment-based selection.
+        
+        Uses SQLite for development/testing and PostgreSQL for production,
+        following the same pattern as BOS BatchRepositoryProtocol.
+        """
+        if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
+            # Development/testing: use SQLite implementation
+            store = SQLiteEssayStateStore(
+                database_path=settings.DATABASE_PATH,
+                timeout=settings.DATABASE_TIMEOUT
+            )
+            await store.initialize()
+            return store
+        else:
+            # Production: use PostgreSQL implementation
+            postgres_repo = PostgreSQLEssayRepository(settings)
+            await postgres_repo.initialize_db_schema()
+            return postgres_repo
 
     @provide(scope=Scope.APP)
     def provide_state_transition_validator(self) -> StateTransitionValidator:
@@ -118,12 +138,22 @@ class EssayLifecycleServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_batch_command_handler(
         self,
-        state_store: EssayStateStore,
+        repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
         event_publisher: EventPublisher,
     ) -> BatchCommandHandler:
         """Provide batch command handler implementation."""
-        return DefaultBatchCommandHandler(state_store, request_dispatcher, event_publisher)
+        return DefaultBatchCommandHandler(repository, request_dispatcher, event_publisher)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_coordination_handler(
+        self,
+        batch_tracker: BatchEssayTracker,
+        repository: EssayRepositoryProtocol,
+        event_publisher: EventPublisher,
+    ) -> BatchCoordinationHandler:
+        """Provide batch coordination handler implementation."""
+        return DefaultBatchCoordinationHandler(batch_tracker, repository, event_publisher)
 
     @provide(scope=Scope.APP)
     def provide_batch_essay_tracker(self) -> BatchEssayTracker:
@@ -133,17 +163,17 @@ class EssayLifecycleServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_batch_phase_coordinator(
         self,
-        state_store: EssayStateStore,
+        repository: EssayRepositoryProtocol,
         event_publisher: EventPublisher,
     ) -> BatchPhaseCoordinator:
         """Provide batch phase coordinator implementation."""
-        return DefaultBatchPhaseCoordinator(state_store, event_publisher)
+        return DefaultBatchPhaseCoordinator(repository, event_publisher)
 
     @provide(scope=Scope.APP)
     def provide_service_result_handler(
         self,
-        state_store: EssayStateStore,
+        repository: EssayRepositoryProtocol,
         batch_coordinator: BatchPhaseCoordinator,
     ) -> ServiceResultHandler:
         """Provide service result handler implementation."""
-        return DefaultServiceResultHandler(state_store, batch_coordinator)
+        return DefaultServiceResultHandler(repository, batch_coordinator)

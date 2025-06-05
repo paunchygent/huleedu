@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # Database configuration
     DATABASE_URL_CJ: str = "sqlite+aiosqlite:///./cj_assessment.db"
 
+    # Database Connection Pool Settings (following BOS/ELS pattern)
+    DATABASE_POOL_SIZE: int = 5
+    DATABASE_MAX_OVERFLOW: int = 10
+    DATABASE_POOL_PRE_PING: bool = True
+    DATABASE_POOL_RECYCLE: int = 3600  # 1 hour
+
     # Legacy LLM provider API keys (maintained for backward compatibility)
     ANTHROPIC_API_KEY: str | None = None
     OPENAI_API_KEY: str | None = None

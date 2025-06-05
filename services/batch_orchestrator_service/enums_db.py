@@ -2,33 +2,17 @@
 
 This module defines enums used in database models for the Batch Orchestrator Service.
 These enums represent the specific database states needed for BOS operations.
+
+NOTE: BatchStatus is now imported from common_core as it's part of inter-service contracts.
+Only service-specific internal enums should be defined here.
 """
 
 from __future__ import annotations
 
 import enum
 
-
-class BatchStatusEnum(str, enum.Enum):
-    """Enum representing the possible states of a batch in BOS database."""
-
-    # Initial states
-    AWAITING_CONTENT_VALIDATION = "awaiting_content_validation"
-    AWAITING_PIPELINE_CONFIGURATION = "awaiting_pipeline_configuration"
-    READY_FOR_PIPELINE_EXECUTION = "ready_for_pipeline_execution"
-
-    # Processing states
-    PROCESSING_PIPELINES = "processing_pipelines"
-
-    # Terminal states
-    COMPLETED_SUCCESSFULLY = "completed_successfully"
-    COMPLETED_WITH_FAILURES = "completed_with_failures"
-    FAILED_CRITICALLY = "failed_critically"
-    CANCELLED = "cancelled"
-    CONTENT_INGESTION_FAILED = "content_ingestion_failed"
-
-    def __str__(self) -> str:
-        return self.value
+# BatchStatusEnum REMOVED - use common_core.enums.BatchStatus instead
+# This eliminates duplication and ensures contract consistency
 
 
 class PhaseStatusEnum(str, enum.Enum):

@@ -18,8 +18,8 @@ from services.cj_assessment_service.models_api import (
     EssayForComparison,
 )
 from services.cj_assessment_service.protocols import (
-    CJDatabaseProtocol,
     CJEventPublisherProtocol,
+    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
 )
@@ -32,7 +32,7 @@ logger = create_service_logger("cj_assessment_service.core_assessment_logic")
 async def run_cj_assessment_workflow(
     request_data: dict[str, Any],
     correlation_id: str | None,
-    database: CJDatabaseProtocol,
+    database: CJRepositoryProtocol,
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,
     event_publisher: CJEventPublisherProtocol,

@@ -15,8 +15,8 @@ from services.cj_assessment_service.config import settings
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.protocols import (
-    CJDatabaseProtocol,
     CJEventPublisherProtocol,
+    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
 )
@@ -38,7 +38,7 @@ async def main() -> None:
 
     try:
         # Initialize database schema
-        database = await container.get(CJDatabaseProtocol)
+        database = await container.get(CJRepositoryProtocol)
         await database.initialize_db_schema()
         logger.info("Database schema initialized")
 

@@ -141,7 +141,6 @@ class BatchExpectation:
             EssayProcessingInputRefV1(
                 essay_id=assignment.internal_essay_id,
                 text_storage_id=assignment.text_storage_id,
-                student_name=None,  # Will be extracted later in the pipeline
             )
             for assignment in self.slot_assignments.values()
         ]

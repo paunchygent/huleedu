@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     )
     from common_core.events.spellcheck_models import SpellcheckResultDataV1
 
+from common_core.enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.essay_state_machine import (
@@ -28,7 +29,7 @@ from services.essay_lifecycle_service.essay_state_machine import (
 )
 from services.essay_lifecycle_service.protocols import (
     BatchPhaseCoordinator,
-    EssayStateStore,
+    EssayRepositoryProtocol,
     ServiceResultHandler,
 )
 
@@ -38,8 +39,8 @@ logger = create_service_logger("service_result_handler")
 class DefaultServiceResultHandler(ServiceResultHandler):
     """Default implementation of ServiceResultHandler protocol."""
 
-    def __init__(self, state_store: EssayStateStore, batch_coordinator: BatchPhaseCoordinator) -> None:
-        self.state_store = state_store
+    def __init__(self, repository: EssayRepositoryProtocol, batch_coordinator: BatchPhaseCoordinator) -> None:
+        self.repository = repository
         self.batch_coordinator = batch_coordinator
 
     async def handle_spellcheck_result(
@@ -49,8 +50,6 @@ class DefaultServiceResultHandler(ServiceResultHandler):
     ) -> bool:
         """Handle spellcheck result from Spell Checker Service."""
         try:
-            from common_core.enums import EssayStatus
-
             # Determine success from status
             is_success = result_data.status == EssayStatus.SPELLCHECKED_SUCCESS
 
@@ -65,7 +64,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             )
 
             # Get current essay state
-            essay_state = await self.state_store.get_essay_state(result_data.entity_ref.entity_id)
+            essay_state = await self.repository.get_essay_state(result_data.entity_ref.entity_id)
             if essay_state is None:
                 logger.error(
                     "Essay not found for spellcheck result",
@@ -106,7 +105,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             # Attempt state transition
             if state_machine.trigger(trigger):
                 # Correct call to update_essay_status_via_machine
-                await self.state_store.update_essay_status_via_machine(
+                await self.repository.update_essay_status_via_machine(
                     essay_id=result_data.entity_ref.entity_id,
                     new_status=state_machine.current_status,
                     metadata={
@@ -149,7 +148,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             )
 
             # Check for batch phase completion after individual essay state update
-            updated_essay_state = await self.state_store.get_essay_state(result_data.entity_ref.entity_id)
+            updated_essay_state = await self.repository.get_essay_state(result_data.entity_ref.entity_id)
             if updated_essay_state:
                 await self.batch_coordinator.check_batch_completion(
                     essay_state=updated_essay_state,
@@ -197,7 +196,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     continue
 
                 # Get current essay state
-                essay_state = await self.state_store.get_essay_state(essay_id)
+                essay_state = await self.repository.get_essay_state(essay_id)
                 if essay_state is None:
                     logger.error(
                         "Essay not found for CJ assessment result",
@@ -215,7 +214,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
 
                 # Attempt state transition
                 if state_machine.trigger(EVT_CJ_ASSESSMENT_SUCCEEDED):
-                    await self.state_store.update_essay_status_via_machine(
+                    await self.repository.update_essay_status_via_machine(
                         essay_id=essay_id,
                         new_status=state_machine.current_status,
                         metadata={
@@ -253,7 +252,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             if result_data.rankings:
                 first_essay_id_in_ranking = result_data.rankings[0].get("els_essay_id")
                 if first_essay_id_in_ranking:
-                    batch_representative_essay_state = await self.state_store.get_essay_state(first_essay_id_in_ranking)
+                    batch_representative_essay_state = await self.repository.get_essay_state(first_essay_id_in_ranking)
                     if batch_representative_essay_state:
                         await self.batch_coordinator.check_batch_completion(
                             essay_state=batch_representative_essay_state,
@@ -293,11 +292,10 @@ class DefaultServiceResultHandler(ServiceResultHandler):
 
             # CJ assessment failure affects all essays in the batch
             # Need to find all essays in this batch and mark them as failed
-            batch_essays = await self.state_store.list_essays_by_batch(result_data.entity_ref.entity_id)
+            batch_essays = await self.repository.list_essays_by_batch(result_data.entity_ref.entity_id)
 
             for essay_state in batch_essays:
                 # Only update essays that are currently awaiting CJ assessment
-                from common_core.enums import EssayStatus
                 if essay_state.current_status != EssayStatus.AWAITING_CJ_ASSESSMENT:
                     continue
 
@@ -308,7 +306,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
 
                 # Attempt state transition
                 if state_machine.trigger(EVT_CJ_ASSESSMENT_FAILED):
-                    await self.state_store.update_essay_status_via_machine(
+                    await self.repository.update_essay_status_via_machine(
                         essay_id=essay_state.essay_id,
                         new_status=state_machine.current_status,
                         metadata={

@@ -7,6 +7,7 @@ including Kafka connection settings, HTTP API configuration, and state persisten
 
 from __future__ import annotations
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,10 +38,29 @@ class Settings(BaseSettings):
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
     BATCH_ORCHESTRATOR_SERVICE_URL: str = "http://batch_orchestrator_service:8000/v1"
 
-    # State Storage Configuration
+    # Repository Configuration (following BOS pattern)
+    USE_MOCK_REPOSITORY: bool = True  # False in production
+
+    # SQLite Configuration (development/testing)
     DATABASE_PATH: str = "./essay_lifecycle.db"
     DATABASE_TIMEOUT: float = 30.0
     DATABASE_POOL_SIZE: int = 20
+
+    # PostgreSQL Configuration (production)
+    DATABASE_URL: str = Field(
+        default="postgresql+asyncpg://huleedu_user:REDACTED_DEFAULT_PASSWORD@essay_lifecycle_db:5432/essay_lifecycle",
+        alias="ELS_DATABASE_URL"
+    )
+    DATABASE_HOST: str = Field(default="essay_lifecycle_db", alias="ELS_DB_HOST")
+    DATABASE_PORT: int = Field(default=5432, alias="ELS_DB_PORT")
+    DATABASE_NAME: str = Field(default="essay_lifecycle", alias="ELS_DB_NAME")
+    DATABASE_USER: str = Field(default="huleedu_user", alias="ELS_DB_USER")
+    DATABASE_PASSWORD: str = Field(default="REDACTED_DEFAULT_PASSWORD", alias="ELS_DB_PASSWORD")
+
+    # PostgreSQL Connection Pool Settings
+    DATABASE_MAX_OVERFLOW: int = 20
+    DATABASE_POOL_PRE_PING: bool = True
+    DATABASE_POOL_RECYCLE: int = 3600  # 1 hour
 
     # Observability Configuration
     PROMETHEUS_PORT: int = 9090

@@ -28,8 +28,14 @@ class EssayState(Protocol):
     updated_at: Any  # datetime
 
 
-class EssayStateStore(Protocol):
-    """Protocol for essay state persistence operations."""
+class EssayRepositoryProtocol(Protocol):
+    """
+    Protocol for essay state persistence operations.
+    
+    This follows the repository pattern established by BOS BatchRepositoryProtocol,
+    providing an abstraction layer for essay state persistence that supports
+    both SQLite (development/testing) and PostgreSQL (production) implementations.
+    """
 
     async def get_essay_state(self, essay_id: str) -> EssayState | None:
         """Retrieve essay state by ID."""

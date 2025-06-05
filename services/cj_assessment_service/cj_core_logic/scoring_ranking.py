@@ -214,7 +214,7 @@ async def get_essay_rankings(
         .order_by(CJ_ProcessedEssay.current_bt_score.desc().nulls_last())
     )
     result = await db_session.execute(stmt)
-    essays_with_scores = await result.all()
+    essays_with_scores = result.all()
 
     rankings = []
     for rank, db_row in enumerate(essays_with_scores, 1):

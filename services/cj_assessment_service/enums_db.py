@@ -9,7 +9,7 @@ from __future__ import annotations
 import enum
 
 
-class CJBatchStatusEnum(enum.Enum):
+class CJBatchStatusEnum(str, enum.Enum):
     """Enum representing the possible states of a CJ Assessment batch."""
 
     PENDING = "PENDING"

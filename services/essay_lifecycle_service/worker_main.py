@@ -1,8 +1,8 @@
 """
-Main entry point for the Essay Lifecycle Service Kafka worker.
+Essay Lifecycle Service Kafka Worker Main Entry Point.
 
-This module handles the Kafka consumer lifecycle, dependency injection setup,
-and message processing orchestration.
+This module implements the Kafka consumer worker for the Essay Lifecycle Service,
+handling incoming events for batch coordination, command processing, and service results.
 """
 
 from __future__ import annotations
@@ -17,23 +17,20 @@ from common_core.enums import ProcessingEvent, topic_name
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 
-from batch_command_handlers import process_single_message
-from config import settings
-from di import EssayLifecycleServiceProvider
-from protocols import (
+from services.essay_lifecycle_service.batch_command_handlers import process_single_message
+from services.essay_lifecycle_service.config import settings
+from services.essay_lifecycle_service.di import EssayLifecycleServiceProvider
+from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
-    BatchEssayTracker,
-    EssayStateStore,
-    EventPublisher,
-    MetricsCollector,
-    StateTransitionValidator,
+    BatchCoordinationHandler,
+    ServiceResultHandler,
 )
 
 logger = create_service_logger("worker_main")
 
 
 class WorkerState:
-    """Holds worker state for graceful shutdown."""
+    """Global worker state management."""
 
     def __init__(self) -> None:
         self.should_stop = False
@@ -49,10 +46,6 @@ def setup_signal_handlers() -> None:
     def signal_handler(signum: int, frame: object) -> None:
         logger.info(f"Received signal {signum}, initiating graceful shutdown")
         worker_state.should_stop = True
-
-        # Stop the consumer if it's running
-        if worker_state.consumer:
-            asyncio.create_task(worker_state.consumer.stop())
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -105,12 +98,9 @@ async def kafka_consumer_context() -> AsyncIterator[AIOKafkaConsumer]:
 
 async def process_messages(
     consumer: AIOKafkaConsumer,
-    state_store: EssayStateStore,
-    event_publisher: EventPublisher,
-    transition_validator: StateTransitionValidator,
-    metrics_collector: MetricsCollector,
-    batch_essay_tracker: BatchEssayTracker,
+    batch_coordination_handler: BatchCoordinationHandler,
     batch_command_handler: BatchCommandHandler,
+    service_result_handler: ServiceResultHandler,
 ) -> None:
     """Main message processing loop."""
     logger.info("Starting message processing loop")
@@ -124,21 +114,28 @@ async def process_messages(
             try:
                 success = await process_single_message(
                     msg=msg,
-                    state_store=state_store,
-                    event_publisher=event_publisher,
-                    transition_validator=transition_validator,
-                    metrics_collector=metrics_collector,
-                    batch_tracker=batch_essay_tracker,
+                    batch_coordination_handler=batch_coordination_handler,
                     batch_command_handler=batch_command_handler,
+                    service_result_handler=service_result_handler,
                 )
 
                 if success:
-                    metrics_collector.increment_counter(
-                        "operations", {"operation": "message_processed", "status": "success"}
+                    logger.debug(
+                        "Successfully processed message",
+                        extra={
+                            "topic": msg.topic,
+                            "partition": msg.partition,
+                            "offset": msg.offset,
+                        },
                     )
                 else:
-                    metrics_collector.increment_counter(
-                        "operations", {"operation": "message_processed", "status": "failed"}
+                    logger.warning(
+                        "Failed to process message",
+                        extra={
+                            "topic": msg.topic,
+                            "partition": msg.partition,
+                            "offset": msg.offset,
+                        },
                     )
 
             except Exception as e:
@@ -151,9 +148,6 @@ async def process_messages(
                         "offset": msg.offset,
                     },
                 )
-                metrics_collector.increment_counter(
-                    "operations", {"operation": "message_processed", "status": "error"}
-                )
 
     except Exception as e:
         logger.error(f"Error in message processing loop: {e}")
@@ -161,41 +155,27 @@ async def process_messages(
 
 
 async def run_worker() -> None:
-    """Main worker function with dependency injection."""
-    logger.info("Starting Essay Lifecycle Service worker")
+    """Main worker execution logic."""
+    logger.info("Starting Essay Lifecycle Service Kafka Worker")
 
-    # Setup DI container
+    # Initialize dependency injection container
     container = make_async_container(EssayLifecycleServiceProvider())
+    async with container() as request_container:
+        # Get dependencies
+        batch_coordination_handler = await request_container.get(BatchCoordinationHandler)
+        batch_command_handler = await request_container.get(BatchCommandHandler)
+        service_result_handler = await request_container.get(ServiceResultHandler)
 
-    try:
-        async with container() as request_container:
-            # Get dependencies
-            state_store = await request_container.get(EssayStateStore)
-            event_publisher = await request_container.get(EventPublisher)
-            transition_validator = await request_container.get(StateTransitionValidator)
-            metrics_collector = await request_container.get(MetricsCollector)
-            batch_essay_tracker = await request_container.get(BatchEssayTracker)
-            batch_command_handler = await request_container.get(BatchCommandHandler)
+        logger.info("Dependencies injected successfully")
 
-            logger.info("Dependencies injected successfully")
-
-            # Start Kafka consumer and process messages
-            async with kafka_consumer_context() as consumer:
-                await process_messages(
-                    consumer=consumer,
-                    state_store=state_store,
-                    event_publisher=event_publisher,
-                    transition_validator=transition_validator,
-                    metrics_collector=metrics_collector,
-                    batch_essay_tracker=batch_essay_tracker,
-                    batch_command_handler=batch_command_handler,
-                )
-
-    except Exception as e:
-        logger.error(f"Error in worker: {e}")
-        raise
-    finally:
-        logger.info("Essay Lifecycle Service worker stopped")
+        # Start Kafka consumer and process messages
+        async with kafka_consumer_context() as consumer:
+            await process_messages(
+                consumer=consumer,
+                batch_coordination_handler=batch_coordination_handler,
+                batch_command_handler=batch_command_handler,
+                service_result_handler=service_result_handler,
+            )
 
 
 async def main() -> None:

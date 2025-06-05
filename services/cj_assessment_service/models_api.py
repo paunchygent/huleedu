@@ -48,3 +48,4 @@ class ComparisonResult(BaseModel):
     error_message: str | None = None
     from_cache: bool = False
     prompt_hash: str | None = None
+    raw_llm_response_content: str | None = None

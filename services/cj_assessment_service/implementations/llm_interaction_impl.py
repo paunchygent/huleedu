@@ -117,6 +117,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             from_cache=True,
                             prompt_hash=cache_key,
                             error_message=None,
+                            raw_llm_response_content=None,  # TODO: Capture raw response
                         )
                     except Exception as e:
                         logger.warning(
@@ -146,6 +147,8 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             from_cache=False,
                             prompt_hash=cache_key,
                             error_message=None,
+                            raw_llm_response_content=None,
+                            # TODO: Capture raw response for debugging
                         )
                     else:
                         logger.error(
@@ -158,6 +161,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             from_cache=False,
                             prompt_hash=cache_key,
                             error_message=error_message,
+                            raw_llm_response_content=None,
                         )
 
                 except Exception as e:
@@ -172,6 +176,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         from_cache=False,
                         prompt_hash=cache_key,
                         error_message=f"Unexpected error: {e!s}",
+                        raw_llm_response_content=None,
                     )
 
         # Process all tasks concurrently
@@ -196,6 +201,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             llm_assessment=None,
                             from_cache=False,
                             error_message=f"Task execution failed: {result!s}",
+                            raw_llm_response_content=None,
                         )
                     )
                 else:
@@ -224,6 +230,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     llm_assessment=None,
                     from_cache=False,
                     error_message=f"Critical processing error: {e!s}",
+                    raw_llm_response_content=None,
                 )
                 for task in tasks
             ]

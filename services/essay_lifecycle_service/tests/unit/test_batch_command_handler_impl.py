@@ -23,7 +23,7 @@ from services.essay_lifecycle_service.implementations.batch_command_handler_impl
     DefaultBatchCommandHandler,
 )
 from services.essay_lifecycle_service.protocols import (
-    EssayStateStore,
+    EssayRepositoryProtocol,
     EventPublisher,
     SpecializedServiceRequestDispatcher,
 )
@@ -50,9 +50,9 @@ class TestDefaultBatchCommandHandler:
         return essay_state
 
     @pytest.fixture
-    def mock_state_store(self) -> AsyncMock:
-        """Create mock EssayStateStore."""
-        return AsyncMock(spec=EssayStateStore)
+    def mock_essay_repository(self) -> AsyncMock:
+        """Create mock EssayRepositoryProtocol."""
+        return AsyncMock(spec=EssayRepositoryProtocol)
 
     @pytest.fixture
     def mock_request_dispatcher(self) -> AsyncMock:
@@ -67,13 +67,13 @@ class TestDefaultBatchCommandHandler:
     @pytest.fixture
     def command_handler(
         self,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
         mock_event_publisher: AsyncMock
     ) -> DefaultBatchCommandHandler:
         """Create DefaultBatchCommandHandler with mocked dependencies."""
         return DefaultBatchCommandHandler(
-            state_store=mock_state_store,
+            repository=mock_essay_repository,
             request_dispatcher=mock_request_dispatcher,
             event_publisher=mock_event_publisher
         )
@@ -133,7 +133,7 @@ class TestDefaultBatchCommandHandler:
     async def test_process_initiate_spellcheck_command_success(
         self,
         command_handler: DefaultBatchCommandHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
         spellcheck_command_data: BatchServiceSpellcheckInitiateCommandDataV1,
         sample_essay_state: MagicMock,
@@ -142,8 +142,8 @@ class TestDefaultBatchCommandHandler:
     ) -> None:
         """Test successful spellcheck command processing with state machine."""
         # Setup mocks
-        mock_state_store.get_essay_state.return_value = sample_essay_state
-        mock_state_store.update_essay_status_via_machine.return_value = None
+        mock_essay_repository.get_essay_state.return_value = sample_essay_state
+        mock_essay_repository.update_essay_status_via_machine.return_value = None
         mock_request_dispatcher.dispatch_spellcheck_requests.return_value = None
 
         with patch('services.essay_lifecycle_service.implementations.batch_command_handler_impl.EssayStateMachine') as mock_state_machine_class:
@@ -159,7 +159,7 @@ class TestDefaultBatchCommandHandler:
             )
 
             # Verify state store get_essay_state called
-            mock_state_store.get_essay_state.assert_called_once_with(essay_id)
+            mock_essay_repository.get_essay_state.assert_called_once_with(essay_id)
 
             # Verify state machine instantiation
             mock_state_machine_class.assert_called_once_with(
@@ -171,7 +171,7 @@ class TestDefaultBatchCommandHandler:
             mock_machine.trigger.assert_called_once_with(CMD_INITIATE_SPELLCHECK)
 
             # Verify state store update_essay_status_via_machine called with correct parameters
-            mock_state_store.update_essay_status_via_machine.assert_called_once_with(
+            mock_essay_repository.update_essay_status_via_machine.assert_called_once_with(
                 essay_id,
                 EssayStatus.AWAITING_SPELLCHECK,
                 {
@@ -193,7 +193,7 @@ class TestDefaultBatchCommandHandler:
     async def test_process_initiate_spellcheck_command_state_machine_fails(
         self,
         command_handler: DefaultBatchCommandHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
         spellcheck_command_data: BatchServiceSpellcheckInitiateCommandDataV1,
         sample_essay_state: MagicMock,
@@ -202,7 +202,7 @@ class TestDefaultBatchCommandHandler:
     ) -> None:
         """Test spellcheck command when state machine trigger fails."""
         # Setup mocks
-        mock_state_store.get_essay_state.return_value = sample_essay_state
+        mock_essay_repository.get_essay_state.return_value = sample_essay_state
 
         with patch('services.essay_lifecycle_service.implementations.batch_command_handler_impl.EssayStateMachine') as mock_state_machine_class:
             mock_machine = MagicMock()
@@ -219,7 +219,7 @@ class TestDefaultBatchCommandHandler:
             mock_machine.trigger.assert_called_once_with(CMD_INITIATE_SPELLCHECK)
 
             # Verify update_essay_status_via_machine was NOT called
-            mock_state_store.update_essay_status_via_machine.assert_not_called()
+            mock_essay_repository.update_essay_status_via_machine.assert_not_called()
 
             # Verify request dispatcher was NOT called (no successfully transitioned essays)
             mock_request_dispatcher.dispatch_spellcheck_requests.assert_not_called()
@@ -229,7 +229,7 @@ class TestDefaultBatchCommandHandler:
     async def test_process_initiate_spellcheck_command_essay_not_found(
         self,
         command_handler: DefaultBatchCommandHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
         spellcheck_command_data: BatchServiceSpellcheckInitiateCommandDataV1,
         correlation_id: UUID,
@@ -237,7 +237,7 @@ class TestDefaultBatchCommandHandler:
     ) -> None:
         """Test spellcheck command when essay is not found in state store."""
         # Setup mock to return None (essay not found)
-        mock_state_store.get_essay_state.return_value = None
+        mock_essay_repository.get_essay_state.return_value = None
 
         # Execute
         await command_handler.process_initiate_spellcheck_command(
@@ -246,10 +246,10 @@ class TestDefaultBatchCommandHandler:
         )
 
         # Verify get_essay_state was called
-        mock_state_store.get_essay_state.assert_called_once_with(essay_id)
+        mock_essay_repository.get_essay_state.assert_called_once_with(essay_id)
 
         # Verify update_essay_status_via_machine was NOT called
-        mock_state_store.update_essay_status_via_machine.assert_not_called()
+        mock_essay_repository.update_essay_status_via_machine.assert_not_called()
 
         # Verify request dispatcher was NOT called
         mock_request_dispatcher.dispatch_spellcheck_requests.assert_not_called()
@@ -259,7 +259,7 @@ class TestDefaultBatchCommandHandler:
     async def test_process_initiate_spellcheck_command_multiple_essays_mixed_success(
         self,
         command_handler: DefaultBatchCommandHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
         batch_id: str,
         correlation_id: UUID,
@@ -288,7 +288,7 @@ class TestDefaultBatchCommandHandler:
             for ref in essay_refs
         ]
 
-        mock_state_store.get_essay_state.side_effect = essay_states
+        mock_essay_repository.get_essay_state.side_effect = essay_states
 
         with patch(
             'services.essay_lifecycle_service.implementations.batch_command_handler_impl.'
@@ -316,7 +316,7 @@ class TestDefaultBatchCommandHandler:
                 machine.trigger.assert_called_once_with(CMD_INITIATE_SPELLCHECK)
 
             # Verify update_essay_status_via_machine called only for successful transitions (first two)
-            assert mock_state_store.update_essay_status_via_machine.call_count == 2
+            assert mock_essay_repository.update_essay_status_via_machine.call_count == 2
 
             # Verify request dispatcher called with only successfully transitioned essays
             mock_request_dispatcher.dispatch_spellcheck_requests.assert_called_once()
@@ -332,7 +332,7 @@ class TestDefaultBatchCommandHandler:
     async def test_process_initiate_spellcheck_command_dispatch_fails(
         self,
         command_handler: DefaultBatchCommandHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
         spellcheck_command_data: BatchServiceSpellcheckInitiateCommandDataV1,
         sample_essay_state: MagicMock,
@@ -340,7 +340,7 @@ class TestDefaultBatchCommandHandler:
     ) -> None:
         """Test spellcheck command when request dispatcher raises exception."""
         # Setup mocks - state transition succeeds but dispatcher fails
-        mock_state_store.get_essay_state.return_value = sample_essay_state
+        mock_essay_repository.get_essay_state.return_value = sample_essay_state
         mock_request_dispatcher.dispatch_spellcheck_requests.side_effect = Exception(
             "Dispatch failed"
         )
@@ -361,7 +361,7 @@ class TestDefaultBatchCommandHandler:
             )
 
             # Verify state transitions still completed successfully
-            mock_state_store.update_essay_status_via_machine.assert_called_once()
+            mock_essay_repository.update_essay_status_via_machine.assert_called_once()
 
             # Verify request dispatcher was called (and failed)
             mock_request_dispatcher.dispatch_spellcheck_requests.assert_called_once()
@@ -426,7 +426,7 @@ class TestDefaultBatchCommandHandler:
     async def test_process_initiate_spellcheck_command_metadata_update(
         self,
         command_handler: DefaultBatchCommandHandler,
-        mock_state_store: AsyncMock,
+        mock_essay_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
         spellcheck_command_data: BatchServiceSpellcheckInitiateCommandDataV1,
         correlation_id: UUID,
@@ -439,7 +439,7 @@ class TestDefaultBatchCommandHandler:
             essay_id, batch_id, commanded_phases=["existing_phase"]
         )
 
-        mock_state_store.get_essay_state.return_value = essay_state
+        mock_essay_repository.get_essay_state.return_value = essay_state
 
         with patch('services.essay_lifecycle_service.implementations.batch_command_handler_impl.EssayStateMachine') as mock_state_machine_class:
             mock_machine = MagicMock()
@@ -454,8 +454,8 @@ class TestDefaultBatchCommandHandler:
             )
 
             # Verify metadata update includes current_phase and proper commanded_phases
-            mock_state_store.update_essay_status_via_machine.assert_called_once()
-            call_args = mock_state_store.update_essay_status_via_machine.call_args
+            mock_essay_repository.update_essay_status_via_machine.assert_called_once()
+            call_args = mock_essay_repository.update_essay_status_via_machine.call_args
             assert call_args.args[0] == essay_id
             assert call_args.args[1] == EssayStatus.AWAITING_SPELLCHECK
 

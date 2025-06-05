@@ -13,7 +13,7 @@ health_bp = Blueprint('health_routes', __name__)
 
 
 @health_bp.route("/healthz")
-async def health_check() -> Response:
+async def health_check():
     """Health check endpoint for CJ Assessment Service.
 
     Performs basic service responsiveness check. Can be extended

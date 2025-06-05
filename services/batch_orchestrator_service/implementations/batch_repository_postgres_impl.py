@@ -8,13 +8,14 @@ from typing import Any, AsyncGenerator
 
 from api_models import BatchRegistrationRequestV1
 from config import Settings
-from enums_db import BatchStatusEnum
 from huleedu_service_libs.logging_utils import create_service_logger
 from models_db import Base, Batch, ConfigurationSnapshot, PhaseStatusLog
 from protocols import BatchRepositoryProtocol
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from common_core.enums import BatchStatus
 
 
 class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
@@ -93,10 +94,10 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
         async with self.session() as session:
             # Extract and validate status
             status_value = batch_data.get(
-                "status", BatchStatusEnum.AWAITING_CONTENT_VALIDATION.value
+                "status", BatchStatus.AWAITING_CONTENT_VALIDATION.value
             )
             if isinstance(status_value, str):
-                status = BatchStatusEnum(status_value)
+                status = BatchStatus(status_value)
             else:
                 status = status_value
 
@@ -131,7 +132,7 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
         async with self.session() as session:
             try:
                 # Validate status enum
-                status_enum = BatchStatusEnum(new_status)
+                status_enum = BatchStatus(new_status)
 
                 stmt = (
                     update(Batch)
@@ -225,7 +226,7 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
                             f"{registration_data.class_designation}"
                         ),
                         description=registration_data.essay_instructions,
-                        status=BatchStatusEnum.AWAITING_CONTENT_VALIDATION,
+                        status=BatchStatus.AWAITING_CONTENT_VALIDATION,
                         total_essays=registration_data.expected_essay_count,
                         processing_metadata=registration_data.model_dump(),
                     )

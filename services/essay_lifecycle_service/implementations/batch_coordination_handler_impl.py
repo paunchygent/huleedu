@@ -18,7 +18,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from services.essay_lifecycle_service.protocols import (
     BatchCoordinationHandler,
     BatchEssayTracker,
-    EssayStateStore,
+    EssayRepositoryProtocol,
     EventPublisher,
 )
 
@@ -31,11 +31,11 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
     def __init__(
         self,
         batch_tracker: BatchEssayTracker,
-        state_store: EssayStateStore,
+        repository: EssayRepositoryProtocol,
         event_publisher: EventPublisher,
     ) -> None:
         self.batch_tracker = batch_tracker
-        self.state_store = state_store
+        self.repository = repository
         self.event_publisher = event_publisher
 
     async def handle_batch_essays_registered(
@@ -84,7 +84,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             )
 
             # **Step 1: Idempotency Check**
-            existing_essay = await self.state_store.get_essay_by_text_storage_id_and_batch_id(
+            existing_essay = await self.repository.get_essay_by_text_storage_id_and_batch_id(
                 event_data.batch_id, event_data.text_storage_id
             )
 
@@ -140,7 +140,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             # **Step 3: Persist Slot Assignment**
             from common_core.enums import EssayStatus
 
-            await self.state_store.create_or_update_essay_state_for_slot_assignment(
+            await self.repository.create_or_update_essay_state_for_slot_assignment(
                 internal_essay_id=assigned_essay_id,
                 batch_id=event_data.batch_id,
                 text_storage_id=event_data.text_storage_id,

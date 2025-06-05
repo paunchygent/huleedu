@@ -17,8 +17,8 @@ from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from common_core.enums import BatchStatus
 from services.batch_orchestrator_service.enums_db import (
-    BatchStatusEnum,
     PhaseStatusEnum,
     PipelinePhaseEnum,
 )
@@ -44,13 +44,13 @@ class Batch(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Status tracking
-    status: Mapped[BatchStatusEnum] = mapped_column(
+    status: Mapped[BatchStatus] = mapped_column(
         SQLAlchemyEnum(
-            BatchStatusEnum,
+            BatchStatus,
             name="batch_status_enum",
             values_callable=lambda obj: [e.value for e in obj]
         ),
-        default=BatchStatusEnum.AWAITING_CONTENT_VALIDATION,
+        default=BatchStatus.AWAITING_CONTENT_VALIDATION,
         nullable=False,
         index=True,
     )

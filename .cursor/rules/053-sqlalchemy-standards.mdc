@@ -46,5 +46,18 @@ status: Mapped[StatusEnum] = mapped_column(
 )
 ```
 
+## 4. JSON Field Datetime Serialization
+- **MUST** convert datetime objects to ISO strings before storing in JSON fields
+- **PATTERN**: Use `.isoformat()` for datetime serialization in update operations
+
+```python
+# ✅ CORRECT - Convert datetime to string for JSON storage
+timeline_for_db = {k: v.isoformat() for k, v in timeline.items()}
+stmt = update(Table).values(timeline=timeline_for_db)
+
+# ❌ FORBIDDEN - Direct datetime storage causes JSON serialization error
+stmt = update(Table).values(timeline=timeline)  # TypeError: datetime not JSON serializable
+```
+
 ===
 

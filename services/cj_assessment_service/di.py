@@ -16,7 +16,7 @@ from services.cj_assessment_service.implementations.anthropic_provider_impl impo
 )
 from services.cj_assessment_service.implementations.cache_manager_impl import CacheManagerImpl
 from services.cj_assessment_service.implementations.content_client_impl import ContentClientImpl
-from services.cj_assessment_service.implementations.db_access_impl import CJDatabaseImpl
+from services.cj_assessment_service.implementations.db_access_impl import PostgreSQLCJRepositoryImpl
 from services.cj_assessment_service.implementations.event_publisher_impl import CJEventPublisherImpl
 from services.cj_assessment_service.implementations.google_provider_impl import GoogleProviderImpl
 from services.cj_assessment_service.implementations.llm_interaction_impl import LLMInteractionImpl
@@ -29,8 +29,8 @@ from services.cj_assessment_service.implementations.retry_manager_impl import Re
 # Import all business logic protocols
 from services.cj_assessment_service.protocols import (
     CacheProtocol,
-    CJDatabaseProtocol,
     CJEventPublisherProtocol,
+    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
     LLMProviderProtocol,
@@ -147,9 +147,9 @@ class CJAssessmentServiceProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    def provide_database_handler(self, settings: Settings) -> CJDatabaseProtocol:
+    def provide_database_handler(self, settings: Settings) -> CJRepositoryProtocol:
         """Provide database handler."""
-        return CJDatabaseImpl(settings)
+        return PostgreSQLCJRepositoryImpl(settings)
 
     @provide(scope=Scope.APP)
     def provide_content_client(

@@ -32,7 +32,7 @@ class TestBatchCommandIntegration:
 
         # Create handler
         handler = DefaultBatchCommandHandler(
-            state_store=mock_state_store,
+            repository=mock_state_store,
             request_dispatcher=mock_request_dispatcher,
             event_publisher=mock_event_publisher
         )
@@ -82,7 +82,7 @@ class TestBatchCommandIntegration:
         mock_event_publisher = AsyncMock()
 
         handler = DefaultBatchCommandHandler(
-            state_store=mock_state_store,
+            repository=mock_state_store,
             request_dispatcher=mock_request_dispatcher,
             event_publisher=mock_event_publisher
         )

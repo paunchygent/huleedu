@@ -96,7 +96,7 @@ async def run_health_api(settings: Settings, port: Optional[int] = None) -> None
         settings: Application settings
         port: Optional port override
     """
-    api_port = port or getattr(settings, 'METRICS_PORT', 9090)
+    api_port = port if port is not None else getattr(settings, 'METRICS_PORT', 9090)
 
     logger.info(
         f"Starting CJ Assessment Service health API on port {api_port}"

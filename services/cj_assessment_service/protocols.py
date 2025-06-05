@@ -97,7 +97,7 @@ class LLMProviderProtocol(Protocol):
         ...
 
 
-class CJDatabaseProtocol(Protocol):
+class CJRepositoryProtocol(Protocol):
     """Protocol for all database interactions specific to CJ assessment."""
 
     def session(self) -> AsyncContextManager[AsyncSession]:
