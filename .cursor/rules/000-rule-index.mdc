@@ -20,7 +20,10 @@ alwaysApply: false
 - [030-event-driven-architecture-eda-standards.md](mdc:030-event-driven-architecture-eda-standards.md): Event-driven communication standards
 
 ## Implementation & Coding Standards
-- [040-service-implementation-guidelines.md](mdc:040-service-implementation-guidelines.md): Microservice implementation (Quart, async, state, logging)
+- [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc): High-level service implementation principles and stack requirements
+- [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc): HTTP service architecture patterns and Blueprint implementation
+- [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc): Async patterns, protocols, dependency injection, and worker service structure
+- [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc): Configuration management and logging standards
 - [050-python-coding-standards.md](mdc:050-python-coding-standards.md): Python style, formatting, linting, typing, documentation
 - [051-pydantic-v2-standards.md](mdc:051-pydantic-v2-standards.md): Pydantic v2 usage patterns, serialization, and configuration standards
 - [060-data-and-metadata-management.md](mdc:060-data-and-metadata-management.md): Data/metadata definition, storage, access, common models
