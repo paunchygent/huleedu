@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from aiohttp import ClientSession
 from aiokafka import AIOKafkaProducer
 from config import Settings, settings
@@ -13,6 +15,11 @@ from implementations.essay_lifecycle_client_impl import DefaultEssayLifecycleCli
 from implementations.event_publisher_impl import DefaultBatchEventPublisherImpl
 from implementations.pipeline_phase_coordinator_impl import DefaultPipelinePhaseCoordinator
 from prometheus_client import CollectorRegistry
+
+if TYPE_CHECKING:
+    from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
+    from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
+    from kafka_consumer import BatchKafkaConsumer
 from protocols import (
     BatchEventPublisherProtocol,
     BatchProcessingServiceProtocol,
@@ -97,3 +104,38 @@ class BatchOrchestratorServiceProvider(Provider):
     ) -> BatchProcessingServiceProtocol:
         """Provide batch processing service implementation."""
         return BatchProcessingServiceImpl(batch_repo, event_publisher, settings)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_essays_ready_handler(
+        self,
+        event_publisher: BatchEventPublisherProtocol,
+        batch_repo: BatchRepositoryProtocol,
+    ) -> BatchEssaysReadyHandler:
+        """Provide BatchEssaysReady message handler."""
+        from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
+        return BatchEssaysReadyHandler(event_publisher, batch_repo)
+
+    @provide(scope=Scope.APP)
+    def provide_els_batch_phase_outcome_handler(
+        self,
+        phase_coordinator: PipelinePhaseCoordinatorProtocol,
+    ) -> ELSBatchPhaseOutcomeHandler:
+        """Provide ELSBatchPhaseOutcome message handler."""
+        from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
+        return ELSBatchPhaseOutcomeHandler(phase_coordinator)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_kafka_consumer(
+        self,
+        settings: Settings,
+        batch_essays_ready_handler: BatchEssaysReadyHandler,
+        els_batch_phase_outcome_handler: ELSBatchPhaseOutcomeHandler,
+    ) -> BatchKafkaConsumer:
+        """Provide Kafka consumer for batch events."""
+        from kafka_consumer import BatchKafkaConsumer
+        return BatchKafkaConsumer(
+            kafka_bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            consumer_group="batch-orchestrator-group",
+            batch_essays_ready_handler=batch_essays_ready_handler,
+            els_batch_phase_outcome_handler=els_batch_phase_outcome_handler,
+        )

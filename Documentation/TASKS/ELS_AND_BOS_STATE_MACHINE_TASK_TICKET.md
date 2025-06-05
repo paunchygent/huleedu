@@ -156,7 +156,22 @@ def test_invalid_triggers_return_false(self) -> None:
 
 ### **Phase 3: BOS Dynamic Pipeline Orchestration Enhancements**
 
-* **Task 3.1: Enhance BOS `batch_processing_service_impl.py` for Pipeline Definition**
+#### **Phase 3.0: BOS Architecture Refactoring** ✅ **COMPLETED**
+* **Goal**: Refactor kafka_consumer.py (354 lines) to comply with 400-line limit and clean architecture
+* **Implementation Completed**:
+  * ✅ **Clean Architecture Refactoring**: Extracted message handlers following SRP
+  * ✅ **Files Created**:
+    * `implementations/batch_essays_ready_handler.py` (192 lines) - BatchEssaysReady event processing
+    * `implementations/els_batch_phase_outcome_handler.py` (100 lines) - ELSBatchPhaseOutcomeV1 processing with Phase 3 data propagation
+  * ✅ **kafka_consumer.py Refactored**: 354 → 134 lines, focused on consumer lifecycle and message routing
+  * ✅ **Dependency Injection Enhanced**: Added providers for new handlers in di.py with TYPE_CHECKING imports
+  * ✅ **Protocol Interface Updated**: Added `processed_essays_for_next_phase: list[Any] | None = None` parameter to `PipelinePhaseCoordinatorProtocol.handle_phase_concluded`
+  * ✅ **Data Propagation Implemented**: ELS handler extracts `processed_essays` and converts to `EssayProcessingInputRefV1` objects
+  * ✅ **Common Core Extended**: Added `BATCH_AI_FEEDBACK_INITIATE_COMMAND` and `BATCH_NLP_INITIATE_COMMAND` events with topic mappings
+  * ✅ **Type Safety**: All files Pydantic v2 compliant, MyPy clean, Ruff linter passing
+  * ✅ **File Size Compliance**: All files under 400 lines, largest is 192 lines
+
+* **Task 3.1: Enhance BOS `batch_processing_service_impl.py` for Pipeline Definition** 🔄 **IN PROGRESS**
   * **Goal**: Ensure BOS robustly defines and stores the intended pipeline sequence.
   * **File**: `services/batch_orchestrator_service/implementations/batch_processing_service_impl.py`
   * **Core Logic for `register_new_batch`**:

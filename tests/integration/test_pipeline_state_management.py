@@ -97,9 +97,9 @@ class TestPipelineStateManagement:
         assert updated_state is not None
         assert updated_state["spellcheck_status"] == "COMPLETED"
 
-        # Verify CJ assessment was initiated
+        # Verify CJ assessment was initiated (with None processed_essays since no data propagation from spellcheck)
         mock_cj_initiator.initiate_cj_assessment.assert_called_once_with(
-            batch_id, batch_context, correlation_id
+            batch_id, batch_context, correlation_id, None
         )
 
     async def test_pipeline_progression_with_cj_assessment_disabled(

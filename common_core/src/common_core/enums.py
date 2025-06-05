@@ -58,6 +58,8 @@ class ProcessingEvent(str, Enum):
     # -------------  Specialized service commands  -------------#
     BATCH_SPELLCHECK_INITIATE_COMMAND = "batch.spellcheck.initiate.command"
     BATCH_CJ_ASSESSMENT_INITIATE_COMMAND = "batch.cj_assessment.initiate.command"
+    BATCH_AI_FEEDBACK_INITIATE_COMMAND = "batch.ai_feedback.initiate.command"
+    BATCH_NLP_INITIATE_COMMAND = "batch.nlp.initiate.command"
 
     # -------------  ELS-BOS communication events  -------------#
     ELS_BATCH_PHASE_OUTCOME = "els.batch.phase.outcome"
@@ -94,6 +96,12 @@ _TOPIC_MAPPING = {
     ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND: "huleedu.els.spellcheck.initiate.command.v1",
     ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND: (
         "huleedu.batch.cj_assessment.initiate.command.v1"
+    ),
+    ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND: (
+        "huleedu.batch.ai_feedback.initiate.command.v1"
+    ),
+    ProcessingEvent.BATCH_NLP_INITIATE_COMMAND: (
+        "huleedu.batch.nlp.initiate.command.v1"
     ),
     ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED: "huleedu.els.cj_assessment.requested.v1",
     ProcessingEvent.CJ_ASSESSMENT_COMPLETED: "huleedu.cj_assessment.completed.v1",

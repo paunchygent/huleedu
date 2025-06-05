@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from api_models import BatchRegistrationRequestV1
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -31,6 +32,7 @@ class DefaultPipelinePhaseCoordinator:
         completed_phase: str,
         phase_status: str,
         correlation_id: str,
+        processed_essays_for_next_phase: list[Any] | None = None,
     ) -> None:
         """
         Handle completion of a pipeline phase and determine next actions.
@@ -59,8 +61,10 @@ class DefaultPipelinePhaseCoordinator:
             )
             return
 
-        # Determine and initiate next phase
-        await self._initiate_next_phase(batch_id, completed_phase, correlation_id)
+        # Determine and initiate next phase with data propagation
+        await self._initiate_next_phase(
+            batch_id, completed_phase, correlation_id, processed_essays_for_next_phase
+        )
 
     async def update_phase_status(
         self,
@@ -92,7 +96,11 @@ class DefaultPipelinePhaseCoordinator:
         logger.info(f"Updated {phase} status to {status} for batch {batch_id}")
 
     async def _initiate_next_phase(
-        self, batch_id: str, completed_phase: str, correlation_id: str
+        self,
+        batch_id: str,
+        completed_phase: str,
+        correlation_id: str,
+        processed_essays_from_previous_phase: list[Any] | None = None,
     ) -> None:
         """Determine and initiate the next pipeline phase based on the completed phase."""
         # Get batch context to determine what phases are enabled
@@ -103,7 +111,9 @@ class DefaultPipelinePhaseCoordinator:
 
         # Handle phase transitions
         if completed_phase == "spellcheck":
-            await self._handle_spellcheck_completion(batch_id, batch_context, correlation_id)
+            await self._handle_spellcheck_completion(
+                batch_id, batch_context, correlation_id, processed_essays_from_previous_phase
+            )
         else:
             logger.info(
                 f"No next phase defined for completed phase '{completed_phase}' "
@@ -115,6 +125,7 @@ class DefaultPipelinePhaseCoordinator:
         batch_id: str,
         batch_context: BatchRegistrationRequestV1,
         correlation_id: str,
+        processed_essays_from_previous_phase: list[Any] | None = None,
     ) -> None:
         """Handle spellcheck completion and potentially initiate CJ assessment."""
         # Check if CJ assessment should be initiated
@@ -136,9 +147,9 @@ class DefaultPipelinePhaseCoordinator:
             )
             return
 
-        # Initiate CJ assessment
+        # Initiate CJ assessment with processed essays from spellcheck
         await self.cj_initiator.initiate_cj_assessment(
-            batch_id, batch_context, correlation_id
+            batch_id, batch_context, correlation_id, processed_essays_from_previous_phase
         )
 
     def _get_phase_status(self, pipeline_state: dict, phase: str) -> str | None:

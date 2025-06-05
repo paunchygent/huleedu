@@ -9,10 +9,11 @@ Following 070-testing-and-quality-assurance.mdc:
 - Limited scope component interactions (not full E2E)
 
 FIXED INTEGRATION TESTS:
-- Tests actual BatchKafkaConsumer._handle_els_batch_phase_outcome() method
+- Tests actual BatchKafkaConsumer message routing and ELSBatchPhaseOutcomeHandler processing
 - Uses real Kafka message structure (msg.value, msg.topic)
 - Validates JSON roundtrip serialization/deserialization
 - Tests error handling for malformed messages
+- Tests Phase 3 data propagation (processed_essays_for_next_phase)
 """
 
 from __future__ import annotations
@@ -26,6 +27,12 @@ import pytest
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
+from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
+    BatchEssaysReadyHandler,
+)
+from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import (
+    ELSBatchPhaseOutcomeHandler,
+)
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
 
 
@@ -49,21 +56,32 @@ class TestBosElsPhaseCoordination:
         return AsyncMock()
 
     @pytest.fixture
-    def kafka_consumer(self, mock_phase_coordinator):
-        """Create real BatchKafkaConsumer with mocked external dependencies."""
+    def mock_batch_essays_ready_handler(self):
+        """Mock the BatchEssaysReadyHandler external boundary."""
+        return AsyncMock(spec=BatchEssaysReadyHandler)
+
+    @pytest.fixture
+    def real_els_outcome_handler(self, mock_phase_coordinator):
+        """Create real ELSBatchPhaseOutcomeHandler with mocked external dependencies."""
+        return ELSBatchPhaseOutcomeHandler(
+            phase_coordinator=mock_phase_coordinator
+        )
+
+    @pytest.fixture
+    def kafka_consumer(self, mock_batch_essays_ready_handler, real_els_outcome_handler):
+        """Create real BatchKafkaConsumer with real outcome handler and mocked dependencies."""
         return BatchKafkaConsumer(
             kafka_bootstrap_servers="localhost:9092",
             consumer_group="test-group",
-            event_publisher=AsyncMock(),
-            batch_repo=AsyncMock(),
-            phase_coordinator=mock_phase_coordinator,
+            batch_essays_ready_handler=mock_batch_essays_ready_handler,
+            els_batch_phase_outcome_handler=real_els_outcome_handler,
         )
 
-    async def test_real_bos_els_kafka_integration(
+    async def test_real_bos_els_kafka_integration_with_data_propagation(
         self, kafka_consumer, mock_phase_coordinator
     ):
-        """Test actual BatchKafkaConsumer._handle_els_batch_phase_outcome()
-         with real Kafka message structure."""
+        """Test actual Kafka message routing and ELS outcome handler processing
+         with Phase 3 data propagation."""
         batch_id = str(uuid4())
         correlation_id = uuid4()
 
@@ -103,15 +121,16 @@ class TestBosElsPhaseCoordination:
             topic="huleedu.els.batch_phase.outcome.v1"
         )
 
-        # Test ACTUAL BatchKafkaConsumer method with real JSON serialization
-        await kafka_consumer._handle_els_batch_phase_outcome(kafka_msg)
+        # Test ACTUAL BatchKafkaConsumer message routing to real ELS handler
+        await kafka_consumer._handle_message(kafka_msg)
 
-        # Verify phase coordinator called with correct individual parameters
+        # Verify phase coordinator called with Phase 3 data propagation
         mock_phase_coordinator.handle_phase_concluded.assert_called_once_with(
-            batch_id,                     # batch_id string
-            "spellcheck",                 # phase_name string
-            "COMPLETED_SUCCESSFULLY",     # phase_status string
-            str(correlation_id),          # correlation_id as string
+            batch_id=batch_id,                               # batch_id string
+            completed_phase="spellcheck",                    # phase_name string
+            phase_status="COMPLETED_SUCCESSFULLY",          # phase_status string
+            correlation_id=str(correlation_id),             # correlation_id as string
+            processed_essays_for_next_phase=processed_essays,  # NEW: Phase 3 data propagation
         )
 
     async def test_kafka_message_json_deserialization_error_handling(
@@ -125,9 +144,9 @@ class TestBosElsPhaseCoordination:
         malformed_msg.partition = 0
         malformed_msg.offset = 456
 
-        # Should handle the error gracefully without crashing
+        # Should properly raise the JSON decode error (proper error handling design)
         with pytest.raises(json.JSONDecodeError):
-            await kafka_consumer._handle_els_batch_phase_outcome(malformed_msg)
+            await kafka_consumer._handle_message(malformed_msg)
 
         # Phase coordinator should not be called for malformed messages
         mock_phase_coordinator.handle_phase_concluded.assert_not_called()
@@ -160,8 +179,8 @@ class TestBosElsPhaseCoordination:
         incomplete_msg.value = json.dumps(envelope_data).encode('utf-8')
         incomplete_msg.topic = "huleedu.els.batch_phase.outcome.v1"
 
-        # Should handle missing fields gracefully
-        await kafka_consumer._handle_els_batch_phase_outcome(incomplete_msg)
+        # Should handle missing fields gracefully (with logging)
+        await kafka_consumer._handle_message(incomplete_msg)
 
         # Phase coordinator should not be called for incomplete events
         mock_phase_coordinator.handle_phase_concluded.assert_not_called()

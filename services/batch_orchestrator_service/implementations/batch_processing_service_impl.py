@@ -62,8 +62,8 @@ class BatchProcessingServiceImpl:
         # 1. Persist Full Batch Context
         await self.batch_repo.store_batch_context(batch_id, registration_data)
 
-        # 2. Determine requested pipelines based on registration data (Sub-task 2.1.1)
-        requested_pipelines = ["spellcheck"]  # Default pipeline
+        # 2. Determine requested pipelines based on registration data (Task 3.1)
+        requested_pipelines = ["spellcheck"]  # Always include spellcheck first
         if registration_data.enable_cj_assessment:
             requested_pipelines.append("cj_assessment")
             self.logger.info(
@@ -71,10 +71,52 @@ class BatchProcessingServiceImpl:
                 extra={"correlation_id": str(correlation_id)},
             )
 
-        # Also store initial pipeline state with CJ assessment if enabled
+        # Future pipeline support
+        if getattr(registration_data, "enable_ai_feedback", False):
+            requested_pipelines.append("ai_feedback")
+        if getattr(registration_data, "enable_nlp_metrics", False):
+            requested_pipelines.append("nlp_metrics")
+
+        # 3. Initialize pipeline state with proper PipelineStateDetail objects (Task 3.1)
+        from common_core.pipeline_models import PipelineExecutionStatus, PipelineStateDetail
+
+        # Initialize each pipeline phase with correct status
+        spellcheck_detail = PipelineStateDetail(
+            status=(
+                PipelineExecutionStatus.PENDING_DEPENDENCIES
+                if "spellcheck" in requested_pipelines
+                else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
+            )
+        )
+        cj_assessment_detail = PipelineStateDetail(
+            status=(
+                PipelineExecutionStatus.PENDING_DEPENDENCIES
+                if "cj_assessment" in requested_pipelines
+                else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
+            )
+        )
+        ai_feedback_detail = PipelineStateDetail(
+            status=(
+                PipelineExecutionStatus.PENDING_DEPENDENCIES
+                if "ai_feedback" in requested_pipelines
+                else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
+            )
+        )
+        nlp_metrics_detail = PipelineStateDetail(
+            status=(
+                PipelineExecutionStatus.PENDING_DEPENDENCIES
+                if "nlp_metrics" in requested_pipelines
+                else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
+            )
+        )
+
         initial_pipeline_state = ProcessingPipelineState(
             batch_id=batch_id,
             requested_pipelines=requested_pipelines,
+            spellcheck=spellcheck_detail,
+            cj_assessment=cj_assessment_detail,
+            ai_feedback=ai_feedback_detail,
+            nlp_metrics=nlp_metrics_detail,
         )
         await self.batch_repo.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 

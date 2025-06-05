@@ -14,6 +14,12 @@ import pytest
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
+from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
+    BatchEssaysReadyHandler,
+)
+from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import (
+    ELSBatchPhaseOutcomeHandler,
+)
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
 
 
@@ -21,33 +27,106 @@ class TestBatchKafkaConsumerBusinessLogic:
     """Test BatchKafkaConsumer business logic without overmocking."""
 
     @pytest.fixture
-    def mock_batch_processing_service(self):
-        """Mock the external boundary - batch processing service protocol."""
-        return AsyncMock()
+    def mock_batch_essays_ready_handler(self):
+        """Mock the BatchEssaysReadyHandler external boundary."""
+        return AsyncMock(spec=BatchEssaysReadyHandler)
 
     @pytest.fixture
-    def kafka_consumer(self, mock_batch_processing_service):
+    def mock_els_batch_phase_outcome_handler(self):
+        """Mock the ELSBatchPhaseOutcomeHandler external boundary."""
+        return AsyncMock(spec=ELSBatchPhaseOutcomeHandler)
+
+    @pytest.fixture
+    def kafka_consumer(self, mock_batch_essays_ready_handler, mock_els_batch_phase_outcome_handler):
         """Create Kafka consumer with mocked external dependencies."""
         return BatchKafkaConsumer(
             kafka_bootstrap_servers="localhost:9092",
             consumer_group="test-group",
-            event_publisher=AsyncMock(),
-            batch_repo=AsyncMock(),
-            phase_coordinator=mock_batch_processing_service,
+            batch_essays_ready_handler=mock_batch_essays_ready_handler,
+            els_batch_phase_outcome_handler=mock_els_batch_phase_outcome_handler,
         )
 
-    async def test_els_batch_phase_outcome_message_processing(
-        self, kafka_consumer, mock_batch_processing_service
+    async def test_els_batch_phase_outcome_message_routing(
+        self, kafka_consumer, mock_els_batch_phase_outcome_handler
     ):
-        """Test processing of ELSBatchPhaseOutcomeV1 Kafka message."""
+        """Test that ELS batch phase outcome messages are routed to the correct handler."""
+        # Mock Kafka message for ELS batch phase outcome
+        mock_message = Mock()
+        mock_message.topic = "huleedu.els.batch_phase.outcome.v1"
+        mock_message.partition = 0
+        mock_message.offset = 123
+
+        # Execute the message routing logic
+        await kafka_consumer._handle_message(mock_message)
+
+        # Verify the correct handler was called
+        mock_els_batch_phase_outcome_handler.handle_els_batch_phase_outcome.assert_called_once_with(mock_message)
+
+    async def test_batch_essays_ready_message_routing(
+        self, kafka_consumer, mock_batch_essays_ready_handler
+    ):
+        """Test that BatchEssaysReady messages are routed to the correct handler."""
+        # Mock Kafka message for BatchEssaysReady
+        mock_message = Mock()
+        mock_message.topic = "huleedu.els.batch.essays.ready.v1"  # Correct topic name
+        mock_message.partition = 0
+        mock_message.offset = 456
+
+        # Execute the message routing logic
+        await kafka_consumer._handle_message(mock_message)
+
+        # Verify the correct handler was called
+        mock_batch_essays_ready_handler.handle_batch_essays_ready.assert_called_once_with(mock_message)
+
+    async def test_unknown_topic_handling(
+        self, kafka_consumer, mock_batch_essays_ready_handler, mock_els_batch_phase_outcome_handler
+    ):
+        """Test that unknown topics are handled gracefully without calling any handlers."""
+        # Mock Kafka message for unknown topic
+        mock_message = Mock()
+        mock_message.topic = "unknown.topic.name"
+        mock_message.partition = 0
+        mock_message.offset = 789
+
+        # Execute the message routing logic (should not raise exception)
+        await kafka_consumer._handle_message(mock_message)
+
+        # Verify no handlers were called
+        mock_batch_essays_ready_handler.handle_batch_essays_ready.assert_not_called()
+        mock_els_batch_phase_outcome_handler.handle_els_batch_phase_outcome.assert_not_called()
+
+
+class TestELSBatchPhaseOutcomeHandler:
+    """Test ELSBatchPhaseOutcomeHandler business logic without overmocking."""
+
+    @pytest.fixture
+    def mock_phase_coordinator(self):
+        """Mock the external boundary - phase coordinator protocol."""
+        return AsyncMock()
+
+    @pytest.fixture
+    def outcome_handler(self, mock_phase_coordinator):
+        """Create ELS outcome handler with mocked external dependencies."""
+        return ELSBatchPhaseOutcomeHandler(
+            phase_coordinator=mock_phase_coordinator
+        )
+
+    async def test_els_batch_phase_outcome_processing_with_data_propagation(
+        self, outcome_handler, mock_phase_coordinator
+    ):
+        """Test processing of ELSBatchPhaseOutcomeV1 with data propagation to next phase."""
         batch_id = str(uuid4())
         correlation_id = uuid4()
 
-        # Create valid processed essays
+        # Create valid processed essays with updated text_storage_id from spellcheck
         processed_essays = [
             EssayProcessingInputRefV1(
                 essay_id=str(uuid4()),
-                text_storage_id=str(uuid4()),
+                text_storage_id="corrected_original_text_1",  # Updated from spellcheck
+            ),
+            EssayProcessingInputRefV1(
+                essay_id=str(uuid4()),
+                text_storage_id="corrected_original_text_2",  # Updated from spellcheck
             ),
         ]
 
@@ -57,7 +136,7 @@ class TestBatchKafkaConsumerBusinessLogic:
             phase_name="spellcheck",
             phase_status="COMPLETED_SUCCESSFULLY",
             processed_essays=processed_essays,
-            failed_essay_ids=["essay-2"],
+            failed_essay_ids=["essay-3"],
             correlation_id=correlation_id,
         )
 
@@ -77,12 +156,13 @@ class TestBatchKafkaConsumerBusinessLogic:
         mock_message.offset = 123
 
         # Execute the business logic
-        await kafka_consumer._handle_els_batch_phase_outcome(mock_message)
+        await outcome_handler.handle_els_batch_phase_outcome(mock_message)
 
-        # Verify the external boundary was called correctly
-        mock_batch_processing_service.handle_phase_concluded.assert_called_once_with(
-            batch_id,
-            "spellcheck",
-            "COMPLETED_SUCCESSFULLY",
-            str(correlation_id),
+        # Verify the external boundary was called with the new signature including processed essays
+        mock_phase_coordinator.handle_phase_concluded.assert_called_once_with(
+            batch_id=batch_id,
+            completed_phase="spellcheck",
+            phase_status="COMPLETED_SUCCESSFULLY",
+            correlation_id=str(correlation_id),
+            processed_essays_for_next_phase=processed_essays,  # NEW: Phase 3 data propagation
         )

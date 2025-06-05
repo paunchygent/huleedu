@@ -92,6 +92,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
         completed_phase: str,
         phase_status: str,
         correlation_id: str,
+        processed_essays_for_next_phase: list[Any] | None = None,
     ) -> None:
         """Handle completion of a pipeline phase and determine next actions."""
         ...
