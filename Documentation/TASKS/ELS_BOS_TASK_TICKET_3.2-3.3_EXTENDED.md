@@ -63,6 +63,7 @@ This phase focuses on creating the foundational protocols and the first concrete
                 """Initiate a specific pipeline phase for the batch."""
                 ...
             ```
+
         * Emphasize that `phase_to_initiate` uses the `PhaseName` enum.
     * **`SpellcheckInitiatorProtocol(PipelinePhaseInitiatorProtocol)`** (in `protocols.py`):
         * Inherits, providing specific type hinting if necessary, but primarily for semantic grouping.
@@ -95,6 +96,7 @@ This phase focuses on creating the foundational protocols and the first concrete
         * This map is central to dynamic dispatch.
         * Keys **must** be `PhaseName` enum members.
         * Example:
+
             ```python
             from dishka import Provider, Scope, provide
             from common_core.pipeline_models import PhaseName # Assuming PhaseName location
@@ -113,6 +115,7 @@ This phase focuses on creating the foundational protocols and the first concrete
                         # Add other phase initiators here as they are implemented
                     }
             ```
+
     * Ensure this map is injected into `BatchEssaysReadyHandler` and `DefaultPipelinePhaseCoordinator`.
 
 ### Phase 2: Refactor `BatchEssaysReadyHandler` to Initiate the *First* Pipeline Phase Generically

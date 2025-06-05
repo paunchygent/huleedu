@@ -31,7 +31,7 @@ class EssayState(Protocol):
 class EssayRepositoryProtocol(Protocol):
     """
     Protocol for essay state persistence operations.
-    
+
     This follows the repository pattern established by BOS BatchRepositoryProtocol,
     providing an abstraction layer for essay state persistence that supports
     both SQLite (development/testing) and PostgreSQL (production) implementations.

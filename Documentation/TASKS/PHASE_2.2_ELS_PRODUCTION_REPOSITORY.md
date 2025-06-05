@@ -48,6 +48,7 @@ Implement production-ready PostgreSQL database persistence for ELS, following th
 **Goal**: Define EssayRepositoryProtocol to abstract persistence layer
 
 **Completed**:
+
 - Renamed `EssayStateStore` to `EssayRepositoryProtocol` throughout codebase
 - Made `SQLiteEssayStateStore` implement the protocol
 - Updated all implementation files and DI configuration
@@ -58,6 +59,7 @@ Implement production-ready PostgreSQL database persistence for ELS, following th
 **Goal**: Create production PostgreSQL implementation
 
 **Completed**:
+
 - Created `PostgreSQLEssayRepository` class in `implementations/essay_repository_postgres_impl.py`
 - Implemented async PostgreSQL with connection pooling
 - Fixed SQLAlchemy enum handling and timezone issues
@@ -69,6 +71,7 @@ Implement production-ready PostgreSQL database persistence for ELS, following th
 **Goal**: Configure environment-based repository selection
 
 **Completed**:
+
 - Added environment-based selection following BOS pattern: `settings.ENVIRONMENT == "testing" or USE_MOCK_REPOSITORY`
 - Updated DI providers in `di.py`
 - SQLite for development/testing, PostgreSQL for production
@@ -79,6 +82,7 @@ Implement production-ready PostgreSQL database persistence for ELS, following th
 **Goal**: Add PostgreSQL configuration settings
 
 **Completed**:
+
 - Added PostgreSQL settings to `config.py` with proper field aliases
 - Connection pool configuration (size, overflow, recycle settings)
 - Environment variable mapping for Docker deployment
@@ -89,6 +93,7 @@ Implement production-ready PostgreSQL database persistence for ELS, following th
 **Goal**: Add essay_lifecycle_db PostgreSQL service
 
 **Completed**:
+
 - Added `essay_lifecycle_db` PostgreSQL service to docker-compose.yml
 - Configured health checks and service dependencies
 - Updated ELS services with database environment variables
@@ -99,6 +104,7 @@ Implement production-ready PostgreSQL database persistence for ELS, following th
 **Goal**: Create PostgreSQL schema equivalent to SQLite
 
 **Completed**:
+
 - Created `models_db.py` with SQLAlchemy database models
 - Proper enum handling with `str, enum.Enum` inheritance
 - JSON fields for timeline and metadata storage
@@ -109,6 +115,7 @@ Implement production-ready PostgreSQL database persistence for ELS, following th
 **Goal**: Comprehensive testing with test containers
 
 **Completed**:
+
 - Created comprehensive integration tests using PostgreSQL test containers
 - All 8 integration tests passing
 - Fixed timeline JSON serialization issues
@@ -120,6 +127,7 @@ Implement production-ready PostgreSQL database persistence for ELS, following th
 **Goal**: Deploy and validate production configuration
 
 **Completed**:
+
 - Docker configuration builds and starts successfully
 - Environment-based repository selection working
 - All existing SQLite tests continue to pass
