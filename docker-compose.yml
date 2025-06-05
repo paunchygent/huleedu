@@ -5,8 +5,31 @@ networks:
 volumes:
   huleedu_content_store_data:
   essay_lifecycle_data:
+  batch_orchestrator_db_data:
 
 services:
+  # PostgreSQL database for Batch Orchestrator Service
+  batch_orchestrator_db:
+    image: postgres:15
+    container_name: huleedu_batch_orchestrator_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=batch_orchestrator
+      - POSTGRES_USER=huleedu_user
+      - POSTGRES_PASSWORD=REDACTED_DEFAULT_PASSWORD
+    volumes:
+      - batch_orchestrator_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U huleedu_user -d batch_orchestrator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   zookeeper:
     image: bitnami/zookeeper:3.9
     container_name: huleedu_zookeeper
@@ -135,6 +158,8 @@ services:
         condition: service_healthy
       essay_lifecycle_api:
         condition: service_healthy
+      batch_orchestrator_db:
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:
@@ -145,6 +170,12 @@ services:
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - PORT=5000
       - LOG_LEVEL=INFO
+      # Database configuration
+      - BATCH_ORCHESTRATOR_DB_HOST=batch_orchestrator_db
+      - BATCH_ORCHESTRATOR_DB_PORT=5432
+      - BATCH_ORCHESTRATOR_DB_NAME=batch_orchestrator
+      - BATCH_ORCHESTRATOR_DB_USER=huleedu_user
+      - BATCH_ORCHESTRATOR_DB_PASSWORD=REDACTED_DEFAULT_PASSWORD
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/healthz || exit 1"]
       interval: 15s

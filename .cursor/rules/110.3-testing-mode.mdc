@@ -28,3 +28,31 @@ alwaysApply: false
 ## 5. Patterns
 - Follow [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc) Sections 3.9-3.11
 - Follow [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc) Section 8.2
+
+## 6. Integration Testing Standards
+
+### 6.1. Database Integration Testing
+- **MUST** use testcontainers for database integration tests when testing repository implementations
+- **REQUIRED**: Real database instances over in-memory alternatives for production parity
+
+### 6.2. Test Isolation
+- **MUST** ensure test containers clean up automatically
+- **PATTERN**: Use pytest fixture scopes appropriately
+
+## 7. Debugging and Error Analysis
+
+### 7.1. Test Failure Analysis
+- **MUST** run tests with `-s` flag during debugging to see print output
+- **REQUIRED**: Read actual error messages completely before attempting fixes
+- **FORBIDDEN**: Simplifying tests to make them pass without fixing root cause
+
+### 7.2. Web Research Integration
+- **SHOULD** research known issues for complex errors (SQLAlchemy, async, etc.)
+- **PATTERN**: Include reference links in comments for documented solutions
+- **EXAMPLE**: Document GitHub issues and Stack Overflow solutions
+
+```python
+# Reference: https://github.com/googleapis/python-bigquery-sqlalchemy/issues/844
+class StatusEnum(str, enum.Enum):  # str inheritance required for SQLAlchemy
+    PENDING = "pending"
+```

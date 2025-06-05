@@ -16,3 +16,4 @@ cj_essay_assessment/
 cj_ai_essay_assessment/*.xml
 /*.xml
 
+.DS_Store

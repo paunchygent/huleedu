@@ -20,6 +20,9 @@ dependencies = [
     "dishka",
     "quart-dishka",
     "transitions",
+    # Database dependencies for production repository
+    "SQLAlchemy[asyncio]",
+    "asyncpg",  # PostgreSQL async driver
 ]
 
 [build-system]

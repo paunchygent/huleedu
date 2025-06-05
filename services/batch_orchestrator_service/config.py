@@ -7,6 +7,7 @@ including environment-specific overrides and Pydantic-based settings validation.
 
 from __future__ import annotations
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,6 +35,28 @@ class Settings(BaseSettings):
     KAFKA_TOPIC_BATCH_PHASE_CONCLUDED: str = "huleedu.els.batch_phase.concluded.v1"
     KAFKA_CONSUMER_GROUP_ID: str = "batch-orchestrator-consumers"
 
+    # Database configuration
+    DB_HOST: str = Field(
+        default="localhost", validation_alias="BATCH_ORCHESTRATOR_DB_HOST"
+    )
+    DB_PORT: int = Field(
+        default=5432, validation_alias="BATCH_ORCHESTRATOR_DB_PORT"
+    )
+    DB_NAME: str = Field(
+        default="batch_orchestrator", validation_alias="BATCH_ORCHESTRATOR_DB_NAME"
+    )
+    DB_USER: str = Field(
+        default="huleedu_user", validation_alias="BATCH_ORCHESTRATOR_DB_USER"
+    )
+    DB_PASSWORD: str = Field(
+        default="REDACTED_DEFAULT_PASSWORD", validation_alias="BATCH_ORCHESTRATOR_DB_PASSWORD"
+    )
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+
+    # Repository configuration
+    USE_MOCK_REPOSITORY: bool = False  # Set to True to use mock repository for testing
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -41,6 +64,11 @@ class Settings(BaseSettings):
         # To prefix env vars, e.g. BATCH_ORCHESTRATOR_SERVICE_LOG_LEVEL
         env_prefix="BATCH_ORCHESTRATOR_SERVICE_",
     )
+
+    @property
+    def database_url(self) -> str:
+        """Construct the PostgreSQL database URL from configuration settings."""
+        return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
 
 # Create a single instance for the application to use

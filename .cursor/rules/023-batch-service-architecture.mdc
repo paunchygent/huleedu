@@ -190,3 +190,19 @@ HTTP Request → Service Layer → Repository → Event Publisher → Kafka → 
 - **Business Logic**: Centralized in `BatchProcessingServiceImpl`
 - **Repository Pattern**: Data access abstracted via protocols
 - **Event Publishing**: Coordinated through service layer
+
+## 13. Production Requirements
+
+### 13.1. Database Atomicity Requirements
+- **CRITICAL**: Production `BatchRepositoryProtocol` implementation **MUST** provide atomic operations for `ProcessingPipelineState` updates
+- **Race Condition Prevention**: Pipeline state transitions (e.g., `PENDING_DEPENDENCIES` → `DISPATCH_INITIATED`) must be atomic to prevent duplicate phase initiations
+- **Implementation Options**:
+  - Database-level transactions with optimistic locking
+  - Compare-and-set operations with version fields
+  - Unique constraints on `(batch_id, phase_name, status)` combinations
+- **Mock Repository**: Must simulate production atomicity behavior to prevent anti-pattern development
+
+### 13.2. Idempotency Requirements
+- **Phase Initiation**: Must be idempotent across multiple events/retries
+- **State Transitions**: Must prevent race conditions in concurrent environments
+- **Database Implementation**: Repository layer responsible for atomicity, not application layer

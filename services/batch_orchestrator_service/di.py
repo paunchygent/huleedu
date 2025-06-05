@@ -2,24 +2,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from aiohttp import ClientSession
 from aiokafka import AIOKafkaProducer
 from config import Settings, settings
 from dishka import Provider, Scope, provide
+from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
 from implementations.batch_processing_service_impl import BatchProcessingServiceImpl
 from implementations.batch_repository_impl import MockBatchRepositoryImpl
+from implementations.batch_repository_postgres_impl import PostgreSQLBatchRepositoryImpl
 from implementations.cj_assessment_initiator_impl import DefaultCJAssessmentInitiator
+from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
 from implementations.essay_lifecycle_client_impl import DefaultEssayLifecycleClientImpl
 from implementations.event_publisher_impl import DefaultBatchEventPublisherImpl
 from implementations.pipeline_phase_coordinator_impl import DefaultPipelinePhaseCoordinator
+from kafka_consumer import BatchKafkaConsumer
 from prometheus_client import CollectorRegistry
-
-if TYPE_CHECKING:
-    from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
-    from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
-    from kafka_consumer import BatchKafkaConsumer
 from protocols import (
     BatchEventPublisherProtocol,
     BatchProcessingServiceProtocol,
@@ -59,9 +56,12 @@ class BatchOrchestratorServiceProvider(Provider):
         return ClientSession()
 
     @provide(scope=Scope.APP)
-    def provide_batch_repository(self) -> BatchRepositoryProtocol:
-        """Provide batch repository implementation."""
-        return MockBatchRepositoryImpl()
+    def provide_batch_repository(self, settings: Settings) -> BatchRepositoryProtocol:
+        """Provide batch repository implementation based on environment configuration."""
+        if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
+            return MockBatchRepositoryImpl()
+        else:
+            return PostgreSQLBatchRepositoryImpl(settings)
 
     @provide(scope=Scope.APP)
     def provide_batch_event_publisher(
@@ -112,7 +112,6 @@ class BatchOrchestratorServiceProvider(Provider):
         batch_repo: BatchRepositoryProtocol,
     ) -> BatchEssaysReadyHandler:
         """Provide BatchEssaysReady message handler."""
-        from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
         return BatchEssaysReadyHandler(event_publisher, batch_repo)
 
     @provide(scope=Scope.APP)
@@ -121,7 +120,6 @@ class BatchOrchestratorServiceProvider(Provider):
         phase_coordinator: PipelinePhaseCoordinatorProtocol,
     ) -> ELSBatchPhaseOutcomeHandler:
         """Provide ELSBatchPhaseOutcome message handler."""
-        from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
         return ELSBatchPhaseOutcomeHandler(phase_coordinator)
 
     @provide(scope=Scope.APP)
@@ -132,7 +130,6 @@ class BatchOrchestratorServiceProvider(Provider):
         els_batch_phase_outcome_handler: ELSBatchPhaseOutcomeHandler,
     ) -> BatchKafkaConsumer:
         """Provide Kafka consumer for batch events."""
-        from kafka_consumer import BatchKafkaConsumer
         return BatchKafkaConsumer(
             kafka_bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
             consumer_group="batch-orchestrator-group",

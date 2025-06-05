@@ -31,6 +31,7 @@ monorepo-tools = [
     "pytest-xdist",
     "httpx",
     "pre-commit",
+    "testcontainers[postgres]",  # For PostgreSQL integration tests
 ]
 
 # Install all services and common_core for unified development
@@ -153,6 +154,9 @@ module = [
     "diskcache.*",
     "choix.*",
     "tenacity.*",
+    "sqlalchemy.*",
+    "asyncpg.*",
+    "testcontainers.*",
     "enums_db",       # Database enum module without type stubs
     "models_db",      # Database models module without type stubs
 ]

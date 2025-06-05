@@ -22,34 +22,51 @@ class BatchRepositoryProtocol(Protocol):
     """Protocol for batch data persistence operations."""
 
     async def get_batch_by_id(self, batch_id: str) -> dict | None:
-        """Retrieve a batch by its ID."""
+        """Retrieve batch data by ID."""
         ...
 
     async def create_batch(self, batch_data: dict) -> dict:
-        """Create a new batch and return it with an ID."""
+        """Create a new batch record."""
         ...
 
     async def update_batch_status(self, batch_id: str, new_status: str) -> bool:
-        """Update the status of a batch."""
-        # new_status would ideally be from common_core.enums.BatchStatus
+        """Update the status of an existing batch."""
         ...
 
     async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
-        """Save the processing pipeline state for a batch."""
+        """Save pipeline processing state for a batch."""
         ...
 
     async def get_processing_pipeline_state(self, batch_id: str) -> dict | None:
-        """Retrieve the processing pipeline state for a batch."""
+        """Retrieve pipeline processing state for a batch."""
         ...
 
     async def store_batch_context(
         self, batch_id: str, registration_data: BatchRegistrationRequestV1
     ) -> bool:
-        """Store the full batch context including course info and essay instructions."""
+        """Store batch context information."""
         ...
 
     async def get_batch_context(self, batch_id: str) -> BatchRegistrationRequestV1 | None:
-        """Retrieve the stored batch context for a given batch ID."""
+        """Retrieve batch context information."""
+        ...
+
+    async def update_phase_status_atomically(
+        self,
+        batch_id: str,
+        phase_name: str,
+        expected_status: str,
+        new_status: str,
+        completion_timestamp: str | None = None,
+    ) -> bool:
+        """
+        Atomically update phase status if current status matches expected.
+
+        Returns True if update was successful, False if status didn't match expected
+        (indicating another process already updated it).
+
+        This method prevents race conditions in phase initiation.
+        """
         ...
 
 

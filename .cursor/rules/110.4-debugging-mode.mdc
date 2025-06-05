@@ -12,6 +12,7 @@ alwaysApply: false
 ## 2. Debugging Process
 - **Analyze**: Error messages, logs, codebase context
 - **Hypothesize**: Formulate specific root cause theories
+- **Research**: Use web_search for complex framework errors
 - **Test**: Propose diagnostic steps to verify hypotheses
 - **Fix**: Apply targeted code changes
 - **Verify**: Confirm resolution
@@ -44,6 +45,7 @@ ignore_missing_imports = true
 - `read_file`: Inspect code
 - `grep_search`: Find error patterns
 - `run_terminal_cmd`: Run tests with debug flags
+- `web_search`: Research known issues and solutions
 
 ---
 **Read the actual error messages.**
