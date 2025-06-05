@@ -1,0 +1,64 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 043: Service Configuration and Logging
+
+## 1. Purpose
+Defines configuration management and logging standards for all services.
+
+**See also**: [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc) for core stack requirements.
+
+## 2. Configuration Management
+
+### 2.1. Standardized Pydantic Settings Pattern
+- **MUST** use `pydantic-settings` for all service configuration
+- **MUST** create `config.py` at service root with this pattern:
+
+```python
+from __future__ import annotations
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    """Configuration settings for the [Service Name]."""
+    LOG_LEVEL: str = "INFO"
+    # Add typed fields with defaults
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        env_prefix="[SERVICE_NAME]_",
+    )
+
+settings = Settings()
+```
+
+### 2.2. Configuration Usage
+- Import settings: `from .config import settings`
+- Use `settings.FIELD_NAME` instead of `os.getenv()`
+- Sensitive info **MUST NEVER** be hardcoded
+
+## 3. Logging
+
+### 3.1. Centralized Logging Utility
+- **MUST** use `huleedu_service_libs.logging_utils` for all logging
+- **FORBIDDEN**: Standard library `logging` module in services
+- **Pattern**:
+```python
+from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+
+# Service initialization
+configure_service_logging("service-name", log_level=settings.LOG_LEVEL)
+logger = create_service_logger("component-name")
+```
+
+### 3.2. Mandatory Correlation IDs
+- For any operation chain (request/event), a `correlation_id` **MUST** be established or propagated
+- This `correlation_id` **MUST** be in all log messages across all involved services
+- Use `log_event_processing()` for EventEnvelope processing
+
+### 3.3. Consistent Log Levels & Clear Messages
+- Use appropriate levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`)
+- Log messages **MUST** be clear, concise, and contextual

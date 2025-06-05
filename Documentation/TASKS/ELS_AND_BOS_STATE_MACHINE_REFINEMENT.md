@@ -677,7 +677,7 @@ async def _handle_els_phase_completion_event(
             
     else: # All stages in requested_pipelines are complete
         logger.info(f"Batch {batch_id}: All requested pipeline stages completed.")
-        # Potentially update batch status to a final completed state in BOS's primary batch store
+        # If all pipeline phases for the batch are complete, update batch status to a final terminal state in BOS's primary batch store
         pipeline_state.batch_status = BatchStatus.COMPLETED_SUCCESSFULLY # Assuming BatchStatus on pipeline_state
 
     await self.batch_repo.save_processing_pipeline_state(batch_id, pipeline_state)

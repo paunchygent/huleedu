@@ -24,6 +24,14 @@ alwaysApply: true
 
 ## 2. HuleEdu Domain Terms
 
+- **Specialized Processing Service (SS):** Single-phase microservice.
+- **Thin Events:** Minimal, versioned event payloads.
+- **Callback APIs:** Used by SS to notify BOS of completion.
+- **`typing.Protocol`:** Python interface contract.
+- **Dishka:** Project DI container.
+- **schema_version:** Top-level field in every EventEnvelope.
+
+
 - **BatchUpload**: Essay collection for processing (BOS)
 - **ProcessingPipelineState**: Pipeline progress within BatchUpload
 - **ProcessedEssay**: Individual essay entity (ELS)

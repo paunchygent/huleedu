@@ -24,8 +24,16 @@ alwaysApply: true
 - **ProcessedEssay**: Individual essay entity (ELS)
 - **EssayStatus**: Lifecycle state enum
 - **StorageReferenceMetadata**: Thin event data references
+- **Specialized Processing Service (SS)**: Single-phase microservice
+- **Thin Events**: Minimal, versioned event payloads
 
-## 3. AI Interaction Modes
+## 3. Technical Implementation Terms
+
+- **`typing.Protocol`**: Python interface contract
+- **Dishka**: Project DI container
+- **schema_version**: Top-level field in every EventEnvelope
+
+## 4. AI Interaction Modes
 
 - **Planning**: Task analysis and execution planning
 - **Coding**: Code generation and modification  

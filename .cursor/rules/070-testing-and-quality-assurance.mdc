@@ -34,6 +34,11 @@ async def mock_http_context_manager(mock_response: AsyncMock) -> Any:
     yield mock_response
 ```
 
+### 3.3. Protocol and DI Testing Patterns
+- Mock protocol-based services using test doubles implementing the same `typing.Protocol`.
+- Override Dishka providers in tests to inject mocks/fakes.
+- Unit test all protocol implementations for both success and error; integration tests must cover full orchestration flows.
+
 ## 4. Execution Rules
 - **Command**: `pdm run pytest` (always use PDM)
 - **Debug**: `pdm run pytest -s` for print statements
@@ -44,7 +49,7 @@ async def mock_http_context_manager(mock_response: AsyncMock) -> Any:
 - **REQUIRED**: Add missing type stubs to `pyproject.toml` MyPy external libraries section
 - **Pattern**: Use `ignore_missing_imports = true` in MyPy overrides for libraries without stubs
 
-## 5. Anti-Patterns
+## 6. Anti-Patterns
 - **FORBIDDEN**: `try/except pass` blocks hiding model rebuilding failures
 - **FORBIDDEN**: Mocking at wrong abstraction levels
 - **FORBIDDEN**: Using `AsyncMock()` directly for async context managers

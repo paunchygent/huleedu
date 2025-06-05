@@ -117,7 +117,7 @@ def test_invalid_triggers_return_false(self) -> None:
     * ✅ **Event publishing** - Added `publish_els_batch_phase_outcome()` method to EventPublisher
     * ✅ **Batch completion logic**:
       * Tracks essay batch/phase membership via processing_metadata
-      * Aggregates phase completion when all essays reach terminal states
+      * Aggregates phase completion for the current pipeline phase when all essays reach terminal states. Batch is only set to terminal state when all pipeline phases are complete.
       * Publishes ELSBatchPhaseOutcomeV1 with correct processed_essays and text_storage_ids
     * ✅ **Tests passing** - All 43 ELS unit tests pass with new architecture
     * ✅ **IMPROVEMENTS APPLIED** (June 2025):
@@ -157,6 +157,7 @@ def test_invalid_triggers_return_false(self) -> None:
 ### **Phase 3: BOS Dynamic Pipeline Orchestration Enhancements**
 
 #### **Phase 3.0: BOS Architecture Refactoring** ✅ **COMPLETED**
+
 * **Goal**: Refactor kafka_consumer.py (354 lines) to comply with 400-line limit and clean architecture
 * **Implementation Completed**:
   * ✅ **Clean Architecture Refactoring**: Extracted message handlers following SRP
@@ -165,166 +166,102 @@ def test_invalid_triggers_return_false(self) -> None:
     * `implementations/els_batch_phase_outcome_handler.py` (100 lines) - ELSBatchPhaseOutcomeV1 processing with Phase 3 data propagation
   * ✅ **kafka_consumer.py Refactored**: 354 → 134 lines, focused on consumer lifecycle and message routing
   * ✅ **Dependency Injection Enhanced**: Added providers for new handlers in di.py with TYPE_CHECKING imports
-  * ✅ **Protocol Interface Updated**: Added `processed_essays_for_next_phase: list[Any] | None = None` parameter to `PipelinePhaseCoordinatorProtocol.handle_phase_concluded`
-  * ✅ **Data Propagation Implemented**: ELS handler extracts `processed_essays` and converts to `EssayProcessingInputRefV1` objects
-  * ✅ **Common Core Extended**: Added `BATCH_AI_FEEDBACK_INITIATE_COMMAND` and `BATCH_NLP_INITIATE_COMMAND` events with topic mappings
-  * ✅ **Type Safety**: All files Pydantic v2 compliant, MyPy clean, Ruff linter passing
-  * ✅ **File Size Compliance**: All files under 400 lines, largest is 192 lines
 
-* **Task 3.1: Enhance BOS `batch_processing_service_impl.py` for Pipeline Definition** 🔄 **IN PROGRESS**
+* **Task 3.1: Enhance BOS `batch_processing_service_impl.py` for Pipeline Definition**
   * **Goal**: Ensure BOS robustly defines and stores the intended pipeline sequence.
   * **File**: `services/batch_orchestrator_service/implementations/batch_processing_service_impl.py`
-  * **Core Logic for `register_new_batch`**:
-        1. Extend the logic for determining `requested_pipelines`:
+  * **Status Update (June 2025)**:
+    * **Implementation Verified**: The `register_new_batch` method correctly determines `requested_pipelines` based on `BatchRegistrationRequestV1` flags (always including "spellcheck", conditionally adding "cj_assessment", "ai_feedback", "nlp_metrics").
+    * **Pipeline State Initialization Verified**: `ProcessingPipelineState` is correctly initialized with `PipelineStateDetail` for all potential phases, setting statuses to `PENDING_DEPENDENCIES` or `SKIPPED_BY_USER_CONFIG` as appropriate.
+    * **Unit Tests Verified**: The test `test_batch_registration_pipeline_setup` in `scripts/tests/test_phase3_bos_orchestration.py` confirms this logic.
+
+* **Task 3.2: Refactor BOS `pipeline_phase_coordinator_impl.py` for Generic Orchestration & Data Propagation**
+  * **Goal**: Make BOS pipeline orchestration truly dynamic and ensure correct data propagation.
+  * **File**: `services/batch_orchestrator_service/implementations/pipeline_phase_coordinator_impl.py`
+  * **Validation Summary (June 2025)**:
+    * **Generic Orchestration Logic**: **PENDING/INCOMPLETE**. The current `_initiate_next_phase` (and its helper `_handle_spellcheck_completion`) is hardcoded for a "spellcheck" -> "cj_assessment" transition. It does not dynamically select the next phase from `requested_pipelines`.
+    * **Data Propagation (`processed_essays_for_next_phase`)**: **CRITICAL GAP IDENTIFIED**. While `ELSBatchPhaseOutcomeHandler` passes `processed_essays` to the coordinator, the coordinator's current logic (e.g., `_handle_spellcheck_completion`) **FAILS** to pass this crucial data to the subsequent phase initiator (e.g., `cj_initiator.initiate_cj_assessment`). The unit test `test_essay_list_propagation_to_next_phase_command` in `scripts/tests/test_phase3_bos_orchestration.py` confirms this gap.
+
+  * **Proposed Solution & Core Logic for `_initiate_next_phase`**:
+    1. **Dynamic Next Phase Determination**:
+        * The method must iterate through `ProcessingPipelineState.requested_pipelines` in order.
+        * For the `completed_phase`, find its index in `requested_pipelines`.
+        * Identify the *next* phase in `requested_pipelines` that has a status like `PENDING_DEPENDENCIES` or `REQUESTED_BY_USER`.
+        * If no such next phase exists, the pipeline for this batch might be complete or awaiting further user action if optional phases were skipped.
+    2. **Generic Dispatch Mechanism**:
+        * Replace phase-specific handlers (like `_handle_spellcheck_completion`) with a generic dispatch system.
+        * This could use a dictionary mapping phase names (e.g., "spellcheck", "cj_assessment", "ai_feedback", "nlp_metrics") to their respective initiator protocol instances (e.g., `self.spellcheck_initiator: SpellcheckInitiatorProtocol`, `self.cj_initiator: CJAssessmentInitiatorProtocol`, etc.). These initiators must be injected via DI.
+        * Example dispatch:
 
             ```python
-            # In BatchProcessingServiceImpl.register_new_batch
-            # ...
-            # requested_pipelines = ["spellcheck"] # Always include spellcheck first if applicable
-            # if registration_data.enable_cj_assessment:
-            #     requested_pipelines.append("cj_assessment")
-            # if getattr(registration_data, 'enable_ai_feedback', False): # Example for future
-            #     requested_pipelines.append("ai_feedback")
-            # if getattr(registration_data, 'enable_nlp_metrics', False): # Example for future
-            #     requested_pipelines.append("nlp") # Assuming 'nlp' is the phase_name for nlp_metrics
-            # ...
+            # In DefaultPipelinePhaseCoordinator._initiate_next_phase
+            # ... (determine actual_next_phase_name and current_pipeline_state)
+            initiator = self.phase_initiators_map.get(actual_next_phase_name)
+            if initiator:
+                await initiator.initiate_phase(
+                    batch_id=batch_id,
+                    batch_context=batch_context, # Fetched from repo
+                    correlation_id=correlation_id,
+                    essays_to_process=processed_essays_for_next_phase # CRITICAL: Pass the propagated data
+                )
+                # Update pipeline state for the initiated phase (e.g., to IN_PROGRESS or DISPATCH_INITIATED)
+            else:
+                # Log error: No initiator found for actual_next_phase_name
             ```
 
-        2. When initializing `ProcessingPipelineState` (from `common_core.pipeline_models`), ensure all potential stages defined within that Pydantic model (e.g., `spellcheck`, `ai_feedback`, `cj_assessment`, `nlp_metrics`) are explicitly initialized with a default `PipelineStateDetail` (e.g., status `PENDING` or `NOT_REQUESTED`).
-
-            ```python
-            # from common_core.pipeline_models import PipelineStateDetail, PipelineExecutionStatus
-            # # ...
-            # initial_spellcheck_detail = PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES if "spellcheck" in requested_pipelines else PipelineExecutionStatus.NOT_REQUESTED)
-            # initial_cj_detail = PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES if "cj_assessment" in requested_pipelines else PipelineExecutionStatus.NOT_REQUESTED)
-            # # ... and so on for ai_feedback, nlp_metrics
-            #
-            # initial_pipeline_state = ProcessingPipelineState(
-            #     batch_id=batch_id,
-            #     requested_pipelines=requested_pipelines,
-            #     spellcheck=initial_spellcheck_detail,
+    3. **Data Propagation to Initiators**:
+        * **Crucially, the `processed_essays_for_next_phase` list (containing `EssayProcessingInputRefV1` with updated `text_storage_id`s) MUST be passed to the `initiate_phase` method of the selected initiator.**
+    4. **Phase Initiator Protocols & Implementations**:
+        * Ensure all phase initiator protocols (e.g., `AIFeedbackInitiatorProtocol`, `NLPMetricsInitiatorProtocol`) are defined and accept `essays_to_process: list[EssayProcessingInputRefV1]`.
+        * Their implementations must use this list to construct the `essays_to_process` field in their respective `BatchServiceXInitiateCommandDataV1` payloads.
+    5. **State Updates**: After successfully calling an initiator, update the `ProcessingPipelineState` for the `actual_next_phase_name` to reflect its new status (e.g., `DISPATCH_INITIATED` or `IN_PROGRESS`).           #     spellcheck=initial_spellcheck_detail,
             #     cj_assessment=initial_cj_detail,
             #     ai_feedback=initial_ai_feedback_detail, # if model has it
             #     nlp_metrics=initial_nlp_metrics_detail  # if model has it
             # )
             # await self.batch_repo.save_processing_pipeline_state(batch_id, initial_pipeline_state)
-            ```
-
-  * **Action**: Add unit tests for `BatchProcessingServiceImpl.register_new_batch` covering these aspects of `ProcessingPipelineState` initialization.
-
-* **Task 3.2: Refactor BOS `pipeline_phase_coordinator_impl.py` for Generic Orchestration & Data Propagation**
-  * **Goal**: Make BOS pipeline orchestration truly dynamic and ensure correct data propagation.
-  * **File**: `services/batch_orchestrator_service/implementations/pipeline_phase_coordinator_impl.py`
-  * **Core Logic for `handle_phase_concluded` and `_initiate_next_phase`**:
-        1. `handle_phase_concluded` needs to receive `processed_essays: List[EssayProcessingInputRefV1]` from the calling `kafka_consumer._handle_els_batch_phase_outcome`.
-
-            ```python
-            # In DefaultPipelinePhaseCoordinator
-            # async def handle_phase_concluded(
-            #     self,
-            #     batch_id: str,
-            #     completed_phase_name: str, # Renamed for clarity
-            #     phase_status: str,
-            #     correlation_id: str | None, # Ensure UUID or str consistency
-            #     processed_essays_for_next_phase: list[EssayProcessingInputRefV1] | None = None # NEW PARAMETER
-            # ) -> None:
-            #     # ... existing status update logic ...
-            #     if phase_status.upper() == "COMPLETED_SUCCESSFULLY": # Or use a shared enum/constant
-            #         await self._initiate_next_phase(batch_id, completed_phase_name, correlation_id, processed_essays_for_next_phase)
-            ```
-
-            The `kafka_consumer.py` `_handle_els_batch_phase_outcome` needs to extract `processed_essays` from the `ELSBatchPhaseOutcomeV1` data and pass it here.
-        2. Refactor `_initiate_next_phase` to be generic:
-
-            ```python
-            # async def _initiate_next_phase(
-            #     self, batch_id: str, completed_phase_name: str, correlation_id: str | None,
-            #     processed_essays_from_previous_phase: list[EssayProcessingInputRefV1] | None
-            # ) -> None:
-            #     batch_context = await self.batch_repo.get_batch_context(batch_id)
-            #     pipeline_state_model = await self.batch_repo.get_processing_pipeline_state(batch_id) # Assume this returns the Pydantic model
-            #
-            #     if not batch_context or not pipeline_state_model: # Check Pydantic model
-            #         logger.error(f"Missing context or pipeline state for batch {batch_id}")
-            #         return
-            #
-            #     requested_pipelines = pipeline_state_model.requested_pipelines
-            #     try:
-            #         current_phase_index = requested_pipelines.index(completed_phase_name)
-            #     except ValueError:
-            #         logger.error(f"Completed phase {completed_phase_name} not in requested_pipelines for batch {batch_id}")
-            #         return
-            #
-            #     if current_phase_index + 1 < len(requested_pipelines):
-            #         next_phase_name = requested_pipelines[current_phase_index + 1]
-            #         logger.info(f"Next phase for batch {batch_id} is {next_phase_name}")
-            #
-            #         # Check if next phase already processed (idempotency)
-            #         next_phase_detail = getattr(pipeline_state_model, next_phase_name, None) # e.g., pipeline_state_model.cj_assessment
-            #         if next_phase_detail and next_phase_detail.status not in [PipelineExecutionStatus.PENDING_DEPENDENCIES, PipelineExecutionStatus.NOT_REQUESTED, PipelineExecutionStatus.REQUESTED_BY_USER]: # Adjust statuses
-            #             logger.info(f"Next phase {next_phase_name} for batch {batch_id} already processed/initiated ({next_phase_detail.status}). Skipping.")
-            #             return
-            #
-            #         # IMPORTANT: Use processed_essays_from_previous_phase here
-            #         if not processed_essays_from_previous_phase:
-            #             logger.warning(f"No processed essays from {completed_phase_name} to pass to {next_phase_name} for batch {batch_id}. Cannot proceed with this phase.")
-            #             # Potentially mark phase as failed or awaiting data
-            #             return
-            #
-            #         # Construct and dispatch command for next_phase_name
-            #         if next_phase_name == "cj_assessment" and batch_context.enable_cj_assessment:
-            #             await self.cj_initiator.initiate_cj_assessment(
-            #                 batch_id, batch_context, correlation_id, essays_to_process=processed_essays_from_previous_phase
-            #             )
-            #         elif next_phase_name == "ai_feedback": # Assuming enable_ai_feedback flag exists
-            #             # await self.ai_feedback_initiator.initiate_ai_feedback(
-            #             #     batch_id, batch_context, correlation_id, essays_to_process=processed_essays_from_previous_phase
-            #             # )
-            #             pass # TODO
-            #         elif next_phase_name == "nlp":
-            #             # await self.nlp_initiator.initiate_nlp( ... )
-            #             pass # TODO
-            #         else:
-            #             logger.info(f"No action defined for next phase {next_phase_name} or it's not enabled for batch {batch_id}")
-            #     else:
-            #         logger.info(f"All pipeline phases completed for batch {batch_id}")
-            #         # TODO: Update overall batch status to COMPLETED_SUCCESSFULLY
+{{ ... }}
             ```
 
   * **File to Modify (common_core)**: Add `BatchServiceAIFeedbackInitiateCommandDataV1`, `BatchServiceNLPInitiateCommandDataV1` to `common_core.batch_service_models` that accept `essays_to_process: List[EssayProcessingInputRefV1]`.
   * **File to Modify (common_core)**: Add `ProcessingEvent` enums for these new commands and map them in `topic_name()`.
 
 * **Task 3.3: Unit/Integration Tests for BOS Orchestration Logic**
-  * **Goal**: Verify the refactored BOS pipeline coordinator.
-  * **Action**: Update tests in `tests/integration/test_pipeline_state_management.py` and potentially add new unit tests for `DefaultPipelinePhaseCoordinator` to:
-        1. Simulate receiving `ELSBatchPhaseOutcomeV1` with different `completed_phase_name` values.
-        2. Verify that the correct next phase is determined from `requested_pipelines`.
-        3. Verify that the command for the next phase is constructed with the `processed_essays` list (including correct `text_storage_id`s) from the input event.
-        4. Mock and verify calls to the appropriate phase initiators (e.g., `cj_initiator`, future `ai_feedback_initiator`).
+  * **Goal**: Ensure comprehensive test coverage for the BOS dynamic orchestration logic.
+  * **File**: `scripts/tests/test_phase3_bos_orchestration.py`
+  * **Status Update (June 2025)**:
+    * **Existing Coverage**: Tests like `test_phase_outcome_consumption_and_next_phase_determination` and `test_idempotency_in_phase_initiation` cover the current (hardcoded spellcheck -> CJ) orchestration flow and its idempotency.
+    * **Gap Identification**: `test_essay_list_propagation_to_next_phase_command` correctly identifies the critical data propagation gap where `processed_essays_for_next_phase` are not passed to the initiator by the coordinator.
+    * **Missing Generic Orchestration Tests**: Tests for the *generic* dynamic pipeline orchestration (as proposed for Task 3.2) are currently **MISSING**. These are essential once the generic logic is implemented.
 
----
-
-### **Phase 4: Advanced End-to-End Validation**
-
-* **Task 4.1: Implement E2E Tests for Multi-Stage Dynamic Pipelines**
-  * **Goal**: Validate the complete dynamic pipeline flow for different sequences.
-  * **File**: Extend `tests/functional/test_walking_skeleton_e2e_v2.py` or create new E2E test files.
+  * **Required Test Enhancements & New Tests**:
+    1. **Verify Data Propagation Fix**: Modify `test_essay_list_propagation_to_next_phase_command` to assert that `processed_essays_for_next_phase` *are correctly passed* to the mock initiator once the Task 3.2 fix is implemented.
+    2. **Generic Next Phase Determination**: Add tests to verify that `_initiate_next_phase` correctly determines the next phase based on various `ProcessingPipelineState.requested_pipelines` scenarios and current phase statuses (e.g., `PENDING_DEPENDENCIES`, `SKIPPED_BY_USER_CONFIG`, `COMPLETED`).
+    3. **Command Construction with Propagated Data**: For each new pipeline path (AI Feedback, NLP), ensure tests verify that the command for the next phase is constructed with the correct `processed_essays` (containing updated `text_storage_id`s) passed from the coordinator to the specific initiator.
+    4. **Mocking All Initiators**: Ensure all phase initiators (e.g., `AIFeedbackInitiatorProtocol`, `NLPMetricsInitiatorProtocol`) are mocked and their `initiate_phase` calls are verified with correct arguments.
+    5. **Diverse Pipeline Sequences**: Add tests for various pipeline configurations:
+        * Spellcheck -> AI Feedback -> Complete
+        * Spellcheck -> CJ Assessment -> NLP Metrics -> Complete
+        * Spellcheck -> AI Feedback -> NLP Metrics -> Complete
+        * Pipelines with optional phases skipped.
+    6. **Phase Failure Handling**: Test that if a phase fails, subsequent dependent phases in `requested_pipelines` are correctly marked (e.g., `SKIPPED_DUE_TO_FAILURE`) and not initiated.
+    7. **Idempotency for All Paths**: Extend idempotency tests to cover other phase transitions once generic logic is in place.al/test_walking_skeleton_e2e_v2.py` or create new E2E test files.
   * **Core Logic**:
         1. **Scenario 1 (e.g., Spellcheck -> CJ Assessment)**:
             *Register a batch with `enable_cj_assessment=True`.
             * Upload files.
             *Verify `BatchEssaysReady` from ELS.
-            * Verify BOS sends `BatchServiceSpellcheckInitiateCommandDataV1` to ELS.
+{{ ... }}
             *Verify ELS sends `EssayLifecycleSpellcheckRequestV1` to Spell Checker.
-            * **Simulate Spell Checker Service**: Have a mock Kafka consumer-producer that acts as Spell Checker:
+            ***Simulate Spell Checker Service**: Have a mock Kafka consumer-producer that acts as Spell Checker:
                 *Consumes `EssayLifecycleSpellcheckRequestV1`.
-                * Creates dummy corrected content, stores it via Content Service (real call), gets new `text_storage_id_corrected`.
+                *Creates dummy corrected content, stores it via Content Service (real call), gets new `text_storage_id_corrected`.
                 *Publishes `SpellcheckResultDataV1` back to ELS (simulating specialized service).
-            * Verify ELS processes these results and (after implementing R2.3) publishes `ELSBatchPhaseOutcomeV1` for "spellcheck" with `processed_essays` containing the `text_storage_id_corrected`.
+            *Verify ELS processes these results and (after implementing R2.3) publishes `ELSBatchPhaseOutcomeV1` for "spellcheck" with `processed_essays` containing the `text_storage_id_corrected`.
             *Verify BOS consumes `ELSBatchPhaseOutcomeV1`.
-            * Verify BOS (after implementing R3.2) determines "cj_assessment" is next.
+            *Verify BOS (after implementing R3.2) determines "cj_assessment" is next.
             *Verify BOS publishes `BatchServiceCJAssessmentInitiateCommandDataV1` to ELS, ensuring it includes the `essays_to_process` list with the `text_storage_id_corrected` values.
-            * Verify ELS receives this command and (after R2.2) transitions states and dispatches `ELS_CJAssessmentRequestV1` (this part involves the CJ Assessment service, which can be mocked at Kafka level for this test if focusing only on BOS/ELS orchestration).
+            *Verify ELS receives this command and (after R2.2) transitions states and dispatches `ELS_CJAssessmentRequestV1` (this part involves the CJ Assessment service, which can be mocked at Kafka level for this test if focusing only on BOS/ELS orchestration).
         2. **Scenario 2 (e.g., Spellcheck only)**:
             *Register batch with `enable_cj_assessment=False`.
             * Verify pipeline stops after spellcheck completion is processed by BOS.

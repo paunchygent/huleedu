@@ -33,6 +33,13 @@ async def process_function(
 ```
 
 ### 3.2. Async Context Manager Mocking
+
+### 3.3. Protocol and DI Testing Patterns
+
+- Mock protocol-based services using test doubles implementing the same `typing.Protocol`.
+- Override Dishka providers in tests to inject mocks/fakes.
+- Unit test all protocol implementations for both success and error; integration tests must cover full orchestration flows.
+
 ```python
 @asynccontextmanager
 async def mock_http_context_manager(mock_response: AsyncMock) -> Any:

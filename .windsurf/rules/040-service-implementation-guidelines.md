@@ -11,6 +11,13 @@ alwaysApply: false
 # 040: Service Implementation Guidelines
 
 ## 1. Core Stack
+
+## 3. Protocols, Dependency Injection, and Metrics
+
+- All service contracts must use `typing.Protocol`. Do not use adapters/wrappers in prototypes.
+- Use Dishka DI for all provider wiring. Orchestration maps (e.g., `phase_initiators_map`) must use enums as keys.
+- Expose Prometheus metrics for orchestration and state transitions (see README Sec 5).
+
 - **Framework**: Quart for async HTTP services, direct `asyncio` and `aiokafka` for worker services.
 - **Dependencies**: PDM exclusively (`pyproject.toml`, `pdm.lock`)
 - **Programming**: `async/await` for all I/O operations

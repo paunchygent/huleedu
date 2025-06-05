@@ -181,7 +181,7 @@ All event contracts and enums necessary for CJ Assessment integration are implem
         - 🔲 Modify the existing BOS API endpoint(s) that return batch status (e.g., `GET /v1/batches/{batch_id}/status`) to include the status of the "CJ_ASSESSMENT" pipeline phase.
         - 🔲 The status displayed (e.g., PENDING, IN_PROGRESS, COMPLETED, FAILED) must be derived from BOS's internally tracked state for that batch's CJ assessment phase, which is updated solely based on events consumed from ELS.
         - 🔲 The API response model for batch status must be updated to formally include this CJ assessment phase status.
-        - **Done When:** The BOS batch status API accurately and explicitly reports the current state of the CJ assessment phase for a batch, as known by BOS from ELS notifications.
+        - **Done When:** The BOS batch status API accurately reports the status of each pipeline phase (including CJ assessment) for a batch. The overall batch status is only set to a terminal state when all requested phases are complete.
 - **Definition of Done for Phase 2:**
   - BOS can define batches requiring CJ assessment and command ELS to initiate it.
   - BOS accurately tracks and reports the batch-level status of the CJ assessment phase based on information received from ELS.
@@ -247,20 +247,20 @@ All event contracts and enums necessary for CJ Assessment integration are implem
         - 🔲 ELS receives the command, prepares `ELS_CJAssessmentRequestV1` including (or overriding with its own logic) the `llm_config_overrides`.
         - 🔲 `cj_assessment_service` consumes the request, applies the LLM overrides, processes successfully, and publishes `CJAssessmentCompletedV1`.
         - 🔲 ELS receives results, updates essay states, and notifies BOS of batch-level CJ phase completion.
-        - 🔲 BOS updates its overall batch status, which now includes "CJ_ASSESSMENT: COMPLETED".
+        - 🔲 BOS updates the status of the 'CJ_ASSESSMENT' pipeline phase for the batch. If additional phases remain in the batch's requested pipeline, BOS initiates the next phase. Only when all requested phases are complete does BOS update the overall batch status to a terminal state.
         - 🔲 The `cj_assessment_service`'s `/healthz` and `/metrics` endpoints are verified operational during the test.
         - **Done When:** The entire workflow completes successfully, data and states are correctly propagated across all services, and the specified LLM overrides are demonstrably used by the `cj_assessment_service`.
     2. **CJ Service Failure Propagation:**
         - 🔲 Simulate a failure within `cj_assessment_service` (e.g., persistent LLM API error, internal error) causing it to publish `CJAssessmentFailedV1`.
         - 🔲 Verify ELS receives this failure, updates the relevant essay state(s) to `CJ_ASSESSMENT_FAILED`.
         - 🔲 Verify ELS notifies BOS of the batch-level impact (e.g., "CJ_ASSESSMENT_FAILED_FOR_BATCH").
-        - 🔲 Verify BOS updates its overall batch status to reflect the CJ phase failure.
+        - 🔲 Verify BOS updates the status of the 'CJ_ASSESSMENT' pipeline phase to reflect failure. The overall batch status is only set to a terminal state when all requested phases are complete or failed.
         - **Done When:** Failures in the `cj_assessment_service` are correctly handled and propagated up to BOS, with appropriate state changes in all services.
     3. **ELS Failure Scenarios:**
         - 🔲 Test ELS failing to publish to `cj_assessment_service` (e.g., Kafka unavailable) and its retry/error handling.
         - 🔲 Test ELS failing to process a result from `cj_assessment_service` and its error handling.
         - **Done When:** ELS exhibits robust error handling for its interactions related to the CJ phase.
-    4. **BOS Failure Scenarios:**
+{{ ... }}
         - 🔲 Test BOS failing to publish the CJ initiation command to ELS and its retry/error handling.
         - 🔲 Test BOS failing to process the batch-level CJ phase conclusion event from ELS and its error handling.
         - **Done When:** BOS exhibits robust error handling for its orchestration of the CJ phase.
