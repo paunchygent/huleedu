@@ -123,9 +123,10 @@ class BatchOrchestratorServiceProvider(Provider):
         self,
         event_publisher: BatchEventPublisherProtocol,
         batch_repo: BatchRepositoryProtocol,
+        phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol],
     ) -> BatchEssaysReadyHandler:
         """Provide BatchEssaysReady message handler."""
-        return BatchEssaysReadyHandler(event_publisher, batch_repo)
+        return BatchEssaysReadyHandler(event_publisher, batch_repo, phase_initiators_map)
 
     @provide(scope=Scope.APP)
     def provide_els_batch_phase_outcome_handler(

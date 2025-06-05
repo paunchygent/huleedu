@@ -7,7 +7,7 @@ from typing import Optional
 
 from api.batch_routes import set_batch_operations_metric
 from config import Settings
-from di import BatchOrchestratorServiceProvider
+from di import BatchOrchestratorServiceProvider, InitiatorMapProvider
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
 from kafka_consumer import BatchKafkaConsumer
@@ -33,7 +33,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
 
     try:
         # Initialize DI container
-        container = make_async_container(BatchOrchestratorServiceProvider())
+        container = make_async_container(BatchOrchestratorServiceProvider(), InitiatorMapProvider())
         QuartDishka(app=app, container=container)
 
         # Initialize metrics with DI registry and store in app context
