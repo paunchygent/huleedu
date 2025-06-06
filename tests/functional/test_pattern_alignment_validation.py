@@ -14,7 +14,7 @@ import pytest
 
 class TestPatternAlignmentValidation:
     """
-    Comprehensive test suite validating that service pattern alignment maintains 
+    Comprehensive test suite validating that service pattern alignment maintains
     functionality while improving consistency and reliability.
     """
 
@@ -77,7 +77,7 @@ class TestPatternAlignmentValidation:
     @pytest.mark.asyncio
     async def test_metrics_consistency_after_alignment(self):
         """
-        Validate that the new app context metrics pattern works consistently 
+        Validate that the new app context metrics pattern works consistently
         across all services and prevents Prometheus registry collisions.
         """
         async with httpx.AsyncClient() as client:
@@ -176,7 +176,7 @@ class TestPatternAlignmentValidation:
     @pytest.mark.asyncio
     async def test_cross_service_integration_preserved(self):
         """
-        Validate that cross-service integration still works correctly 
+        Validate that cross-service integration still works correctly
         after pattern alignment.
         """
         async with httpx.AsyncClient() as client:
@@ -366,7 +366,7 @@ class TestStartupSetupPatternBenefits:
     @pytest.mark.asyncio
     async def test_no_prometheus_registry_collisions(self):
         """
-        Validate that the app context metrics pattern prevents 
+        Validate that the app context metrics pattern prevents
         Prometheus registry collisions that occurred with DI-based metrics.
         """
         async with httpx.AsyncClient() as client:

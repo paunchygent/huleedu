@@ -367,4 +367,11 @@ services:
       - CJ_ASSESSMENT_SERVICE_METRICS_PORT=9090
       # Database configuration
       - CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ=postgresql+asyncpg://huleedu_user:REDACTED_DEFAULT_PASSWORD@cj_assessment_db:5432/cj_assessment
+      # Testing configuration
+      - CJ_ASSESSMENT_SERVICE_USE_MOCK_LLM=true  # Use mock LLM for E2E testing (no API costs)
+      # LLM API Keys for real testing if mock is disabled
+      - ***REMOVED***
+      - ***REMOVED***
+      - ***REMOVED***
+      - ***REMOVED***
     # Note: cj_assessment_service is a worker service with metrics endpoint only 

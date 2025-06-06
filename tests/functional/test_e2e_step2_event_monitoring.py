@@ -127,7 +127,8 @@ class TestE2EStep2EventMonitoring:
                             assert "file_size_bytes" in content_data, "Missing file_size_bytes"
                             assert content_data["file_size_bytes"] > 0, "Invalid file_size_bytes"
 
-                            # Validate correlation ID matches - check both event level and data level
+                            # Validate correlation ID matches - check both event level
+                            # and data level
                             event_correlation_id = event_data.get("correlation_id")
                             data_correlation_id = content_data.get("correlation_id")
 

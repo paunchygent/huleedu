@@ -3,7 +3,7 @@ End-to-End Test: Phase 4 - Spellcheck Pipeline Validation
 
 This test validates the complete spellcheck processing pipeline:
 1. Content upload to Content Service
-2. SpellcheckRequestedV1 event simulation  
+2. SpellcheckRequestedV1 event simulation
 3. Spell Checker Service processing
 4. SpellcheckResultDataV1 event generation
 5. Content Service corrected text storage
@@ -57,7 +57,7 @@ async def test_spell_checker_service_health_prerequisite():
 async def test_complete_spellcheck_processing_pipeline():
     """
     Test complete spellcheck pipeline: Content upload → Kafka event → Processing → Results
-    
+
     This test validates the full business workflow:
     1. Upload test essay text to Content Service
     2. Simulate SpellcheckRequestedV1 event (as BOS would send)

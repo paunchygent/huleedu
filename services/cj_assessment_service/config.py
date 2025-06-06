@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # Basic service configuration
     LOG_LEVEL: str = "INFO"
     SERVICE_NAME: str = "cj_assessment_service"
+    USE_MOCK_LLM: bool = False  # Enable mock LLM for testing (no API calls)
 
     # Kafka configuration
     KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
@@ -36,7 +37,7 @@ class Settings(BaseSettings):
     CJ_ASSESSMENT_FAILED_TOPIC: str = "huleedu.cj_assessment.failed.v1"
 
     # External service URLs
-    CONTENT_SERVICE_URL: str = "http://localhost:8002"
+    CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
 
     # Database configuration
     DATABASE_URL_CJ: str = "sqlite+aiosqlite:///./cj_assessment.db"

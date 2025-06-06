@@ -142,6 +142,13 @@ class CJAssessmentServiceProvider(Provider):
         settings: Settings,
     ) -> LLMInteractionProtocol:
         """Provide LLM interaction orchestrator."""
+        # Use mock LLM for testing if enabled
+        if settings.USE_MOCK_LLM:
+            from services.cj_assessment_service.implementations.mock_llm_interaction_impl import (
+                MockLLMInteractionImpl,
+            )
+            return MockLLMInteractionImpl(seed=42)  # Fixed seed for reproducible tests
+
         return LLMInteractionImpl(
             cache_manager=cache_manager, providers=providers, settings=settings
         )

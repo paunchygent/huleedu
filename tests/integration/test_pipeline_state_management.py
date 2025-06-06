@@ -85,7 +85,7 @@ class TestPipelineStateManagement:
         # Setup initial pipeline state with spellcheck in progress
         initial_pipeline_state = {
             "batch_id": batch_id,
-            "requested_pipelines": ["spellcheck", "cj_assessment"],  # Add missing requested_pipelines
+            "requested_pipelines": ["spellcheck", "cj_assessment"],
             "spellcheck_status": "IN_PROGRESS",
             "cj_assessment_status": "PENDING",
         }
@@ -104,7 +104,8 @@ class TestPipelineStateManagement:
         assert updated_state is not None
         assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
 
-        # Verify CJ assessment was initiated (with None processed_essays since no data propagation from spellcheck)
+        # Verify CJ assessment was initiated (with None processed_essays since
+        # no data propagation from spellcheck)
         mock_cj_initiator.initiate_phase.assert_called_once_with(
             batch_id=batch_id,
             phase_to_initiate=PhaseName.CJ_ASSESSMENT,

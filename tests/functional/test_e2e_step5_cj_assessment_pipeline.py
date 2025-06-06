@@ -71,7 +71,7 @@ async def test_complete_cj_assessment_processing_pipeline():
     4. Validate CJ rankings and scores stored in Content Service
     """
     correlation_id = str(uuid.uuid4())
-    batch_id = f"e2e-test-cj-batch-{uuid.uuid4()}"
+    batch_id = str(uuid.uuid4())  # Use standard UUID format (36 chars) to match database schema
 
     # Use real student essays for CJ Assessment
     essay_files = [
@@ -90,7 +90,7 @@ async def test_complete_cj_assessment_processing_pipeline():
             essay_content = f.read()
 
         storage_id = await upload_content_to_content_service(essay_content)
-        essay_id = f"e2e-cj-essay-{i+1}-{uuid.uuid4()}"
+        essay_id = str(uuid.uuid4())  # Use standard UUID format (36 chars) to match database schema
 
         essay_storage_refs.append({
             "essay_id": essay_id,
@@ -171,7 +171,7 @@ async def test_cj_assessment_pipeline_minimal_essays():
     Validates that the pipeline works with just 2 essays (minimum for CJ).
     """
     correlation_id = str(uuid.uuid4())
-    batch_id = f"e2e-test-minimal-cj-{uuid.uuid4()}"
+    batch_id = str(uuid.uuid4())  # Use standard UUID format (36 chars) to match database schema
 
     # Use just 2 essays for minimal CJ
     essay_files = [
@@ -186,7 +186,7 @@ async def test_cj_assessment_pipeline_minimal_essays():
             essay_content = f.read()
 
         storage_id = await upload_content_to_content_service(essay_content)
-        essay_id = f"e2e-minimal-essay-{i+1}-{uuid.uuid4()}"
+        essay_id = str(uuid.uuid4())  # Use standard UUID format (36 chars) to match database schema
 
         essay_storage_refs.append({
             "essay_id": essay_id,
@@ -243,10 +243,10 @@ async def test_cj_assessment_pipeline_minimal_essays():
 async def upload_content_to_content_service(content: str) -> str:
     """Upload content to Content Service and return storage ID."""
     async with aiohttp.ClientSession() as session:
-        data = {"content": content}
         async with session.post(
             "http://localhost:8001/v1/content",
-            json=data
+            data=content.encode('utf-8'),
+            headers={"Content-Type": "text/plain"}
         ) as response:
             assert response.status == 201
             result = await response.json()

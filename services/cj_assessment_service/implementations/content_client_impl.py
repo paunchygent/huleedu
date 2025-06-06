@@ -36,7 +36,7 @@ class ContentClientImpl(ContentClientProtocol):
             aiohttp.ClientError: If HTTP request fails
             ValueError: If content cannot be decoded or is empty
         """
-        endpoint = f"{self.content_service_base_url}/content/{storage_id}"
+        endpoint = f"{self.content_service_base_url}/{storage_id}"
 
         timeout_config = aiohttp.ClientTimeout(total=self.settings.LLM_REQUEST_TIMEOUT_SECONDS)
 
