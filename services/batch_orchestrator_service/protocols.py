@@ -196,3 +196,29 @@ class CJAssessmentInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     for consistency with other phase initiators.
     """
     pass
+
+
+class AIFeedbackInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
+    """
+    Protocol for initiating AI feedback operations.
+
+    Inherits from PipelinePhaseInitiatorProtocol for standardized interface,
+    primarily for semantic grouping and potential future AI feedback-specific methods.
+
+    Note: AI Feedback Service is not yet implemented - this initiator will publish
+    commands that will be consumed once the AI Feedback Service is built.
+    """
+    pass
+
+
+class NLPInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
+    """
+    Protocol for initiating NLP processing operations.
+
+    Inherits from PipelinePhaseInitiatorProtocol for standardized interface,
+    primarily for semantic grouping and potential future NLP-specific methods.
+
+    Note: NLP Service is not yet implemented - this initiator will publish
+    commands that will be consumed once the NLP Service is built.
+    """
+    pass

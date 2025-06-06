@@ -1,0 +1,142 @@
+"""AI feedback initiator implementation for batch processing.
+
+TODO: AI Feedback Service is not yet implemented. This initiator publishes commands to Kafka
+topics that will be consumed once the AI Feedback Service is built and wired up.
+"""
+
+from __future__ import annotations
+
+from uuid import UUID
+
+from api_models import BatchRegistrationRequestV1
+from huleedu_service_libs.logging_utils import create_service_logger
+from protocols import (
+    AIFeedbackInitiatorProtocol,
+    BatchEventPublisherProtocol,
+    DataValidationError,
+)
+
+from common_core.batch_service_models import BatchServiceAIFeedbackInitiateCommandDataV1
+from common_core.enums import ProcessingEvent, topic_name
+from common_core.events.envelope import EventEnvelope
+from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
+from common_core.pipeline_models import PhaseName
+
+logger = create_service_logger("bos.ai_feedback.initiator")
+
+
+def _infer_language_from_course_code(course_code: str) -> str:
+    """
+    Infer language from course code for pipeline processing.
+
+    Args:
+        course_code: Course code (e.g., "SV1", "ENG5")
+
+    Returns:
+        Language code (e.g., "sv", "en")
+    """
+    # Simple mapping logic - can be enhanced as needed
+    course_code_upper = course_code.upper()
+
+    if course_code_upper.startswith("SV"):
+        return "sv"  # Swedish
+    elif course_code_upper.startswith("ENG"):
+        return "en"  # English
+    else:
+        # Default to English if course code is unrecognized
+        logger.warning(f"Unknown course code '{course_code}', defaulting to English")
+        return "en"
+
+
+class AIFeedbackInitiatorImpl(AIFeedbackInitiatorProtocol):
+    """
+    Default implementation for initiating AI feedback operations.
+
+    TODO: AI Feedback Service consumer is not yet implemented. Commands published by this
+    initiator will be queued until the AI Feedback Service is built to consume them.
+    """
+
+    def __init__(
+        self,
+        event_publisher: BatchEventPublisherProtocol,
+    ) -> None:
+        self.event_publisher = event_publisher
+
+    async def initiate_phase(
+        self,
+        batch_id: str,
+        phase_to_initiate: PhaseName,
+        correlation_id: UUID | None,
+        essays_for_processing: list[EssayProcessingInputRefV1],
+        batch_context: BatchRegistrationRequestV1,
+    ) -> None:
+        """
+        Initiate AI feedback phase for a batch with the given context.
+
+        This implements the standardized PipelinePhaseInitiatorProtocol interface
+        for AI feedback operations.
+
+        TODO: The published command will be queued until AI Feedback Service is implemented.
+        """
+        try:
+            logger.info(
+                f"Initiating AI feedback for batch {batch_id}",
+                extra={"correlation_id": str(correlation_id)},
+            )
+
+            # Validate that this is the correct phase
+            if phase_to_initiate != PhaseName.AI_FEEDBACK:
+                raise DataValidationError(
+                    f"AIFeedbackInitiatorImpl received incorrect phase: {phase_to_initiate}"
+                )
+
+            # Validate required data
+            if not essays_for_processing:
+                raise DataValidationError(
+                    f"No essays provided for AI feedback initiation in batch {batch_id}"
+                )
+
+            # Get language from course code
+            language = _infer_language_from_course_code(batch_context.course_code)
+
+            # Construct AI feedback command with full context
+            batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
+
+            ai_feedback_command = BatchServiceAIFeedbackInitiateCommandDataV1(
+                event_name=ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND,
+                entity_ref=batch_entity_ref,
+                essays_to_process=essays_for_processing,
+                language=language,
+                # AI feedback specific context fields
+                course_code=batch_context.course_code,
+                teacher_name=batch_context.teacher_name,  # Direct access - no extraction needed!
+                class_designation=batch_context.class_designation,
+                essay_instructions=batch_context.essay_instructions,
+            )
+
+            # Create EventEnvelope for AI feedback command
+            command_envelope = EventEnvelope[BatchServiceAIFeedbackInitiateCommandDataV1](
+                event_type=topic_name(ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND),
+                source_service="batch-orchestrator-service",
+                correlation_id=correlation_id,
+                data=ai_feedback_command,
+            )
+
+            # Publish AI feedback command
+            # TODO: Command will be queued until AI Feedback Service is implemented
+            await self.event_publisher.publish_batch_event(command_envelope)
+
+            logger.info(
+                f"Published AI feedback initiate command for batch {batch_id}, "
+                f"event_id {command_envelope.event_id}, teacher: {batch_context.teacher_name} "
+                f"(TODO: AI Feedback Service not yet implemented to consume this)",
+                extra={"correlation_id": str(correlation_id)},
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Error initiating AI feedback for batch {batch_id}: {e}",
+                exc_info=True,
+                extra={"correlation_id": str(correlation_id)},
+            )
+            raise

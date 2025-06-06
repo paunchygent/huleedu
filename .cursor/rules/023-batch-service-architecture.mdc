@@ -206,3 +206,11 @@ HTTP Request → Service Layer → Repository → Event Publisher → Kafka → 
 - **Phase Initiation**: Must be idempotent across multiple events/retries
 - **State Transitions**: Must prevent race conditions in concurrent environments
 - **Database Implementation**: Repository layer responsible for atomicity, not application layer
+
+## 14. Technical Debt
+
+### 14.1. Teacher Name Inference (Priority: HIGH)
+- **Current**: `teacher_name` manually provided in `BatchRegistrationRequestV1`
+- **Required**: Auto-inference from authenticated user when AUTH/USER services available
+- **Impact**: AI Feedback initiator and user identification across services
+- **Action**: Replace manual input with `f"{user.first_name} {user.last_name}"` lookup

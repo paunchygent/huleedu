@@ -6,6 +6,7 @@ from aiohttp import ClientSession
 from aiokafka import AIOKafkaProducer
 from config import Settings, settings
 from dishka import Provider, Scope, provide
+from implementations.ai_feedback_initiator_impl import AIFeedbackInitiatorImpl
 from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
 from implementations.batch_processing_service_impl import BatchProcessingServiceImpl
 from implementations.batch_repository_impl import MockBatchRepositoryImpl
@@ -14,16 +15,19 @@ from implementations.cj_assessment_initiator_impl import DefaultCJAssessmentInit
 from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
 from implementations.essay_lifecycle_client_impl import DefaultEssayLifecycleClientImpl
 from implementations.event_publisher_impl import DefaultBatchEventPublisherImpl
+from implementations.nlp_initiator_impl import NLPInitiatorImpl
 from implementations.pipeline_phase_coordinator_impl import DefaultPipelinePhaseCoordinator
 from implementations.spellcheck_initiator_impl import SpellcheckInitiatorImpl
 from kafka_consumer import BatchKafkaConsumer
 from prometheus_client import CollectorRegistry
 from protocols import (
+    AIFeedbackInitiatorProtocol,
     BatchEventPublisherProtocol,
     BatchProcessingServiceProtocol,
     BatchRepositoryProtocol,
     CJAssessmentInitiatorProtocol,
     EssayLifecycleClientProtocol,
+    NLPInitiatorProtocol,
     PipelinePhaseCoordinatorProtocol,
     PipelinePhaseInitiatorProtocol,
     SpellcheckInitiatorProtocol,
@@ -100,6 +104,30 @@ class BatchOrchestratorServiceProvider(Provider):
         return SpellcheckInitiatorImpl(event_publisher)
 
     @provide(scope=Scope.APP)
+    def provide_ai_feedback_initiator(
+        self,
+        event_publisher: BatchEventPublisherProtocol,
+    ) -> AIFeedbackInitiatorProtocol:
+        """
+        Provide AI feedback initiator implementation.
+
+        TODO: AI Feedback Service is not yet implemented - commands will be queued.
+        """
+        return AIFeedbackInitiatorImpl(event_publisher)
+
+    @provide(scope=Scope.APP)
+    def provide_nlp_initiator(
+        self,
+        event_publisher: BatchEventPublisherProtocol,
+    ) -> NLPInitiatorProtocol:
+        """
+        Provide NLP initiator implementation.
+
+        TODO: NLP Service is not yet implemented - commands will be queued.
+        """
+        return NLPInitiatorImpl(event_publisher)
+
+    @provide(scope=Scope.APP)
     def provide_pipeline_phase_coordinator(
         self,
         batch_repo: BatchRepositoryProtocol,
@@ -160,17 +188,21 @@ class InitiatorMapProvider(Provider):
         self,
         spellcheck_initiator: SpellcheckInitiatorProtocol,
         cj_assessment_initiator: CJAssessmentInitiatorProtocol,
+        ai_feedback_initiator: AIFeedbackInitiatorProtocol,
+        nlp_initiator: NLPInitiatorProtocol,
     ) -> dict[PhaseName, PipelinePhaseInitiatorProtocol]:
         """
-        Provide phase initiators map for dynamic dispatch.
+        Provide complete phase initiators map for dynamic dispatch.
 
         This map is central to the generic orchestration system,
         enabling type-safe dynamic dispatch based on PhaseName enum.
+
+        TODO: AI Feedback and NLP services are not yet implemented - their
+        commands will be queued until the services are built.
         """
         return {
             PhaseName.SPELLCHECK: spellcheck_initiator,
             PhaseName.CJ_ASSESSMENT: cj_assessment_initiator,
-            # Add other phase initiators here as they are implemented
-            # PhaseName.AI_FEEDBACK: ai_feedback_initiator,
-            # PhaseName.NLP: nlp_initiator,
+            PhaseName.AI_FEEDBACK: ai_feedback_initiator,  # TODO: Service not implemented
+            PhaseName.NLP: nlp_initiator,  # TODO: Service not implemented
         }
