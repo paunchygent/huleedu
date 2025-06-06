@@ -22,6 +22,7 @@ from uuid import uuid4
 
 import pytest
 
+from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_repository_impl import (
     MockBatchRepositoryImpl,
@@ -47,9 +48,14 @@ class TestPipelineStateManagement:
     @pytest.fixture
     def pipeline_coordinator(self, batch_repository, mock_cj_initiator):
         """Create real DefaultPipelinePhaseCoordinator with mocked external dependencies."""
+        # Create phase initiators map with the mock CJ initiator
+        phase_initiators_map = {
+            PhaseName.CJ_ASSESSMENT: mock_cj_initiator,
+            # Add other phases as needed for testing
+        }
         return DefaultPipelinePhaseCoordinator(
             batch_repo=batch_repository,
-            cj_initiator=mock_cj_initiator,
+            phase_initiators_map=phase_initiators_map,
         )
 
     async def test_spellcheck_to_cj_assessment_pipeline_progression(
@@ -79,6 +85,7 @@ class TestPipelineStateManagement:
         # Setup initial pipeline state with spellcheck in progress
         initial_pipeline_state = {
             "batch_id": batch_id,
+            "requested_pipelines": ["spellcheck", "cj_assessment"],  # Add missing requested_pipelines
             "spellcheck_status": "IN_PROGRESS",
             "cj_assessment_status": "PENDING",
         }
@@ -95,11 +102,15 @@ class TestPipelineStateManagement:
         # Verify pipeline state was updated
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED"
+        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
 
         # Verify CJ assessment was initiated (with None processed_essays since no data propagation from spellcheck)
-        mock_cj_initiator.initiate_cj_assessment.assert_called_once_with(
-            batch_id, batch_context, correlation_id, None
+        mock_cj_initiator.initiate_phase.assert_called_once_with(
+            batch_id=batch_id,
+            phase_to_initiate=PhaseName.CJ_ASSESSMENT,
+            correlation_id=correlation_id,
+            essays_for_processing=[],
+            batch_context=batch_context,
         )
 
     async def test_pipeline_progression_with_cj_assessment_disabled(
@@ -130,6 +141,7 @@ class TestPipelineStateManagement:
         # Setup initial pipeline state
         initial_pipeline_state = {
             "batch_id": batch_id,
+            "requested_pipelines": ["spellcheck"],  # CJ assessment disabled, only spellcheck
             "spellcheck_status": "IN_PROGRESS",
             "cj_assessment_status": "PENDING",
         }
@@ -146,10 +158,10 @@ class TestPipelineStateManagement:
         # Verify pipeline state was updated
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED"
+        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
 
         # Verify CJ assessment was NOT initiated (disabled)
-        mock_cj_initiator.initiate_cj_assessment.assert_not_called()
+        mock_cj_initiator.initiate_phase.assert_not_called()
 
     async def test_failed_phase_handling(
         self, pipeline_coordinator, batch_repository, mock_cj_initiator
@@ -172,6 +184,7 @@ class TestPipelineStateManagement:
         # Setup initial pipeline state
         initial_pipeline_state = {
             "batch_id": batch_id,
+            "requested_pipelines": ["spellcheck", "cj_assessment"],  # Add missing requested_pipelines
             "spellcheck_status": "IN_PROGRESS",
             "cj_assessment_status": "PENDING",
         }
@@ -191,7 +204,7 @@ class TestPipelineStateManagement:
         assert updated_state["spellcheck_status"] == "FAILED"
 
         # Verify CJ assessment was NOT initiated (previous phase failed)
-        mock_cj_initiator.initiate_cj_assessment.assert_not_called()
+        mock_cj_initiator.initiate_phase.assert_not_called()
 
     async def test_idempotency_handling_for_already_initiated_phase(
         self, pipeline_coordinator, batch_repository, mock_cj_initiator
@@ -214,6 +227,7 @@ class TestPipelineStateManagement:
         # Setup pipeline state with CJ assessment already initiated
         initial_pipeline_state = {
             "batch_id": batch_id,
+            "requested_pipelines": ["spellcheck", "cj_assessment"],  # Add missing requested_pipelines
             "spellcheck_status": "COMPLETED",
             "cj_assessment_status": "DISPATCH_INITIATED",  # Already initiated
         }
@@ -230,10 +244,10 @@ class TestPipelineStateManagement:
         # Verify pipeline state was updated (spellcheck marked as completed)
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED"
+        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
 
         # Verify CJ assessment was NOT re-initiated (idempotency)
-        mock_cj_initiator.initiate_cj_assessment.assert_not_called()
+        mock_cj_initiator.initiate_phase.assert_not_called()
 
     async def test_missing_batch_context_error_handling(
         self, pipeline_coordinator, batch_repository, mock_cj_initiator
@@ -245,6 +259,7 @@ class TestPipelineStateManagement:
         # Setup pipeline state without batch context
         initial_pipeline_state = {
             "batch_id": batch_id,
+            "requested_pipelines": ["spellcheck"],  # Add missing requested_pipelines
             "spellcheck_status": "IN_PROGRESS",
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
@@ -260,10 +275,10 @@ class TestPipelineStateManagement:
         # Verify pipeline state was still updated
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED"
+        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
 
         # Verify CJ assessment was not initiated (missing context)
-        mock_cj_initiator.initiate_cj_assessment.assert_not_called()
+        mock_cj_initiator.initiate_phase.assert_not_called()
 
     async def test_missing_pipeline_state_error_handling(
         self, pipeline_coordinator, batch_repository, mock_cj_initiator
@@ -292,4 +307,4 @@ class TestPipelineStateManagement:
         )
 
         # Verify CJ assessment was not initiated (missing pipeline state)
-        mock_cj_initiator.initiate_cj_assessment.assert_not_called()
+        mock_cj_initiator.initiate_phase.assert_not_called()

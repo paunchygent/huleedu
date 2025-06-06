@@ -118,7 +118,9 @@ class BatchProcessingServiceImpl:
             ai_feedback=ai_feedback_detail,
             nlp_metrics=nlp_metrics_detail,
         )
-        await self.batch_repo.save_processing_pipeline_state(batch_id, initial_pipeline_state)
+        await self.batch_repo.save_processing_pipeline_state(
+            batch_id, initial_pipeline_state.model_dump(mode="json")
+        )
 
         # 3. Construct lightweight BatchEssaysRegistered event with internal essay IDs
         batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")

@@ -12,13 +12,12 @@ from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
 from kafka_consumer import BatchKafkaConsumer
 from prometheus_client import CollectorRegistry, Counter, Histogram
-from protocols import (
-    BatchEventPublisherProtocol,
-    BatchRepositoryProtocol,
-    PipelinePhaseCoordinatorProtocol,
-)
 from quart import Quart
 from quart_dishka import QuartDishka
+
+from services.batch_orchestrator_service.implementations.batch_repository_postgres_impl import (
+    PostgreSQLBatchRepositoryImpl,
+)
 
 logger = create_service_logger("bos.startup")
 
@@ -36,6 +35,11 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         container = make_async_container(BatchOrchestratorServiceProvider(), InitiatorMapProvider())
         QuartDishka(app=app, container=container)
 
+        # Initialize database schema directly (bypasses DI scoping issues)
+        db_repository = PostgreSQLBatchRepositoryImpl(settings)
+        await db_repository.initialize_db_schema()
+        logger.info("Database schema initialized successfully")
+
         # Initialize metrics with DI registry and store in app context
         async with container() as request_container:
             registry = await request_container.get(CollectorRegistry)
@@ -48,19 +52,8 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
             # Share batch operations metric with routes module (legacy support)
             set_batch_operations_metric(metrics["batch_operations"])
 
-            # Get dependencies for Kafka consumer
-            event_publisher = await request_container.get(BatchEventPublisherProtocol)
-            batch_repo = await request_container.get(BatchRepositoryProtocol)
-            phase_coordinator = await request_container.get(PipelinePhaseCoordinatorProtocol)
-
-            # Initialize Kafka consumer
-            kafka_consumer_instance = BatchKafkaConsumer(
-                kafka_bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-                consumer_group=f"{settings.SERVICE_NAME}-consumer",
-                event_publisher=event_publisher,
-                batch_repo=batch_repo,
-                phase_coordinator=phase_coordinator,
-            )
+            # Get Kafka consumer from DI container (properly configured)
+            kafka_consumer_instance = await request_container.get(BatchKafkaConsumer)
 
             # Start Kafka consumer as background task
             consumer_task = asyncio.create_task(kafka_consumer_instance.start_consumer())

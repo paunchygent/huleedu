@@ -2,6 +2,8 @@
 Thin Kafka wrapper using aiokafka for HuleEdu microservices.
 """
 
+from __future__ import annotations
+
 import json
 import os
 from typing import Any, AsyncIterator, Optional, TypeVar  # Added Optional

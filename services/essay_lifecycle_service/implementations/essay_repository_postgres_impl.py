@@ -25,7 +25,7 @@ from services.essay_lifecycle_service.protocols import EssayRepositoryProtocol
 from services.essay_lifecycle_service.state_store import EssayState as ConcreteEssayState
 
 if TYPE_CHECKING:
-    from services.essay_lifecycle_service.protocols import EssayState
+    from protocols import EssayState
 
 logger = logging.getLogger(__name__)
 

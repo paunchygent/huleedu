@@ -7,32 +7,26 @@ essay processing workflows.
 
 from __future__ import annotations
 
-from dishka import make_async_container
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
-from prometheus_client import (
-    CollectorRegistry,
-    Counter,
-    Histogram,
-)
 from pydantic import ValidationError
 from quart import Quart, Response, g, jsonify, request
-from quart_dishka import QuartDishka
 
 # Import Blueprints
+# Import local modules using absolute imports for containerized deployment
+import startup_setup
 from api.batch_routes import batch_bp
-from api.batch_routes import set_essay_operations_metric as set_batch_essay_operations
 from api.essay_routes import essay_bp
-from api.essay_routes import set_essay_operations_metric as set_essay_essay_operations
 from api.health_routes import health_bp
 from config import settings
-from di import EssayLifecycleServiceProvider
 
-logger = create_service_logger("essay_api")
+# Configure structured logging for the service
+configure_service_logging(
+    service_name=settings.SERVICE_NAME,
+    log_level=settings.LOG_LEVEL,
+)
+logger = create_service_logger("els.app")
 
-# Prometheus metrics (will be registered with DI-provided registry)
-REQUEST_COUNT: Counter | None = None
-REQUEST_DURATION: Histogram | None = None
-ESSAY_OPERATIONS: Counter | None = None
+app = Quart(__name__)
 
 
 class ErrorResponse:
@@ -53,64 +47,25 @@ class ErrorResponse:
         return result
 
 
-def create_app() -> Quart:
-    """Create and configure the Quart application."""
-    app = Quart(__name__)
-
-    # Configure logging
-    configure_service_logging(
-        service_name=settings.SERVICE_NAME,
-        log_level=settings.LOG_LEVEL,
-    )
-
-    # Setup DI container
-    container = make_async_container(EssayLifecycleServiceProvider())
-    QuartDishka(app=app, container=container)
-
-    # Initialize metrics with DI registry
-    @app.before_serving
-    async def initialize_metrics() -> None:
-        """Initialize Prometheus metrics with DI registry."""
-        async with container() as request_container:
-            registry = await request_container.get(CollectorRegistry)
-            _initialize_metrics(registry)
-
-    logger.info("Quart application created with DI container")
-
-    return app
+@app.before_serving
+async def startup() -> None:
+    """Initialize services and middleware."""
+    try:
+        await startup_setup.initialize_services(app, settings)
+        logger.info("Essay Lifecycle Service startup completed successfully")
+    except Exception as e:
+        logger.critical(f"Failed to start Essay Lifecycle Service: {e}", exc_info=True)
+        raise
 
 
-def _initialize_metrics(registry: CollectorRegistry) -> None:
-    """Initialize Prometheus metrics with the provided registry."""
-    global REQUEST_COUNT, REQUEST_DURATION, ESSAY_OPERATIONS
-
-    REQUEST_COUNT = Counter(
-        "http_requests_total",
-        "Total HTTP requests",
-        ["method", "endpoint", "status_code"],
-        registry=registry,
-    )
-
-    REQUEST_DURATION = Histogram(
-        "http_request_duration_seconds",
-        "HTTP request duration in seconds",
-        ["method", "endpoint"],
-        registry=registry,
-    )
-
-    ESSAY_OPERATIONS = Counter(
-        "essay_operations_total",
-        "Total essay operations",
-        ["operation", "status"],
-        registry=registry,
-    )
-
-    # Share metrics with Blueprint modules
-    set_essay_essay_operations(ESSAY_OPERATIONS)
-    set_batch_essay_operations(ESSAY_OPERATIONS)
-
-
-app = create_app()
+@app.after_serving
+async def shutdown() -> None:
+    """Gracefully shutdown all services."""
+    try:
+        await startup_setup.shutdown_services()
+        logger.info("Essay Lifecycle Service shutdown completed")
+    except Exception as e:
+        logger.error(f"Error during service shutdown: {e}", exc_info=True)
 
 
 @app.errorhandler(ValidationError)
@@ -152,7 +107,8 @@ async def after_request(response: Response) -> Response:
         import time
 
         start_time = getattr(g, "start_time", None)
-        if start_time is not None and REQUEST_COUNT is not None and REQUEST_DURATION is not None:
+        if start_time is not None and hasattr(app, "extensions") and "metrics" in app.extensions:
+            metrics = app.extensions["metrics"]
             duration = time.time() - start_time
 
             # Get endpoint name (remove query parameters)
@@ -161,8 +117,8 @@ async def after_request(response: Response) -> Response:
             status_code = str(response.status_code)
 
             # Record metrics
-            REQUEST_COUNT.labels(method=method, endpoint=endpoint, status_code=status_code).inc()
-            REQUEST_DURATION.labels(method=method, endpoint=endpoint).observe(duration)
+            metrics["request_count"].labels(method=method, endpoint=endpoint, status_code=status_code).inc()
+            metrics["request_duration"].labels(method=method, endpoint=endpoint).observe(duration)
 
     except Exception as e:
         logger.error(f"Error recording request metrics: {e}")
@@ -180,12 +136,16 @@ if __name__ == "__main__":
     import asyncio
 
     import hypercorn.asyncio
-    import hypercorn.config
+    from hypercorn import Config
 
-    # Create hypercorn config
-    config = hypercorn.config.Config()
+    # Create hypercorn config with our settings (explicit like BOS)
+    config = Config()
     config.bind = [f"{settings.HTTP_HOST}:{settings.HTTP_PORT}"]
+    config.workers = getattr(settings, 'WEB_CONCURRENCY', 1)
+    config.worker_class = "asyncio"
     config.loglevel = settings.LOG_LEVEL.lower()
+    config.graceful_timeout = getattr(settings, 'GRACEFUL_TIMEOUT', 30)
+    config.keep_alive_timeout = getattr(settings, 'KEEP_ALIVE_TIMEOUT', 5)
 
     logger.info(f"Starting Essay Lifecycle Service API on {config.bind[0]}")
 

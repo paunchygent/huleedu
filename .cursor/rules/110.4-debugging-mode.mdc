@@ -19,23 +19,18 @@ alwaysApply: false
 
 ## 3. Common Patterns
 
-### 3.1. Container Issues
-- Restart loops = import failures
-- `ModuleNotFoundError` = missing dependencies or wrong import paths
+### 3.1. Container Issues (Service Configuration Priority)
+- Restart loops = often service configuration, not import failures
+- `ModuleNotFoundError` = check `PYTHONPATH=/app` in Dockerfile first
+- Constructor errors = check DI container usage vs manual instantiation
 
-### 3.2. Docker Import Resolution
-**Containers require absolute imports**:
-```python
-from config import settings  # ✅ Works in containers
-from .config import settings  # ❌ Fails in containers
-```
+### 3.2. Service Configuration First
+**Before investigating imports, check**:
+- Docker environment variables and health check alignment
+- Framework configuration methods (avoid "magic" like `config.from_object()`)
+- DI container resolution vs manual dependency instantiation
 
-**MyPy configuration**:
-```toml
-[[tool.mypy.overrides]]
-module = "config"
-ignore_missing_imports = true
-```
+**Refer to [044-service-debugging-and-troubleshooting.md](mdc:044-service-debugging-and-troubleshooting.md) for systematic priority order.**
 
 ### 3.3. Multi-Service Debugging
 - **MUST** trace `correlation_id` through logs across services

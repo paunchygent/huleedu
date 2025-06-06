@@ -21,6 +21,8 @@ dependencies = [
     "dishka",
     "quart-dishka",
     "transitions",
+    "sqlalchemy[asyncio]",
+    "asyncpg",
 ]
 
 [build-system]

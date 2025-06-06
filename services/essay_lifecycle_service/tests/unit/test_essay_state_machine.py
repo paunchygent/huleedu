@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from common_core.enums import EssayStatus
 
-from services.essay_lifecycle_service.essay_state_machine import (
+from essay_state_machine import (
     CMD_INITIATE_AI_FEEDBACK,
     CMD_INITIATE_CJ_ASSESSMENT,
     CMD_INITIATE_NLP,

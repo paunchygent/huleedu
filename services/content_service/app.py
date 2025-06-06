@@ -7,6 +7,8 @@ error handling, logging, and health checks. Content is stored as files
 on the local filesystem with UUID-based identifiers.
 """
 
+from __future__ import annotations
+
 # Import Blueprints
 from api.content_routes import content_bp, set_content_dependencies
 from api.health_routes import health_bp, set_store_root

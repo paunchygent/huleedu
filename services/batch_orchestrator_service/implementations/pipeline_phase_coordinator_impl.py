@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from protocols import (
@@ -233,10 +234,12 @@ class DefaultPipelinePhaseCoordinator:
 
             # Delegate to phase initiator with standardized interface
             try:
+                # Convert correlation_id from string to UUID if needed
+                correlation_uuid = UUID(correlation_id) if correlation_id else None
                 await initiator.initiate_phase(
                     batch_id=batch_id,
                     phase_to_initiate=next_phase_name,
-                    correlation_id=correlation_id,
+                    correlation_id=correlation_uuid,
                     essays_for_processing=essays_to_process,
                     batch_context=batch_context,
                 )

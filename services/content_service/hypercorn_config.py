@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 _default_host = "0.0.0.0"

@@ -37,7 +37,7 @@ huleedu-common-core = "file:///app/common_core"
 huleedu-service-libs = "file:///app/services/libs"
 
 [tool.pdm.scripts]
-start = "hypercorn app:app --config python:hypercorn_config"
+start = "python app.py"
 dev = "quart --app app:app --debug run -p 5001"
 
 [tool.mypy]

@@ -5,6 +5,8 @@ This module implements the Batch Orchestrator Service REST API using Quart frame
 The service acts as the primary orchestrator for batch processing workflows.
 """
 
+from __future__ import annotations
+
 # Import Blueprints
 # Import local modules using absolute imports for containerized deployment
 import metrics
@@ -47,3 +49,21 @@ async def shutdown() -> None:
 # Register Blueprints
 app.register_blueprint(batch_bp)
 app.register_blueprint(health_bp)
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    import hypercorn.asyncio
+    from hypercorn import Config
+
+    # Create hypercorn config with our settings
+    config = Config()
+    config.bind = [f"{settings.HOST}:{settings.PORT}"]
+    config.workers = settings.WEB_CONCURRENCY
+    config.worker_class = "asyncio"
+    config.loglevel = settings.LOG_LEVEL.lower()
+    config.graceful_timeout = settings.GRACEFUL_TIMEOUT
+    config.keep_alive_timeout = settings.KEEP_ALIVE_TIMEOUT
+
+    asyncio.run(hypercorn.asyncio.serve(app, config))

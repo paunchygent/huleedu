@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 import pytest
 from common_core.enums import ContentType, EssayStatus
 
-from services.essay_lifecycle_service.state_store import EssayState, SQLiteEssayStateStore
+from state_store import EssayState, SQLiteEssayStateStore
 
 
 class TestSQLiteEssayStateStore:

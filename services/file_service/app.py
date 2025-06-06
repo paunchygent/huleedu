@@ -7,7 +7,7 @@ The service handles file uploads, text extraction, and event publishing.
 
 from __future__ import annotations
 
-# Import local modules using absolute imports for containerized deployment
+# Import local modules using relative imports for containerized deployment
 from api.file_routes import file_bp
 from api.health_routes import health_bp
 from config import settings

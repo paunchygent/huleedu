@@ -24,6 +24,7 @@ alwaysApply: false
 - [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc): HTTP service architecture patterns and Blueprint implementation
 - [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc): Async patterns, protocols, dependency injection, and worker service structure
 - [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc): Configuration management and logging standards
+- [044-service-debugging-and-troubleshooting.md](mdc:044-service-debugging-and-troubleshooting.md): CRITICAL debugging priority: service configuration over import patterns
 - [050-python-coding-standards.md](mdc:050-python-coding-standards.md): Python style, formatting, linting, typing, documentation
 - [051-pydantic-v2-standards.md](mdc:051-pydantic-v2-standards.md): Pydantic v2 usage patterns, serialization, and configuration standards
 - [052-sqlalchemy-standards.md](mdc:052-sqlalchemy-standards.md): Database models and SQLAlchemy patterns

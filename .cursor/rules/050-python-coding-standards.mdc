@@ -78,29 +78,19 @@ class ConcreteImpl:
 - Private: `_private_member`
 
 ## 6. Code Structure
-- **Imports**: Use absolute imports for modules outside the current service. **MUST** use absolute imports for intra-service modules.
 - **Error Handling**: Catch specific exceptions, use domain-specific exceptions
 - **Line Length**: Max 100 characters (hard limit enforced by CI where possible).
 - **File Size**: Max 400 lines of code (LoC) per Python file (hard limit enforced by CI where possible, e.g., via `scripts/loc_guard.sh`).
 - **Blank Lines**: Per PEP 8
+- **Imports**: Prefer consistent patterns within services; actual import failures are usually service configuration issues
 
-## 7. Import Standards for Containerized Services
+## 7. Service Configuration Priority
 
-- **MUST** use absolute imports for all intra-service modules
-- **Reason**: Container script context breaks relative import resolution between containers
-- **For services in containers**: Use fully-qualified module paths (e.g., `services.cj_assessment_service.module`)
+**When debugging import errors, prioritize service setup over import patterns**:
+- Verify `PYTHONPATH=/app` in Dockerfiles
+- Check DI container usage vs manual instantiation  
+- Validate framework configuration methods
+- Confirm environment variable alignment
 
-```python
-# ✅ CORRECT - For containerized services
-from services.cj_assessment_service.api.health_routes import health_bp
-from services.cj_assessment_service.config import settings
-
-# ✅ CORRECT - For non-containerized contexts
-from api.health_routes import health_bp
-from config import settings
-
-# ❌ FORBIDDEN  
-from .api.health_routes import health_bp
-from .config import settings
-```
+See [044-service-debugging-and-troubleshooting.md](mdc:044-service-debugging-and-troubleshooting.md) for systematic debugging approach.
 ===

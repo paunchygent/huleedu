@@ -9,8 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import signal
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+import sys
 
 from aiokafka import AIOKafkaConsumer
 from common_core.enums import ProcessingEvent, topic_name
@@ -28,32 +27,25 @@ from services.essay_lifecycle_service.protocols import (
 
 logger = create_service_logger("worker_main")
 
-
-class WorkerState:
-    """Global worker state management."""
-
-    def __init__(self) -> None:
-        self.should_stop = False
-        self.consumer: AIOKafkaConsumer | None = None
-
-
-worker_state = WorkerState()
+# Global state for graceful shutdown
+should_stop = False
 
 
 def setup_signal_handlers() -> None:
     """Setup signal handlers for graceful shutdown."""
+    global should_stop
 
     def signal_handler(signum: int, frame: object) -> None:
+        global should_stop
         logger.info(f"Received signal {signum}, initiating graceful shutdown")
-        worker_state.should_stop = True
+        should_stop = True
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
 
-@asynccontextmanager
-async def kafka_consumer_context() -> AsyncIterator[AIOKafkaConsumer]:
-    """Context manager for Kafka consumer lifecycle."""
+async def create_kafka_consumer() -> AIOKafkaConsumer:
+    """Create and configure Kafka consumer."""
     # Define topics using topic_name() function for consistency
     topics = [
         topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED),
@@ -72,42 +64,31 @@ async def kafka_consumer_context() -> AsyncIterator[AIOKafkaConsumer]:
         auto_commit_interval_ms=1000,
     )
 
-    try:
-        await consumer.start()
-        worker_state.consumer = consumer
-        logger.info(
-            "Kafka consumer started",
-            extra={
-                "group_id": settings.CONSUMER_GROUP,
-                "topics": list(consumer.subscription()),
-            },
-        )
-        yield consumer
-    except Exception as e:
-        logger.error(f"Error starting Kafka consumer: {e}")
-        raise
-    finally:
-        try:
-            await consumer.stop()
-            logger.info("Kafka consumer stopped")
-        except Exception as e:
-            logger.error(f"Error stopping Kafka consumer: {e}")
-        finally:
-            worker_state.consumer = None
+    await consumer.start()
+    logger.info(
+        "Kafka consumer started",
+        extra={
+            "group_id": settings.CONSUMER_GROUP,
+            "topics": topics,
+        },
+    )
+    return consumer
 
 
-async def process_messages(
+async def run_consumer_loop(
     consumer: AIOKafkaConsumer,
     batch_coordination_handler: BatchCoordinationHandler,
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
 ) -> None:
     """Main message processing loop."""
+    global should_stop
+
     logger.info("Starting message processing loop")
 
     try:
         async for msg in consumer:
-            if worker_state.should_stop:
+            if should_stop:
                 logger.info("Shutdown requested, stopping message processing")
                 break
 
@@ -154,30 +135,6 @@ async def process_messages(
         raise
 
 
-async def run_worker() -> None:
-    """Main worker execution logic."""
-    logger.info("Starting Essay Lifecycle Service Kafka Worker")
-
-    # Initialize dependency injection container
-    container = make_async_container(EssayLifecycleServiceProvider())
-    async with container() as request_container:
-        # Get dependencies
-        batch_coordination_handler = await request_container.get(BatchCoordinationHandler)
-        batch_command_handler = await request_container.get(BatchCommandHandler)
-        service_result_handler = await request_container.get(ServiceResultHandler)
-
-        logger.info("Dependencies injected successfully")
-
-        # Start Kafka consumer and process messages
-        async with kafka_consumer_context() as consumer:
-            await process_messages(
-                consumer=consumer,
-                batch_coordination_handler=batch_coordination_handler,
-                batch_command_handler=batch_command_handler,
-                service_result_handler=service_result_handler,
-            )
-
-
 async def main() -> None:
     """Main entry point."""
     # Configure logging
@@ -189,14 +146,46 @@ async def main() -> None:
     # Setup signal handlers
     setup_signal_handlers()
 
-    # Run the worker
+    logger.info("Starting Essay Lifecycle Service Kafka Worker")
+
+    # Initialize dependency injection container
+    container = make_async_container(EssayLifecycleServiceProvider())
+
+    consumer = None
     try:
-        await run_worker()
+        async with container() as request_container:
+            # Get dependencies from DI container
+            batch_coordination_handler = await request_container.get(BatchCoordinationHandler)
+            batch_command_handler = await request_container.get(BatchCommandHandler)
+            service_result_handler = await request_container.get(ServiceResultHandler)
+
+            logger.info("Dependencies injected successfully")
+
+            # Create and start Kafka consumer
+            consumer = await create_kafka_consumer()
+
+            # Run consumer loop
+            await run_consumer_loop(
+                consumer=consumer,
+                batch_coordination_handler=batch_coordination_handler,
+                batch_command_handler=batch_command_handler,
+                service_result_handler=service_result_handler,
+            )
+
     except KeyboardInterrupt:
         logger.info("Worker interrupted by user")
     except Exception as e:
         logger.error(f"Worker failed: {e}")
-        raise
+        sys.exit(1)
+    finally:
+        if consumer:
+            try:
+                await consumer.stop()
+                logger.info("Kafka consumer stopped")
+            except Exception as e:
+                logger.error(f"Error stopping Kafka consumer: {e}")
+
+    logger.info("Essay Lifecycle Service Worker shutdown completed")
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
 from config import settings
-from protocols import EssayStateStore
+from protocols import EssayRepositoryProtocol
 
 logger = create_service_logger("els.api.essay")
 essay_bp = Blueprint("essay_routes", __name__, url_prefix=f"/{settings.API_VERSION}/essays")
@@ -74,7 +74,7 @@ def _calculate_processing_progress(current_status: EssayStatus) -> dict[str, boo
 @inject
 async def get_essay_status(
     essay_id: str,
-    state_store: FromDishka[EssayStateStore],
+    state_store: FromDishka[EssayRepositoryProtocol],
 ) -> Response | tuple[Response, int]:
     """Get current status of an essay."""
     logger.info(f"Getting status for essay {essay_id}")
@@ -111,7 +111,7 @@ async def get_essay_status(
 @inject
 async def get_essay_timeline(
     essay_id: str,
-    state_store: FromDishka[EssayStateStore],
+    state_store: FromDishka[EssayRepositoryProtocol],
 ) -> Response | tuple[Response, int]:
     """Get detailed timeline for an essay."""
     logger.info(f"Getting timeline for essay {essay_id}")

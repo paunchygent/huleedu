@@ -11,7 +11,7 @@ from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
 from config import settings
-from protocols import EssayStateStore
+from protocols import EssayRepositoryProtocol
 
 logger = create_service_logger("els.api.batch")
 batch_bp = Blueprint("batch_routes", __name__, url_prefix=f"/{settings.API_VERSION}/batches")
@@ -47,7 +47,7 @@ class ErrorResponse(BaseModel):
 @inject
 async def get_batch_status(
     batch_id: str,
-    state_store: FromDishka[EssayStateStore],
+    state_store: FromDishka[EssayRepositoryProtocol],
 ) -> Response | tuple[Response, int]:
     """Get status summary for a batch of essays."""
     logger.info(f"Getting status for batch {batch_id}")
