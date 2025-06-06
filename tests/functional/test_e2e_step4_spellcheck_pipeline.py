@@ -117,14 +117,18 @@ async def test_complete_spellcheck_processing_pipeline():
         print(f"✅ Spellcheck completed with {spellcheck_result['corrections_made']} corrections")
 
         # Debug: Print the actual storage_metadata structure
-        print(f"🔍 storage_metadata structure: {spellcheck_result.get('storage_metadata', 'NOT_FOUND')}")
+        print(f"🔍 storage_metadata structure: "
+              f"{spellcheck_result.get('storage_metadata', 'NOT_FOUND')}")
 
-                # Step 5: Validate corrected content stored in Content Service
+        # Step 5: Validate corrected content stored in Content Service
         # Based on actual structure: storage_metadata.references.corrected_text.default
         storage_metadata = spellcheck_result.get("storage_metadata", {})
-        corrected_storage_id = storage_metadata.get("references", {}).get("corrected_text", {}).get("default")
+        corrected_storage_id = storage_metadata.get("references", {}).get(
+            "corrected_text", {}).get("default")
 
-        assert corrected_storage_id is not None, f"No corrected text storage ID found in: {storage_metadata}"
+        assert corrected_storage_id is not None, (
+            f"No corrected text storage ID found in: {storage_metadata}"
+        )
         print(f"📝 Found corrected text storage ID: {corrected_storage_id}")
 
         corrected_content = await fetch_content_from_content_service(corrected_storage_id)
@@ -146,7 +150,7 @@ async def test_complete_spellcheck_processing_pipeline():
 async def test_spellcheck_pipeline_with_no_errors():
     """
     Test spellcheck pipeline with text that has no spelling errors.
-    
+
     Validates that the pipeline processes correctly even when no corrections are needed.
     """
     correlation_id = str(uuid.uuid4())
@@ -301,7 +305,8 @@ async def monitor_for_spellcheck_result(
 
                         # Check if this is our essay's result
                         if (envelope_data.get("correlation_id") == correlation_id and
-                            envelope_data.get("data", {}).get("entity_ref", {}).get("entity_id") == essay_id):
+                            envelope_data.get("data", {}).get(
+                                "entity_ref", {}).get("entity_id") == essay_id):
 
                             result_data = envelope_data["data"]
                             print(f"📨 Received spellcheck result for essay {essay_id}")

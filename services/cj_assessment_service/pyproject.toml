@@ -23,7 +23,8 @@ dependencies = [
     "hypercorn",
     # Database dependencies
     "SQLAlchemy[asyncio]",
-    "aiosqlite",
+    "aiosqlite",  # For unit tests with in-memory DB
+    "asyncpg",    # For PostgreSQL in production/E2E tests
     # CJ-specific dependencies
     "cachetools",
     "diskcache",

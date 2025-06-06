@@ -67,6 +67,13 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
     @app.before_serving
     async def startup() -> None:
         """Application startup tasks."""
+        # Initialize database schema (following BOS/ELS pattern)
+        async with container() as request_container:
+            from services.cj_assessment_service.protocols import CJRepositoryProtocol
+            database = await request_container.get(CJRepositoryProtocol)
+            await database.initialize_db_schema()
+            logger.info("Database schema initialized")
+
         logger.info("CJ Assessment Service health API starting up")
         logger.info("Health endpoint: /healthz")
         logger.info("Metrics endpoint: /metrics")

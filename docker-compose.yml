@@ -7,6 +7,7 @@ volumes:
   essay_lifecycle_data:
   batch_orchestrator_db_data:
   essay_lifecycle_db_data:
+  cj_assessment_db_data:
 
 services:
   # PostgreSQL database for Batch Orchestrator Service
@@ -48,6 +49,28 @@ services:
       - essay_lifecycle_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U huleedu_user -d essay_lifecycle"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # PostgreSQL database for CJ Assessment Service
+  cj_assessment_db:
+    image: postgres:15
+    container_name: huleedu_cj_assessment_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5434:5432"  # Different port from other databases
+    environment:
+      - POSTGRES_DB=cj_assessment
+      - POSTGRES_USER=huleedu_user
+      - POSTGRES_PASSWORD=REDACTED_DEFAULT_PASSWORD
+    volumes:
+      - cj_assessment_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U huleedu_user -d cj_assessment"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -330,6 +353,8 @@ services:
         condition: service_completed_successfully
       content_service:
         condition: service_healthy
+      cj_assessment_db:
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:
@@ -340,4 +365,6 @@ services:
       - CJ_ASSESSMENT_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - CJ_ASSESSMENT_SERVICE_LOG_LEVEL=INFO
       - CJ_ASSESSMENT_SERVICE_METRICS_PORT=9090
+      # Database configuration
+      - CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ=postgresql+asyncpg://huleedu_user:REDACTED_DEFAULT_PASSWORD@cj_assessment_db:5432/cj_assessment
     # Note: cj_assessment_service is a worker service with metrics endpoint only 

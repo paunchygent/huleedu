@@ -855,6 +855,7 @@ dependencies = [
     "aiohttp",
     "aiokafka",
     "aiosqlite",
+    "asyncpg",
     "cachetools",
     "choix",
     "dishka",
