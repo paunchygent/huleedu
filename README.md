@@ -44,13 +44,13 @@ The HuleEdu ecosystem currently comprises the following services:
   * **Architecture**: Clean architecture with DI, protocols, language parameter support, and comprehensive test coverage
 
 * **Batch Orchestrator Service** ✅ **IMPLEMENTED**:
-  * **Description**: A Quart-based HTTP service that orchestrates essay processing workflows, initiating tasks by publishing events.
+  * **Description**: A Quart-based HTTP service that acts as the central coordinator, dynamically orchestrating essay processing workflows using a flexible pipeline definition and various phase initiators.
   * **Port**: 5001 (HTTP API)
   * **Location**: `services/batch_orchestrator_service/`
   * **API**: `/v1/batches` endpoints for batch registration and coordination
 
 * **Essay Lifecycle Service (ELS)** ✅ **IMPLEMENTED**:
-  * **Description**: A dual-mode service (HTTP API + Kafka worker) responsible for managing the state of individual essays throughout the processing pipeline. Handles essay state transitions and batch coordination.
+  * **Description**: A dual-mode service (HTTP API + Kafka worker) that manages individual essay states via a formal state machine (`EssayStateMachine`). It is responsible for reporting batch-level phase outcomes (including updated `text_storage_id`s) to BOS, enabling dynamic pipeline progression.
   * **Ports**: 6001 (HTTP API), 9091 (Metrics)
   * **Location**: `services/essay_lifecycle_service/`
   * **Architecture**: SQLite-based state management with event-driven coordination
@@ -145,9 +145,9 @@ The entire HuleEdu system, including Kafka and all microservices, can be run loc
 
     This command will start all services defined in `docker-compose.yml` in detached mode. It includes Zookeeper, Kafka, the `kafka_topic_setup` one-shot service for automatic topic creation, and all HuleEdu microservices.
 
-## Current Development Status & Focus (Dynamic Pipeline Orchestration - Phase 3 ✅ COMPLETED)
+## Current Development Status & Focus (Dynamic Pipeline Orchestration - Phase 4 ✅ COMPLETED)
 
-🚀 **Dynamic Pipeline Orchestration Achieved** - The project has successfully implemented Phases 1-3 of the Dynamic Pipeline Orchestration with ELS State Machine refactoring. Current status includes:
+🚀 **Dynamic Pipeline Orchestration Achieved** - Phases 1-4 of Dynamic Pipeline Orchestration are complete, including the implementation of all four phase initiators (Spellcheck, CJ Assessment, AI Feedback, NLP) in BOS. BOS uses a `phase_initiators_map` and `requested_pipelines` to dynamically sequence phases, while ELS manages individual essay states via a formal state machine and reports phase outcomes to BOS. Current status includes:
 
 * **Core Services Implemented** ✅:
   * **Content Service**: HTTP API with filesystem storage backend
@@ -174,10 +174,11 @@ The entire HuleEdu system, including Kafka and all microservices, can be run loc
   * **Dependency Management**: PDM monorepo with proper version resolution
 
 * **Dynamic Pipeline Orchestration** ✅:
+  * **Phase 4: All phase initiators (Spellcheck, CJ Assessment, AI Feedback, NLP) implemented and integrated into BOS dynamic orchestration framework.**
   * **Phase 1**: Common core event contracts (`ELSBatchPhaseOutcomeV1`, topic mapping, enums)
   * **Phase 2**: ELS State Machine (transitions library, `EssayStateMachine`, state validation)
   * **Phase 3**: BOS Dynamic Pipeline Orchestration (pipeline state management, Kafka consumer updates)
-  * **Event Architecture**: `ELSBatchPhaseOutcomeV1` events enable dynamic multi-phase orchestration
+  * **Event Architecture**: `ELSBatchPhaseOutcomeV1` and various `BatchService<Phase>InitiateCommandDataV1` commands are key for this dynamic flow.
   * **Pipeline Sequences**: Support for flexible pipeline definitions (Spellcheck → CJ Assessment, etc.)
 
 * **Architecture Enhancements** ✅:

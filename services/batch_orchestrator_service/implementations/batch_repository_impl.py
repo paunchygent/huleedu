@@ -11,7 +11,7 @@ from protocols import BatchRepositoryProtocol
 
 class MockBatchRepositoryImpl(BatchRepositoryProtocol):
     """Mock implementation of BatchRepositoryProtocol for Phase 1.2.
-    
+
     Simulates production database atomicity behavior to prevent anti-pattern development.
     """
 
@@ -75,7 +75,7 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
     ) -> bool:
         """
         Atomically update phase status if current status matches expected.
-        
+
         Simulates production database compare-and-set behavior to prevent race conditions.
         """
         async with self._get_lock(batch_id):

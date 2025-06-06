@@ -38,7 +38,7 @@ def test_transitions_library():
             initial='A'
         )
 
-        assert test_model.state == 'A'  # type: ignore[attr-defined]
+        assert test_model.state == 'A'
         print("✅ transitions library is properly installed and functional")
         return True
 
@@ -65,7 +65,7 @@ def test_essay_state_machine_creation():
 
         assert machine.essay_id == 'test-essay-123'
         assert machine.current_status == EssayStatus.READY_FOR_PROCESSING
-        assert hasattr(machine, 'machine')  # transitions.Machine instance
+        assert hasattr(machine, 'machine')
 
         print(f"✅ EssayStateMachine created successfully with status: {machine.current_status}")
         return True
@@ -86,12 +86,7 @@ def test_state_machine_triggers():
 
     try:
         from essay_state_machine import (
-            CMD_INITIATE_AI_FEEDBACK,
-            CMD_INITIATE_CJ_ASSESSMENT,
             CMD_INITIATE_SPELLCHECK,
-            CMD_MARK_PIPELINE_COMPLETE,
-            EVT_AI_FEEDBACK_SUCCEEDED,
-            EVT_CJ_ASSESSMENT_SUCCEEDED,
             EVT_SPELLCHECK_SUCCEEDED,
             EssayStateMachine,
         )

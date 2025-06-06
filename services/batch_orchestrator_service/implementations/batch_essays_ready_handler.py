@@ -103,7 +103,8 @@ class BatchEssaysReadyHandler:
                     PipelineExecutionStatus.FAILED,
                 ]:
                     logger.info(
-                        f"Phase {first_phase_name.value} already initiated for batch {batch_id}, skipping",
+                        f"Phase {first_phase_name.value} already initiated for batch {batch_id}, "
+                        "skipping",
                         extra={"current_status": pipeline_detail.status.value},
                     )
                     return
@@ -117,7 +118,8 @@ class BatchEssaysReadyHandler:
                     "FAILED",
                 ]:
                     logger.info(
-                        f"Phase {first_phase_name.value} already initiated for batch {batch_id}, skipping",
+                        f"Phase {first_phase_name.value} already initiated for batch {batch_id}, "
+                        "skipping",
                         extra={"current_status": phase_status},
                     )
                     return
@@ -130,7 +132,9 @@ class BatchEssaysReadyHandler:
             # 5. Extract essays_to_process from BatchEssaysReady.ready_essays
             essays_to_process = batch_essays_ready_data.ready_essays
             if not essays_to_process:
-                raise DataValidationError(f"BatchEssaysReady for batch {batch_id} contains no ready_essays")
+                raise DataValidationError(
+                    f"BatchEssaysReady for batch {batch_id} contains no ready_essays"
+                )
 
             logger.info(f"Processing {len(essays_to_process)} ready essays for batch {batch_id}")
 
@@ -149,7 +153,9 @@ class BatchEssaysReadyHandler:
                     batch_context=batch_context,
                 )
             except InitiationError as e:
-                logger.error(f"Failed to initiate phase {first_phase_name} for batch {batch_id}: {e}")
+                logger.error(
+                    f"Failed to initiate phase {first_phase_name} for batch {batch_id}: {e}"
+                )
 
                 # Mark phase as FAILED and save state
                 if hasattr(current_pipeline_state, "get_pipeline"):  # Pydantic object
@@ -160,15 +166,21 @@ class BatchEssaysReadyHandler:
                             "error": str(e),
                             "timestamp": datetime.now(timezone.utc).isoformat()
                         }
-                        await self.batch_repo.save_processing_pipeline_state(batch_id, current_pipeline_state)
+                        await self.batch_repo.save_processing_pipeline_state(
+                            batch_id, current_pipeline_state
+                        )
                 else:  # Dictionary - backwards compatibility
                     updated_pipeline_state = current_pipeline_state.copy()
                     updated_pipeline_state.update({
                         f"{first_phase_name.value}_status": "FAILED",
                         f"{first_phase_name.value}_error": str(e),
-                        f"{first_phase_name.value}_failed_at": datetime.now(timezone.utc).isoformat(),
+                        f"{first_phase_name.value}_failed_at": (
+                            datetime.now(timezone.utc).isoformat()
+                        ),
                     })
-                    await self.batch_repo.save_processing_pipeline_state(batch_id, updated_pipeline_state)
+                    await self.batch_repo.save_processing_pipeline_state(
+                        batch_id, updated_pipeline_state
+                    )
 
                 # TODO: Publish diagnostic event when error event models are available
                 raise
@@ -179,16 +191,24 @@ class BatchEssaysReadyHandler:
                 if pipeline_detail:
                     pipeline_detail.status = PipelineExecutionStatus.DISPATCH_INITIATED
                     pipeline_detail.started_at = datetime.now(timezone.utc)
-                    await self.batch_repo.save_processing_pipeline_state(batch_id, current_pipeline_state)
+                    await self.batch_repo.save_processing_pipeline_state(
+                        batch_id, current_pipeline_state
+                    )
             else:  # Dictionary - backwards compatibility
                 updated_pipeline_state = current_pipeline_state.copy()
                 updated_pipeline_state.update({
                     f"{first_phase_name.value}_status": "DISPATCH_INITIATED",
-                    f"{first_phase_name.value}_initiated_at": datetime.now(timezone.utc).isoformat(),
+                    f"{first_phase_name.value}_initiated_at": (
+                        datetime.now(timezone.utc).isoformat()
+                    ),
                 })
-                await self.batch_repo.save_processing_pipeline_state(batch_id, updated_pipeline_state)
+                await self.batch_repo.save_processing_pipeline_state(
+                    batch_id, updated_pipeline_state
+                )
 
-            logger.info(f"Successfully initiated {first_phase_name.value} pipeline for batch {batch_id}")
+            logger.info(
+                f"Successfully initiated {first_phase_name.value} pipeline for batch {batch_id}"
+            )
 
         except Exception as e:
             logger.error(f"Error handling BatchEssaysReady message: {e}", exc_info=True)

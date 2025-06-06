@@ -6,10 +6,12 @@ alwaysApply: true
 ---
 
 ---
+
 description: Defines the all pydantic models: event contracts, enums, and Kafka topics. ALL IMPLEMENTATION MUST COMPLY TO THESE
-globs: 
+globs:
 alwaysApply: false
 ---
+
 # 024: Common Core Architecture
 
 ## 1. Purpose
@@ -88,6 +90,7 @@ def topic_name(event: ProcessingEvent) -> str:
 ```
 
 **Current Mappings**:
+
 - `ESSAY_SPELLCHECK_REQUESTED` → `"huleedu.essay.spellcheck.requested.v1"`
 - `ESSAY_SPELLCHECK_RESULT_RECEIVED` → `"huleedu.essay.spellcheck.completed.v1"`
 - `BATCH_ESSAYS_REGISTERED` → `"huleedu.batch.essays.registered.v1"`
@@ -131,7 +134,6 @@ def add_reference(self, ctype: ContentType, storage_id: str, path_hint: Optional
 ```python
 essay_id: str
 text_storage_id: str
-student_name: Optional[str] = None
 ```
 
 ## 5. Event System

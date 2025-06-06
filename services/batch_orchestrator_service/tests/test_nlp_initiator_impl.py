@@ -1,7 +1,7 @@
 """Unit tests for NLP initiator implementation.
 
 Tests the NLPInitiatorImpl for correct command construction, event publishing,
-validation, and error handling. 
+validation, and error handling.
 
 TODO: NLP Service is not yet implemented - these tests verify the BOS
 orchestration side works correctly for when the NLP Service is built.
@@ -101,7 +101,9 @@ class TestNLPInitiatorImpl:
         )
 
         assert isinstance(published_envelope.data, BatchServiceNLPInitiateCommandDataV1)
-        assert published_envelope.event_type == topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND)
+        assert published_envelope.event_type == topic_name(
+            ProcessingEvent.BATCH_NLP_INITIATE_COMMAND
+        )
         assert published_envelope.source_service == "batch-orchestrator-service"
         assert published_envelope.correlation_id == sample_correlation_id
 

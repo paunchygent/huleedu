@@ -101,7 +101,9 @@ class TestAIFeedbackInitiatorImpl:
         )
 
         assert isinstance(published_envelope.data, BatchServiceAIFeedbackInitiateCommandDataV1)
-        assert published_envelope.event_type == topic_name(ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND)
+        assert published_envelope.event_type == topic_name(
+            ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND
+        )
         assert published_envelope.source_service == "batch-orchestrator-service"
         assert published_envelope.correlation_id == sample_correlation_id
 
@@ -127,7 +129,9 @@ class TestAIFeedbackInitiatorImpl:
         sample_correlation_id: uuid.UUID,
     ) -> None:
         """Test that initiator rejects incorrect phase."""
-        with pytest.raises(DataValidationError, match="AIFeedbackInitiatorImpl received incorrect phase"):
+        with pytest.raises(
+            DataValidationError, match="AIFeedbackInitiatorImpl received incorrect phase"
+        ):
             await ai_feedback_initiator.initiate_phase(
                 batch_id="test-batch-456",
                 phase_to_initiate=PhaseName.CJ_ASSESSMENT,  # Wrong phase!
@@ -143,7 +147,9 @@ class TestAIFeedbackInitiatorImpl:
         sample_correlation_id: uuid.UUID,
     ) -> None:
         """Test that initiator rejects empty essay list."""
-        with pytest.raises(DataValidationError, match="No essays provided for AI feedback initiation"):
+        with pytest.raises(
+            DataValidationError, match="No essays provided for AI feedback initiation"
+        ):
             await ai_feedback_initiator.initiate_phase(
                 batch_id="test-batch-456",
                 phase_to_initiate=PhaseName.AI_FEEDBACK,
@@ -252,7 +258,9 @@ class TestAIFeedbackInitiatorImpl:
             course_code="PHIL301",
             class_designation="Advanced Philosophy",
             teacher_name="Dr. Elizabeth Hartwell",
-            essay_instructions="Examine the ethical implications of artificial intelligence in 1000 words.",
+            essay_instructions=(
+                "Examine the ethical implications of artificial intelligence in 1000 words."
+            ),
             essay_ids=["essay1", "essay2"],
         )
 
@@ -271,7 +279,9 @@ class TestAIFeedbackInitiatorImpl:
         assert command_data.course_code == "PHIL301"
         assert command_data.class_designation == "Advanced Philosophy"
         assert command_data.teacher_name == "Dr. Elizabeth Hartwell"
-        assert command_data.essay_instructions == "Examine the ethical implications of artificial intelligence in 1000 words."
+        assert command_data.essay_instructions == (
+            "Examine the ethical implications of artificial intelligence in 1000 words."
+        )
 
     async def test_event_publisher_exception_propagation(
         self,
@@ -315,7 +325,9 @@ class TestAIFeedbackInitiatorImpl:
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
         assert published_envelope.correlation_id is None
 
-    async def test_protocol_compliance(self, ai_feedback_initiator: AIFeedbackInitiatorImpl) -> None:
+    async def test_protocol_compliance(
+        self, ai_feedback_initiator: AIFeedbackInitiatorImpl
+    ) -> None:
         """Test that implementation properly implements the protocol."""
         # Verify that the implementation has the required methods
         assert hasattr(ai_feedback_initiator, 'initiate_phase')
