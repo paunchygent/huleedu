@@ -904,6 +904,7 @@ dependencies = [
     "pydantic-settings",
     "python-dotenv",
     "quart",
+    "quart-dishka",
 ]
 
 [[package]]

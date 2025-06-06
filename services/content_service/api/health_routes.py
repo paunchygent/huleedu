@@ -1,6 +1,5 @@
 """Health and metrics routes for Content Service."""
 
-from pathlib import Path
 from typing import Union
 
 from config import settings
@@ -10,15 +9,6 @@ from quart import Blueprint, Response, jsonify
 
 logger = create_service_logger("content.api.health")
 health_bp = Blueprint("health_routes", __name__)
-
-# Reference to store root (set by app.py)
-STORE_ROOT: Path | None = None
-
-
-def set_store_root(store_root: Path) -> None:
-    """Set the store root reference from app.py."""
-    global STORE_ROOT
-    STORE_ROOT = store_root
 
 
 @health_bp.route("/healthz")

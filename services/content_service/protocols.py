@@ -1,35 +1,68 @@
+"""
+Content Service behavioral contracts and protocols.
+
+This module defines the protocols (interfaces) that Content Service components
+must implement, enabling dependency injection and testability.
+"""
+
 from __future__ import annotations
 
-from typing import Optional, Protocol
-
-# Assuming common_core models might be used in signatures
-from common_core.enums import ContentType
+from pathlib import Path
+from typing import Protocol
 
 
-class ContentRepositoryProtocol(Protocol):
-    async def store_content(
-        self,
-        content_type: ContentType,
-        content_data: bytes,
-        user_id: Optional[str] = None,  # Optional user context
-    ) -> str:
-        """Stores content data and returns a unique storage ID."""
+class ContentStoreProtocol(Protocol):
+    """Protocol for content storage operations."""
+
+    async def save_content(self, content_data: bytes) -> str:
+        """
+        Save content data and return storage identifier.
+
+        Args:
+            content_data: Raw bytes to store
+
+        Returns:
+            Storage identifier (UUID hex string)
+
+        Raises:
+            Exception: If storage operation fails
+        """
         ...
 
-    async def retrieve_content(self, storage_id: str) -> bytes | None:
-        """Retrieves content data by its storage ID, returns None if not found."""
+    async def get_content_path(self, content_id: str) -> Path:
+        """
+        Get file path for content identifier.
+
+        Args:
+            content_id: Storage identifier
+
+        Returns:
+            Path to content file
+        """
         ...
 
-    async def delete_content(self, storage_id: str) -> bool:
-        """Deletes content data by its storage ID, returns True on success."""
+    async def content_exists(self, content_id: str) -> bool:
+        """
+        Check if content exists for given identifier.
+
+        Args:
+            content_id: Storage identifier
+
+        Returns:
+            True if content exists, False otherwise
+        """
         ...
 
 
-class ContentEventPublisherProtocol(Protocol):
-    async def publish_content_stored_event(
-        self, storage_id: str, content_type: ContentType, user_id: Optional[str]
-    ) -> None:
-        """Publishes an event indicating content has been stored (example)."""
-        # This is speculative; actual event details would be TBD.
-        # Might use a specific EventEnvelope[ContentStoredEventData]
+class ContentMetricsProtocol(Protocol):
+    """Protocol for content service metrics collection."""
+
+    def record_operation(self, operation: str, status: str) -> None:
+        """
+        Record a content operation metric.
+
+        Args:
+            operation: Operation type ('upload', 'download')
+            status: Operation status ('success', 'failed', 'error', 'not_found')
+        """
         ...

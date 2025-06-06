@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     ENVIRONMENT: str = "development"  # development, production, testing
     CONTENT_STORE_ROOT_PATH: Path = Path("./.local_content_store_mvp")
+    HOST: str = "0.0.0.0"
     PORT: int = 8001  # Default port, matches docker-compose and pdm dev script for content_service
+    WEB_CONCURRENCY: int = 1
 
     model_config = SettingsConfigDict(
         env_file=".env",
