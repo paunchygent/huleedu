@@ -26,15 +26,23 @@ Defines async patterns, protocols, dependency injection, resource management, an
 
 ### 3.2. HTTP Service Pattern (Quart + quart-dishka):
 ```python
-# app.py
-from dishka import make_async_container
-from quart_dishka import QuartDishka, inject
-from di import ServiceProvider
+# app.py - Lean setup with startup hooks
+from startup_setup import initialize_services, shutdown_services
 
 @app.before_serving
 async def startup():
+    await initialize_services(app, settings)
+
+@app.after_serving
+async def shutdown():
+    await shutdown_services()
+
+# startup_setup.py - DI and metrics initialization
+async def initialize_services(app: Quart, settings: Settings):
     container = make_async_container(ServiceProvider())
     QuartDishka(app=app, container=container)
+    # Create metrics with app context pattern
+    app.extensions["metrics"] = _create_metrics(registry)
 
 # In Blueprint route file
 @content_bp.post("/endpoint")

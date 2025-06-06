@@ -18,6 +18,7 @@ alwaysApply: false
 ```
 services/content_service/
 ├── app.py                     # Lean Quart application (setup, DI, Blueprint registration)
+├── startup_setup.py           # DI initialization, metrics creation, service lifecycle
 ├── api/                       # Blueprint API routes directory
 │   ├── __init__.py
 │   ├── health_routes.py       # /healthz, /metrics endpoints
@@ -30,10 +31,11 @@ services/content_service/
 ```
 
 ### 2.2. Blueprint Implementation
-- **app.py**: Lean setup focused on Blueprint registration and dependency sharing
+- **app.py**: Lean setup focused on Blueprint registration and startup/shutdown hooks
+- **startup_setup.py**: DI container initialization, metrics creation using app context pattern
 - **api/health_routes.py**: Standard health and metrics endpoints
 - **api/content_routes.py**: Content-specific API routes
-- **Dependencies**: Shared from app.py to Blueprints via module functions
+- **Dependencies**: Injected via Dishka with protocol-based abstractions
 
 ## 3. API Specification
 

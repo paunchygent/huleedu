@@ -27,6 +27,7 @@ High-level, cross-cutting principles and stack requirements for HuleEdu microser
 - **MUST** follow Blueprint pattern architecture → See [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc)
 - **MUST** implement standardized `/healthz` and `/metrics` endpoints
 - **MUST** use Dishka DI with `quart-dishka` integration
+- **MUST** separate concerns: lean `app.py` + `startup_setup.py` for DI/metrics initialization
 
 ### 3.2. Worker Services (Kafka-based)
 - **MUST** follow event processor pattern → See [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc)
@@ -44,6 +45,7 @@ High-level, cross-cutting principles and stack requirements for HuleEdu microser
 - **MUST** expose Prometheus metrics via `/metrics` endpoint
 - **MUST** use centralized metrics collection patterns
 - **MUST** implement service-specific health validation logic
+- **MUST** use app context pattern for metrics: `app.extensions["metrics"]` (prevents registry collisions)
 
 ### 4.3. State Management
 - Each service owns its primary entities' state
