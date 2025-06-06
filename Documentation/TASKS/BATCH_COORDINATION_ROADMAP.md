@@ -263,8 +263,6 @@ sequenceDiagram
 
 1. **Streaming File Processing**: Real-time file upload and processing
 2. **Distributed File Service**: Multi-region file processing
-3. **Adaptive Batching**: Dynamic batch size optimization based on file complexity
-4. **Predictive Processing**: ML-based processing time estimation
 
 ---
 

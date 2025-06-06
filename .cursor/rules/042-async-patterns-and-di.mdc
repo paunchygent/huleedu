@@ -1,5 +1,5 @@
 ---
-description: 
+description: Use when defining async patterns, protocols, dependency injection, resource management, and worker service structure.
 globs: 
 alwaysApply: false
 ---

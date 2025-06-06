@@ -224,6 +224,8 @@ markers = [
     "integration: marks tests requiring external services like Kafka",
     "docker: marks tests that need docker-compose setup",
     "kafka: marks tests requiring a Kafka instance",
+    "e2e: marks tests as end-to-end pipeline tests",
+    "timeout: marks tests with specific timeout requirements",
 ]
 
 filterwarnings = [

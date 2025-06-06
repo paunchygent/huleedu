@@ -184,7 +184,7 @@ class TestPipelineStateManagement:
         # Setup initial pipeline state
         initial_pipeline_state = {
             "batch_id": batch_id,
-            "requested_pipelines": ["spellcheck", "cj_assessment"],  # Add missing requested_pipelines
+            "requested_pipelines": ["spellcheck", "cj_assessment"],
             "spellcheck_status": "IN_PROGRESS",
             "cj_assessment_status": "PENDING",
         }
@@ -227,7 +227,7 @@ class TestPipelineStateManagement:
         # Setup pipeline state with CJ assessment already initiated
         initial_pipeline_state = {
             "batch_id": batch_id,
-            "requested_pipelines": ["spellcheck", "cj_assessment"],  # Add missing requested_pipelines
+            "requested_pipelines": ["spellcheck", "cj_assessment"],
             "spellcheck_status": "COMPLETED",
             "cj_assessment_status": "DISPATCH_INITIATED",  # Already initiated
         }
@@ -259,7 +259,7 @@ class TestPipelineStateManagement:
         # Setup pipeline state without batch context
         initial_pipeline_state = {
             "batch_id": batch_id,
-            "requested_pipelines": ["spellcheck"],  # Add missing requested_pipelines
+            "requested_pipelines": ["spellcheck"],
             "spellcheck_status": "IN_PROGRESS",
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)

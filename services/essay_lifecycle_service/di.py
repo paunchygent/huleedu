@@ -86,7 +86,7 @@ class EssayLifecycleServiceProvider(Provider):
     async def provide_essay_repository(self, settings: Settings) -> EssayRepositoryProtocol:
         """
         Provide essay repository implementation with environment-based selection.
-        
+
         Uses SQLite for development/testing and PostgreSQL for production,
         following the same pattern as BOS BatchRepositoryProtocol.
         """

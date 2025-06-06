@@ -6,8 +6,6 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_l
 from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
-from config import settings
-
 logger = create_service_logger("els.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
@@ -15,7 +13,7 @@ health_bp = Blueprint("health_routes", __name__)
 @health_bp.route("/healthz", methods=["GET"])
 async def health_check() -> Response:
     """Health check endpoint."""
-    return jsonify({"status": "healthy", "service": settings.SERVICE_NAME})
+    return jsonify({"status": "ok", "message": "Essay Lifecycle Service is healthy"})
 
 
 @health_bp.route("/metrics")

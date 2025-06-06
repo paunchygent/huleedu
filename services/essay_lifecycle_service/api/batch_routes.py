@@ -11,7 +11,7 @@ from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
 from config import settings
-from protocols import EssayRepositoryProtocol
+from services.essay_lifecycle_service.protocols import EssayRepositoryProtocol
 
 logger = create_service_logger("els.api.batch")
 batch_bp = Blueprint("batch_routes", __name__, url_prefix=f"/{settings.API_VERSION}/batches")
