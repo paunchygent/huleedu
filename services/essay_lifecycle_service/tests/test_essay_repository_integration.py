@@ -7,7 +7,9 @@ implementation works correctly with actual database operations.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from datetime import datetime
+from typing import Any
 
 import pytest
 from common_core.enums import ContentType, EssayStatus
@@ -24,7 +26,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
     """Integration tests with real PostgreSQL database."""
 
     @pytest.fixture(scope="class")
-    def postgres_container(self) -> PostgresContainer:
+    def postgres_container(self) -> Generator[PostgresContainer, Any, None]:
         """Start PostgreSQL test container for integration tests."""
         container = PostgresContainer("postgres:15")
         container.start()
