@@ -71,7 +71,7 @@ async def shutdown_services() -> None:
 
 
 def _create_metrics(registry: CollectorRegistry) -> dict:
-    """Create Prometheus metrics instances."""
+    """Create Prometheus metrics instances for HTTP middleware."""
     return {
         "http_requests_total": Counter(
             "http_requests_total",
@@ -83,12 +83,6 @@ def _create_metrics(registry: CollectorRegistry) -> dict:
             "http_request_duration_seconds",
             "HTTP request duration in seconds",
             ["method", "endpoint"],
-            registry=registry,
-        ),
-        "content_operations_total": Counter(
-            "content_operations_total",
-            "Total content operations",
-            ["operation", "status"],
             registry=registry,
         ),
     }

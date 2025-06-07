@@ -8,7 +8,7 @@ must implement, enabling dependency injection and testability.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
 class ContentStoreProtocol(Protocol):
@@ -54,6 +54,7 @@ class ContentStoreProtocol(Protocol):
         ...
 
 
+@runtime_checkable
 class ContentMetricsProtocol(Protocol):
     """Protocol for content service metrics collection."""
 
