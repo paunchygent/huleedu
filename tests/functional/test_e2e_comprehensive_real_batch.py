@@ -29,7 +29,7 @@ from common_core.enums import ProcessingEvent, topic_name
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-@pytest.mark.timeout(45)  # 2 minute timeout for complete pipeline with mock LLM
+@pytest.mark.timeout(240)  # 2 minute timeout for complete pipeline with mock LLM
 async def test_comprehensive_real_batch_pipeline():
     """
     Test complete pipeline with real student essays through actual BOS orchestration.
@@ -56,7 +56,7 @@ async def test_comprehensive_real_batch_pipeline():
     print(f"📚 Found {len(essay_files)} real student essays")
 
     # Use subset for test performance (first 6 essays)
-    test_essays = essay_files[:6]
+    test_essays = essay_files[:25]
 
     # Step 1: Validate all services are healthy
     await validate_all_services_healthy()
@@ -207,7 +207,7 @@ async def register_batch_with_bos(expected_essay_count: int) -> str:
 async def watch_pipeline_progression(
     consumer: AIOKafkaConsumer,
     batch_id: str,
-    timeout_seconds: int = 30
+    timeout_seconds: int = 180
 ) -> Dict[str, Any]:
     """Watch pipeline progression and wait for completion."""
 

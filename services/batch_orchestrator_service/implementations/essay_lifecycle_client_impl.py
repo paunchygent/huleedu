@@ -20,4 +20,3 @@ class DefaultEssayLifecycleClientImpl(EssayLifecycleClientProtocol):
     ) -> None:
         """Mock implementation - logs the request."""
         # TODO: Implement actual HTTP call to Essay Lifecycle Service
-        print(f"Mock: Requesting {phase} for batch {batch_id}, essays {essay_ids}")

@@ -487,7 +487,58 @@ class PipelinePerformanceMetrics:
 
 **Task**: Complete final 5% of CJ Assessment E2E testing
 
-**Immediate Actions**:
+**Context**
+Test pass with 6 essays, but failes every time on 25 and 30 essays. Preliminary analysis suggests the same essay is the root cause of failure in multiple runs.
+
+## 📊 **E2E Test Failure - Facts Only**
+
+### **Failing Essay Details:**
+
+- **Essay ID:** `69bf8401-604e-4ca1-9231-59ab6f16b619`
+- **Content Storage ID:** `4353cfb7f9734084814648de1926be73`
+- **Text Length:** 2,798 characters
+- **Content Preview:** Starts with "For a better future" - essay about environmental overconsumption
+
+### **Processing Timeline (from logs):**
+
+- `09:17:48` - pyspellchecker processing started: "Running pyspellchecker on L2-corrected text"
+- `09:17:53` - pyspellchecker processing completed (5+ seconds later)
+- `09:17:53` - Content storage failed: "Error storing content: Server disconnected"
+
+### **Processing Results:**
+
+- **L2 Corrections:** 18 applied successfully
+- **pyspellchecker Corrections:** 1 applied successfully  
+- **Total Processing Time:** 5.31 seconds
+- **Failure Point:** Content storage to Content Service
+
+### **Comparison with Other Essays:**
+
+- **Typical Processing Times:** 0.05-0.67 seconds for other essays
+- **This Essay:** 5.31 seconds (10-100x slower)
+- **Content Lengths:** Other essays range 1,952-3,272 characters (similar size)
+
+### **Content Service Status:**
+
+- Content Service was operational at `09:17:53`
+- Successfully serving other requests at same timestamp
+- No errors in Content Service logs
+
+### **Error Chain:**
+
+1. pyspellchecker hangs for 5+ seconds on this specific essay
+2. HTTP connection to Content Service times out during storage attempt
+3. Spellcheck service publishes failure event to ELS
+4. ELS correctly processes failure, updates batch statistics to 1 failed essay
+5. BOS receives phase completion with failures, stops pipeline progression
+
+### **Deterministic Behavior:**
+
+- Same essay fails consistently across multiple test runs
+- Failure occurs at identical processing stage
+- Error pattern is reproducible, not random
+
+**Immediate Actions after Identified Failure and fix**:
 
 1. Rebuild service: `docker compose stop cj_assessment_service && docker compose build cj_assessment_service && docker compose up -d cj_assessment_service`
 2. Run test: `timeout 60 pdm run pytest tests/functional/test_e2e_step5_cj_assessment_pipeline.py::test_cj_assessment_pipeline_minimal_essays -v -s`

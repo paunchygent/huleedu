@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import pytest
 from common_core.enums import EssayStatus
+from common_core.metadata_models import StorageReferenceMetadata
 
 from services.essay_lifecycle_service.implementations.service_result_handler_impl import (
     DefaultServiceResultHandler,
@@ -61,7 +62,10 @@ class TestDefaultServiceResultHandler:
         result.entity_ref = entity_ref
         result.status = EssayStatus.SPELLCHECKED_SUCCESS
         result.original_text_storage_id = "original-123"
-        result.storage_metadata = {"corrected_text_id": "corrected-456"}
+        # Updated storage_metadata to be a mock that handles model_dump()
+        mock_storage_meta = MagicMock(spec=StorageReferenceMetadata)
+        mock_storage_meta.model_dump.return_value = {"corrected_text_id": "corrected-456"}
+        result.storage_metadata = mock_storage_meta
         result.corrections_made = 5
         result.system_metadata = None
         return result
@@ -287,7 +291,6 @@ class TestDefaultServiceResultHandler:
         self,
         handler: DefaultServiceResultHandler,
         mock_essay_repository: AsyncMock,
-        mock_batch_coordinator: AsyncMock,
         mock_cj_assessment_failed: MagicMock
     ) -> None:
         """Test CJ assessment failure handling."""
@@ -325,7 +328,6 @@ class TestDefaultServiceResultHandler:
         self,
         handler: DefaultServiceResultHandler,
         mock_essay_repository: AsyncMock,
-        mock_batch_coordinator: AsyncMock,
         mock_cj_assessment_failed: MagicMock
     ) -> None:
         """Test CJ assessment failure when essay not found."""
@@ -339,4 +341,3 @@ class TestDefaultServiceResultHandler:
         # Verify - should still return True but skip missing essays
         assert result is True
         mock_essay_repository.update_essay_status_via_machine.assert_not_called()
-        mock_batch_coordinator.check_batch_completion.assert_not_called()

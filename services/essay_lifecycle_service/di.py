@@ -24,11 +24,17 @@ from services.essay_lifecycle_service.implementations.batch_coordination_handler
 from services.essay_lifecycle_service.implementations.batch_phase_coordinator_impl import (
     DefaultBatchPhaseCoordinator,
 )
+from services.essay_lifecycle_service.implementations.cj_assessment_command_handler import (
+    CJAssessmentCommandHandler,
+)
 from services.essay_lifecycle_service.implementations.content_client import DefaultContentClient
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
 from services.essay_lifecycle_service.implementations.event_publisher import DefaultEventPublisher
+from services.essay_lifecycle_service.implementations.future_services_command_handlers import (
+    FutureServicesCommandHandler,
+)
 from services.essay_lifecycle_service.implementations.metrics_collector import (
     DefaultMetricsCollector,
 )
@@ -37,6 +43,9 @@ from services.essay_lifecycle_service.implementations.service_request_dispatcher
 )
 from services.essay_lifecycle_service.implementations.service_result_handler_impl import (
     DefaultServiceResultHandler,
+)
+from services.essay_lifecycle_service.implementations.spellcheck_command_handler import (
+    SpellcheckCommandHandler,
 )
 from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
@@ -135,15 +144,46 @@ class EssayLifecycleServiceProvider(Provider):
         """Provide specialized service request dispatcher implementation."""
         return DefaultSpecializedServiceRequestDispatcher(producer, settings)
 
+    # Service-specific command handlers
     @provide(scope=Scope.APP)
-    def provide_batch_command_handler(
+    def provide_spellcheck_command_handler(
         self,
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
         event_publisher: EventPublisher,
+    ) -> SpellcheckCommandHandler:
+        """Provide spellcheck command handler implementation."""
+        return SpellcheckCommandHandler(repository, request_dispatcher, event_publisher)
+
+    @provide(scope=Scope.APP)
+    def provide_cj_assessment_command_handler(
+        self,
+        repository: EssayRepositoryProtocol,
+        request_dispatcher: SpecializedServiceRequestDispatcher,
+        event_publisher: EventPublisher,
+    ) -> CJAssessmentCommandHandler:
+        """Provide CJ assessment command handler implementation."""
+        return CJAssessmentCommandHandler(repository, request_dispatcher, event_publisher)
+
+    @provide(scope=Scope.APP)
+    def provide_future_services_command_handler(
+        self,
+        repository: EssayRepositoryProtocol,
+        request_dispatcher: SpecializedServiceRequestDispatcher,
+        event_publisher: EventPublisher,
+    ) -> FutureServicesCommandHandler:
+        """Provide future services command handler implementation."""
+        return FutureServicesCommandHandler(repository, request_dispatcher, event_publisher)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_command_handler(
+        self,
+        spellcheck_handler: SpellcheckCommandHandler,
+        cj_assessment_handler: CJAssessmentCommandHandler,
+        future_services_handler: FutureServicesCommandHandler,
     ) -> BatchCommandHandler:
-        """Provide batch command handler implementation."""
-        return DefaultBatchCommandHandler(repository, request_dispatcher, event_publisher)
+        """Provide batch command handler implementation with injected service handlers."""
+        return DefaultBatchCommandHandler(spellcheck_handler, cj_assessment_handler, future_services_handler)
 
     @provide(scope=Scope.APP)
     def provide_batch_coordination_handler(

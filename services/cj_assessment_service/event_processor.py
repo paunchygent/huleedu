@@ -73,7 +73,7 @@ async def process_single_message(
                 "course_code": request_event_data.course_code,
             }
 
-            logger.info("📨 Received CJ assessment request from ELS", extra=log_extra)
+            logger.info("Received CJ assessment request from ELS", extra=log_extra)
             logger.info(f"📚 Processing {len(request_event_data.essays_for_cj)} essays for CJ assessment", extra=log_extra)
 
         except (
@@ -167,7 +167,7 @@ async def process_single_message(
             completion_data=completed_envelope, correlation_id=completed_envelope.correlation_id
         )
 
-        logger.info("✅ CJ assessment message processed successfully and completion event published.", extra=log_extra)
+        logger.info("CJ assessment message processed successfully and completion event published.", extra=log_extra)
         return True
 
     except Exception as e:

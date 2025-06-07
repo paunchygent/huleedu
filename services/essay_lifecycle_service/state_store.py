@@ -1,9 +1,8 @@
 """
-Essay state management and SQLite storage implementation for Essay Lifecycle Service.
+SQLite storage implementation for Essay Lifecycle Service.
 
-Provides the EssayState data model and SQLite-based persistence implementation
-that serves as the development/testing alternative to the PostgreSQL production
-implementation.
+Provides SQLite-based persistence implementation that serves as the 
+development/testing alternative to the PostgreSQL production implementation.
 """
 
 from __future__ import annotations
@@ -15,48 +14,18 @@ from typing import TYPE_CHECKING, Any
 import aiosqlite
 from common_core.enums import ContentType, EssayStatus
 from common_core.metadata_models import EntityReference
-from pydantic import BaseModel, Field
 
+from services.essay_lifecycle_service.implementations.database_schema_manager import (
+    SQLiteDatabaseSchemaManager,
+)
+from services.essay_lifecycle_service.implementations.essay_crud_operations import (
+    SQLiteEssayCrudOperations,
+)
+from services.essay_lifecycle_service.implementations.essay_state_model import EssayState
 from services.essay_lifecycle_service.protocols import EssayRepositoryProtocol
 
 if TYPE_CHECKING:
     from services.essay_lifecycle_service.protocols import EssayState as ProtocolEssayState
-
-
-class EssayState(BaseModel):
-    """
-    Essay state data model for tracking essay processing lifecycle.
-
-    This model represents the complete state of an essay as it progresses
-    through the HuleEdu processing pipeline.
-    """
-
-    essay_id: str
-    batch_id: str | None = None
-    current_status: EssayStatus
-    processing_metadata: dict[str, Any] = Field(default_factory=dict)
-    timeline: dict[str, datetime] = Field(default_factory=dict)
-    storage_references: dict[ContentType, str] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-    class Config:
-        """Pydantic configuration."""
-
-        json_encoders = {
-            datetime: lambda v: v.isoformat(),
-        }
-
-    def update_status(
-        self, new_status: EssayStatus, metadata: dict[str, Any] | None = None
-    ) -> None:
-        """Update essay status and metadata."""
-        self.current_status = new_status
-        self.updated_at = datetime.now(UTC)
-        self.timeline[new_status.value] = self.updated_at
-
-        if metadata:
-            self.processing_metadata.update(metadata)
 
 
 class SQLiteEssayStateStore(EssayRepositoryProtocol):
@@ -77,120 +46,28 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         """
         self.database_path = database_path
         self.timeout = timeout
+        self.schema_manager = SQLiteDatabaseSchemaManager(database_path, timeout)
+        self.crud_ops = SQLiteEssayCrudOperations(database_path, timeout)
 
     async def initialize(self) -> None:
         """Initialize the database schema and migrations."""
-        async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
-            # Enable foreign keys
-            await db.execute("PRAGMA foreign_keys = ON")
-
-            # Create schema version table
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS schema_version (
-                    version INTEGER PRIMARY KEY,
-                    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-            # Create essay_states table
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS essay_states (
-                    essay_id TEXT PRIMARY KEY,
-                    batch_id TEXT,
-                    current_status TEXT NOT NULL,
-                    processing_metadata TEXT NOT NULL DEFAULT '{}',
-                    timeline TEXT NOT NULL DEFAULT '{}',
-                    storage_references TEXT NOT NULL DEFAULT '{}',
-                    created_at TIMESTAMP NOT NULL,
-                    updated_at TIMESTAMP NOT NULL
-                )
-            """)
-
-            # Create index for batch queries
-            await db.execute("""
-                CREATE INDEX IF NOT EXISTS idx_essay_states_batch_id
-                ON essay_states(batch_id)
-            """)
-
-            # Create index for status queries
-            await db.execute("""
-                CREATE INDEX IF NOT EXISTS idx_essay_states_status
-                ON essay_states(current_status)
-            """)
-
-            # Set current schema version
-            await db.execute("""
-                INSERT OR IGNORE INTO schema_version (version) VALUES (1)
-            """)
-
-            await db.commit()
+        await self.schema_manager.initialize_schema()
 
     async def get_essay_state(self, essay_id: str) -> EssayState | None:
         """Retrieve essay state by ID."""
-        async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute(
-                "SELECT * FROM essay_states WHERE essay_id = ?", (essay_id,)
-            ) as cursor:
-                row = await cursor.fetchone()
-
-                if row is None:
-                    return None
-
-                return EssayState(
-                    essay_id=row["essay_id"],
-                    batch_id=row["batch_id"],
-                    current_status=EssayStatus(row["current_status"]),
-                    processing_metadata=json.loads(row["processing_metadata"]),
-                    timeline={
-                        k: datetime.fromisoformat(v) for k, v in json.loads(row["timeline"]).items()
-                    },
-                    storage_references={
-                        ContentType(k): v for k, v in json.loads(row["storage_references"]).items()
-                    },
-                    created_at=datetime.fromisoformat(row["created_at"]),
-                    updated_at=datetime.fromisoformat(row["updated_at"]),
-                )
+        return await self.crud_ops.get_essay_state(essay_id)
 
     async def update_essay_state(
         self, essay_id: str, new_status: EssayStatus, metadata: dict[str, Any]
     ) -> None:
         """Update essay state with new status and metadata."""
-        async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
-            # First, get the current state
-            current_state = await self.get_essay_state(essay_id)
-            if current_state is None:
-                raise ValueError(f"Essay {essay_id} not found")
-
-            # Update the state
-            current_state.update_status(new_status, metadata)
-
-            # Save to database
-            await db.execute(
-                """
-                UPDATE essay_states
-                SET current_status = ?,
-                    processing_metadata = ?,
-                    timeline = ?,
-                    updated_at = ?
-                WHERE essay_id = ?
-            """,
-                (
-                    current_state.current_status.value,
-                    json.dumps(current_state.processing_metadata),
-                    json.dumps({k: v.isoformat() for k, v in current_state.timeline.items()}),
-                    current_state.updated_at.isoformat(),
-                    essay_id,
-                ),
-            )
-
-            await db.commit()
+        await self.crud_ops.update_essay_state(essay_id, new_status, metadata)
 
     async def update_essay_status_via_machine(
         self, essay_id: str, new_status: EssayStatus, metadata: dict[str, Any]
     ) -> None:
         """Update essay state using status from state machine."""
-        await self.update_essay_state(essay_id, new_status, metadata)
+        await self.crud_ops.update_essay_state(essay_id, new_status, metadata)
 
     async def create_essay_record(
         self,
@@ -202,50 +79,13 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         initial_status: EssayStatus | None = None
     ) -> EssayState:
         """Create new essay record from entity reference or keyword arguments."""
-        # Handle both calling patterns
-        if essay_ref is not None:
-            # Legacy pattern with EntityReference
-            actual_essay_id = essay_ref.entity_id
-            actual_batch_id = essay_ref.parent_id
-            actual_status = EssayStatus.UPLOADED
-        else:
-            # New pattern with keyword arguments
-            if essay_id is None:
-                raise ValueError("essay_id is required when essay_ref is not provided")
-            actual_essay_id = essay_id
-            actual_batch_id = batch_id
-            actual_status = initial_status or EssayStatus.READY_FOR_PROCESSING
-
-        essay_state = EssayState(
-            essay_id=actual_essay_id,
-            batch_id=actual_batch_id,
-            current_status=actual_status,
-            timeline={actual_status.value: datetime.now(UTC)},
+        return await self.crud_ops.create_essay_record(
+            essay_ref=essay_ref,
+            essay_id=essay_id,
+            slot_assignment=slot_assignment,
+            batch_id=batch_id,
+            initial_status=initial_status
         )
-
-        async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
-            await db.execute(
-                """
-                INSERT INTO essay_states (
-                    essay_id, batch_id, current_status, processing_metadata,
-                    timeline, storage_references, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    essay_state.essay_id,
-                    essay_state.batch_id,
-                    essay_state.current_status.value,
-                    json.dumps(essay_state.processing_metadata),
-                    json.dumps({k: v.isoformat() for k, v in essay_state.timeline.items()}),
-                    json.dumps({k.value: v for k, v in essay_state.storage_references.items()}),
-                    essay_state.created_at.isoformat(),
-                    essay_state.updated_at.isoformat(),
-                ),
-            )
-
-            await db.commit()
-
-        return essay_state
 
     async def list_essays_by_batch(self, batch_id: str) -> list[ProtocolEssayState]:
         """List all essays in a batch."""

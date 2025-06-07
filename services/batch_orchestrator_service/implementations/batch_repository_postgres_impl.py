@@ -186,7 +186,6 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
                 if result.rowcount == 0:
                     return False
 
-                self.logger.debug(f"Saved pipeline state for batch {batch_id}")
                 return True
 
             except Exception as e:
