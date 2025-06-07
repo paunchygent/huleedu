@@ -48,7 +48,21 @@ async def upload_batch_files(
             logger.warning(f"No files provided for batch {batch_id}.")
             return jsonify({"error": "No files provided in 'files' field."}), 400
 
-        main_correlation_id = uuid.uuid4()
+        # Check for X-Correlation-ID header for distributed tracing
+        correlation_id_header = request.headers.get("X-Correlation-ID")
+        if correlation_id_header:
+            try:
+                main_correlation_id = uuid.UUID(correlation_id_header)
+                logger.info(f"Using correlation ID from header: {main_correlation_id}")
+            except ValueError:
+                logger.warning(
+                    f"Invalid correlation ID format in header: {correlation_id_header}, "
+                    "generating new one"
+                )
+                main_correlation_id = uuid.uuid4()
+        else:
+            main_correlation_id = uuid.uuid4()
+
         logger.info(
             f"Received {len(uploaded_files)} files for batch {batch_id}. "
             f"Correlation ID: {main_correlation_id}"

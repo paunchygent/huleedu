@@ -104,6 +104,11 @@ async def default_perform_spell_check_algorithm(
         f"{log_prefix}Performing L2 + pyspellchecker algorithm for text (length: {len(text)})"
     )
 
+    # Skip empty content or content with less than 20 words
+    if not text or len(text.strip().split()) < 20:
+        logger.warning(f"{log_prefix}Text too short (less than 20 words), skipping spell check")
+        return text, 0
+
     try:
         # Import the migrated modules (local to service)
         import re

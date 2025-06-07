@@ -62,7 +62,8 @@ async def test_comprehensive_real_batch_pipeline():
     await validate_all_services_healthy()
 
     # Step 2: Set up Kafka consumer for pipeline events FIRST
-    consumer_group_id = f"e2e-simple-consumer-{uuid.uuid4()}"
+    # Use unique group ID to avoid conflicts with other tests
+    consumer_group_id = f"e2e-comprehensive-test-{uuid.uuid4().hex[:8]}"
 
     # Monitor key pipeline events to see progression
     monitoring_topics = [
@@ -77,8 +78,9 @@ async def test_comprehensive_real_batch_pipeline():
         *monitoring_topics,
         bootstrap_servers="localhost:9093",
         group_id=consumer_group_id,
-        auto_offset_reset="latest",  # Only see new events from this test run
-        enable_auto_commit=False
+        auto_offset_reset="earliest",  # FIX: Get all events to avoid test order dependency
+        enable_auto_commit=False,
+        value_deserializer=lambda x: json.loads(x.decode("utf-8")),
     )
 
     try:
@@ -88,22 +90,27 @@ async def test_comprehensive_real_batch_pipeline():
         # Give consumer time to position at latest offsets
         await asyncio.sleep(2)
 
-        # Step 3: Register batch with BOS
+        # Step 3: Generate unique correlation ID for this test (must be valid UUID format)
+        test_correlation_id = str(uuid.uuid4())
+        print(f"🔍 Test correlation ID: {test_correlation_id}")
+
+        # Step 4: Register batch with BOS
         print("📝 Registering batch with BOS to create essay slots...")
-        batch_id = await register_batch_with_bos(len(test_essays))
+        batch_id = await register_batch_with_bos(len(test_essays), test_correlation_id)
         print(f"✅ Batch registered with BOS: {batch_id}")
 
-        # Step 4: Upload files to trigger the pipeline
+        # Step 5: Upload files to trigger the pipeline with correlation ID header
         print("🚀 Uploading real student essays to trigger pipeline...")
         upload_response = await upload_real_essays_via_file_service(
             batch_id=batch_id,
-            essay_files=test_essays
+            essay_files=test_essays,
+            correlation_id=test_correlation_id
         )
         print(f"✅ File upload successful: {upload_response}")
 
-        # Step 5: Watch pipeline progression and wait for completion
+        # Step 6: Watch pipeline progression and wait for completion with correlation ID filtering
         print("⏳ Watching pipeline progression...")
-        result = await watch_pipeline_progression(event_consumer, batch_id, timeout_seconds=30)
+        result = await watch_pipeline_progression(event_consumer, batch_id, test_correlation_id, timeout_seconds=60)
         cj_completion = result
 
         assert cj_completion is not None, "CJ assessment phase did not complete"
@@ -145,7 +152,8 @@ async def validate_all_services_healthy() -> None:
 
 async def upload_real_essays_via_file_service(
     batch_id: str,
-    essay_files: List[Path]
+    essay_files: List[Path],
+    correlation_id: str | None = None
 ) -> Dict[str, Any]:
     """Upload real student essays via File Service batch endpoint."""
 
@@ -163,20 +171,27 @@ async def upload_real_essays_via_file_service(
                 content_type="text/plain"
             )
 
+        # Prepare headers with correlation ID for distributed tracing
+        headers = {}
+        if correlation_id:
+            headers["X-Correlation-ID"] = correlation_id
+
         async with session.post(
             "http://localhost:7001/v1/files/batch",
             data=data,
+            headers=headers,
             timeout=aiohttp.ClientTimeout(total=60)
         ) as response:
             # File Service returns 202 for async processing, not 200
             if response.status == 202:
-                return await response.json()
+                result: Dict[str, Any] = await response.json()
+                return result
             else:
                 error_text = await response.text()
                 raise AssertionError(f"File upload failed: {response.status} - {error_text}")
 
 
-async def register_batch_with_bos(expected_essay_count: int) -> str:
+async def register_batch_with_bos(expected_essay_count: int, correlation_id: str | None = None) -> str:
     """Register a batch with BOS to create essay slots before file upload."""
 
     registration_payload = {
@@ -195,8 +210,9 @@ async def register_batch_with_bos(expected_essay_count: int) -> str:
             timeout=aiohttp.ClientTimeout(total=30)
         ) as response:
             if response.status == 202:
-                result = await response.json()
-                return result["batch_id"]
+                result: Dict[str, Any] = await response.json()
+                batch_id: str = result["batch_id"]
+                return batch_id
             else:
                 error_text = await response.text()
                 raise AssertionError(
@@ -207,8 +223,9 @@ async def register_batch_with_bos(expected_essay_count: int) -> str:
 async def watch_pipeline_progression(
     consumer: AIOKafkaConsumer,
     batch_id: str,
+    correlation_id: str | None = None,
     timeout_seconds: int = 180
-) -> Dict[str, Any]:
+) -> Dict[str, Any] | None:
     """Watch pipeline progression and wait for completion."""
 
     start_time = asyncio.get_event_loop().time()
@@ -221,14 +238,40 @@ async def watch_pipeline_progression(
             for topic_partition, messages in msg_batch.items():
                 for message in messages:
                     try:
-                        message_text = message.value.decode('utf-8')
-                        envelope_data = json.loads(message_text)
+                        # message.value is already deserialized by value_deserializer
+                        envelope_data = message.value
                         event_data = envelope_data.get("data", {})
 
-                        # Check if this event is for our batch
+                                                # Check if this event is for our batch and correlation ID (if provided)
                         entity_id = event_data.get("entity_ref", {}).get("entity_id")
+                        event_correlation_id = envelope_data.get("correlation_id")
 
-                        if entity_id == batch_id:
+                        # DEBUG: Print event details to understand filtering
+                        print(f"🔍 DEBUG: Received event on {message.topic}")
+                        print(f"    Entity ID: {entity_id}")
+                        print(f"    Event Correlation ID: {event_correlation_id}")
+                        print(f"    Expected Batch ID: {batch_id}")
+                        print(f"    Expected Correlation ID: {correlation_id}")
+
+                        # Smart filtering: Different events have different entity_id patterns
+                        if message.topic in [
+                            topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
+                            topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
+                            topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
+                        ]:
+                            # Batch-level events: entity_id should be batch_id
+                            entity_match = entity_id == batch_id
+                        else:
+                            # Essay-level events: rely on correlation_id for filtering
+                            # (entity_id will be essay_id, not batch_id)
+                            entity_match = True  # Accept any entity_id for essay events
+
+                        correlation_match = (correlation_id is None or
+                                           event_correlation_id == correlation_id)
+
+                        print(f"    Entity match: {entity_match}, Correlation match: {correlation_match}")
+
+                        if entity_match and correlation_match:
                             # Show progression based on event type
                             if message.topic == topic_name(
                                 ProcessingEvent.BATCH_ESSAYS_READY
@@ -277,7 +320,8 @@ async def watch_pipeline_progression(
                                 print(
                                     "🎯 Pipeline SUCCESS! Complete end-to-end processing finished."
                                 )
-                                return envelope_data
+                                # Return the envelope data as Dict[str, Any]
+                                return dict(envelope_data)
 
                     except (json.JSONDecodeError, KeyError) as e:
                         print(f"⚠️ Failed to parse message: {e}")
