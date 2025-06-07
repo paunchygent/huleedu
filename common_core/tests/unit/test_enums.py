@@ -99,7 +99,7 @@ class TestTopicNameFunction:
             == "huleedu.essay.spellcheck.requested.v1"
         )
         assert (
-            topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED)
+            topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
             == "huleedu.essay.spellcheck.completed.v1"
         )
 
@@ -195,7 +195,7 @@ class TestTopicNameFunction:
         # Events that should definitely have mappings
         required_mapped_events = [
             ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
-            ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED,
+            ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
             ProcessingEvent.BATCH_ESSAYS_REGISTERED,
             ProcessingEvent.BATCH_ESSAYS_READY,
             ProcessingEvent.ESSAY_CONTENT_PROVISIONED,

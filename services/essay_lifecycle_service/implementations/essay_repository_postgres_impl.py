@@ -278,10 +278,20 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
     async def list_essays_by_batch_and_phase(self, batch_id: str, phase_name: str) -> list[EssayState]:
         """List all essays in a batch that are part of a specific processing phase."""
-        # Define phase mappings using correct enum values
+        # Define phase mappings using correct enum values - MUST include ALL statuses for each phase
         phase_status_mapping = {
-            "spellcheck": [EssayStatus.AWAITING_SPELLCHECK, EssayStatus.SPELLCHECKED_SUCCESS],
-            "cj_assessment": [EssayStatus.AWAITING_CJ_ASSESSMENT, EssayStatus.CJ_ASSESSMENT_SUCCESS],
+            "spellcheck": [
+                EssayStatus.AWAITING_SPELLCHECK,
+                EssayStatus.SPELLCHECKING_IN_PROGRESS,
+                EssayStatus.SPELLCHECKED_SUCCESS,
+                EssayStatus.SPELLCHECK_FAILED,
+            ],
+                        "cj_assessment": [
+                EssayStatus.AWAITING_CJ_ASSESSMENT,
+                EssayStatus.CJ_ASSESSMENT_IN_PROGRESS,
+                EssayStatus.CJ_ASSESSMENT_SUCCESS,
+                EssayStatus.CJ_ASSESSMENT_FAILED,
+            ],
         }
 
         if phase_name not in phase_status_mapping:

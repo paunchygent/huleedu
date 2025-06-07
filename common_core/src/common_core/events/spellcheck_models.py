@@ -26,7 +26,7 @@ class SpellcheckResultDataV1(ProcessingUpdate):
     """
     Data representing the result of a spellcheck.
     'event_name' (from BaseEventData) should be
-        ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED.value
+        ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value
     'status' (from ProcessingUpdate) indicates outcome
         (e.g., SPELLCHECKED_SUCCESS or _FAILED).
     'system_metadata' provides context for this result event, including error_info if failed.

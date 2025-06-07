@@ -68,8 +68,13 @@ async def process_single_message(
                 "correlation_id": str(correlation_id),
                 "event_id": str(envelope.event_id),
                 "bos_batch_id": str(request_event_data.entity_ref.entity_id),
+                "essay_count": len(request_event_data.essays_for_cj),
+                "language": request_event_data.language,
+                "course_code": request_event_data.course_code,
             }
-            logger.debug("Deserialized ELS_CJAssessmentRequestV1 event", extra=log_extra)
+
+            logger.info("📨 Received CJ assessment request from ELS", extra=log_extra)
+            logger.info(f"📚 Processing {len(request_event_data.essays_for_cj)} essays for CJ assessment", extra=log_extra)
 
         except (
             Exception
@@ -99,6 +104,8 @@ async def process_single_message(
             "llm_config_overrides": request_event_data.llm_config_overrides,
         }
 
+        logger.info(f"Starting CJ assessment workflow for batch {converted_request_data['bos_batch_id']}", extra=log_extra)
+
         # Run CJ assessment workflow with LLM interaction
         rankings, cj_job_id_ref = await run_cj_assessment_workflow(
             request_data=converted_request_data,
@@ -108,6 +115,16 @@ async def process_single_message(
             llm_interaction=llm_interaction,
             event_publisher=event_publisher,
             settings=settings_obj,
+        )
+
+        logger.info(
+            f"CJ assessment workflow completed for batch {converted_request_data['bos_batch_id']}",
+            extra={
+                **log_extra,
+                "job_id": cj_job_id_ref,
+                "rankings_count": len(rankings) if rankings else 0,
+                "rankings_preview": rankings[:2] if rankings else []
+            }
         )
 
         # Construct and publish CJAssessmentCompletedV1 event
@@ -136,11 +153,21 @@ async def process_single_message(
             data=completed_event_data,
         )
 
+        logger.info(
+            f"📤 Publishing CJ assessment completion event for batch {converted_request_data['bos_batch_id']}",
+            extra={
+                **log_extra,
+                "completion_topic": settings_obj.CJ_ASSESSMENT_COMPLETED_TOPIC,
+                "job_id": cj_job_id_ref,
+                "rankings_count": len(rankings) if rankings else 0,
+            }
+        )
+
         await event_publisher.publish_assessment_completed(
             completion_data=completed_envelope, correlation_id=completed_envelope.correlation_id
         )
 
-        logger.info("CJ assessment message processed successfully.", extra=log_extra)
+        logger.info("✅ CJ assessment message processed successfully and completion event published.", extra=log_extra)
         return True
 
     except Exception as e:

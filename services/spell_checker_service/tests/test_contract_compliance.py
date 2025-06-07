@@ -35,7 +35,7 @@ from ..worker_main import (
 )
 
 # Constants for frequently referenced values
-ESSAY_RESULT_EVENT = ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED
+ESSAY_RESULT_EVENT = ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED
 CORRECTED_TEXT_TYPE = ContentType.CORRECTED_TEXT
 
 

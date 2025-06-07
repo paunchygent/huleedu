@@ -283,6 +283,18 @@ class SpecializedServiceRequestDispatcher(Protocol):
         """Dispatch AI feedback requests to AI Feedback Service."""
         ...
 
+    async def dispatch_cj_assessment_requests(
+        self,
+        essays_to_process: list[EssayProcessingInputRefV1],
+        language: str,
+        course_code: str,
+        essay_instructions: str,
+        batch_id: str,
+        correlation_id: UUID | None = None,
+    ) -> None:
+        """Dispatch CJ assessment requests to CJ Assessment Service."""
+        ...
+
 
 class StateTransitionValidator(Protocol):
     """Protocol for validating essay state transitions."""

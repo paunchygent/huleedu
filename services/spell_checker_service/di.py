@@ -7,6 +7,7 @@ from aiokafka import AIOKafkaProducer
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry
 
+from common_core.enums import ProcessingEvent, topic_name
 from services.spell_checker_service.config import Settings, settings
 from services.spell_checker_service.protocol_implementations.content_client_impl import (
     DefaultContentClient,
@@ -68,9 +69,9 @@ class SpellCheckerServiceProvider(Provider):
     ) -> SpellcheckEventPublisherProtocol:
         """Provide spellcheck event publisher implementation."""
         return DefaultSpellcheckEventPublisher(
-            kafka_event_type="huleedu.spellchecker.essay.concluded.v1",
+            kafka_event_type=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
             source_service_name="spell-checker-service",
-            kafka_output_topic="huleedu.essay.spellcheck.completed.v1",
+            kafka_output_topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
         )
 
     # Note: SpellLogicProtocol will be provided per-message since it needs message-specific data

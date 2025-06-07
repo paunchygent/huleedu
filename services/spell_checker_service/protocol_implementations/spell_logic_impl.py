@@ -90,7 +90,7 @@ class DefaultSpellLogic(SpellLogicProtocol):
                     if current_status == EssayStatus.SPELLCHECKED_SUCCESS
                     else ProcessingStage.FAILED
                 ),
-                "event": ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED.value,
+                "event": ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
                 "completed_at": datetime.now(timezone.utc),
                 "error_info": updated_error_info,
             }
@@ -102,7 +102,7 @@ class DefaultSpellLogic(SpellLogicProtocol):
             original_text_storage_id=self.original_text_storage_id,
             storage_metadata=storage_metadata_for_result,
             corrections_made=corrections_count,
-            event_name=ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED,
+            event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
             entity_ref=final_entity_ref,
             timestamp=datetime.now(timezone.utc),
             status=current_status,

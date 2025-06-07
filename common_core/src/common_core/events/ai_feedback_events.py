@@ -55,7 +55,7 @@ class AIFeedbackResultDataV1(ProcessingUpdate):
     # Inherits status (EssayStatus), system_metadata from ProcessingUpdate
 
     event_name: ProcessingEvent = Field(
-        default=ProcessingEvent.ESSAY_AIFEEDBACK_RESULT_RECEIVED,
+        default=ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED,
         description="The specific type of processing event.",
     )
     # The 'status' field (inherited from ProcessingUpdate) will be populated with

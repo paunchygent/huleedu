@@ -60,7 +60,7 @@ common_core/
 - **Essay Lifecycle**: `ESSAY_PHASE_INITIATION_REQUESTED`, `ESSAY_LIFECYCLE_STATE_UPDATED`
 - **Essay Content**: `ESSAY_CONTENT_PROVISIONED`, `EXCESS_CONTENT_PROVISIONED`
 - **Service Commands**: `BATCH_SPELLCHECK_INITIATE_COMMAND`
-- **Specialized Services**: `ESSAY_SPELLCHECK_REQUESTED`, `ESSAY_SPELLCHECK_RESULT_RECEIVED`, `ESSAY_NLP_RESULT_RECEIVED`, `ESSAY_AIFEEDBACK_RESULT_RECEIVED`, etc.
+- **Specialized Services**: `ESSAY_SPELLCHECK_REQUESTED`, `ESSAY_SPELLCHECK_COMPLETED`, `ESSAY_NLP_COMPLETED`, `ESSAY_AIFEEDBACK_COMPLETED`, etc.
 - **Generic**: `PROCESSING_STARTED`, `PROCESSING_CONCLUDED`, `PROCESSING_FAILED`
 
 ### 3.3. EssayStatus
@@ -92,7 +92,7 @@ def topic_name(event: ProcessingEvent) -> str:
 **Current Mappings**:
 
 - `ESSAY_SPELLCHECK_REQUESTED` → `"huleedu.essay.spellcheck.requested.v1"`
-- `ESSAY_SPELLCHECK_RESULT_RECEIVED` → `"huleedu.essay.spellcheck.completed.v1"`
+- `ESSAY_SPELLCHECK_COMPLETED` → `"huleedu.essay.spellcheck.completed.v1"`
 - `BATCH_ESSAYS_REGISTERED` → `"huleedu.batch.essays.registered.v1"`
 - `BATCH_ESSAYS_READY` → `"huleedu.els.batch.essays.ready.v1"`
 - `ESSAY_CONTENT_PROVISIONED` → `"huleedu.file.essay.content.provisioned.v1"`

@@ -43,3 +43,8 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
         encoded_message = json.dumps(result_envelope.model_dump(mode="json")).encode("utf-8")
 
         await producer.send_and_wait(self.kafka_output_topic, encoded_message, key=encoded_key)
+
+        # Add logging to track successful event publishing
+        from huleedu_service_libs.logging_utils import create_service_logger
+        logger = create_service_logger("spell_checker_service.event_publisher_impl")
+        logger.info(f"Published spellcheck completion event for essay {event_data.entity_ref.entity_id}")

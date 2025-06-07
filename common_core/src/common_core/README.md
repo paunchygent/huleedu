@@ -94,7 +94,7 @@ These Pydantic models define the `data` field within the `EventEnvelope` for spe
 
 * **Result Models (Specialized Services -> ELS)**: Define what specialized services send back to ELS.
   * Example: `SpellcheckResultDataV1` (inherits `ProcessingUpdate`)
-    * `event_name`: `ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED`
+    * `event_name`: `ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED`
     * `entity_ref`: Identifies the essay.
     * `status`: The outcome `EssayStatus` (e.g., `SPELLCHECK_SUCCESS`).
     * `system_metadata`: Includes `processing_stage` (e.g., `COMPLETED`).
@@ -155,7 +155,7 @@ This illustrates how the `common_core` components are used in a typical (happy p
     * **SCS Publishes Result to ELS**:
         * `EventEnvelope` with `event_type = "huleedu.spellchecker.essay.concluded.v1"`.
         * `data = SpellcheckResultDataV1(...)` including:
-            * `event_name = ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED`
+            * `event_name = ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED`
             * `entity_ref` for the essay.
             * `status = EssayStatus.SPELLCHECK_SUCCESS`
             * `system_metadata.processing_stage = ProcessingStage.COMPLETED`

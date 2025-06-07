@@ -63,12 +63,12 @@ class DefaultPipelinePhaseCoordinator:
         await self.update_phase_status(
             batch_id,
             completed_phase,
-            "COMPLETED_SUCCESSFULLY" if phase_status == "completed" else "FAILED",
+            "COMPLETED_SUCCESSFULLY" if phase_status == "COMPLETED_SUCCESSFULLY" else "FAILED",
             datetime.now(timezone.utc).isoformat(),
         )
 
         # Only proceed with next phase if current phase completed successfully
-        if phase_status != "completed":
+        if phase_status != "COMPLETED_SUCCESSFULLY":
             logger.info(
                 f"Phase {completed_phase} for batch {batch_id} did not complete successfully, "
                 f"skipping next phase initiation"

@@ -80,7 +80,7 @@ async def test_complete_spellcheck_processing_pipeline():
     print(f"✅ Original content uploaded with storage_id: {original_storage_id}")
 
     # Step 2: Set up Kafka monitoring for spellcheck results
-    result_topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED)
+    result_topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
     result_consumer = AIOKafkaConsumer(
         result_topic,
         bootstrap_servers="localhost:9093",  # External port as learned in Phase 2
@@ -167,7 +167,7 @@ async def test_spellcheck_pipeline_with_no_errors():
     original_storage_id = await upload_content_to_content_service(perfect_essay_content)
 
     # Set up monitoring
-    result_topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED)
+    result_topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
     result_consumer = AIOKafkaConsumer(
         result_topic,
         bootstrap_servers="localhost:9093",

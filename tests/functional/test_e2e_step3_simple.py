@@ -28,7 +28,7 @@ async def test_complete_workflow_file_to_els():
     Test the complete workflow from batch registration through ELS integration.
 
     This demonstrates the proper sequence:
-    1. BOS batch registration  
+    1. BOS batch registration
     2. File Service upload
     3. Kafka event flow
     4. ELS essay entity creation

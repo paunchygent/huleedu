@@ -58,7 +58,7 @@ The service follows a clean architecture pattern with clear separation of concer
 ### **Produces**
 
 * **Event Type String in Envelope**: `huleedu.spellchecker.essay.concluded.v1` (defined as `KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED` in `event_processor.py`).
-  * **Topic**: Dynamically determined by `topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED)`.
+  * **Topic**: Dynamically determined by `topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)`.
   * **Data Model**: `EventEnvelope[SpellcheckResultDataV1]`.
   * Contains correction results and storage references.
 

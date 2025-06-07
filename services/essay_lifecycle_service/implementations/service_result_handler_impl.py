@@ -113,7 +113,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                             "success": is_success,
                             "status": result_data.status.value,
                             "original_text_storage_id": result_data.original_text_storage_id,
-                            "storage_metadata": result_data.storage_metadata,
+                            "storage_metadata": result_data.storage_metadata.model_dump() if result_data.storage_metadata else None,
                             "corrections_made": result_data.corrections_made,
                             "error_info": result_data.system_metadata.error_info if result_data.system_metadata else None,
                         },

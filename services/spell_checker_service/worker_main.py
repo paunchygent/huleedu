@@ -41,11 +41,11 @@ CONSUMER_CLIENT_ID = settings.CONSUMER_CLIENT_ID
 METRICS_PORT = settings.METRICS_PORT  # Now properly configured in Settings class
 
 INPUT_TOPIC = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
-OUTPUT_TOPIC = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED)
+OUTPUT_TOPIC = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
 # Configuration constants for protocol implementations
 CONTENT_SERVICE_URL_CONFIG = settings.CONTENT_SERVICE_URL
-KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED = "huleedu.spellchecker.essay.concluded.v1"
+KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 SOURCE_SERVICE_NAME_CONFIG = "spell-checker-service"
 
 # Prometheus metrics (will be initialized with DI registry)

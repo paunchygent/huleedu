@@ -65,8 +65,8 @@ class ProcessingEvent(str, Enum):
     ELS_BATCH_PHASE_OUTCOME = "els.batch.phase.outcome"
 
     # -------------  Results from specialised services -############
-    ESSAY_SPELLCHECK_RESULT_RECEIVED = (
-        "essay.spellcheck.result.received"  # Output from spellchecker
+    ESSAY_SPELLCHECK_COMPLETED = (
+        "essay.spellcheck.completed"  # Output from spellchecker (producer perspective)
     )
     ESSAY_SPELLCHECK_REQUESTED = (
         "essay.spellcheck.requested"  # Input to spellchecker (added for clarity)
@@ -74,10 +74,10 @@ class ProcessingEvent(str, Enum):
     ELS_CJ_ASSESSMENT_REQUESTED = "els.cj_assessment.requested"
     CJ_ASSESSMENT_COMPLETED = "cj_assessment.completed"
     CJ_ASSESSMENT_FAILED = "cj_assessment.failed"
-    ESSAY_NLP_RESULT_RECEIVED = "essay.nlp.result.received"
-    ESSAY_AIFEEDBACK_RESULT_RECEIVED = "essay.aifeedback.result.received"
-    ESSAY_EDITOR_REVISION_RESULT_RECEIVED = "essay.editor_revision.result.received"
-    ESSAY_GRAMMAR_RESULT_RECEIVED = "essay.grammar.result.received"
+    ESSAY_NLP_COMPLETED = "essay.nlp.completed"  # Producer perspective
+    ESSAY_AIFEEDBACK_COMPLETED = "essay.aifeedback.completed"  # Producer perspective
+    ESSAY_EDITOR_REVISION_COMPLETED = "essay.editor_revision.completed"  # Producer perspective
+    ESSAY_GRAMMAR_COMPLETED = "essay.grammar.completed"  # Producer perspective
 
     # -------------  Generic -------------#
     PROCESSING_STARTED = "processing.started"
@@ -88,7 +88,7 @@ class ProcessingEvent(str, Enum):
 # Private mapping for topic_name() function
 _TOPIC_MAPPING = {
     ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED: "huleedu.essay.spellcheck.requested.v1",
-    ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED: "huleedu.essay.spellcheck.completed.v1",
+    ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED: "huleedu.essay.spellcheck.completed.v1",
     ProcessingEvent.BATCH_ESSAYS_REGISTERED: "huleedu.batch.essays.registered.v1",
     ProcessingEvent.ESSAY_CONTENT_PROVISIONED: "huleedu.file.essay.content.provisioned.v1",
     ProcessingEvent.EXCESS_CONTENT_PROVISIONED: "huleedu.els.excess.content.provisioned.v1",
@@ -130,7 +130,7 @@ def topic_name(event: ProcessingEvent) -> str:
     Current Topic Mapping:
     ----------------------
     ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED ➜ "huleedu.essay.spellcheck.requested.v1"
-    ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED ➜ "huleedu.essay.spellcheck.completed.v1"
+    ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED ➜ "huleedu.essay.spellcheck.completed.v1"
     ProcessingEvent.BATCH_ESSAYS_REGISTERED ➜ "huleedu.batch.essays.registered.v1"
 
 

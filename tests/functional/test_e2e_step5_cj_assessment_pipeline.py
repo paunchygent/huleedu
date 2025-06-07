@@ -75,10 +75,10 @@ async def test_complete_cj_assessment_processing_pipeline():
 
     # Use real student essays for CJ Assessment
     essay_files = [
-        "test_uploads/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt",
-        "test_uploads/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt",
-        "test_uploads/MHHXGMUX 50 (SA24D ENG 5 WRITING 2025).txt",
-        "test_uploads/MHHXGMUU 50 (SA24D ENG 5 WRITING 2025).txt"
+        "test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt",
+        "test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt",
+        "test_uploads/real_test_batch/MHHXGMUX 50 (SA24D ENG 5 WRITING 2025).txt",
+        "test_uploads/real_test_batch/MHHXGMUU 50 (SA24D ENG 5 WRITING 2025).txt"
     ]
 
     # Step 1: Upload essays to Content Service
@@ -175,8 +175,8 @@ async def test_cj_assessment_pipeline_minimal_essays():
 
     # Use just 2 essays for minimal CJ
     essay_files = [
-        "test_uploads/MHHXGLUU 50 (SA24D ENG 5 WRITING 2025).txt",
-        "test_uploads/MHHXGLMX 50 (SA24D ENG 5 WRITING 2025).txt"
+        "test_uploads/real_test_batch/MHHXGLUU 50 (SA24D ENG 5 WRITING 2025).txt",
+        "test_uploads/real_test_batch/MHHXGLMX 50 (SA24D ENG 5 WRITING 2025).txt"
     ]
 
     # Upload essays

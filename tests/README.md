@@ -6,7 +6,7 @@ This is the comprehensive functional testing framework for the HuleEdu microserv
 
 ## Architecture
 
-```
+``` text
 tests/
 ├── __init__.py                     # Framework package
 ├── README.md                       # This file

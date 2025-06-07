@@ -121,7 +121,7 @@ async def process_single_message(
             error_sys_meta = request_data.system_metadata.model_copy(
                 update={
                     "processing_stage": ProcessingStage.FAILED,
-                    "event": ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED.value,
+                    "event": ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
                     "completed_at": datetime.now(timezone.utc),
                     "error_info": {
                         "fetch_error": f"Failed to fetch original content: {str(fetch_exc)[:150]}"
@@ -132,7 +132,7 @@ async def process_single_message(
                 original_text_storage_id=request_data.text_storage_id,
                 storage_metadata=None,
                 corrections_made=None,
-                event_name=ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED,
+                event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
                 entity_ref=request_data.entity_ref,
                 timestamp=datetime.now(timezone.utc),
                 status=EssayStatus.SPELLCHECK_FAILED,
@@ -151,7 +151,7 @@ async def process_single_message(
             empty_content_sys_meta = request_data.system_metadata.model_copy(
                 update={
                     "processing_stage": ProcessingStage.FAILED,
-                    "event": ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED.value,
+                    "event": ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
                     "completed_at": datetime.now(timezone.utc),
                     "error_info": {"content_error": "Fetched content is None or empty"},
                 }
@@ -160,7 +160,7 @@ async def process_single_message(
                 original_text_storage_id=request_data.text_storage_id,
                 storage_metadata=None,
                 corrections_made=None,
-                event_name=ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED,
+                event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
                 entity_ref=request_data.entity_ref,
                 timestamp=datetime.now(timezone.utc),
                 status=EssayStatus.SPELLCHECK_FAILED,
@@ -221,7 +221,7 @@ async def process_single_message(
 
                 error_sys_meta_update = {
                     "processing_stage": ProcessingStage.FAILED,
-                    "event": ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED.value,
+                    "event": ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
                     "completed_at": datetime.now(timezone.utc),
                     "error_info": {"unhandled_error": f"Unhandled error: {str(e)[:200]}"},
                 }
@@ -235,7 +235,7 @@ async def process_single_message(
                         timestamp=processing_started_at,  # Time of initial processing attempt
                         started_at=processing_started_at,
                         processing_stage=ProcessingStage.FAILED,
-                        event=ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED.value,
+                        event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
                         completed_at=datetime.now(timezone.utc),
                         error_info={"unhandled_error": f"Unhandled error: {str(e)[:200]}"},
                     )
@@ -248,7 +248,7 @@ async def process_single_message(
                     ),
                     storage_metadata=None,
                     corrections_made=None,
-                    event_name=ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED,
+                    event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
                     entity_ref=error_entity_ref,
                     timestamp=datetime.now(timezone.utc),
                     status=EssayStatus.SPELLCHECK_FAILED,

@@ -178,7 +178,7 @@ Topics follow the pattern: `{project}.{domain}.{entity}.{action}.v{version}`
 def topic_name(event: ProcessingEvent) -> str:
     mapping = {
         ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED: "huleedu.essay.spellcheck.requested.v1",
-        ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED: "huleedu.essay.spellcheck.completed.v1",
+        ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED: "huleedu.essay.spellcheck.completed.v1",
     }
     return mapping[event]
 ```

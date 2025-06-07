@@ -144,3 +144,96 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         # TODO: Implement when AI Feedback Service is available
         logger = create_service_logger("specialized_service_dispatcher")
         logger.info("Dispatching AI feedback requests (STUB)")
+
+    async def dispatch_cj_assessment_requests(
+        self,
+        essays_to_process: list[EssayProcessingInputRefV1],
+        language: str,
+        course_code: str,
+        essay_instructions: str,
+        batch_id: str,
+        correlation_id: UUID | None = None,
+    ) -> None:
+        """Dispatch CJ assessment request to CJ Assessment Service."""
+        from datetime import UTC, datetime
+
+        from common_core.enums import ProcessingEvent, ProcessingStage, topic_name
+        from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
+        from common_core.events.envelope import EventEnvelope
+        from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+
+        logger = create_service_logger("specialized_service_dispatcher")
+
+        logger.info(
+            "Dispatching CJ assessment request to CJ Assessment Service",
+            extra={
+                "batch_id": batch_id,
+                "essay_count": len(essays_to_process),
+                "essay_ids": [essay.essay_id for essay in essays_to_process],
+                "language": language,
+                "course_code": course_code,
+                "essay_instructions": essay_instructions[:100] + "..." if len(essay_instructions) > 100 else essay_instructions,
+                "correlation_id": str(correlation_id),
+            },
+        )
+
+        try:
+            # Create batch entity reference (CJ assessment works on batches, not individual essays)
+            batch_entity_ref = EntityReference(
+                entity_id=batch_id,
+                entity_type="batch",
+            )
+
+            # Create system metadata
+            system_metadata = SystemProcessingMetadata(
+                entity=batch_entity_ref,
+                event=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED.value,
+                timestamp=datetime.now(UTC),
+                processing_stage=ProcessingStage.PENDING,
+            )
+
+            # Create CJ assessment request event data
+            cj_request = ELS_CJAssessmentRequestV1(
+                entity_ref=batch_entity_ref,
+                system_metadata=system_metadata,
+                essays_for_cj=essays_to_process,
+                language=language,
+                course_code=course_code,
+                essay_instructions=essay_instructions,
+                llm_config_overrides=None,  # Use service defaults
+            )
+
+            # Create event envelope
+            envelope = EventEnvelope[ELS_CJAssessmentRequestV1](
+                event_type=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
+                source_service=self.settings.SERVICE_NAME,
+                correlation_id=correlation_id,
+                data=cj_request,
+            )
+
+            # Publish to CJ Assessment Service
+            topic = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
+            message = envelope.model_dump_json().encode("utf-8")
+            await self.producer.send_and_wait(topic, message)
+
+            logger.info(
+                "Successfully dispatched CJ assessment request",
+                extra={
+                    "batch_id": batch_id,
+                    "essay_count": len(essays_to_process),
+                    "language": language,
+                    "course_code": course_code,
+                    "event_id": str(envelope.event_id),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+        except Exception as e:
+            logger.error(
+                "Failed to dispatch CJ assessment request",
+                extra={
+                    "error": str(e),
+                    "essay_count": len(essays_to_process),
+                    "correlation_id": str(correlation_id),
+                },
+            )

@@ -48,10 +48,12 @@ async def create_kafka_consumer() -> AIOKafkaConsumer:
     """Create and configure Kafka consumer."""
     # Define topics using topic_name() function for consistency
     topics = [
-        topic_name(ProcessingEvent.ESSAY_SPELLCHECK_RESULT_RECEIVED),
+        topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
         topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),
         topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED),
         topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
     ]
 
     consumer = AIOKafkaConsumer(
