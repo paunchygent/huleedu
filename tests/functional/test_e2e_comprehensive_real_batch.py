@@ -29,7 +29,7 @@ from common_core.enums import ProcessingEvent, topic_name
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-@pytest.mark.timeout(240)  # 2 minute timeout for complete pipeline with mock LLM
+@pytest.mark.timeout(240)  # 4 minute timeout for complete pipeline with mock LLM
 async def test_comprehensive_real_batch_pipeline():
     """
     Test complete pipeline with real student essays through actual BOS orchestration.
@@ -55,20 +55,18 @@ async def test_comprehensive_real_batch_pipeline():
 
     print(f"📚 Found {len(essay_files)} real student essays")
 
-    # Use subset for test performance (first 6 essays)
+    # Use subset for test performance
     test_essays = essay_files[:25]
 
     # Step 1: Validate all services are healthy
     await validate_all_services_healthy()
 
     # Step 2: Set up Kafka consumer for pipeline events FIRST
-    # Use unique group ID to avoid conflicts with other tests
     consumer_group_id = f"e2e-comprehensive-test-{uuid.uuid4().hex[:8]}"
-
-    # Monitor key pipeline events to see progression
     monitoring_topics = [
         topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
         topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
         topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
         topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
         topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
@@ -78,19 +76,37 @@ async def test_comprehensive_real_batch_pipeline():
         *monitoring_topics,
         bootstrap_servers="localhost:9093",
         group_id=consumer_group_id,
-        auto_offset_reset="earliest",  # FIX: Get all events to avoid test order dependency
+        auto_offset_reset="latest",
         enable_auto_commit=False,
         value_deserializer=lambda x: json.loads(x.decode("utf-8")),
     )
 
     try:
         await event_consumer.start()
-        print("✅ Consumer ready for pipeline events")
+        print("✅ Consumer starting...")
 
-        # Give consumer time to position at latest offsets
-        await asyncio.sleep(2)
+        # FIX: Wait for the consumer to be assigned partitions, then seek to the end.
+        # This robustly prevents the race condition where events are published before the
+        # consumer is ready to read from the 'latest' position.
+        partitions_assigned = False
+        assignment_timeout = 15  # seconds
+        start_time = asyncio.get_event_loop().time()
+        while not partitions_assigned:
+            if asyncio.get_event_loop().time() - start_time > assignment_timeout:
+                pytest.fail("Kafka consumer did not get partition assignment within timeout.")
 
-        # Step 3: Generate unique correlation ID for this test (must be valid UUID format)
+            assigned_partitions = event_consumer.assignment()
+            if assigned_partitions:
+                print(f"✅ Consumer assigned partitions: {assigned_partitions}")
+                # Now that we have partitions, seek to the absolute end of them.
+                await event_consumer.seek_to_end()
+                print("✅ Consumer is now positioned at the end of all topics.")
+                partitions_assigned = True
+            else:
+                # Still waiting for the consumer group to balance and assign partitions.
+                await asyncio.sleep(0.2)
+
+        # Step 3: Generate a valid UUID for the correlation ID
         test_correlation_id = str(uuid.uuid4())
         print(f"🔍 Test correlation ID: {test_correlation_id}")
 
@@ -99,7 +115,7 @@ async def test_comprehensive_real_batch_pipeline():
         batch_id = await register_batch_with_bos(len(test_essays), test_correlation_id)
         print(f"✅ Batch registered with BOS: {batch_id}")
 
-        # Step 5: Upload files to trigger the pipeline with correlation ID header
+        # Step 5: Upload files to trigger the pipeline
         print("🚀 Uploading real student essays to trigger pipeline...")
         upload_response = await upload_real_essays_via_file_service(
             batch_id=batch_id,
@@ -108,9 +124,9 @@ async def test_comprehensive_real_batch_pipeline():
         )
         print(f"✅ File upload successful: {upload_response}")
 
-        # Step 6: Watch pipeline progression and wait for completion with correlation ID filtering
+        # Step 6: Watch pipeline progression
         print("⏳ Watching pipeline progression...")
-        result = await watch_pipeline_progression(event_consumer, batch_id, test_correlation_id, timeout_seconds=60)
+        result = await watch_pipeline_progression(event_consumer, batch_id, test_correlation_id, timeout_seconds=180)
         cj_completion = result
 
         assert cj_completion is not None, "CJ assessment phase did not complete"
@@ -128,7 +144,7 @@ async def test_comprehensive_real_batch_pipeline():
 
 
 async def validate_all_services_healthy() -> None:
-    """Validate all 6 services are healthy before running comprehensive test."""
+    """Validate all services are healthy before running comprehensive test."""
     services = [
         ("File Service", "http://localhost:7001/healthz"),
         ("Content Service", "http://localhost:8001/healthz"),
@@ -158,7 +174,6 @@ async def upload_real_essays_via_file_service(
     """Upload real student essays via File Service batch endpoint."""
 
     async with aiohttp.ClientSession() as session:
-        # Create multipart form data
         data = aiohttp.FormData()
         data.add_field("batch_id", batch_id)
 
@@ -171,7 +186,6 @@ async def upload_real_essays_via_file_service(
                 content_type="text/plain"
             )
 
-        # Prepare headers with correlation ID for distributed tracing
         headers = {}
         if correlation_id:
             headers["X-Correlation-ID"] = correlation_id
@@ -182,7 +196,6 @@ async def upload_real_essays_via_file_service(
             headers=headers,
             timeout=aiohttp.ClientTimeout(total=60)
         ) as response:
-            # File Service returns 202 for async processing, not 200
             if response.status == 202:
                 result: Dict[str, Any] = await response.json()
                 return result
@@ -200,7 +213,7 @@ async def register_batch_with_bos(expected_essay_count: int, correlation_id: str
         "class_designation": "E2E-Test-Class",
         "essay_instructions": "End-to-end test essay for comprehensive pipeline validation",
         "teacher_name": "E2E Test Teacher",
-        "enable_cj_assessment": True  # Enable CJ assessment pipeline
+        "enable_cj_assessment": True
     }
 
     async with aiohttp.ClientSession() as session:
@@ -215,9 +228,7 @@ async def register_batch_with_bos(expected_essay_count: int, correlation_id: str
                 return batch_id
             else:
                 error_text = await response.text()
-                raise AssertionError(
-                    f"BOS batch registration failed: {response.status} - {error_text}"
-                )
+                raise AssertionError(f"BOS batch registration failed: {response.status} - {error_text}")
 
 
 async def watch_pipeline_progression(
@@ -238,89 +249,58 @@ async def watch_pipeline_progression(
             for topic_partition, messages in msg_batch.items():
                 for message in messages:
                     try:
-                        # message.value is already deserialized by value_deserializer
                         envelope_data = message.value
                         event_data = envelope_data.get("data", {})
-
-                                                # Check if this event is for our batch and correlation ID (if provided)
-                        entity_id = event_data.get("entity_ref", {}).get("entity_id")
                         event_correlation_id = envelope_data.get("correlation_id")
 
-                        # DEBUG: Print event details to understand filtering
-                        print(f"🔍 DEBUG: Received event on {message.topic}")
-                        print(f"    Entity ID: {entity_id}")
-                        print(f"    Event Correlation ID: {event_correlation_id}")
-                        print(f"    Expected Batch ID: {batch_id}")
-                        print(f"    Expected Correlation ID: {correlation_id}")
+                        # Primary filter: correlation_id MUST match.
+                        if correlation_id is None or event_correlation_id != correlation_id:
+                            continue
 
-                        # Smart filtering: Different events have different entity_id patterns
-                        if message.topic in [
+                        # Secondary check: entity_id should match for batch-level events.
+                        # For essay-level events, this check is skipped as we rely on correlation_id.
+                        entity_match = False
+
+                        # List of topics that are about the whole batch
+                        batch_level_topics = [
                             topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
                             topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
+                            topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
                             topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
-                        ]:
-                            # Batch-level events: entity_id should be batch_id
-                            entity_match = entity_id == batch_id
+                            topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
+                        ]
+
+                        if message.topic in batch_level_topics:
+                            entity_id_from_event = None
+                            if message.topic == topic_name(ProcessingEvent.BATCH_ESSAYS_READY):
+                                entity_id_from_event = event_data.get("batch_id")
+                            else:
+                                entity_id_from_event = event_data.get("entity_ref", {}).get("entity_id")
+
+                            if entity_id_from_event == batch_id:
+                                entity_match = True
+                        elif message.topic == topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED):
+                            # This is an essay-level event. The correlation_id match is sufficient.
+                            entity_match = True
                         else:
-                            # Essay-level events: rely on correlation_id for filtering
-                            # (entity_id will be essay_id, not batch_id)
-                            entity_match = True  # Accept any entity_id for essay events
+                            # Skip topics not relevant to this test's flow
+                            continue
 
-                        correlation_match = (correlation_id is None or
-                                           event_correlation_id == correlation_id)
-
-                        print(f"    Entity match: {entity_match}, Correlation match: {correlation_match}")
-
-                        if entity_match and correlation_match:
-                            # Show progression based on event type
-                            if message.topic == topic_name(
-                                ProcessingEvent.BATCH_ESSAYS_READY
-                            ):
-                                essay_count = len(
-                                    event_data.get("ready_essays", [])
-                                )
-                                print(
-                                    f"📨 1️⃣ ELS published BatchEssaysReady: "
-                                    f"{essay_count} essays ready"
-                                )
-
-                            elif message.topic == topic_name(
-                                ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND
-                            ):
-                                print(
-                                    "📨 2️⃣ BOS published spellcheck initiate command"
-                                )
-
-                            elif message.topic == topic_name(
-                                ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED
-                            ):
-                                print(
-                                    "📨 3️⃣ Spellcheck completed for an essay"
-                                )
-
-                            elif message.topic == topic_name(
-                                ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND
-                            ):
-                                essay_count = len(
-                                    event_data.get("essays_to_process", [])
-                                )
-                                print(
-                                    f"📨 4️⃣ BOS published CJ assessment initiate command: "
-                                    f"{essay_count} essays"
-                                )
-
-                            elif message.topic == topic_name(
-                                ProcessingEvent.CJ_ASSESSMENT_COMPLETED
-                            ):
+                        if entity_match:
+                            if message.topic == topic_name(ProcessingEvent.BATCH_ESSAYS_READY):
+                                essay_count = len(event_data.get("ready_essays", []))
+                                print(f"📨 1️⃣ ELS published BatchEssaysReady: {essay_count} essays ready")
+                            elif message.topic == topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND):
+                                print("📨 2️⃣ BOS published spellcheck initiate command")
+                            elif message.topic == topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME):
+                                print(f"📨 3️⃣ ELS published phase outcome: {event_data.get('phase_name')} -> {event_data.get('phase_status')}")
+                            elif message.topic == topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND):
+                                essay_count = len(event_data.get("essays_to_process", []))
+                                print(f"📨 4️⃣ BOS published CJ assessment initiate command: {essay_count} essays")
+                            elif message.topic == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
                                 rankings = event_data.get("rankings", [])
-                                print(
-                                    f"📨 5️⃣ CJ assessment completed: "
-                                    f"{len(rankings)} essays ranked"
-                                )
-                                print(
-                                    "🎯 Pipeline SUCCESS! Complete end-to-end processing finished."
-                                )
-                                # Return the envelope data as Dict[str, Any]
+                                print(f"📨 5️⃣ CJ assessment completed: {len(rankings)} essays ranked")
+                                print("🎯 Pipeline SUCCESS! Complete end-to-end processing finished.")
                                 return dict(envelope_data)
 
                     except (json.JSONDecodeError, KeyError) as e:

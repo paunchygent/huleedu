@@ -60,20 +60,37 @@ class DefaultPipelinePhaseCoordinator:
         )
 
         # Update the phase status in pipeline state
+        # COMPLETED_WITH_FAILURES is treated as success for progression purposes
+        # (per common_core/enums.py - it's a terminal success state with partial failures)
+        if phase_status in ["COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"]:
+            updated_status = "COMPLETED_SUCCESSFULLY"
+        else:
+            updated_status = "FAILED"
+
         await self.update_phase_status(
             batch_id,
             completed_phase,
-            "COMPLETED_SUCCESSFULLY" if phase_status == "COMPLETED_SUCCESSFULLY" else "FAILED",
+            updated_status,
             datetime.now(timezone.utc).isoformat(),
         )
 
-        # Only proceed with next phase if current phase completed successfully
-        if phase_status != "COMPLETED_SUCCESSFULLY":
+        # Allow progression for both COMPLETED_SUCCESSFULLY and COMPLETED_WITH_FAILURES
+        # COMPLETED_WITH_FAILURES indicates partial success and should proceed with successful essays
+        if phase_status not in ["COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"]:
             logger.info(
-                f"Phase {completed_phase} for batch {batch_id} did not complete successfully, "
-                f"skipping next phase initiation"
+                f"Phase {completed_phase} for batch {batch_id} did not complete successfully "
+                f"(status: {phase_status}), skipping next phase initiation"
             )
             return
+
+        # Log progression decision for COMPLETED_WITH_FAILURES cases
+        if phase_status == "COMPLETED_WITH_FAILURES":
+            successful_count = len(processed_essays_for_next_phase) if processed_essays_for_next_phase else 0
+            logger.info(
+                f"Phase {completed_phase} completed with partial failures for batch {batch_id}. "
+                f"Proceeding to next phase with {successful_count} successful essays.",
+                extra={"correlation_id": correlation_id}
+            )
 
         # Determine and initiate next phase with data propagation
         await self._initiate_next_phase(
