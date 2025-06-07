@@ -105,6 +105,9 @@ async def process_single_message(
             ),
         )
 
+        logger.info(f"Step 1: Fetching content for essay {essay_id_for_logging}",
+                    extra={"correlation_id": str(request_envelope.correlation_id)})
+
         # Fetch original text content
         original_text: Optional[str] = None
         try:
@@ -112,6 +115,8 @@ async def process_single_message(
                 storage_id=request_data.text_storage_id,
                 http_session=http_session,
             )
+            logger.info(f"Step 2: Content fetched successfully for essay {essay_id_for_logging}"
+                        , extra={"correlation_id": str(request_envelope.correlation_id)})
         except Exception as fetch_exc:
             logger.error(
                 f"Essay {essay_id_for_logging}: Failed to fetch original content: {fetch_exc}",
@@ -171,6 +176,10 @@ async def process_single_message(
             )
             return True
 
+
+        logger.info(f"Step 3: Performing spell check for essay {essay_id_for_logging}",
+                    extra={"correlation_id": str(request_envelope.correlation_id)})
+
         # Create a DefaultSpellLogic instance for this particular message/essay
         # This allows passing essay_id and original_text_storage_id to the spell logic
         spell_logic = DefaultSpellLogic(
@@ -187,6 +196,9 @@ async def process_single_message(
         result_data = await spell_logic.perform_spell_check(
             original_text, essay_id_for_logging, language
         )
+
+        logger.info(f"Step 4: Publishing spell check result for essay {essay_id_for_logging}",
+                    extra={"correlation_id": str(request_envelope.correlation_id)})
 
         # Publish the result
         await event_publisher.publish_spellcheck_result(

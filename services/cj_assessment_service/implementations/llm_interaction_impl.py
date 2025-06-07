@@ -100,14 +100,17 @@ class LLMInteractionImpl(LLMInteractionProtocol):
             async with semaphore:
                 # Generate cache key from the prompt and override parameters for proper caching
                 cache_key = self.cache_manager.generate_hash(
-                    f"{task.prompt}|model:{model_override}|temp:{temperature_override}|tokens:{max_tokens_override}"
+                    f"{task.prompt}|model:{model_override}|"
+                    f"temp:{temperature_override}|"
+                    f"tokens:{max_tokens_override}"
                 )
 
                 # Check cache first
                 cached_response = self.cache_manager.get_from_cache(cache_key)
                 if cached_response:
-                    logger.debug(
-                        f"Cache hit for task with essays {task.essay_a.id}-{task.essay_b.id}"
+                    logger.info(
+                        f"Cache HIT for essays {task.essay_a.id} vs {task.essay_b.id}",
+                        extra={"prompt_hash": cache_key}
                     )
                     try:
                         llm_assessment = LLMAssessmentResponseSchema(**cached_response)
@@ -126,6 +129,10 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         )
                         # Continue to make fresh request if cache data is invalid
 
+                logger.info(
+                    f"Cache MISS for essays {task.essay_a.id} vs {task.essay_b.id}. Querying LLM.",
+                    extra={"prompt_hash": cache_key}
+                )
                 # Make fresh API request
                 try:
                     response_data, error_message = await provider.generate_comparison(
@@ -137,6 +144,11 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     )
 
                     if response_data:
+                        logger.info(
+                            f"LLM Response for essays {task.essay_a.id} vs {task.essay_b.id}: "
+                            f"Winner -> {response_data.get('winner')}",
+                            extra={"prompt_hash": cache_key}
+                        )
                         # Cache successful response
                         self.cache_manager.add_to_cache(cache_key, response_data)
 

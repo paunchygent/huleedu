@@ -38,7 +38,11 @@ class TestPrometheusContentMetrics:
         """Test that PrometheusContentMetrics implements ContentMetricsProtocol."""
         assert isinstance(metrics, ContentMetricsProtocol)
 
-    def test_record_upload_success(self, metrics: ContentMetricsProtocol, registry: CollectorRegistry) -> None:
+    def test_record_upload_success(
+        self,
+        metrics: ContentMetricsProtocol,
+        registry: CollectorRegistry,
+    ) -> None:
         """Test recording successful upload operation."""
         # Record upload success
         metrics.record_operation("upload", "success")
@@ -74,7 +78,10 @@ class TestPrometheusContentMetrics:
         assert upload_success_sample is not None, "Upload success metric sample not found"
         assert upload_success_sample.value == 1.0
 
-    def test_record_download_success(self, metrics: ContentMetricsProtocol, registry: CollectorRegistry) -> None:
+    def test_record_download_success(
+        self, metrics: ContentMetricsProtocol,
+        registry: CollectorRegistry,
+    ) -> None:
         """Test recording successful download operation."""
         # Record download success
         metrics.record_operation("download", "success")
@@ -102,7 +109,9 @@ class TestPrometheusContentMetrics:
         assert download_success_sample is not None
         assert download_success_sample.value == 1.0
 
-    def test_record_multiple_operations(self, metrics: ContentMetricsProtocol, registry: CollectorRegistry) -> None:
+    def test_record_multiple_operations(
+        self, metrics: ContentMetricsProtocol, registry: CollectorRegistry
+    ) -> None:
         """Test recording multiple operations with different statuses."""
         # Record various operations
         metrics.record_operation("upload", "success")

@@ -288,6 +288,3 @@ def test_invalid_triggers_return_false(self) -> None:
     * `documentation/PRD:s/PRD.md` if behavior changes affect user-facing aspects or high-level flows.
 
 ---
-
-This implementation ticket provides a structured approach to tackling the remaining work. The core logic snippets should guide the development of the missing pieces. Remember to adhere to all coding standards, linting, and typing rules throughout the implementation. Good luck
----

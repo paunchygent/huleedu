@@ -52,7 +52,9 @@ async def run_cj_assessment_workflow(
     Raises:
         Exception: If the workflow encounters an unrecoverable error
     """
-    logger.info(f"Starting CJ assessment workflow for correlation_id: {correlation_id}")
+
+    log_extra = {"correlation_id": correlation_id, "bos_batch_id": request_data.get("bos_batch_id")}
+    logger.info("Starting CJ assessment workflow.", extra=log_extra)
 
     cj_batch_id = None
     try:
@@ -98,7 +100,9 @@ async def run_cj_assessment_workflow(
             )
             cj_batch_id = cj_batch.id
 
-            logger.info(f"Created CJ batch {cj_batch_id} for BOS batch {bos_batch_id}")
+
+            log_extra["cj_batch_id"] = cj_batch_id
+            logger.info(f"Created internal CJ batch {cj_batch_id}", extra=log_extra)
 
         # Phase 2: Fetch content and prepare essays
         async with database.session() as session:
@@ -165,7 +169,8 @@ async def run_cj_assessment_workflow(
                 and not scores_are_stable
             ):
                 current_iteration += 1
-                logger.info(f"CJ Iteration {current_iteration} for CJ Batch ID: {cj_batch_id}")
+
+                logger.info(f"Starting CJ Iteration {current_iteration}", extra=log_extra)
 
                 # Generate comparison tasks
                 comparison_tasks_for_llm: List[
@@ -180,7 +185,9 @@ async def run_cj_assessment_workflow(
                 )
 
                 if not comparison_tasks_for_llm:
-                    logger.info("No new comparison tasks generated. Ending comparisons.")
+                    logger.info(
+                        "No new comparison tasks generated. Ending comparisons.", extra=log_extra
+                    )
                     break
 
                 # Process comparisons using LLMInteractionProtocol
@@ -200,11 +207,10 @@ async def run_cj_assessment_workflow(
                     if res.llm_assessment and res.llm_assessment.winner != "Error"
                 ]
 
-                if not valid_llm_results and llm_comparison_results:
-                    logger.warning(
-                        f"All {len(llm_comparison_results)} LLM comparisons in iteration "
-                        f"{current_iteration} resulted in errors."
-                    )
+                logger.info(
+                    f"Iteration {current_iteration}: Received {len(valid_llm_results)} valid LLM results from {len(llm_comparison_results)} tasks.",
+                    extra=log_extra
+                )
 
                 # Record valid results and update scores
                 current_bt_scores_dict: Dict[
@@ -235,10 +241,13 @@ async def run_cj_assessment_workflow(
                         previous_bt_scores,
                         stability_threshold=getattr(settings, "SCORE_STABILITY_THRESHOLD", 0.05),
                     )
-                    logger.info(f"Max score change: {max_score_change:.5f}")
+                    logger.info(
+                        f"Iteration {current_iteration}: Max score change is {max_score_change:.5f}",
+                        extra=log_extra
+                    )
                     if max_score_change < getattr(settings, "SCORE_STABILITY_THRESHOLD", 0.05):
                         scores_are_stable = True
-                        logger.info("Scores are stable.")
+                        logger.info("Score stability reached. Ending comparison loop.", extra=log_extra)
 
                 previous_bt_scores = current_bt_scores_dict.copy()
                 await session.commit()
@@ -268,7 +277,8 @@ async def run_cj_assessment_workflow(
             logger.info(
                 f"CJ assessment completed for batch {cj_batch_id}. "
                 f"Rankings generated for {len(rankings)} essays after "
-                f"{current_iteration} iterations."
+                f"{current_iteration} iterations.",
+                extra=log_extra
             )
 
             # Return rankings and CJ batch ID as expected by event_processor

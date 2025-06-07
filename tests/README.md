@@ -97,7 +97,7 @@ pdm run test-all tests/functional/ -s -v
 
 ### Test Output Example
 
-```
+``` text
 ✅ content_service: 200 - {'message': 'Content Service is healthy.', 'status': 'ok'}
 ✅ batch_orchestrator_service: 200 - {'message': 'Batch Orchestrator Service is healthy', 'status': 'ok'}  
 ✅ essay_lifecycle_service: 200 - {'service': 'essay-lifecycle-service', 'status': 'healthy'}

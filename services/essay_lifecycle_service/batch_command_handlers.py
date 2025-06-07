@@ -139,9 +139,9 @@ async def _route_event(
             from common_core.batch_service_models import (
                 BatchServiceCJAssessmentInitiateCommandDataV1,
             )
-            command_data = BatchServiceCJAssessmentInitiateCommandDataV1.model_validate(envelope.data)
+            cj_command_data = BatchServiceCJAssessmentInitiateCommandDataV1.model_validate(envelope.data)
             await batch_command_handler.process_initiate_cj_assessment_command(
-                command_data=command_data, correlation_id=correlation_id
+                command_data=cj_command_data, correlation_id=correlation_id
             )
             return True
 
@@ -156,9 +156,9 @@ async def _route_event(
 
         elif event_type == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
             from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
-            result_data = CJAssessmentCompletedV1.model_validate(envelope.data)
+            cj_result_data = CJAssessmentCompletedV1.model_validate(envelope.data)
             cj_result: bool = await service_result_handler.handle_cj_assessment_completed(
-                result_data=result_data, correlation_id=correlation_id
+                result_data=cj_result_data, correlation_id=correlation_id
             )
             return cj_result
 

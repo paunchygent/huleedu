@@ -8,7 +8,7 @@ avoiding expensive API calls.
 from __future__ import annotations
 
 import random
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
@@ -54,31 +54,38 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
         results = []
 
         for task in tasks:
-            # Generate random winner
-            winner = random.choice(["Essay A", "Essay B"])
-
-            # Generate realistic confidence score (1.0 to 5.0)
-            confidence = round(random.uniform(1.5, 4.5), 1)
-
-            # Generate realistic justification based on winner
-            justifications = {
-                "Essay A": [
-                    "Essay A demonstrates stronger argumentation and clearer structure.",
-                    "Essay A provides more compelling evidence and better analysis.",
-                    "Essay A has superior organization and more persuasive language.",
-                    "Essay A shows better understanding of the topic with more detailed examples.",
-                    "Essay A maintains better coherence and has stronger conclusions."
-                ],
-                "Essay B": [
-                    "Essay B presents a more convincing argument with better supporting evidence.",
-                    "Essay B demonstrates superior writing quality and clearer expression.",
-                    "Essay B shows more sophisticated analysis and deeper understanding.",
-                    "Essay B has better paragraph structure and more effective transitions.",
-                    "Essay B provides more relevant examples and stronger reasoning."
-                ]
-            }
-
-            justification = random.choice(justifications[winner])
+            # Randomly select winner and generate justification
+            winner: Literal["Essay A", "Essay B", "Error"]
+            if random.random() < 0.05:
+                # 5% chance of error
+                winner = "Error"
+                justification = "The model encountered an error comparing these essays."
+                confidence = None
+            else:
+                # Randomly select winner with slight bias towards Essay B
+                winner = "Essay A" if random.random() < 0.45 else "Essay B"
+                confidence = round(random.uniform(1.0, 5.0), 1)
+                
+                # Generate realistic justification based on winner
+                justifications = {
+                    "Essay A": [
+                        "Essay A demonstrates stronger argumentation and clearer structure.",
+                        "Essay A provides more compelling evidence and better analysis.",
+                        "Essay A has superior organization and more persuasive language.",
+                        "Essay A shows better understanding of the topic with more detailed examples.",
+                        "Essay A maintains better coherence and has stronger conclusions."
+                    ],
+                    "Essay B": [
+                        "Essay B presents a more convincing argument with better supporting evidence.",
+                        "Essay B demonstrates superior writing quality and clearer expression.",
+                        "Essay B shows more sophisticated analysis and deeper understanding.",
+                        "Essay B has better paragraph structure and more effective transitions.",
+                        "Essay B provides more relevant examples and stronger reasoning."
+                    ]
+                }
+                
+                # Only get justification from dictionary for non-error cases
+                justification = random.choice(justifications[winner])
 
             # Create mock LLM assessment response
             llm_assessment = LLMAssessmentResponseSchema(

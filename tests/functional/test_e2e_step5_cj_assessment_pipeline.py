@@ -384,8 +384,25 @@ async def monitor_for_cj_assessment_result(
                 error_info = event_data.get("system_metadata", {}).get(
                     "error_info", {}
                 )
+                
+                # Extract and format the most relevant error information
+                error_message = error_info.get("error_message", "Unknown error")
+                error_type = error_info.get("error_type", "UnknownErrorType")
+                
+                # Print detailed error information for debugging
+                print(f"Error type: {error_type}")
+                print(f"Error message: {error_message}")
+                
+                # If there's a traceback, print the first few lines for context
+                traceback_info = error_info.get("traceback", "")
+                if traceback_info:
+                    traceback_lines = traceback_info.split("\n")[:10]  # First 10 lines
+                    print("Traceback preview:")
+                    for line in traceback_lines:
+                        print(f"  {line}")
+                
                 raise AssertionError(
-                    f"CJ Assessment failed: {error_info}"
+                    f"CJ Assessment failed: {error_type} - {error_message}"
                 )
 
         except json.JSONDecodeError as e:

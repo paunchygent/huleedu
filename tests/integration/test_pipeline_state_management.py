@@ -212,7 +212,7 @@ class TestPipelineStateManagement:
     ):
         """
         Test pipeline handling when a phase completes with partial failures.
-        
+
         COMPLETED_WITH_FAILURES should allow progression to next phase as it indicates
         successful completion with some non-critical essay failures (per common_core/enums.py).
         """
@@ -378,7 +378,7 @@ class TestPipelineStateManagement:
         """
         Test the specific root cause scenario: 24/25 essays complete successfully,
         1 fails due to service issues (e.g., Content Service disconnection during storage).
-        
+
         BOS should proceed with the 24 successful essays to CJ assessment.
         This tests the exact issue described in the user's root cause analysis.
         """
@@ -405,9 +405,11 @@ class TestPipelineStateManagement:
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
-        # Simulate 24 successful essays and 1 failed (e.g., essay 8de29880-6ede-4d72-ae53-3b18b8d86d99)
+        # Simulate 24 successful essays and 1 failed
+        # (e.g., essay 8de29880-6ede-4d72-ae53-3b18b8d86d99)
         successful_essays = [
-            {"essay_id": f"essay-{i:02d}", "text_storage_id": f"storage-{i:02d}", "status": "success"}
+            {"essay_id": f"essay-{i:02d}", "text_storage_id": f"storage-{i:02d}",
+             "status": "success"}
             for i in range(1, 25)  # 24 successful essays
         ]
 
@@ -437,4 +439,6 @@ class TestPipelineStateManagement:
         # Verify we're proceeding with exactly 24 essays (not 25)
         call_args = mock_cj_initiator.initiate_phase.call_args
         essays_for_processing = call_args.kwargs["essays_for_processing"]
-        assert len(essays_for_processing) == 24, f"Expected 24 essays, got {len(essays_for_processing)}"
+        assert len(essays_for_processing) == 24, (
+            f"Expected 24 essays, got {len(essays_for_processing)}"
+        )

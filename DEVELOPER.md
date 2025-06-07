@@ -10,7 +10,7 @@ HuleEdu implements an event-driven microservice architecture using Domain-Driven
 
 ### Service Communication Patterns
 
-```
+``` text
 ┌─────────────────┐    HTTP    ┌─────────────────┐
 │  Batch Service  │ ──────────▶│ Content Service │
 └─────────────────┘            └─────────────────┘
@@ -309,6 +309,7 @@ def test_event_serialization_roundtrip():
 ### Import Conventions
 
 **Absolute imports for containerized services**:
+
 ```python
 # ✅ CORRECT - Works in containers
 from config import settings
@@ -543,4 +544,4 @@ curl -f http://localhost:8001/metrics | grep -E "(http_requests|service_)"
 
 ---
 
-**Note**: This documentation reflects the current implementation state. Update as services evolve and new patterns emerge. 
+**Note**: This documentation reflects the current implementation state. Update as services evolve and new patterns emerge.

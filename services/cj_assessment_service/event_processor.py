@@ -184,6 +184,17 @@ async def process_single_message(
                 envelope.correlation_id or request_event_data.system_metadata.entity.entity_id
             )
 
+            # Create detailed error information including exception type and traceback
+            import traceback
+            error_details = {
+                "error_message": str(e),
+                "error_type": type(e).__name__,
+                "traceback": traceback.format_exc()
+            }
+            
+            # Log detailed error information
+            logger.error(f"Detailed error information: {error_details}")
+            
             failed_event_data = CJAssessmentFailedV1(
                 event_name=ProcessingEvent.CJ_ASSESSMENT_FAILED,
                 entity_ref=request_event_data.entity_ref,
@@ -193,7 +204,7 @@ async def process_single_message(
                     timestamp=datetime.now(timezone.utc),
                     processing_stage=ProcessingStage.FAILED,
                     event=ProcessingEvent.CJ_ASSESSMENT_FAILED.value,
-                    error_info={"error_message": str(e)},
+                    error_info=error_details,
                 ),
                 cj_assessment_job_id="unknown",  # No CJ job created due to failure
             )
