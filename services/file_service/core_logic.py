@@ -126,7 +126,9 @@ async def process_single_file_upload(
                 batch_id=batch_id,
                 original_file_name=file_name,
                 validation_error_code=validation_result.error_code or "UNKNOWN_ERROR",
-                validation_error_message=validation_result.error_message or "Content validation failed",
+                validation_error_message=(
+                    validation_result.error_message or "Content validation failed"
+                ),
                 file_size_bytes=len(file_content),
                 correlation_id=main_correlation_id,
                 timestamp=datetime.now(timezone.utc)

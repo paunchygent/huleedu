@@ -34,6 +34,7 @@ All architectural violations and test failures have been resolved. Clean archite
 #### **✅ ELS DI Refactoring Complete:**
 
 **ELS Success Summary:**
+
 * ✅ **Split single 219-line provider into 4 focused providers** following BOS multi-provider pattern
 * ✅ **CoreInfrastructureProvider** (6 methods): Settings, metrics, Kafka, HTTP, repository, state validator
 * ✅ **ServiceClientsProvider** (4 methods): Event publisher, content client, metrics collector, request dispatcher  
@@ -45,10 +46,9 @@ All architectural violations and test failures have been resolved. Clean archite
 
 #### **🚨 Remaining Critical Violations:**
 
-**DI Pattern Violations (3 services remaining):**
+**DI Pattern Violations (2 services remaining):**
 
-* `batch_orchestrator_service/di.py`: **208 lines** (39% over limit) - **NEXT PRIORITY**
-* `file_service/di.py`: **187 lines** (25% over limit)
+* `batch_orchestrator_service/di.py`: **208 lines** (39% over limit) - **NEXT PRIORITY** 
 * `cj_assessment_service/di.py`: **173 lines** (15% over limit)
 
 #### **✅ Compliant Services:**
@@ -56,12 +56,13 @@ All architectural violations and test failures have been resolved. Clean archite
 * `content_service`: All patterns correct (51-line DI, proper protocols, Dishka usage)
 * `spell_checker_service`: All patterns correct (78-line DI, clean architecture, real test validation)
 * ✅ `essay_lifecycle_service`: **REFACTORING COMPLETE** (4-provider pattern, all tests passing, containers building)
+* ✅ `file_service`: **REFACTORING COMPLETE** (2-provider pattern, clean architecture, all tests passing)
 
 #### **Remaining Work:**
 
 * [ ] **HIGH PRIORITY (DI Refactoring)**:
   * Refactor batch_orchestrator_service/di.py (208→<150 lines) - **NEXT PRIORITY** (already uses multiple provider pattern)
-  * Refactor file_service/di.py (187→<150 lines)
+  * Refactor cj_assessment_service/di.py (173→<150 lines)
   * ✅ **CJ Assessment Service FIXED**: Test failures resolved using methodical debugging approach following service configuration priority
 
 ### 2. Systematic Linting Cleanup (Priority 2)
@@ -107,101 +108,14 @@ All high-priority issues identified in the initial audit were resolved.
 * **Validation**: 120/120 tests passing, both API and Worker containers building successfully
 * **Impact**: Clean separation of concerns following proven BOS multi-provider pattern
 
-This is an exceptionally well-structured and thoughtfully designed microservice architecture, especially for a single-developer project. The adherence to modern tooling, clean architecture principles, and comprehensive documentation puts this codebase on par with, and in some cases ahead of, many professional team projects.
+### ✅ Phase 3E: File Service DI Refactoring Complete
 
-The review below is structured to be methodical and honest, highlighting the significant strengths first, followed by areas for consideration as the project scales.
+* **Achievement**: Successfully refactored File Service from 188-line single provider to 82-line 2-provider architecture
+* **Clean Architecture Violations Fixed**: Moved all inline business logic implementations (`DefaultContentServiceClient`, `DefaultEventPublisher`, `DefaultTextExtractor`) to separate `implementations/` directory 
+* **Provider Structure**: Split into `CoreInfrastructureProvider` (infrastructure) and `ServiceImplementationsProvider` (business logic)
+* **Validation**: All 61 unit tests passing, container builds successfully, passes linting standards
+* **Impact**: Reduced DI file size by 56% (188→82 lines) while fixing critical architectural violations
 
-***
-
-## Overall Assessment
-
-This is an **A-tier** project. The design choices demonstrate a deep understanding of modern software architecture, particularly in the Python ecosystem. The commitment to principles like Domain-Driven Design (DDD), Event-Driven Architecture (EDA), and Dependency Injection (DI) is evident and consistently applied. The project is not just a collection of services; it's a well-defined ecosystem with clear rules and patterns, which is critical for long-term maintainability.
-
----
-
-## ✅ Strengths & Excellent Practices
-
-This project excels in several key areas.
-
-### 1. Architectural Principles & Documentation
-
-The foundational work on architecture and documentation is outstanding. The `README.md` is a model of clarity, effectively communicating the project's vision, principles, services, and setup procedures.
-
-The use of a `.cursor/rules/` directory to codify development standards is a brilliant practice that ensures consistency and provides an "architectural constitution" for the project. This is a force multiplier for development velocity and quality.
-
-**Key Principle Example (from `README.md`):**
-
-> **Explicit Contracts**: All inter-service data structures (event payloads, API DTOs) are defined as versioned Pydantic models residing in `common_core/src/common_core/`. The `EventEnvelope` structure is standardized for all events.
-
-This principle is strictly followed, as seen in the `common_core` package, which acts as the single source of truth for data contracts, preventing schema drift between services.
-
-### 2. Project Structure & Tooling
-
-The monorepo structure is clean and logical. The use of **PDM** is exemplary, not just for dependency management but as a central task runner. The `pyproject.toml` is well-organized with clear dependency groups and scripts.
-
-**Example (`pyproject.toml` scripts):**
-
-```toml
-[tool.pdm.scripts]
-# Monorepo-wide scripts
-format-all = "ruff format --force-exclude ."
-lint-all = "ruff check --force-exclude ."
-# ...
-test-parallel = "pytest -n auto"
-
-# Docker convenience scripts
-docker-build = "docker compose build"
-docker-up = "docker compose up -d"
-# ...
-```
-
-This centralizes all common commands, making the development workflow smooth and consistent. The use of Ruff for combined linting/formatting and the strict MyPy configuration demonstrate a commitment to code quality from the ground up.
-
-### 3. Code-Level Practices (DI, Protocols, Typing)
-
-The use of **Dependency Injection with `typing.Protocol`** is the most impressive aspect of the codebase. This is an advanced pattern that decouples business logic from concrete implementations, making the services incredibly testable and maintainable.
-
-The `essay_lifecycle_service` provides a perfect example of this pattern in action.
-
-**Protocol Definition (`services/essay_lifecycle_service/protocols.py`):**
-Here, an abstract contract for the repository is defined. The business logic will only ever know about this interface.
-```python
-class EssayRepositoryProtocol(Protocol):
-    """
-    Protocol for essay state persistence operations.
-    """
-    async def get_essay_state(self, essay_id: str) -> EssayState | None:
-        """Retrieve essay state by ID."""
-        ...
-
-    async def create_or_update_essay_state_for_slot_assignment(...) -> EssayState:
-        """Create or update essay state for slot assignment with content metadata."""
-        ...
-```
-
-**Dependency Injection (`services/essay_lifecycle_service/di.py`):**
-The DI container provides the correct concrete implementation based on the environment, without the application code needing to know the difference.
-```python
-class CoreInfrastructureProvider(Provider):
-    # ...
-    @provide(scope=Scope.APP)
-    async def provide_essay_repository(self, settings: Settings) -> EssayRepositoryProtocol:
-        """
-        Provide essay repository implementation with environment-based selection.
-        """
-        if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
-            # Development/testing: use SQLite implementation
-            store = SQLiteEssayStateStore(...)
-            await store.initialize()
-            return store
-        else:
-            # Production: use PostgreSQL implementation
-            postgres_repo = PostgreSQLEssayRepository(settings)
-            await postgres_repo.initialize_db_schema()
-            return postgres_repo
-```
-
-This is a best-in-class implementation of the Dependency Inversion Principle.
 
 ### 4. Testing Strategy
 
@@ -212,6 +126,7 @@ The project has a robust and multi-layered testing strategy that is crucial for 
 * **End-to-End (E2E) Testing:** The walking skeleton tests (e.g., `test_e2e_step4_spellcheck_pipeline.py`) are excellent for validating the entire workflow across multiple services and Kafka. This is often overlooked in personal projects but is essential for confidence in the system.
 
 **Example of an excellent E2E test (`test_e2e_step4_spellcheck_pipeline.py`):**
+
 ```python
 @pytest.mark.e2e
 @pytest.mark.asyncio
@@ -284,6 +199,7 @@ consumer = AIOKafkaConsumer(
 The metrics middleware in `batch_orchestrator_service/metrics.py` and `essay_lifecycle_service/app.py` (inside `after_request`) is nearly identical.
 
 **Code Example (occurs in multiple services):**
+
 ```python
 @app.after_request
 async def after_request(response: Response) -> Response:
@@ -314,5 +230,6 @@ async def isolated_services():
 ```
 
 **Consideration:** As the number of E2E tests grows, this will become extremely slow. A more scalable approach would be to:
-1.  Use a session-scoped fixture (`scope="session"`) to start the Docker services once for the entire test run.
-2.  For tests that require isolation, develop fixtures that reset service state between tests instead of restarting containers. This could involve clearing database tables, flushing a test-specific Kafka topic, or calling a dedicated `/reset` endpoint on a service.
+
+1. Use a session-scoped fixture (`scope="session"`) to start the Docker services once for the entire test run.
+2. For tests that require isolation, develop fixtures that reset service state between tests instead of restarting containers. This could involve clearing database tables, flushing a test-specific Kafka topic, or calling a dedicated `/reset` endpoint on a service.

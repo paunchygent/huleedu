@@ -9,7 +9,7 @@ from prometheus_client import CollectorRegistry, Counter, Histogram
 from quart import Quart
 from quart_dishka import QuartDishka
 
-from services.file_service.di import FileServiceProvider
+from services.file_service.di import CoreInfrastructureProvider, ServiceImplementationsProvider
 
 logger = create_service_logger("file_service.startup")
 
@@ -17,8 +17,11 @@ logger = create_service_logger("file_service.startup")
 async def initialize_services(app: Quart, settings: Settings) -> None:
     """Initialize DI container, Quart-Dishka integration, and metrics."""
     try:
-        # Initialize DI container
-        container = make_async_container(FileServiceProvider())
+        # Initialize DI container with both providers
+        container = make_async_container(
+            CoreInfrastructureProvider(),
+            ServiceImplementationsProvider()
+        )
         QuartDishka(app=app, container=container)
 
         # Initialize metrics with DI registry and store in app context

@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-import json
-import uuid
-from typing import Optional
-
 from aiohttp import ClientSession
 from aiokafka import AIOKafkaProducer
-from config import Settings, settings
 from dishka import Provider, Scope, provide
-from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CollectorRegistry
-from text_processing import extract_text_from_file
 
-from common_core.events.envelope import EventEnvelope
-from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
+from services.file_service.config import Settings, settings
 from services.file_service.content_validator import FileContentValidator
+from services.file_service.implementations.content_service_client_impl import (
+    DefaultContentServiceClient,
+)
+from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
+from services.file_service.implementations.text_extractor_impl import DefaultTextExtractor
 from services.file_service.protocols import (
     ContentServiceClientProtocol,
     ContentValidatorProtocol,
@@ -24,115 +21,9 @@ from services.file_service.protocols import (
     TextExtractorProtocol,
 )
 
-logger = create_service_logger("file_service.di")
 
-
-class DefaultContentServiceClient:
-    """Default implementation of ContentServiceClientProtocol."""
-
-    def __init__(self, http_session: ClientSession, settings: Settings):
-        self.http_session = http_session
-        self.settings = settings
-
-    async def store_content(self, content_bytes: bytes) -> str:
-        """Store content in Content Service and return storage ID."""
-        try:
-            async with self.http_session.post(
-                self.settings.CONTENT_SERVICE_URL, data=content_bytes
-            ) as response:
-                if response.status == 201:
-                    result = await response.json()
-                    storage_id = result.get("storage_id")
-                    if isinstance(storage_id, str) and storage_id:
-                        logger.info(f"Successfully stored content, storage_id: {storage_id}")
-                        return storage_id
-                    else:
-                        raise ValueError("Content Service response missing storage_id")
-                else:
-                    error_text = await response.text()
-                    raise RuntimeError(
-                        f"Content Service returned status {response.status}: {error_text}"
-                    )
-        except Exception as e:
-            logger.error(f"Error storing content in Content Service: {e}")
-            raise
-
-
-class DefaultEventPublisher:
-    """Default implementation of EventPublisherProtocol."""
-
-    def __init__(self, producer: AIOKafkaProducer, settings: Settings):
-        self.producer = producer
-        self.settings = settings
-
-    async def publish_essay_content_provisioned(
-        self, event_data: EssayContentProvisionedV1, correlation_id: Optional[uuid.UUID]
-    ) -> None:
-        """Publish EssayContentProvisionedV1 event to Kafka."""
-        try:
-            # Construct EventEnvelope
-            envelope = EventEnvelope[EssayContentProvisionedV1](
-                event_type=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
-                source_service=self.settings.SERVICE_NAME,
-                correlation_id=correlation_id,
-                data=event_data,
-            )
-
-            # Serialize to JSON
-            message_bytes = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-
-            # Publish to Kafka
-            await self.producer.send(self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC, message_bytes)
-
-            logger.info(
-                f"Published EssayContentProvisionedV1 event for file: "
-                f"{event_data.original_file_name}"
-            )
-
-        except Exception as e:
-            logger.error(f"Error publishing EssayContentProvisionedV1 event: {e}")
-            raise
-
-    async def publish_essay_validation_failed(
-        self, event_data: EssayValidationFailedV1, correlation_id: Optional[uuid.UUID]
-    ) -> None:
-        """Publish EssayValidationFailedV1 event to Kafka."""
-        try:
-            # Construct EventEnvelope
-            envelope = EventEnvelope[EssayValidationFailedV1](
-                event_type=self.settings.ESSAY_VALIDATION_FAILED_TOPIC,
-                source_service=self.settings.SERVICE_NAME,
-                correlation_id=correlation_id,
-                data=event_data,
-            )
-
-            # Serialize to JSON
-            message_bytes = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-
-            # Publish to Kafka
-            await self.producer.send(self.settings.ESSAY_VALIDATION_FAILED_TOPIC, message_bytes)
-
-            logger.info(
-                f"Published EssayValidationFailedV1 event for file: "
-                f"{event_data.original_file_name} (error: {event_data.validation_error_code})"
-            )
-
-        except Exception as e:
-            logger.error(f"Error publishing EssayValidationFailedV1 event: {e}")
-            raise
-
-
-class DefaultTextExtractor:
-    """Default implementation of TextExtractorProtocol."""
-
-    async def extract_text(self, file_content: bytes, file_name: str) -> str:
-        """Extract text content from file bytes."""
-        result: str = await extract_text_from_file(file_content, file_name)
-        return result
-
-
-class FileServiceProvider(Provider):
-    """Provider for File Service dependencies."""
+class CoreInfrastructureProvider(Provider):
+    """Provider for core infrastructure dependencies (settings, metrics, Kafka, HTTP)."""
 
     @provide(scope=Scope.APP)
     def provide_settings(self) -> Settings:
@@ -158,6 +49,10 @@ class FileServiceProvider(Provider):
     async def provide_http_session(self) -> ClientSession:
         """Provide HTTP client session."""
         return ClientSession()
+
+
+class ServiceImplementationsProvider(Provider):
+    """Provider for service implementation dependencies."""
 
     @provide(scope=Scope.APP)
     def provide_content_service_client(
