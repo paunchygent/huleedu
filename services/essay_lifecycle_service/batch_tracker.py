@@ -17,6 +17,7 @@ from common_core.events.batch_coordination_events import (
     BatchEssaysRegistered,
     BatchReadinessTimeout,
 )
+from common_core.events.file_events import EssayValidationFailedV1
 from common_core.metadata_models import (
     EntityReference,
     EssayProcessingInputRefV1,
@@ -151,10 +152,12 @@ class BatchEssayTracker:
     Manages batch slot assignment and readiness tracking across multiple batches.
 
     Implements the ELS side of slot-based batch coordination pattern.
+    Enhanced to handle validation failures and prevent infinite waits.
     """
 
     def __init__(self) -> None:
         self.batch_expectations: dict[str, BatchExpectation] = {}
+        self.validation_failures: dict[str, list[EssayValidationFailedV1]] = {}
         self._event_callbacks: dict[str, Callable[[Any], Awaitable[None]]] = {}
 
     def register_event_callback(
@@ -230,18 +233,29 @@ class BatchEssayTracker:
 
         expectation = self.batch_expectations[batch_id]
 
-        if expectation.mark_slot_fulfilled(internal_essay_id, text_storage_id):
+        # Mark slot as fulfilled
+        expectation.mark_slot_fulfilled(internal_essay_id, text_storage_id)
+
+        # Check completion: either all slots filled OR total processed meets expectation
+        failure_count = len(self.validation_failures.get(batch_id, []))
+        assigned_count = len(expectation.slot_assignments)
+        total_processed = assigned_count + failure_count
+
+        is_complete = expectation.is_complete or total_processed >= expectation.expected_count
+
+        if is_complete:
             # Batch is complete!
             logger.info(
-                f"Batch {batch_id} is complete with {len(expectation.slot_assignments)} fulfilled slots"
+                f"Batch {batch_id} is complete: {assigned_count} assigned + {failure_count} failed = {total_processed}/{expectation.expected_count}"
             )
 
             # Cancel timeout monitoring
             if expectation._timeout_task:
                 expectation._timeout_task.cancel()
 
-            # Create completion event with actual text_storage_id mappings
+            # Create completion event with actual text_storage_id mappings and validation failures
             ready_essays = expectation.get_ready_essays()
+            failures = self.validation_failures.get(batch_id, [])
 
             batch_ready_event = BatchEssaysReady(
                 batch_id=batch_id,
@@ -255,10 +269,14 @@ class BatchEssayTracker:
                     timestamp=datetime.now(UTC),
                     event="batch.essays.ready",
                 ),
+                validation_failures=failures if failures else None,
+                total_files_processed=len(ready_essays) + len(failures)
             )
 
             # Clean up completed batch
             del self.batch_expectations[batch_id]
+            if batch_id in self.validation_failures:
+                del self.validation_failures[batch_id]
 
             return batch_ready_event
 
@@ -322,3 +340,136 @@ class BatchEssayTracker:
     def list_active_batches(self) -> list[str]:
         """Get list of currently tracked batch IDs."""
         return list(self.batch_expectations.keys())
+
+    async def handle_validation_failure(self, event: EssayValidationFailedV1) -> BatchEssaysReady | None:
+        """
+        Handle validation failure by adjusting batch expectations.
+
+        Prevents ELS from waiting indefinitely for content that will never arrive.
+        """
+        batch_id = event.batch_id
+
+        # Track validation failure
+        if batch_id not in self.validation_failures:
+            self.validation_failures[batch_id] = []
+        self.validation_failures[batch_id].append(event)
+
+        logger.info(
+            f"Tracked validation failure for batch {batch_id}: {event.validation_error_code} "
+            f"({event.original_file_name}). Total failures: {len(self.validation_failures[batch_id])}"
+        )
+
+        # Check if we should trigger early batch completion
+        if batch_id in self.batch_expectations:
+            expectation = self.batch_expectations[batch_id]
+            failure_count = len(self.validation_failures[batch_id])
+            assigned_count = len(expectation.slot_assignments)
+            total_processed = assigned_count + failure_count
+
+            logger.info(
+                f"Batch {batch_id} processing status: {assigned_count} assigned + "
+                f"{failure_count} failed = {total_processed}/{expectation.expected_count}"
+            )
+
+            # If processed count meets expectation, complete batch early
+            if total_processed >= expectation.expected_count:
+                logger.info(
+                    f"Batch {batch_id} completing early: "
+                    f"{assigned_count} assigned + {failure_count} failed = {total_processed}"
+                )
+                ready_event = self._complete_batch_with_failures(batch_id, expectation)
+                return ready_event
+
+        return None
+
+    def _complete_batch_with_failures(
+        self, batch_id: str, expectation: BatchExpectation
+    ) -> BatchEssaysReady:
+        """Complete batch with enhanced event including validation failures."""
+
+        # Get validation failures for this batch
+        failures = self.validation_failures.get(batch_id, [])
+
+        # Cancel timeout monitoring
+        if expectation._timeout_task:
+            expectation._timeout_task.cancel()
+
+        # Create enhanced BatchEssaysReady event
+        ready_event = BatchEssaysReady(
+            batch_id=batch_id,
+            ready_essays=expectation.get_ready_essays(),
+            batch_entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+            metadata=SystemProcessingMetadata(
+                entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                timestamp=datetime.now(UTC),
+                event="batch.essays.ready",
+            ),
+            validation_failures=failures if failures else None,
+            total_files_processed=len(expectation.slot_assignments) + len(failures)
+        )
+
+        logger.info(
+            f"Completed batch {batch_id} with failures: "
+            f"{len(expectation.slot_assignments)} successful, {len(failures)} failed, "
+            f"{ready_event.total_files_processed} total processed"
+        )
+
+        # Clean up completed batch
+        del self.batch_expectations[batch_id]
+        if batch_id in self.validation_failures:
+            del self.validation_failures[batch_id]
+
+        return ready_event
+
+    def check_batch_completion(self, batch_id: str) -> BatchEssaysReady | None:
+        """
+        Check if batch is complete and return BatchEssaysReady event if so.
+
+        This is used to check completion after validation failures or other events
+        that might complete a batch.
+        """
+        if batch_id not in self.batch_expectations:
+            return None
+
+        expectation = self.batch_expectations[batch_id]
+        failure_count = len(self.validation_failures.get(batch_id, []))
+        assigned_count = len(expectation.slot_assignments)
+        total_processed = assigned_count + failure_count
+
+        # Check if batch is complete (either all slots filled OR processed count meets expectation)
+        if expectation.is_complete or total_processed >= expectation.expected_count:
+            # Get validation failures for this batch
+            failures = self.validation_failures.get(batch_id, [])
+
+            # Cancel timeout monitoring
+            if expectation._timeout_task:
+                expectation._timeout_task.cancel()
+
+            # Create enhanced BatchEssaysReady event
+            ready_event = BatchEssaysReady(
+                batch_id=batch_id,
+                ready_essays=expectation.get_ready_essays(),
+                batch_entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                metadata=SystemProcessingMetadata(
+                    entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                    timestamp=datetime.now(UTC),
+                    event="batch.essays.ready",
+                ),
+                validation_failures=failures if failures else None,
+                total_files_processed=len(expectation.slot_assignments) + len(failures)
+            )
+
+            logger.info(
+                f"Batch {batch_id} completion check: "
+                f"{len(expectation.slot_assignments)} successful, {len(failures)} failed, "
+                f"{ready_event.total_files_processed} total processed"
+            )
+
+            # Clean up completed batch
+            del self.batch_expectations[batch_id]
+            if batch_id in self.validation_failures:
+                del self.validation_failures[batch_id]
+
+            return ready_event
+
+        return None

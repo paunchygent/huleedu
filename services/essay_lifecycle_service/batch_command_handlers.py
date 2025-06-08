@@ -126,6 +126,14 @@ async def _route_event(
             )
             return content_result
 
+        elif event_type == topic_name(ProcessingEvent.ESSAY_VALIDATION_FAILED):
+            from common_core.events.file_events import EssayValidationFailedV1
+            validation_event_data = EssayValidationFailedV1.model_validate(envelope.data)
+            validation_result: bool = await batch_coordination_handler.handle_essay_validation_failed(
+                event_data=validation_event_data, correlation_id=correlation_id
+            )
+            return validation_result
+
         # Handle BOS command events
         elif event_type == topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND):
             from common_core.batch_service_models import BatchServiceSpellcheckInitiateCommandDataV1

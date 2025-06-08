@@ -51,6 +51,7 @@ async def create_kafka_consumer() -> AIOKafkaConsumer:
         topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
         topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),
         topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED),
+        topic_name(ProcessingEvent.ESSAY_VALIDATION_FAILED),  # Added for validation coordination
         topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
         topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
         topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),

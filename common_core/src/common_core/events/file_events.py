@@ -34,8 +34,34 @@ class EssayContentProvisionedV1(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class EssayValidationFailedV1(BaseModel):
+    """
+    Event published when file content validation fails.
+
+    Enables ELS to adjust slot expectations and BOS to track
+    actual vs expected essay counts for informed pipeline decisions.
+    This event is critical for maintaining BOS/ELS coordination when
+    validation prevents files from reaching content storage.
+    """
+
+    event: str = Field(default="essay.validation.failed", description="Event type identifier")
+    batch_id: str = Field(description="Batch identifier this failed validation belongs to")
+    original_file_name: str = Field(description="Name of the file that failed validation")
+    validation_error_code: str = Field(
+        description="Specific validation error code (e.g., EMPTY_CONTENT, CONTENT_TOO_SHORT)"
+    )
+    validation_error_message: str = Field(description="Human-readable error message with context")
+    file_size_bytes: int = Field(description="Size of the failed file for metrics and analysis")
+    correlation_id: Optional[UUID] = Field(default=None, description="Request correlation ID")
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Validation failure timestamp"
+    )
+
+
 # Event envelope integration for file events
 class FileEventData(BaseModel):
     """Union type for all file service event data types."""
 
     essay_content_provisioned: Optional[EssayContentProvisionedV1] = None
+    essay_validation_failed: Optional[EssayValidationFailedV1] = None

@@ -6,16 +6,18 @@ import asyncio
 import uuid
 from typing import Union
 
-from core_logic import process_single_file_upload
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import (
+from quart import Blueprint, Response, jsonify, request
+from quart_dishka import inject
+
+from services.file_service.core_logic import process_single_file_upload
+from services.file_service.protocols import (
     ContentServiceClientProtocol,
+    ContentValidatorProtocol,
     EventPublisherProtocol,
     TextExtractorProtocol,
 )
-from quart import Blueprint, Response, jsonify, request
-from quart_dishka import inject
 
 logger = create_service_logger("file_service.api.file_routes")
 file_bp = Blueprint("file_routes", __name__, url_prefix="/v1/files")
@@ -25,6 +27,7 @@ file_bp = Blueprint("file_routes", __name__, url_prefix="/v1/files")
 @inject
 async def upload_batch_files(
     text_extractor: FromDishka[TextExtractorProtocol],
+    content_validator: FromDishka[ContentValidatorProtocol],
     content_client: FromDishka[ContentServiceClientProtocol],
     event_publisher: FromDishka[EventPublisherProtocol],
 ) -> Union[Response, tuple[Response, int]]:
@@ -32,7 +35,7 @@ async def upload_batch_files(
     Handle batch file upload endpoint.
 
     Accepts multiple files associated with a batch_id and processes them
-    concurrently to extract text, store content, and publish readiness events.
+    concurrently to extract text, validate content, store content, and publish events.
     """
     try:
         form_data = await request.form
@@ -80,6 +83,7 @@ async def upload_batch_files(
                         file_name=file_storage.filename,
                         main_correlation_id=main_correlation_id,
                         text_extractor=text_extractor,
+                        content_validator=content_validator,
                         content_client=content_client,
                         event_publisher=event_publisher,
                     )

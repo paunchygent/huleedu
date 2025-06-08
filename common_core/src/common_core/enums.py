@@ -54,6 +54,7 @@ class ProcessingEvent(str, Enum):
     # -------------  Essay content readiness  -------------#
     ESSAY_CONTENT_PROVISIONED = "essay.content.provisioned"
     EXCESS_CONTENT_PROVISIONED = "excess.content.provisioned"
+    ESSAY_VALIDATION_FAILED = "essay.validation.failed"
 
     # -------------  Specialized service commands  -------------#
     BATCH_SPELLCHECK_INITIATE_COMMAND = "batch.spellcheck.initiate.command"
@@ -92,6 +93,7 @@ _TOPIC_MAPPING = {
     ProcessingEvent.BATCH_ESSAYS_REGISTERED: "huleedu.batch.essays.registered.v1",
     ProcessingEvent.ESSAY_CONTENT_PROVISIONED: "huleedu.file.essay.content.provisioned.v1",
     ProcessingEvent.EXCESS_CONTENT_PROVISIONED: "huleedu.els.excess.content.provisioned.v1",
+    ProcessingEvent.ESSAY_VALIDATION_FAILED: "huleedu.file.essay.validation.failed.v1",
     ProcessingEvent.BATCH_ESSAYS_READY: "huleedu.els.batch.essays.ready.v1",
     ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND: "huleedu.els.spellcheck.initiate.command.v1",
     ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND: (

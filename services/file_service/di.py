@@ -12,15 +12,17 @@ from config import Settings, settings
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CollectorRegistry
-from protocols import (
-    ContentServiceClientProtocol,
-    EventPublisherProtocol,
-    TextExtractorProtocol,
-)
 from text_processing import extract_text_from_file
 
 from common_core.events.envelope import EventEnvelope
-from common_core.events.file_events import EssayContentProvisionedV1
+from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
+from services.file_service.content_validator import FileContentValidator
+from services.file_service.protocols import (
+    ContentServiceClientProtocol,
+    ContentValidatorProtocol,
+    EventPublisherProtocol,
+    TextExtractorProtocol,
+)
 
 logger = create_service_logger("file_service.di")
 
@@ -91,6 +93,34 @@ class DefaultEventPublisher:
             logger.error(f"Error publishing EssayContentProvisionedV1 event: {e}")
             raise
 
+    async def publish_essay_validation_failed(
+        self, event_data: EssayValidationFailedV1, correlation_id: Optional[uuid.UUID]
+    ) -> None:
+        """Publish EssayValidationFailedV1 event to Kafka."""
+        try:
+            # Construct EventEnvelope
+            envelope = EventEnvelope[EssayValidationFailedV1](
+                event_type=self.settings.ESSAY_VALIDATION_FAILED_TOPIC,
+                source_service=self.settings.SERVICE_NAME,
+                correlation_id=correlation_id,
+                data=event_data,
+            )
+
+            # Serialize to JSON
+            message_bytes = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
+
+            # Publish to Kafka
+            await self.producer.send(self.settings.ESSAY_VALIDATION_FAILED_TOPIC, message_bytes)
+
+            logger.info(
+                f"Published EssayValidationFailedV1 event for file: "
+                f"{event_data.original_file_name} (error: {event_data.validation_error_code})"
+            )
+
+        except Exception as e:
+            logger.error(f"Error publishing EssayValidationFailedV1 event: {e}")
+            raise
+
 
 class DefaultTextExtractor:
     """Default implementation of TextExtractorProtocol."""
@@ -147,3 +177,11 @@ class FileServiceProvider(Provider):
     def provide_text_extractor(self) -> TextExtractorProtocol:
         """Provide text extractor implementation."""
         return DefaultTextExtractor()
+
+    @provide(scope=Scope.APP)
+    def provide_content_validator(self, settings: Settings) -> ContentValidatorProtocol:
+        """Provide content validator implementation."""
+        return FileContentValidator(
+            min_length=settings.MIN_CONTENT_LENGTH,
+            max_length=settings.MAX_CONTENT_LENGTH
+        )

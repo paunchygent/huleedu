@@ -10,7 +10,10 @@ These events enable count-based aggregation pattern for batch readiness coordina
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from common_core.events.file_events import EssayValidationFailedV1
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -41,6 +44,7 @@ class BatchEssaysReady(BaseModel):
     Event sent by ELS to BOS when all essays in a batch are ready for processing.
 
     This triggers BOS to begin pipeline orchestration for the complete batch.
+    Enhanced to include validation failure information for Phase 6 coordination.
     """
 
     event: str = Field(default="batch.essays.ready", description="Event type identifier")
@@ -50,6 +54,14 @@ class BatchEssaysReady(BaseModel):
     )
     batch_entity: EntityReference = Field(description="Batch entity reference")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
+    validation_failures: Optional[list["EssayValidationFailedV1"]] = Field(
+        default=None,
+        description="List of essays that failed validation (EssayValidationFailedV1 events)"
+    )
+    total_files_processed: Optional[int] = Field(
+        default=None,
+        description="Total number of files processed (successful + failed)"
+    )
 
 
 class BatchReadinessTimeout(BaseModel):

@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     PROMETHEUS_PORT: int = 9092
     HOST: str = "0.0.0.0"
 
+    # Content validation settings
+    CONTENT_VALIDATION_ENABLED: bool = True
+    MIN_CONTENT_LENGTH: int = 50
+    MAX_CONTENT_LENGTH: int = 50000
+    VALIDATION_LOG_LEVEL: str = "INFO"
+
+    # Kafka topic for validation failures (will be implemented with new enum)
+    ESSAY_VALIDATION_FAILED_TOPIC: str = "huleedu.file.essay.validation.failed.v1"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

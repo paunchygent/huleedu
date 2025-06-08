@@ -2,7 +2,7 @@
 Core business logic for File Service file processing workflow.
 
 This module implements the main file processing pipeline that coordinates
-text extraction, content storage, and event publishing.
+text extraction, content validation, content storage, and event publishing.
 """
 
 from __future__ import annotations
@@ -13,13 +13,14 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import (
+
+from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
+from services.file_service.protocols import (
     ContentServiceClientProtocol,
+    ContentValidatorProtocol,
     EventPublisherProtocol,
     TextExtractorProtocol,
 )
-
-from common_core.events.file_events import EssayContentProvisionedV1
 
 logger = create_service_logger("file_service.core_logic")
 
@@ -30,6 +31,7 @@ async def process_single_file_upload(
     file_name: str,
     main_correlation_id: uuid.UUID,
     text_extractor: TextExtractorProtocol,
+    content_validator: ContentValidatorProtocol,
     content_client: ContentServiceClientProtocol,
     event_publisher: EventPublisherProtocol,
 ) -> Dict[str, Any]:
@@ -38,10 +40,15 @@ async def process_single_file_upload(
 
     This function implements the complete file processing workflow:
     1. Extract text content from file
-    2. Store content via Content Service
-    3. Calculate file content hash for integrity
-    4. Construct and publish EssayContentProvisionedV1 event
+    2. Validate extracted content against business rules
+    3. If validation passes: Store content and publish success event
+    4. If validation fails: Publish validation failure event for BOS/ELS coordination
     5. Return processing result
+
+    Architecture:
+    - Text extraction handles technical concerns (file format, encoding, corruption)
+    - Content validation handles business rules (empty content, length limits, format)
+    - Clear separation of concerns ensures consistent error handling and codes
 
     Args:
         batch_id: Batch identifier this file belongs to
@@ -49,11 +56,12 @@ async def process_single_file_upload(
         file_name: Original filename
         main_correlation_id: Correlation ID for batch upload operation
         text_extractor: Text extraction protocol implementation
+        content_validator: Content validation protocol implementation
         content_client: Content Service client protocol implementation
         event_publisher: Event publishing protocol implementation
 
     Returns:
-        Dict containing processing result with file_name, text_storage_id, and status
+        Dict containing processing result with file_name, status, and relevant IDs/error info
     """
     logger.info(
         f"Processing file {file_name} for batch {batch_id}",
@@ -61,27 +69,97 @@ async def process_single_file_upload(
     )
 
     try:
-        # Extract text content from file
-        text = await text_extractor.extract_text(file_content, file_name)
-        if not text:
-            logger.warning(
-                f"Text extraction failed or returned empty for {file_name}",
+        # Step 1: Extract text content from file
+        # Note: This should only fail for technical issues (unsupported format, corruption, etc.)
+        # Empty files should successfully extract to empty string and be handled by validation
+        try:
+            text = await text_extractor.extract_text(file_content, file_name)
+            logger.debug(
+                f"Text extraction completed for {file_name}: {len(text) if text else 0} characters",
                 extra={"correlation_id": str(main_correlation_id)},
             )
-            return {"file_name": file_name, "status": "extraction_failed_or_empty"}
+        except Exception as extraction_error:
+            logger.error(
+                f"Text extraction failed for {file_name}: {extraction_error}",
+                extra={"correlation_id": str(main_correlation_id)},
+                exc_info=True,
+            )
 
-        # Store extracted text content via Content Service
+            # Publish technical extraction failure event
+            validation_failure_event = EssayValidationFailedV1(
+                batch_id=batch_id,
+                original_file_name=file_name,
+                validation_error_code="TEXT_EXTRACTION_FAILED",
+                validation_error_message=f"Technical text extraction failure: {extraction_error}",
+                file_size_bytes=len(file_content),
+                correlation_id=main_correlation_id,
+                timestamp=datetime.now(timezone.utc)
+            )
+
+            await event_publisher.publish_essay_validation_failed(
+                validation_failure_event, main_correlation_id
+            )
+
+            logger.info(
+                f"Published EssayValidationFailedV1 for technical extraction failure: {file_name}",
+                extra={"correlation_id": str(main_correlation_id)}
+            )
+
+            return {"file_name": file_name, "status": "extraction_failed"}
+
+        # Step 2: Validate extracted content against business rules
+        # This handles all content-related issues including empty content, length limits, etc.
+        validation_result = await content_validator.validate_content(text, file_name)
+        if not validation_result.is_valid:
+            logger.warning(
+                f"Content validation failed for {file_name}: {validation_result.error_message}",
+                extra={
+                    "correlation_id": str(main_correlation_id),
+                    "error_code": validation_result.error_code,
+                    "error_message": validation_result.error_message,
+                    "content_length": len(text) if text else 0
+                }
+            )
+
+            # Publish business rule validation failure event
+            validation_failure_event = EssayValidationFailedV1(
+                batch_id=batch_id,
+                original_file_name=file_name,
+                validation_error_code=validation_result.error_code or "UNKNOWN_ERROR",
+                validation_error_message=validation_result.error_message or "Content validation failed",
+                file_size_bytes=len(file_content),
+                correlation_id=main_correlation_id,
+                timestamp=datetime.now(timezone.utc)
+            )
+
+            await event_publisher.publish_essay_validation_failed(
+                validation_failure_event, main_correlation_id
+            )
+
+            logger.info(
+                f"Published EssayValidationFailedV1 for content validation failure: {file_name}",
+                extra={"correlation_id": str(main_correlation_id)}
+            )
+
+            return {
+                "file_name": file_name,
+                "status": "content_validation_failed",
+                "error_code": validation_result.error_code,
+                "error_message": validation_result.error_message
+            }
+
+        # Step 3: Store validated content and publish success event
         text_storage_id = await content_client.store_content(text.encode("utf-8"))
         logger.info(
             f"Stored content for file {file_name}, text_storage_id: {text_storage_id}",
             extra={"correlation_id": str(main_correlation_id)},
         )
 
-        # Calculate MD5 hash of file content for integrity tracking
+        # Calculate metadata for event
         content_md5_hash = hashlib.md5(file_content).hexdigest()
         file_size_bytes = len(file_content)
 
-        # Construct EssayContentProvisionedV1 event data
+        # Construct success event
         content_provisioned_event_data = EssayContentProvisionedV1(
             batch_id=batch_id,
             original_file_name=file_name,
@@ -92,7 +170,7 @@ async def process_single_file_upload(
             timestamp=datetime.now(timezone.utc),
         )
 
-        # Publish the event
+        # Publish success event
         await event_publisher.publish_essay_content_provisioned(
             content_provisioned_event_data, main_correlation_id
         )
@@ -104,12 +182,12 @@ async def process_single_file_upload(
         return {
             "file_name": file_name,
             "text_storage_id": text_storage_id,
-            "status": "processing_initiated",
+            "status": "processing_success",
         }
 
     except Exception as e:
         logger.error(
-            f"Error processing file {file_name}: {e}",
+            f"Unexpected error processing file {file_name}: {e}",
             extra={"correlation_id": str(main_correlation_id)},
             exc_info=True,
         )

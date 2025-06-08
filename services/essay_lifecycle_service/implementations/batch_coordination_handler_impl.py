@@ -11,7 +11,7 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from common_core.events.batch_coordination_events import BatchEssaysRegistered
-    from common_core.events.file_events import EssayContentProvisionedV1
+    from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -186,6 +186,59 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
         except Exception as e:
             logger.error(
                 "Error handling EssayContentProvisionedV1 event",
+                extra={"error": str(e), "correlation_id": str(correlation_id)},
+            )
+            return False
+
+    async def handle_essay_validation_failed(
+        self,
+        event_data: EssayValidationFailedV1,
+        correlation_id: UUID | None = None,
+    ) -> bool:
+        """Handle EssayValidationFailedV1 event for validation coordination."""
+        try:
+            logger.info(
+                "Processing EssayValidationFailedV1 event",
+                extra={
+                    "batch_id": event_data.batch_id,
+                    "original_file_name": event_data.original_file_name,
+                    "error_code": event_data.validation_error_code,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+            # Handle validation failure in batch tracker
+            batch_ready_event = await self.batch_tracker.handle_validation_failure(event_data)
+
+            # Publish BatchEssaysReady if batch is now complete
+            if batch_ready_event is not None:
+                logger.info(
+                    "Batch is complete after validation failure, publishing BatchEssaysReady event",
+                    extra={
+                        "batch_id": batch_ready_event.batch_id,
+                        "ready_count": len(batch_ready_event.ready_essays),
+                        "validation_failures": len(batch_ready_event.validation_failures or []),
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+                await self.event_publisher.publish_batch_essays_ready(
+                    batch_ready_event, correlation_id=correlation_id
+                )
+
+            logger.info(
+                "Successfully processed validation failure",
+                extra={
+                    "batch_id": event_data.batch_id,
+                    "original_file_name": event_data.original_file_name,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(
+                "Error handling EssayValidationFailedV1 event",
                 extra={"error": str(e), "correlation_id": str(correlation_id)},
             )
             return False

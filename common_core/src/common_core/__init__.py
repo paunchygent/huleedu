@@ -46,6 +46,7 @@ from .events.cj_assessment_events import (
 from .events.envelope import EventEnvelope
 from .events.file_events import (
     EssayContentProvisionedV1,
+    EssayValidationFailedV1,
 )
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .metadata_models import (
@@ -105,6 +106,7 @@ __all__ = [
     "ExcessContentProvisionedV1",
     # File Service Event Models
     "EssayContentProvisionedV1",
+    "EssayValidationFailedV1",
     # Batch Service Command Models
     "BatchServiceSpellcheckInitiateCommandDataV1",
     "BatchServiceNLPInitiateCommandDataV1",
@@ -137,6 +139,7 @@ BatchReadinessTimeout.model_rebuild(raise_errors=True)
 ExcessContentProvisionedV1.model_rebuild(raise_errors=True)
 
 EssayContentProvisionedV1.model_rebuild(raise_errors=True)
+EssayValidationFailedV1.model_rebuild(raise_errors=True)
 ELS_CJAssessmentRequestV1.model_rebuild(raise_errors=True)
 CJAssessmentCompletedV1.model_rebuild(raise_errors=True)
 CJAssessmentFailedV1.model_rebuild(raise_errors=True)

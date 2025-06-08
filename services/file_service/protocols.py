@@ -10,7 +10,8 @@ from __future__ import annotations
 import uuid
 from typing import Optional, Protocol
 
-from common_core.events.file_events import EssayContentProvisionedV1
+from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
+from services.file_service.validation_models import ValidationResult
 
 
 class ContentServiceClientProtocol(Protocol):
@@ -48,6 +49,22 @@ class EventPublisherProtocol(Protocol):
         """
         ...
 
+    async def publish_essay_validation_failed(
+        self, event_data: EssayValidationFailedV1, correlation_id: Optional[uuid.UUID]
+    ) -> None:
+        """
+        Publish EssayValidationFailedV1 event to Kafka.
+
+        Args:
+            event_data: EssayValidationFailedV1 event payload
+            correlation_id: Optional correlation ID for request tracing
+
+        Note:
+            Critical for BOS/ELS coordination - enables ELS to adjust
+            slot expectations when validation prevents content storage.
+        """
+        ...
+
 
 class TextExtractorProtocol(Protocol):
     """Protocol for text extraction from file content."""
@@ -65,5 +82,22 @@ class TextExtractorProtocol(Protocol):
 
         Note:
             file_name can be used for context or simple type dispatch
+        """
+        ...
+
+
+class ContentValidatorProtocol(Protocol):
+    """Protocol for validating extracted file content."""
+
+    async def validate_content(self, text: str, file_name: str) -> ValidationResult:
+        """
+        Validate extracted text content against business rules.
+
+        Args:
+            text: Extracted text content to validate
+            file_name: Original filename for context in error messages
+
+        Returns:
+            ValidationResult indicating success/failure with details
         """
         ...

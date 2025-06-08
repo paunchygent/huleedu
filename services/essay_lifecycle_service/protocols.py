@@ -201,6 +201,14 @@ class BatchCoordinationHandler(Protocol):
         """Handle content provisioning and slot assignment."""
         ...
 
+    async def handle_essay_validation_failed(
+        self,
+        event_data: Any,  # EssayValidationFailedV1
+        correlation_id: UUID | None = None,
+    ) -> bool:
+        """Handle validation failure events for coordination."""
+        ...
+
 
 class ServiceResultHandler(Protocol):
     """Protocol for handling specialized service result events."""
@@ -367,4 +375,12 @@ class BatchEssayTracker(Protocol):
         self, event_type: str, callback: Callable[[Any], Awaitable[None]]
     ) -> None:
         """Register callback for batch coordination events."""
+        ...
+
+    async def handle_validation_failure(self, event: Any) -> Any | None:  # EssayValidationFailedV1 -> BatchEssaysReady | None
+        """Handle validation failure event for batch coordination."""
+        ...
+
+    def check_batch_completion(self, batch_id: str) -> Any | None:  # BatchEssaysReady | None
+        """Check if batch is complete and return BatchEssaysReady event if so."""
         ...
