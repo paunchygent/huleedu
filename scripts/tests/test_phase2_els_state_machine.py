@@ -38,7 +38,7 @@ def test_transitions_library():
             initial='A'
         )
 
-        assert test_model.state == 'A'
+        assert test_model.state == 'A'  # type: ignore[attr-defined]
         print("✅ transitions library is properly installed and functional")
         return True
 

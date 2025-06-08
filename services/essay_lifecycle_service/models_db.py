@@ -1,7 +1,7 @@
 """
 SQLAlchemy database models for Essay Lifecycle Service PostgreSQL implementation.
 
-Following the pattern established by BOS, with proper enum handling and 
+Following the pattern established by BOS, with proper enum handling and
 optimistic locking support.
 """
 

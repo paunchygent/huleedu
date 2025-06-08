@@ -7,9 +7,6 @@ from aiokafka import AIOKafkaProducer
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry
 
-from services.essay_lifecycle_service.batch_tracker import (
-    BatchEssayTracker as ConcreteBatchEssayTracker,
-)
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.config import settings as app_settings
 from services.essay_lifecycle_service.core_logic import (
@@ -20,6 +17,9 @@ from services.essay_lifecycle_service.implementations.batch_command_handler_impl
 )
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
     DefaultBatchCoordinationHandler,
+)
+from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
+    DefaultBatchEssayTracker,
 )
 from services.essay_lifecycle_service.implementations.batch_phase_coordinator_impl import (
     DefaultBatchPhaseCoordinator,
@@ -198,7 +198,7 @@ class EssayLifecycleServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_batch_essay_tracker(self) -> BatchEssayTracker:
         """Provide batch essay tracker implementation."""
-        return ConcreteBatchEssayTracker()
+        return DefaultBatchEssayTracker()
 
     @provide(scope=Scope.APP)
     def provide_batch_phase_coordinator(

@@ -41,10 +41,10 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
     ) -> None:
         """
         Initialize with injected service-specific command handlers.
-        
+
         Args:
             spellcheck_handler: Handler for spellcheck commands
-            cj_assessment_handler: Handler for CJ assessment commands  
+            cj_assessment_handler: Handler for CJ assessment commands
             future_services_handler: Handler for future service commands
         """
         self.spellcheck_handler = spellcheck_handler

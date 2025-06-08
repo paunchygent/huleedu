@@ -16,7 +16,9 @@ import pytest
 from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayValidationFailedV1
 
-from services.essay_lifecycle_service.batch_tracker import BatchEssayTracker
+from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
+    DefaultBatchEssayTracker as BatchEssayTracker,
+)
 
 
 class TestValidationEventConsumerIntegration:
@@ -202,7 +204,7 @@ class TestValidationEventConsumerIntegration:
     async def test_event_timestamp_validation(self, sample_validation_failure_event: EssayValidationFailedV1) -> None:
         """Test that event timestamps are properly validated and preserved."""
         # Create envelope with specific timestamp
-        test_timestamp = datetime.now(UTC)
+        test_timestamp = datetime.now(UTC        )
 
         envelope = EventEnvelope(
             event_id=uuid4(),
@@ -228,7 +230,7 @@ class TestValidationEventConsumerIntegration:
             file_size_bytes=0
         )
 
-        envelope = EventEnvelope(
+        EventEnvelope(
             event_id=uuid4(),
             event_type="essay.validation.failed",
             event_timestamp=datetime.now(UTC),

@@ -7,7 +7,6 @@ proper connection pooling, transaction management, and enum handling.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -26,8 +25,6 @@ from services.essay_lifecycle_service.state_store import EssayState as ConcreteE
 
 if TYPE_CHECKING:
     from protocols import EssayState
-
-logger = logging.getLogger(__name__)
 
 
 class PostgreSQLEssayRepository(EssayRepositoryProtocol):
@@ -295,7 +292,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         }
 
         if phase_name not in phase_status_mapping:
-            logger.warning(f"Unknown phase: {phase_name}")
+            self.logger.warning(f"Unknown phase: {phase_name}")
             return []
 
         phase_statuses = phase_status_mapping[phase_name]

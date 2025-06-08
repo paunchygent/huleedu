@@ -55,6 +55,8 @@ EventEnvelope.model_rebuild(raise_errors=True)
 SystemProcessingMetadata.model_rebuild(raise_errors=True)
 EntityReference.model_rebuild(raise_errors=True)
 
+# Configure logging for tests to ensure caplog works properly
+# NOTE: Logging now configured globally in root tests/conftest.py to avoid conflicts
 
 @pytest.fixture
 def sample_essay_id() -> str:

@@ -16,10 +16,10 @@ from services.file_service.validation_models import ValidationResult
 
 
 @pytest.mark.asyncio
-async def test_empty_file_uses_content_validation():
+async def test_empty_file_uses_content_validation() -> None:
     """
     Test that empty files are handled by content validation with proper EMPTY_CONTENT error code.
-    
+
     This ensures the elegant separation of concerns:
     - Text extraction succeeds (returns empty string)
     - Content validation fails with EMPTY_CONTENT error code
@@ -71,7 +71,9 @@ async def test_empty_file_uses_content_validation():
 
     assert isinstance(published_event, EssayValidationFailedV1)
     assert published_event.validation_error_code == "EMPTY_CONTENT"
-    assert published_event.validation_error_message == "File 'empty_essay.txt' contains no readable text content."
+    assert published_event.validation_error_message == (
+        "File 'empty_essay.txt' contains no readable text content."
+    )
     assert published_event.batch_id == batch_id
     assert published_event.original_file_name == file_name
 
@@ -85,10 +87,10 @@ async def test_empty_file_uses_content_validation():
 
 
 @pytest.mark.asyncio
-async def test_text_extraction_failure_vs_empty_content():
+async def test_text_extraction_failure_vs_empty_content() -> None:
     """
     Test that true text extraction failures are distinguished from empty content.
-    
+
     This verifies:
     - Technical extraction failures get TEXT_EXTRACTION_FAILED error code
     - Empty content gets EMPTY_CONTENT error code
@@ -139,10 +141,10 @@ async def test_text_extraction_failure_vs_empty_content():
 
 
 @pytest.mark.asyncio
-async def test_content_too_short_validation():
+async def test_content_too_short_validation() -> None:
     """
     Test that content validation properly handles files that are too short.
-    
+
     This ensures all content validation rules work through the new architecture.
     """
     # Arrange
@@ -159,7 +161,10 @@ async def test_content_too_short_validation():
     content_validator.validate_content.return_value = ValidationResult(
         is_valid=False,
         error_code="CONTENT_TOO_SHORT",
-        error_message="File 'too_short.txt' contains only 2 characters. Essays must contain at least 50 characters."
+        error_message=(
+            "File 'too_short.txt' contains only 2 characters. "
+            "Essays must contain at least 50 characters."
+        )
     )
 
     content_client = AsyncMock()

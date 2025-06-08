@@ -191,10 +191,10 @@ async def process_single_message(
                 "error_type": type(e).__name__,
                 "traceback": traceback.format_exc()
             }
-            
+
             # Log detailed error information
             logger.error(f"Detailed error information: {error_details}")
-            
+
             failed_event_data = CJAssessmentFailedV1(
                 event_name=ProcessingEvent.CJ_ASSESSMENT_FAILED,
                 entity_ref=request_event_data.entity_ref,

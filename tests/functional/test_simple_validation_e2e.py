@@ -1,20 +1,20 @@
 """
-Simple End-to-End Test for Validation Coordination Fix.
+Simple End-to-End Test for Content Validation.
 
-Tests that text extraction failures publish EssayValidationFailedV1 events.
+Tests that content validation failures publish EssayValidationFailedV1 events 
+with appropriate error codes (EMPTY_CONTENT, CONTENT_TOO_SHORT).
 """
 
 import json
-import logging
 import uuid
 from datetime import datetime, timedelta
 
 import aiohttp
 import pytest
 from aiokafka import AIOKafkaConsumer
+from huleedu_service_libs.logging_utils import create_service_logger
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = create_service_logger("test.simple_validation_e2e")
 
 CONFIG = {
     "bos_url": "http://localhost:5001",
@@ -29,8 +29,8 @@ TOPICS = {
 
 
 @pytest.mark.asyncio
-async def test_text_extraction_failure_publishes_event():
-    """Test that text extraction failures publish validation failure events."""
+async def test_content_validation_failures_publish_events():
+    """Test that content validation failures publish validation failure events with proper error codes."""
 
     # Create a small batch
     async with aiohttp.ClientSession() as session:
@@ -52,7 +52,7 @@ async def test_text_extraction_failure_publishes_event():
 
         logger.info(f"Created batch {batch_id}")
 
-    # Create test files: 1 valid, 1 text extraction failure, 1 validation failure
+    # Create test files: 1 valid, 2 content validation failures
     files = [
         {
             "file_name": "valid_essay.txt",
@@ -60,11 +60,11 @@ async def test_text_extraction_failure_publishes_event():
         },
         {
             "file_name": "invalid_essay_empty.txt",
-            "content": ""  # This will trigger text extraction failure
+            "content": ""  # This will trigger EMPTY_CONTENT validation failure
         },
         {
             "file_name": "invalid_essay_short.txt",
-            "content": "Too short"  # This will trigger validation failure
+            "content": "Too short"  # This will trigger CONTENT_TOO_SHORT validation failure
         }
     ]
 
@@ -120,9 +120,13 @@ async def test_text_extraction_failure_publishes_event():
 
             logger.info(f"Received event on {msg.topic}: {json.dumps(msg.value, indent=2)}")
 
-                        # Stop when we have expected events (1 content + 2 validation failures)
-            validation_failure_count = len([e for e in events if e["topic"] == TOPICS["validation_failed"]])
-            content_provision_count = len([e for e in events if e["topic"] == TOPICS["content_provisioned"]])
+            # Stop when we have expected events (1 content + 2 validation failures)
+            validation_failure_count = len(
+                [e for e in events if e["topic"] == TOPICS["validation_failed"]]
+            )
+            content_provision_count = len(
+                [e for e in events if e["topic"] == TOPICS["content_provisioned"]]
+            )
 
             if validation_failure_count >= 2 and content_provision_count >= 1:
                 logger.info("Received all expected events!")
@@ -140,11 +144,15 @@ async def test_text_extraction_failure_publishes_event():
     logger.info(f"Content provisions: {len(content_provision_events)}")
 
     # Assert we got the expected events
-    assert len(content_provision_events) >= 1, "Should have at least 1 content provision (valid essay)"
-    assert len(validation_failure_events) >= 2, "Should have 2 validation failures (empty + short)"
+    assert len(
+        content_provision_events) >= 1, "Should have at least 1 content provision (valid essay)"
+    assert len(
+        validation_failure_events) >= 2, "Should have 2 validation failures (empty + short)"
 
-    # Check that text extraction failure event was published
-    text_extraction_failures = []
+    # Check that validation failure events have the expected error codes
+    empty_content_failures = []
+    content_too_short_failures = []
+
     for event in validation_failure_events:
         event_data = event["data"]
         # Handle EventEnvelope format
@@ -153,9 +161,16 @@ async def test_text_extraction_failure_publishes_event():
         else:
             failure_data = event_data
 
-        if failure_data.get("validation_error_code") == "TEXT_EXTRACTION_FAILED":
-            text_extraction_failures.append(failure_data)
+        error_code = failure_data.get("validation_error_code")
+        if error_code == "EMPTY_CONTENT":
+            empty_content_failures.append(failure_data)
+        elif error_code == "CONTENT_TOO_SHORT":
+            content_too_short_failures.append(failure_data)
 
-    assert len(text_extraction_failures) >= 1, "Should have at least 1 text extraction failure event"
+    assert len(
+        empty_content_failures) >= 1, "Should have at least 1 EMPTY_CONTENT validation failure event"
+    assert len(
+        content_too_short_failures) >= 1, "Should have at least 1 CONTENT_TOO_SHORT validation failure event"
 
-    logger.info("✅ Test passed: Text extraction failures correctly publish validation failure events!")
+    logger.info("✅ Test passed: Content validation failures "
+                "correctly publish appropriate validation failure events!")

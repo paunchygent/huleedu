@@ -120,11 +120,10 @@ def test_filter_l2_entries_empty_input() -> None:
     assert filter_l2_entries({}) == {}
 
 
-def test_filter_l2_entries_invalid_input_type(capsys: Any) -> None:
+def test_filter_l2_entries_invalid_input_type(caplog: Any) -> None:
     """Test filter_l2_entries with invalid input type."""
     assert filter_l2_entries(None) == {}  # type: ignore
-    captured = capsys.readouterr()
-    assert "Invalid input: expected a dictionary" in captured.out
+    assert "Invalid input: expected a dictionary" in caplog.text
 
 
 def test_filter_l2_entries_valid_and_invalid() -> None:
@@ -140,13 +139,12 @@ def test_filter_l2_entries_valid_and_invalid() -> None:
     assert filter_l2_entries(l2_errors) == expected_filtered
 
 
-def test_filter_l2_entries_non_string_input(capsys: Any) -> None:
+def test_filter_l2_entries_non_string_input(caplog: Any) -> None:
     """Test filter_l2_entries with non-string entries."""
     mixed_input = {"good": "correction", 123: "string_value", "another": "valid"}  # type: ignore
     result = filter_l2_entries(mixed_input)  # type: ignore
     assert result == {"good": "correction", "another": "valid"}
-    captured = capsys.readouterr()
-    assert "Skipping non-string entry: 123 -> string_value" in captured.out
+    assert "Skipping non-string entry: 123 -> string_value" in caplog.text
 
 
 def test_filter_l2_entries_all_valid() -> None:
@@ -174,28 +172,26 @@ def test_create_filtered_l2_dictionary_success(tmp_path: Path) -> None:
     assert content == expected_content_lines
 
 
-def test_create_filtered_l2_dictionary_empty_input(tmp_path: Path, capsys: Any) -> None:
+def test_create_filtered_l2_dictionary_empty_input(tmp_path: Path, caplog: Any) -> None:
     """Test create_filtered_l2_dictionary with empty input."""
     output_file = tmp_path / "test_filtered.txt"
     assert not create_filtered_l2_dictionary({}, output_file)
     assert not output_file.exists()
-    captured = capsys.readouterr()
-    assert "No corrections provided" in captured.out
+    assert "No corrections provided" in caplog.text
 
 
-def test_create_filtered_l2_dictionary_no_valid_entries(tmp_path: Path, capsys: Any) -> None:
+def test_create_filtered_l2_dictionary_no_valid_entries(tmp_path: Path, caplog: Any) -> None:
     """Test create_filtered_l2_dictionary when all entries are filtered out."""
     output_file = tmp_path / "test_no_valid.txt"
     # These entries will be filtered out (short words, pluralization)
     invalid_entries = {"a": "an", "cats": "cat", "is": "are"}
     assert not create_filtered_l2_dictionary(invalid_entries, output_file)
     assert not output_file.exists()
-    captured = capsys.readouterr()
-    assert "No valid corrections after filtering" in captured.out
+    assert "No valid corrections after filtering" in caplog.text
 
 
 def test_create_filtered_l2_dictionary_os_error_parent_dir(
-    tmp_path: Path, mocker: Any, capsys: Any
+    tmp_path: Path, mocker: Any, caplog: Any
 ) -> None:
     """Test create_filtered_l2_dictionary with OSError during parent directory creation."""
     # Create a file where a directory is expected to cause OSError
@@ -223,12 +219,11 @@ def test_create_filtered_l2_dictionary_os_error_parent_dir(
 
     assert create_filtered_l2_dictionary(l2_errors, output_file) is False
     assert not output_file.exists()
-    captured = capsys.readouterr()
-    assert "Failed to create directory" in captured.out  # Check for specific part of log
+    assert "Failed to create directory" in caplog.text  # Check for specific part of log
 
 
 def test_create_filtered_l2_dictionary_os_error_writing_file(
-    tmp_path: Path, mocker: Any, capsys: Any
+    tmp_path: Path, mocker: Any, caplog: Any
 ) -> None:
     """Test create_filtered_l2_dictionary with OSError during file writing."""
     output_file = tmp_path / "filtered_l2_test.txt"
@@ -240,5 +235,4 @@ def test_create_filtered_l2_dictionary_os_error_writing_file(
     assert create_filtered_l2_dictionary(l2_errors, output_file) is False
     # The file might be created before open fails, or not, depending on implementation details
     # For this test, we mainly care about the False return and log.
-    captured = capsys.readouterr()
-    assert "Failed to write to" in captured.out
+    assert "Failed to write to" in caplog.text

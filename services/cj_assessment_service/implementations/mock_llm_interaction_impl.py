@@ -8,7 +8,7 @@ avoiding expensive API calls.
 from __future__ import annotations
 
 import random
-from typing import List, Optional, Literal
+from typing import List, Literal, Optional
 
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
@@ -65,7 +65,7 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
                 # Randomly select winner with slight bias towards Essay B
                 winner = "Essay A" if random.random() < 0.45 else "Essay B"
                 confidence = round(random.uniform(1.0, 5.0), 1)
-                
+
                 # Generate realistic justification based on winner
                 justifications = {
                     "Essay A": [
@@ -83,7 +83,7 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
                         "Essay B provides more relevant examples and stronger reasoning."
                     ]
                 }
-                
+
                 # Only get justification from dictionary for non-error cases
                 justification = random.choice(justifications[winner])
 

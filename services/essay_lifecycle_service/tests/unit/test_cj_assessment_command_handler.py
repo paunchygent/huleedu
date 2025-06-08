@@ -303,7 +303,7 @@ class TestCJAssessmentCommandHandler:
             # Setup state machines - all succeed
             # Need 4 total: 2 for initial processing + 2 for started events
             mock_machines = []
-            for i in range(4):
+            for _ in range(4):
                 mock_machine = MagicMock()
                 mock_machine.trigger.return_value = True  # All succeed
                 mock_machine.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT

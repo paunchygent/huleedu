@@ -113,7 +113,7 @@ def filter_l2_entries(l2_errors: Dict[str, str]) -> Dict[str, str]:
         for wrong, correct in l2_errors.items():
             processed_count += 1
             if not isinstance(wrong, str) or not isinstance(correct, str):
-                logger.debug(f"Skipping non-string entry: {wrong} -> {correct}")
+                logger.info(f"Skipping non-string entry: {wrong} -> {correct}")
                 invalid_count += 1
                 continue
 

@@ -242,7 +242,7 @@ class TestPatternAlignmentValidation:
         """
         Test that pattern alignment provides measurable development experience improvements.
         """
-        consistency_checks = []
+        consistency_checks: list[tuple[str, int | float]] = []
 
         async with httpx.AsyncClient() as client:
 

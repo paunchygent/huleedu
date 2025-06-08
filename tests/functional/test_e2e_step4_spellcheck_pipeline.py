@@ -217,7 +217,8 @@ async def upload_content_to_content_service(content: str) -> str:
         ) as response:
             assert response.status == 201
             result = await response.json()
-            return result["storage_id"]
+            storage_id: str = result["storage_id"]
+            return storage_id
 
 
 async def fetch_content_from_content_service(storage_id: str) -> str:
@@ -308,7 +309,7 @@ async def monitor_for_spellcheck_result(
                             envelope_data.get("data", {}).get(
                                 "entity_ref", {}).get("entity_id") == essay_id):
 
-                            result_data = envelope_data["data"]
+                            result_data: Dict[str, Any] = envelope_data["data"]
                             print(f"📨 Received spellcheck result for essay {essay_id}")
                             return result_data
 

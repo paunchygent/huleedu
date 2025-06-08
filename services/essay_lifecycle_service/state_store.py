@@ -1,7 +1,7 @@
 """
 SQLite storage implementation for Essay Lifecycle Service.
 
-Provides SQLite-based persistence implementation that serves as the 
+Provides SQLite-based persistence implementation that serves as the
 development/testing alternative to the PostgreSQL production implementation.
 """
 

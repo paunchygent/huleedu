@@ -250,7 +250,8 @@ async def upload_content_to_content_service(content: str) -> str:
         ) as response:
             assert response.status == 201
             result = await response.json()
-            return result["storage_id"]
+            storage_id: str = result["storage_id"]
+            return storage_id
 
 
 async def publish_cj_assessment_request_event(
@@ -384,15 +385,15 @@ async def monitor_for_cj_assessment_result(
                 error_info = event_data.get("system_metadata", {}).get(
                     "error_info", {}
                 )
-                
+
                 # Extract and format the most relevant error information
                 error_message = error_info.get("error_message", "Unknown error")
                 error_type = error_info.get("error_type", "UnknownErrorType")
-                
+
                 # Print detailed error information for debugging
                 print(f"Error type: {error_type}")
                 print(f"Error message: {error_message}")
-                
+
                 # If there's a traceback, print the first few lines for context
                 traceback_info = error_info.get("traceback", "")
                 if traceback_info:
@@ -400,7 +401,7 @@ async def monitor_for_cj_assessment_result(
                     print("Traceback preview:")
                     for line in traceback_lines:
                         print(f"  {line}")
-                
+
                 raise AssertionError(
                     f"CJ Assessment failed: {error_type} - {error_message}"
                 )

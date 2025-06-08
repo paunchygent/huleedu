@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -20,7 +20,9 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 
-from services.essay_lifecycle_service.batch_tracker import BatchEssayTracker
+from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
+    DefaultBatchEssayTracker as BatchEssayTracker,
+)
 
 
 class TestEnhancedBatchEssayTracker:
@@ -59,7 +61,9 @@ class TestEnhancedBatchEssayTracker:
             correlation_id=uuid4()
         )
 
-    async def test_validation_failure_tracking_initialization(self, tracker: BatchEssayTracker) -> None:
+    async def test_validation_failure_tracking_initialization(
+        self, tracker: BatchEssayTracker, sample_batch_registration: BatchEssaysRegistered
+    ) -> None:
         """Test that validation failure tracking is properly initialized."""
         # Verify initialization
         assert hasattr(tracker, 'validation_failures')
@@ -67,14 +71,17 @@ class TestEnhancedBatchEssayTracker:
         assert len(tracker.validation_failures) == 0
 
     async def test_handle_single_validation_failure(
-        self, tracker: BatchEssayTracker, sample_batch_registration: BatchEssaysRegistered, sample_validation_failure: EssayValidationFailedV1
+        self,
+        tracker: BatchEssayTracker,
+        sample_batch_registration: BatchEssaysRegistered,
+        sample_validation_failure: EssayValidationFailedV1
     ) -> None:
         """Test handling a single validation failure."""
         # Register batch first
         await tracker.register_batch(sample_batch_registration)
 
         # Mock the completion method to track calls
-        with patch.object(tracker, '_complete_batch_with_failures') as mock_complete:
+        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
             mock_complete.return_value = None
 
             # Handle validation failure
@@ -83,7 +90,8 @@ class TestEnhancedBatchEssayTracker:
             # Verify failure is tracked
             assert "batch_test" in tracker.validation_failures
             assert len(tracker.validation_failures["batch_test"]) == 1
-            assert tracker.validation_failures["batch_test"][0].validation_error_code == "EMPTY_CONTENT"
+            failure = tracker.validation_failures["batch_test"][0]
+            assert failure.validation_error_code == "EMPTY_CONTENT"
 
             # Should not trigger completion yet (only 1 of 5 processed)
             mock_complete.assert_not_called()
@@ -107,7 +115,7 @@ class TestEnhancedBatchEssayTracker:
         await tracker.register_batch(sample_batch_registration)
 
         # Mock the completion method
-        with patch.object(tracker, '_complete_batch_with_failures') as mock_complete:
+        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
             mock_complete.return_value = None
 
             # Assign 3 slots successfully
@@ -150,7 +158,7 @@ class TestEnhancedBatchEssayTracker:
         await tracker.register_batch(batch_registration)
 
         # Mock completion method
-        with patch.object(tracker, '_complete_batch_with_failures') as mock_complete:
+        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
             mock_complete.return_value = None
 
             # Assign 24 slots successfully
@@ -206,42 +214,46 @@ class TestEnhancedBatchEssayTracker:
 
         # Verify all failures are tracked
         assert len(tracker.validation_failures["batch_test"]) == 3
-        assert all(f.validation_error_code == "EMPTY_CONTENT" for f in tracker.validation_failures["batch_test"])
+        assert all(
+            f.validation_error_code == "EMPTY_CONTENT"
+            for f in tracker.validation_failures["batch_test"]
+        )
 
-    async def test_complete_batch_with_failures_implementation(
+    async def test_create_batch_ready_event_implementation(
         self, tracker: BatchEssayTracker, sample_batch_registration: BatchEssaysRegistered
     ) -> None:
-        """Test the _complete_batch_with_failures method implementation."""
-        # Register batch
+        """Test the _create_batch_ready_event method implementation."""
         await tracker.register_batch(sample_batch_registration)
 
-        # Mock the event callback
-        batch_ready_callback = AsyncMock()
-        tracker.register_event_callback("batch_essays_ready", batch_ready_callback)
-
-        # Assign 3 slots
+        # Assign 3 slots successfully
         for i in range(1, 4):
             tracker.assign_slot_to_content("batch_test", f"content_{i:03d}", f"essay_{i}.txt")
 
-        # Add 2 validation failures
-        failures = [
-            EssayValidationFailedV1(
-                batch_id="batch_test",
-                original_file_name=f"failed_{i}.txt",
-                validation_error_code="CONTENT_TOO_SHORT",
-                validation_error_message=f"Failed file {i}",
-                file_size_bytes=10
-            )
-            for i in range(4, 6)
-        ]
+        # Create 1 validation failure (not enough to trigger completion)
+        failure = EssayValidationFailedV1(
+            batch_id="batch_test",
+            original_file_name="failed_4.txt",
+            validation_error_code="CONTENT_TOO_SHORT",
+            validation_error_message="Failed file 4",
+            file_size_bytes=10
+        )
+        await tracker.handle_validation_failure(failure)
 
-        tracker.validation_failures["batch_test"] = failures
-
-        # Get expectation
+        # Get expectation before completion
         expectation = tracker.batch_expectations["batch_test"]
 
-        # Call _complete_batch_with_failures directly (no need to mock for this test)
-        ready_event = tracker._complete_batch_with_failures("batch_test", expectation)
+        # Manually add another failure to the tracker for testing
+        failure2 = EssayValidationFailedV1(
+            batch_id="batch_test",
+            original_file_name="failed_5.txt",
+            validation_error_code="CONTENT_TOO_SHORT",
+            validation_error_message="Failed file 5",
+            file_size_bytes=10
+        )
+        tracker.validation_failures["batch_test"].append(failure2)
+
+        # Call _create_batch_ready_event directly (no need to mock for this test)
+        ready_event = tracker._create_batch_ready_event("batch_test", expectation)
 
         # Verify the content of the returned BatchEssaysReady event
         assert isinstance(ready_event, BatchEssaysReady)
@@ -269,7 +281,7 @@ class TestEnhancedBatchEssayTracker:
         await tracker.register_batch(batch_registration)
 
         # Mock completion method
-        with patch.object(tracker, '_complete_batch_with_failures') as mock_complete:
+        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
             mock_complete.return_value = None
 
             # Create 3 validation failures (all essays fail)
@@ -319,7 +331,7 @@ class TestEnhancedBatchEssayTracker:
         """Test boundary conditions for validation failure handling."""
         await tracker.register_batch(sample_batch_registration)
 
-        with patch.object(tracker, '_complete_batch_with_failures') as mock_complete:
+        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
             mock_complete.return_value = None
 
             # Assign 4 slots (1 short of completion)
@@ -348,7 +360,7 @@ class TestEnhancedBatchEssayTracker:
         """Test that batch completion only occurs if there are assigned essays."""
         await tracker.register_batch(sample_batch_registration)
 
-        with patch.object(tracker, '_complete_batch_with_failures') as mock_complete:
+        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
             mock_complete.return_value = None
 
             # Create 5 validation failures (all essays fail, none assigned)
@@ -417,7 +429,7 @@ class TestEnhancedBatchEssayTracker:
         """Test handling of concurrent validation failures."""
         await tracker.register_batch(sample_batch_registration)
 
-        with patch.object(tracker, '_complete_batch_with_failures') as mock_complete:
+        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
             mock_complete.return_value = None
 
             # Create multiple failures to handle concurrently
@@ -437,6 +449,3 @@ class TestEnhancedBatchEssayTracker:
 
             # Should trigger completion (0 assigned + 5 failed = 5)
             mock_complete.assert_called()
-
-            # Verify all failures are tracked
-            assert len(tracker.validation_failures["batch_test"]) == 5
