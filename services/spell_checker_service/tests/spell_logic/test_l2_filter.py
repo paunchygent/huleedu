@@ -5,11 +5,12 @@ Unit tests for the L2 Correction Filter module.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any  # type: ignore
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
-from ...spell_logic.l2_filter import (
+from services.spell_checker_service.spell_logic.l2_filter import (
     L2CorrectionFilter,
     create_filtered_l2_dictionary,
     filter_l2_entries,
@@ -22,7 +23,7 @@ class TestL2CorrectionFilter:
     @pytest.fixture
     def correction_filter(self) -> L2CorrectionFilter:
         """Fixture to provide an L2CorrectionFilter instance."""
-        return L2CorrectionFilter()
+        return L2CorrectionFilter(logger=MagicMock())
 
     @pytest.mark.parametrize(
         "error, correction, expected",
@@ -120,10 +121,11 @@ def test_filter_l2_entries_empty_input() -> None:
     assert filter_l2_entries({}) == {}
 
 
-def test_filter_l2_entries_invalid_input_type(caplog: Any) -> None:
+def test_filter_l2_entries_invalid_input_type() -> None:
     """Test filter_l2_entries with invalid input type."""
-    assert filter_l2_entries(None) == {}  # type: ignore
-    assert "Invalid input: expected a dictionary" in caplog.text
+    mock_logger = MagicMock()
+    assert filter_l2_entries(None, logger=mock_logger) == {}  # type: ignore
+    mock_logger.warning.assert_called_once_with("Invalid input: expected a dictionary")
 
 
 def test_filter_l2_entries_valid_and_invalid() -> None:
@@ -139,12 +141,13 @@ def test_filter_l2_entries_valid_and_invalid() -> None:
     assert filter_l2_entries(l2_errors) == expected_filtered
 
 
-def test_filter_l2_entries_non_string_input(caplog: Any) -> None:
+def test_filter_l2_entries_non_string_input() -> None:
     """Test filter_l2_entries with non-string entries."""
+    mock_logger = MagicMock()
     mixed_input = {"good": "correction", 123: "string_value", "another": "valid"}  # type: ignore
-    result = filter_l2_entries(mixed_input)  # type: ignore
+    result = filter_l2_entries(mixed_input, logger=mock_logger)  # type: ignore
     assert result == {"good": "correction", "another": "valid"}
-    assert "Skipping non-string entry: 123 -> string_value" in caplog.text
+    mock_logger.info.assert_any_call("Skipping non-string entry: 123 -> string_value")
 
 
 def test_filter_l2_entries_all_valid() -> None:
@@ -172,28 +175,33 @@ def test_create_filtered_l2_dictionary_success(tmp_path: Path) -> None:
     assert content == expected_content_lines
 
 
-def test_create_filtered_l2_dictionary_empty_input(tmp_path: Path, caplog: Any) -> None:
+def test_create_filtered_l2_dictionary_empty_input(tmp_path: Path) -> None:
     """Test create_filtered_l2_dictionary with empty input."""
+    mock_logger = MagicMock()
     output_file = tmp_path / "test_filtered.txt"
-    assert not create_filtered_l2_dictionary({}, output_file)
+    assert not create_filtered_l2_dictionary({}, output_file, logger=mock_logger)
     assert not output_file.exists()
-    assert "No corrections provided" in caplog.text
+    mock_logger.warning.assert_called_once_with(
+        "No corrections provided to create_filtered_l2_dictionary"
+    )
 
 
-def test_create_filtered_l2_dictionary_no_valid_entries(tmp_path: Path, caplog: Any) -> None:
+def test_create_filtered_l2_dictionary_no_valid_entries(tmp_path: Path) -> None:
     """Test create_filtered_l2_dictionary when all entries are filtered out."""
+    mock_logger = MagicMock()
     output_file = tmp_path / "test_no_valid.txt"
     # These entries will be filtered out (short words, pluralization)
     invalid_entries = {"a": "an", "cats": "cat", "is": "are"}
-    assert not create_filtered_l2_dictionary(invalid_entries, output_file)
+    assert not create_filtered_l2_dictionary(invalid_entries, output_file, logger=mock_logger)
     assert not output_file.exists()
-    assert "No valid corrections after filtering" in caplog.text
+    mock_logger.warning.assert_called_once_with("No valid corrections after filtering")
 
 
 def test_create_filtered_l2_dictionary_os_error_parent_dir(
-    tmp_path: Path, mocker: Any, caplog: Any
+    tmp_path: Path, mocker: Any
 ) -> None:
     """Test create_filtered_l2_dictionary with OSError during parent directory creation."""
+    mock_logger = MagicMock()
     # Create a file where a directory is expected to cause OSError
     non_dir_path = tmp_path / "actually_a_file.txt"
     non_dir_path.touch()
@@ -217,22 +225,31 @@ def test_create_filtered_l2_dictionary_os_error_parent_dir(
     # For this test, let's assume the mkdir within the function will be hit by
     # the mocker.patch above.
 
-    assert create_filtered_l2_dictionary(l2_errors, output_file) is False
+    assert (
+        create_filtered_l2_dictionary(l2_errors, output_file, logger=mock_logger) is False
+    )
     assert not output_file.exists()
-    assert "Failed to create directory" in caplog.text  # Check for specific part of log
+    mock_logger.error.assert_called_once()
+    call_args, _ = mock_logger.error.call_args
+    assert "Failed to create directory" in call_args[0]
 
 
 def test_create_filtered_l2_dictionary_os_error_writing_file(
-    tmp_path: Path, mocker: Any, caplog: Any
+    tmp_path: Path, mocker: Any
 ) -> None:
     """Test create_filtered_l2_dictionary with OSError during file writing."""
+    mock_logger = MagicMock()
     output_file = tmp_path / "filtered_l2_test.txt"
     l2_errors = {"aple": "apple"}
 
     # Mock open to raise OSError
     mocker.patch("pathlib.Path.open", side_effect=OSError("Test OS Error writing"))
 
-    assert create_filtered_l2_dictionary(l2_errors, output_file) is False
+    assert (
+        create_filtered_l2_dictionary(l2_errors, output_file, logger=mock_logger) is False
+    )
     # The file might be created before open fails, or not, depending on implementation details
     # For this test, we mainly care about the False return and log.
-    assert "Failed to write to" in caplog.text
+    mock_logger.error.assert_called_once()
+    call_args, _ = mock_logger.error.call_args
+    assert "Failed to write to" in call_args[0]
