@@ -18,7 +18,12 @@ from huleedu_service_libs.logging_utils import configure_service_logging, create
 
 from services.essay_lifecycle_service.batch_command_handlers import process_single_message
 from services.essay_lifecycle_service.config import settings
-from services.essay_lifecycle_service.di import EssayLifecycleServiceProvider
+from services.essay_lifecycle_service.di import (
+    BatchCoordinationProvider,
+    CommandHandlerProvider,
+    CoreInfrastructureProvider,
+    ServiceClientsProvider,
+)
 from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
     BatchCoordinationHandler,
@@ -151,8 +156,13 @@ async def main() -> None:
 
     logger.info("Starting Essay Lifecycle Service Kafka Worker")
 
-    # Initialize dependency injection container
-    container = make_async_container(EssayLifecycleServiceProvider())
+    # Initialize dependency injection container with all provider classes
+    container = make_async_container(
+        CoreInfrastructureProvider(),
+        ServiceClientsProvider(),
+        CommandHandlerProvider(),
+        BatchCoordinationProvider(),
+    )
 
     consumer = None
     try:

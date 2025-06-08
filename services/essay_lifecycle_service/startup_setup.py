@@ -11,7 +11,12 @@ from quart_dishka import QuartDishka
 from api.batch_routes import set_essay_operations_metric as set_batch_essay_operations
 from api.essay_routes import set_essay_operations_metric as set_essay_essay_operations
 from config import Settings
-from di import EssayLifecycleServiceProvider
+from di import (
+    BatchCoordinationProvider,
+    CommandHandlerProvider,
+    CoreInfrastructureProvider,
+    ServiceClientsProvider,
+)
 
 logger = create_service_logger("els.startup")
 
@@ -23,8 +28,13 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
     """Initialize DI container, Quart-Dishka integration, and metrics."""
 
     try:
-        # Initialize DI container
-        container = make_async_container(EssayLifecycleServiceProvider())
+        # Initialize DI container with all provider classes
+        container = make_async_container(
+            CoreInfrastructureProvider(),
+            ServiceClientsProvider(),
+            CommandHandlerProvider(),
+            BatchCoordinationProvider(),
+        )
         QuartDishka(app=app, container=container)
 
         # Initialize metrics with DI registry and store in app context

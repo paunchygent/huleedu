@@ -63,8 +63,8 @@ from services.essay_lifecycle_service.protocols import (
 from services.essay_lifecycle_service.state_store import SQLiteEssayStateStore
 
 
-class EssayLifecycleServiceProvider(Provider):
-    """Provider for Essay Lifecycle Service dependencies."""
+class CoreInfrastructureProvider(Provider):
+    """Provider for core infrastructure dependencies (settings, metrics, Kafka, HTTP)."""
 
     @provide(scope=Scope.APP)
     def provide_settings(self) -> Settings:
@@ -118,6 +118,10 @@ class EssayLifecycleServiceProvider(Provider):
         """Provide state transition validator implementation."""
         return ConcreteStateTransitionValidator()
 
+
+class ServiceClientsProvider(Provider):
+    """Provider for external service client implementations."""
+
     @provide(scope=Scope.APP)
     def provide_event_publisher(
         self, producer: AIOKafkaProducer, settings: Settings
@@ -144,7 +148,10 @@ class EssayLifecycleServiceProvider(Provider):
         """Provide specialized service request dispatcher implementation."""
         return DefaultSpecializedServiceRequestDispatcher(producer, settings)
 
-    # Service-specific command handlers
+
+class CommandHandlerProvider(Provider):
+    """Provider for command handler implementations."""
+
     @provide(scope=Scope.APP)
     def provide_spellcheck_command_handler(
         self,
@@ -184,6 +191,10 @@ class EssayLifecycleServiceProvider(Provider):
     ) -> BatchCommandHandler:
         """Provide batch command handler implementation with injected service handlers."""
         return DefaultBatchCommandHandler(spellcheck_handler, cj_assessment_handler, future_services_handler)
+
+
+class BatchCoordinationProvider(Provider):
+    """Provider for batch coordination and tracking implementations."""
 
     @provide(scope=Scope.APP)
     def provide_batch_coordination_handler(
