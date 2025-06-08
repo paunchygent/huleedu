@@ -7,7 +7,15 @@ from typing import Optional
 
 from api.batch_routes import set_batch_operations_metric
 from config import Settings
-from di import BatchOrchestratorServiceProvider, InitiatorMapProvider
+from di import (
+    CoreInfrastructureProvider,
+    EventHandlingProvider,
+    ExternalClientsProvider,
+    InitiatorMapProvider,
+    PhaseInitiatorsProvider,
+    PipelineCoordinationProvider,
+    RepositoryAndPublishingProvider,
+)
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
 from kafka_consumer import BatchKafkaConsumer
@@ -31,8 +39,16 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
     global kafka_consumer_instance, consumer_task
 
     try:
-        # Initialize DI container
-        container = make_async_container(BatchOrchestratorServiceProvider(), InitiatorMapProvider())
+        # Initialize DI container with all provider instances
+        container = make_async_container(
+            CoreInfrastructureProvider(),
+            RepositoryAndPublishingProvider(),
+            ExternalClientsProvider(),
+            PhaseInitiatorsProvider(),
+            PipelineCoordinationProvider(),
+            EventHandlingProvider(),
+            InitiatorMapProvider(),
+        )
         QuartDishka(app=app, container=container)
 
         # Initialize database schema directly (bypasses DI scoping issues)

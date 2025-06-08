@@ -36,8 +36,8 @@ from protocols import (
 from common_core.pipeline_models import PhaseName
 
 
-class BatchOrchestratorServiceProvider(Provider):
-    """Provider for Batch Orchestrator Service dependencies."""
+class CoreInfrastructureProvider(Provider):
+    """Provider for core infrastructure dependencies (settings, metrics, Kafka, HTTP)."""
 
     @provide(scope=Scope.APP)
     def provide_settings(self) -> Settings:
@@ -64,6 +64,10 @@ class BatchOrchestratorServiceProvider(Provider):
         """Provide HTTP client session."""
         return ClientSession()
 
+
+class RepositoryAndPublishingProvider(Provider):
+    """Provider for data repository and event publishing dependencies."""
+
     @provide(scope=Scope.APP)
     def provide_batch_repository(self, settings: Settings) -> BatchRepositoryProtocol:
         """Provide batch repository implementation based on environment configuration."""
@@ -79,12 +83,20 @@ class BatchOrchestratorServiceProvider(Provider):
         """Provide batch event publisher implementation."""
         return DefaultBatchEventPublisherImpl(producer)
 
+
+class ExternalClientsProvider(Provider):
+    """Provider for external service client dependencies."""
+
     @provide(scope=Scope.APP)
     def provide_essay_lifecycle_client(
         self, http_session: ClientSession, settings: Settings
     ) -> EssayLifecycleClientProtocol:
         """Provide essay lifecycle service client implementation."""
         return DefaultEssayLifecycleClientImpl(http_session, settings)
+
+
+class PhaseInitiatorsProvider(Provider):
+    """Provider for pipeline phase initiator implementations."""
 
     @provide(scope=Scope.APP)
     def provide_cj_assessment_initiator(
@@ -127,6 +139,10 @@ class BatchOrchestratorServiceProvider(Provider):
         """
         return NLPInitiatorImpl(event_publisher)
 
+
+class PipelineCoordinationProvider(Provider):
+    """Provider for high-level pipeline coordination and processing services."""
+
     @provide(scope=Scope.APP)
     def provide_pipeline_phase_coordinator(
         self,
@@ -145,6 +161,10 @@ class BatchOrchestratorServiceProvider(Provider):
     ) -> BatchProcessingServiceProtocol:
         """Provide batch processing service implementation."""
         return BatchProcessingServiceImpl(batch_repo, event_publisher, settings)
+
+
+class EventHandlingProvider(Provider):
+    """Provider for event handling and Kafka consumer dependencies."""
 
     @provide(scope=Scope.APP)
     def provide_batch_essays_ready_handler(
