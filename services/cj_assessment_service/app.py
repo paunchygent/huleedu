@@ -16,17 +16,15 @@ from __future__ import annotations
 import asyncio
 from typing import Optional
 
-from dishka import make_async_container
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
     create_service_logger,
 )
 from quart import Quart
-from quart_dishka import QuartDishka
 
 from services.cj_assessment_service.api.health_routes import health_bp
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.di import CJAssessmentServiceProvider
+from services.cj_assessment_service.startup_setup import initialize_services, shutdown_services
 
 logger = create_service_logger("cj_assessment_service.app")
 
@@ -57,9 +55,15 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
         "DEBUG": settings.LOG_LEVEL == "DEBUG",
     })
 
-    # Initialize dependency injection container
+    # Initialize dependency injection container immediately (required for tests)
+    from dishka import make_async_container
+    from quart_dishka import QuartDishka
+
+    from services.cj_assessment_service.di import CJAssessmentServiceProvider
+
     container = make_async_container(CJAssessmentServiceProvider())
     QuartDishka(app=app, container=container)
+
 
     # Register mandatory health Blueprint
     app.register_blueprint(health_bp)
@@ -67,13 +71,7 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
     @app.before_serving
     async def startup() -> None:
         """Application startup tasks."""
-        # Initialize database schema (following BOS/ELS pattern)
-        async with container() as request_container:
-            from services.cj_assessment_service.protocols import CJRepositoryProtocol
-            database = await request_container.get(CJRepositoryProtocol)
-            await database.initialize_db_schema()
-            logger.info("Database schema initialized")
-
+        await initialize_services(app, settings, container)
         logger.info("CJ Assessment Service health API starting up")
         logger.info("Health endpoint: /healthz")
         logger.info("Metrics endpoint: /metrics")
@@ -81,6 +79,7 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
     @app.after_serving
     async def cleanup() -> None:
         """Application cleanup tasks."""
+        await shutdown_services()
         logger.info("CJ Assessment Service health API shutting down")
 
     @app.errorhandler(Exception)

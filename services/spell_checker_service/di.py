@@ -22,6 +22,7 @@ from services.spell_checker_service.protocols import (
     ContentClientProtocol,
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
+    SpellLogicProtocol,
 )
 
 
@@ -74,5 +75,14 @@ class SpellCheckerServiceProvider(Provider):
             kafka_output_topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
         )
 
-    # Note: SpellLogicProtocol will be provided per-message since it needs message-specific data
-    # This will be handled in the event processor or worker_main
+    @provide(scope=Scope.APP)
+    def provide_spell_logic(
+        self,
+        result_store: ResultStoreProtocol,
+        http_session: ClientSession,
+    ) -> SpellLogicProtocol:
+        """Provide spell logic implementation."""
+        from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
+            DefaultSpellLogic,
+        )
+        return DefaultSpellLogic(result_store, http_session)

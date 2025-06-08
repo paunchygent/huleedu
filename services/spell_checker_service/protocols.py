@@ -11,6 +11,7 @@ from aiokafka import AIOKafkaProducer  # Changed from placeholder
 # Assuming common_core models might be used in signatures
 from common_core.enums import ContentType
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
+from common_core.metadata_models import SystemProcessingMetadata
 
 
 class ContentClientProtocol(Protocol):
@@ -25,7 +26,12 @@ class ContentClientProtocol(Protocol):
 
 class SpellLogicProtocol(Protocol):
     async def perform_spell_check(
-        self, text: str, essay_id: Optional[str], language: str = "en"
+        self,
+        text: str,
+        essay_id: Optional[str],
+        original_text_storage_id: str,
+        initial_system_metadata: SystemProcessingMetadata,
+        language: str = "en"
     ) -> SpellcheckResultDataV1:
         """Performs spell check and returns a SpellcheckResultDataV1."""
         ...

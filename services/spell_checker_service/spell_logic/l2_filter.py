@@ -8,11 +8,13 @@ corrections such as pluralization or very short words.
 
 from __future__ import annotations
 
-from logging import Logger
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import TYPE_CHECKING, Dict, Optional, Union
 
 from huleedu_service_libs.logging_utils import create_service_logger
+
+if TYPE_CHECKING:
+    from logging import Logger
 
 MODULE_LOGGER = create_service_logger(__name__)
 

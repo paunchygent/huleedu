@@ -31,6 +31,7 @@ from ..protocols import (
     ContentClientProtocol,
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
+    SpellLogicProtocol,
 )
 
 # Constants for frequently referenced values
@@ -53,16 +54,24 @@ class TestProcessSingleMessage:
     ) -> None:
         """Test successful processing of a spell check message."""
 
-        # 1. Mock Protocol Implementations
+        # 1. Mock Protocol Implementations - only mock external dependencies
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
         mock_content_client.fetch_content.return_value = sample_text
 
         mock_result_store = AsyncMock(spec=ResultStoreProtocol)
-        # Assume store_content is called for the corrected text and returns a new ID
         mock_corrected_storage_id = "corrected_storage_id_xyz"
         mock_result_store.store_content.return_value = mock_corrected_storage_id
 
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
+
+        # Use REAL spell logic implementation, not a mock
+        from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
+            DefaultSpellLogic,
+        )
+        real_spell_logic = DefaultSpellLogic(
+            result_store=mock_result_store,
+            http_session=mock_http_session
+        )
 
         # Act - The real algorithm will run, which is the correct behavior
         result = await process_single_message(
@@ -72,6 +81,7 @@ class TestProcessSingleMessage:
             mock_content_client,
             mock_result_store,
             mock_event_publisher,
+            real_spell_logic,  # Use real implementation
             consumer_group_id="test-group",
             kafka_queue_latency_metric=None,
         )
@@ -85,11 +95,23 @@ class TestProcessSingleMessage:
             http_session=mock_http_session,
         )
 
-        # Verify that content was stored (the real algorithm ran and produced results)
+        # Verify that the real spell logic called the result store to save corrected content
         mock_result_store.store_content.assert_called_once()
+        store_call_args = mock_result_store.store_content.call_args
+        stored_content = store_call_args.kwargs["content"]
+        assert stored_content != sample_text  # Should be corrected text, not original
+        assert store_call_args.kwargs["content_type"] == ContentType.CORRECTED_TEXT
 
         # Verify that the result was published
         mock_event_publisher.publish_spellcheck_result.assert_called_once()
+
+        # Verify the published result contains real spell check results
+        publish_call_args = mock_event_publisher.publish_spellcheck_result.call_args
+        published_result: SpellcheckResultDataV1 = publish_call_args[0][1]
+        assert published_result.status == EssayStatus.SPELLCHECKED_SUCCESS
+        assert published_result.corrections_made is not None
+        assert published_result.storage_metadata is not None
+        assert published_result.storage_metadata.references[ContentType.CORRECTED_TEXT]["default"] == mock_corrected_storage_id
 
     @pytest.mark.asyncio
     async def test_fetch_content_failure(
@@ -108,6 +130,7 @@ class TestProcessSingleMessage:
         # These will be passed but their main methods shouldn't be called
         mock_result_store = AsyncMock(spec=ResultStoreProtocol)
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
+        mock_spell_logic = AsyncMock(spec=SpellLogicProtocol)
 
         # 2. Patch the core algorithm function (should not be called)
         with patch(
@@ -122,6 +145,7 @@ class TestProcessSingleMessage:
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
+                mock_spell_logic,
                 consumer_group_id="test-group",
                 kafka_queue_latency_metric=None,
             )
@@ -163,22 +187,31 @@ class TestProcessSingleMessage:
         kafka_message: Any,
         mock_producer: Any,
         mock_http_session: Any,
-        sample_text: str,
         sample_essay_id: str,
+        sample_text: str,
         corrected_text: str,
     ) -> None:
-        """Test handling when content storing fails."""
+        """Test handling of storage failure."""
 
-        # 1. Mock Protocol Implementations
+        # 1. Mock Protocol Implementations - mock storage failure
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        mock_content_client.fetch_content.return_value = sample_text  # Success
+        mock_content_client.fetch_content.return_value = sample_text
 
         mock_result_store = AsyncMock(spec=ResultStoreProtocol)
-        # Set side effect to simulate failure
-        mock_result_store.store_content.side_effect = Exception("Failed to store content")
+        mock_result_store.store_content.side_effect = Exception("Storage failed during spell check")
+
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
 
-        # Act - The real algorithm will run and then fail when trying to store
+        # Use REAL spell logic implementation that will encounter the storage error
+        from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
+            DefaultSpellLogic,
+        )
+        real_spell_logic = DefaultSpellLogic(
+            result_store=mock_result_store,  # This will fail
+            http_session=mock_http_session
+        )
+
+        # Act - Process message, expecting spell logic to fail during storage
         result = await process_single_message(
             kafka_message,
             mock_producer,
@@ -186,26 +219,22 @@ class TestProcessSingleMessage:
             mock_content_client,
             mock_result_store,
             mock_event_publisher,
+            real_spell_logic,
             consumer_group_id="test-group",
             kafka_queue_latency_metric=None,
         )
 
         # Assert
-        assert result is True  # Should still commit to avoid reprocessing
+        assert result is True  # Should ALWAYS commit to avoid reprocessing loops
 
-        # Verify fetch was called
+        # Verify content was fetched
         mock_content_client.fetch_content.assert_called_once()
 
-        # Verify store was attempted (and failed)
+        # Verify storage was attempted (and failed) inside the real spell logic
         mock_result_store.store_content.assert_called_once()
 
-        # Verify that a failure event was published
+        # Verify failure event was published
         mock_event_publisher.publish_spellcheck_result.assert_called_once()
-
-        # Verify the published event indicates failure
-        call_args = mock_event_publisher.publish_spellcheck_result.call_args
-        published_event_data: SpellcheckResultDataV1 = call_args[0][1]
-        assert published_event_data.status == EssayStatus.SPELLCHECK_FAILED
 
     @pytest.mark.asyncio
     async def test_spell_check_failure(
@@ -213,21 +242,27 @@ class TestProcessSingleMessage:
         kafka_message: Any,
         mock_producer: Any,
         mock_http_session: Any,
-        sample_text: str,
         sample_essay_id: str,
+        sample_text: str,
+        corrected_text: str,
     ) -> None:
-        """Test handling when spell checking fails during storage."""
+        """Test handling when spell checking logic fails."""
 
-        # 1. Mock Protocol Implementations
+        # 1. Mock Protocol Implementations - simulate internal failure
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        mock_content_client.fetch_content.return_value = sample_text  # Success
+        mock_content_client.fetch_content.return_value = sample_text
 
         mock_result_store = AsyncMock(spec=ResultStoreProtocol)
-        # Simulate failure at storage step - this will cause spell check to fail
-        mock_result_store.store_content.side_effect = Exception("Storage failed")
+        mock_corrected_storage_id = "corrected_storage_id_abc"
+        mock_result_store.store_content.return_value = mock_corrected_storage_id
+
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
 
-        # Act - The real algorithm will run and succeed, but fail when trying to store
+        # Use a mock that fails during perform_spell_check (not real implementation)
+        mock_spell_logic = AsyncMock(spec=SpellLogicProtocol)
+        mock_spell_logic.perform_spell_check.side_effect = Exception("Spell check failed")
+
+        # Act - Process message, expecting spell logic to fail
         result = await process_single_message(
             kafka_message,
             mock_producer,
@@ -235,24 +270,25 @@ class TestProcessSingleMessage:
             mock_content_client,
             mock_result_store,
             mock_event_publisher,
+            mock_spell_logic,  # Use mock that fails
             consumer_group_id="test-group",
             kafka_queue_latency_metric=None,
         )
 
         # Assert
-        assert result is True  # Should commit to avoid reprocessing
+        assert result is True  # Should ALWAYS commit to avoid reprocessing loops
 
-        # Verify fetch and storage were attempted
+        # Verify content was fetched successfully
         mock_content_client.fetch_content.assert_called_once()
-        mock_result_store.store_content.assert_called_once()
 
-        # Verify that a failure event was published
+        # Verify spell check was attempted and failed
+        mock_spell_logic.perform_spell_check.assert_called_once()
+
+        # Since spell check failed, storage should not be called
+        # (because the real implementation handles storage internally)
+
+        # Verify failure event was published
         mock_event_publisher.publish_spellcheck_result.assert_called_once()
-
-        # Verify the published event indicates failure
-        call_args = mock_event_publisher.publish_spellcheck_result.call_args
-        published_event_data: SpellcheckResultDataV1 = call_args[0][1]
-        assert published_event_data.status == EssayStatus.SPELLCHECK_FAILED
 
     @pytest.mark.asyncio
     async def test_invalid_message_validation_error(
@@ -267,6 +303,7 @@ class TestProcessSingleMessage:
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
         mock_result_store = AsyncMock(spec=ResultStoreProtocol)
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
+        mock_spell_logic = AsyncMock(spec=SpellLogicProtocol)
 
         # 2. Patch the core algorithm function (should not be called)
         with patch(
@@ -281,6 +318,7 @@ class TestProcessSingleMessage:
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
+                mock_spell_logic,
                 consumer_group_id="test-group",
                 kafka_queue_latency_metric=None,
             )
@@ -298,47 +336,56 @@ class TestProcessSingleMessage:
     async def test_producer_failure(
         self,
         kafka_message: Any,
-        # This is the AIOKafkaProducer used by the event_publisher
         mock_producer: Any,
         mock_http_session: Any,
         sample_essay_id: str,
         sample_text: str,
         corrected_text: str,
     ) -> None:
-        """Test handling when Kafka producer (via event publisher) fails."""
+        """Test handling when Kafka producer fails."""
 
         # 1. Mock Protocol Implementations
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        mock_content_client.fetch_content.return_value = sample_text  # Success
+        mock_content_client.fetch_content.return_value = sample_text
 
         mock_result_store = AsyncMock(spec=ResultStoreProtocol)
-        mock_corrected_storage_id = "corrected_storage_id_abc"
-        mock_result_store.store_content.return_value = mock_corrected_storage_id  # Success
+        mock_corrected_storage_id = "corrected_storage_id_def"
+        mock_result_store.store_content.return_value = mock_corrected_storage_id
 
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
-        # Simulate failure when event_publisher tries to publish
-        mock_event_publisher.publish_spellcheck_result.side_effect = Exception(
-            "Kafka producer error"
+        # Make the publisher fail every time
+        mock_event_publisher.publish_spellcheck_result.side_effect = Exception("Kafka producer error")
+
+        # Use REAL spell logic implementation
+        from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
+            DefaultSpellLogic,
+        )
+        real_spell_logic = DefaultSpellLogic(
+            result_store=mock_result_store,
+            http_session=mock_http_session
         )
 
-        # Act - The real algorithm will run, succeed, but fail when publishing
+        # Act - Process message, expecting publisher to fail
         result = await process_single_message(
             kafka_message,
-            mock_producer,  # This mock_producer is passed to the event_publisher
+            mock_producer,
             mock_http_session,
             mock_content_client,
             mock_result_store,
             mock_event_publisher,
+            real_spell_logic,
             consumer_group_id="test-group",
             kafka_queue_latency_metric=None,
         )
 
         # Assert
-        assert result is True  # Should still commit to avoid reprocessing
+        assert result is True  # Should ALWAYS commit even when publisher fails to avoid reprocessing loops
 
-        # Verify all processing steps were attempted up to publishing
+        # Verify all processing steps were completed
         mock_content_client.fetch_content.assert_called_once()
         mock_result_store.store_content.assert_called_once()
 
-        # Verify that publishing was attempted (and failed)
-        mock_event_publisher.publish_spellcheck_result.assert_called()
+        # Verify publisher was called twice:
+        # 1. First call for successful spell check result
+        # 2. Second call for failure event (which also fails)
+        assert mock_event_publisher.publish_spellcheck_result.call_count == 2

@@ -14,9 +14,7 @@ from huleedu_service_libs.logging_utils import (
     create_service_logger,
 )
 from prometheus_client import CollectorRegistry, Histogram, start_http_server
-from protocol_implementations.content_client_impl import DefaultContentClient
 from protocol_implementations.event_publisher_impl import DefaultSpellcheckEventPublisher
-from protocol_implementations.result_store_impl import DefaultResultStore
 
 from common_core.enums import ProcessingEvent, topic_name
 from services.spell_checker_service.config import (
@@ -24,6 +22,11 @@ from services.spell_checker_service.config import (
 )
 from services.spell_checker_service.di import SpellCheckerServiceProvider
 from services.spell_checker_service.event_processor import process_single_message
+from services.spell_checker_service.protocols import (
+    ContentClientProtocol,
+    ResultStoreProtocol,
+    SpellLogicProtocol,
+)
 
 # Configure structured logging for the service (moved from original worker.py)
 configure_service_logging(
@@ -143,106 +146,100 @@ async def spell_checker_worker_main() -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, _signal_handler)
 
-    # Instantiate content client and result store (these are stateless or configured once)
-    # Their config (CONTENT_SERVICE_URL_CONFIG) comes from event_router for now, pass it.
-    content_client = DefaultContentClient(content_service_url=CONTENT_SERVICE_URL_CONFIG)
-    result_store = DefaultResultStore(content_service_url=CONTENT_SERVICE_URL_CONFIG)
+    # Get dependencies from DI container and keep it open for the entire duration
+    async with container() as request_container:
+        content_client = await request_container.get(ContentClientProtocol)
+        result_store = await request_container.get(ResultStoreProtocol)
+        spell_logic = await request_container.get(SpellLogicProtocol)
 
-    # Note: DefaultSpellLogic is instantiated per message in event_router.process_single_message
-    # because it needs message-specific context (original_text_storage_id, essay_id,
-    # initial_system_metadata)
+        retry_count = 0
+        max_retries = 3
 
-    retry_count = 0
-    max_retries = 3
+        while not stop_event.is_set():
+            try:
+                async with kafka_clients(
+                    INPUT_TOPIC,
+                    CONSUMER_GROUP_ID,
+                    PRODUCER_CLIENT_ID,
+                    CONSUMER_CLIENT_ID,
+                    KAFKA_BOOTSTRAP_SERVERS,
+                    KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED,  # from event_router
+                    SOURCE_SERVICE_NAME_CONFIG,  # from event_router
+                    OUTPUT_TOPIC,  # from event_router
+                ) as (consumer, producer, event_publisher_instance):
+                    retry_count = 0  # Reset retries on successful connection
+                    logger.info("Kafka clients initialized. Starting message consumption loop...")
+                    async with (
+                        aiohttp.ClientSession() as http_session
+                    ):  # Manage ClientSession lifecycle
+                        while not stop_event.is_set():
+                            try:
+                                # Process in batches
+                                result = await consumer.getmany(timeout_ms=1000, max_records=10)
+                                if not result:
+                                    await asyncio.sleep(0.1)  # Short sleep if no messages
+                                    continue
 
-    while not stop_event.is_set():
-        try:
-            async with kafka_clients(
-                INPUT_TOPIC,
-                CONSUMER_GROUP_ID,
-                PRODUCER_CLIENT_ID,
-                CONSUMER_CLIENT_ID,
-                KAFKA_BOOTSTRAP_SERVERS,
-                KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED,  # from event_router
-                SOURCE_SERVICE_NAME_CONFIG,  # from event_router
-                OUTPUT_TOPIC,  # from event_router
-            ) as (consumer, producer, event_publisher_instance):
-                retry_count = 0  # Reset retries on successful connection
-                logger.info("Kafka clients initialized. Starting message consumption loop...")
-                async with (
-                    aiohttp.ClientSession() as http_session
-                ):  # Manage ClientSession lifecycle
-                    while not stop_event.is_set():
-                        try:
-                            # Process in batches
-                            result = await consumer.getmany(timeout_ms=1000, max_records=10)
-                            if not result:
-                                await asyncio.sleep(0.1)  # Short sleep if no messages
-                                continue
+                                for tp, messages in result.items():
+                                    logger.debug(
+                                        f"Received {len(messages)} messages from {tp.topic} "
+                                        f"partition {tp.partition}"
+                                    )
+                                    for msg_count, msg in enumerate(messages):
+                                        if stop_event.is_set():
+                                            break
+                                        logger.info(
+                                            f"Processing message {msg_count + 1}/{len(messages)} "
+                                            f"from {tp}"
+                                        )
 
-                            for tp, messages in result.items():
-                                logger.debug(
-                                    f"Received {len(messages)} messages from {tp.topic} "
-                                    f"partition {tp.partition}"
-                                )
-                                for msg_count, msg in enumerate(messages):
+                                        should_commit = await process_single_message(
+                                            msg,
+                                            producer,
+                                            http_session,
+                                            content_client,  # From DI
+                                            result_store,  # From DI
+                                            event_publisher_instance,  # Instantiated by kafka_clients context mgr
+                                            spell_logic,  # From DI
+                                            consumer_group_id=CONSUMER_GROUP_ID,
+                                            kafka_queue_latency_metric=KAFKA_QUEUE_LATENCY,
+                                        )
+                                        if should_commit:
+                                            # Store offset for this specific message
+                                            # Create a TopicPartition instance for the current message
+                                            tp_instance = TopicPartition(msg.topic, msg.partition)
+                                            offsets = {tp_instance: msg.offset + 1}
+                                            await consumer.commit(offsets)
+                                            logger.debug(
+                                                f"Committed offset {msg.offset + 1} for {tp_instance}"
+                                            )
                                     if stop_event.is_set():
                                         break
-                                    logger.info(
-                                        f"Processing message {msg_count + 1}/{len(messages)} "
-                                        f"from {tp}"
-                                    )
-
-                                    # process_single_message now takes fewer direct DI components
-                                    # as DefaultSpellLogic is created inside it with more
-                                    # specific context
-                                    should_commit = await process_single_message(
-                                        msg,
-                                        producer,
-                                        http_session,
-                                        content_client,  # Instantiated once
-                                        result_store,  # Instantiated once
-                                        # Instantiated by kafka_clients context mgr
-                                        event_publisher_instance,
-                                        consumer_group_id=CONSUMER_GROUP_ID,
-                                        kafka_queue_latency_metric=KAFKA_QUEUE_LATENCY,
-                                    )
-                                    if should_commit:
-                                        # Store offset for this specific message
-                                        # Create a TopicPartition instance for the current message
-                                        tp_instance = TopicPartition(msg.topic, msg.partition)
-                                        offsets = {tp_instance: msg.offset + 1}
-                                        await consumer.commit(offsets)
-                                        logger.debug(
-                                            f"Committed offset {msg.offset + 1} for {tp_instance}"
-                                        )
-                                if stop_event.is_set():
-                                    break
-                        except KafkaConnectionError as kce:
-                            logger.error(
-                                f"Kafka connection error during consumption: {kce}", exc_info=True
-                            )
-                            stop_event.set()  # Stop on critical Kafka error
-                        except Exception as e:
-                            logger.error(f"Error in main consumption loop: {e}", exc_info=True)
-                            await asyncio.sleep(5)  # Wait before retrying the loop section
-        except KafkaConnectionError as kce_outer:
-            retry_count += 1
-            logger.error(
-                f"Kafka connection error setting up clients "
-                f"(attempt {retry_count}/{max_retries}): {kce_outer}",
-                exc_info=True,
-            )
-            if retry_count >= max_retries or stop_event.is_set():
-                logger.error("Max retries reached or shutdown signaled. Exiting worker.")
-                break
-            await asyncio.sleep(2**retry_count)  # Exponential backoff
-        except Exception as e_outer:
-            logger.critical(
-                f"Unhandled critical error in spell_checker_worker_main: {e_outer}", exc_info=True
-            )
-            stop_event.set()  # Critical error, stop the worker
-            break  # Exit while loop
+                            except KafkaConnectionError as kce:
+                                logger.error(
+                                    f"Kafka connection error during consumption: {kce}", exc_info=True
+                                )
+                                stop_event.set()  # Stop on critical Kafka error
+                            except Exception as e:
+                                logger.error(f"Error in main consumption loop: {e}", exc_info=True)
+                                await asyncio.sleep(5)  # Wait before retrying the loop section
+            except KafkaConnectionError as kce_outer:
+                retry_count += 1
+                logger.error(
+                    f"Kafka connection error setting up clients "
+                    f"(attempt {retry_count}/{max_retries}): {kce_outer}",
+                    exc_info=True,
+                )
+                if retry_count >= max_retries or stop_event.is_set():
+                    logger.error("Max retries reached or shutdown signaled. Exiting worker.")
+                    break
+                await asyncio.sleep(2**retry_count)  # Exponential backoff
+            except Exception as e_outer:
+                logger.critical(
+                    f"Unhandled critical error in spell_checker_worker_main: {e_outer}", exc_info=True
+                )
+                stop_event.set()  # Critical error, stop the worker
+                break  # Exit while loop
 
     logger.info("Spell checker worker main loop has finished.")
 

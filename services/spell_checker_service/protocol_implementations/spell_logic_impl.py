@@ -25,16 +25,17 @@ class DefaultSpellLogic(SpellLogicProtocol):
         self,
         result_store: ResultStoreProtocol,
         http_session: aiohttp.ClientSession,
-        original_text_storage_id: str,
-        initial_system_metadata: SystemProcessingMetadata,
     ):
         self.result_store = result_store
         self.http_session = http_session
-        self.original_text_storage_id = original_text_storage_id
-        self.initial_system_metadata = initial_system_metadata
 
     async def perform_spell_check(
-        self, text: str, essay_id: Optional[str], language: str = "en"
+        self,
+        text: str,
+        essay_id: Optional[str],
+        original_text_storage_id: str,
+        initial_system_metadata: SystemProcessingMetadata,
+        language: str = "en"
     ) -> SpellcheckResultDataV1:
         """Perform spell check using the core logic implementation."""
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
@@ -49,7 +50,7 @@ class DefaultSpellLogic(SpellLogicProtocol):
         if corrected_text:
             try:
                 new_storage_id = await self.result_store.store_content(
-                    original_storage_id=self.original_text_storage_id,
+                    original_storage_id=original_text_storage_id,
                     content_type=ContentType.CORRECTED_TEXT,
                     content=corrected_text,
                     http_session=self.http_session,
@@ -79,11 +80,11 @@ class DefaultSpellLogic(SpellLogicProtocol):
         final_entity_ref = EntityReference(entity_id=essay_id or "unknown", entity_type="essay")
 
         # Update system_metadata based on this step's outcome
-        updated_error_info = self.initial_system_metadata.error_info.copy()
+        updated_error_info = initial_system_metadata.error_info.copy()
         if error_detail and not updated_error_info.get("spellcheck_error"):
             updated_error_info["spellcheck_error"] = error_detail
 
-        final_system_metadata = self.initial_system_metadata.model_copy(
+        final_system_metadata = initial_system_metadata.model_copy(
             update={
                 "processing_stage": (
                     ProcessingStage.COMPLETED
@@ -99,7 +100,7 @@ class DefaultSpellLogic(SpellLogicProtocol):
         final_system_metadata.entity = final_entity_ref
 
         return SpellcheckResultDataV1(
-            original_text_storage_id=self.original_text_storage_id,
+            original_text_storage_id=original_text_storage_id,
             storage_metadata=storage_metadata_for_result,
             corrections_made=corrections_count,
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,

@@ -6,8 +6,10 @@ for operational monitoring and observability.
 
 from __future__ import annotations
 
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from dishka import FromDishka
+from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry
 from quart import Blueprint, Response, jsonify
+from quart_dishka import inject
 
 health_bp = Blueprint('health_routes', __name__)
 
@@ -40,7 +42,8 @@ async def health_check():
 
 
 @health_bp.route("/metrics")
-async def metrics() -> Response:
+@inject
+async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
     """Prometheus metrics endpoint.
 
     Serves metrics in OpenMetrics format for Prometheus scraping.
@@ -49,14 +52,11 @@ async def metrics() -> Response:
         Prometheus-formatted metrics data
     """
     try:
-        metrics_data = generate_latest()
+        from prometheus_client import generate_latest
+        metrics_data = generate_latest(registry)
         return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
-    except Exception:
-        # Return error response but don't crash the service
-        error_response = (
-            "# HELP metrics_error Metrics generation failed\n"
-            "# TYPE metrics_error gauge\nmetrics_error 1\n"
-        )
-        return Response(
-            error_response, content_type=CONTENT_TYPE_LATEST, status=500
-        )
+    except Exception as e:
+        from huleedu_service_libs.logging_utils import create_service_logger
+        logger = create_service_logger("cj_assessment_service.api.health")
+        logger.error(f"Error generating metrics: {e}", exc_info=True)
+        return Response("Error generating metrics", status=500)

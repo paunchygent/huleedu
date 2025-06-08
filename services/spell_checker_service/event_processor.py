@@ -21,13 +21,11 @@ from common_core.events.spellcheck_models import (
     SpellcheckResultDataV1,
 )
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
-from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
-    DefaultSpellLogic,
-)
 from services.spell_checker_service.protocols import (
     ContentClientProtocol,
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
+    SpellLogicProtocol,
 )
 
 logger = create_service_logger("spell_checker_service.event_processor")
@@ -40,6 +38,7 @@ async def process_single_message(
     content_client: ContentClientProtocol,
     result_store: ResultStoreProtocol,
     event_publisher: SpellcheckEventPublisherProtocol,
+    spell_logic: SpellLogicProtocol,
     consumer_group_id: str = "spell-checker-group",
     kafka_queue_latency_metric: Optional[Any] = None,
 ) -> bool:
@@ -180,21 +179,16 @@ async def process_single_message(
         logger.info(f"Step 3: Performing spell check for essay {essay_id_for_logging}",
                     extra={"correlation_id": str(request_envelope.correlation_id)})
 
-        # Create a DefaultSpellLogic instance for this particular message/essay
-        # This allows passing essay_id and original_text_storage_id to the spell logic
-        spell_logic = DefaultSpellLogic(
-            result_store=result_store,
-            http_session=http_session,
-            original_text_storage_id=request_data.text_storage_id,
-            initial_system_metadata=request_data.system_metadata,
-        )
-
         # Extract language from the new event model
         language = request_data.language if hasattr(request_data, "language") else "en"
 
-        # Perform the spell check
+        # Perform the spell check using injected spell logic protocol
         result_data = await spell_logic.perform_spell_check(
-            original_text, essay_id_for_logging, language
+            original_text,
+            essay_id_for_logging,
+            request_data.text_storage_id,
+            request_data.system_metadata,
+            language
         )
 
         logger.info(f"Step 4: Publishing spell check result for essay {essay_id_for_logging}",
