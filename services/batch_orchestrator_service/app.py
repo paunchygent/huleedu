@@ -9,12 +9,12 @@ from __future__ import annotations
 
 # Import Blueprints
 # Import local modules using absolute imports for containerized deployment
-import metrics
 import startup_setup
 from api.batch_routes import batch_bp
 from api.health_routes import health_bp
 from config import settings
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
 from quart import Quart
 
 # Configure structured logging for the service
@@ -29,7 +29,7 @@ async def startup() -> None:
     """Initialize services and middleware."""
     try:
         await startup_setup.initialize_services(app, settings)
-        metrics.setup_metrics_middleware(app)
+        setup_standard_service_metrics_middleware(app, "bos")
         logger.info("Batch Orchestrator Service startup completed successfully")
     except Exception as e:
         logger.critical(f"Failed to start Batch Orchestrator Service: {e}", exc_info=True)

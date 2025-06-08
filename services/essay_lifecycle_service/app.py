@@ -8,8 +8,9 @@ essay processing workflows.
 from __future__ import annotations
 
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
 from pydantic import ValidationError
-from quart import Quart, Response, g, jsonify, request
+from quart import Quart, Response, jsonify
 
 # Import Blueprints
 # Import local modules using absolute imports for containerized deployment
@@ -52,6 +53,7 @@ async def startup() -> None:
     """Initialize services and middleware."""
     try:
         await startup_setup.initialize_services(app, settings)
+        setup_standard_service_metrics_middleware(app, "els")
         logger.info("Essay Lifecycle Service startup completed successfully")
     except Exception as e:
         logger.critical(f"Failed to start Essay Lifecycle Service: {e}", exc_info=True)
@@ -90,42 +92,6 @@ async def handle_general_error(error: Exception) -> Response | tuple[Response, i
     logger.error(f"Unexpected error: {error}")
     response = ErrorResponse(error="Internal Server Error", detail="An unexpected error occurred")
     return jsonify(response.model_dump()), 500
-
-
-@app.before_request
-async def before_request() -> None:
-    """Record request start time for duration metrics."""
-    import time
-
-    g.start_time = time.time()
-
-
-@app.after_request
-async def after_request(response: Response) -> Response:
-    """Record metrics after each request."""
-    try:
-        import time
-
-        start_time = getattr(g, "start_time", None)
-        if start_time is not None and hasattr(app, "extensions") and "metrics" in app.extensions:
-            metrics = app.extensions["metrics"]
-            duration = time.time() - start_time
-
-            # Get endpoint name (remove query parameters)
-            endpoint = request.path
-            method = request.method
-            status_code = str(response.status_code)
-
-            # Record metrics
-            metrics["request_count"].labels(
-                method=method, endpoint=endpoint, status_code=status_code
-            ).inc()
-            metrics["request_duration"].labels(method=method, endpoint=endpoint).observe(duration)
-
-    except Exception as e:
-        logger.error(f"Error recording request metrics: {e}")
-
-    return response
 
 
 # Register Blueprints

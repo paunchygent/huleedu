@@ -31,7 +31,8 @@ monorepo-tools = [
     "pytest-xdist",
     "httpx",
     "pre-commit",
-    "testcontainers[postgres]",  # For PostgreSQL integration tests
+    "testcontainers[postgres,kafka]",  # For PostgreSQL and Kafka integration tests
+    "kafka-python",
 ]
 
 # Install all services and common_core for unified development
@@ -157,6 +158,7 @@ module = [
     "sqlalchemy.*",
     "asyncpg.*",
     "testcontainers.*",
+    "kafka.*", # For kafka-python library
     "enums_db",       # Database enum module without type stubs
     "models_db",      # Database models module without type stubs
 ]
@@ -217,7 +219,6 @@ log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s:%(filename)s:%(lineno)s %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
 
 markers = [
     "slow: marks tests as slow running",
