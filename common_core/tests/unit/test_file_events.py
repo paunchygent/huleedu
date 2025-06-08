@@ -25,7 +25,7 @@ class TestEssayContentProvisionedV1:
             batch_id="batch_123",
             original_file_name="essay1.pdf",
             text_storage_id="content_456",
-            file_size_bytes=1024
+            file_size_bytes=1024,
         )
 
         assert event.batch_id == "batch_123"
@@ -46,7 +46,7 @@ class TestEssayContentProvisionedV1:
             text_storage_id="content_456",
             file_size_bytes=1024,
             content_md5_hash="abc123",
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
 
         json_data = event.model_dump_json()
@@ -68,7 +68,7 @@ class TestEssayValidationFailedV1:
             original_file_name="empty_essay.txt",
             validation_error_code="EMPTY_CONTENT",
             validation_error_message="File content is empty or contains only whitespace",
-            file_size_bytes=0
+            file_size_bytes=0,
         )
 
         assert event.batch_id == "batch_456"
@@ -92,7 +92,7 @@ class TestEssayValidationFailedV1:
             validation_error_message="Content length (25 characters) below minimum threshold (50)",
             file_size_bytes=512,
             correlation_id=correlation_id,
-            timestamp=timestamp
+            timestamp=timestamp,
         )
 
         assert event.batch_id == "batch_789"
@@ -110,7 +110,7 @@ class TestEssayValidationFailedV1:
             validation_error_code="CONTENT_TOO_LONG",
             validation_error_message="Content exceeds maximum length limit",
             file_size_bytes=2048,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
 
         # Serialize to JSON
@@ -125,7 +125,9 @@ class TestEssayValidationFailedV1:
         assert reconstructed_event.batch_id == original_event.batch_id
         assert reconstructed_event.original_file_name == original_event.original_file_name
         assert reconstructed_event.validation_error_code == original_event.validation_error_code
-        assert reconstructed_event.validation_error_message == original_event.validation_error_message
+        assert (
+            reconstructed_event.validation_error_message == original_event.validation_error_message
+        )
         assert reconstructed_event.file_size_bytes == original_event.file_size_bytes
         assert reconstructed_event.correlation_id == original_event.correlation_id
 
@@ -136,7 +138,7 @@ class TestEssayValidationFailedV1:
             original_file_name="test.txt",
             validation_error_code="TEST_ERROR",
             validation_error_message="Test error message",
-            file_size_bytes=100
+            file_size_bytes=100,
         )
 
         # Default event type
@@ -157,7 +159,7 @@ class TestEssayValidationFailedV1:
             "CONTENT_TOO_SHORT",
             "CONTENT_TOO_LONG",
             "INVALID_FORMAT",
-            "ENCODING_ERROR"
+            "ENCODING_ERROR",
         ]
 
         for error_code in error_codes:
@@ -166,7 +168,7 @@ class TestEssayValidationFailedV1:
                 original_file_name="test.txt",
                 validation_error_code=error_code,
                 validation_error_message=f"Test error for {error_code}",
-                file_size_bytes=100
+                file_size_bytes=100,
             )
             assert event.validation_error_code == error_code
 
@@ -178,7 +180,7 @@ class TestEssayValidationFailedV1:
             original_file_name="empty.txt",
             validation_error_code="EMPTY_CONTENT",
             validation_error_message="Empty file",
-            file_size_bytes=0
+            file_size_bytes=0,
         )
         assert event_zero.file_size_bytes == 0
 
@@ -188,7 +190,7 @@ class TestEssayValidationFailedV1:
             original_file_name="huge.txt",
             validation_error_code="CONTENT_TOO_LONG",
             validation_error_message="File too large",
-            file_size_bytes=10_000_000
+            file_size_bytes=10_000_000,
         )
         assert event_large.file_size_bytes == 10_000_000
 
@@ -200,7 +202,7 @@ class TestEssayValidationFailedV1:
             original_file_name="test.txt",
             validation_error_code="TEST_ERROR",
             validation_error_message="Test message",
-            file_size_bytes=100
+            file_size_bytes=100,
         )
 
         # Should have timezone info
@@ -215,7 +217,7 @@ class TestEssayValidationFailedV1:
             validation_error_code="TEST_ERROR",
             validation_error_message="Test message",
             file_size_bytes=200,
-            timestamp=explicit_time
+            timestamp=explicit_time,
         )
 
         assert event_explicit.timestamp == explicit_time
@@ -228,7 +230,7 @@ class TestEssayValidationFailedV1:
                 original_file_name="test.txt",
                 validation_error_code="TEST_ERROR",
                 validation_error_message="Test message",
-                file_size_bytes=100
+                file_size_bytes=100,
             )
 
     def test_batch_coordination_scenario(self) -> None:
@@ -241,9 +243,11 @@ class TestEssayValidationFailedV1:
             batch_id=batch_id,
             original_file_name="student_essay_3.docx",
             validation_error_code="CONTENT_TOO_SHORT",
-            validation_error_message="Essay content (15 words) below minimum requirement (50 words)",
+            validation_error_message=(
+                "Essay content (15 words) below minimum requirement (50 words)"
+            ),
             file_size_bytes=256,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
 
         # Verify event contains all information needed for coordination

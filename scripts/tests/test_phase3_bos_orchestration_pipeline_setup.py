@@ -4,6 +4,7 @@ Tests for BOS pipeline setup and batch registration functionality.
 This module tests the batch registration process and initial pipeline state setup
 in the Batch Orchestrator Service (BOS).
 """
+
 from __future__ import annotations
 
 import uuid

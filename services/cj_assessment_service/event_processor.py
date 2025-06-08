@@ -74,7 +74,10 @@ async def process_single_message(
             }
 
             logger.info("Received CJ assessment request from ELS", extra=log_extra)
-            logger.info(f"📚 Processing {len(request_event_data.essays_for_cj)} essays for CJ assessment", extra=log_extra)
+            logger.info(
+                f"📚 Processing {len(request_event_data.essays_for_cj)} essays for CJ assessment",
+                extra=log_extra,
+            )
 
         except (
             Exception
@@ -104,7 +107,10 @@ async def process_single_message(
             "llm_config_overrides": request_event_data.llm_config_overrides,
         }
 
-        logger.info(f"Starting CJ assessment workflow for batch {converted_request_data['bos_batch_id']}", extra=log_extra)
+        logger.info(
+            f"Starting CJ assessment workflow for batch {converted_request_data['bos_batch_id']}",
+            extra=log_extra,
+        )
 
         # Run CJ assessment workflow with LLM interaction
         rankings, cj_job_id_ref = await run_cj_assessment_workflow(
@@ -123,8 +129,8 @@ async def process_single_message(
                 **log_extra,
                 "job_id": cj_job_id_ref,
                 "rankings_count": len(rankings) if rankings else 0,
-                "rankings_preview": rankings[:2] if rankings else []
-            }
+                "rankings_preview": rankings[:2] if rankings else [],
+            },
         )
 
         # Construct and publish CJAssessmentCompletedV1 event
@@ -154,20 +160,26 @@ async def process_single_message(
         )
 
         logger.info(
-            f"📤 Publishing CJ assessment completion event for batch {converted_request_data['bos_batch_id']}",
+            (
+                f"📤 Publishing CJ assessment completion event for batch "
+                f"{converted_request_data['bos_batch_id']}"
+            ),
             extra={
                 **log_extra,
                 "completion_topic": settings_obj.CJ_ASSESSMENT_COMPLETED_TOPIC,
                 "job_id": cj_job_id_ref,
                 "rankings_count": len(rankings) if rankings else 0,
-            }
+            },
         )
 
         await event_publisher.publish_assessment_completed(
             completion_data=completed_envelope, correlation_id=completed_envelope.correlation_id
         )
 
-        logger.info("CJ assessment message processed successfully and completion event published.", extra=log_extra)
+        logger.info(
+            "CJ assessment message processed successfully and completion event published.",
+            extra=log_extra,
+        )
         return True
 
     except Exception as e:
@@ -186,10 +198,11 @@ async def process_single_message(
 
             # Create detailed error information including exception type and traceback
             import traceback
+
             error_details = {
                 "error_message": str(e),
                 "error_type": type(e).__name__,
-                "traceback": traceback.format_exc()
+                "traceback": traceback.format_exc(),
             }
 
             # Log detailed error information

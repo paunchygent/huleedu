@@ -31,7 +31,7 @@ class SpellLogicProtocol(Protocol):
         essay_id: Optional[str],
         original_text_storage_id: str,
         initial_system_metadata: SystemProcessingMetadata,
-        language: str = "en"
+        language: str = "en",
     ) -> SpellcheckResultDataV1:
         """Performs spell check and returns a SpellcheckResultDataV1."""
         ...

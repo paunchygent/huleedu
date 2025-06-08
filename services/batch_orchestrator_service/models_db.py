@@ -48,7 +48,7 @@ class Batch(Base):
         SQLAlchemyEnum(
             BatchStatus,
             name="batch_status_enum",
-            values_callable=lambda obj: [e.value for e in obj]
+            values_callable=lambda obj: [e.value for e in obj],
         ),
         default=BatchStatus.AWAITING_CONTENT_VALIDATION,
         nullable=False,
@@ -107,7 +107,7 @@ class PhaseStatusLog(Base):
         SQLAlchemyEnum(
             PipelinePhaseEnum,
             name="pipeline_phase_enum",
-            values_callable=lambda obj: [e.value for e in obj]
+            values_callable=lambda obj: [e.value for e in obj],
         ),
         nullable=False,
         index=True,
@@ -118,7 +118,7 @@ class PhaseStatusLog(Base):
         SQLAlchemyEnum(
             PhaseStatusEnum,
             name="phase_status_enum",
-            values_callable=lambda obj: [e.value for e in obj]
+            values_callable=lambda obj: [e.value for e in obj],
         ),
         nullable=False,
         index=True,

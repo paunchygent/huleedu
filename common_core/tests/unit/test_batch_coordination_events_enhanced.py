@@ -29,37 +29,22 @@ class TestEnhancedBatchEssaysReady:
     def sample_metadata(self) -> SystemProcessingMetadata:
         """Fixture providing sample processing metadata."""
         return SystemProcessingMetadata(
-            entity=EntityReference(
-                entity_id="test_entity",
-                entity_type="batch"
-            ),
-            timestamp=datetime.now(timezone.utc)
+            entity=EntityReference(entity_id="test_entity", entity_type="batch"),
+            timestamp=datetime.now(timezone.utc),
         )
 
     @pytest.fixture
     def sample_batch_entity(self) -> EntityReference:
         """Fixture providing sample batch entity reference."""
-        return EntityReference(
-            entity_id="batch_123",
-            entity_type="batch"
-        )
+        return EntityReference(entity_id="batch_123", entity_type="batch")
 
     @pytest.fixture
     def sample_ready_essays(self) -> list[EssayProcessingInputRefV1]:
         """Fixture providing sample ready essays."""
         return [
-            EssayProcessingInputRefV1(
-                essay_id="essay_001",
-                text_storage_id="content_123"
-            ),
-            EssayProcessingInputRefV1(
-                essay_id="essay_002",
-                text_storage_id="content_456"
-            ),
-            EssayProcessingInputRefV1(
-                essay_id="essay_003",
-                text_storage_id="content_789"
-            )
+            EssayProcessingInputRefV1(essay_id="essay_001", text_storage_id="content_123"),
+            EssayProcessingInputRefV1(essay_id="essay_002", text_storage_id="content_456"),
+            EssayProcessingInputRefV1(essay_id="essay_003", text_storage_id="content_789"),
         ]
 
     @pytest.fixture
@@ -71,15 +56,15 @@ class TestEnhancedBatchEssaysReady:
                 original_file_name="empty_essay.txt",
                 validation_error_code="EMPTY_CONTENT",
                 validation_error_message="File content is empty",
-                file_size_bytes=0
+                file_size_bytes=0,
             ),
             EssayValidationFailedV1(
                 batch_id="batch_123",
                 original_file_name="too_short.docx",
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message="Content below minimum length",
-                file_size_bytes=25
-            )
+                file_size_bytes=25,
+            ),
         ]
 
     def test_basic_batch_ready_without_validation_failures(
@@ -93,7 +78,7 @@ class TestEnhancedBatchEssaysReady:
             batch_id="batch_123",
             ready_essays=sample_ready_essays,
             batch_entity=sample_batch_entity,
-            metadata=sample_metadata
+            metadata=sample_metadata,
         )
 
         assert event.batch_id == "batch_123"
@@ -116,7 +101,7 @@ class TestEnhancedBatchEssaysReady:
             batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             validation_failures=sample_validation_failures,
-            total_files_processed=5
+            total_files_processed=5,
         )
 
         assert event.batch_id == "batch_123"
@@ -144,7 +129,7 @@ class TestEnhancedBatchEssaysReady:
             batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             validation_failures=sample_validation_failures,
-            total_files_processed=5
+            total_files_processed=5,
         )
 
         # Serialize to JSON
@@ -168,10 +153,7 @@ class TestEnhancedBatchEssaysReady:
         """Test the real-world scenario: 24 successful essays, 1 validation failure."""
         # Create 24 successful essays
         ready_essays = [
-            EssayProcessingInputRefV1(
-                essay_id=f"essay_{i:03d}",
-                text_storage_id=f"content_{i:03d}"
-            )
+            EssayProcessingInputRefV1(essay_id=f"essay_{i:03d}", text_storage_id=f"content_{i:03d}")
             for i in range(1, 25)  # 24 essays
         ]
 
@@ -182,7 +164,7 @@ class TestEnhancedBatchEssaysReady:
                 original_file_name="corrupted_essay_25.pdf",
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message="Essay content below minimum threshold",
-                file_size_bytes=15
+                file_size_bytes=15,
             )
         ]
 
@@ -192,7 +174,7 @@ class TestEnhancedBatchEssaysReady:
             batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             validation_failures=validation_failures,
-            total_files_processed=25
+            total_files_processed=25,
         )
 
         # Verify the scenario
@@ -215,7 +197,7 @@ class TestEnhancedBatchEssaysReady:
                 original_file_name=f"corrupted_{i}.txt",
                 validation_error_code="EMPTY_CONTENT",
                 validation_error_message="Empty file content",
-                file_size_bytes=0
+                file_size_bytes=0,
             )
             for i in range(1, 6)  # 5 failed essays
         ]
@@ -226,7 +208,7 @@ class TestEnhancedBatchEssaysReady:
             batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             validation_failures=validation_failures,
-            total_files_processed=5
+            total_files_processed=5,
         )
 
         assert len(event.ready_essays) == 0
@@ -241,7 +223,7 @@ class TestEnhancedBatchEssaysReady:
         ready_essays = [
             EssayProcessingInputRefV1(essay_id="essay_001", text_storage_id="content_001"),
             EssayProcessingInputRefV1(essay_id="essay_002", text_storage_id="content_002"),
-            EssayProcessingInputRefV1(essay_id="essay_003", text_storage_id="content_003")
+            EssayProcessingInputRefV1(essay_id="essay_003", text_storage_id="content_003"),
         ]
 
         validation_failures = [
@@ -250,15 +232,15 @@ class TestEnhancedBatchEssaysReady:
                 original_file_name="failed_1.txt",
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message="Too short",
-                file_size_bytes=10
+                file_size_bytes=10,
             ),
             EssayValidationFailedV1(
                 batch_id="batch_metrics",
                 original_file_name="failed_2.txt",
                 validation_error_code="EMPTY_CONTENT",
                 validation_error_message="Empty",
-                file_size_bytes=0
-            )
+                file_size_bytes=0,
+            ),
         ]
 
         event = BatchEssaysReady(
@@ -267,7 +249,7 @@ class TestEnhancedBatchEssaysReady:
             batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             validation_failures=validation_failures,
-            total_files_processed=5  # 3 successful + 2 failed
+            total_files_processed=5,  # 3 successful + 2 failed
         )
 
         # Verify metrics
@@ -292,7 +274,7 @@ class TestEnhancedBatchEssaysReady:
             batch_id="batch_compat",
             ready_essays=sample_ready_essays,
             batch_entity=sample_batch_entity,
-            metadata=sample_metadata
+            metadata=sample_metadata,
         )
 
         # Should work without validation_failures and total_files_processed
@@ -318,7 +300,7 @@ class TestEnhancedBatchEssaysReady:
             batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             validation_failures=[],  # Empty list instead of None
-            total_files_processed=3
+            total_files_processed=3,
         )
 
         assert event.validation_failures == []
@@ -342,7 +324,7 @@ class TestEnhancedBatchEssaysReady:
                 validation_error_code="EMPTY_CONTENT",
                 validation_error_message="Empty content",
                 file_size_bytes=0,
-                correlation_id=correlation_id_1
+                correlation_id=correlation_id_1,
             ),
             EssayValidationFailedV1(
                 batch_id="batch_correlation",
@@ -350,8 +332,8 @@ class TestEnhancedBatchEssaysReady:
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message="Too short",
                 file_size_bytes=10,
-                correlation_id=correlation_id_2
-            )
+                correlation_id=correlation_id_2,
+            ),
         ]
 
         event = BatchEssaysReady(
@@ -360,7 +342,7 @@ class TestEnhancedBatchEssaysReady:
             batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             validation_failures=validation_failures,
-            total_files_processed=5
+            total_files_processed=5,
         )
 
         # Verify correlation IDs are preserved

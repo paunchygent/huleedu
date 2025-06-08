@@ -55,7 +55,7 @@ class EssayValidationFailedV1(BaseModel):
     correlation_id: Optional[UUID] = Field(default=None, description="Request correlation ID")
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        description="Validation failure timestamp"
+        description="Validation failure timestamp",
     )
 
 

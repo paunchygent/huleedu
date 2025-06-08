@@ -35,7 +35,6 @@ class TestE2EStep1FileUpload:
         - File content is processed asynchronously
         """
         async with httpx.AsyncClient() as client:
-
             # Use real test file
             test_file_path = Path("test_uploads/essay1.txt")
             assert test_file_path.exists(), f"Test file {test_file_path} not found"
@@ -53,7 +52,7 @@ class TestE2EStep1FileUpload:
                         "http://localhost:7001/v1/files/batch",
                         files=files,
                         data=data,
-                        timeout=30.0  # Allow time for processing
+                        timeout=30.0,  # Allow time for processing
                     )
 
                     # Validate File Service response
@@ -79,17 +78,14 @@ class TestE2EStep1FileUpload:
 
                     assert "processed" in response_data["message"] or (
                         "received" in response_data["message"]
-                    ), (
-                        f"Unexpected message format: {response_data['message']}"
-                    )
+                    ), f"Unexpected message format: {response_data['message']}"
 
                     # Validate correlation_id is valid UUID format
                     try:
                         uuid.UUID(response_data["correlation_id"])
                     except ValueError:
                         pytest.fail(
-                            f"correlation_id is not valid UUID: "
-                            f"{response_data['correlation_id']}"
+                            f"correlation_id is not valid UUID: {response_data['correlation_id']}"
                         )
 
                     print(f"✅ File upload successful for batch {batch_id}")
@@ -101,9 +97,7 @@ class TestE2EStep1FileUpload:
                         "File Service not accessible - ensure docker compose up -d is running"
                     )
                 except httpx.TimeoutException:
-                    pytest.fail(
-                        "File Service response timeout - service may be overloaded"
-                    )
+                    pytest.fail("File Service response timeout - service may be overloaded")
 
     @pytest.mark.e2e
     @pytest.mark.docker
@@ -118,12 +112,8 @@ class TestE2EStep1FileUpload:
         - Response indicates number of files processed
         """
         async with httpx.AsyncClient() as client:
-
             # Use both test files
-            test_files = [
-                Path("test_uploads/essay1.txt"),
-                Path("test_uploads/essay2.txt")
-            ]
+            test_files = [Path("test_uploads/essay1.txt"), Path("test_uploads/essay2.txt")]
 
             for test_file in test_files:
                 assert test_file.exists(), f"Test file {test_file} not found"
@@ -140,10 +130,7 @@ class TestE2EStep1FileUpload:
 
             try:
                 response = await client.post(
-                    "http://localhost:7001/v1/files/batch",
-                    files=files,
-                    data=data,
-                    timeout=30.0
+                    "http://localhost:7001/v1/files/batch", files=files, data=data, timeout=30.0
                 )
 
                 assert response.status_code == 202, (
@@ -156,8 +143,7 @@ class TestE2EStep1FileUpload:
                 # Validate batch processing acknowledgment
                 assert response_data["batch_id"] == batch_id
                 assert str(len(test_files)) in response_data["message"], (
-                    f"Message should mention {len(test_files)} files: "
-                    f"{response_data['message']}"
+                    f"Message should mention {len(test_files)} files: {response_data['message']}"
                 )
 
                 print(f"✅ Multi-file upload successful for batch {batch_id}")
@@ -182,7 +168,6 @@ class TestE2EStep1FileUpload:
         - Error messages are clear
         """
         async with httpx.AsyncClient() as client:
-
             try:
                 # Test 1: Missing batch_id
                 with open("test_uploads/essay1.txt", "rb") as f:
@@ -190,9 +175,7 @@ class TestE2EStep1FileUpload:
                     # Intentionally omit batch_id
 
                     response = await client.post(
-                        "http://localhost:7001/v1/files/batch",
-                        files=files,
-                        timeout=10.0
+                        "http://localhost:7001/v1/files/batch", files=files, timeout=10.0
                     )
 
                     assert response.status_code == 400, (
@@ -200,9 +183,7 @@ class TestE2EStep1FileUpload:
                     )
 
                     error_data = response.json()
-                    assert "error" in error_data, (
-                        "Error response should have 'error' field"
-                    )
+                    assert "error" in error_data, "Error response should have 'error' field"
                     assert "batch_id" in error_data["error"].lower(), (
                         f"Error should mention batch_id: {error_data['error']}"
                     )
@@ -211,9 +192,7 @@ class TestE2EStep1FileUpload:
                 data = {"batch_id": "test-batch"}
 
                 response = await client.post(
-                    "http://localhost:7001/v1/files/batch",
-                    data=data,
-                    timeout=10.0
+                    "http://localhost:7001/v1/files/batch", data=data, timeout=10.0
                 )
 
                 assert response.status_code == 400, (
@@ -224,9 +203,7 @@ class TestE2EStep1FileUpload:
                 assert "error" in error_data
                 assert "files" in error_data["error"].lower() or (
                     "no files" in error_data["error"].lower()
-                ), (
-                    f"Error should mention missing files: {error_data['error']}"
-                )
+                ), f"Error should mention missing files: {error_data['error']}"
 
                 print("✅ File Service validation errors handled correctly")
 
@@ -255,6 +232,5 @@ async def test_file_service_health_prerequisite():
 
         except httpx.ConnectError:
             pytest.fail(
-                "File Service not accessible. Ensure services are running:\n"
-                "docker compose up -d"
+                "File Service not accessible. Ensure services are running:\ndocker compose up -d"
             )

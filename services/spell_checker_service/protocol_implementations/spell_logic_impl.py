@@ -35,7 +35,7 @@ class DefaultSpellLogic(SpellLogicProtocol):
         essay_id: Optional[str],
         original_text_storage_id: str,
         initial_system_metadata: SystemProcessingMetadata,
-        language: str = "en"
+        language: str = "en",
     ) -> SpellcheckResultDataV1:
         """Perform spell check using the core logic implementation."""
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(

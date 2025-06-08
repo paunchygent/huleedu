@@ -282,9 +282,7 @@ async def test_walking_skeleton_e2e_architecture_fix():
                 # Check correlation ID propagation across events
                 correlated_events = []
                 for topic in TOPICS.values():
-                    topic_events = event_collector.get_events_for_correlation(
-                        topic, correlation_id
-                    )
+                    topic_events = event_collector.get_events_for_correlation(topic, correlation_id)
                     correlated_events.extend(topic_events)
 
                 if len(correlated_events) > 0:

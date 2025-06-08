@@ -41,7 +41,7 @@ class RealKafkaMessage:
 
     def __init__(self, envelope: EventEnvelope, topic: str):
         """Create Kafka message with real .value and .topic attributes."""
-        self.value = envelope.model_dump_json().encode('utf-8')
+        self.value = envelope.model_dump_json().encode("utf-8")
         self.topic = topic
         self.partition = 0
         self.offset = 123
@@ -63,9 +63,7 @@ class TestBosElsPhaseCoordination:
     @pytest.fixture
     def real_els_outcome_handler(self, mock_phase_coordinator):
         """Create real ELSBatchPhaseOutcomeHandler with mocked external dependencies."""
-        return ELSBatchPhaseOutcomeHandler(
-            phase_coordinator=mock_phase_coordinator
-        )
+        return ELSBatchPhaseOutcomeHandler(phase_coordinator=mock_phase_coordinator)
 
     @pytest.fixture
     def kafka_consumer(self, mock_batch_essays_ready_handler, real_els_outcome_handler):
@@ -81,7 +79,7 @@ class TestBosElsPhaseCoordination:
         self, kafka_consumer, mock_phase_coordinator
     ):
         """Test actual Kafka message routing and ELS outcome handler processing
-         with Phase 3 data propagation."""
+        with Phase 3 data propagation."""
         batch_id = str(uuid4())
         correlation_id = uuid4()
 
@@ -116,20 +114,17 @@ class TestBosElsPhaseCoordination:
         )
 
         # Create real Kafka message structure
-        kafka_msg = RealKafkaMessage(
-            envelope=envelope,
-            topic="huleedu.els.batch_phase.outcome.v1"
-        )
+        kafka_msg = RealKafkaMessage(envelope=envelope, topic="huleedu.els.batch_phase.outcome.v1")
 
         # Test ACTUAL BatchKafkaConsumer message routing to real ELS handler
         await kafka_consumer._handle_message(kafka_msg)
 
         # Verify phase coordinator called with Phase 3 data propagation
         mock_phase_coordinator.handle_phase_concluded.assert_called_once_with(
-            batch_id=batch_id,                               # batch_id string
-            completed_phase="spellcheck",                    # phase_name string
-            phase_status="COMPLETED_SUCCESSFULLY",          # phase_status string
-            correlation_id=str(correlation_id),             # correlation_id as string
+            batch_id=batch_id,  # batch_id string
+            completed_phase="spellcheck",  # phase_name string
+            phase_status="COMPLETED_SUCCESSFULLY",  # phase_status string
+            correlation_id=str(correlation_id),  # correlation_id as string
             processed_essays_for_next_phase=processed_essays,  # NEW: Phase 3 data propagation
         )
 
@@ -176,7 +171,7 @@ class TestBosElsPhaseCoordination:
 
         # Create Kafka message with incomplete event
         incomplete_msg = Mock()
-        incomplete_msg.value = json.dumps(envelope_data).encode('utf-8')
+        incomplete_msg.value = json.dumps(envelope_data).encode("utf-8")
         incomplete_msg.topic = "huleedu.els.batch_phase.outcome.v1"
 
         # Should handle missing fields gracefully (with logging)

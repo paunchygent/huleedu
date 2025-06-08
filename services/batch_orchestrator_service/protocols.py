@@ -18,16 +18,19 @@ from common_core.pipeline_models import PhaseName
 # Exception hierarchy for phase initiation errors
 class InitiationError(Exception):
     """Base exception for errors occurring during phase initiation."""
+
     pass
 
 
 class DataValidationError(InitiationError):
     """Raised when critical data is missing or invalid for phase initiation."""
+
     pass
 
 
 class CommandPublishError(InitiationError):
     """Raised when command publishing to event system fails."""
+
     pass
 
 
@@ -78,6 +81,7 @@ class SpellcheckInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     Inherits from PipelinePhaseInitiatorProtocol for standardized interface,
     primarily for semantic grouping and potential future spellcheck-specific methods.
     """
+
     pass
 
 
@@ -195,6 +199,7 @@ class CJAssessmentInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     Now implements the standardized PipelinePhaseInitiatorProtocol interface
     for consistency with other phase initiators.
     """
+
     pass
 
 
@@ -208,6 +213,7 @@ class AIFeedbackInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     Note: AI Feedback Service is not yet implemented - this initiator will publish
     commands that will be consumed once the AI Feedback Service is built.
     """
+
     pass
 
 
@@ -221,4 +227,5 @@ class NLPInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     Note: NLP Service is not yet implemented - this initiator will publish
     commands that will be consumed once the NLP Service is built.
     """
+
     pass

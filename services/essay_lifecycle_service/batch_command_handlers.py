@@ -109,9 +109,10 @@ async def _route_event(
     correlation_id = envelope.correlation_id
 
     try:
-                # Handle batch coordination events
+        # Handle batch coordination events
         if event_type == topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED):
             from common_core.events.batch_coordination_events import BatchEssaysRegistered
+
             batch_event_data = BatchEssaysRegistered.model_validate(envelope.data)
             batch_result: bool = await batch_coordination_handler.handle_batch_essays_registered(
                 event_data=batch_event_data, correlation_id=correlation_id
@@ -120,23 +121,30 @@ async def _route_event(
 
         elif event_type == topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED):
             from common_core.events.file_events import EssayContentProvisionedV1
+
             content_event_data = EssayContentProvisionedV1.model_validate(envelope.data)
-            content_result: bool = await batch_coordination_handler.handle_essay_content_provisioned(
-                event_data=content_event_data, correlation_id=correlation_id
+            content_result: bool = (
+                await batch_coordination_handler.handle_essay_content_provisioned(
+                    event_data=content_event_data, correlation_id=correlation_id
+                )
             )
             return content_result
 
         elif event_type == topic_name(ProcessingEvent.ESSAY_VALIDATION_FAILED):
             from common_core.events.file_events import EssayValidationFailedV1
+
             validation_event_data = EssayValidationFailedV1.model_validate(envelope.data)
-            validation_result: bool = await batch_coordination_handler.handle_essay_validation_failed(
-                event_data=validation_event_data, correlation_id=correlation_id
+            validation_result: bool = (
+                await batch_coordination_handler.handle_essay_validation_failed(
+                    event_data=validation_event_data, correlation_id=correlation_id
+                )
             )
             return validation_result
 
         # Handle BOS command events
         elif event_type == topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND):
             from common_core.batch_service_models import BatchServiceSpellcheckInitiateCommandDataV1
+
             command_data = BatchServiceSpellcheckInitiateCommandDataV1.model_validate(envelope.data)
             await batch_command_handler.process_initiate_spellcheck_command(
                 command_data=command_data, correlation_id=correlation_id
@@ -147,7 +155,10 @@ async def _route_event(
             from common_core.batch_service_models import (
                 BatchServiceCJAssessmentInitiateCommandDataV1,
             )
-            cj_command_data = BatchServiceCJAssessmentInitiateCommandDataV1.model_validate(envelope.data)
+
+            cj_command_data = BatchServiceCJAssessmentInitiateCommandDataV1.model_validate(
+                envelope.data
+            )
             await batch_command_handler.process_initiate_cj_assessment_command(
                 command_data=cj_command_data, correlation_id=correlation_id
             )
@@ -156,6 +167,7 @@ async def _route_event(
         # Handle specialized service result events
         elif event_type == topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED):
             from common_core.events.spellcheck_models import SpellcheckResultDataV1
+
             result_data = SpellcheckResultDataV1.model_validate(envelope.data)
             spellcheck_result: bool = await service_result_handler.handle_spellcheck_result(
                 result_data=result_data, correlation_id=correlation_id
@@ -164,6 +176,7 @@ async def _route_event(
 
         elif event_type == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
             from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
+
             cj_result_data = CJAssessmentCompletedV1.model_validate(envelope.data)
             cj_result: bool = await service_result_handler.handle_cj_assessment_completed(
                 result_data=cj_result_data, correlation_id=correlation_id

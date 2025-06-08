@@ -66,9 +66,9 @@ class TestEventContractCompliance:
         from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
             DefaultSpellLogic,
         )
+
         real_spell_logic = DefaultSpellLogic(
-            result_store=mock_result_store,
-            http_session=mock_http_session
+            result_store=mock_result_store, http_session=mock_http_session
         )
 
         # Act - Process message using real spell checking
@@ -105,7 +105,10 @@ class TestEventContractCompliance:
         assert published_result.corrections_made is not None
         assert published_result.storage_metadata is not None
         assert ContentType.CORRECTED_TEXT in published_result.storage_metadata.references
-        assert published_result.storage_metadata.references[ContentType.CORRECTED_TEXT]["default"] == mock_corrected_storage_id
+        assert (
+            published_result.storage_metadata.references[ContentType.CORRECTED_TEXT]["default"]
+            == mock_corrected_storage_id
+        )
 
     @pytest.mark.asyncio
     async def test_correlation_id_propagation(
@@ -133,9 +136,9 @@ class TestEventContractCompliance:
         from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
             DefaultSpellLogic,
         )
+
         real_spell_logic = DefaultSpellLogic(
-            result_store=mock_result_store,
-            http_session=mock_http_session
+            result_store=mock_result_store, http_session=mock_http_session
         )
 
         # Act - Process message using real spell checking
@@ -174,4 +177,6 @@ class TestEventContractCompliance:
 
         # Verify the published result has the expected correlation ID context
         published_result: SpellcheckResultDataV1 = call_args[0][1]
-        assert published_result.entity_ref.entity_id == sample_essay_id  # Should match the essay from the request
+        assert (
+            published_result.entity_ref.entity_id == sample_essay_id
+        )  # Should match the essay from the request

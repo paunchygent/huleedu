@@ -37,7 +37,7 @@ class TestBatchCommandIntegration:
         handler = DefaultBatchCommandHandler(
             spellcheck_handler=mock_spellcheck_handler,
             cj_assessment_handler=mock_cj_assessment_handler,
-            future_services_handler=mock_future_services_handler
+            future_services_handler=mock_future_services_handler,
         )
 
         # Create simple command
@@ -47,7 +47,7 @@ class TestBatchCommandIntegration:
             essays_to_process=[
                 EssayProcessingInputRefV1(essay_id="essay-1", text_storage_id="storage-1")
             ],
-            language="en"
+            language="en",
         )
 
         correlation_id = uuid4()
@@ -77,7 +77,7 @@ class TestBatchCommandIntegration:
         handler = DefaultBatchCommandHandler(
             spellcheck_handler=mock_spellcheck_handler,
             cj_assessment_handler=mock_cj_assessment_handler,
-            future_services_handler=mock_future_services_handler
+            future_services_handler=mock_future_services_handler,
         )
 
         # Create command for missing essay
@@ -87,7 +87,7 @@ class TestBatchCommandIntegration:
             essays_to_process=[
                 EssayProcessingInputRefV1(essay_id="missing-essay", text_storage_id="storage-1")
             ],
-            language="en"
+            language="en",
         )
 
         correlation_id = uuid4()

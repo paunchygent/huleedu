@@ -33,7 +33,7 @@ class TestValidationResult:
             is_valid=False,
             error_code="EMPTY_CONTENT",
             error_message="File contains no readable text content.",
-            warnings=["File size is unusually small"]
+            warnings=["File size is unusually small"],
         )
 
         assert result.is_valid is False
@@ -46,7 +46,7 @@ class TestValidationResult:
         result = ValidationResult(
             is_valid=False,
             error_code="  CONTENT_TOO_SHORT  ",
-            error_message="  Content is too short.  "
+            error_message="  Content is too short.  ",
         )
 
         assert result.error_code == "CONTENT_TOO_SHORT"
@@ -71,10 +71,7 @@ class TestValidationResult:
     def test_warnings_list_handling(self) -> None:
         """Test proper handling of warnings list."""
         warnings = ["Warning 1", "Warning 2", "Warning 3"]
-        result = ValidationResult(
-            is_valid=True,
-            warnings=warnings
-        )
+        result = ValidationResult(is_valid=True, warnings=warnings)
 
         assert result.warnings == warnings
         assert len(result.warnings) == 3
@@ -91,7 +88,7 @@ class TestValidationResult:
             is_valid=False,
             error_code="CONTENT_TOO_SHORT",
             error_message="Content must be at least 50 characters.",
-            warnings=["Consider adding more detail"]
+            warnings=["Consider adding more detail"],
         )
 
         # Serialize to JSON
@@ -112,7 +109,7 @@ class TestValidationResult:
             is_valid=False,
             error_code="EMPTY_CONTENT",
             error_message="No content found",
-            warnings=["File seems empty"]
+            warnings=["File seems empty"],
         )
 
         json_data = result.model_dump(mode="json")
@@ -141,11 +138,7 @@ class TestValidationResult:
 
     def test_none_values_handling(self) -> None:
         """Test proper handling of None values for optional fields."""
-        result = ValidationResult(
-            is_valid=True,
-            error_code=None,
-            error_message=None
-        )
+        result = ValidationResult(is_valid=True, error_code=None, error_message=None)
 
         assert result.error_code is None
         assert result.error_message is None
@@ -153,25 +146,18 @@ class TestValidationResult:
     def test_model_equality(self) -> None:
         """Test model equality comparison."""
         result1 = ValidationResult(
-            is_valid=False,
-            error_code="TEST_ERROR",
-            error_message="Test message"
+            is_valid=False, error_code="TEST_ERROR", error_message="Test message"
         )
 
         result2 = ValidationResult(
-            is_valid=False,
-            error_code="TEST_ERROR",
-            error_message="Test message"
+            is_valid=False, error_code="TEST_ERROR", error_message="Test message"
         )
 
         assert result1 == result2
 
     def test_model_repr(self) -> None:
         """Test string representation of the model."""
-        result = ValidationResult(
-            is_valid=False,
-            error_code="TEST_ERROR"
-        )
+        result = ValidationResult(is_valid=False, error_code="TEST_ERROR")
 
         repr_str = repr(result)
         assert "ValidationResult" in repr_str

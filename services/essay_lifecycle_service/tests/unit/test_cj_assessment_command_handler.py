@@ -39,16 +39,14 @@ class TestCJAssessmentCommandHandler:
         essay_id: str,
         batch_id: str,
         status: EssayStatus = EssayStatus.READY_FOR_PROCESSING,
-        commanded_phases: list[str] | None = None
+        commanded_phases: list[str] | None = None,
     ) -> MagicMock:
         """Create a mock essay state with given parameters."""
         essay_state = MagicMock()
         essay_state.essay_id = essay_id
         essay_state.batch_id = batch_id
         essay_state.current_status = status
-        essay_state.processing_metadata = {
-            "commanded_phases": commanded_phases or []
-        }
+        essay_state.processing_metadata = {"commanded_phases": commanded_phases or []}
         return essay_state
 
     @pytest.fixture
@@ -76,13 +74,13 @@ class TestCJAssessmentCommandHandler:
         self,
         mock_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
-        mock_event_publisher: AsyncMock
+        mock_event_publisher: AsyncMock,
     ) -> CJAssessmentCommandHandler:
         """Create CJAssessmentCommandHandler with mocked dependencies."""
         return CJAssessmentCommandHandler(
             repository=mock_repository,
             request_dispatcher=mock_request_dispatcher,
-            event_publisher=mock_event_publisher
+            event_publisher=mock_event_publisher,
         )
 
     @pytest.fixture
@@ -103,16 +101,11 @@ class TestCJAssessmentCommandHandler:
     @pytest.fixture
     def essay_processing_ref(self, essay_id: str) -> EssayProcessingInputRefV1:
         """Sample essay processing reference."""
-        return EssayProcessingInputRefV1(
-            essay_id=essay_id,
-            text_storage_id="storage-456"
-        )
+        return EssayProcessingInputRefV1(essay_id=essay_id, text_storage_id="storage-456")
 
     @pytest.fixture
     def cj_assessment_command_data(
-        self,
-        batch_id: str,
-        essay_processing_ref: EssayProcessingInputRefV1
+        self, batch_id: str, essay_processing_ref: EssayProcessingInputRefV1
     ) -> BatchServiceCJAssessmentInitiateCommandDataV1:
         """Sample CJ assessment command data."""
         return BatchServiceCJAssessmentInitiateCommandDataV1(
@@ -122,7 +115,7 @@ class TestCJAssessmentCommandHandler:
             language="en",
             course_code="ENG101",
             class_designation="Class 9A",
-            essay_instructions="Write about your summer vacation"
+            essay_instructions="Write about your summer vacation",
         )
 
     # Test: Successful CJ Assessment Command Processing
@@ -144,7 +137,9 @@ class TestCJAssessmentCommandHandler:
         mock_repository.update_essay_status_via_machine.return_value = None
         mock_request_dispatcher.dispatch_cj_assessment_requests.return_value = None
 
-        with patch('services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine') as mock_state_machine_class:
+        with patch(
+            "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
+        ) as mock_state_machine_class:
             mock_machine = MagicMock()
             mock_machine.trigger.return_value = True
             mock_machine.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT
@@ -152,8 +147,7 @@ class TestCJAssessmentCommandHandler:
 
             # Execute
             await cj_assessment_handler.process_initiate_cj_assessment_command(
-                command_data=cj_assessment_command_data,
-                correlation_id=correlation_id
+                command_data=cj_assessment_command_data, correlation_id=correlation_id
             )
 
             # Verify repository interactions (called twice: initial + started event)
@@ -168,20 +162,19 @@ class TestCJAssessmentCommandHandler:
                 {
                     "bos_command": "cj_assessment_initiate",
                     "current_phase": "cj_assessment",
-                    "commanded_phases": ["cj_assessment"]
-                }
+                    "commanded_phases": ["cj_assessment"],
+                },
             )
             mock_repository.update_essay_status_via_machine.assert_any_call(
                 essay_id,
                 EssayStatus.AWAITING_CJ_ASSESSMENT,
-                {"cj_assessment_phase": "started", "dispatch_completed": True}
+                {"cj_assessment_phase": "started", "dispatch_completed": True},
             )
 
             # Verify state machine interaction (called twice: initial + started event)
             assert mock_state_machine_class.call_count == 2
             mock_state_machine_class.assert_any_call(
-                essay_id=essay_id,
-                initial_status=EssayStatus.READY_FOR_PROCESSING
+                essay_id=essay_id, initial_status=EssayStatus.READY_FOR_PROCESSING
             )
 
             # Verify trigger calls (initial + started event)
@@ -196,7 +189,7 @@ class TestCJAssessmentCommandHandler:
                 course_code=cj_assessment_command_data.course_code,
                 essay_instructions=cj_assessment_command_data.essay_instructions,
                 batch_id=cj_assessment_command_data.entity_ref.entity_id,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
     # Test: State Machine Transition Failure
@@ -216,15 +209,16 @@ class TestCJAssessmentCommandHandler:
         essay_state = self.create_essay_state_mock(essay_id, batch_id)
         mock_repository.get_essay_state.return_value = essay_state
 
-        with patch('services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine') as mock_state_machine_class:
+        with patch(
+            "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
+        ) as mock_state_machine_class:
             mock_machine = MagicMock()
             mock_machine.trigger.return_value = False  # Transition fails
             mock_state_machine_class.return_value = mock_machine
 
             # Execute
             await cj_assessment_handler.process_initiate_cj_assessment_command(
-                command_data=cj_assessment_command_data,
-                correlation_id=correlation_id
+                command_data=cj_assessment_command_data, correlation_id=correlation_id
             )
 
             # Verify state machine was attempted
@@ -251,8 +245,7 @@ class TestCJAssessmentCommandHandler:
 
         # Execute
         await cj_assessment_handler.process_initiate_cj_assessment_command(
-            command_data=cj_assessment_command_data,
-            correlation_id=correlation_id
+            command_data=cj_assessment_command_data, correlation_id=correlation_id
         )
 
         # Verify repository was queried
@@ -286,19 +279,16 @@ class TestCJAssessmentCommandHandler:
             language="en",
             course_code="ENG101",
             class_designation="Class 9A",
-            essay_instructions="Write about your summer vacation"
+            essay_instructions="Write about your summer vacation",
         )
 
         # Setup essay states - all found and can transition
-        essay_states = [
-            self.create_essay_state_mock(ref.essay_id, batch_id)
-            for ref in essay_refs
-        ]
+        essay_states = [self.create_essay_state_mock(ref.essay_id, batch_id) for ref in essay_refs]
         mock_repository.get_essay_state.side_effect = essay_states
 
         with patch(
-            'services.essay_lifecycle_service.implementations.cj_assessment_command_handler.'
-            'EssayStateMachine'
+            "services.essay_lifecycle_service.implementations.cj_assessment_command_handler."
+            "EssayStateMachine"
         ) as mock_state_machine_class:
             # Setup state machines - all succeed
             # Need 4 total: 2 for initial processing + 2 for started events
@@ -313,8 +303,7 @@ class TestCJAssessmentCommandHandler:
 
             # Execute
             await cj_assessment_handler.process_initiate_cj_assessment_command(
-                command_data=command_data,
-                correlation_id=correlation_id
+                command_data=command_data, correlation_id=correlation_id
             )
 
             # Verify all essays were processed (started events fail due to mock exhaustion)
@@ -329,9 +318,9 @@ class TestCJAssessmentCommandHandler:
             args, kwargs = mock_request_dispatcher.dispatch_cj_assessment_requests.call_args
 
             # Should contain both essays
-            assert len(kwargs['essays_to_process']) == 2
-            assert kwargs['essays_to_process'][0].essay_id == "essay-a"
-            assert kwargs['essays_to_process'][1].essay_id == "essay-b"
+            assert len(kwargs["essays_to_process"]) == 2
+            assert kwargs["essays_to_process"][0].essay_id == "essay-a"
+            assert kwargs["essays_to_process"][1].essay_id == "essay-b"
 
     # Test: Custom Command Data Propagation
     @pytest.mark.asyncio
@@ -355,14 +344,16 @@ class TestCJAssessmentCommandHandler:
             language="sv",
             course_code="SV201",
             class_designation="Gymnasiet 2A",
-            essay_instructions="Skriv om din semester"
+            essay_instructions="Skriv om din semester",
         )
 
         # Setup essay state
         essay_state = self.create_essay_state_mock(essay_id, batch_id)
         mock_repository.get_essay_state.return_value = essay_state
 
-        with patch('services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine') as mock_state_machine_class:
+        with patch(
+            "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
+        ) as mock_state_machine_class:
             mock_machine = MagicMock()
             mock_machine.trigger.return_value = True
             mock_machine.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT
@@ -370,8 +361,7 @@ class TestCJAssessmentCommandHandler:
 
             # Execute
             await cj_assessment_handler.process_initiate_cj_assessment_command(
-                command_data=command_data,
-                correlation_id=correlation_id
+                command_data=command_data, correlation_id=correlation_id
             )
 
             # Verify command data is passed correctly to dispatcher
@@ -381,5 +371,5 @@ class TestCJAssessmentCommandHandler:
                 course_code="SV201",
                 essay_instructions="Skriv om din semester",
                 batch_id=batch_id,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )

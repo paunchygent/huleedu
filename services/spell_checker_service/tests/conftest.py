@@ -58,6 +58,7 @@ EntityReference.model_rebuild(raise_errors=True)
 # Configure logging for tests to ensure caplog works properly
 # NOTE: Logging now configured globally in root tests/conftest.py to avoid conflicts
 
+
 @pytest.fixture
 def sample_essay_id() -> str:
     """Provide a sample essay ID for testing."""

@@ -49,13 +49,11 @@ async def test_complete_workflow_file_to_els():
             "class_designation": "Test Class Phase3",
             "teacher_name": "Test Teacher",
             "essay_instructions": "Write a test essay for E2E validation",
-            "enable_cj_assessment": False
+            "enable_cj_assessment": False,
         }
 
         response = await client.post(
-            "http://localhost:5001/v1/batches/register",
-            json=registration_data,
-            timeout=10.0
+            "http://localhost:5001/v1/batches/register", json=registration_data, timeout=10.0
         )
 
         assert response.status_code == 202, (
@@ -83,10 +81,7 @@ async def test_complete_workflow_file_to_els():
             data = {"batch_id": batch_id}
 
             response = await client.post(
-                "http://localhost:7001/v1/files/batch",
-                files=files,
-                data=data,
-                timeout=30.0
+                "http://localhost:7001/v1/files/batch", files=files, data=data, timeout=30.0
             )
 
             assert response.status_code == 202, (
@@ -106,7 +101,7 @@ async def test_complete_workflow_file_to_els():
         value_deserializer=lambda m: json.loads(m.decode("utf-8")),
         client_id=f"e2e-complete-client-{uuid.uuid4().hex[:8]}",
         fetch_max_wait_ms=1000,
-        max_poll_records=10
+        max_poll_records=10,
     )
 
     event_found = False
@@ -117,11 +112,11 @@ async def test_complete_workflow_file_to_els():
             async for message in consumer:
                 event_data = message.value
 
-                if ("data" in event_data and
-                    event_data["data"].get("batch_id") == batch_id):
-
-                    print(f"✅ EssayContentProvisionedV1 event received: "
-                          f"{event_data['data']['original_file_name']}")
+                if "data" in event_data and event_data["data"].get("batch_id") == batch_id:
+                    print(
+                        f"✅ EssayContentProvisionedV1 event received: "
+                        f"{event_data['data']['original_file_name']}"
+                    )
                     event_found = True
                     break
 
@@ -140,8 +135,7 @@ async def test_complete_workflow_file_to_els():
     print("🔍 Step 6: Querying ELS for essay entities...")
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"http://localhost:6001/v1/batches/{batch_id}/status",
-            timeout=10.0
+            f"http://localhost:6001/v1/batches/{batch_id}/status", timeout=10.0
         )
 
         if response.status_code == 404:

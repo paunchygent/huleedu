@@ -60,7 +60,9 @@ class TestBatchKafkaConsumerBusinessLogic:
         await kafka_consumer._handle_message(mock_message)
 
         # Verify the correct handler was called
-        mock_els_batch_phase_outcome_handler.handle_els_batch_phase_outcome.assert_called_once_with(mock_message)
+        mock_els_batch_phase_outcome_handler.handle_els_batch_phase_outcome.assert_called_once_with(
+            mock_message
+        )
 
     async def test_batch_essays_ready_message_routing(
         self, kafka_consumer, mock_batch_essays_ready_handler
@@ -76,7 +78,9 @@ class TestBatchKafkaConsumerBusinessLogic:
         await kafka_consumer._handle_message(mock_message)
 
         # Verify the correct handler was called
-        mock_batch_essays_ready_handler.handle_batch_essays_ready.assert_called_once_with(mock_message)
+        mock_batch_essays_ready_handler.handle_batch_essays_ready.assert_called_once_with(
+            mock_message
+        )
 
     async def test_unknown_topic_handling(
         self, kafka_consumer, mock_batch_essays_ready_handler, mock_els_batch_phase_outcome_handler
@@ -107,9 +111,7 @@ class TestELSBatchPhaseOutcomeHandler:
     @pytest.fixture
     def outcome_handler(self, mock_phase_coordinator):
         """Create ELS outcome handler with mocked external dependencies."""
-        return ELSBatchPhaseOutcomeHandler(
-            phase_coordinator=mock_phase_coordinator
-        )
+        return ELSBatchPhaseOutcomeHandler(phase_coordinator=mock_phase_coordinator)
 
     async def test_els_batch_phase_outcome_processing_with_data_propagation(
         self, outcome_handler, mock_phase_coordinator

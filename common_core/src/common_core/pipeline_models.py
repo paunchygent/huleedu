@@ -17,6 +17,7 @@ class PhaseName(str, Enum):
     and for validating requested_pipelines values, eliminating magic strings and
     providing compile-time safety.
     """
+
     SPELLCHECK = "spellcheck"
     AI_FEEDBACK = "ai_feedback"
     CJ_ASSESSMENT = "cj_assessment"

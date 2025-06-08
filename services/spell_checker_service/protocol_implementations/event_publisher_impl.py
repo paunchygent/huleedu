@@ -46,5 +46,8 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
 
         # Add logging to track successful event publishing
         from huleedu_service_libs.logging_utils import create_service_logger
+
         logger = create_service_logger("spell_checker_service.event_publisher_impl")
-        logger.info(f"Published spellcheck completion event for essay {event_data.entity_ref.entity_id}")
+        logger.info(
+            f"Published spellcheck completion event for essay {event_data.entity_ref.entity_id}"
+        )

@@ -21,10 +21,7 @@ class ValidationResult(BaseModel):
     for providing actionable feedback to users.
     """
 
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True
-    )
+    model_config = ConfigDict(str_strip_whitespace=True, validate_assignment=True)
 
     is_valid: bool
     error_code: Optional[str] = None

@@ -8,7 +8,7 @@ Shared utilities and fixtures:
 
 Test modules by functionality:
 - test_phase3_bos_orchestration_pipeline_setup.py - Batch registration and pipeline initialization
-- test_phase3_bos_orchestration_phase_coordination.py - Event consumption and phase determination  
+- test_phase3_bos_orchestration_phase_coordination.py - Event consumption and phase determination
 - test_phase3_bos_orchestration_command_generation.py - CJ assessment command generation
 - test_phase3_bos_orchestration_data_propagation.py - Essay list handling between phases
 - test_phase3_bos_orchestration_idempotency.py - Duplicate event handling and edge cases

@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # PostgreSQL Configuration (production)
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://huleedu_user:REDACTED_DEFAULT_PASSWORD@essay_lifecycle_db:5432/essay_lifecycle",
-        alias="ELS_DATABASE_URL"
+        alias="ELS_DATABASE_URL",
     )
     DATABASE_HOST: str = Field(default="essay_lifecycle_db", alias="ELS_DB_HOST")
     DATABASE_PORT: int = Field(default=5432, alias="ELS_DB_PORT")

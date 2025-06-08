@@ -86,7 +86,7 @@ async def test_complete_spellcheck_processing_pipeline():
         bootstrap_servers="localhost:9093",  # External port as learned in Phase 2
         group_id=f"e2e-test-spellcheck-consumer-{uuid.uuid4()}",
         auto_offset_reset="latest",  # Only new messages
-        enable_auto_commit=False
+        enable_auto_commit=False,
     )
 
     try:
@@ -98,16 +98,13 @@ async def test_complete_spellcheck_processing_pipeline():
             essay_id=essay_id,
             text_storage_id=original_storage_id,
             correlation_id=correlation_id,
-            language="en"
+            language="en",
         )
         print(f"✅ Published SpellcheckRequestedV1 event for essay: {essay_id}")
 
         # Step 4: Monitor for SpellcheckResultDataV1 response
         spellcheck_result = await monitor_for_spellcheck_result(
-            result_consumer,
-            essay_id=essay_id,
-            correlation_id=correlation_id,
-            timeout_seconds=90
+            result_consumer, essay_id=essay_id, correlation_id=correlation_id, timeout_seconds=90
         )
 
         assert spellcheck_result is not None
@@ -117,14 +114,17 @@ async def test_complete_spellcheck_processing_pipeline():
         print(f"✅ Spellcheck completed with {spellcheck_result['corrections_made']} corrections")
 
         # Debug: Print the actual storage_metadata structure
-        print(f"🔍 storage_metadata structure: "
-              f"{spellcheck_result.get('storage_metadata', 'NOT_FOUND')}")
+        print(
+            f"🔍 storage_metadata structure: "
+            f"{spellcheck_result.get('storage_metadata', 'NOT_FOUND')}"
+        )
 
         # Step 5: Validate corrected content stored in Content Service
         # Based on actual structure: storage_metadata.references.corrected_text.default
         storage_metadata = spellcheck_result.get("storage_metadata", {})
-        corrected_storage_id = storage_metadata.get("references", {}).get(
-            "corrected_text", {}).get("default")
+        corrected_storage_id = (
+            storage_metadata.get("references", {}).get("corrected_text", {}).get("default")
+        )
 
         assert corrected_storage_id is not None, (
             f"No corrected text storage ID found in: {storage_metadata}"
@@ -138,8 +138,10 @@ async def test_complete_spellcheck_processing_pipeline():
         assert "essay" in corrected_content  # "esay" should be corrected to "essay"
         assert "spelling" in corrected_content  # "speling" should be corrected to "spelling"
         print("✅ Corrected content retrieved and validated")
-        print(f"📝 Original length: {len(test_essay_content)}, "
-              f"Corrected length: {len(corrected_content)}")
+        print(
+            f"📝 Original length: {len(test_essay_content)}, "
+            f"Corrected length: {len(corrected_content)}"
+        )
 
     finally:
         await result_consumer.stop()
@@ -173,7 +175,7 @@ async def test_spellcheck_pipeline_with_no_errors():
         bootstrap_servers="localhost:9093",
         group_id=f"e2e-test-perfect-consumer-{uuid.uuid4()}",
         auto_offset_reset="latest",
-        enable_auto_commit=False
+        enable_auto_commit=False,
     )
 
     try:
@@ -183,14 +185,11 @@ async def test_spellcheck_pipeline_with_no_errors():
             essay_id=essay_id,
             text_storage_id=original_storage_id,
             correlation_id=correlation_id,
-            language="en"
+            language="en",
         )
 
         spellcheck_result = await monitor_for_spellcheck_result(
-            result_consumer,
-            essay_id=essay_id,
-            correlation_id=correlation_id,
-            timeout_seconds=60
+            result_consumer, essay_id=essay_id, correlation_id=correlation_id, timeout_seconds=60
         )
 
         assert spellcheck_result is not None
@@ -207,13 +206,14 @@ async def test_spellcheck_pipeline_with_no_errors():
 
 # Helper Functions (Research-based implementations)
 
+
 async def upload_content_to_content_service(content: str) -> str:
     """Upload content to Content Service and return storage_id."""
     async with aiohttp.ClientSession() as session:
         async with session.post(
             "http://localhost:8001/v1/content",
-            data=content.encode('utf-8'),
-            headers={"Content-Type": "text/plain"}
+            data=content.encode("utf-8"),
+            headers={"Content-Type": "text/plain"},
         ) as response:
             assert response.status == 201
             result = await response.json()
@@ -230,10 +230,7 @@ async def fetch_content_from_content_service(storage_id: str) -> str:
 
 
 async def publish_spellcheck_request_event(
-    essay_id: str,
-    text_storage_id: str,
-    correlation_id: str,
-    language: str = "en"
+    essay_id: str, text_storage_id: str, correlation_id: str, language: str = "en"
 ) -> None:
     """Publish SpellcheckRequestedV1 event to trigger spell checker processing."""
 
@@ -245,7 +242,7 @@ async def publish_spellcheck_request_event(
         timestamp=datetime.now(timezone.utc),
         started_at=datetime.now(timezone.utc),
         processing_stage=ProcessingStage.PROCESSING,
-        event=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED.value
+        event=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED.value,
     )
 
     spellcheck_request_data = EssayLifecycleSpellcheckRequestV1(
@@ -255,7 +252,7 @@ async def publish_spellcheck_request_event(
         status=EssayStatus.AWAITING_SPELLCHECK,  # Required field from ProcessingUpdate
         text_storage_id=text_storage_id,
         language=language,
-        system_metadata=system_metadata
+        system_metadata=system_metadata,
     )
 
     # Create EventEnvelope
@@ -263,7 +260,7 @@ async def publish_spellcheck_request_event(
         event_type=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED),
         source_service="e2e-test-service",
         correlation_id=uuid.UUID(correlation_id),
-        data=spellcheck_request_data
+        data=spellcheck_request_data,
     )
 
     # Publish to Kafka
@@ -272,21 +269,16 @@ async def publish_spellcheck_request_event(
 
     try:
         await producer.start()
-        message_value = json.dumps(event_envelope.model_dump(mode="json")).encode('utf-8')
+        message_value = json.dumps(event_envelope.model_dump(mode="json")).encode("utf-8")
         await producer.send_and_wait(
-            request_topic,
-            value=message_value,
-            key=essay_id.encode('utf-8')
+            request_topic, value=message_value, key=essay_id.encode("utf-8")
         )
     finally:
         await producer.stop()
 
 
 async def monitor_for_spellcheck_result(
-    consumer: AIOKafkaConsumer,
-    essay_id: str,
-    correlation_id: str,
-    timeout_seconds: int = 90
+    consumer: AIOKafkaConsumer, essay_id: str, correlation_id: str, timeout_seconds: int = 90
 ) -> Optional[Dict[str, Any]]:
     """Monitor Kafka for SpellcheckResultDataV1 event matching essay_id and correlation_id."""
 
@@ -301,14 +293,15 @@ async def monitor_for_spellcheck_result(
                 for message in messages:
                     try:
                         # Parse EventEnvelope
-                        message_text = message.value.decode('utf-8')
+                        message_text = message.value.decode("utf-8")
                         envelope_data = json.loads(message_text)
 
                         # Check if this is our essay's result
-                        if (envelope_data.get("correlation_id") == correlation_id and
-                            envelope_data.get("data", {}).get(
-                                "entity_ref", {}).get("entity_id") == essay_id):
-
+                        if (
+                            envelope_data.get("correlation_id") == correlation_id
+                            and envelope_data.get("data", {}).get("entity_ref", {}).get("entity_id")
+                            == essay_id
+                        ):
                             result_data: Dict[str, Any] = envelope_data["data"]
                             print(f"📨 Received spellcheck result for essay {essay_id}")
                             return result_data

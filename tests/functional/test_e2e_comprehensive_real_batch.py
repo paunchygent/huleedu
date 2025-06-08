@@ -118,15 +118,15 @@ async def test_comprehensive_real_batch_pipeline():
         # Step 5: Upload files to trigger the pipeline
         print("🚀 Uploading real student essays to trigger pipeline...")
         upload_response = await upload_real_essays_via_file_service(
-            batch_id=batch_id,
-            essay_files=test_essays,
-            correlation_id=test_correlation_id
+            batch_id=batch_id, essay_files=test_essays, correlation_id=test_correlation_id
         )
         print(f"✅ File upload successful: {upload_response}")
 
         # Step 6: Watch pipeline progression
         print("⏳ Watching pipeline progression...")
-        result = await watch_pipeline_progression(event_consumer, batch_id, test_correlation_id, timeout_seconds=180)
+        result = await watch_pipeline_progression(
+            event_consumer, batch_id, test_correlation_id, timeout_seconds=180
+        )
         cj_completion = result
 
         assert cj_completion is not None, "CJ assessment phase did not complete"
@@ -167,9 +167,7 @@ async def validate_all_services_healthy() -> None:
 
 
 async def upload_real_essays_via_file_service(
-    batch_id: str,
-    essay_files: List[Path],
-    correlation_id: str | None = None
+    batch_id: str, essay_files: List[Path], correlation_id: str | None = None
 ) -> Dict[str, Any]:
     """Upload real student essays via File Service batch endpoint."""
 
@@ -178,12 +176,9 @@ async def upload_real_essays_via_file_service(
         data.add_field("batch_id", batch_id)
 
         for essay_file in essay_files:
-            essay_content = essay_file.read_text(encoding='utf-8')
+            essay_content = essay_file.read_text(encoding="utf-8")
             data.add_field(
-                "files",
-                essay_content,
-                filename=essay_file.name,
-                content_type="text/plain"
+                "files", essay_content, filename=essay_file.name, content_type="text/plain"
             )
 
         headers = {}
@@ -194,7 +189,7 @@ async def upload_real_essays_via_file_service(
             "http://localhost:7001/v1/files/batch",
             data=data,
             headers=headers,
-            timeout=aiohttp.ClientTimeout(total=60)
+            timeout=aiohttp.ClientTimeout(total=60),
         ) as response:
             if response.status == 202:
                 result: Dict[str, Any] = await response.json()
@@ -204,7 +199,9 @@ async def upload_real_essays_via_file_service(
                 raise AssertionError(f"File upload failed: {response.status} - {error_text}")
 
 
-async def register_batch_with_bos(expected_essay_count: int, correlation_id: str | None = None) -> str:
+async def register_batch_with_bos(
+    expected_essay_count: int, correlation_id: str | None = None
+) -> str:
     """Register a batch with BOS to create essay slots before file upload."""
 
     registration_payload = {
@@ -213,14 +210,14 @@ async def register_batch_with_bos(expected_essay_count: int, correlation_id: str
         "class_designation": "E2E-Test-Class",
         "essay_instructions": "End-to-end test essay for comprehensive pipeline validation",
         "teacher_name": "E2E Test Teacher",
-        "enable_cj_assessment": True
+        "enable_cj_assessment": True,
     }
 
     async with aiohttp.ClientSession() as session:
         async with session.post(
             "http://localhost:5001/v1/batches/register",
             json=registration_payload,
-            timeout=aiohttp.ClientTimeout(total=30)
+            timeout=aiohttp.ClientTimeout(total=30),
         ) as response:
             if response.status == 202:
                 result: Dict[str, Any] = await response.json()
@@ -228,14 +225,16 @@ async def register_batch_with_bos(expected_essay_count: int, correlation_id: str
                 return batch_id
             else:
                 error_text = await response.text()
-                raise AssertionError(f"BOS batch registration failed: {response.status} - {error_text}")
+                raise AssertionError(
+                    f"BOS batch registration failed: {response.status} - {error_text}"
+                )
 
 
 async def watch_pipeline_progression(
     consumer: AIOKafkaConsumer,
     batch_id: str,
     correlation_id: str | None = None,
-    timeout_seconds: int = 180
+    timeout_seconds: int = 180,
 ) -> Dict[str, Any] | None:
     """Watch pipeline progression and wait for completion."""
 
@@ -258,7 +257,8 @@ async def watch_pipeline_progression(
                             continue
 
                         # Secondary check: entity_id should match for batch-level events.
-                        # For essay-level events, this check is skipped as we rely on correlation_id.
+                        # For essay-level events, this check is skipped as we rely on
+                        # correlation_id.
                         entity_match = False
 
                         # List of topics that are about the whole batch
@@ -275,11 +275,15 @@ async def watch_pipeline_progression(
                             if message.topic == topic_name(ProcessingEvent.BATCH_ESSAYS_READY):
                                 entity_id_from_event = event_data.get("batch_id")
                             else:
-                                entity_id_from_event = event_data.get("entity_ref", {}).get("entity_id")
+                                entity_id_from_event = event_data.get("entity_ref", {}).get(
+                                    "entity_id"
+                                )
 
                             if entity_id_from_event == batch_id:
                                 entity_match = True
-                        elif message.topic == topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED):
+                        elif message.topic == topic_name(
+                            ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED
+                        ):
                             # This is an essay-level event. The correlation_id match is sufficient.
                             entity_match = True
                         else:
@@ -289,18 +293,46 @@ async def watch_pipeline_progression(
                         if entity_match:
                             if message.topic == topic_name(ProcessingEvent.BATCH_ESSAYS_READY):
                                 essay_count = len(event_data.get("ready_essays", []))
-                                print(f"📨 1️⃣ ELS published BatchEssaysReady: {essay_count} essays ready")
-                            elif message.topic == topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND):
+                                print(
+                                    (
+                                        f"📨 1️⃣ ELS published BatchEssaysReady: "
+                                        f"{essay_count} essays ready"
+                                    )
+                                )
+                            elif message.topic == topic_name(
+                                ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND
+                            ):
                                 print("📨 2️⃣ BOS published spellcheck initiate command")
-                            elif message.topic == topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME):
-                                print(f"📨 3️⃣ ELS published phase outcome: {event_data.get('phase_name')} -> {event_data.get('phase_status')}")
-                            elif message.topic == topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND):
+                            elif message.topic == topic_name(
+                                ProcessingEvent.ELS_BATCH_PHASE_OUTCOME
+                            ):
+                                print(
+                                    (
+                                        f"📨 3️⃣ ELS published phase outcome: "
+                                        f"{event_data.get('phase_name')} -> "
+                                        f"{event_data.get('phase_status')}"
+                                    )
+                                )
+                            elif message.topic == topic_name(
+                                ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND
+                            ):
                                 essay_count = len(event_data.get("essays_to_process", []))
-                                print(f"📨 4️⃣ BOS published CJ assessment initiate command: {essay_count} essays")
-                            elif message.topic == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
+                                print(
+                                    (
+                                        f"📨 4️⃣ BOS published CJ assessment initiate command: "
+                                        f"{essay_count} essays"
+                                    )
+                                )
+                            elif message.topic == topic_name(
+                                ProcessingEvent.CJ_ASSESSMENT_COMPLETED
+                            ):
                                 rankings = event_data.get("rankings", [])
-                                print(f"📨 5️⃣ CJ assessment completed: {len(rankings)} essays ranked")
-                                print("🎯 Pipeline SUCCESS! Complete end-to-end processing finished.")
+                                print(
+                                    f"📨 5️⃣ CJ assessment completed: {len(rankings)} essays ranked"
+                                )
+                                print(
+                                    "🎯 Pipeline SUCCESS! Complete end-to-end processing finished."
+                                )
                                 return dict(envelope_data)
 
                     except (json.JSONDecodeError, KeyError) as e:

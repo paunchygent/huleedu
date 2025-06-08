@@ -147,6 +147,7 @@ class CJAssessmentServiceProvider(Provider):
             from services.cj_assessment_service.implementations.mock_llm_interaction_impl import (
                 MockLLMInteractionImpl,
             )
+
             return MockLLMInteractionImpl(seed=42)  # Fixed seed for reproducible tests
 
         return LLMInteractionImpl(

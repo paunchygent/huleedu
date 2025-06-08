@@ -67,150 +67,145 @@ class EssayStateMachine:
         transitions = [
             # Spellcheck workflow
             {
-                'trigger': CMD_INITIATE_SPELLCHECK,
-                'source': EssayStatus.READY_FOR_PROCESSING.value,
-                'dest': EssayStatus.AWAITING_SPELLCHECK.value
+                "trigger": CMD_INITIATE_SPELLCHECK,
+                "source": EssayStatus.READY_FOR_PROCESSING.value,
+                "dest": EssayStatus.AWAITING_SPELLCHECK.value,
             },
             {
-                'trigger': EVT_SPELLCHECK_STARTED,
-                'source': EssayStatus.AWAITING_SPELLCHECK.value,
-                'dest': EssayStatus.SPELLCHECKING_IN_PROGRESS.value
+                "trigger": EVT_SPELLCHECK_STARTED,
+                "source": EssayStatus.AWAITING_SPELLCHECK.value,
+                "dest": EssayStatus.SPELLCHECKING_IN_PROGRESS.value,
             },
             {
-                'trigger': EVT_SPELLCHECK_SUCCEEDED,
-                'source': EssayStatus.SPELLCHECKING_IN_PROGRESS.value,
-                'dest': EssayStatus.SPELLCHECKED_SUCCESS.value
+                "trigger": EVT_SPELLCHECK_SUCCEEDED,
+                "source": EssayStatus.SPELLCHECKING_IN_PROGRESS.value,
+                "dest": EssayStatus.SPELLCHECKED_SUCCESS.value,
             },
             {
-                'trigger': EVT_SPELLCHECK_FAILED,
-                'source': EssayStatus.SPELLCHECKING_IN_PROGRESS.value,
-                'dest': EssayStatus.SPELLCHECK_FAILED.value
+                "trigger": EVT_SPELLCHECK_FAILED,
+                "source": EssayStatus.SPELLCHECKING_IN_PROGRESS.value,
+                "dest": EssayStatus.SPELLCHECK_FAILED.value,
             },
             {
-                'trigger': EVT_SPELLCHECK_FAILED,
-                'source': EssayStatus.AWAITING_SPELLCHECK.value,
-                'dest': EssayStatus.SPELLCHECK_FAILED.value
+                "trigger": EVT_SPELLCHECK_FAILED,
+                "source": EssayStatus.AWAITING_SPELLCHECK.value,
+                "dest": EssayStatus.SPELLCHECK_FAILED.value,
             },
-
             # AI Feedback workflow
             {
-                'trigger': CMD_INITIATE_AI_FEEDBACK,
-                'source': EssayStatus.SPELLCHECKED_SUCCESS.value,
-                'dest': EssayStatus.AWAITING_AI_FEEDBACK.value
+                "trigger": CMD_INITIATE_AI_FEEDBACK,
+                "source": EssayStatus.SPELLCHECKED_SUCCESS.value,
+                "dest": EssayStatus.AWAITING_AI_FEEDBACK.value,
             },
             {
-                'trigger': EVT_AI_FEEDBACK_STARTED,
-                'source': EssayStatus.AWAITING_AI_FEEDBACK.value,
-                'dest': EssayStatus.AI_FEEDBACK_IN_PROGRESS.value
+                "trigger": EVT_AI_FEEDBACK_STARTED,
+                "source": EssayStatus.AWAITING_AI_FEEDBACK.value,
+                "dest": EssayStatus.AI_FEEDBACK_IN_PROGRESS.value,
             },
             {
-                'trigger': EVT_AI_FEEDBACK_SUCCEEDED,
-                'source': EssayStatus.AI_FEEDBACK_IN_PROGRESS.value,
-                'dest': EssayStatus.AI_FEEDBACK_SUCCESS.value
+                "trigger": EVT_AI_FEEDBACK_SUCCEEDED,
+                "source": EssayStatus.AI_FEEDBACK_IN_PROGRESS.value,
+                "dest": EssayStatus.AI_FEEDBACK_SUCCESS.value,
             },
             {
-                'trigger': EVT_AI_FEEDBACK_FAILED,
-                'source': EssayStatus.AI_FEEDBACK_IN_PROGRESS.value,
-                'dest': EssayStatus.AI_FEEDBACK_FAILED.value
+                "trigger": EVT_AI_FEEDBACK_FAILED,
+                "source": EssayStatus.AI_FEEDBACK_IN_PROGRESS.value,
+                "dest": EssayStatus.AI_FEEDBACK_FAILED.value,
             },
             {
-                'trigger': EVT_AI_FEEDBACK_FAILED,
-                'source': EssayStatus.AWAITING_AI_FEEDBACK.value,
-                'dest': EssayStatus.AI_FEEDBACK_FAILED.value
+                "trigger": EVT_AI_FEEDBACK_FAILED,
+                "source": EssayStatus.AWAITING_AI_FEEDBACK.value,
+                "dest": EssayStatus.AI_FEEDBACK_FAILED.value,
             },
-
             # CJ Assessment workflow
             {
-                'trigger': CMD_INITIATE_CJ_ASSESSMENT,
-                'source': EssayStatus.SPELLCHECKED_SUCCESS.value,
-                'dest': EssayStatus.AWAITING_CJ_ASSESSMENT.value
+                "trigger": CMD_INITIATE_CJ_ASSESSMENT,
+                "source": EssayStatus.SPELLCHECKED_SUCCESS.value,
+                "dest": EssayStatus.AWAITING_CJ_ASSESSMENT.value,
             },
             {
-                'trigger': CMD_INITIATE_CJ_ASSESSMENT,
-                'source': EssayStatus.AI_FEEDBACK_SUCCESS.value,
-                'dest': EssayStatus.AWAITING_CJ_ASSESSMENT.value
+                "trigger": CMD_INITIATE_CJ_ASSESSMENT,
+                "source": EssayStatus.AI_FEEDBACK_SUCCESS.value,
+                "dest": EssayStatus.AWAITING_CJ_ASSESSMENT.value,
             },
             {
-                'trigger': EVT_CJ_ASSESSMENT_STARTED,
-                'source': EssayStatus.AWAITING_CJ_ASSESSMENT.value,
-                'dest': EssayStatus.CJ_ASSESSMENT_IN_PROGRESS.value
+                "trigger": EVT_CJ_ASSESSMENT_STARTED,
+                "source": EssayStatus.AWAITING_CJ_ASSESSMENT.value,
+                "dest": EssayStatus.CJ_ASSESSMENT_IN_PROGRESS.value,
             },
             {
-                'trigger': EVT_CJ_ASSESSMENT_SUCCEEDED,
-                'source': EssayStatus.CJ_ASSESSMENT_IN_PROGRESS.value,
-                'dest': EssayStatus.CJ_ASSESSMENT_SUCCESS.value
+                "trigger": EVT_CJ_ASSESSMENT_SUCCEEDED,
+                "source": EssayStatus.CJ_ASSESSMENT_IN_PROGRESS.value,
+                "dest": EssayStatus.CJ_ASSESSMENT_SUCCESS.value,
             },
             {
-                'trigger': EVT_CJ_ASSESSMENT_FAILED,
-                'source': EssayStatus.CJ_ASSESSMENT_IN_PROGRESS.value,
-                'dest': EssayStatus.CJ_ASSESSMENT_FAILED.value
+                "trigger": EVT_CJ_ASSESSMENT_FAILED,
+                "source": EssayStatus.CJ_ASSESSMENT_IN_PROGRESS.value,
+                "dest": EssayStatus.CJ_ASSESSMENT_FAILED.value,
             },
             {
-                'trigger': EVT_CJ_ASSESSMENT_FAILED,
-                'source': EssayStatus.AWAITING_CJ_ASSESSMENT.value,
-                'dest': EssayStatus.CJ_ASSESSMENT_FAILED.value
+                "trigger": EVT_CJ_ASSESSMENT_FAILED,
+                "source": EssayStatus.AWAITING_CJ_ASSESSMENT.value,
+                "dest": EssayStatus.CJ_ASSESSMENT_FAILED.value,
             },
-
             # NLP workflow
             {
-                'trigger': CMD_INITIATE_NLP,
-                'source': EssayStatus.SPELLCHECKED_SUCCESS.value,
-                'dest': EssayStatus.AWAITING_NLP.value
+                "trigger": CMD_INITIATE_NLP,
+                "source": EssayStatus.SPELLCHECKED_SUCCESS.value,
+                "dest": EssayStatus.AWAITING_NLP.value,
             },
             {
-                'trigger': CMD_INITIATE_NLP,
-                'source': EssayStatus.AI_FEEDBACK_SUCCESS.value,
-                'dest': EssayStatus.AWAITING_NLP.value
+                "trigger": CMD_INITIATE_NLP,
+                "source": EssayStatus.AI_FEEDBACK_SUCCESS.value,
+                "dest": EssayStatus.AWAITING_NLP.value,
             },
             {
-                'trigger': EVT_NLP_STARTED,
-                'source': EssayStatus.AWAITING_NLP.value,
-                'dest': EssayStatus.NLP_IN_PROGRESS.value
+                "trigger": EVT_NLP_STARTED,
+                "source": EssayStatus.AWAITING_NLP.value,
+                "dest": EssayStatus.NLP_IN_PROGRESS.value,
             },
             {
-                'trigger': EVT_NLP_SUCCEEDED,
-                'source': EssayStatus.NLP_IN_PROGRESS.value,
-                'dest': EssayStatus.NLP_SUCCESS.value
+                "trigger": EVT_NLP_SUCCEEDED,
+                "source": EssayStatus.NLP_IN_PROGRESS.value,
+                "dest": EssayStatus.NLP_SUCCESS.value,
             },
             {
-                'trigger': EVT_NLP_FAILED,
-                'source': EssayStatus.NLP_IN_PROGRESS.value,
-                'dest': EssayStatus.NLP_FAILED.value
+                "trigger": EVT_NLP_FAILED,
+                "source": EssayStatus.NLP_IN_PROGRESS.value,
+                "dest": EssayStatus.NLP_FAILED.value,
             },
             {
-                'trigger': EVT_NLP_FAILED,
-                'source': EssayStatus.AWAITING_NLP.value,
-                'dest': EssayStatus.NLP_FAILED.value
+                "trigger": EVT_NLP_FAILED,
+                "source": EssayStatus.AWAITING_NLP.value,
+                "dest": EssayStatus.NLP_FAILED.value,
             },
-
             # Pipeline completion
             {
-                'trigger': CMD_MARK_PIPELINE_COMPLETE,
-                'source': EssayStatus.SPELLCHECKED_SUCCESS.value,
-                'dest': EssayStatus.ALL_PROCESSING_COMPLETED.value
+                "trigger": CMD_MARK_PIPELINE_COMPLETE,
+                "source": EssayStatus.SPELLCHECKED_SUCCESS.value,
+                "dest": EssayStatus.ALL_PROCESSING_COMPLETED.value,
             },
             {
-                'trigger': CMD_MARK_PIPELINE_COMPLETE,
-                'source': EssayStatus.AI_FEEDBACK_SUCCESS.value,
-                'dest': EssayStatus.ALL_PROCESSING_COMPLETED.value
+                "trigger": CMD_MARK_PIPELINE_COMPLETE,
+                "source": EssayStatus.AI_FEEDBACK_SUCCESS.value,
+                "dest": EssayStatus.ALL_PROCESSING_COMPLETED.value,
             },
             {
-                'trigger': CMD_MARK_PIPELINE_COMPLETE,
-                'source': EssayStatus.CJ_ASSESSMENT_SUCCESS.value,
-                'dest': EssayStatus.ALL_PROCESSING_COMPLETED.value
+                "trigger": CMD_MARK_PIPELINE_COMPLETE,
+                "source": EssayStatus.CJ_ASSESSMENT_SUCCESS.value,
+                "dest": EssayStatus.ALL_PROCESSING_COMPLETED.value,
             },
             {
-                'trigger': CMD_MARK_PIPELINE_COMPLETE,
-                'source': EssayStatus.NLP_SUCCESS.value,
-                'dest': EssayStatus.ALL_PROCESSING_COMPLETED.value
+                "trigger": CMD_MARK_PIPELINE_COMPLETE,
+                "source": EssayStatus.NLP_SUCCESS.value,
+                "dest": EssayStatus.ALL_PROCESSING_COMPLETED.value,
             },
-
             # Critical failure from any state
             {
-                'trigger': EVT_CRITICAL_FAILURE,
-                'source': '*',  # Any state
-                'dest': EssayStatus.ESSAY_CRITICAL_FAILURE.value
-            }
+                "trigger": EVT_CRITICAL_FAILURE,
+                "source": "*",  # Any state
+                "dest": EssayStatus.ESSAY_CRITICAL_FAILURE.value,
+            },
         ]
 
         # Create the state machine
@@ -219,14 +214,14 @@ class EssayStateMachine:
             states=states,
             transitions=transitions,
             initial=initial_status.value,
-            ignore_invalid_triggers=False  # Raise exceptions for invalid triggers
+            ignore_invalid_triggers=False,  # Raise exceptions for invalid triggers
         )
 
     @property
     def current_status(self) -> EssayStatus:
         """Get current status as EssayStatus enum."""
         # The state is set on the model by the transitions library
-        return EssayStatus(getattr(self, 'state', self._current_status.value))
+        return EssayStatus(getattr(self, "state", self._current_status.value))
 
     def trigger(self, trigger_name: str) -> bool:
         """
@@ -279,13 +274,24 @@ class EssayStateMachine:
         """
         valid_triggers = []
         all_triggers = [
-            CMD_INITIATE_SPELLCHECK, CMD_INITIATE_AI_FEEDBACK, CMD_INITIATE_CJ_ASSESSMENT,
-            CMD_INITIATE_NLP, CMD_MARK_PIPELINE_COMPLETE,
-            EVT_SPELLCHECK_STARTED, EVT_SPELLCHECK_SUCCEEDED, EVT_SPELLCHECK_FAILED,
-            EVT_AI_FEEDBACK_STARTED, EVT_AI_FEEDBACK_SUCCEEDED, EVT_AI_FEEDBACK_FAILED,
-            EVT_CJ_ASSESSMENT_STARTED, EVT_CJ_ASSESSMENT_SUCCEEDED, EVT_CJ_ASSESSMENT_FAILED,
-            EVT_NLP_STARTED, EVT_NLP_SUCCEEDED, EVT_NLP_FAILED,
-            EVT_CRITICAL_FAILURE
+            CMD_INITIATE_SPELLCHECK,
+            CMD_INITIATE_AI_FEEDBACK,
+            CMD_INITIATE_CJ_ASSESSMENT,
+            CMD_INITIATE_NLP,
+            CMD_MARK_PIPELINE_COMPLETE,
+            EVT_SPELLCHECK_STARTED,
+            EVT_SPELLCHECK_SUCCEEDED,
+            EVT_SPELLCHECK_FAILED,
+            EVT_AI_FEEDBACK_STARTED,
+            EVT_AI_FEEDBACK_SUCCEEDED,
+            EVT_AI_FEEDBACK_FAILED,
+            EVT_CJ_ASSESSMENT_STARTED,
+            EVT_CJ_ASSESSMENT_SUCCEEDED,
+            EVT_CJ_ASSESSMENT_FAILED,
+            EVT_NLP_STARTED,
+            EVT_NLP_SUCCEEDED,
+            EVT_NLP_FAILED,
+            EVT_CRITICAL_FAILURE,
         ]
 
         for trigger_name in all_triggers:

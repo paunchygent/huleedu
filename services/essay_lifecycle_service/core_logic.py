@@ -53,7 +53,11 @@ class StateTransitionValidator:
         EssayStatus.ESSAY_CRITICAL_FAILURE: set(),
     }
 
-    def validate_transition(self, machine_or_status: EssayStateMachine | EssayStatus, trigger_or_target: str | EssayStatus) -> bool:
+    def validate_transition(
+        self,
+        machine_or_status: EssayStateMachine | EssayStatus,
+        trigger_or_target: str | EssayStatus,
+    ) -> bool:
         """
         Validate if state transition is allowed.
 
@@ -65,7 +69,7 @@ class StateTransitionValidator:
             True if transition is valid, False otherwise
         """
         # Check if first argument is a state machine
-        if hasattr(machine_or_status, 'can_trigger'):
+        if hasattr(machine_or_status, "can_trigger"):
             # State machine pattern: validate_transition(machine, trigger)
             result = machine_or_status.can_trigger(trigger_or_target)  # type: ignore[arg-type]
             return bool(result)

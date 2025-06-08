@@ -68,9 +68,9 @@ class TestProcessSingleMessage:
         from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
             DefaultSpellLogic,
         )
+
         real_spell_logic = DefaultSpellLogic(
-            result_store=mock_result_store,
-            http_session=mock_http_session
+            result_store=mock_result_store, http_session=mock_http_session
         )
 
         # Act - The real algorithm will run, which is the correct behavior
@@ -111,7 +111,10 @@ class TestProcessSingleMessage:
         assert published_result.status == EssayStatus.SPELLCHECKED_SUCCESS
         assert published_result.corrections_made is not None
         assert published_result.storage_metadata is not None
-        assert published_result.storage_metadata.references[ContentType.CORRECTED_TEXT]["default"] == mock_corrected_storage_id
+        assert (
+            published_result.storage_metadata.references[ContentType.CORRECTED_TEXT]["default"]
+            == mock_corrected_storage_id
+        )
 
     @pytest.mark.asyncio
     async def test_fetch_content_failure(
@@ -206,9 +209,10 @@ class TestProcessSingleMessage:
         from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
             DefaultSpellLogic,
         )
+
         real_spell_logic = DefaultSpellLogic(
             result_store=mock_result_store,  # This will fail
-            http_session=mock_http_session
+            http_session=mock_http_session,
         )
 
         # Act - Process message, expecting spell logic to fail during storage
@@ -354,15 +358,17 @@ class TestProcessSingleMessage:
 
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
         # Make the publisher fail every time
-        mock_event_publisher.publish_spellcheck_result.side_effect = Exception("Kafka producer error")
+        mock_event_publisher.publish_spellcheck_result.side_effect = Exception(
+            "Kafka producer error"
+        )
 
         # Use REAL spell logic implementation
         from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
             DefaultSpellLogic,
         )
+
         real_spell_logic = DefaultSpellLogic(
-            result_store=mock_result_store,
-            http_session=mock_http_session
+            result_store=mock_result_store, http_session=mock_http_session
         )
 
         # Act - Process message, expecting publisher to fail
@@ -379,7 +385,9 @@ class TestProcessSingleMessage:
         )
 
         # Assert
-        assert result is True  # Should ALWAYS commit even when publisher fails to avoid reprocessing loops
+        assert (
+            result is True
+        )  # Should ALWAYS commit even when publisher fails to avoid reprocessing loops
 
         # Verify all processing steps were completed
         mock_content_client.fetch_content.assert_called_once()

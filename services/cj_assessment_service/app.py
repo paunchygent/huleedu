@@ -42,18 +42,18 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
         settings = Settings()
 
     # Configure logging
-    configure_service_logging(
-        "cj_assessment_service", log_level=settings.LOG_LEVEL
-    )
+    configure_service_logging("cj_assessment_service", log_level=settings.LOG_LEVEL)
 
     # Create Quart app
     app = Quart(__name__)
 
     # Configure app settings
-    app.config.update({
-        "TESTING": False,
-        "DEBUG": settings.LOG_LEVEL == "DEBUG",
-    })
+    app.config.update(
+        {
+            "TESTING": False,
+            "DEBUG": settings.LOG_LEVEL == "DEBUG",
+        }
+    )
 
     # Initialize dependency injection container immediately (required for tests)
     from dishka import make_async_container
@@ -63,7 +63,6 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
 
     container = make_async_container(CJAssessmentServiceProvider())
     QuartDishka(app=app, container=container)
-
 
     # Register mandatory health Blueprint
     app.register_blueprint(health_bp)
@@ -89,7 +88,7 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
         return {
             "error": "Internal server error",
             "message": "An unexpected error occurred",
-            "service": "cj_assessment_service"
+            "service": "cj_assessment_service",
         }, 500
 
     return app
@@ -102,22 +101,16 @@ async def run_health_api(settings: Settings, port: Optional[int] = None) -> None
         settings: Application settings
         port: Optional port override
     """
-    api_port = port if port is not None else getattr(settings, 'METRICS_PORT', 9090)
+    api_port = port if port is not None else getattr(settings, "METRICS_PORT", 9090)
 
-    logger.info(
-        f"Starting CJ Assessment Service health API on port {api_port}"
-    )
+    logger.info(f"Starting CJ Assessment Service health API on port {api_port}")
 
     # Create app
     app = create_app(settings)
 
     # Run the server
     try:
-        await app.run_task(
-            host="0.0.0.0",
-            port=api_port,
-            debug=settings.LOG_LEVEL == "DEBUG"
-        )
+        await app.run_task(host="0.0.0.0", port=api_port, debug=settings.LOG_LEVEL == "DEBUG")
     except Exception as e:
         logger.error(f"Health API server error: {e}", exc_info=True)
         raise
@@ -125,6 +118,7 @@ async def run_health_api(settings: Settings, port: Optional[int] = None) -> None
 
 # For development/testing
 if __name__ == "__main__":
+
     async def main() -> None:
         settings = Settings()
         await run_health_api(settings)

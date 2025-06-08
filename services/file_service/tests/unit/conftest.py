@@ -30,9 +30,7 @@ def mock_content_validator() -> AsyncMock:
     validator = AsyncMock()
     # Default to valid content
     validator.validate_content.return_value = ValidationResult(
-        is_valid=True,
-        error_code=None,
-        error_message=None
+        is_valid=True, error_code=None, error_message=None
     )
     return validator
 

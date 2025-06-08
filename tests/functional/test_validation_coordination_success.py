@@ -47,7 +47,7 @@ async def test_all_essays_pass_validation():
         test_files = create_validation_test_files(success_count=25, failure_count=0)
 
         # Upload files
-        upload_result = await upload_test_files(batch_id, test_files)
+        _ = await upload_test_files(batch_id, test_files)
 
         # Collect events using active polling (proven working pattern)
         validation_failures = []
@@ -85,7 +85,9 @@ async def test_all_essays_pass_validation():
                             if "data" in event_data and isinstance(event_data["data"], dict):
                                 failure_data = event_data["data"]
                                 if failure_data.get("batch_id") == batch_id:
-                                    validation_failures.append(EssayValidationFailedV1(**failure_data))
+                                    validation_failures.append(
+                                        EssayValidationFailedV1(**failure_data)
+                                    )
                             # Handle direct event format
                             elif event_data.get("batch_id") == batch_id:
                                 validation_failures.append(EssayValidationFailedV1(**event_data))
@@ -122,9 +124,7 @@ async def test_all_essays_pass_validation():
         assert len(validation_failures) == 0, (
             f"Expected no validation failures, got {len(validation_failures)}"
         )
-        assert content_provisions == 25, (
-            f"Expected 25 content provisions, got {content_provisions}"
-        )
+        assert content_provisions == 25, f"Expected 25 content provisions, got {content_provisions}"
         assert batch_ready_event is not None, "Expected BatchEssaysReady event"
         assert len(batch_ready_event.ready_essays) == 25, (
             f"Expected 25 ready essays, got {len(batch_ready_event.ready_essays)}"

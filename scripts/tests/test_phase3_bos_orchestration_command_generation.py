@@ -4,6 +4,7 @@ Tests for BOS command generation functionality.
 This module tests command generation for various phases, specifically focusing
 on CJ assessment command creation and validation.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -52,13 +53,10 @@ class TestBOSCommandGeneration:
         """
         Tests that DefaultCJAssessmentInitiator generates and publishes the correct command.
         """
-        correlation_id_str = str(sample_correlation_id)
-        mock_batch_repo.get_processing_pipeline_state.return_value = (
-            ProcessingPipelineState(
-                batch_id=sample_batch_id,
-                requested_pipelines=["spellcheck", "cj_assessment"],
-            ).model_dump()
-        ) # Needed for _update_cj_assessment_status
+        mock_batch_repo.get_processing_pipeline_state.return_value = ProcessingPipelineState(
+            batch_id=sample_batch_id,
+            requested_pipelines=["spellcheck", "cj_assessment"],
+        ).model_dump()  # Needed for _update_cj_assessment_status
 
         await cj_assessment_initiator.initiate_phase(
             batch_id=sample_batch_id,
@@ -69,19 +67,16 @@ class TestBOSCommandGeneration:
         )
 
         mock_event_publisher.publish_batch_event.assert_called_once()
-        published_envelope: EventEnvelope[
-            BatchServiceCJAssessmentInitiateCommandDataV1
-        ] = mock_event_publisher.publish_batch_event.call_args[0][0]
-
-        assert isinstance(
-            published_envelope.data, BatchServiceCJAssessmentInitiateCommandDataV1
+        published_envelope: EventEnvelope[BatchServiceCJAssessmentInitiateCommandDataV1] = (
+            mock_event_publisher.publish_batch_event.call_args[0][0]
         )
-        assert (
-            published_envelope.event_type
-            == topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND)
+
+        assert isinstance(published_envelope.data, BatchServiceCJAssessmentInitiateCommandDataV1)
+        assert published_envelope.event_type == topic_name(
+            ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND
         )
         assert published_envelope.data.entity_ref.entity_id == sample_batch_id
-        assert published_envelope.data.language == "en" # Inferred by initiator
+        assert published_envelope.data.language == "en"  # Inferred by initiator
         assert (
             published_envelope.data.course_code
             == sample_batch_registration_request_cj_enabled.course_code

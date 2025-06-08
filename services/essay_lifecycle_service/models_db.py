@@ -18,6 +18,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 class Base(DeclarativeBase):
     """Base class for all database models."""
+
     pass
 
 
@@ -41,7 +42,7 @@ class EssayStateDB(Base):
         SQLAlchemyEnum(
             EssayStatus,
             name="essay_status_enum",
-            values_callable=lambda obj: [e.value for e in obj]
+            values_callable=lambda obj: [e.value for e in obj],
         ),
         nullable=False,
         index=True,

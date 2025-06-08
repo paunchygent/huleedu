@@ -76,7 +76,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         essay_id: str | None = None,
         slot_assignment: str | None = None,
         batch_id: str | None = None,
-        initial_status: EssayStatus | None = None
+        initial_status: EssayStatus | None = None,
     ) -> EssayState:
         """Create new essay record from entity reference or keyword arguments."""
         return await self.crud_ops.create_essay_record(
@@ -84,7 +84,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
             essay_id=essay_id,
             slot_assignment=slot_assignment,
             batch_id=batch_id,
-            initial_status=initial_status
+            initial_status=initial_status,
         )
 
     async def list_essays_by_batch(self, batch_id: str) -> list[ProtocolEssayState]:
@@ -257,7 +257,9 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
 
             return essay_state
 
-    async def list_essays_by_batch_and_phase(self, batch_id: str, phase_name: str) -> list[ProtocolEssayState]:
+    async def list_essays_by_batch_and_phase(
+        self, batch_id: str, phase_name: str
+    ) -> list[ProtocolEssayState]:
         """List all essays in a batch that are part of a specific processing phase."""
         async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
             db.row_factory = aiosqlite.Row

@@ -135,7 +135,9 @@ class BatchPipelineStateManager:
                     batch_id=batch_id,
                     phase=phase_name,
                     status=new_status,
-                    phase_completed_at=datetime.fromisoformat(completion_timestamp).replace(tzinfo=None)
+                    phase_completed_at=datetime.fromisoformat(completion_timestamp).replace(
+                        tzinfo=None
+                    )
                     if completion_timestamp
                     else None,
                     processing_metadata={"previous_status": expected_status},

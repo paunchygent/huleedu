@@ -36,18 +36,12 @@ class Settings(BaseSettings):
     KAFKA_CONSUMER_GROUP_ID: str = "batch-orchestrator-consumers"
 
     # Database configuration
-    DB_HOST: str = Field(
-        default="localhost", validation_alias="BATCH_ORCHESTRATOR_DB_HOST"
-    )
-    DB_PORT: int = Field(
-        default=5432, validation_alias="BATCH_ORCHESTRATOR_DB_PORT"
-    )
+    DB_HOST: str = Field(default="localhost", validation_alias="BATCH_ORCHESTRATOR_DB_HOST")
+    DB_PORT: int = Field(default=5432, validation_alias="BATCH_ORCHESTRATOR_DB_PORT")
     DB_NAME: str = Field(
         default="batch_orchestrator", validation_alias="BATCH_ORCHESTRATOR_DB_NAME"
     )
-    DB_USER: str = Field(
-        default="huleedu_user", validation_alias="BATCH_ORCHESTRATOR_DB_USER"
-    )
+    DB_USER: str = Field(default="huleedu_user", validation_alias="BATCH_ORCHESTRATOR_DB_USER")
     DB_PASSWORD: str = Field(
         default="REDACTED_DEFAULT_PASSWORD", validation_alias="BATCH_ORCHESTRATOR_DB_PASSWORD"
     )

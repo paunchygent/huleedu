@@ -117,7 +117,9 @@ async def after_request(response: Response) -> Response:
             status_code = str(response.status_code)
 
             # Record metrics
-            metrics["request_count"].labels(method=method, endpoint=endpoint, status_code=status_code).inc()
+            metrics["request_count"].labels(
+                method=method, endpoint=endpoint, status_code=status_code
+            ).inc()
             metrics["request_duration"].labels(method=method, endpoint=endpoint).observe(duration)
 
     except Exception as e:
@@ -141,11 +143,11 @@ if __name__ == "__main__":
     # Create hypercorn config with our settings (explicit like BOS)
     config = Config()
     config.bind = [f"{settings.HTTP_HOST}:{settings.HTTP_PORT}"]
-    config.workers = getattr(settings, 'WEB_CONCURRENCY', 1)
+    config.workers = getattr(settings, "WEB_CONCURRENCY", 1)
     config.worker_class = "asyncio"
     config.loglevel = settings.LOG_LEVEL.lower()
-    config.graceful_timeout = getattr(settings, 'GRACEFUL_TIMEOUT', 30)
-    config.keep_alive_timeout = getattr(settings, 'KEEP_ALIVE_TIMEOUT', 5)
+    config.graceful_timeout = getattr(settings, "GRACEFUL_TIMEOUT", 30)
+    config.keep_alive_timeout = getattr(settings, "KEEP_ALIVE_TIMEOUT", 5)
 
     logger.info(f"Starting Essay Lifecycle Service API on {config.bind[0]}")
 

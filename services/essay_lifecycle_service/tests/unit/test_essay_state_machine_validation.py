@@ -32,7 +32,7 @@ class TestEssayStateMachineInvalidTransitions:
         # These should be invalid from READY_FOR_PROCESSING
         invalid_triggers = [
             EVT_SPELLCHECK_SUCCEEDED,  # Haven't started spellcheck yet
-            EVT_AI_FEEDBACK_STARTED,   # Can't start AI feedback from initial state
+            EVT_AI_FEEDBACK_STARTED,  # Can't start AI feedback from initial state
             CMD_INITIATE_CJ_ASSESSMENT,  # Need spellcheck first
             CMD_MARK_PIPELINE_COMPLETE,  # Nothing completed yet
         ]

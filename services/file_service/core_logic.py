@@ -93,7 +93,7 @@ async def process_single_file_upload(
                 validation_error_message=f"Technical text extraction failure: {extraction_error}",
                 file_size_bytes=len(file_content),
                 correlation_id=main_correlation_id,
-                timestamp=datetime.now(timezone.utc)
+                timestamp=datetime.now(timezone.utc),
             )
 
             await event_publisher.publish_essay_validation_failed(
@@ -102,7 +102,7 @@ async def process_single_file_upload(
 
             logger.info(
                 f"Published EssayValidationFailedV1 for technical extraction failure: {file_name}",
-                extra={"correlation_id": str(main_correlation_id)}
+                extra={"correlation_id": str(main_correlation_id)},
             )
 
             return {"file_name": file_name, "status": "extraction_failed"}
@@ -117,8 +117,8 @@ async def process_single_file_upload(
                     "correlation_id": str(main_correlation_id),
                     "error_code": validation_result.error_code,
                     "error_message": validation_result.error_message,
-                    "content_length": len(text) if text else 0
-                }
+                    "content_length": len(text) if text else 0,
+                },
             )
 
             # Publish business rule validation failure event
@@ -131,7 +131,7 @@ async def process_single_file_upload(
                 ),
                 file_size_bytes=len(file_content),
                 correlation_id=main_correlation_id,
-                timestamp=datetime.now(timezone.utc)
+                timestamp=datetime.now(timezone.utc),
             )
 
             await event_publisher.publish_essay_validation_failed(
@@ -140,14 +140,14 @@ async def process_single_file_upload(
 
             logger.info(
                 f"Published EssayValidationFailedV1 for content validation failure: {file_name}",
-                extra={"correlation_id": str(main_correlation_id)}
+                extra={"correlation_id": str(main_correlation_id)},
             )
 
             return {
                 "file_name": file_name,
                 "status": "content_validation_failed",
                 "error_code": validation_result.error_code,
-                "error_message": validation_result.error_message
+                "error_message": validation_result.error_message,
             }
 
         # Step 3: Store validated content and publish success event

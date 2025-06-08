@@ -38,7 +38,7 @@ async def test_empty_file_uses_content_validation() -> None:
     content_validator.validate_content.return_value = ValidationResult(
         is_valid=False,
         error_code="EMPTY_CONTENT",
-        error_message="File 'empty_essay.txt' contains no readable text content."
+        error_message="File 'empty_essay.txt' contains no readable text content.",
     )
 
     content_client = AsyncMock()
@@ -164,7 +164,7 @@ async def test_content_too_short_validation() -> None:
         error_message=(
             "File 'too_short.txt' contains only 2 characters. "
             "Essays must contain at least 50 characters."
-        )
+        ),
     )
 
     content_client = AsyncMock()

@@ -39,7 +39,9 @@ logger = create_service_logger("service_result_handler")
 class DefaultServiceResultHandler(ServiceResultHandler):
     """Default implementation of ServiceResultHandler protocol."""
 
-    def __init__(self, repository: EssayRepositoryProtocol, batch_coordinator: BatchPhaseCoordinator) -> None:
+    def __init__(
+        self, repository: EssayRepositoryProtocol, batch_coordinator: BatchPhaseCoordinator
+    ) -> None:
         self.repository = repository
         self.batch_coordinator = batch_coordinator
 
@@ -97,7 +99,9 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     extra={
                         "essay_id": result_data.entity_ref.entity_id,
                         "current_status": essay_state.current_status.value,
-                        "error_info": result_data.system_metadata.error_info if result_data.system_metadata else None,
+                        "error_info": result_data.system_metadata.error_info
+                        if result_data.system_metadata
+                        else None,
                         "correlation_id": str(correlation_id),
                     },
                 )
@@ -113,13 +117,17 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                             "success": is_success,
                             "status": result_data.status.value,
                             "original_text_storage_id": result_data.original_text_storage_id,
-                            "storage_metadata": result_data.storage_metadata.model_dump() if result_data.storage_metadata else None,
+                            "storage_metadata": result_data.storage_metadata.model_dump()
+                            if result_data.storage_metadata
+                            else None,
                             "corrections_made": result_data.corrections_made,
-                            "error_info": result_data.system_metadata.error_info if result_data.system_metadata else None,
+                            "error_info": result_data.system_metadata.error_info
+                            if result_data.system_metadata
+                            else None,
                         },
                         "current_phase": "spellcheck",
-                        "phase_outcome_status": result_data.status.value
-                    }
+                        "phase_outcome_status": result_data.status.value,
+                    },
                 )
 
                 logger.info(
@@ -148,7 +156,9 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             )
 
             # Check for batch phase completion after individual essay state update
-            updated_essay_state = await self.repository.get_essay_state(result_data.entity_ref.entity_id)
+            updated_essay_state = await self.repository.get_essay_state(
+                result_data.entity_ref.entity_id
+            )
             if updated_essay_state:
                 await self.batch_coordinator.check_batch_completion(
                     essay_state=updated_essay_state,
@@ -226,8 +236,8 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                 "ranking_data": ranking,
                             },
                             "current_phase": "cj_assessment",
-                            "phase_outcome_status": "CJ_ASSESSMENT_SUCCESS"
-                        }
+                            "phase_outcome_status": "CJ_ASSESSMENT_SUCCESS",
+                        },
                     )
 
                     logger.info(
@@ -252,7 +262,9 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             if result_data.rankings:
                 first_essay_id_in_ranking = result_data.rankings[0].get("els_essay_id")
                 if first_essay_id_in_ranking:
-                    batch_representative_essay_state = await self.repository.get_essay_state(first_essay_id_in_ranking)
+                    batch_representative_essay_state = await self.repository.get_essay_state(
+                        first_essay_id_in_ranking
+                    )
                     if batch_representative_essay_state:
                         await self.batch_coordinator.check_batch_completion(
                             essay_state=batch_representative_essay_state,
@@ -292,7 +304,9 @@ class DefaultServiceResultHandler(ServiceResultHandler):
 
             # CJ assessment failure affects all essays in the batch
             # Need to find all essays in this batch and mark them as failed
-            batch_essays = await self.repository.list_essays_by_batch(result_data.entity_ref.entity_id)
+            batch_essays = await self.repository.list_essays_by_batch(
+                result_data.entity_ref.entity_id
+            )
 
             for essay_state in batch_essays:
                 # Only update essays that are currently awaiting CJ assessment
@@ -314,11 +328,13 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                 "success": False,
                                 "job_id": result_data.cj_assessment_job_id,
                                 "batch_failure": True,
-                                "error_info": result_data.system_metadata.error_info if result_data.system_metadata else None,
+                                "error_info": result_data.system_metadata.error_info
+                                if result_data.system_metadata
+                                else None,
                             },
                             "current_phase": "cj_assessment",
-                            "phase_outcome_status": "CJ_ASSESSMENT_FAILED"
-                        }
+                            "phase_outcome_status": "CJ_ASSESSMENT_FAILED",
+                        },
                     )
 
                     logger.info(

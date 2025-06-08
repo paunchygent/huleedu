@@ -68,8 +68,7 @@ async def create_kafka_consumer() -> AIOKafkaConsumer:
         group_id=settings.CONSUMER_GROUP,
         client_id=settings.CONSUMER_CLIENT_ID,
         auto_offset_reset="earliest",
-        enable_auto_commit=True,
-        auto_commit_interval_ms=1000,
+        enable_auto_commit=False,  # Manual commit for reliable message processing
     )
 
     await consumer.start()
@@ -109,8 +108,10 @@ async def run_consumer_loop(
                 )
 
                 if success:
+                    # Commit offset only after successful processing (manual commit pattern)
+                    await consumer.commit()
                     logger.debug(
-                        "Successfully processed message",
+                        "Successfully processed and committed message",
                         extra={
                             "topic": msg.topic,
                             "partition": msg.partition,
@@ -119,7 +120,7 @@ async def run_consumer_loop(
                     )
                 else:
                     logger.warning(
-                        "Failed to process message",
+                        "Failed to process message, not committing offset",
                         extra={
                             "topic": msg.topic,
                             "partition": msg.partition,

@@ -56,11 +56,10 @@ class BatchEssaysReady(BaseModel):
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
     validation_failures: Optional[list["EssayValidationFailedV1"]] = Field(
         default=None,
-        description="List of essays that failed validation (EssayValidationFailedV1 events)"
+        description="List of essays that failed validation (EssayValidationFailedV1 events)",
     )
     total_files_processed: Optional[int] = Field(
-        default=None,
-        description="Total number of files processed (successful + failed)"
+        default=None, description="Total number of files processed (successful + failed)"
     )
 
 

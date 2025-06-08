@@ -40,11 +40,13 @@ class TestValidationEventConsumerIntegration:
             validation_error_code="EMPTY_CONTENT",
             validation_error_message="File content is empty or contains only whitespace",
             file_size_bytes=0,
-            correlation_id=uuid4()
+            correlation_id=uuid4(),
         )
 
     @pytest.fixture
-    def sample_event_envelope(self, sample_validation_failure_event: EssayValidationFailedV1) -> EventEnvelope:
+    def sample_event_envelope(
+        self, sample_validation_failure_event: EssayValidationFailedV1
+    ) -> EventEnvelope:
         """Fixture providing a sample event envelope with validation failure."""
         return EventEnvelope(
             event_id=uuid4(),
@@ -52,7 +54,7 @@ class TestValidationEventConsumerIntegration:
             event_timestamp=datetime.now(UTC),
             source_service="file_service",
             correlation_id=sample_validation_failure_event.correlation_id,
-            data=sample_validation_failure_event
+            data=sample_validation_failure_event,
         )
 
     async def test_validation_failure_event_processing(
@@ -63,10 +65,14 @@ class TestValidationEventConsumerIntegration:
         await mock_batch_tracker.handle_validation_failure(sample_validation_failure_event)
 
         # Verify the batch tracker was called with the correct event
-        mock_batch_tracker.handle_validation_failure.assert_called_once_with(sample_validation_failure_event)
+        mock_batch_tracker.handle_validation_failure.assert_called_once_with(
+            sample_validation_failure_event
+        )
 
     async def test_event_envelope_deserialization(
-        self, sample_event_envelope: EventEnvelope, sample_validation_failure_event: EssayValidationFailedV1
+        self,
+        sample_event_envelope: EventEnvelope,
+        sample_validation_failure_event: EssayValidationFailedV1,
     ) -> None:
         """Test that event envelopes with validation failures can be properly deserialized."""
         # Serialize the envelope to JSON (simulating Kafka message)
@@ -75,8 +81,9 @@ class TestValidationEventConsumerIntegration:
 
         # Deserialize back from JSON
         envelope_data = json.loads(envelope_json)
-        reconstructed_envelope: EventEnvelope[
-            EssayValidationFailedV1] = EventEnvelope[EssayValidationFailedV1](
+        reconstructed_envelope: EventEnvelope[EssayValidationFailedV1] = EventEnvelope[
+            EssayValidationFailedV1
+        ](
             event_id=envelope_data["event_id"],
             event_type=envelope_data["event_type"],
             event_timestamp=envelope_data["event_timestamp"],
@@ -93,7 +100,10 @@ class TestValidationEventConsumerIntegration:
         # Verify the validation failure data
         validation_data = reconstructed_envelope.data
         assert validation_data.batch_id == sample_validation_failure_event.batch_id
-        assert validation_data.validation_error_code == sample_validation_failure_event.validation_error_code
+        assert (
+            validation_data.validation_error_code
+            == sample_validation_failure_event.validation_error_code
+        )
 
     async def test_consumer_event_routing(
         self, mock_batch_tracker: Mock, sample_event_envelope: EventEnvelope
@@ -111,9 +121,7 @@ class TestValidationEventConsumerIntegration:
         # Verify the routing occurred
         mock_batch_tracker.handle_validation_failure.assert_called_once_with(event_data)
 
-    async def test_multiple_validation_failure_events(
-        self, mock_batch_tracker: Mock
-    ) -> None:
+    async def test_multiple_validation_failure_events(self, mock_batch_tracker: Mock) -> None:
         """Test processing multiple validation failure events for the same batch."""
         # Create multiple validation failure events
         validation_failures = [
@@ -122,7 +130,7 @@ class TestValidationEventConsumerIntegration:
                 original_file_name=f"failed_{i}.txt",
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message=f"Content too short: file {i}",
-                file_size_bytes=10
+                file_size_bytes=10,
             )
             for i in range(1, 4)
         ]
@@ -146,7 +154,7 @@ class TestValidationEventConsumerIntegration:
             validation_error_code="CONTENT_TOO_LONG",
             validation_error_message="Content exceeds maximum length",
             file_size_bytes=100000,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
 
         # Process event
@@ -169,8 +177,8 @@ class TestValidationEventConsumerIntegration:
                 original_file_name="test.txt",
                 validation_error_code="TEST_ERROR",
                 validation_error_message="Test error",
-                file_size_bytes=100
-            )
+                file_size_bytes=100,
+            ),
         )
 
         # Consumer should not process this as a validation failure
@@ -191,7 +199,7 @@ class TestValidationEventConsumerIntegration:
             original_file_name="error_test.txt",
             validation_error_code="TEST_ERROR",
             validation_error_message="Test error message",
-            file_size_bytes=50
+            file_size_bytes=50,
         )
 
         # Processing should handle the exception
@@ -201,7 +209,9 @@ class TestValidationEventConsumerIntegration:
         # Verify the call was attempted
         mock_batch_tracker.handle_validation_failure.assert_called_once()
 
-    async def test_event_timestamp_validation(self, sample_validation_failure_event: EssayValidationFailedV1) -> None:
+    async def test_event_timestamp_validation(
+        self, sample_validation_failure_event: EssayValidationFailedV1
+    ) -> None:
         """Test that event timestamps are properly validated and preserved."""
         # Create envelope with specific timestamp
         test_timestamp = datetime.now(UTC)
@@ -211,7 +221,7 @@ class TestValidationEventConsumerIntegration:
             event_type="essay.validation.failed",
             event_timestamp=test_timestamp,
             source_service="file_service",
-            data=sample_validation_failure_event
+            data=sample_validation_failure_event,
         )
 
         # Verify timestamp is preserved
@@ -227,7 +237,7 @@ class TestValidationEventConsumerIntegration:
             original_file_name="consistency_test.txt",
             validation_error_code="EMPTY_CONTENT",
             validation_error_message="Empty content test",
-            file_size_bytes=0
+            file_size_bytes=0,
         )
 
         envelope = EventEnvelope(
@@ -235,7 +245,7 @@ class TestValidationEventConsumerIntegration:
             event_type="essay.validation.failed",
             event_timestamp=datetime.now(UTC),
             source_service="file_service",
-            data=validation_failure
+            data=validation_failure,
         )
 
         # Process the event
@@ -257,16 +267,18 @@ class TestValidationEventConsumerIntegration:
                 original_file_name=f"concurrent_{i}.txt",
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message=f"Concurrent processing test {i}",
-                file_size_bytes=15
+                file_size_bytes=15,
             )
             for i in range(1, 6)
         ]
 
         # Process all events concurrently
-        await asyncio.gather(*[
-            mock_batch_tracker.handle_validation_failure(failure)
-            for failure in validation_failures
-        ])
+        await asyncio.gather(
+            *[
+                mock_batch_tracker.handle_validation_failure(failure)
+                for failure in validation_failures
+            ]
+        )
 
         # Verify all events were processed
         assert mock_batch_tracker.handle_validation_failure.call_count == 5
@@ -281,7 +293,7 @@ class TestValidationEventConsumerIntegration:
             event_type="essay.validation.failed",
             event_timestamp=datetime.now(UTC),
             source_service="file_service",
-            data=sample_validation_failure_event
+            data=sample_validation_failure_event,
         )
 
         # Should process events from file service
@@ -299,7 +311,7 @@ class TestValidationEventConsumerIntegration:
             event_type="essay.validation.failed",
             event_timestamp=datetime.now(UTC),
             source_service="unexpected_service",
-            data=sample_validation_failure_event
+            data=sample_validation_failure_event,
         )
 
         # Consumer should still process (source filtering might be at topic level)
@@ -316,7 +328,7 @@ class TestValidationEventConsumerIntegration:
                 original_file_name=f"test_{error_code.lower()}.txt",
                 validation_error_code=error_code,
                 validation_error_message=f"Test message for {error_code}",
-                file_size_bytes=100
+                file_size_bytes=100,
             )
 
             await mock_batch_tracker.handle_validation_failure(validation_failure)

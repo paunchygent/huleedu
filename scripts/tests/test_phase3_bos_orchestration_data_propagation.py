@@ -4,6 +4,7 @@ Tests for BOS data propagation functionality.
 This module tests how essay lists and data are propagated between processing
 phases in the Batch Orchestrator Service (BOS).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -59,9 +60,7 @@ class TestBOSDataPropagation:
         mock_batch_repo.get_batch_context.return_value = (
             sample_batch_registration_request_cj_enabled
         )
-        mock_batch_repo.get_processing_pipeline_state.return_value = (
-            initial_state.model_dump()
-        )
+        mock_batch_repo.get_processing_pipeline_state.return_value = initial_state.model_dump()
 
         # This outcome_event_data would come from ELS, containing processed essays
         # However, the current DefaultPipelinePhaseCoordinator doesn't use

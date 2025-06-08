@@ -47,7 +47,7 @@ class TestE2EStep2EventMonitoring:
             # Additional config to handle container networking
             client_id=f"e2e-test-client-{uuid.uuid4().hex[:8]}",
             fetch_max_wait_ms=1000,
-            max_poll_records=10
+            max_poll_records=10,
         )
 
         try:
@@ -63,10 +63,7 @@ class TestE2EStep2EventMonitoring:
                     data = {"batch_id": batch_id}
 
                     upload_response = await client.post(
-                        "http://localhost:7001/v1/files/batch",
-                        files=files,
-                        data=data,
-                        timeout=30.0
+                        "http://localhost:7001/v1/files/batch", files=files, data=data, timeout=30.0
                     )
 
                     assert upload_response.status_code == 202, (
@@ -91,9 +88,7 @@ class TestE2EStep2EventMonitoring:
                         print(f"📨 Received Kafka event: {json.dumps(event_data, indent=2)}")
 
                         # Validate event structure - check if it's from our test
-                        if ("data" in event_data and
-                            event_data["data"].get("batch_id") == batch_id):
-
+                        if "data" in event_data and event_data["data"].get("batch_id") == batch_id:
                             # Validate EventEnvelope structure
                             assert "event_id" in event_data, "Missing event_id in EventEnvelope"
                             assert "event_type" in event_data, "Missing event_type in EventEnvelope"
@@ -105,9 +100,7 @@ class TestE2EStep2EventMonitoring:
                             # Validate event metadata
                             assert event_data["event_type"] == (
                                 "huleedu.file.essay.content.provisioned.v1"
-                            ), (
-                                f"Unexpected event_type: {event_data['event_type']}"
-                            )
+                            ), f"Unexpected event_type: {event_data['event_type']}"
                             assert event_data["source_service"] == "file-service", (
                                 f"Unexpected source_service: {event_data['source_service']}"
                             )
@@ -152,8 +145,7 @@ class TestE2EStep2EventMonitoring:
 
             except asyncio.TimeoutError:
                 pytest.fail(
-                    f"No EssayContentProvisionedV1 event received within "
-                    f"{timeout_seconds} seconds"
+                    f"No EssayContentProvisionedV1 event received within {timeout_seconds} seconds"
                 )
 
             assert event_received, "Expected event was not received"
@@ -184,17 +176,14 @@ class TestE2EStep2EventMonitoring:
             value_deserializer=lambda m: json.loads(m.decode("utf-8")),
             client_id=f"e2e-multi-client-{uuid.uuid4().hex[:8]}",
             fetch_max_wait_ms=1000,
-            max_poll_records=10
+            max_poll_records=10,
         )
 
         try:
             await consumer.start()
 
             # Upload multiple files
-            test_files = [
-                Path("test_uploads/essay1.txt"),
-                Path("test_uploads/essay2.txt")
-            ]
+            test_files = [Path("test_uploads/essay1.txt"), Path("test_uploads/essay2.txt")]
             batch_id = f"e2e-multi-event-{uuid.uuid4().hex[:8]}"
 
             async with httpx.AsyncClient() as client:
@@ -206,10 +195,7 @@ class TestE2EStep2EventMonitoring:
                 data = {"batch_id": batch_id}
 
                 upload_response = await client.post(
-                    "http://localhost:7001/v1/files/batch",
-                    files=files,
-                    data=data,
-                    timeout=30.0
+                    "http://localhost:7001/v1/files/batch", files=files, data=data, timeout=30.0
                 )
 
                 assert upload_response.status_code == 202
@@ -229,9 +215,7 @@ class TestE2EStep2EventMonitoring:
                         event_data = message.value
 
                         # Check if this event is from our test batch
-                        if ("data" in event_data and
-                            event_data["data"].get("batch_id") == batch_id):
-
+                        if "data" in event_data and event_data["data"].get("batch_id") == batch_id:
                             events_received.append(event_data)
                             print(f"📨 Event {len(events_received)}/{expected_file_count} received")
 
@@ -296,7 +280,7 @@ async def test_kafka_connectivity_prerequisite():
         group_id=f"connectivity-test-{uuid.uuid4().hex[:8]}",
         auto_offset_reset="latest",
         client_id=f"connectivity-test-client-{uuid.uuid4().hex[:8]}",
-        fetch_max_wait_ms=1000
+        fetch_max_wait_ms=1000,
     )
 
     try:
@@ -304,9 +288,6 @@ async def test_kafka_connectivity_prerequisite():
         print("✅ Kafka connectivity confirmed - ready for event monitoring tests")
 
     except Exception as e:
-        pytest.fail(
-            f"Kafka not accessible: {e}\n"
-            "Ensure Kafka is running: docker compose up -d"
-        )
+        pytest.fail(f"Kafka not accessible: {e}\nEnsure Kafka is running: docker compose up -d")
     finally:
         await consumer.stop()

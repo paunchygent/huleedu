@@ -330,5 +330,5 @@ class TestAIFeedbackInitiatorImpl:
     ) -> None:
         """Test that implementation properly implements the protocol."""
         # Verify that the implementation has the required methods
-        assert hasattr(ai_feedback_initiator, 'initiate_phase')
+        assert hasattr(ai_feedback_initiator, "initiate_phase")
         assert callable(ai_feedback_initiator.initiate_phase)

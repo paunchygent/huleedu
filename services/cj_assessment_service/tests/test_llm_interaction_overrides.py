@@ -54,6 +54,7 @@ class TestLLMInteractionImplOverrides:
         from typing import cast
 
         from services.cj_assessment_service.protocols import LLMProviderProtocol
+
         providers = cast(dict[str, LLMProviderProtocol], {"openai": mock_provider})
         return LLMInteractionImpl(
             cache_manager=mock_cache_manager,

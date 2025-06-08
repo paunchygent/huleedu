@@ -79,14 +79,15 @@ class TestPrometheusContentMetrics:
         assert upload_success_sample.value == 1.0
 
     def test_record_download_success(
-        self, metrics: ContentMetricsProtocol,
+        self,
+        metrics: ContentMetricsProtocol,
         registry: CollectorRegistry,
     ) -> None:
         """Test recording successful download operation."""
         # Record download success
         metrics.record_operation("download", "success")
 
-                # Verify metric was recorded
+        # Verify metric was recorded
         metric_families = list(registry.collect())
         content_ops_family = next(
             (family for family in metric_families if family.name == "content_operations"),
@@ -121,7 +122,7 @@ class TestPrometheusContentMetrics:
         metrics.record_operation("download", "not_found")
         metrics.record_operation("download", "error")
 
-                # Verify all metrics were recorded correctly
+        # Verify all metrics were recorded correctly
         metric_families = list(registry.collect())
         content_ops_family = next(
             (family for family in metric_families if family.name == "content_operations"),
@@ -134,7 +135,8 @@ class TestPrometheusContentMetrics:
         def get_sample_value(operation: str, status: str) -> float:
             sample = next(
                 (
-                    s for s in content_ops_family.samples
+                    s
+                    for s in content_ops_family.samples
                     if s.name == "content_operations_total"
                     and s.labels.get("operation") == operation
                     and s.labels.get("status") == status
@@ -165,7 +167,7 @@ class TestPrometheusContentMetrics:
         # (The actual implementation handles errors gracefully)
         metrics.record_operation("upload", "success")
 
-                # Verify it still recorded the metric
+        # Verify it still recorded the metric
         metric_families = list(registry.collect())
         content_ops_family = next(
             (family for family in metric_families if family.name == "content_operations"),

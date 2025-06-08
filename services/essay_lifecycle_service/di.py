@@ -102,8 +102,7 @@ class CoreInfrastructureProvider(Provider):
         if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
             # Development/testing: use SQLite implementation
             store = SQLiteEssayStateStore(
-                database_path=settings.DATABASE_PATH,
-                timeout=settings.DATABASE_TIMEOUT
+                database_path=settings.DATABASE_PATH, timeout=settings.DATABASE_TIMEOUT
             )
             await store.initialize()
             return store
@@ -190,7 +189,9 @@ class CommandHandlerProvider(Provider):
         future_services_handler: FutureServicesCommandHandler,
     ) -> BatchCommandHandler:
         """Provide batch command handler implementation with injected service handlers."""
-        return DefaultBatchCommandHandler(spellcheck_handler, cj_assessment_handler, future_services_handler)
+        return DefaultBatchCommandHandler(
+            spellcheck_handler, cj_assessment_handler, future_services_handler
+        )
 
 
 class BatchCoordinationProvider(Provider):

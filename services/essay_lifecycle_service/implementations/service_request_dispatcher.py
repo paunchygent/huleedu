@@ -172,7 +172,9 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 "essay_ids": [essay.essay_id for essay in essays_to_process],
                 "language": language,
                 "course_code": course_code,
-                "essay_instructions": essay_instructions[:100] + "..." if len(essay_instructions) > 100 else essay_instructions,
+                "essay_instructions": essay_instructions[:100] + "..."
+                if len(essay_instructions) > 100
+                else essay_instructions,
                 "correlation_id": str(correlation_id),
             },
         )

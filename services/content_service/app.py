@@ -42,7 +42,7 @@ async def startup() -> None:
 async def shutdown() -> None:
     """Gracefully shutdown all services."""
     try:
-        await startup_setup.shutdown_services() # Uses global ref in startup_setup
+        await startup_setup.shutdown_services()  # Uses global ref in startup_setup
         logger.info("Content Service shutdown completed")
     except Exception as e:
         logger.error(f"Error during service shutdown: {e}", exc_info=True)

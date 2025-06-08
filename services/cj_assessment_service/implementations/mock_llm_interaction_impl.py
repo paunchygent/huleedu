@@ -72,16 +72,22 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
                         "Essay A demonstrates stronger argumentation and clearer structure.",
                         "Essay A provides more compelling evidence and better analysis.",
                         "Essay A has superior organization and more persuasive language.",
-                        "Essay A shows better understanding of the topic with more detailed examples.",
-                        "Essay A maintains better coherence and has stronger conclusions."
+                        (
+                            "Essay A shows better understanding of the topic with more "
+                            "detailed examples."
+                        ),
+                        "Essay A maintains better coherence and has stronger conclusions.",
                     ],
                     "Essay B": [
-                        "Essay B presents a more convincing argument with better supporting evidence.",
+                        (
+                            "Essay B presents a more convincing argument with better "
+                            "supporting evidence."
+                        ),
                         "Essay B demonstrates superior writing quality and clearer expression.",
                         "Essay B shows more sophisticated analysis and deeper understanding.",
                         "Essay B has better paragraph structure and more effective transitions.",
-                        "Essay B provides more relevant examples and stronger reasoning."
-                    ]
+                        "Essay B provides more relevant examples and stronger reasoning.",
+                    ],
                 }
 
                 # Only get justification from dictionary for non-error cases
@@ -89,9 +95,7 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
 
             # Create mock LLM assessment response
             llm_assessment = LLMAssessmentResponseSchema(
-                winner=winner,
-                justification=justification,
-                confidence=confidence
+                winner=winner, justification=justification, confidence=confidence
             )
 
             # Create comparison result with short hash to fit database schema (64 chars max)
@@ -102,7 +106,7 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
                 from_cache=False,
                 prompt_hash=short_hash,  # e.g., "mock_123456" (10 chars)
                 error_message=None,
-                raw_llm_response_content=None
+                raw_llm_response_content=None,
             )
 
             results.append(result)

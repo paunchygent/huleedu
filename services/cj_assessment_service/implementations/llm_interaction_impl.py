@@ -110,7 +110,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                 if cached_response:
                     logger.info(
                         f"Cache HIT for essays {task.essay_a.id} vs {task.essay_b.id}",
-                        extra={"prompt_hash": cache_key}
+                        extra={"prompt_hash": cache_key},
                     )
                     try:
                         llm_assessment = LLMAssessmentResponseSchema(**cached_response)
@@ -131,7 +131,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
 
                 logger.info(
                     f"Cache MISS for essays {task.essay_a.id} vs {task.essay_b.id}. Querying LLM.",
-                    extra={"prompt_hash": cache_key}
+                    extra={"prompt_hash": cache_key},
                 )
                 # Make fresh API request
                 try:
@@ -147,7 +147,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         logger.info(
                             f"LLM Response for essays {task.essay_a.id} vs {task.essay_b.id}: "
                             f"Winner -> {response_data.get('winner')}",
-                            extra={"prompt_hash": cache_key}
+                            extra={"prompt_hash": cache_key},
                         )
                         # Cache successful response
                         self.cache_manager.add_to_cache(cache_key, response_data)

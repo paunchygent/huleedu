@@ -109,10 +109,7 @@ class TestTopicNameFunction:
             topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED)
             == "huleedu.batch.essays.registered.v1"
         )
-        assert (
-            topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
-            == "huleedu.els.batch.essays.ready.v1"
-        )
+        assert topic_name(ProcessingEvent.BATCH_ESSAYS_READY) == "huleedu.els.batch.essays.ready.v1"
 
     def test_content_provisioning_events_mapping(self) -> None:
         """Test content provisioning event mappings."""
@@ -146,10 +143,7 @@ class TestTopicNameFunction:
             topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
             == "huleedu.cj_assessment.completed.v1"
         )
-        assert (
-            topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED)
-            == "huleedu.cj_assessment.failed.v1"
-        )
+        assert topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED) == "huleedu.cj_assessment.failed.v1"
 
     def test_unmapped_event_raises_error(self) -> None:
         """Test that unmapped events raise ValueError with helpful message."""

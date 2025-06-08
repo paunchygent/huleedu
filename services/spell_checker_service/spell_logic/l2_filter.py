@@ -91,9 +91,7 @@ class L2CorrectionFilter:
         return True
 
 
-def filter_l2_entries(
-    l2_errors: Dict[str, str], logger: Optional[Logger] = None
-) -> Dict[str, str]:
+def filter_l2_entries(l2_errors: Dict[str, str], logger: Optional[Logger] = None) -> Dict[str, str]:
     """Filter a dictionary of L2 errors to remove unwanted corrections.
 
     Args:

@@ -75,9 +75,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
     def _db_to_essay_state(self, db_essay: EssayStateDB) -> ConcreteEssayState:
         """Convert database model to EssayState."""
         # Convert timeline from string to datetime
-        timeline_converted = {
-            k: datetime.fromisoformat(v) for k, v in db_essay.timeline.items()
-        }
+        timeline_converted = {k: datetime.fromisoformat(v) for k, v in db_essay.timeline.items()}
 
         return ConcreteEssayState(
             essay_id=db_essay.essay_id,
@@ -85,9 +83,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             current_status=db_essay.current_status,
             processing_metadata=db_essay.processing_metadata,
             timeline=timeline_converted,
-            storage_references={
-                ContentType(k): v for k, v in db_essay.storage_references.items()
-            },
+            storage_references={ContentType(k): v for k, v in db_essay.storage_references.items()},
             created_at=db_essay.created_at,
             updated_at=db_essay.updated_at,
         )
@@ -273,7 +269,9 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 self.logger.info(f"Created essay {internal_essay_id} for slot assignment")
                 return essay_state
 
-    async def list_essays_by_batch_and_phase(self, batch_id: str, phase_name: str) -> list[EssayState]:
+    async def list_essays_by_batch_and_phase(
+        self, batch_id: str, phase_name: str
+    ) -> list[EssayState]:
         """List all essays in a batch that are part of a specific processing phase."""
         # Define phase mappings using correct enum values - MUST include ALL statuses for each phase
         phase_status_mapping = {
@@ -283,7 +281,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 EssayStatus.SPELLCHECKED_SUCCESS,
                 EssayStatus.SPELLCHECK_FAILED,
             ],
-                        "cj_assessment": [
+            "cj_assessment": [
                 EssayStatus.AWAITING_CJ_ASSESSMENT,
                 EssayStatus.CJ_ASSESSMENT_IN_PROGRESS,
                 EssayStatus.CJ_ASSESSMENT_SUCCESS,

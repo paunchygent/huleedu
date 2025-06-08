@@ -77,6 +77,5 @@ class ServiceImplementationsProvider(Provider):
     def provide_content_validator(self, settings: Settings) -> ContentValidatorProtocol:
         """Provide content validator implementation."""
         return FileContentValidator(
-            min_length=settings.MIN_CONTENT_LENGTH,
-            max_length=settings.MAX_CONTENT_LENGTH
+            min_length=settings.MIN_CONTENT_LENGTH, max_length=settings.MAX_CONTENT_LENGTH
         )

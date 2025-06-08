@@ -32,13 +32,9 @@ def test_transitions_library():
             pass
 
         test_model = TestModel()
-        Machine(
-            model=test_model,
-            states=['A', 'B'],
-            initial='A'
-        )
+        Machine(model=test_model, states=["A", "B"], initial="A")
 
-        assert test_model.state == 'A'  # type: ignore[attr-defined]
+        assert test_model.state == "A"  # type: ignore[attr-defined]
         print("✅ transitions library is properly installed and functional")
         return True
 
@@ -61,19 +57,21 @@ def test_essay_state_machine_creation():
         from common_core.enums import EssayStatus
 
         # Test machine creation with valid initial state
-        machine = EssayStateMachine('test-essay-123', EssayStatus.READY_FOR_PROCESSING)
+        machine = EssayStateMachine("test-essay-123", EssayStatus.READY_FOR_PROCESSING)
 
-        assert machine.essay_id == 'test-essay-123'
+        assert machine.essay_id == "test-essay-123"
         assert machine.current_status == EssayStatus.READY_FOR_PROCESSING
-        assert hasattr(machine, 'machine')
+        assert hasattr(machine, "machine")
 
         print(f"✅ EssayStateMachine created successfully with status: {machine.current_status}")
         return True
 
     except ImportError as e:
         print(f"❌ Failed to import EssayStateMachine: {e}")
-        print("💡 Hint: EssayStateMachine class needs to be created in "
-              "services/essay_lifecycle_service/essay_state_machine.py")
+        print(
+            "💡 Hint: EssayStateMachine class needs to be created in "
+            "services/essay_lifecycle_service/essay_state_machine.py"
+        )
         return False
     except Exception as e:
         print(f"❌ Unexpected error creating EssayStateMachine: {e}")
@@ -94,7 +92,7 @@ def test_state_machine_triggers():
         from common_core.enums import EssayStatus
 
         # Test spellcheck initiation from READY_FOR_PROCESSING
-        machine = EssayStateMachine('test-essay', EssayStatus.READY_FOR_PROCESSING)
+        machine = EssayStateMachine("test-essay", EssayStatus.READY_FOR_PROCESSING)
 
         # Valid transition: READY_FOR_PROCESSING -> AWAITING_SPELLCHECK
         success = machine.trigger(CMD_INITIATE_SPELLCHECK)
@@ -106,8 +104,8 @@ def test_state_machine_triggers():
         assert not invalid_success, "Invalid transition should have failed"
 
         # Test valid trigger checking
-        assert machine.can_trigger('EVT_SPELLCHECK_STARTED')
-        assert not machine.can_trigger('EVT_AI_FEEDBACK_SUCCEEDED')
+        assert machine.can_trigger("EVT_SPELLCHECK_STARTED")
+        assert not machine.can_trigger("EVT_AI_FEEDBACK_SUCCEEDED")
 
         print("✅ State machine triggers and transitions working correctly")
         return True
@@ -142,13 +140,13 @@ def test_multi_phase_transitions():
         from common_core.enums import EssayStatus
 
         # Test full pipeline: Spellcheck -> AI Feedback -> CJ Assessment -> Complete
-        machine = EssayStateMachine('test-pipeline-essay', EssayStatus.READY_FOR_PROCESSING)
+        machine = EssayStateMachine("test-pipeline-essay", EssayStatus.READY_FOR_PROCESSING)
 
         # Phase 1: Spellcheck
         assert machine.trigger(CMD_INITIATE_SPELLCHECK)
         assert machine.current_status == EssayStatus.AWAITING_SPELLCHECK
 
-        assert machine.trigger('EVT_SPELLCHECK_STARTED')
+        assert machine.trigger("EVT_SPELLCHECK_STARTED")
         assert machine.current_status == EssayStatus.SPELLCHECKING_IN_PROGRESS
 
         assert machine.trigger(EVT_SPELLCHECK_SUCCEEDED)
@@ -158,7 +156,7 @@ def test_multi_phase_transitions():
         assert machine.trigger(CMD_INITIATE_AI_FEEDBACK)
         assert machine.current_status == EssayStatus.AWAITING_AI_FEEDBACK
 
-        assert machine.trigger('EVT_AI_FEEDBACK_STARTED')
+        assert machine.trigger("EVT_AI_FEEDBACK_STARTED")
         assert machine.current_status == EssayStatus.AI_FEEDBACK_IN_PROGRESS
 
         assert machine.trigger(EVT_AI_FEEDBACK_SUCCEEDED)
@@ -168,7 +166,7 @@ def test_multi_phase_transitions():
         assert machine.trigger(CMD_INITIATE_CJ_ASSESSMENT)
         assert machine.current_status == EssayStatus.AWAITING_CJ_ASSESSMENT
 
-        assert machine.trigger('EVT_CJ_ASSESSMENT_STARTED')
+        assert machine.trigger("EVT_CJ_ASSESSMENT_STARTED")
         assert machine.current_status == EssayStatus.CJ_ASSESSMENT_IN_PROGRESS
 
         assert machine.trigger(EVT_CJ_ASSESSMENT_SUCCEEDED)
@@ -203,7 +201,7 @@ def test_state_transition_validator_integration():
         from common_core.enums import EssayStatus
 
         validator = StateTransitionValidator()
-        machine = EssayStateMachine('test-validator', EssayStatus.READY_FOR_PROCESSING)
+        machine = EssayStateMachine("test-validator", EssayStatus.READY_FOR_PROCESSING)
 
         # Test validation method works with state machine
         valid = validator.validate_transition(machine, CMD_INITIATE_SPELLCHECK)
@@ -242,32 +240,33 @@ async def test_state_store_integration():
         from state_store import SQLiteEssayStateStore
 
         from common_core.enums import EssayStatus
-        temp_db = tempfile.mktemp(suffix='.db')
+
+        temp_db = tempfile.mktemp(suffix=".db")
         store = SQLiteEssayStateStore(temp_db)
         await store.initialize()
 
         # Create initial essay state
         await store.create_essay_record(
-            essay_id='test-store-essay',
-            slot_assignment='1',
-            batch_id='test-batch',
-            initial_status=EssayStatus.READY_FOR_PROCESSING
+            essay_id="test-store-essay",
+            slot_assignment="1",
+            batch_id="test-batch",
+            initial_status=EssayStatus.READY_FOR_PROCESSING,
         )
 
         # Test state machine integration
-        machine = EssayStateMachine('test-store-essay', EssayStatus.READY_FOR_PROCESSING)
+        machine = EssayStateMachine("test-store-essay", EssayStatus.READY_FOR_PROCESSING)
         success = machine.trigger(CMD_INITIATE_SPELLCHECK)
         assert success
 
         # Test updating state via machine
         await store.update_essay_status_via_machine(
-            'test-store-essay',
+            "test-store-essay",
             machine.current_status,
-            {'test_metadata': 'state_machine_transition'}
+            {"test_metadata": "state_machine_transition"},
         )
 
         # Verify state was persisted
-        essay_state = await store.get_essay_state('test-store-essay')
+        essay_state = await store.get_essay_state("test-store-essay")
         assert essay_state is not None
         assert essay_state.current_status == EssayStatus.AWAITING_SPELLCHECK
 
@@ -300,10 +299,10 @@ def test_convenience_methods():
 
         from common_core.enums import EssayStatus
 
-        machine = EssayStateMachine('test-convenience', EssayStatus.READY_FOR_PROCESSING)
+        machine = EssayStateMachine("test-convenience", EssayStatus.READY_FOR_PROCESSING)
 
         # Test convenience methods exist and work
-        if hasattr(machine, 'cmd_initiate_spellcheck'):
+        if hasattr(machine, "cmd_initiate_spellcheck"):
             success = machine.cmd_initiate_spellcheck()
             assert success
             assert machine.current_status == EssayStatus.AWAITING_SPELLCHECK
@@ -346,13 +345,10 @@ async def main():
         test_state_machine_triggers,
         test_multi_phase_transitions,
         test_state_transition_validator_integration,
-        test_convenience_methods
+        test_convenience_methods,
     ]
 
-    async_tests = [
-        test_state_store_integration,
-        test_batch_phase_completion_tracking
-    ]
+    async_tests = [test_state_store_integration, test_batch_phase_completion_tracking]
 
     results = []
 

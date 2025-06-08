@@ -104,9 +104,7 @@ class TestPatternAlignmentValidation:
                         assert "# HELP" in metrics_text, (
                             f"{service_name} metrics not in Prometheus format"
                         )
-                        assert "# TYPE" in metrics_text, (
-                            f"{service_name} missing TYPE declarations"
-                        )
+                        assert "# TYPE" in metrics_text, f"{service_name} missing TYPE declarations"
 
                     metrics_results.append((service_name, len(metrics_text)))
                     print(f"📊 {service_name}: {len(metrics_text)} chars of metrics data")
@@ -180,7 +178,6 @@ class TestPatternAlignmentValidation:
         after pattern alignment.
         """
         async with httpx.AsyncClient() as client:
-
             # Test Content Service storage functionality
             try:
                 # Upload content
@@ -188,9 +185,7 @@ class TestPatternAlignmentValidation:
                 test_content = "This is test content for pattern alignment validation."
 
                 upload_response = await client.post(
-                    upload_url,
-                    json={"content": test_content},
-                    timeout=10.0
+                    upload_url, json={"content": test_content}, timeout=10.0
                 )
 
                 assert upload_response.status_code == 201, (
@@ -227,8 +222,7 @@ class TestPatternAlignmentValidation:
             # Test File Service if available
             try:
                 file_health_response = await client.get(
-                    "http://localhost:7001/healthz",
-                    timeout=5.0
+                    "http://localhost:7001/healthz", timeout=5.0
                 )
                 if file_health_response.status_code == 200:
                     print("✅ File Service integration endpoint accessible")
@@ -245,7 +239,6 @@ class TestPatternAlignmentValidation:
         consistency_checks: list[tuple[str, int | float]] = []
 
         async with httpx.AsyncClient() as client:
-
             # Test 1: Consistent error response formats
             error_responses = []
             for service_name, port, pattern_type in self.ALIGNED_SERVICES:
@@ -310,13 +303,11 @@ class TestPatternAlignmentValidation:
         }
 
         async with httpx.AsyncClient() as client:
-
             # Count aligned services responding
             for service_name, port, pattern_type in self.ALIGNED_SERVICES:
                 try:
                     health_response = await client.get(
-                        f"http://localhost:{port}/healthz",
-                        timeout=5.0
+                        f"http://localhost:{port}/healthz", timeout=5.0
                     )
                     if health_response.status_code == 200:
                         success_metrics["services_aligned"] += 1
@@ -324,8 +315,7 @@ class TestPatternAlignmentValidation:
                         success_metrics["consistent_responses"] += 1
 
                     metrics_response = await client.get(
-                        f"http://localhost:{port}/metrics",
-                        timeout=5.0
+                        f"http://localhost:{port}/metrics", timeout=5.0
                     )
                     if metrics_response.status_code == 200:
                         success_metrics["metrics_endpoints_working"] += 1
@@ -344,9 +334,7 @@ class TestPatternAlignmentValidation:
         print(f"   • Success Rate: {success_rate:.1%}")
 
         # Success criteria: At least 75% of services aligned and working
-        assert success_rate >= 0.75, (
-            f"Pattern alignment success rate too low: {success_rate:.1%}"
-        )
+        assert success_rate >= 0.75, f"Pattern alignment success rate too low: {success_rate:.1%}"
 
         # Validate we have meaningful test coverage
         assert success_metrics["health_checks_passing"] >= 3, (
@@ -357,6 +345,7 @@ class TestPatternAlignmentValidation:
 
 
 # Additional focused tests for specific pattern benefits
+
 
 class TestStartupSetupPatternBenefits:
     """Test specific benefits of the startup_setup.py pattern."""
@@ -370,7 +359,6 @@ class TestStartupSetupPatternBenefits:
         Prometheus registry collisions that occurred with DI-based metrics.
         """
         async with httpx.AsyncClient() as client:
-
             # Make multiple requests to trigger metrics creation
             services_to_test = [
                 ("content_service", 8001),
@@ -385,8 +373,7 @@ class TestStartupSetupPatternBenefits:
 
                     # Check metrics endpoint for collision indicators
                     metrics_response = await client.get(
-                        f"http://localhost:{port}/metrics",
-                        timeout=5.0
+                        f"http://localhost:{port}/metrics", timeout=5.0
                     )
 
                     if metrics_response.status_code == 200:

@@ -4,6 +4,7 @@ Tests for BOS idempotency and edge case handling.
 This module tests idempotent behavior for duplicate events and various edge cases
 in the Batch Orchestrator Service (BOS).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -88,15 +89,15 @@ class TestBOSIdempotency:
         state_after_first_cj_init["cj_assessment_status"] = "DISPATCH_INITIATED"
 
         mock_batch_repo.get_processing_pipeline_state.return_value = state_after_first_cj_init
-        mock_cj_initiator.initiate_phase.reset_mock() # Reset for the next assertion
-
+        mock_cj_initiator.initiate_phase.reset_mock()  # Reset for the next assertion
 
         # Second, duplicate "spellcheck completed" event
         await pipeline_phase_coordinator.handle_phase_concluded(
             batch_id=sample_batch_id,
             completed_phase="spellcheck",
             phase_status="COMPLETED_SUCCESSFULLY",
-            correlation_id=correlation_id_str + "_dup", # Different correlation for the event itself
+            correlation_id=correlation_id_str
+            + "_dup",  # Different correlation for the event itself
         )
 
         # CJ initiator should NOT have been called again

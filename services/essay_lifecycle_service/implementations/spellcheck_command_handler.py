@@ -77,8 +77,7 @@ class SpellcheckCommandHandler:
 
                 # Instantiate EssayStateMachine with current status
                 essay_machine = EssayStateMachine(
-                    essay_id=essay_id,
-                    initial_status=essay_state_model.current_status
+                    essay_id=essay_id, initial_status=essay_state_model.current_status
                 )
 
                 # Attempt to trigger the transition for initiating spellcheck
@@ -90,12 +89,15 @@ class SpellcheckCommandHandler:
                         {
                             "bos_command": "spellcheck_initiate",
                             "current_phase": "spellcheck",
-                            "commanded_phases": list(set(
-                                essay_state_model.processing_metadata.get(
-                                    "commanded_phases", []
-                                ) + ["spellcheck"]
-                            ))
-                        }
+                            "commanded_phases": list(
+                                set(
+                                    essay_state_model.processing_metadata.get(
+                                        "commanded_phases", []
+                                    )
+                                    + ["spellcheck"]
+                                )
+                            ),
+                        },
                     )
 
                     logger.info(
@@ -142,30 +144,27 @@ class SpellcheckCommandHandler:
                     "Successfully dispatched spellcheck requests for transitioned essays",
                     extra={
                         "batch_id": command_data.entity_ref.entity_id,
-                        "transitioned_essays_count": len(
-                            successfully_transitioned_essays
-                        ),
+                        "transitioned_essays_count": len(successfully_transitioned_essays),
                         "correlation_id": str(correlation_id),
                     },
                 )
 
                 for essay_ref in successfully_transitioned_essays:
                     try:
-                        essay_state_model = await self.repository.get_essay_state(essay_ref.essay_id)
+                        essay_state_model = await self.repository.get_essay_state(
+                            essay_ref.essay_id
+                        )
                         if essay_state_model:
                             essay_machine = EssayStateMachine(
                                 essay_id=essay_ref.essay_id,
-                                initial_status=essay_state_model.current_status
+                                initial_status=essay_state_model.current_status,
                             )
 
                             if essay_machine.trigger(EVT_SPELLCHECK_STARTED):
                                 await self.repository.update_essay_status_via_machine(
                                     essay_ref.essay_id,
                                     essay_machine.current_status,
-                                    {
-                                        "spellcheck_phase": "started",
-                                        "dispatch_completed": True
-                                    }
+                                    {"spellcheck_phase": "started", "dispatch_completed": True},
                                 )
                                 logger.info(
                                     f"Essay {essay_ref.essay_id} transitioned to "
@@ -205,5 +204,5 @@ class SpellcheckCommandHandler:
             logger.warning(
                 f"No essays successfully transitioned for spellcheck "
                 f"for batch {command_data.entity_ref.entity_id}. Skipping dispatch.",
-                extra={"correlation_id": str(correlation_id)}
+                extra={"correlation_id": str(correlation_id)},
             )

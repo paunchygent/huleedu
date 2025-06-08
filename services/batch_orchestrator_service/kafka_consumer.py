@@ -55,8 +55,7 @@ class BatchKafkaConsumer:
             group_id=self.consumer_group,
             client_id="bos-pipeline-initiator",
             auto_offset_reset="earliest",
-            enable_auto_commit=True,
-            auto_commit_interval_ms=1000,
+            enable_auto_commit=False,  # Manual commit for reliable message processing
         )
 
         try:
@@ -105,9 +104,19 @@ class BatchKafkaConsumer:
 
                 try:
                     await self._handle_message(msg)
+                    # Commit offset only after successful processing (manual commit pattern)
+                    await self.consumer.commit()
+                    logger.debug(
+                        "Successfully processed and committed BOS message",
+                        extra={
+                            "topic": msg.topic,
+                            "partition": msg.partition,
+                            "offset": msg.offset,
+                        },
+                    )
                 except Exception as e:
                     logger.error(
-                        "Error processing message in BOS",
+                        "Error processing message in BOS, not committing offset",
                         extra={
                             "error": str(e),
                             "topic": msg.topic,

@@ -39,16 +39,14 @@ class TestSpellcheckCommandHandler:
         essay_id: str,
         batch_id: str,
         status: EssayStatus = EssayStatus.READY_FOR_PROCESSING,
-        commanded_phases: list[str] | None = None
+        commanded_phases: list[str] | None = None,
     ) -> MagicMock:
         """Create a mock essay state with given parameters."""
         essay_state = MagicMock()
         essay_state.essay_id = essay_id
         essay_state.batch_id = batch_id
         essay_state.current_status = status
-        essay_state.processing_metadata = {
-            "commanded_phases": commanded_phases or []
-        }
+        essay_state.processing_metadata = {"commanded_phases": commanded_phases or []}
         return essay_state
 
     @pytest.fixture
@@ -76,13 +74,13 @@ class TestSpellcheckCommandHandler:
         self,
         mock_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
-        mock_event_publisher: AsyncMock
+        mock_event_publisher: AsyncMock,
     ) -> SpellcheckCommandHandler:
         """Create SpellcheckCommandHandler with mocked dependencies."""
         return SpellcheckCommandHandler(
             repository=mock_repository,
             request_dispatcher=mock_request_dispatcher,
-            event_publisher=mock_event_publisher
+            event_publisher=mock_event_publisher,
         )
 
     @pytest.fixture
@@ -103,23 +101,18 @@ class TestSpellcheckCommandHandler:
     @pytest.fixture
     def essay_processing_ref(self, essay_id: str) -> EssayProcessingInputRefV1:
         """Sample essay processing reference."""
-        return EssayProcessingInputRefV1(
-            essay_id=essay_id,
-            text_storage_id="storage-123"
-        )
+        return EssayProcessingInputRefV1(essay_id=essay_id, text_storage_id="storage-123")
 
     @pytest.fixture
     def spellcheck_command_data(
-        self,
-        batch_id: str,
-        essay_processing_ref: EssayProcessingInputRefV1
+        self, batch_id: str, essay_processing_ref: EssayProcessingInputRefV1
     ) -> BatchServiceSpellcheckInitiateCommandDataV1:
         """Sample spellcheck command data."""
         return BatchServiceSpellcheckInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
             entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
             essays_to_process=[essay_processing_ref],
-            language="en"
+            language="en",
         )
 
     # Test: Successful Spellcheck Command Processing
@@ -141,7 +134,9 @@ class TestSpellcheckCommandHandler:
         mock_repository.update_essay_status_via_machine.return_value = None
         mock_request_dispatcher.dispatch_spellcheck_requests.return_value = None
 
-        with patch('services.essay_lifecycle_service.implementations.spellcheck_command_handler.EssayStateMachine') as mock_state_machine_class:
+        with patch(
+            "services.essay_lifecycle_service.implementations.spellcheck_command_handler.EssayStateMachine"
+        ) as mock_state_machine_class:
             mock_machine = MagicMock()
             mock_machine.trigger.return_value = True
             mock_machine.current_status = EssayStatus.AWAITING_SPELLCHECK
@@ -149,8 +144,7 @@ class TestSpellcheckCommandHandler:
 
             # Execute
             await spellcheck_handler.process_initiate_spellcheck_command(
-                command_data=spellcheck_command_data,
-                correlation_id=correlation_id
+                command_data=spellcheck_command_data, correlation_id=correlation_id
             )
 
             # Verify repository interactions (called twice: initial + started event)
@@ -165,20 +159,19 @@ class TestSpellcheckCommandHandler:
                 {
                     "bos_command": "spellcheck_initiate",
                     "current_phase": "spellcheck",
-                    "commanded_phases": ["spellcheck"]
-                }
+                    "commanded_phases": ["spellcheck"],
+                },
             )
             mock_repository.update_essay_status_via_machine.assert_any_call(
                 essay_id,
                 EssayStatus.AWAITING_SPELLCHECK,
-                {"spellcheck_phase": "started", "dispatch_completed": True}
+                {"spellcheck_phase": "started", "dispatch_completed": True},
             )
 
             # Verify state machine interaction (called twice: initial + started event)
             assert mock_state_machine_class.call_count == 2
             mock_state_machine_class.assert_any_call(
-                essay_id=essay_id,
-                initial_status=EssayStatus.READY_FOR_PROCESSING
+                essay_id=essay_id, initial_status=EssayStatus.READY_FOR_PROCESSING
             )
 
             # Verify trigger calls (initial + started event)
@@ -190,7 +183,7 @@ class TestSpellcheckCommandHandler:
             mock_request_dispatcher.dispatch_spellcheck_requests.assert_called_once_with(
                 essays_to_process=spellcheck_command_data.essays_to_process,
                 language="en",
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
     # Test: State Machine Transition Failure
@@ -210,15 +203,16 @@ class TestSpellcheckCommandHandler:
         essay_state = self.create_essay_state_mock(essay_id, batch_id)
         mock_repository.get_essay_state.return_value = essay_state
 
-        with patch('services.essay_lifecycle_service.implementations.spellcheck_command_handler.EssayStateMachine') as mock_state_machine_class:
+        with patch(
+            "services.essay_lifecycle_service.implementations.spellcheck_command_handler.EssayStateMachine"
+        ) as mock_state_machine_class:
             mock_machine = MagicMock()
             mock_machine.trigger.return_value = False  # Transition fails
             mock_state_machine_class.return_value = mock_machine
 
             # Execute
             await spellcheck_handler.process_initiate_spellcheck_command(
-                command_data=spellcheck_command_data,
-                correlation_id=correlation_id
+                command_data=spellcheck_command_data, correlation_id=correlation_id
             )
 
             # Verify state machine was attempted
@@ -245,8 +239,7 @@ class TestSpellcheckCommandHandler:
 
         # Execute
         await spellcheck_handler.process_initiate_spellcheck_command(
-            command_data=spellcheck_command_data,
-            correlation_id=correlation_id
+            command_data=spellcheck_command_data, correlation_id=correlation_id
         )
 
         # Verify repository was queried
@@ -271,26 +264,23 @@ class TestSpellcheckCommandHandler:
         essay_refs = [
             EssayProcessingInputRefV1(essay_id="essay-1", text_storage_id="storage-1"),
             EssayProcessingInputRefV1(essay_id="essay-2", text_storage_id="storage-2"),
-            EssayProcessingInputRefV1(essay_id="essay-3", text_storage_id="storage-3")
+            EssayProcessingInputRefV1(essay_id="essay-3", text_storage_id="storage-3"),
         ]
 
         command_data = BatchServiceSpellcheckInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
             entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
             essays_to_process=essay_refs,
-            language="en"
+            language="en",
         )
 
         # Setup essay states - all found
-        essay_states = [
-            self.create_essay_state_mock(ref.essay_id, batch_id)
-            for ref in essay_refs
-        ]
+        essay_states = [self.create_essay_state_mock(ref.essay_id, batch_id) for ref in essay_refs]
         mock_repository.get_essay_state.side_effect = essay_states
 
         with patch(
-            'services.essay_lifecycle_service.implementations.spellcheck_command_handler.'
-            'EssayStateMachine'
+            "services.essay_lifecycle_service.implementations.spellcheck_command_handler."
+            "EssayStateMachine"
         ) as mock_state_machine_class:
             # Setup state machines - first two succeed, third fails
             # Need 5 total: 3 for initial processing + 2 for started events (only successful ones)
@@ -308,8 +298,7 @@ class TestSpellcheckCommandHandler:
 
             # Execute
             await spellcheck_handler.process_initiate_spellcheck_command(
-                command_data=command_data,
-                correlation_id=correlation_id
+                command_data=command_data, correlation_id=correlation_id
             )
 
             # Verify all essays were processed (started events fail due to mock exhaustion)
@@ -324,9 +313,9 @@ class TestSpellcheckCommandHandler:
             args, kwargs = mock_request_dispatcher.dispatch_spellcheck_requests.call_args
 
             # Should only contain first two essays (successfully transitioned)
-            assert len(kwargs['essays_to_process']) == 2
-            assert kwargs['essays_to_process'][0].essay_id == "essay-1"
-            assert kwargs['essays_to_process'][1].essay_id == "essay-2"
+            assert len(kwargs["essays_to_process"]) == 2
+            assert kwargs["essays_to_process"][0].essay_id == "essay-1"
+            assert kwargs["essays_to_process"][1].essay_id == "essay-2"
 
     # Test: Metadata Update with Existing Phases
     @pytest.mark.asyncio
@@ -347,7 +336,9 @@ class TestSpellcheckCommandHandler:
         )
         mock_repository.get_essay_state.return_value = essay_state
 
-        with patch('services.essay_lifecycle_service.implementations.spellcheck_command_handler.EssayStateMachine') as mock_state_machine_class:
+        with patch(
+            "services.essay_lifecycle_service.implementations.spellcheck_command_handler.EssayStateMachine"
+        ) as mock_state_machine_class:
             mock_machine = MagicMock()
             mock_machine.trigger.return_value = True
             mock_machine.current_status = EssayStatus.AWAITING_SPELLCHECK
@@ -355,8 +346,7 @@ class TestSpellcheckCommandHandler:
 
             # Execute
             await spellcheck_handler.process_initiate_spellcheck_command(
-                command_data=spellcheck_command_data,
-                correlation_id=correlation_id
+                command_data=spellcheck_command_data, correlation_id=correlation_id
             )
 
             # Verify metadata includes both existing and new phases (called twice: transition + started event)

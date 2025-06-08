@@ -19,8 +19,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
     try:
         # Initialize DI container with both providers
         container = make_async_container(
-            CoreInfrastructureProvider(),
-            ServiceImplementationsProvider()
+            CoreInfrastructureProvider(), ServiceImplementationsProvider()
         )
         QuartDishka(app=app, container=container)
 

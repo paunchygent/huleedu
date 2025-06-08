@@ -37,16 +37,14 @@ class TestDefaultBatchCommandHandler:
         essay_id: str,
         batch_id: str,
         status: EssayStatus = EssayStatus.READY_FOR_PROCESSING,
-        commanded_phases: list[str] | None = None
+        commanded_phases: list[str] | None = None,
     ) -> MagicMock:
         """Create a mock essay state with given parameters."""
         essay_state = MagicMock()
         essay_state.essay_id = essay_id
         essay_state.batch_id = batch_id
         essay_state.current_status = status
-        essay_state.processing_metadata = {
-            "commanded_phases": commanded_phases or []
-        }
+        essay_state.processing_metadata = {"commanded_phases": commanded_phases or []}
         return essay_state
 
     @pytest.fixture
@@ -76,13 +74,13 @@ class TestDefaultBatchCommandHandler:
         self,
         mock_spellcheck_handler: AsyncMock,
         mock_cj_assessment_handler: AsyncMock,
-        mock_future_services_handler: AsyncMock
+        mock_future_services_handler: AsyncMock,
     ) -> DefaultBatchCommandHandler:
         """Create DefaultBatchCommandHandler with mocked service handlers."""
         return DefaultBatchCommandHandler(
             spellcheck_handler=mock_spellcheck_handler,
             cj_assessment_handler=mock_cj_assessment_handler,
-            future_services_handler=mock_future_services_handler
+            future_services_handler=mock_future_services_handler,
         )
 
     @pytest.fixture
@@ -103,16 +101,11 @@ class TestDefaultBatchCommandHandler:
     @pytest.fixture
     def essay_processing_ref(self, essay_id: str) -> EssayProcessingInputRefV1:
         """Sample essay processing reference."""
-        return EssayProcessingInputRefV1(
-            essay_id=essay_id,
-            text_storage_id="storage-123"
-        )
+        return EssayProcessingInputRefV1(essay_id=essay_id, text_storage_id="storage-123")
 
     @pytest.fixture
     def spellcheck_command_data(
-        self,
-        batch_id: str,
-        essay_processing_ref: EssayProcessingInputRefV1
+        self, batch_id: str, essay_processing_ref: EssayProcessingInputRefV1
     ) -> BatchServiceSpellcheckInitiateCommandDataV1:
         """Sample spellcheck command data."""
         from common_core.enums import ProcessingEvent
@@ -122,7 +115,7 @@ class TestDefaultBatchCommandHandler:
             event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
             entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
             essays_to_process=[essay_processing_ref],
-            language="en"
+            language="en",
         )
 
     # Test: process_initiate_spellcheck_command Success Case
@@ -137,8 +130,7 @@ class TestDefaultBatchCommandHandler:
         """Test successful spellcheck command delegation."""
         # Execute
         await command_handler.process_initiate_spellcheck_command(
-            command_data=spellcheck_command_data,
-            correlation_id=correlation_id
+            command_data=spellcheck_command_data, correlation_id=correlation_id
         )
 
         # Verify delegation to spellcheck handler
@@ -159,8 +151,7 @@ class TestDefaultBatchCommandHandler:
 
         # Execute
         await command_handler.process_initiate_nlp_command(
-            command_data=mock_command,
-            correlation_id=correlation_id
+            command_data=mock_command, correlation_id=correlation_id
         )
 
         # Verify delegation to future services handler
@@ -181,8 +172,7 @@ class TestDefaultBatchCommandHandler:
 
         # Execute
         await command_handler.process_initiate_ai_feedback_command(
-            command_data=mock_command,
-            correlation_id=correlation_id
+            command_data=mock_command, correlation_id=correlation_id
         )
 
         # Verify delegation to future services handler
@@ -203,8 +193,7 @@ class TestDefaultBatchCommandHandler:
 
         # Execute
         await command_handler.process_initiate_cj_assessment_command(
-            command_data=mock_command,
-            correlation_id=correlation_id
+            command_data=mock_command, correlation_id=correlation_id
         )
 
         # Verify delegation to CJ assessment handler

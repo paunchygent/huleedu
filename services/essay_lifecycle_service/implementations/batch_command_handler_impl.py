@@ -57,15 +57,17 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         correlation_id: UUID | None = None,
     ) -> None:
         """Process spellcheck initiation command from Batch Orchestrator Service."""
-        await self.spellcheck_handler.process_initiate_spellcheck_command(command_data, correlation_id)
+        await self.spellcheck_handler.process_initiate_spellcheck_command(
+            command_data, correlation_id
+        )
 
     async def process_initiate_nlp_command(
-        self,
-        command_data: BatchServiceNLPInitiateCommandDataV1,
-        correlation_id: UUID | None = None
+        self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID | None = None
     ) -> None:
         """Process NLP initiation command from Batch Orchestrator Service."""
-        await self.future_services_handler.process_initiate_nlp_command(command_data, correlation_id)
+        await self.future_services_handler.process_initiate_nlp_command(
+            command_data, correlation_id
+        )
 
     async def process_initiate_ai_feedback_command(
         self,
@@ -73,7 +75,9 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         correlation_id: UUID | None = None,
     ) -> None:
         """Process AI feedback initiation command from Batch Orchestrator Service."""
-        await self.future_services_handler.process_initiate_ai_feedback_command(command_data, correlation_id)
+        await self.future_services_handler.process_initiate_ai_feedback_command(
+            command_data, correlation_id
+        )
 
     async def process_initiate_cj_assessment_command(
         self,
@@ -81,4 +85,6 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         correlation_id: UUID | None = None,
     ) -> None:
         """Process CJ assessment initiation command from Batch Orchestrator Service."""
-        await self.cj_assessment_handler.process_initiate_cj_assessment_command(command_data, correlation_id)
+        await self.cj_assessment_handler.process_initiate_cj_assessment_command(
+            command_data, correlation_id
+        )

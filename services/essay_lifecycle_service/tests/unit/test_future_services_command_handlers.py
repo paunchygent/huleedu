@@ -46,8 +46,7 @@ class TestFutureServicesCommandHandler:
 
         # Execute - should not raise exception
         await future_services_handler.process_initiate_nlp_command(
-            command_data=mock_command,
-            correlation_id=correlation_id
+            command_data=mock_command, correlation_id=correlation_id
         )
 
         # Method should complete without error (just logs stub message)
@@ -65,8 +64,7 @@ class TestFutureServicesCommandHandler:
 
         # Execute - should not raise exception
         await future_services_handler.process_initiate_ai_feedback_command(
-            command_data=mock_command,
-            correlation_id=correlation_id
+            command_data=mock_command, correlation_id=correlation_id
         )
 
         # Method should complete without error (just logs stub message)

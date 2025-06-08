@@ -78,7 +78,7 @@ class TestLLMProviderPublicInterface:
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value=mock_response_data)
 
-        with patch.object(openai_provider.session, 'post') as mock_post:
+        with patch.object(openai_provider.session, "post") as mock_post:
             # Configure the mock to act as async context manager
             mock_post.return_value.__aenter__.return_value = mock_response
             mock_post.return_value.__aexit__.return_value = None
@@ -127,7 +127,7 @@ class TestLLMProviderPublicInterface:
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value=mock_response_data)
 
-        with patch.object(anthropic_provider.session, 'post') as mock_post:
+        with patch.object(anthropic_provider.session, "post") as mock_post:
             # Configure the mock to act as async context manager
             mock_post.return_value.__aenter__.return_value = mock_response
             mock_post.return_value.__aexit__.return_value = None
@@ -177,7 +177,7 @@ class TestLLMProviderPublicInterface:
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value=mock_response_data)
 
-        with patch.object(openai_provider.session, 'post') as mock_post:
+        with patch.object(openai_provider.session, "post") as mock_post:
             # Configure the mock to act as async context manager
             mock_post.return_value.__aenter__.return_value = mock_response
             mock_post.return_value.__aexit__.return_value = None
@@ -210,7 +210,7 @@ class TestLLMProviderPublicInterface:
         mock_response.status = 400  # Bad Request (non-retryable)
         mock_response.text = AsyncMock(return_value="Invalid request format")
 
-        with patch.object(openai_provider.session, 'post') as mock_post:
+        with patch.object(openai_provider.session, "post") as mock_post:
             # Configure the mock to act as async context manager
             mock_post.return_value.__aenter__.return_value = mock_response
             mock_post.return_value.__aexit__.return_value = None

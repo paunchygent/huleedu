@@ -46,7 +46,7 @@ class FileContentValidator:
             return ValidationResult(
                 is_valid=False,
                 error_code="EMPTY_CONTENT",
-                error_message=f"File '{file_name}' contains no readable text content."
+                error_message=f"File '{file_name}' contains no readable text content.",
             )
 
         # Length validation
@@ -59,7 +59,7 @@ class FileContentValidator:
                     f"File '{file_name}' contains only "
                     f"{content_length} characters. Essays must contain at least "
                     f"{self.min_length} characters."
-                )
+                ),
             )
 
         if content_length > self.max_length:
@@ -70,7 +70,7 @@ class FileContentValidator:
                     f"File '{file_name}' contains "
                     f"{content_length} characters. Essays must not exceed "
                     f"{self.max_length} characters."
-                )
+                ),
             )
 
         # Valid content

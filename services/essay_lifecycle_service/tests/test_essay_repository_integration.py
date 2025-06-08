@@ -56,6 +56,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
     def sample_entity_reference(self) -> EntityReference:
         """Sample entity reference for testing."""
         import uuid
+
         unique_id = str(uuid.uuid4())[:8]  # Short unique suffix
         return EntityReference(
             entity_id=f"test-essay-{unique_id}",
@@ -75,6 +76,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
             from sqlalchemy import delete
 
             from services.essay_lifecycle_service.models_db import EssayStateDB
+
             await session.execute(delete(EssayStateDB))
             await session.commit()
 
@@ -88,9 +90,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # The schema should be initialized in the fixture
         # Let's verify we can perform basic operations
         essay_ref = EntityReference(
-            entity_id="schema-test-essay",
-            entity_type="essay",
-            parent_id="schema-test-batch"
+            entity_id="schema-test-essay", entity_type="essay", parent_id="schema-test-batch"
         )
 
         created_essay = await postgres_repository.create_essay_record(essay_ref)
@@ -100,14 +100,18 @@ class TestPostgreSQLEssayRepositoryIntegration:
 
     @pytest.mark.asyncio
     async def test_create_and_retrieve_essay(
-        self, postgres_repository: PostgreSQLEssayRepository, sample_entity_reference: EntityReference
+        self,
+        postgres_repository: PostgreSQLEssayRepository,
+        sample_entity_reference: EntityReference,
     ) -> None:
         """Test creating and retrieving an essay."""
         # Act - Create essay
         created_essay = await postgres_repository.create_essay_record(sample_entity_reference)
 
         # Act - Retrieve essay
-        retrieved_essay = await postgres_repository.get_essay_state(sample_entity_reference.entity_id)
+        retrieved_essay = await postgres_repository.get_essay_state(
+            sample_entity_reference.entity_id
+        )
 
         # Assert
         assert created_essay.essay_id == sample_entity_reference.entity_id
@@ -123,7 +127,9 @@ class TestPostgreSQLEssayRepositoryIntegration:
 
     @pytest.mark.asyncio
     async def test_update_essay_state(
-        self, postgres_repository: PostgreSQLEssayRepository, sample_entity_reference: EntityReference
+        self,
+        postgres_repository: PostgreSQLEssayRepository,
+        sample_entity_reference: EntityReference,
     ) -> None:
         """Test updating essay state and metadata."""
         # Arrange - Create essay
@@ -184,18 +190,14 @@ class TestPostgreSQLEssayRepositoryIntegration:
         assert found_essay.essay_id == essay_id
 
     @pytest.mark.asyncio
-    async def test_batch_operations(
-        self, postgres_repository: PostgreSQLEssayRepository
-    ) -> None:
+    async def test_batch_operations(self, postgres_repository: PostgreSQLEssayRepository) -> None:
         """Test batch-level operations."""
         # Arrange - Create multiple essays in same batch
         batch_id = "batch-ops-test"
 
         for i in range(3):
             essay_ref = EntityReference(
-                entity_id=f"essay-{i}",
-                entity_type="essay",
-                parent_id=batch_id
+                entity_id=f"essay-{i}", entity_type="essay", parent_id=batch_id
             )
             await postgres_repository.create_essay_record(essay_ref)
 
@@ -242,9 +244,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
 
         for i, status in enumerate(essay_statuses):
             essay_ref = EntityReference(
-                entity_id=f"phase-essay-{i}",
-                entity_type="essay",
-                parent_id=batch_id
+                entity_id=f"phase-essay-{i}", entity_type="essay", parent_id=batch_id
             )
             await postgres_repository.create_essay_record(essay_ref)
             await postgres_repository.update_essay_state(f"phase-essay-{i}", status, {})
@@ -298,7 +298,9 @@ class TestPostgreSQLEssayRepositoryIntegration:
 
     @pytest.mark.asyncio
     async def test_timeline_and_metadata_persistence(
-        self, postgres_repository: PostgreSQLEssayRepository, sample_entity_reference: EntityReference
+        self,
+        postgres_repository: PostgreSQLEssayRepository,
+        sample_entity_reference: EntityReference,
     ) -> None:
         """Test that timeline and metadata are properly persisted and retrieved."""
         # Arrange - Create essay

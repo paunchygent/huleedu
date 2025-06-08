@@ -15,7 +15,6 @@ logger = create_service_logger("cj_assessment_service.startup")
 async def initialize_services(app: Quart, settings: Settings, container) -> None:
     """Initialize database schema and metrics (DI container already initialized in app.py)."""
     try:
-
         # Initialize database schema directly (following BOS/ELS pattern)
         async with container() as request_container:
             database = await request_container.get(CJRepositoryProtocol)

@@ -28,7 +28,9 @@ logger = create_service_logger("batch_phase_coordinator")
 class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
     """Default implementation of BatchPhaseCoordinator protocol."""
 
-    def __init__(self, repository: EssayRepositoryProtocol, event_publisher: EventPublisher) -> None:
+    def __init__(
+        self, repository: EssayRepositoryProtocol, event_publisher: EventPublisher
+    ) -> None:
         self.repository = repository
         self.event_publisher = event_publisher
 
@@ -74,8 +76,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
 
             # Get all essays in this batch/phase
             essays_in_phase = await self.repository.list_essays_by_batch_and_phase(
-                batch_id=batch_id,
-                phase_name=phase_name
+                batch_id=batch_id, phase_name=phase_name
             )
 
             if not essays_in_phase:
@@ -257,7 +258,9 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
                 },
             )
 
-    def _get_text_storage_id_for_phase(self, essay_state: EssayState, phase_name: str) -> str | None:
+    def _get_text_storage_id_for_phase(
+        self, essay_state: EssayState, phase_name: str
+    ) -> str | None:
         """
         Get the appropriate text_storage_id for the *output* of the completed 'phase_name',
         which will be used as input for the *next* phase.
@@ -294,7 +297,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
             if phase_name == "spellcheck":
                 logger.warning(
                     f"Corrected text storage ID not found for essay {essay_state.essay_id} after spellcheck. Falling back to original.",
-                    extra={"essay_id": essay_state.essay_id, "phase_name": phase_name}
+                    extra={"essay_id": essay_state.essay_id, "phase_name": phase_name},
                 )
 
             fallback_storage_id = essay_state.storage_references.get(ContentType.ORIGINAL_ESSAY)
@@ -303,6 +306,6 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
 
         logger.warning(
             f"Could not determine relevant text_storage_id for essay {essay_state.essay_id} after phase {phase_name}",
-            extra={"essay_id": essay_state.essay_id, "phase_name": phase_name}
+            extra={"essay_id": essay_state.essay_id, "phase_name": phase_name},
         )
         return None

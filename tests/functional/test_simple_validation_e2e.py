@@ -1,7 +1,7 @@
 """
 Simple End-to-End Test for Content Validation.
 
-Tests that content validation failures publish EssayValidationFailedV1 events 
+Tests that content validation failures publish EssayValidationFailedV1 events
 with appropriate error codes (EMPTY_CONTENT, CONTENT_TOO_SHORT).
 """
 
@@ -30,7 +30,9 @@ TOPICS = {
 
 @pytest.mark.asyncio
 async def test_content_validation_failures_publish_events():
-    """Test that content validation failures publish validation failure events with proper error codes."""
+    """
+    Test that content validation failures publish validation failure events with proper error codes.
+    """
 
     # Create a small batch
     async with aiohttp.ClientSession() as session:
@@ -56,16 +58,16 @@ async def test_content_validation_failures_publish_events():
     files = [
         {
             "file_name": "valid_essay.txt",
-            "content": "This is a valid essay with enough content to pass validation."
+            "content": "This is a valid essay with enough content to pass validation.",
         },
         {
             "file_name": "invalid_essay_empty.txt",
-            "content": ""  # This will trigger EMPTY_CONTENT validation failure
+            "content": "",  # This will trigger EMPTY_CONTENT validation failure
         },
         {
             "file_name": "invalid_essay_short.txt",
-            "content": "Too short"  # This will trigger CONTENT_TOO_SHORT validation failure
-        }
+            "content": "Too short",  # This will trigger CONTENT_TOO_SHORT validation failure
+        },
     ]
 
     # Start Kafka consumer
@@ -94,7 +96,7 @@ async def test_content_validation_failures_publish_events():
                     "files",
                     file_info["content"].encode("utf-8"),
                     filename=file_info["file_name"],
-                    content_type="text/plain"
+                    content_type="text/plain",
                 )
 
             async with session.post(
@@ -112,11 +114,9 @@ async def test_content_validation_failures_publish_events():
             if datetime.now() > end_time:
                 break
 
-            events.append({
-                "topic": msg.topic,
-                "data": msg.value,
-                "timestamp": datetime.now().isoformat()
-            })
+            events.append(
+                {"topic": msg.topic, "data": msg.value, "timestamp": datetime.now().isoformat()}
+            )
 
             logger.info(f"Received event on {msg.topic}: {json.dumps(msg.value, indent=2)}")
 
@@ -144,10 +144,10 @@ async def test_content_validation_failures_publish_events():
     logger.info(f"Content provisions: {len(content_provision_events)}")
 
     # Assert we got the expected events
-    assert len(
-        content_provision_events) >= 1, "Should have at least 1 content provision (valid essay)"
-    assert len(
-        validation_failure_events) >= 2, "Should have 2 validation failures (empty + short)"
+    assert len(content_provision_events) >= 1, (
+        "Should have at least 1 content provision (valid essay)"
+    )
+    assert len(validation_failure_events) >= 2, "Should have 2 validation failures (empty + short)"
 
     # Check that validation failure events have the expected error codes
     empty_content_failures = []
@@ -167,10 +167,14 @@ async def test_content_validation_failures_publish_events():
         elif error_code == "CONTENT_TOO_SHORT":
             content_too_short_failures.append(failure_data)
 
-    assert len(
-        empty_content_failures) >= 1, "Should have at least 1 EMPTY_CONTENT validation failure event"
-    assert len(
-        content_too_short_failures) >= 1, "Should have at least 1 CONTENT_TOO_SHORT validation failure event"
+    assert len(empty_content_failures) >= 1, (
+        "Should have at least 1 EMPTY_CONTENT validation failure event"
+    )
+    assert len(content_too_short_failures) >= 1, (
+        "Should have at least 1 CONTENT_TOO_SHORT validation failure event"
+    )
 
-    logger.info("✅ Test passed: Content validation failures "
-                "correctly publish appropriate validation failure events!")
+    logger.info(
+        "✅ Test passed: Content validation failures "
+        "correctly publish appropriate validation failure events!"
+    )

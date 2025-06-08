@@ -75,7 +75,8 @@ class DefaultPipelinePhaseCoordinator:
         )
 
         # Allow progression for both COMPLETED_SUCCESSFULLY and COMPLETED_WITH_FAILURES
-        # COMPLETED_WITH_FAILURES indicates partial success and should proceed with successful essays
+        # COMPLETED_WITH_FAILURES indicates partial success and should proceed with
+        # successful essays
         if phase_status not in ["COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"]:
             logger.info(
                 f"Phase {completed_phase} for batch {batch_id} did not complete successfully "
@@ -85,11 +86,13 @@ class DefaultPipelinePhaseCoordinator:
 
         # Log progression decision for COMPLETED_WITH_FAILURES cases
         if phase_status == "COMPLETED_WITH_FAILURES":
-            successful_count = len(processed_essays_for_next_phase) if processed_essays_for_next_phase else 0
+            successful_count = (
+                len(processed_essays_for_next_phase) if processed_essays_for_next_phase else 0
+            )
             logger.info(
                 f"Phase {completed_phase} completed with partial failures for batch {batch_id}. "
                 f"Proceeding to next phase with {successful_count} successful essays.",
-                extra={"correlation_id": correlation_id}
+                extra={"correlation_id": correlation_id},
             )
 
         # Determine and initiate next phase with data propagation
@@ -272,20 +275,22 @@ class DefaultPipelinePhaseCoordinator:
                         pipeline_detail.status = PipelineExecutionStatus.FAILED
                         pipeline_detail.error_info = {
                             "error": str(e),
-                            "timestamp": datetime.now(timezone.utc).isoformat()
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
                         }
                         await self.batch_repo.save_processing_pipeline_state(
                             batch_id, current_pipeline_state
                         )
                 else:  # Dictionary - backwards compatibility
                     updated_pipeline_state = current_pipeline_state.copy()
-                    updated_pipeline_state.update({
-                        f"{next_phase_name.value}_status": "FAILED",
-                        f"{next_phase_name.value}_error": str(e),
-                        f"{next_phase_name.value}_failed_at": (
-                            datetime.now(timezone.utc).isoformat()
-                        ),
-                    })
+                    updated_pipeline_state.update(
+                        {
+                            f"{next_phase_name.value}_status": "FAILED",
+                            f"{next_phase_name.value}_error": str(e),
+                            f"{next_phase_name.value}_failed_at": (
+                                datetime.now(timezone.utc).isoformat()
+                            ),
+                        }
+                    )
                     await self.batch_repo.save_processing_pipeline_state(
                         batch_id, updated_pipeline_state
                     )
@@ -304,12 +309,14 @@ class DefaultPipelinePhaseCoordinator:
                     )
             else:  # Dictionary - backwards compatibility
                 updated_pipeline_state = current_pipeline_state.copy()
-                updated_pipeline_state.update({
-                    f"{next_phase_name.value}_status": "DISPATCH_INITIATED",
-                    f"{next_phase_name.value}_initiated_at": (
-                        datetime.now(timezone.utc).isoformat()
-                    ),
-                })
+                updated_pipeline_state.update(
+                    {
+                        f"{next_phase_name.value}_status": "DISPATCH_INITIATED",
+                        f"{next_phase_name.value}_initiated_at": (
+                            datetime.now(timezone.utc).isoformat()
+                        ),
+                    }
+                )
                 await self.batch_repo.save_processing_pipeline_state(
                     batch_id, updated_pipeline_state
                 )

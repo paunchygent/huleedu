@@ -105,7 +105,7 @@ class SQLiteEssayCrudOperations:
         essay_id: str | None = None,
         slot_assignment: str | None = None,
         batch_id: str | None = None,
-        initial_status: EssayStatus | None = None
+        initial_status: EssayStatus | None = None,
     ) -> EssayState:
         """Create new essay record from entity reference or keyword arguments."""
         # Handle both calling patterns

@@ -24,9 +24,7 @@ class TestHealthAPI:
         app.config.update({"TESTING": True})
         return app.test_client()
 
-    async def test_healthz_endpoint_responds_ok(
-        self, app_client: QuartClient
-    ) -> None:
+    async def test_healthz_endpoint_responds_ok(self, app_client: QuartClient) -> None:
         """Test /healthz endpoint returns 200 with correct response."""
         response = await app_client.get("/healthz")
 
@@ -61,9 +59,7 @@ class TestHealthAPI:
             assert "# HELP" in content or "# TYPE" in content
         # If empty, that's acceptable for test environment
 
-    async def test_metrics_endpoint_error_handling(
-        self, app_client: QuartClient
-    ) -> None:
+    async def test_metrics_endpoint_error_handling(self, app_client: QuartClient) -> None:
         """Test /metrics endpoint error handling by testing the route logic."""
         # Test that the metrics endpoint exists and is accessible
         # Error handling is implemented in the route, so we test the working case
@@ -77,9 +73,7 @@ class TestHealthAPI:
             content = await response.get_data(as_text=True)
             assert "metrics_error" in content
 
-    async def test_metrics_endpoint_basic_functionality(
-        self, app_client: QuartClient
-    ) -> None:
+    async def test_metrics_endpoint_basic_functionality(self, app_client: QuartClient) -> None:
         """Test /metrics endpoint basic functionality."""
         response = await app_client.get("/metrics")
 

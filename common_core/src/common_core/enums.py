@@ -102,9 +102,7 @@ _TOPIC_MAPPING = {
     ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND: (
         "huleedu.batch.ai_feedback.initiate.command.v1"
     ),
-    ProcessingEvent.BATCH_NLP_INITIATE_COMMAND: (
-        "huleedu.batch.nlp.initiate.command.v1"
-    ),
+    ProcessingEvent.BATCH_NLP_INITIATE_COMMAND: ("huleedu.batch.nlp.initiate.command.v1"),
     ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED: "huleedu.els.cj_assessment.requested.v1",
     ProcessingEvent.CJ_ASSESSMENT_COMPLETED: "huleedu.cj_assessment.completed.v1",
     ProcessingEvent.CJ_ASSESSMENT_FAILED: "huleedu.cj_assessment.failed.v1",

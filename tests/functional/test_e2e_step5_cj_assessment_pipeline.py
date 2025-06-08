@@ -53,7 +53,7 @@ async def test_cj_assessment_service_health_prerequisite():
             assert response.status == 200
             # Prometheus metrics format - should contain CJ assessment metrics
             metrics_text = await response.text()
-            assert "python_info" in metrics_text  # Basic Prometheus metric
+            assert "http_requests_total" in metrics_text  # Basic Prometheus metric
 
 
 @pytest.mark.e2e
@@ -78,7 +78,7 @@ async def test_complete_cj_assessment_processing_pipeline():
         "test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt",
         "test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt",
         "test_uploads/real_test_batch/MHHXGMUX 50 (SA24D ENG 5 WRITING 2025).txt",
-        "test_uploads/real_test_batch/MHHXGMUU 50 (SA24D ENG 5 WRITING 2025).txt"
+        "test_uploads/real_test_batch/MHHXGMUU 50 (SA24D ENG 5 WRITING 2025).txt",
     ]
 
     # Step 1: Upload essays to Content Service
@@ -86,19 +86,17 @@ async def test_complete_cj_assessment_processing_pipeline():
     essay_storage_refs = []
 
     for i, essay_file in enumerate(essay_files):
-        with open(essay_file, 'r', encoding='utf-8') as f:
+        with open(essay_file, "r", encoding="utf-8") as f:
             essay_content = f.read()
 
         storage_id = await upload_content_to_content_service(essay_content)
         essay_id = str(uuid.uuid4())  # Use standard UUID format (36 chars) to match database schema
 
-        essay_storage_refs.append({
-            "essay_id": essay_id,
-            "storage_id": storage_id,
-            "file_name": essay_file.split('/')[-1]
-        })
+        essay_storage_refs.append(
+            {"essay_id": essay_id, "storage_id": storage_id, "file_name": essay_file.split("/")[-1]}
+        )
 
-        print(f"✅ Essay {i+1} uploaded: {storage_id}")
+        print(f"✅ Essay {i + 1} uploaded: {storage_id}")
 
     # Step 2: Set up Kafka monitoring for CJ Assessment results
     completed_topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
@@ -110,7 +108,7 @@ async def test_complete_cj_assessment_processing_pipeline():
         bootstrap_servers="localhost:9093",  # External port
         group_id=f"e2e-test-cj-consumer-{uuid.uuid4()}",
         auto_offset_reset="latest",  # Only new messages
-        enable_auto_commit=False
+        enable_auto_commit=False,
     )
 
     try:
@@ -124,7 +122,7 @@ async def test_complete_cj_assessment_processing_pipeline():
             correlation_id=correlation_id,
             language="en",
             course_code="SA24D ENG 5 WRITING 2025",
-            essay_instructions="Write a persuasive essay on your topic."
+            essay_instructions="Write a persuasive essay on your topic.",
         )
         print(f"✅ Published CJ Assessment request for batch: {batch_id}")
 
@@ -133,7 +131,7 @@ async def test_complete_cj_assessment_processing_pipeline():
             result_consumer,
             batch_id=batch_id,
             correlation_id=correlation_id,
-            timeout_seconds=240  # 4 minutes for CJ processing
+            timeout_seconds=240,  # 4 minutes for CJ processing
         )
 
         assert cj_result is not None
@@ -142,8 +140,7 @@ async def test_complete_cj_assessment_processing_pipeline():
         assert len(cj_result["rankings"]) >= 2  # Should have rankings
         assert cj_result["cj_assessment_job_id"] is not None
 
-        print(f"✅ CJ Assessment completed with job ID: "
-              f"{cj_result['cj_assessment_job_id']}")
+        print(f"✅ CJ Assessment completed with job ID: {cj_result['cj_assessment_job_id']}")
         print(f"📊 Generated {len(cj_result['rankings'])} essay rankings")
 
         # Step 5: Validate ranking structure and content
@@ -151,7 +148,7 @@ async def test_complete_cj_assessment_processing_pipeline():
         for i, ranking in enumerate(rankings):
             assert "els_essay_id" in ranking
             assert "rank" in ranking or "score" in ranking
-            print(f"📝 Essay {i+1}: {ranking}")
+            print(f"📝 Essay {i + 1}: {ranking}")
 
         # Optional: Validate CJ results storage in Content Service if available
         # This depends on whether CJ service stores results back to Content
@@ -176,22 +173,19 @@ async def test_cj_assessment_pipeline_minimal_essays():
     # Use just 2 essays for minimal CJ
     essay_files = [
         "test_uploads/real_test_batch/MHHXGLUU 50 (SA24D ENG 5 WRITING 2025).txt",
-        "test_uploads/real_test_batch/MHHXGLMX 50 (SA24D ENG 5 WRITING 2025).txt"
+        "test_uploads/real_test_batch/MHHXGLMX 50 (SA24D ENG 5 WRITING 2025).txt",
     ]
 
     # Upload essays
     essay_storage_refs = []
     for i, essay_file in enumerate(essay_files):
-        with open(essay_file, 'r', encoding='utf-8') as f:
+        with open(essay_file, "r", encoding="utf-8") as f:
             essay_content = f.read()
 
         storage_id = await upload_content_to_content_service(essay_content)
         essay_id = str(uuid.uuid4())  # Use standard UUID format (36 chars) to match database schema
 
-        essay_storage_refs.append({
-            "essay_id": essay_id,
-            "storage_id": storage_id
-        })
+        essay_storage_refs.append({"essay_id": essay_id, "storage_id": storage_id})
 
     # Set up monitoring
     completed_topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
@@ -200,7 +194,7 @@ async def test_cj_assessment_pipeline_minimal_essays():
         bootstrap_servers="localhost:9093",
         group_id=f"e2e-test-minimal-cj-consumer-{uuid.uuid4()}",
         auto_offset_reset="latest",
-        enable_auto_commit=False
+        enable_auto_commit=False,
     )
 
     try:
@@ -212,14 +206,11 @@ async def test_cj_assessment_pipeline_minimal_essays():
             correlation_id=correlation_id,
             language="en",
             course_code="SA24D ENG 5 WRITING 2025",
-            essay_instructions="Write about your chosen topic."
+            essay_instructions="Write about your chosen topic.",
         )
 
         cj_result = await monitor_for_cj_assessment_result(
-            result_consumer,
-            batch_id=batch_id,
-            correlation_id=correlation_id,
-            timeout_seconds=120
+            result_consumer, batch_id=batch_id, correlation_id=correlation_id, timeout_seconds=120
         )
 
         assert cj_result is not None
@@ -245,8 +236,8 @@ async def upload_content_to_content_service(content: str) -> str:
     async with aiohttp.ClientSession() as session:
         async with session.post(
             "http://localhost:8001/v1/content",
-            data=content.encode('utf-8'),
-            headers={"Content-Type": "text/plain"}
+            data=content.encode("utf-8"),
+            headers={"Content-Type": "text/plain"},
         ) as response:
             assert response.status == 201
             result = await response.json()
@@ -260,30 +251,26 @@ async def publish_cj_assessment_request_event(
     correlation_id: str,
     language: str = "en",
     course_code: str = "TEST_COURSE",
-    essay_instructions: str = "Write an essay."
+    essay_instructions: str = "Write an essay.",
 ) -> None:
     """Publish ELS_CJAssessmentRequestV1 event to trigger CJ processing."""
 
     # Create EntityReference for the batch
-    batch_entity_ref = EntityReference(
-        entity_id=batch_id,
-        entity_type="batch"
-    )
+    batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
 
     # Create SystemProcessingMetadata
     system_metadata = SystemProcessingMetadata(
         entity=batch_entity_ref,
         timestamp=datetime.now(timezone.utc),
         processing_stage=ProcessingStage.INITIALIZED,
-        event=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED.value
+        event=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED.value,
     )
 
     # Create essay references for CJ processing
     essays_for_cj = []
     for ref in essay_storage_refs:
         essay_ref = EssayProcessingInputRefV1(
-            essay_id=ref["essay_id"],
-            text_storage_id=ref["storage_id"]
+            essay_id=ref["essay_id"], text_storage_id=ref["storage_id"]
         )
         essays_for_cj.append(essay_ref)
 
@@ -295,7 +282,7 @@ async def publish_cj_assessment_request_event(
         language=language,
         course_code=course_code,
         essay_instructions=essay_instructions,
-        llm_config_overrides=None  # Use service defaults
+        llm_config_overrides=None,  # Use service defaults
     )
 
     # Create the event envelope
@@ -303,16 +290,14 @@ async def publish_cj_assessment_request_event(
         event_type=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
         source_service="e2e_test_suite",
         correlation_id=uuid.UUID(correlation_id),
-        data=request_data
+        data=request_data,
     )
 
     # Publish to Kafka
     request_topic = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
     producer = AIOKafkaProducer(
         bootstrap_servers="localhost:9093",
-        value_serializer=lambda v: json.dumps(
-            v, default=str, ensure_ascii=False
-        ).encode("utf-8")
+        value_serializer=lambda v: json.dumps(v, default=str, ensure_ascii=False).encode("utf-8"),
     )
 
     try:
@@ -321,11 +306,7 @@ async def publish_cj_assessment_request_event(
         # Send the envelope as dict for JSON serialization
         envelope_dict = envelope.model_dump(mode="json")
 
-        await producer.send(
-            request_topic,
-            value=envelope_dict,
-            key=correlation_id.encode("utf-8")
-        )
+        await producer.send(request_topic, value=envelope_dict, key=correlation_id.encode("utf-8"))
 
         await producer.flush()
 
@@ -334,10 +315,7 @@ async def publish_cj_assessment_request_event(
 
 
 async def monitor_for_cj_assessment_result(
-    consumer: AIOKafkaConsumer,
-    batch_id: str,
-    correlation_id: str,
-    timeout_seconds: int = 240
+    consumer: AIOKafkaConsumer, batch_id: str, correlation_id: str, timeout_seconds: int = 240
 ) -> Optional[Dict[str, Any]]:
     """Monitor Kafka for CJ Assessment completion or failure events."""
 
@@ -346,8 +324,7 @@ async def monitor_for_cj_assessment_result(
     async for msg in consumer:
         elapsed = asyncio.get_event_loop().time() - start_time
         if elapsed > timeout_seconds:
-            print(f"❌ Timeout waiting for CJ Assessment result after "
-                  f"{timeout_seconds}s")
+            print(f"❌ Timeout waiting for CJ Assessment result after {timeout_seconds}s")
             return None
 
         try:
@@ -373,18 +350,14 @@ async def monitor_for_cj_assessment_result(
                 return {
                     "status": event_data.get("status"),
                     "rankings": event_data.get("rankings", []),
-                    "cj_assessment_job_id": event_data.get(
-                        "cj_assessment_job_id"
-                    ),
-                    "system_metadata": event_data.get("system_metadata", {})
+                    "cj_assessment_job_id": event_data.get("cj_assessment_job_id"),
+                    "system_metadata": event_data.get("system_metadata", {}),
                 }
 
             # Process failed event
             elif msg.topic.endswith("failed.v1"):
                 print("❌ Received CJ Assessment failed event")
-                error_info = event_data.get("system_metadata", {}).get(
-                    "error_info", {}
-                )
+                error_info = event_data.get("system_metadata", {}).get("error_info", {})
 
                 # Extract and format the most relevant error information
                 error_message = error_info.get("error_message", "Unknown error")
@@ -402,9 +375,7 @@ async def monitor_for_cj_assessment_result(
                     for line in traceback_lines:
                         print(f"  {line}")
 
-                raise AssertionError(
-                    f"CJ Assessment failed: {error_type} - {error_message}"
-                )
+                raise AssertionError(f"CJ Assessment failed: {error_type} - {error_message}")
 
         except json.JSONDecodeError as e:
             print(f"⚠️ Failed to decode message: {e}")

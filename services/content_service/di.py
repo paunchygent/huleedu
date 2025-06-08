@@ -1,6 +1,7 @@
 """
 Content Service dependency injection configuration.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -47,5 +48,3 @@ class ContentServiceProvider(Provider):
     def provide_content_store(self, store_root: Path) -> ContentStoreProtocol:
         """Provide content store implementation."""
         return FileSystemContentStore(store_root)
-
-

@@ -37,9 +37,7 @@ class TestServiceManager:
         assert service_manager.tasks == []
         assert not service_manager.shutdown_event.is_set()
 
-    async def test_handle_shutdown_signal(
-        self, service_manager: ServiceManager
-    ) -> None:
+    async def test_handle_shutdown_signal(self, service_manager: ServiceManager) -> None:
         """Test shutdown signal handling."""
         # Initially shutdown event should not be set
         assert not service_manager.shutdown_event.is_set()
@@ -50,9 +48,7 @@ class TestServiceManager:
         # Shutdown event should now be set
         assert service_manager.shutdown_event.is_set()
 
-    async def test_shutdown_event_propagation(
-        self, service_manager: ServiceManager
-    ) -> None:
+    async def test_shutdown_event_propagation(self, service_manager: ServiceManager) -> None:
         """Test that shutdown event can be waited on."""
         # Start a task that waits for shutdown event
         wait_task = asyncio.create_task(service_manager.shutdown_event.wait())
@@ -75,9 +71,7 @@ class TestServiceIntegration:
     async def test_service_runs_with_valid_config(self) -> None:
         """Test that services can be configured correctly."""
         settings = Settings(
-            KAFKA_BOOTSTRAP_SERVERS="localhost:9092",
-            METRICS_PORT=9999,
-            LOG_LEVEL="INFO"
+            KAFKA_BOOTSTRAP_SERVERS="localhost:9092", METRICS_PORT=9999, LOG_LEVEL="INFO"
         )
 
         # Test that we can create a service manager with these settings
@@ -126,10 +120,7 @@ class TestConfigurationValidation:
         assert default_settings.LOG_LEVEL == "INFO"
 
         # Test custom settings
-        custom_settings = Settings(
-            METRICS_PORT=8080,
-            LOG_LEVEL="DEBUG"
-        )
+        custom_settings = Settings(METRICS_PORT=8080, LOG_LEVEL="DEBUG")
         assert custom_settings.METRICS_PORT == 8080
         assert custom_settings.LOG_LEVEL == "DEBUG"
 
@@ -137,16 +128,16 @@ class TestConfigurationValidation:
         """Test service name configuration."""
         settings = Settings()
         # Test that service has a proper name configured
-        assert hasattr(settings, 'SERVICE_NAME')
+        assert hasattr(settings, "SERVICE_NAME")
         # Service name should be meaningful
         assert len(settings.SERVICE_NAME) > 0
 
     async def test_kafka_configuration_exists(self) -> None:
         """Test that Kafka configuration is available."""
         settings = Settings()
-        assert hasattr(settings, 'KAFKA_BOOTSTRAP_SERVERS')
-        assert hasattr(settings, 'CONSUMER_GROUP_ID_CJ')
-        assert hasattr(settings, 'PRODUCER_CLIENT_ID_CJ')
+        assert hasattr(settings, "KAFKA_BOOTSTRAP_SERVERS")
+        assert hasattr(settings, "CONSUMER_GROUP_ID_CJ")
+        assert hasattr(settings, "PRODUCER_CLIENT_ID_CJ")
 
         # Should have sensible defaults (localhost for local development)
         assert settings.KAFKA_BOOTSTRAP_SERVERS == "localhost:9092"

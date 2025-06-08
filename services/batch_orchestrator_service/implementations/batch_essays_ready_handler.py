@@ -164,20 +164,22 @@ class BatchEssaysReadyHandler:
                         pipeline_detail.status = PipelineExecutionStatus.FAILED
                         pipeline_detail.error_info = {
                             "error": str(e),
-                            "timestamp": datetime.now(timezone.utc).isoformat()
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
                         }
                         await self.batch_repo.save_processing_pipeline_state(
                             batch_id, current_pipeline_state
                         )
                 else:  # Dictionary - backwards compatibility
                     updated_pipeline_state = current_pipeline_state.copy()
-                    updated_pipeline_state.update({
-                        f"{first_phase_name.value}_status": "FAILED",
-                        f"{first_phase_name.value}_error": str(e),
-                        f"{first_phase_name.value}_failed_at": (
-                            datetime.now(timezone.utc).isoformat()
-                        ),
-                    })
+                    updated_pipeline_state.update(
+                        {
+                            f"{first_phase_name.value}_status": "FAILED",
+                            f"{first_phase_name.value}_error": str(e),
+                            f"{first_phase_name.value}_failed_at": (
+                                datetime.now(timezone.utc).isoformat()
+                            ),
+                        }
+                    )
                     await self.batch_repo.save_processing_pipeline_state(
                         batch_id, updated_pipeline_state
                     )
@@ -196,12 +198,14 @@ class BatchEssaysReadyHandler:
                     )
             else:  # Dictionary - backwards compatibility
                 updated_pipeline_state = current_pipeline_state.copy()
-                updated_pipeline_state.update({
-                    f"{first_phase_name.value}_status": "DISPATCH_INITIATED",
-                    f"{first_phase_name.value}_initiated_at": (
-                        datetime.now(timezone.utc).isoformat()
-                    ),
-                })
+                updated_pipeline_state.update(
+                    {
+                        f"{first_phase_name.value}_status": "DISPATCH_INITIATED",
+                        f"{first_phase_name.value}_initiated_at": (
+                            datetime.now(timezone.utc).isoformat()
+                        ),
+                    }
+                )
                 await self.batch_repo.save_processing_pipeline_state(
                     batch_id, updated_pipeline_state
                 )

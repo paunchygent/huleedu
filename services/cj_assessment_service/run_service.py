@@ -42,19 +42,15 @@ class ServiceManager:
 
         try:
             # Create tasks for both services
-            kafka_task = asyncio.create_task(
-                self._run_kafka_worker_with_shutdown()
-            )
-            health_api_task = asyncio.create_task(
-                self._run_health_api_with_shutdown()
-            )
+            kafka_task = asyncio.create_task(self._run_kafka_worker_with_shutdown())
+            health_api_task = asyncio.create_task(self._run_health_api_with_shutdown())
 
             self.tasks = [kafka_task, health_api_task]
 
             # Wait for shutdown signal or any task to complete/fail
             done, pending = await asyncio.wait(
                 self.tasks + [asyncio.create_task(self.shutdown_event.wait())],
-                return_when=asyncio.FIRST_COMPLETED
+                return_when=asyncio.FIRST_COMPLETED,
             )
 
             # Cancel remaining tasks
@@ -108,9 +104,7 @@ async def main() -> None:
     settings = Settings()
 
     # Configure logging
-    configure_service_logging(
-        "cj_assessment_service", log_level=settings.LOG_LEVEL
-    )
+    configure_service_logging("cj_assessment_service", log_level=settings.LOG_LEVEL)
 
     logger.info("CJ Assessment Service starting up")
     logger.info(f"Kafka worker + Health API on port {settings.METRICS_PORT}")

@@ -87,8 +87,8 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
 
     async def get_batch_context(self, batch_id: str) -> BatchRegistrationRequestV1 | None:
         """Retrieve batch context information."""
-        result: BatchRegistrationRequestV1 | None = (
-            await self.context_ops.get_batch_context(batch_id)
+        result: BatchRegistrationRequestV1 | None = await self.context_ops.get_batch_context(
+            batch_id
         )
         return result
 

@@ -28,7 +28,7 @@ class TestCoreLogicValidationErrors:
         mock_text_extractor: AsyncMock,
         mock_content_validator: AsyncMock,
         mock_content_client: AsyncMock,
-        mock_event_publisher: AsyncMock
+        mock_event_publisher: AsyncMock,
     ) -> None:
         """Test handling of text extraction failures before validation."""
         # Arrange
@@ -51,7 +51,7 @@ class TestCoreLogicValidationErrors:
             text_extractor=mock_text_extractor,
             content_validator=mock_content_validator,
             content_client=mock_content_client,
-            event_publisher=mock_event_publisher
+            event_publisher=mock_event_publisher,
         )
 
         # Assert
@@ -79,7 +79,7 @@ class TestCoreLogicValidationErrors:
         mock_text_extractor: AsyncMock,
         mock_content_validator: AsyncMock,
         mock_content_client: AsyncMock,
-        mock_event_publisher: AsyncMock
+        mock_event_publisher: AsyncMock,
     ) -> None:
         """Test handling of content service errors after successful validation."""
         # Arrange
@@ -100,7 +100,7 @@ class TestCoreLogicValidationErrors:
             text_extractor=mock_text_extractor,
             content_validator=mock_content_validator,
             content_client=mock_content_client,
-            event_publisher=mock_event_publisher
+            event_publisher=mock_event_publisher,
         )
 
         # Assert

@@ -53,6 +53,7 @@ def app() -> Quart:
 
     # Import and register the blueprint
     from services.content_service.api.content_routes import content_bp
+
     app.register_blueprint(content_bp)
 
     return app
@@ -169,6 +170,7 @@ class TestContentRoutesMetricsIntegration:
 
         # All should be async methods
         import inspect
+
         assert inspect.iscoroutinefunction(mock_store.save_content)
         assert inspect.iscoroutinefunction(mock_store.content_exists)
         assert inspect.iscoroutinefunction(mock_store.get_content_path)

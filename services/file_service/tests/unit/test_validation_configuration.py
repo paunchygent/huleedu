@@ -44,7 +44,7 @@ class TestValidationSettings:
         """Test that custom length limits can be set via environment variables."""
         env_vars = {
             "FILE_SERVICE_MIN_CONTENT_LENGTH": "25",
-            "FILE_SERVICE_MAX_CONTENT_LENGTH": "2000"
+            "FILE_SERVICE_MAX_CONTENT_LENGTH": "2000",
         }
 
         with patch.dict(os.environ, env_vars):
@@ -66,7 +66,8 @@ class TestValidationSettings:
 
         # Test existing topic is preserved
         assert settings.ESSAY_CONTENT_PROVISIONED_TOPIC == topic_name(
-            ProcessingEvent.ESSAY_CONTENT_PROVISIONED)
+            ProcessingEvent.ESSAY_CONTENT_PROVISIONED
+        )
 
         # Test new validation failure topic is configured
         assert settings.ESSAY_VALIDATION_FAILED_TOPIC == "huleedu.file.essay.validation.failed.v1"
@@ -99,7 +100,7 @@ class TestValidationSettings:
         """Test handling of negative length values in configuration."""
         env_vars = {
             "FILE_SERVICE_MIN_CONTENT_LENGTH": "-10",
-            "FILE_SERVICE_MAX_CONTENT_LENGTH": "-100"
+            "FILE_SERVICE_MAX_CONTENT_LENGTH": "-100",
         }
 
         with patch.dict(os.environ, env_vars):
@@ -112,7 +113,7 @@ class TestValidationSettings:
         """Test configuration with boundary values for length limits."""
         env_vars = {
             "FILE_SERVICE_MIN_CONTENT_LENGTH": "1",
-            "FILE_SERVICE_MAX_CONTENT_LENGTH": "1000000"
+            "FILE_SERVICE_MAX_CONTENT_LENGTH": "1000000",
         }
 
         with patch.dict(os.environ, env_vars):
@@ -162,13 +163,13 @@ class TestValidationSettings:
                 "FILE_SERVICE_CONTENT_VALIDATION_ENABLED": "true",
                 "FILE_SERVICE_MIN_CONTENT_LENGTH": "30",
                 "FILE_SERVICE_MAX_CONTENT_LENGTH": "5000",
-                "FILE_SERVICE_VALIDATION_LOG_LEVEL": "WARNING"
+                "FILE_SERVICE_VALIDATION_LOG_LEVEL": "WARNING",
             },
             {
                 "FILE_SERVICE_CONTENT_VALIDATION_ENABLED": "false",
                 "FILE_SERVICE_MIN_CONTENT_LENGTH": "0",
-                "FILE_SERVICE_MAX_CONTENT_LENGTH": "100000"
-            }
+                "FILE_SERVICE_MAX_CONTENT_LENGTH": "100000",
+            },
         ]
 
         for env_vars in test_combinations:
@@ -177,12 +178,17 @@ class TestValidationSettings:
 
                 # Verify each setting is applied correctly
                 assert settings.CONTENT_VALIDATION_ENABLED == (
-                    env_vars.get("FILE_SERVICE_CONTENT_VALIDATION_ENABLED") == "true")
+                    env_vars.get("FILE_SERVICE_CONTENT_VALIDATION_ENABLED") == "true"
+                )
                 assert settings.MIN_CONTENT_LENGTH == int(
-                    env_vars["FILE_SERVICE_MIN_CONTENT_LENGTH"])
+                    env_vars["FILE_SERVICE_MIN_CONTENT_LENGTH"]
+                )
                 assert settings.MAX_CONTENT_LENGTH == int(
-                    env_vars["FILE_SERVICE_MAX_CONTENT_LENGTH"])
+                    env_vars["FILE_SERVICE_MAX_CONTENT_LENGTH"]
+                )
 
                 if "FILE_SERVICE_VALIDATION_LOG_LEVEL" in env_vars:
-                    assert settings.VALIDATION_LOG_LEVEL == env_vars[
-                        "FILE_SERVICE_VALIDATION_LOG_LEVEL"]
+                    assert (
+                        settings.VALIDATION_LOG_LEVEL
+                        == env_vars["FILE_SERVICE_VALIDATION_LOG_LEVEL"]
+                    )

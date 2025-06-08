@@ -24,7 +24,7 @@ def create_di_container() -> AsyncContainer:
     global _app_container_ref
     # Initialize DI container
     container = make_async_container(ContentServiceProvider())
-    _app_container_ref = container # Keep a reference for shutdown
+    _app_container_ref = container  # Keep a reference for shutdown
     logger.info("DI AsyncContainer created.")
     return container
 
@@ -48,9 +48,7 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
             app.extensions = getattr(app, "extensions", {})
             app.extensions["metrics"] = metrics
 
-            logger.info(
-                "Content Service content store and metrics initialized successfully."
-            )
+            logger.info("Content Service content store and metrics initialized successfully.")
     except Exception as e:
         logger.critical(f"Failed to initialize Content Service: {e}", exc_info=True)
         raise
@@ -58,7 +56,7 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
 
 async def shutdown_services() -> None:
     """Gracefully shutdown the Content Service's DI container."""
-    global _app_container_ref # Use the reference stored during creation
+    global _app_container_ref  # Use the reference stored during creation
 
     try:
         if _app_container_ref:

@@ -25,14 +25,14 @@ def test_essay_status_completeness():
 
         # Test that ALL_PROCESSING_COMPLETED exists
         msg = "ALL_PROCESSING_COMPLETED missing from EssayStatus"
-        assert hasattr(EssayStatus, 'ALL_PROCESSING_COMPLETED'), msg
+        assert hasattr(EssayStatus, "ALL_PROCESSING_COMPLETED"), msg
 
         # Test all required CJ assessment states exist
         required_cj_states = [
-            'AWAITING_CJ_ASSESSMENT',
-            'CJ_ASSESSMENT_IN_PROGRESS',
-            'CJ_ASSESSMENT_SUCCESS',
-            'CJ_ASSESSMENT_FAILED'
+            "AWAITING_CJ_ASSESSMENT",
+            "CJ_ASSESSMENT_IN_PROGRESS",
+            "CJ_ASSESSMENT_SUCCESS",
+            "CJ_ASSESSMENT_FAILED",
         ]
 
         for state in required_cj_states:
@@ -40,22 +40,17 @@ def test_essay_status_completeness():
 
         # Test all required AI feedback states exist
         required_ai_states = [
-            'AWAITING_AI_FEEDBACK',
-            'AI_FEEDBACK_IN_PROGRESS',
-            'AI_FEEDBACK_SUCCESS',
-            'AI_FEEDBACK_FAILED'
+            "AWAITING_AI_FEEDBACK",
+            "AI_FEEDBACK_IN_PROGRESS",
+            "AI_FEEDBACK_SUCCESS",
+            "AI_FEEDBACK_FAILED",
         ]
 
         for state in required_ai_states:
             assert hasattr(EssayStatus, state), f"Missing AI feedback state: {state}"
 
         # Test all required NLP states exist
-        required_nlp_states = [
-            'AWAITING_NLP',
-            'NLP_IN_PROGRESS',
-            'NLP_SUCCESS',
-            'NLP_FAILED'
-        ]
+        required_nlp_states = ["AWAITING_NLP", "NLP_IN_PROGRESS", "NLP_SUCCESS", "NLP_FAILED"]
 
         for state in required_nlp_states:
             assert hasattr(EssayStatus, state), f"Missing NLP state: {state}"
@@ -84,37 +79,36 @@ def test_els_batch_phase_outcome_event():
 
         # Test basic event creation
         test_event = ELSBatchPhaseOutcomeV1(
-            batch_id='test-batch-123',
-            phase_name='spellcheck',
-            phase_status='COMPLETED_SUCCESSFULLY',
+            batch_id="test-batch-123",
+            phase_name="spellcheck",
+            phase_status="COMPLETED_SUCCESSFULLY",
             processed_essays=[],
             failed_essay_ids=[],
-            correlation_id=uuid4()
+            correlation_id=uuid4(),
         )
 
-        assert test_event.batch_id == 'test-batch-123'
-        assert test_event.phase_name == 'spellcheck'
-        assert test_event.phase_status == 'COMPLETED_SUCCESSFULLY'
+        assert test_event.batch_id == "test-batch-123"
+        assert test_event.phase_name == "spellcheck"
+        assert test_event.phase_status == "COMPLETED_SUCCESSFULLY"
         assert isinstance(test_event.processed_essays, list)
         assert isinstance(test_event.failed_essay_ids, list)
 
         # Test with essay processing references
         test_essay_ref = EssayProcessingInputRefV1(
-            essay_id='essay-123',
-            text_storage_id='storage-456'
+            essay_id="essay-123", text_storage_id="storage-456"
         )
 
         test_event_with_essays = ELSBatchPhaseOutcomeV1(
-            batch_id='test-batch-456',
-            phase_name='ai_feedback',
-            phase_status='COMPLETED_WITH_FAILURES',
+            batch_id="test-batch-456",
+            phase_name="ai_feedback",
+            phase_status="COMPLETED_WITH_FAILURES",
             processed_essays=[test_essay_ref],
-            failed_essay_ids=['essay-789'],
-            correlation_id=uuid4()
+            failed_essay_ids=["essay-789"],
+            correlation_id=uuid4(),
         )
 
         assert len(test_event_with_essays.processed_essays) == 1
-        assert test_event_with_essays.processed_essays[0].essay_id == 'essay-123'
+        assert test_event_with_essays.processed_essays[0].essay_id == "essay-123"
         assert len(test_event_with_essays.failed_essay_ids) == 1
 
         print("✅ ELSBatchPhaseOutcomeV1 event model validation passed")
@@ -141,13 +135,10 @@ def test_processing_event_updates():
 
         # Test that ELS_BATCH_PHASE_OUTCOME event exists
         msg = "ELS_BATCH_PHASE_OUTCOME missing from ProcessingEvent"
-        assert hasattr(ProcessingEvent, 'ELS_BATCH_PHASE_OUTCOME'), msg
+        assert hasattr(ProcessingEvent, "ELS_BATCH_PHASE_OUTCOME"), msg
 
         # Test additional command events for AI feedback and NLP if they should exist
-        potential_new_events = [
-            'BATCH_AIFEEDBACK_INITIATE_COMMAND',
-            'BATCH_NLP_INITIATE_COMMAND'
-        ]
+        potential_new_events = ["BATCH_AIFEEDBACK_INITIATE_COMMAND", "BATCH_NLP_INITIATE_COMMAND"]
 
         for event in potential_new_events:
             if hasattr(ProcessingEvent, event):
@@ -179,7 +170,7 @@ def test_topic_name_mapping():
         assert spellcheck_topic == "huleedu.essay.spellcheck.requested.v1"
 
         # Test new ELS batch phase outcome mapping
-        if hasattr(ProcessingEvent, 'ELS_BATCH_PHASE_OUTCOME'):
+        if hasattr(ProcessingEvent, "ELS_BATCH_PHASE_OUTCOME"):
             phase_outcome_topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
             msg = "ELS_BATCH_PHASE_OUTCOME should have topic mapping"
             assert phase_outcome_topic is not None, msg
@@ -209,27 +200,26 @@ def test_event_serialization():
 
         # Create test event with complete data
         test_essay_ref = EssayProcessingInputRefV1(
-            essay_id='essay-123',
-            text_storage_id='storage-456'
+            essay_id="essay-123", text_storage_id="storage-456"
         )
 
         original_event = ELSBatchPhaseOutcomeV1(
-            batch_id='test-batch-789',
-            phase_name='cj_assessment',
-            phase_status='COMPLETED_SUCCESSFULLY',
+            batch_id="test-batch-789",
+            phase_name="cj_assessment",
+            phase_status="COMPLETED_SUCCESSFULLY",
             processed_essays=[test_essay_ref],
-            failed_essay_ids=['failed-essay-1', 'failed-essay-2'],
-            correlation_id=uuid4()
+            failed_essay_ids=["failed-essay-1", "failed-essay-2"],
+            correlation_id=uuid4(),
         )
 
         # Test JSON serialization
         json_str = original_event.model_dump_json()
         json_data = json.loads(json_str)
 
-        assert json_data['batch_id'] == 'test-batch-789'
-        assert json_data['phase_name'] == 'cj_assessment'
-        assert len(json_data['processed_essays']) == 1
-        assert len(json_data['failed_essay_ids']) == 2
+        assert json_data["batch_id"] == "test-batch-789"
+        assert json_data["phase_name"] == "cj_assessment"
+        assert len(json_data["processed_essays"]) == 1
+        assert len(json_data["failed_essay_ids"]) == 2
 
         # Test deserialization
         reconstructed_event = ELSBatchPhaseOutcomeV1.model_validate_json(json_str)
@@ -261,7 +251,7 @@ def main():
         test_els_batch_phase_outcome_event,
         test_processing_event_updates,
         test_topic_name_mapping,
-        test_event_serialization
+        test_event_serialization,
     ]
 
     results = []

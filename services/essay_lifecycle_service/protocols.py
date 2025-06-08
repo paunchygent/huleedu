@@ -84,7 +84,9 @@ class EssayRepositoryProtocol(Protocol):
         """Create or update essay state for slot assignment with content metadata."""
         ...
 
-    async def list_essays_by_batch_and_phase(self, batch_id: str, phase_name: str) -> list[EssayState]:
+    async def list_essays_by_batch_and_phase(
+        self, batch_id: str, phase_name: str
+    ) -> list[EssayState]:
         """List all essays in a batch that are part of a specific processing phase."""
         ...
 
@@ -377,7 +379,9 @@ class BatchEssayTracker(Protocol):
         """Register callback for batch coordination events."""
         ...
 
-    async def handle_validation_failure(self, event: Any) -> Any | None:  # EssayValidationFailedV1 -> BatchEssaysReady | None
+    async def handle_validation_failure(
+        self, event: Any
+    ) -> Any | None:  # EssayValidationFailedV1 -> BatchEssaysReady | None
         """Handle validation failure event for batch coordination."""
         ...
 

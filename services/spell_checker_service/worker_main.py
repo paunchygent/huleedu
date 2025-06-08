@@ -199,25 +199,30 @@ async def spell_checker_worker_main() -> None:
                                             http_session,
                                             content_client,  # From DI
                                             result_store,  # From DI
-                                            event_publisher_instance,  # Instantiated by kafka_clients context mgr
+                                            # Instantiated by kafka_clients context mgr
+                                            event_publisher_instance,
                                             spell_logic,  # From DI
                                             consumer_group_id=CONSUMER_GROUP_ID,
                                             kafka_queue_latency_metric=KAFKA_QUEUE_LATENCY,
                                         )
                                         if should_commit:
                                             # Store offset for this specific message
-                                            # Create a TopicPartition instance for the current message
+                                            # Create a TopicPartition instance for current message
                                             tp_instance = TopicPartition(msg.topic, msg.partition)
                                             offsets = {tp_instance: msg.offset + 1}
                                             await consumer.commit(offsets)
                                             logger.debug(
-                                                f"Committed offset {msg.offset + 1} for {tp_instance}"
+                                                (
+                                                    f"Committed offset {msg.offset + 1} for "
+                                                    f"{tp_instance}"
+                                                )
                                             )
                                     if stop_event.is_set():
                                         break
                             except KafkaConnectionError as kce:
                                 logger.error(
-                                    f"Kafka connection error during consumption: {kce}", exc_info=True
+                                    f"Kafka connection error during consumption: {kce}",
+                                    exc_info=True,
                                 )
                                 stop_event.set()  # Stop on critical Kafka error
                             except Exception as e:
@@ -236,7 +241,8 @@ async def spell_checker_worker_main() -> None:
                 await asyncio.sleep(2**retry_count)  # Exponential backoff
             except Exception as e_outer:
                 logger.critical(
-                    f"Unhandled critical error in spell_checker_worker_main: {e_outer}", exc_info=True
+                    f"Unhandled critical error in spell_checker_worker_main: {e_outer}",
+                    exc_info=True,
                 )
                 stop_event.set()  # Critical error, stop the worker
                 break  # Exit while loop

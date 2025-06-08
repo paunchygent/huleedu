@@ -56,9 +56,7 @@ class BatchCrudOperations:
         """Create a new batch record."""
         async with self.db.session() as session:
             # Extract and validate status
-            status_value = batch_data.get(
-                "status", BatchStatus.AWAITING_CONTENT_VALIDATION.value
-            )
+            status_value = batch_data.get("status", BatchStatus.AWAITING_CONTENT_VALIDATION.value)
             if isinstance(status_value, str):
                 status = BatchStatus(status_value)
             else:

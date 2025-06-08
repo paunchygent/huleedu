@@ -42,13 +42,14 @@ async def test_complete_validation_failure_0_of_25():
     try:
         # NOW trigger operations - consumer is guaranteed ready
         batch_id, correlation_id = await create_test_batch(
-            course_code, class_designation, essay_count)
+            course_code, class_designation, essay_count
+        )
 
         # Create all failing files
         test_files = create_validation_test_files(success_count=0, failure_count=25)
 
         # Upload files
-        upload_result = await upload_test_files(batch_id, test_files)
+        _ = await upload_test_files(batch_id, test_files)
 
         # Collect events using active polling (proven working pattern)
         validation_failures = []
@@ -71,10 +72,12 @@ async def test_complete_validation_failure_0_of_25():
                         # Log events for debugging
                         if topic == TOPICS["validation_failed"]:
                             logger.info(
-                                f"🔴 VALIDATION FAILURE: {json.dumps(event_data, indent=2)}")
+                                f"🔴 VALIDATION FAILURE: {json.dumps(event_data, indent=2)}"
+                            )
                         elif topic == TOPICS["content_provisioned"]:
                             logger.info(
-                                f"✅ CONTENT PROVISIONED: {json.dumps(event_data, indent=2)}")
+                                f"✅ CONTENT PROVISIONED: {json.dumps(event_data, indent=2)}"
+                            )
                         elif topic == TOPICS["batch_ready"]:
                             logger.info(f"🎯 BATCH READY: {json.dumps(event_data, indent=2)}")
 
@@ -84,7 +87,9 @@ async def test_complete_validation_failure_0_of_25():
                             if "data" in event_data and isinstance(event_data["data"], dict):
                                 failure_data = event_data["data"]
                                 if failure_data.get("batch_id") == batch_id:
-                                    validation_failures.append(EssayValidationFailedV1(**failure_data))
+                                    validation_failures.append(
+                                        EssayValidationFailedV1(**failure_data)
+                                    )
                             # Handle direct event format
                             elif event_data.get("batch_id") == batch_id:
                                 validation_failures.append(EssayValidationFailedV1(**event_data))
@@ -118,14 +123,16 @@ async def test_complete_validation_failure_0_of_25():
                 break
 
         # Validate results
-        assert len(validation_failures) == 25, \
+        assert len(validation_failures) == 25, (
             f"Expected 25 validation failures, got {len(validation_failures)}"
-        assert content_provisions == 0, \
-            f"Expected 0 content provisions, got {content_provisions}"
-        assert batch_ready_event is not None, \
+        )
+        assert content_provisions == 0, f"Expected 0 content provisions, got {content_provisions}"
+        assert batch_ready_event is not None, (
             "Expected BatchEssaysReady event even for complete failure"
-        assert len(batch_ready_event.ready_essays) == 0, \
+        )
+        assert len(batch_ready_event.ready_essays) == 0, (
             f"Expected 0 ready essays, got {len(batch_ready_event.ready_essays)}"
+        )
 
         # Validate complete failure coordination
         assert batch_ready_event.validation_failures is not None
@@ -133,7 +140,8 @@ async def test_complete_validation_failure_0_of_25():
         assert batch_ready_event.total_files_processed == 25
 
         logger.info(
-            "✅ COMPLETE FAILURE TEST (0/25): Success - Complete failure coordination validated")
+            "✅ COMPLETE FAILURE TEST (0/25): Success - Complete failure coordination validated"
+        )
 
     finally:
         await event_consumer.stop()
@@ -155,7 +163,8 @@ async def test_validation_coordination_timing():
         # Start timing and NOW trigger operations - consumer is guaranteed ready
         timing_start = datetime.now()
         batch_id, correlation_id = await create_test_batch(
-            course_code, class_designation, essay_count)
+            course_code, class_designation, essay_count
+        )
 
         # Create mixed success/failure pattern
         test_files = create_validation_test_files(success_count=7, failure_count=3)
@@ -188,7 +197,8 @@ async def test_validation_coordination_timing():
                                 failure_data = event_data["data"]
                                 if failure_data.get("batch_id") == batch_id:
                                     validation_failures.append(
-                                        EssayValidationFailedV1(**failure_data))
+                                        EssayValidationFailedV1(**failure_data)
+                                    )
                             # Handle direct event format
                             elif event_data.get("batch_id") == batch_id:
                                 validation_failures.append(EssayValidationFailedV1(**event_data))
@@ -217,8 +227,11 @@ async def test_validation_coordination_timing():
                         logger.error(f"Error processing event: {e}")
 
             # Check if we have all expected events (7 provisions + 3 failures + batch ready)
-            if batch_ready_event is not None and content_provisions == 7 and len(
-                    validation_failures) == 3:
+            if (
+                batch_ready_event is not None
+                and content_provisions == 7
+                and len(validation_failures) == 3
+            ):
                 logger.info("All expected events collected, breaking early")
                 break
 
@@ -236,7 +249,8 @@ async def test_validation_coordination_timing():
         assert len(batch_ready_event.ready_essays) == 7
 
         logger.info(
-            f"✅ TIMING TEST: Coordination completed in {coordination_time:.2f}s (target: <30s)")
+            f"✅ TIMING TEST: Coordination completed in {coordination_time:.2f}s (target: <30s)"
+        )
 
     finally:
         await event_consumer.stop()

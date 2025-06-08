@@ -152,7 +152,9 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         """Get list of currently tracked batch IDs."""
         return list(self.batch_expectations.keys())
 
-    async def handle_validation_failure(self, event: Any) -> Any | None:  # EssayValidationFailedV1 -> BatchEssaysReady | None
+    async def handle_validation_failure(
+        self, event: Any
+    ) -> Any | None:  # EssayValidationFailedV1 -> BatchEssaysReady | None
         """
         Handle validation failure by adjusting batch expectations.
 
@@ -214,7 +216,9 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         return None
 
-    def _create_batch_ready_event(self, batch_id: str, expectation: BatchExpectation) -> BatchEssaysReady:
+    def _create_batch_ready_event(
+        self, batch_id: str, expectation: BatchExpectation
+    ) -> BatchEssaysReady:
         """Create BatchEssaysReady event and clean up completed batch."""
         # Get validation failures for this batch
         failures = self.validation_failures.get(batch_id, [])
@@ -234,7 +238,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 event="batch.essays.ready",
             ),
             validation_failures=failures if failures else None,
-            total_files_processed=len(expectation.slot_assignments) + len(failures)
+            total_files_processed=len(expectation.slot_assignments) + len(failures),
         )
 
         self._logger.info(

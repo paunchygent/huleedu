@@ -48,7 +48,7 @@ class TestContentValidatorProtocol:
                 return ValidationResult(
                     is_valid=len(text) > 0,
                     error_code="EMPTY_CONTENT" if not text else None,
-                    error_message="Content is empty" if not text else None
+                    error_message="Content is empty" if not text else None,
                 )
 
         validator = TestValidator()

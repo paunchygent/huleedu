@@ -85,4 +85,5 @@ class SpellCheckerServiceProvider(Provider):
         from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
             DefaultSpellLogic,
         )
+
         return DefaultSpellLogic(result_store, http_session)

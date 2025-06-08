@@ -17,7 +17,7 @@ TEST_BATCH_IDS = {
     "storage_failure": "test_batch_storage_fail",
     "correlation": "test_batch_correlation",
     "fail_correlation": "test_batch_fail_correlation",
-    "empty_success": "test_batch_empty_success"
+    "empty_success": "test_batch_empty_success",
 }
 
 TEST_FILE_NAMES = {
@@ -28,7 +28,7 @@ TEST_FILE_NAMES = {
     "storage_fail": "valid_essay.txt",
     "correlation": "correlation_test.txt",
     "fail_correlation": "short_essay.txt",
-    "empty_success": "empty.txt"
+    "empty_success": "empty.txt",
 }
 
 VALID_FILE_CONTENT = b"Valid essay content for testing"

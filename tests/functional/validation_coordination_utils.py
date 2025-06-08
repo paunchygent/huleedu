@@ -48,7 +48,7 @@ async def create_test_batch(
     course_code: str,
     class_designation: str,
     essay_count: int,
-    essay_instructions: str = "Test validation coordination"
+    essay_instructions: str = "Test validation coordination",
 ) -> tuple[str, str]:
     """Create a batch via BOS API and return batch_id and correlation_id."""
     async with aiohttp.ClientSession() as session:
@@ -83,16 +83,19 @@ def create_validation_test_files(success_count: int, failure_count: int) -> List
 
     # Create successful files (valid content)
     for i in range(success_count):
-        files.append({
-            "name": f"valid_essay_{i+1:02d}.txt",
-            "content": (
-                f"This is valid essay number {i+1} with sufficient content for validation. " * 10
-                + "It contains multiple sentences and meets the minimum length requirements. "
-                + "The essay has meaningful content and proper "
-                + "structure for testing validation coordination."
-            ),
-            "expected_outcome": "success"
-        })
+        files.append(
+            {
+                "name": f"valid_essay_{i + 1:02d}.txt",
+                "content": (
+                    f"This is valid essay number {i + 1} with sufficient content for validation. "
+                    * 10
+                    + "It contains multiple sentences and meets the minimum length requirements. "
+                    + "The essay has meaningful content and proper "
+                    + "structure for testing validation coordination."
+                ),
+                "expected_outcome": "success",
+            }
+        )
 
     # Create failure files (various validation failure types)
     failure_types = [
@@ -103,12 +106,14 @@ def create_validation_test_files(success_count: int, failure_count: int) -> List
 
     for i in range(failure_count):
         failure_type = failure_types[i % len(failure_types)]
-        files.append({
-            "name": f"invalid_essay_{failure_type['suffix']}_{i+1:02d}.txt",
-            "content": failure_type["content"],
-            "expected_outcome": "validation_failure",
-            "expected_error_code": failure_type["error_code"]
-        })
+        files.append(
+            {
+                "name": f"invalid_essay_{failure_type['suffix']}_{i + 1:02d}.txt",
+                "content": failure_type["content"],
+                "expected_outcome": "validation_failure",
+                "expected_error_code": failure_type["error_code"],
+            }
+        )
 
     return files
 
@@ -122,10 +127,7 @@ async def upload_test_files(batch_id: str, files: List[Dict[str, Any]]) -> Any:
 
         for file_info in files:
             data.add_field(
-                "files",
-                file_info["content"],
-                filename=file_info["name"],
-                content_type="text/plain"
+                "files", file_info["content"], filename=file_info["name"], content_type="text/plain"
             )
 
         async with session.post(

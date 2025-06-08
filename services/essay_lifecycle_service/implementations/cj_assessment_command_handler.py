@@ -79,8 +79,7 @@ class CJAssessmentCommandHandler:
 
                 # Instantiate EssayStateMachine with current status
                 essay_machine = EssayStateMachine(
-                    essay_id=essay_id,
-                    initial_status=essay_state_model.current_status
+                    essay_id=essay_id, initial_status=essay_state_model.current_status
                 )
 
                 # Log current state before transition attempt
@@ -92,7 +91,7 @@ class CJAssessmentCommandHandler:
                         "valid_triggers": essay_machine.get_valid_triggers(),
                         "batch_id": command_data.entity_ref.entity_id,
                         "correlation_id": str(correlation_id),
-                    }
+                    },
                 )
 
                 # Attempt to trigger the transition for initiating CJ assessment
@@ -104,12 +103,15 @@ class CJAssessmentCommandHandler:
                         {
                             "bos_command": "cj_assessment_initiate",
                             "current_phase": "cj_assessment",
-                            "commanded_phases": list(set(
-                                essay_state_model.processing_metadata.get(
-                                    "commanded_phases", []
-                                ) + ["cj_assessment"]
-                            ))
-                        }
+                            "commanded_phases": list(
+                                set(
+                                    essay_state_model.processing_metadata.get(
+                                        "commanded_phases", []
+                                    )
+                                    + ["cj_assessment"]
+                                )
+                            ),
+                        },
                     )
 
                     logger.info(
@@ -162,9 +164,7 @@ class CJAssessmentCommandHandler:
                     "Successfully dispatched CJ assessment requests for transitioned essays",
                     extra={
                         "batch_id": command_data.entity_ref.entity_id,
-                        "transitioned_essays_count": len(
-                            successfully_transitioned_essays
-                        ),
+                        "transitioned_essays_count": len(successfully_transitioned_essays),
                         "correlation_id": str(correlation_id),
                     },
                 )
@@ -172,11 +172,13 @@ class CJAssessmentCommandHandler:
                 # Trigger EVT_CJ_ASSESSMENT_STARTED after successful dispatch
                 for essay_ref in successfully_transitioned_essays:
                     try:
-                        essay_state_model = await self.repository.get_essay_state(essay_ref.essay_id)
+                        essay_state_model = await self.repository.get_essay_state(
+                            essay_ref.essay_id
+                        )
                         if essay_state_model:
                             essay_machine = EssayStateMachine(
                                 essay_id=essay_ref.essay_id,
-                                initial_status=essay_state_model.current_status
+                                initial_status=essay_state_model.current_status,
                             )
 
                             logger.info(
@@ -186,17 +188,14 @@ class CJAssessmentCommandHandler:
                                     "current_status": essay_state_model.current_status.value,
                                     "batch_id": command_data.entity_ref.entity_id,
                                     "correlation_id": str(correlation_id),
-                                }
+                                },
                             )
 
                             if essay_machine.trigger(EVT_CJ_ASSESSMENT_STARTED):
                                 await self.repository.update_essay_status_via_machine(
                                     essay_ref.essay_id,
                                     essay_machine.current_status,
-                                    {
-                                        "cj_assessment_phase": "started",
-                                        "dispatch_completed": True
-                                    }
+                                    {"cj_assessment_phase": "started", "dispatch_completed": True},
                                 )
                                 logger.info(
                                     f"Essay {essay_ref.essay_id} transitioned to "
@@ -239,5 +238,5 @@ class CJAssessmentCommandHandler:
             logger.warning(
                 f"No essays successfully transitioned to AWAITING_CJ_ASSESSMENT "
                 f"for batch {command_data.entity_ref.entity_id}. Skipping dispatch.",
-                extra={"correlation_id": str(correlation_id)}
+                extra={"correlation_id": str(correlation_id)},
             )

@@ -4,6 +4,7 @@ Tests for BOS phase coordination and event handling functionality.
 This module tests phase outcome consumption, next phase determination, and
 pipeline state updates in the Batch Orchestrator Service (BOS).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -54,18 +55,12 @@ class TestBOSPhaseCoordination:
         mock_batch_repo.get_batch_context.return_value = (
             sample_batch_registration_request_cj_enabled
         )
-        mock_batch_repo.get_processing_pipeline_state.return_value = (
-            ProcessingPipelineState(
-                batch_id=sample_batch_id,
-                requested_pipelines=["spellcheck", "cj_assessment"],
-                spellcheck=PipelineStateDetail(
-                    status=PipelineExecutionStatus.IN_PROGRESS
-                ),
-                cj_assessment=PipelineStateDetail(
-                    status=PipelineExecutionStatus.PENDING_DEPENDENCIES
-                ),
-            ).model_dump()
-        )
+        mock_batch_repo.get_processing_pipeline_state.return_value = ProcessingPipelineState(
+            batch_id=sample_batch_id,
+            requested_pipelines=["spellcheck", "cj_assessment"],
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
+            cj_assessment=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
+        ).model_dump()
 
         await pipeline_phase_coordinator.handle_phase_concluded(
             batch_id=sample_batch_id,
@@ -76,9 +71,9 @@ class TestBOSPhaseCoordination:
 
         # Should update spellcheck to completed
         mock_batch_repo.save_processing_pipeline_state.assert_called()
-        spellcheck_update_args = (
-            mock_batch_repo.save_processing_pipeline_state.call_args_list[0][0][1]
-        )
+        spellcheck_update_args = mock_batch_repo.save_processing_pipeline_state.call_args_list[0][
+            0
+        ][1]
         assert spellcheck_update_args["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
 
         # Should initiate CJ assessment
@@ -99,13 +94,11 @@ class TestBOSPhaseCoordination:
         mock_batch_repo.get_batch_context.return_value = (
             sample_batch_registration_request_cj_disabled
         )
-        mock_batch_repo.get_processing_pipeline_state.return_value = (
-            ProcessingPipelineState(
-                batch_id=sample_batch_id,
-                requested_pipelines=["spellcheck"],
-                spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
-            ).model_dump()
-        )
+        mock_batch_repo.get_processing_pipeline_state.return_value = ProcessingPipelineState(
+            batch_id=sample_batch_id,
+            requested_pipelines=["spellcheck"],
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
+        ).model_dump()
 
         await pipeline_phase_coordinator.handle_phase_concluded(
             batch_id=sample_batch_id,
@@ -116,9 +109,9 @@ class TestBOSPhaseCoordination:
 
         # Should update spellcheck to completed
         mock_batch_repo.save_processing_pipeline_state.assert_called()
-        spellcheck_update_args = (
-            mock_batch_repo.save_processing_pipeline_state.call_args_list[0][0][1]
-        )
+        spellcheck_update_args = mock_batch_repo.save_processing_pipeline_state.call_args_list[0][
+            0
+        ][1]
         assert spellcheck_update_args["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
 
         # Should NOT initiate CJ assessment
@@ -134,12 +127,9 @@ class TestBOSPhaseCoordination:
         Tests the direct update_phase_status method for pipeline state changes.
         """
         timestamp_now = datetime.now(timezone.utc).isoformat()
-        mock_batch_repo.get_processing_pipeline_state.return_value = (
-            ProcessingPipelineState(
-                batch_id=sample_batch_id,
-                requested_pipelines=["spellcheck"]
-            ).model_dump()
-        )
+        mock_batch_repo.get_processing_pipeline_state.return_value = ProcessingPipelineState(
+            batch_id=sample_batch_id, requested_pipelines=["spellcheck"]
+        ).model_dump()
 
         await pipeline_phase_coordinator.update_phase_status(
             batch_id=sample_batch_id,

@@ -4,6 +4,7 @@ Shared utilities, fixtures, and imports for BOS orchestration test suite.
 This module provides common test fixtures and setup used across multiple
 BOS orchestration test files to avoid duplication and maintain consistency.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -160,10 +161,6 @@ def sample_batch_registration_request_cj_disabled() -> BatchRegistrationRequestV
 def sample_essay_refs() -> list[EssayProcessingInputRefV1]:
     """Provides a list of sample EssayProcessingInputRefV1 objects."""
     return [
-        EssayProcessingInputRefV1(
-            essay_id=str(uuid.uuid4()), text_storage_id=str(uuid.uuid4())
-        ),
-        EssayProcessingInputRefV1(
-            essay_id=str(uuid.uuid4()), text_storage_id=str(uuid.uuid4())
-        ),
+        EssayProcessingInputRefV1(essay_id=str(uuid.uuid4()), text_storage_id=str(uuid.uuid4())),
+        EssayProcessingInputRefV1(essay_id=str(uuid.uuid4()), text_storage_id=str(uuid.uuid4())),
     ]

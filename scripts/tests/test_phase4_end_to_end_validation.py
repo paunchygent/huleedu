@@ -24,36 +24,35 @@ def test_pipeline_sequence_definitions():
 
         # Define test pipeline sequences
         test_sequences = {
-            'spellcheck_cj': ['spellcheck', 'cj_assessment'],
-            'spellcheck_ai_nlp': ['spellcheck', 'ai_feedback', 'nlp'],
-            'spellcheck_ai_cj': ['spellcheck', 'ai_feedback', 'cj_assessment'],
-            'minimal': ['spellcheck']
+            "spellcheck_cj": ["spellcheck", "cj_assessment"],
+            "spellcheck_ai_nlp": ["spellcheck", "ai_feedback", "nlp"],
+            "spellcheck_ai_cj": ["spellcheck", "ai_feedback", "cj_assessment"],
+            "minimal": ["spellcheck"],
         }
 
         sequence_metadata = {}
 
         for sequence_name, pipeline_stages in test_sequences.items():
             pipeline_state = ProcessingPipelineState(
-                batch_id=f'e2e-test-{sequence_name}',
-                requested_pipelines=pipeline_stages
+                batch_id=f"e2e-test-{sequence_name}", requested_pipelines=pipeline_stages
             )
 
             sequence_metadata[sequence_name] = {
-                'batch_id': pipeline_state.batch_id,
-                'stages': pipeline_state.requested_pipelines,
-                'stage_count': len(pipeline_state.requested_pipelines),
-                'has_cj': 'cj_assessment' in pipeline_stages,
-                'has_ai': 'ai_feedback' in pipeline_stages,
-                'has_nlp': 'nlp' in pipeline_stages
+                "batch_id": pipeline_state.batch_id,
+                "stages": pipeline_state.requested_pipelines,
+                "stage_count": len(pipeline_state.requested_pipelines),
+                "has_cj": "cj_assessment" in pipeline_stages,
+                "has_ai": "ai_feedback" in pipeline_stages,
+                "has_nlp": "nlp" in pipeline_stages,
             }
 
         # Validate sequence properties
-        assert sequence_metadata['spellcheck_cj']['stage_count'] == 2
-        assert sequence_metadata['spellcheck_cj']['has_cj']
-        assert sequence_metadata['spellcheck_ai_nlp']['stage_count'] == 3
-        assert sequence_metadata['spellcheck_ai_nlp']['has_ai']
-        assert sequence_metadata['spellcheck_ai_nlp']['has_nlp']
-        assert sequence_metadata['minimal']['stage_count'] == 1
+        assert sequence_metadata["spellcheck_cj"]["stage_count"] == 2
+        assert sequence_metadata["spellcheck_cj"]["has_cj"]
+        assert sequence_metadata["spellcheck_ai_nlp"]["stage_count"] == 3
+        assert sequence_metadata["spellcheck_ai_nlp"]["has_ai"]
+        assert sequence_metadata["spellcheck_ai_nlp"]["has_nlp"]
+        assert sequence_metadata["minimal"]["stage_count"] == 1
 
         print(f"✅ Pipeline sequence definitions validated for {len(test_sequences)} scenarios")
         return True, sequence_metadata
@@ -76,29 +75,29 @@ def test_communication_flow_patterns():
     try:
         # Test communication flow simulation
         communication_flows = {
-            'spellcheck_completion': {
-                'trigger': 'ELS completes spellcheck phase',
-                'event': 'ELSBatchPhaseOutcomeV1',
-                'response': 'BOS initiates next phase',
-                'next_action': 'BatchService*InitiateCommandDataV1'
+            "spellcheck_completion": {
+                "trigger": "ELS completes spellcheck phase",
+                "event": "ELSBatchPhaseOutcomeV1",
+                "response": "BOS initiates next phase",
+                "next_action": "BatchService*InitiateCommandDataV1",
             },
-            'phase_failure': {
-                'trigger': 'ELS reports phase failure',
-                'event': 'ELSBatchPhaseOutcomeV1 with failures',
-                'response': 'BOS handles partial success',
-                'next_action': 'Next phase with reduced essay list'
+            "phase_failure": {
+                "trigger": "ELS reports phase failure",
+                "event": "ELSBatchPhaseOutcomeV1 with failures",
+                "response": "BOS handles partial success",
+                "next_action": "Next phase with reduced essay list",
             },
-            'pipeline_completion': {
-                'trigger': 'ELS completes final phase',
-                'event': 'ELSBatchPhaseOutcomeV1 final',
-                'response': 'BOS marks batch complete',
-                'next_action': 'No further commands'
-            }
+            "pipeline_completion": {
+                "trigger": "ELS completes final phase",
+                "event": "ELSBatchPhaseOutcomeV1 final",
+                "response": "BOS marks batch complete",
+                "next_action": "No further commands",
+            },
         }
 
         # Validate each communication flow has required properties
         for flow_name, flow_details in communication_flows.items():
-            required_keys = ['trigger', 'event', 'response', 'next_action']
+            required_keys = ["trigger", "event", "response", "next_action"]
             for key in required_keys:
                 assert key in flow_details, f"Missing {key} in {flow_name} flow"
 
@@ -122,17 +121,17 @@ def test_partial_success_scenario():
 
         # Simulate batch with 5 essays
         initial_essays = [
-            EssayProcessingInputRefV1(essay_id=f'essay-{i}', text_storage_id=f'original-{i}')
+            EssayProcessingInputRefV1(essay_id=f"essay-{i}", text_storage_id=f"original-{i}")
             for i in range(1, 6)
         ]
 
         # Simulate spellcheck results: 3 succeed, 2 fail
         successful_essays = [
-            EssayProcessingInputRefV1(essay_id='essay-1', text_storage_id='corrected-1'),
-            EssayProcessingInputRefV1(essay_id='essay-2', text_storage_id='corrected-2'),
-            EssayProcessingInputRefV1(essay_id='essay-3', text_storage_id='corrected-3')
+            EssayProcessingInputRefV1(essay_id="essay-1", text_storage_id="corrected-1"),
+            EssayProcessingInputRefV1(essay_id="essay-2", text_storage_id="corrected-2"),
+            EssayProcessingInputRefV1(essay_id="essay-3", text_storage_id="corrected-3"),
         ]
-        failed_essay_ids = ['essay-4', 'essay-5']
+        failed_essay_ids = ["essay-4", "essay-5"]
 
         # Verify reduction
         assert len(initial_essays) == 5
@@ -145,7 +144,7 @@ def test_partial_success_scenario():
 
         # Verify text storage IDs are updated (corrected versions)
         for essay in next_phase_essays:
-            assert essay.text_storage_id.startswith('corrected-')
+            assert essay.text_storage_id.startswith("corrected-")
 
         print("✅ Partial success scenario handling validated")
         return True
@@ -171,14 +170,14 @@ def test_state_machine_integration_readiness():
 
         # Verify required essay states exist
         required_states = [
-            'READY_FOR_PROCESSING',
-            'AWAITING_SPELLCHECK',
-            'SPELLCHECKED_SUCCESS',
-            'AWAITING_AI_FEEDBACK',
-            'AI_FEEDBACK_SUCCESS',
-            'AWAITING_CJ_ASSESSMENT',
-            'CJ_ASSESSMENT_SUCCESS',
-            'ALL_PROCESSING_COMPLETED'
+            "READY_FOR_PROCESSING",
+            "AWAITING_SPELLCHECK",
+            "SPELLCHECKED_SUCCESS",
+            "AWAITING_AI_FEEDBACK",
+            "AI_FEEDBACK_SUCCESS",
+            "AWAITING_CJ_ASSESSMENT",
+            "CJ_ASSESSMENT_SUCCESS",
+            "ALL_PROCESSING_COMPLETED",
         ]
 
         missing_states = []
@@ -193,9 +192,9 @@ def test_state_machine_integration_readiness():
 
         # Test basic state progression logic
         progression_paths = [
-            ('READY_FOR_PROCESSING', 'CMD_INITIATE_SPELLCHECK', 'AWAITING_SPELLCHECK'),
-            ('SPELLCHECKED_SUCCESS', 'CMD_INITIATE_CJ_ASSESSMENT', 'AWAITING_CJ_ASSESSMENT'),
-            ('CJ_ASSESSMENT_SUCCESS', 'CMD_MARK_PIPELINE_COMPLETE', 'ALL_PROCESSING_COMPLETED')
+            ("READY_FOR_PROCESSING", "CMD_INITIATE_SPELLCHECK", "AWAITING_SPELLCHECK"),
+            ("SPELLCHECKED_SUCCESS", "CMD_INITIATE_CJ_ASSESSMENT", "AWAITING_CJ_ASSESSMENT"),
+            ("CJ_ASSESSMENT_SUCCESS", "CMD_MARK_PIPELINE_COMPLETE", "ALL_PROCESSING_COMPLETED"),
         ]
 
         print(f"✅ State progression paths defined for {len(progression_paths)} transitions")
@@ -220,19 +219,18 @@ def test_event_envelope_integration():
 
         # Test creating event envelope with proper Pydantic data
         test_essay_data = EssayProcessingInputRefV1(
-            essay_id='test-essay-123',
-            text_storage_id='test-storage-456'
+            essay_id="test-essay-123", text_storage_id="test-storage-456"
         )
 
         envelope = EventEnvelope(
             event_type=topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
-            source_service='test-service',
-            data=test_essay_data
+            source_service="test-service",
+            data=test_essay_data,
         )
 
         assert envelope.event_type is not None
-        assert envelope.source_service == 'test-service'
-        assert envelope.data.essay_id == 'test-essay-123'
+        assert envelope.source_service == "test-service"
+        assert envelope.data.essay_id == "test-essay-123"
         assert envelope.event_id is not None
         assert envelope.event_timestamp is not None
 
@@ -256,14 +254,13 @@ async def test_repository_integration():
 
         # Simulate repository operations (mock)
         pipeline_state = ProcessingPipelineState(
-            batch_id='test-repo-batch',
-            requested_pipelines=['spellcheck', 'ai_feedback']
+            batch_id="test-repo-batch", requested_pipelines=["spellcheck", "ai_feedback"]
         )
 
         # Test serialization for repository storage
         state_dict = pipeline_state.model_dump()
-        assert 'batch_id' in state_dict
-        assert 'requested_pipelines' in state_dict
+        assert "batch_id" in state_dict
+        assert "requested_pipelines" in state_dict
 
         # Test deserialization from repository
         reconstructed = ProcessingPipelineState.model_validate(state_dict)
@@ -286,28 +283,32 @@ def test_integration_validation_checklist():
     print("🧪 Running integration readiness checklist...")
 
     checklist = {
-        'common_core_models': False,
-        'pipeline_models': False,
-        'event_infrastructure': False,
-        'metadata_models': False
+        "common_core_models": False,
+        "pipeline_models": False,
+        "event_infrastructure": False,
+        "metadata_models": False,
     }
 
     try:
         # Check common_core models (test imports only)
         import common_core.enums  # noqa: F401
-        checklist['common_core_models'] = True
+
+        checklist["common_core_models"] = True
 
         # Check pipeline models (test imports only)
         import common_core.pipeline_models  # noqa: F401
-        checklist['pipeline_models'] = True
+
+        checklist["pipeline_models"] = True
 
         # Check event infrastructure (test imports only)
         import common_core.events.envelope  # noqa: F401
-        checklist['event_infrastructure'] = True
+
+        checklist["event_infrastructure"] = True
 
         # Check metadata models (test imports only)
         import common_core.metadata_models  # noqa: F401
-        checklist['metadata_models'] = True
+
+        checklist["metadata_models"] = True
 
     except ImportError as e:
         print(f"ℹ️  Some components not yet available: {e}")
@@ -335,12 +336,10 @@ async def main():
         test_partial_success_scenario,
         test_state_machine_integration_readiness,
         test_event_envelope_integration,
-        test_integration_validation_checklist
+        test_integration_validation_checklist,
     ]
 
-    async_tests = [
-        test_repository_integration
-    ]
+    async_tests = [test_repository_integration]
 
     results = []
     sequence_metadata = {}
@@ -349,7 +348,7 @@ async def main():
     for test in sync_tests:
         print()
         try:
-            if test.__name__ == 'test_pipeline_sequence_definitions':
+            if test.__name__ == "test_pipeline_sequence_definitions":
                 result, metadata = test()
                 sequence_metadata = metadata
             else:

@@ -29,7 +29,7 @@ class TestEssayStateMachineInitialization:
 
         assert machine.essay_id == essay_id
         assert machine.current_status == initial_status
-        assert hasattr(machine, 'machine')  # transitions.Machine instance
+        assert hasattr(machine, "machine")  # transitions.Machine instance
         assert machine.current_status == EssayStatus.READY_FOR_PROCESSING
 
     def test_initialization_various_statuses(self) -> None:

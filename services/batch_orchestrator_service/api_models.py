@@ -30,9 +30,7 @@ class BatchRegistrationRequestV1(BaseModel):
     class_designation: str = Field(
         ..., description="Class or group designation (e.g., 'Class 9A', 'Group Blue')."
     )
-    teacher_name: str = Field(
-        ..., description="Name of the teacher or instructor for this batch."
-    )
+    teacher_name: str = Field(..., description="Name of the teacher or instructor for this batch.")
     essay_instructions: str = Field(
         ..., description="Instructions provided for the essay assignment."
     )
@@ -47,8 +45,8 @@ class BatchRegistrationRequestV1(BaseModel):
         default=None, ge=0.0, le=2.0, description="Default temperature for CJ assessment LLM."
     )
 
-    @model_validator(mode='after')
-    def validate_essay_count_consistency(self) -> 'BatchRegistrationRequestV1':
+    @model_validator(mode="after")
+    def validate_essay_count_consistency(self) -> "BatchRegistrationRequestV1":
         """Validate that essay_ids length matches expected_essay_count when provided."""
         if self.essay_ids is not None:
             if len(self.essay_ids) != self.expected_essay_count:

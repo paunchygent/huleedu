@@ -30,8 +30,7 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
     """
 
     batch_id: str = Field(
-        ...,
-        description="Unique identifier of the batch that completed the phase"
+        ..., description="Unique identifier of the batch that completed the phase"
     )
 
     phase_name: str = Field(
@@ -39,7 +38,7 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
         description=(
             "Name of the phase that was completed (e.g., 'spellcheck', "
             "'ai_feedback', 'cj_assessment')"
-        )
+        ),
     )
 
     phase_status: str = Field(
@@ -47,7 +46,7 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
         description=(
             "Overall status of the phase completion (e.g., 'COMPLETED_SUCCESSFULLY', "
             "'COMPLETED_WITH_FAILURES', 'FAILED_CRITICALLY')"
-        )
+        ),
     )
 
     processed_essays: List[EssayProcessingInputRefV1] = Field(
@@ -55,7 +54,7 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
         description=(
             "List of essays that successfully completed this phase, with updated "
             "text_storage_id references for the next phase"
-        )
+        ),
     )
 
     failed_essay_ids: List[str] = Field(
@@ -63,35 +62,27 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
         description=(
             "List of essay IDs that failed during this phase and should not be "
             "included in subsequent phases"
-        )
+        ),
     )
 
     correlation_id: Optional[UUID] = Field(
-        None,
-        description="Optional correlation ID for tracking related events across services"
+        None, description="Optional correlation ID for tracking related events across services"
     )
 
     class Config:
         """Pydantic configuration for the event model."""
-        json_encoders = {
-            UUID: str
-        }
+
+        json_encoders = {UUID: str}
         json_schema_extra = {
             "example": {
                 "batch_id": "batch-123-456",
                 "phase_name": "spellcheck",
                 "phase_status": "COMPLETED_WITH_FAILURES",
                 "processed_essays": [
-                    {
-                        "essay_id": "essay-1",
-                        "text_storage_id": "storage-corrected-1"
-                    },
-                    {
-                        "essay_id": "essay-2",
-                        "text_storage_id": "storage-corrected-2"
-                    }
+                    {"essay_id": "essay-1", "text_storage_id": "storage-corrected-1"},
+                    {"essay_id": "essay-2", "text_storage_id": "storage-corrected-2"},
                 ],
                 "failed_essay_ids": ["essay-3", "essay-4"],
-                "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
             }
         }

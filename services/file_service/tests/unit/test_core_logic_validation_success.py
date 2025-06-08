@@ -30,7 +30,7 @@ class TestCoreLogicValidationSuccess:
         mock_text_extractor: AsyncMock,
         mock_content_validator: AsyncMock,
         mock_content_client: AsyncMock,
-        mock_event_publisher: AsyncMock
+        mock_event_publisher: AsyncMock,
     ) -> None:
         """Test complete successful file processing workflow with validation."""
         # Arrange
@@ -48,7 +48,7 @@ class TestCoreLogicValidationSuccess:
             text_extractor=mock_text_extractor,
             content_validator=mock_content_validator,
             content_client=mock_content_client,
-            event_publisher=mock_event_publisher
+            event_publisher=mock_event_publisher,
         )
 
         # Assert workflow completion
@@ -85,7 +85,7 @@ class TestCoreLogicValidationSuccess:
         mock_text_extractor: AsyncMock,
         mock_content_validator: AsyncMock,
         mock_content_client: AsyncMock,
-        mock_event_publisher: AsyncMock
+        mock_event_publisher: AsyncMock,
     ) -> None:
         """Test that correlation IDs are properly propagated to events."""
         # Arrange
@@ -103,7 +103,7 @@ class TestCoreLogicValidationSuccess:
             text_extractor=mock_text_extractor,
             content_validator=mock_content_validator,
             content_client=mock_content_client,
-            event_publisher=mock_event_publisher
+            event_publisher=mock_event_publisher,
         )
 
         # Assert correlation ID propagation for success event

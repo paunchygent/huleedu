@@ -32,7 +32,7 @@ class TestCoreLogicValidationFailures:
         mock_text_extractor: AsyncMock,
         mock_content_validator: AsyncMock,
         mock_content_client: AsyncMock,
-        mock_event_publisher: AsyncMock
+        mock_event_publisher: AsyncMock,
     ) -> None:
         """Test validation failure workflow with proper event publishing."""
         # Arrange
@@ -45,7 +45,7 @@ class TestCoreLogicValidationFailures:
         mock_content_validator.validate_content.return_value = ValidationResult(
             is_valid=False,
             error_code="CONTENT_TOO_SHORT",
-            error_message="Content length (5 characters) below minimum threshold (50)"
+            error_message="Content length (5 characters) below minimum threshold (50)",
         )
 
         # Act
@@ -57,7 +57,7 @@ class TestCoreLogicValidationFailures:
             text_extractor=mock_text_extractor,
             content_validator=mock_content_validator,
             content_client=mock_content_client,
-            event_publisher=mock_event_publisher
+            event_publisher=mock_event_publisher,
         )
 
         # Assert validation failure response
@@ -95,7 +95,7 @@ class TestCoreLogicValidationFailures:
         mock_text_extractor: AsyncMock,
         mock_content_validator: AsyncMock,
         mock_content_client: AsyncMock,
-        mock_event_publisher: AsyncMock
+        mock_event_publisher: AsyncMock,
     ) -> None:
         """Test handling of empty content validation failure."""
         # Arrange
@@ -107,7 +107,7 @@ class TestCoreLogicValidationFailures:
         mock_content_validator.validate_content.return_value = ValidationResult(
             is_valid=False,
             error_code="EMPTY_CONTENT",
-            error_message="File content is empty or contains only whitespace"
+            error_message="File content is empty or contains only whitespace",
         )
 
         # Act
@@ -119,7 +119,7 @@ class TestCoreLogicValidationFailures:
             text_extractor=mock_text_extractor,
             content_validator=mock_content_validator,
             content_client=mock_content_client,
-            event_publisher=mock_event_publisher
+            event_publisher=mock_event_publisher,
         )
 
         # Assert validation failure
@@ -140,7 +140,7 @@ class TestCoreLogicValidationFailures:
         mock_text_extractor: AsyncMock,
         mock_content_validator: AsyncMock,
         mock_content_client: AsyncMock,
-        mock_event_publisher: AsyncMock
+        mock_event_publisher: AsyncMock,
     ) -> None:
         """Test handling of content too long validation failure."""
         # Arrange
@@ -152,7 +152,7 @@ class TestCoreLogicValidationFailures:
         mock_content_validator.validate_content.return_value = ValidationResult(
             is_valid=False,
             error_code="CONTENT_TOO_LONG",
-            error_message="Content length (10000 characters) exceeds maximum threshold (5000)"
+            error_message="Content length (10000 characters) exceeds maximum threshold (5000)",
         )
 
         # Act
@@ -164,7 +164,7 @@ class TestCoreLogicValidationFailures:
             text_extractor=mock_text_extractor,
             content_validator=mock_content_validator,
             content_client=mock_content_client,
-            event_publisher=mock_event_publisher
+            event_publisher=mock_event_publisher,
         )
 
         # Assert validation failure
@@ -185,7 +185,7 @@ class TestCoreLogicValidationFailures:
         mock_text_extractor: AsyncMock,
         mock_content_validator: AsyncMock,
         mock_content_client: AsyncMock,
-        mock_event_publisher: AsyncMock
+        mock_event_publisher: AsyncMock,
     ) -> None:
         """Test correlation ID propagation for validation failure events."""
         # Arrange
@@ -195,9 +195,7 @@ class TestCoreLogicValidationFailures:
         correlation_id = uuid.uuid4()
 
         mock_content_validator.validate_content.return_value = ValidationResult(
-            is_valid=False,
-            error_code="CONTENT_TOO_SHORT",
-            error_message="Content too short"
+            is_valid=False, error_code="CONTENT_TOO_SHORT", error_message="Content too short"
         )
 
         # Act
@@ -209,7 +207,7 @@ class TestCoreLogicValidationFailures:
             text_extractor=mock_text_extractor,
             content_validator=mock_content_validator,
             content_client=mock_content_client,
-            event_publisher=mock_event_publisher
+            event_publisher=mock_event_publisher,
         )
 
         # Assert correlation ID propagation for failure event
@@ -225,7 +223,7 @@ class TestCoreLogicValidationFailures:
         mock_text_extractor: AsyncMock,
         mock_content_validator: AsyncMock,
         mock_content_client: AsyncMock,
-        mock_event_publisher: AsyncMock
+        mock_event_publisher: AsyncMock,
     ) -> None:
         """
         Test that empty text from successful extraction properly goes through content validation.
@@ -247,7 +245,7 @@ class TestCoreLogicValidationFailures:
         mock_content_validator.validate_content.return_value = ValidationResult(
             is_valid=False,
             error_code="EMPTY_CONTENT",
-            error_message=f"File '{file_name}' contains no readable text content."
+            error_message=f"File '{file_name}' contains no readable text content.",
         )
 
         # Act
@@ -259,7 +257,7 @@ class TestCoreLogicValidationFailures:
             text_extractor=mock_text_extractor,
             content_validator=mock_content_validator,
             content_client=mock_content_client,
-            event_publisher=mock_event_publisher
+            event_publisher=mock_event_publisher,
         )
 
         # Assert - Text extraction succeeded, content validation failed

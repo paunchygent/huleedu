@@ -37,27 +37,22 @@ class TestSQLiteEssayStateStore:
             essay_id="test-essay-1",
             batch_id="test-batch-1",
             current_status=EssayStatus.READY_FOR_PROCESSING,
-            processing_metadata={
-                "current_phase": "spellcheck",
-                "commanded_phases": ["spellcheck"]
-            },
+            processing_metadata={"current_phase": "spellcheck", "commanded_phases": ["spellcheck"]},
             timeline={EssayStatus.READY_FOR_PROCESSING.value: datetime.now(UTC)},
             storage_references={ContentType.ORIGINAL_ESSAY: "original-text-123"},
             created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC)
+            updated_at=datetime.now(UTC),
         )
 
     async def test_update_essay_status_via_machine(
-        self,
-        state_store: SQLiteEssayStateStore,
-        sample_essay_state: EssayState
+        self, state_store: SQLiteEssayStateStore, sample_essay_state: EssayState
     ) -> None:
         """Test updating essay status via state machine with metadata."""
         # First create the essay record
         await state_store.create_essay_record(
             essay_id=sample_essay_state.essay_id,
             batch_id=sample_essay_state.batch_id,
-            initial_status=sample_essay_state.current_status
+            initial_status=sample_essay_state.current_status,
         )
 
         # Test metadata for status update
@@ -65,17 +60,17 @@ class TestSQLiteEssayStateStore:
             "spellcheck_result": {
                 "success": True,
                 "corrections_made": 5,
-                "storage_id": "corrected-456"
+                "storage_id": "corrected-456",
             },
             "current_phase": "spellcheck",
-            "phase_outcome_status": "spellchecked_success"
+            "phase_outcome_status": "spellchecked_success",
         }
 
         # Execute
         await state_store.update_essay_status_via_machine(
             essay_id=sample_essay_state.essay_id,
             new_status=EssayStatus.SPELLCHECKED_SUCCESS,
-            metadata=new_metadata
+            metadata=new_metadata,
         )
 
         # Verify
@@ -88,8 +83,7 @@ class TestSQLiteEssayStateStore:
         assert EssayStatus.SPELLCHECKED_SUCCESS.value in updated_state.timeline
 
     async def test_list_essays_by_batch_and_phase_spellcheck(
-        self,
-        state_store: SQLiteEssayStateStore
+        self, state_store: SQLiteEssayStateStore
     ) -> None:
         """Test listing essays by batch and phase for spellcheck."""
         batch_id = "test-batch-1"
@@ -97,47 +91,34 @@ class TestSQLiteEssayStateStore:
         # Create essays with different phase configurations
         # Essay 1: In spellcheck phase, awaiting
         await state_store.create_essay_record(
-            essay_id="essay-1",
-            batch_id=batch_id,
-            initial_status=EssayStatus.AWAITING_SPELLCHECK
+            essay_id="essay-1", batch_id=batch_id, initial_status=EssayStatus.AWAITING_SPELLCHECK
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-1",
             new_status=EssayStatus.AWAITING_SPELLCHECK,
-            metadata={
-                "current_phase": "spellcheck",
-                "commanded_phases": ["spellcheck"]
-            }
+            metadata={"current_phase": "spellcheck", "commanded_phases": ["spellcheck"]},
         )
 
         # Essay 2: In spellcheck phase, completed successfully
         await state_store.create_essay_record(
-            essay_id="essay-2",
-            batch_id=batch_id,
-            initial_status=EssayStatus.SPELLCHECKED_SUCCESS
+            essay_id="essay-2", batch_id=batch_id, initial_status=EssayStatus.SPELLCHECKED_SUCCESS
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-2",
             new_status=EssayStatus.SPELLCHECKED_SUCCESS,
-            metadata={
-                "current_phase": "spellcheck",
-                "commanded_phases": ["spellcheck"]
-            }
+            metadata={"current_phase": "spellcheck", "commanded_phases": ["spellcheck"]},
         )
 
         # Essay 3: NOT in spellcheck phase - should be excluded
         await state_store.create_essay_record(
             essay_id="essay-3",
             batch_id=batch_id,
-            initial_status=EssayStatus.CJ_ASSESSMENT_IN_PROGRESS
+            initial_status=EssayStatus.CJ_ASSESSMENT_IN_PROGRESS,
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-3",
             new_status=EssayStatus.CJ_ASSESSMENT_IN_PROGRESS,
-            metadata={
-                "current_phase": "cj_assessment",
-                "commanded_phases": ["cj_assessment"]
-            }
+            metadata={"current_phase": "cj_assessment", "commanded_phases": ["cj_assessment"]},
         )
 
         # Execute
@@ -154,25 +135,19 @@ class TestSQLiteEssayStateStore:
             assert "spellcheck" in essay.processing_metadata.get("commanded_phases", [])
 
     async def test_list_essays_by_batch_and_phase_no_matches(
-        self,
-        state_store: SQLiteEssayStateStore
+        self, state_store: SQLiteEssayStateStore
     ) -> None:
         """Test listing essays when no essays match the phase."""
         batch_id = "test-batch-1"
 
         # Create essay with different phase
         await state_store.create_essay_record(
-            essay_id="essay-1",
-            batch_id=batch_id,
-            initial_status=EssayStatus.READY_FOR_PROCESSING
+            essay_id="essay-1", batch_id=batch_id, initial_status=EssayStatus.READY_FOR_PROCESSING
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-1",
             new_status=EssayStatus.READY_FOR_PROCESSING,
-            metadata={
-                "current_phase": "ai_feedback",
-                "commanded_phases": ["ai_feedback"]
-            }
+            metadata={"current_phase": "ai_feedback", "commanded_phases": ["ai_feedback"]},
         )
 
         # Execute
@@ -182,8 +157,7 @@ class TestSQLiteEssayStateStore:
         assert len(spellcheck_essays) == 0
 
     async def test_list_essays_by_batch_and_phase_nonexistent_batch(
-        self,
-        state_store: SQLiteEssayStateStore
+        self, state_store: SQLiteEssayStateStore
     ) -> None:
         """Test listing essays for nonexistent batch."""
         # Execute
@@ -193,37 +167,30 @@ class TestSQLiteEssayStateStore:
         assert len(essays) == 0
 
     async def test_list_essays_by_batch_and_phase_multiple_batches(
-        self,
-        state_store: SQLiteEssayStateStore
+        self, state_store: SQLiteEssayStateStore
     ) -> None:
         """Test listing essays correctly filters by batch."""
         # Create essays in different batches
         await state_store.create_essay_record(
             essay_id="essay-batch1",
             batch_id="batch-1",
-            initial_status=EssayStatus.AWAITING_SPELLCHECK
+            initial_status=EssayStatus.AWAITING_SPELLCHECK,
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-batch1",
             new_status=EssayStatus.AWAITING_SPELLCHECK,
-            metadata={
-                "current_phase": "spellcheck",
-                "commanded_phases": ["spellcheck"]
-            }
+            metadata={"current_phase": "spellcheck", "commanded_phases": ["spellcheck"]},
         )
 
         await state_store.create_essay_record(
             essay_id="essay-batch2",
             batch_id="batch-2",
-            initial_status=EssayStatus.AWAITING_SPELLCHECK
+            initial_status=EssayStatus.AWAITING_SPELLCHECK,
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-batch2",
             new_status=EssayStatus.AWAITING_SPELLCHECK,
-            metadata={
-                "current_phase": "spellcheck",
-                "commanded_phases": ["spellcheck"]
-            }
+            metadata={"current_phase": "spellcheck", "commanded_phases": ["spellcheck"]},
         )
 
         # Execute
@@ -239,8 +206,7 @@ class TestSQLiteEssayStateStore:
         assert batch2_essays[0].batch_id == "batch-2"
 
     async def test_update_essay_status_via_machine_essay_not_found(
-        self,
-        state_store: SQLiteEssayStateStore
+        self, state_store: SQLiteEssayStateStore
     ) -> None:
         """Test updating status for nonexistent essay raises error."""
         # Execute and verify exception
@@ -248,19 +214,16 @@ class TestSQLiteEssayStateStore:
             await state_store.update_essay_status_via_machine(
                 essay_id="nonexistent-essay",
                 new_status=EssayStatus.SPELLCHECKED_SUCCESS,
-                metadata={"test": "data"}
+                metadata={"test": "data"},
             )
 
-    async def test_create_essay_record_minimal(
-        self,
-        state_store: SQLiteEssayStateStore
-    ) -> None:
+    async def test_create_essay_record_minimal(self, state_store: SQLiteEssayStateStore) -> None:
         """Test creating essay record with minimal parameters."""
         # Execute
         essay_state = await state_store.create_essay_record(
             essay_id="test-essay",
             batch_id="test-batch",
-            initial_status=EssayStatus.READY_FOR_PROCESSING
+            initial_status=EssayStatus.READY_FOR_PROCESSING,
         )
 
         # Verify
@@ -276,16 +239,13 @@ class TestSQLiteEssayStateStore:
         assert retrieved_state.essay_id == "test-essay"
         assert retrieved_state.current_status == EssayStatus.READY_FOR_PROCESSING
 
-    async def test_essay_state_timeline_tracking(
-        self,
-        state_store: SQLiteEssayStateStore
-    ) -> None:
+    async def test_essay_state_timeline_tracking(self, state_store: SQLiteEssayStateStore) -> None:
         """Test that essay state timeline is correctly tracked during updates."""
         # Create essay
         essay_state = await state_store.create_essay_record(
             essay_id="timeline-test",
             batch_id="test-batch",
-            initial_status=EssayStatus.READY_FOR_PROCESSING
+            initial_status=EssayStatus.READY_FOR_PROCESSING,
         )
 
         # Verify initial timeline
@@ -296,7 +256,7 @@ class TestSQLiteEssayStateStore:
         await state_store.update_essay_status_via_machine(
             essay_id="timeline-test",
             new_status=EssayStatus.AWAITING_SPELLCHECK,
-            metadata={"phase": "spellcheck"}
+            metadata={"phase": "spellcheck"},
         )
 
         # Verify timeline updated
@@ -310,7 +270,7 @@ class TestSQLiteEssayStateStore:
         await state_store.update_essay_status_via_machine(
             essay_id="timeline-test",
             new_status=EssayStatus.SPELLCHECKED_SUCCESS,
-            metadata={"phase": "spellcheck", "result": "success"}
+            metadata={"phase": "spellcheck", "result": "success"},
         )
 
         # Verify timeline has all entries

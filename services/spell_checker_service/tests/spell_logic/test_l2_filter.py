@@ -197,9 +197,7 @@ def test_create_filtered_l2_dictionary_no_valid_entries(tmp_path: Path) -> None:
     mock_logger.warning.assert_called_once_with("No valid corrections after filtering")
 
 
-def test_create_filtered_l2_dictionary_os_error_parent_dir(
-    tmp_path: Path, mocker: Any
-) -> None:
+def test_create_filtered_l2_dictionary_os_error_parent_dir(tmp_path: Path, mocker: Any) -> None:
     """Test create_filtered_l2_dictionary with OSError during parent directory creation."""
     mock_logger = MagicMock()
     # Create a file where a directory is expected to cause OSError
@@ -225,18 +223,14 @@ def test_create_filtered_l2_dictionary_os_error_parent_dir(
     # For this test, let's assume the mkdir within the function will be hit by
     # the mocker.patch above.
 
-    assert (
-        create_filtered_l2_dictionary(l2_errors, output_file, logger=mock_logger) is False
-    )
+    assert create_filtered_l2_dictionary(l2_errors, output_file, logger=mock_logger) is False
     assert not output_file.exists()
     mock_logger.error.assert_called_once()
     call_args, _ = mock_logger.error.call_args
     assert "Failed to create directory" in call_args[0]
 
 
-def test_create_filtered_l2_dictionary_os_error_writing_file(
-    tmp_path: Path, mocker: Any
-) -> None:
+def test_create_filtered_l2_dictionary_os_error_writing_file(tmp_path: Path, mocker: Any) -> None:
     """Test create_filtered_l2_dictionary with OSError during file writing."""
     mock_logger = MagicMock()
     output_file = tmp_path / "filtered_l2_test.txt"
@@ -245,9 +239,7 @@ def test_create_filtered_l2_dictionary_os_error_writing_file(
     # Mock open to raise OSError
     mocker.patch("pathlib.Path.open", side_effect=OSError("Test OS Error writing"))
 
-    assert (
-        create_filtered_l2_dictionary(l2_errors, output_file, logger=mock_logger) is False
-    )
+    assert create_filtered_l2_dictionary(l2_errors, output_file, logger=mock_logger) is False
     # The file might be created before open fails, or not, depending on implementation details
     # For this test, we mainly care about the False return and log.
     mock_logger.error.assert_called_once()

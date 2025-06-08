@@ -41,12 +41,9 @@ class TestEnhancedBatchEssayTracker:
             expected_essay_count=5,
             essay_ids=["essay_001", "essay_002", "essay_003", "essay_004", "essay_005"],
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id="batch_test",
-                    entity_type="batch"
-                ),
-                timestamp=datetime.now(UTC)
-            )
+                entity=EntityReference(entity_id="batch_test", entity_type="batch"),
+                timestamp=datetime.now(UTC),
+            ),
         )
 
     @pytest.fixture
@@ -58,7 +55,7 @@ class TestEnhancedBatchEssayTracker:
             validation_error_code="EMPTY_CONTENT",
             validation_error_message="File content is empty or contains only whitespace",
             file_size_bytes=0,
-            correlation_id=uuid4()
+            correlation_id=uuid4(),
         )
 
     async def test_validation_failure_tracking_initialization(
@@ -66,7 +63,7 @@ class TestEnhancedBatchEssayTracker:
     ) -> None:
         """Test that validation failure tracking is properly initialized."""
         # Verify initialization
-        assert hasattr(tracker, 'validation_failures')
+        assert hasattr(tracker, "validation_failures")
         assert isinstance(tracker.validation_failures, dict)
         assert len(tracker.validation_failures) == 0
 
@@ -74,14 +71,14 @@ class TestEnhancedBatchEssayTracker:
         self,
         tracker: BatchEssayTracker,
         sample_batch_registration: BatchEssaysRegistered,
-        sample_validation_failure: EssayValidationFailedV1
+        sample_validation_failure: EssayValidationFailedV1,
     ) -> None:
         """Test handling a single validation failure."""
         # Register batch first
         await tracker.register_batch(sample_batch_registration)
 
         # Mock the completion method to track calls
-        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
+        with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
             mock_complete.return_value = None
 
             # Handle validation failure
@@ -115,7 +112,7 @@ class TestEnhancedBatchEssayTracker:
         await tracker.register_batch(sample_batch_registration)
 
         # Mock the completion method
-        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
+        with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
             mock_complete.return_value = None
 
             # Assign 3 slots successfully
@@ -132,7 +129,7 @@ class TestEnhancedBatchEssayTracker:
                     original_file_name=f"failed_essay_{i}.txt",
                     validation_error_code="CONTENT_TOO_SHORT",
                     validation_error_message="Content below minimum threshold",
-                    file_size_bytes=10
+                    file_size_bytes=10,
                 )
                 await tracker.handle_validation_failure(failure)
 
@@ -148,17 +145,14 @@ class TestEnhancedBatchEssayTracker:
             expected_essay_count=25,
             essay_ids=[f"essay_{i:03d}" for i in range(1, 26)],
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id="batch_24_of_25",
-                    entity_type="batch"
-                ),
-                timestamp=datetime.now(UTC)
-            )
+                entity=EntityReference(entity_id="batch_24_of_25", entity_type="batch"),
+                timestamp=datetime.now(UTC),
+            ),
         )
         await tracker.register_batch(batch_registration)
 
         # Mock completion method
-        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
+        with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
             mock_complete.return_value = None
 
             # Assign 24 slots successfully
@@ -177,7 +171,7 @@ class TestEnhancedBatchEssayTracker:
                 original_file_name="corrupted_essay_25.pdf",
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message="Essay content below minimum threshold",
-                file_size_bytes=15
+                file_size_bytes=15,
             )
             await tracker.handle_validation_failure(failure)
 
@@ -203,7 +197,7 @@ class TestEnhancedBatchEssayTracker:
                 original_file_name=f"failed_{i}.txt",
                 validation_error_code="EMPTY_CONTENT",
                 validation_error_message=f"Failed file {i}",
-                file_size_bytes=0
+                file_size_bytes=0,
             )
             for i in range(1, 4)
         ]
@@ -235,7 +229,7 @@ class TestEnhancedBatchEssayTracker:
             original_file_name="failed_4.txt",
             validation_error_code="CONTENT_TOO_SHORT",
             validation_error_message="Failed file 4",
-            file_size_bytes=10
+            file_size_bytes=10,
         )
         await tracker.handle_validation_failure(failure)
 
@@ -248,7 +242,7 @@ class TestEnhancedBatchEssayTracker:
             original_file_name="failed_5.txt",
             validation_error_code="CONTENT_TOO_SHORT",
             validation_error_message="Failed file 5",
-            file_size_bytes=10
+            file_size_bytes=10,
         )
         tracker.validation_failures["batch_test"].append(failure2)
 
@@ -271,17 +265,14 @@ class TestEnhancedBatchEssayTracker:
             expected_essay_count=3,
             essay_ids=["essay_001", "essay_002", "essay_003"],
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id="batch_all_failed",
-                    entity_type="batch"
-                ),
-                timestamp=datetime.now(UTC)
-            )
+                entity=EntityReference(entity_id="batch_all_failed", entity_type="batch"),
+                timestamp=datetime.now(UTC),
+            ),
         )
         await tracker.register_batch(batch_registration)
 
         # Mock completion method
-        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
+        with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
             mock_complete.return_value = None
 
             # Create 3 validation failures (all essays fail)
@@ -291,7 +282,7 @@ class TestEnhancedBatchEssayTracker:
                     original_file_name=f"corrupted_{i}.txt",
                     validation_error_code="EMPTY_CONTENT",
                     validation_error_message="Empty file content",
-                    file_size_bytes=0
+                    file_size_bytes=0,
                 )
                 await tracker.handle_validation_failure(failure)
 
@@ -316,7 +307,7 @@ class TestEnhancedBatchEssayTracker:
             validation_error_code="CONTENT_TOO_LONG",
             validation_error_message="Content exceeds maximum length",
             file_size_bytes=100000,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
 
         await tracker.handle_validation_failure(failure)
@@ -331,7 +322,7 @@ class TestEnhancedBatchEssayTracker:
         """Test boundary conditions for validation failure handling."""
         await tracker.register_batch(sample_batch_registration)
 
-        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
+        with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
             mock_complete.return_value = None
 
             # Assign 4 slots (1 short of completion)
@@ -347,7 +338,7 @@ class TestEnhancedBatchEssayTracker:
                 original_file_name="final_failure.txt",
                 validation_error_code="VALIDATION_ERROR",
                 validation_error_message="Final validation error",
-                file_size_bytes=50
+                file_size_bytes=50,
             )
             await tracker.handle_validation_failure(failure)
 
@@ -360,7 +351,7 @@ class TestEnhancedBatchEssayTracker:
         """Test that batch completion only occurs if there are assigned essays."""
         await tracker.register_batch(sample_batch_registration)
 
-        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
+        with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
             mock_complete.return_value = None
 
             # Create 5 validation failures (all essays fail, none assigned)
@@ -370,7 +361,7 @@ class TestEnhancedBatchEssayTracker:
                     original_file_name=f"failed_{i}.txt",
                     validation_error_code="EMPTY_CONTENT",
                     validation_error_message="Empty content",
-                    file_size_bytes=0
+                    file_size_bytes=0,
                 )
                 await tracker.handle_validation_failure(failure)
 
@@ -394,7 +385,7 @@ class TestEnhancedBatchEssayTracker:
             original_file_name="failed_4.txt",
             validation_error_code="CONTENT_TOO_SHORT",
             validation_error_message="Content too short: file 4",
-            file_size_bytes=20
+            file_size_bytes=20,
         )
         await tracker.handle_validation_failure(failure)
 
@@ -415,7 +406,7 @@ class TestEnhancedBatchEssayTracker:
             original_file_name="failed_5.txt",
             validation_error_code="CONTENT_TOO_SHORT",
             validation_error_message="Content too short: file 5",
-            file_size_bytes=20
+            file_size_bytes=20,
         )
         await tracker.handle_validation_failure(failure2)
 
@@ -429,7 +420,7 @@ class TestEnhancedBatchEssayTracker:
         """Test handling of concurrent validation failures."""
         await tracker.register_batch(sample_batch_registration)
 
-        with patch.object(tracker, '_create_batch_ready_event') as mock_complete:
+        with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
             mock_complete.return_value = None
 
             # Create multiple failures to handle concurrently
@@ -439,7 +430,7 @@ class TestEnhancedBatchEssayTracker:
                     original_file_name=f"concurrent_fail_{i}.txt",
                     validation_error_code="CONTENT_TOO_SHORT",
                     validation_error_message=f"Concurrent failure {i}",
-                    file_size_bytes=10
+                    file_size_bytes=10,
                 )
                 for i in range(1, 6)
             ]
