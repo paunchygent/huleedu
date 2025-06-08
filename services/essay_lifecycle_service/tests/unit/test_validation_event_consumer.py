@@ -204,7 +204,7 @@ class TestValidationEventConsumerIntegration:
     async def test_event_timestamp_validation(self, sample_validation_failure_event: EssayValidationFailedV1) -> None:
         """Test that event timestamps are properly validated and preserved."""
         # Create envelope with specific timestamp
-        test_timestamp = datetime.now(UTC        )
+        test_timestamp = datetime.now(UTC)
 
         envelope = EventEnvelope(
             event_id=uuid4(),
@@ -230,7 +230,7 @@ class TestValidationEventConsumerIntegration:
             file_size_bytes=0
         )
 
-        EventEnvelope(
+        envelope = EventEnvelope(
             event_id=uuid4(),
             event_type="essay.validation.failed",
             event_timestamp=datetime.now(UTC),
@@ -243,6 +243,7 @@ class TestValidationEventConsumerIntegration:
 
         # Verify consistency
         call_args = mock_batch_tracker.handle_validation_failure.call_args[0][0]
+        assert envelope.data.batch_id == batch_id
         assert call_args.batch_id == batch_id
 
     async def test_concurrent_event_processing(self, mock_batch_tracker: Mock) -> None:
