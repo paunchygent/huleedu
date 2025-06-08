@@ -77,36 +77,42 @@ All architectural violations and test failures have been resolved. Clean archite
 * ✅ **ALL DI Pattern Violations Resolved**: Successfully completed modular refactoring for all 6 services
 * ✅ **CJ Assessment Service COMPLETE**: Final service refactored with protocol-DI excellence and modern type annotations
 
-### ✅ 2. Systematic Linting Cleanup - COMPLETE! 
+### ✅ 2. Systematic Linting Cleanup - COMPLETE
 
 **🎉 OUTSTANDING RESULTS ACHIEVED:**
 
 **Phase 2A: Assessment & Auto-fixes**
+
 * ✅ Started with 48 violations identified in focused audit
 * ✅ Auto-fixed 30 violations (62% reduction) using `ruff check --fix`
 
 **Phase 2B: Dead Code Removal**  
+
 * ✅ Removed 5 unused variables (F841 violations)
 * ✅ Applied `_` pattern for intentionally ignored return values
 
 **Phase 2C: Line Length Remediation**
+
 * ✅ Fixed 13 E501 violations systematically using proper techniques:
   * Parentheses for natural line breaks
   * Multi-line string formatting  
   * Strategic comment line splitting
 
 **🎯 FINAL RESULT: ZERO LINTING VIOLATIONS**
+
 * ✅ **100% compliance** with project linting standards
-* ✅ **All 48 original violations resolved** 
+* ✅ **All 48 original violations resolved**
 * ✅ Clean, maintainable codebase achieved
 
 ### 3. Final Quality Gate Validation (Priority 3)
 
 This phase ensures the codebase is production-ready after all changes.
 
-* [ ] Run the full test suite (`unit`, `integration`, `functional`) to confirm zero regressions.
-* [ ] Verify all service containers build and start successfully.
-* [ ] Update architectural documentation to reflect the final, verified state.
+* [ ] **Step 7: Container Validation** - Verify all service containers build and start successfully
+* [ ] **Step 5: Middleware Consolidation** - Address code duplication in metrics middleware  
+* [ ] **Testing Strategy Refinement** - Evaluate container-dependent tests and refactor to use Testcontainers
+* [ ] Run the full test suite (`unit`, `integration`, `functional`) to confirm zero regressions
+* [ ] Update architectural documentation to reflect the final, verified state
 
 ## Completed Milestones Summary
 
@@ -176,7 +182,7 @@ async def initialize_db_schema(self) -> None:
 
 #### **✅ Services Updated:**
 
-* **Essay Lifecycle Service**: 
+* **Essay Lifecycle Service**:
 Changed from auto-commit to manual commit with explicit offset management
 * **Batch Orchestrator Service**: Changed from auto-commit to manual commit with explicit offset management  
 * **Spell Checker Service**: Already using manual commit (verified working)

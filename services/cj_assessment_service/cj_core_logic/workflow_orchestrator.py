@@ -11,6 +11,11 @@ from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.cj_assessment_service.cj_core_logic import (
+    batch_preparation,
+    comparison_processing,
+    scoring_ranking,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.protocols import (
@@ -19,8 +24,6 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
 )
-
-from . import batch_preparation, comparison_processing, scoring_ranking
 
 logger = create_service_logger("cj_assessment_service.workflow_orchestrator")
 
@@ -65,22 +68,19 @@ async def run_cj_assessment_workflow(
 
         # Phase 3: Iterative Comparison Loop
         final_scores = await comparison_processing.perform_iterative_comparisons(
-            essays_for_api_model,
-            cj_batch_id,
-            database,
-            llm_interaction,
-            request_data,
-            settings,
-            log_extra,
+            essays_for_api_model, cj_batch_id, database, llm_interaction,
+            request_data, settings, log_extra
         )
 
         # Phase 4: Complete and publish results
-        rankings = await _finalize_batch_results(cj_batch_id, database, final_scores, log_extra)
+        rankings = await _finalize_batch_results(
+            cj_batch_id, database, final_scores, log_extra
+        )
 
         logger.info(
             f"CJ assessment completed for batch {cj_batch_id}. "
             f"Rankings generated for {len(rankings)} essays.",
-            extra=log_extra,
+            extra=log_extra
         )
 
         return rankings, str(cj_batch_id)
@@ -125,7 +125,8 @@ async def _finalize_batch_results(
         rankings = await scoring_ranking.get_essay_rankings(session, cj_batch_id)
 
         logger.info(
-            f"Finalized batch {cj_batch_id} with {len(rankings)} ranked essays", extra=log_extra
+            f"Finalized batch {cj_batch_id} with {len(rankings)} ranked essays",
+            extra=log_extra
         )
 
         return rankings
