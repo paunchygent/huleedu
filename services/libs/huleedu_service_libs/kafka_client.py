@@ -6,9 +6,9 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, AsyncIterator, Optional, TypeVar  # Added Optional
+from typing import Optional, TypeVar  # Added Optional
 
-from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from aiokafka import AIOKafkaProducer
 from aiokafka.errors import KafkaConnectionError, KafkaTimeoutError
 from pydantic import BaseModel
 
@@ -94,54 +94,3 @@ class KafkaBus:
                 exc_info=True,
             )
             raise
-
-
-async def consume_events(
-    topics: list[str] | str,  # Allow single topic or list of topics
-    group_id: str,
-    client_id: str,  # For consumer logging
-    bootstrap_servers: str = KAFKA_BOOTSTRAP_SERVERS,
-    auto_offset_reset: str = "earliest",
-    enable_auto_commit: bool = False,
-    # Add consumer_timeout_ms for non-blocking iteration if needed, e.g. 1000
-) -> AsyncIterator[Any]:  # Yields the full AIOKafkaConsumer message object
-    consumer = AIOKafkaConsumer(
-        topics,
-        bootstrap_servers=bootstrap_servers,
-        group_id=group_id,
-        client_id=client_id,
-        value_deserializer=lambda b: json.loads(b.decode("utf-8")),
-        auto_offset_reset=auto_offset_reset,
-        enable_auto_commit=enable_auto_commit,
-        metadata_max_age_ms=90000,  # How often to refresh metadata
-        session_timeout_ms=30000,  # Increased session timeout
-        heartbeat_interval_ms=10000,  # Adjusted heartbeat
-    )
-
-    # Track running state locally instead of using private attributes
-    consumer_running = False
-
-    await consumer.start()
-    consumer_running = True
-    logger.info(f"KafkaConsumer '{client_id}' started for topic(s) '{topics}', group '{group_id}'.")
-    try:
-        async for msg in consumer:  # msg is an AIOKafkaConsumer message object
-            logger.debug(
-                f"'{client_id}' consumed message from {msg.topic} "
-                f"[partition:{msg.partition}, offset:{msg.offset}] key='{msg.key}'"
-            )
-            yield msg
-            # Manual commit should be handled by the caller after processing
-    except KafkaConnectionError as e:
-        logger.error(f"KafkaConsumer '{client_id}' connection error: {e}", exc_info=True)
-    except Exception as e:  # Catch any other exception during consumption loop
-        logger.error(
-            f"KafkaConsumer '{client_id}' unexpected error in consumption loop: {e}",
-            exc_info=True,
-        )
-    finally:
-        logger.info(f"KafkaConsumer '{client_id}' stopping...")
-        if consumer_running:
-            await consumer.stop()
-            consumer_running = False
-        logger.info(f"KafkaConsumer '{client_id}' stopped.")

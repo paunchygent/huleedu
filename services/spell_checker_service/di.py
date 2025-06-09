@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from aiohttp import ClientSession
-from aiokafka import AIOKafkaProducer
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.kafka_client import KafkaBus
 from prometheus_client import CollectorRegistry
 
 from common_core.enums import ProcessingEvent, topic_name
@@ -40,14 +40,14 @@ class SpellCheckerServiceProvider(Provider):
         return CollectorRegistry()
 
     @provide(scope=Scope.APP)
-    async def provide_kafka_producer(self, settings: Settings) -> AIOKafkaProducer:
-        """Provide Kafka producer for event publishing."""
-        producer = AIOKafkaProducer(
-            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+    async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
+        """Provide Kafka bus for event publishing."""
+        kafka_bus = KafkaBus(
             client_id=f"{settings.SERVICE_NAME}-producer",
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS
         )
-        await producer.start()
-        return producer
+        await kafka_bus.start()
+        return kafka_bus
 
     @provide(scope=Scope.APP)
     async def provide_http_session(self) -> ClientSession:

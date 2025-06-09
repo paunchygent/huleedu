@@ -8,6 +8,8 @@ alwaysApply: false
 ## 1. Purpose
 High-level, cross-cutting principles and stack requirements for HuleEdu microservice development.
 
+Model service: `@batch_orchestrator_service/`
+
 **Related Rules**:
 - [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc) - HTTP service architecture patterns
 - [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc) - Async patterns, protocols, and DI
@@ -53,7 +55,7 @@ High-level, cross-cutting principles and stack requirements for HuleEdu microser
 - Follow state transition logic from Architectural Design Blueprint
 
 ### 4.4. Configuration Management
-- **MUST** use `pydantic-settings` with standardized patterns → See [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc)
+- **MUST** use `pydantic-settings` and `enums` with standardized patterns → See [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc)
 - **FORBIDDEN**: Hardcoded sensitive information
 - **MUST** use environment variables with service-specific prefixes
 
@@ -61,6 +63,18 @@ High-level, cross-cutting principles and stack requirements for HuleEdu microser
 - **MUST** use `huleedu_service_libs.logging_utils` → See [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc)
 - **MANDATORY**: Correlation IDs for all operation chains
 - **FORBIDDEN**: Standard library `logging` module in services
+
+### 4.6. Kafka Client Standards
+- **MUST** use `huleedu_service_libs.kafka_client` utilities
+- **FORBIDDEN**: Direct `AIOKafkaProducer`/`AIOKafkaConsumer` imports
+- **Producers**: Use `KafkaBus` class
+
+### 4.7. Production Patterns (Sprint 1 Hardened)
+- **MUST** implement graceful shutdown with proper async resource cleanup
+- **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
+- **MUST** use manual Kafka commits with error boundaries (no auto-commit)
+- **MUST** implement `/healthz` with consistent JSON response format
+- **MUST** fail fast on startup errors with `logger.critical()` and `raise`
 
 ## 5. Implementation Checklist
 Before implementing any service, ensure you have reviewed:

@@ -6,13 +6,16 @@ alwaysApply: true
 ---
 
 ---
+
 description: defines the architecture and implementation details of the HuleEdu Spell Checker Service
-globs: 
+globs:
 alwaysApply: false
 ---
+
 # 022: Spell Checker Service Architecture
 
 ## 1. Service Identity
+
 - **Package**: `huleedu-spell-checker-service`
 - **Type**: Kafka Consumer Worker (no HTTP API)
 - **Stack**: aiokafka, aiohttp, Python asyncio, Dishka (for DI)
@@ -21,27 +24,30 @@ alwaysApply: false
 ## 2. Internal Structure (✅ Refactored - Clean Architecture)
 
 ### 2.1. Core Components
-- **`worker_main.py`**: Service lifecycle (startup, shutdown), Kafka client management (consumer/producer via `kafka_clients` context manager), signal handling, and the primary message consumption loop. Initializes Dishka DI container and passes protocol instances to `process_single_message`.
+
+- **`worker_main.py`**: Service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes Dishka DI container and passes protocol instances to `process_single_message`.
 - **`event_processor.py`**: Clean message processing logic that depends ONLY on injected protocol interfaces. Contains `process_single_message()` which handles incoming `ConsumerRecord`, deserializes `EventEnvelope[EssayLifecycleSpellcheckRequestV1]`, and orchestrates the fetch-spellcheck-store-publish flow with language parameter extraction.
 - **`protocols.py`**: Defines `typing.Protocol` interfaces for internal dependencies:
-    - `ContentClientProtocol`
-    - `SpellLogicProtocol` (enhanced with language parameter support)
-    - `ResultStoreProtocol`
-    - `SpellcheckEventPublisherProtocol`
+  - `ContentClientProtocol`
+  - `SpellLogicProtocol` (enhanced with language parameter support)
+  - `ResultStoreProtocol`
+  - `SpellcheckEventPublisherProtocol`
 - **`core_logic.py`**: Fundamental, reusable business logic functions:
-    - `default_fetch_content_impl()`: Fetches content via HTTP
-    - `default_store_content_impl()`: Stores content via HTTP  
-    - `default_perform_spell_check_algorithm()`: Core L2 + pyspellchecker spell checking algorithm
+  - `default_fetch_content_impl()`: Fetches content via HTTP
+  - `default_store_content_impl()`: Stores content via HTTP  
+  - `default_perform_spell_check_algorithm()`: Core L2 + pyspellchecker spell checking algorithm
 - **`di.py`**: Dishka dependency injection providers that import implementations from `protocol_implementations/` and configure them with constructor dependencies
 
 ### 2.2. Protocol Implementations (Clean Architecture)
+
 - **`protocol_implementations/`**: Directory containing canonical protocol implementations:
-    - **`content_client_impl.py`**: `DefaultContentClientImpl` - HTTP content fetching with constructor-injected dependencies
-    - **`result_store_impl.py`**: `DefaultResultStoreImpl` - HTTP content storage with constructor-injected dependencies
-    - **`spell_logic_impl.py`**: `DefaultSpellLogicImpl` - Spell checking orchestration using `core_logic` functions
-    - **`event_publisher_impl.py`**: `DefaultSpellcheckEventPublisherImpl` - Kafka event publishing with constructor-injected producer
+  - **`content_client_impl.py`**: `DefaultContentClientImpl` - HTTP content fetching with constructor-injected dependencies
+  - **`result_store_impl.py`**: `DefaultResultStoreImpl` - HTTP content storage with constructor-injected dependencies
+  - **`spell_logic_impl.py`**: `DefaultSpellLogicImpl` - Spell checking orchestration using `core_logic` functions
+  - **`event_publisher_impl.py`**: `DefaultSpellcheckEventPublisherImpl` - Kafka event publishing with constructor-injected producer
 
 ### 2.3. Architecture Benefits
+
 - ✅ **Single Responsibility**: Each file has one clear purpose
 - ✅ **Dependency Injection**: All business logic depends on abstractions, not concrete implementations  
 - ✅ **No Code Duplication**: Single canonical source for each protocol implementation
@@ -66,7 +72,8 @@ alwaysApply: false
 ## 5. Spell Checking Implementation
 
 **Current**: L2 + pyspellchecker dual-algorithm approach:
-- **L2 Error Dictionary**: 4886 common ESL learner corrections 
+
+- **L2 Error Dictionary**: 4886 common ESL learner corrections
 - **PySpellChecker**: General English spell checking with contextual suggestions
 - **Correction Logging**: Detailed correction logs saved to `data/corrected_essays/`
 
@@ -95,15 +102,8 @@ alwaysApply: false
 ## 10. Testing
 
 **Coverage**: 71 tests covering all architectural components
+
 - Unit tests for core logic and protocol implementations
 - Contract compliance tests for event schemas
 - Integration tests for end-to-end message processing
 - All tests pass with architectural refactoring
-
-## 11. Architecture Evolution
-
-**Completed**: Architectural debt remediation (2025-05-30)
-- Eliminated SRP violations and code duplication
-- Implemented clean dependency injection patterns
-- Created proper separation of concerns
-- Maintained full test coverage and functionality

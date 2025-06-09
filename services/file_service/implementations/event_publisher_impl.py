@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import uuid
 from typing import Optional
 
-from aiokafka import AIOKafkaProducer
+from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core.events.envelope import EventEnvelope
@@ -20,8 +19,8 @@ logger = create_service_logger("file_service.implementations.event_publisher")
 class DefaultEventPublisher(EventPublisherProtocol):
     """Default implementation of EventPublisherProtocol."""
 
-    def __init__(self, producer: AIOKafkaProducer, settings: Settings):
-        self.producer = producer
+    def __init__(self, kafka_bus: KafkaBus, settings: Settings):
+        self.kafka_bus = kafka_bus
         self.settings = settings
 
     async def publish_essay_content_provisioned(
@@ -37,11 +36,11 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 data=event_data,
             )
 
-            # Serialize to JSON
-            message_bytes = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-
-            # Publish to Kafka
-            await self.producer.send(self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC, message_bytes)
+            # Publish to Kafka using KafkaBus
+            await self.kafka_bus.publish(
+                topic=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
+                envelope=envelope
+            )
 
             logger.info(
                 f"Published EssayContentProvisionedV1 event for file: "
@@ -65,11 +64,11 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 data=event_data,
             )
 
-            # Serialize to JSON
-            message_bytes = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-
-            # Publish to Kafka
-            await self.producer.send(self.settings.ESSAY_VALIDATION_FAILED_TOPIC, message_bytes)
+            # Publish to Kafka using KafkaBus
+            await self.kafka_bus.publish(
+                topic=self.settings.ESSAY_VALIDATION_FAILED_TOPIC,
+                envelope=envelope
+            )
 
             logger.info(
                 f"Published EssayValidationFailedV1 event for file: "

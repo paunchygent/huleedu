@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from aiokafka import AIOKafkaProducer
     from common_core.events.ai_feedback_events import AIFeedbackInputDataV1
     from common_core.metadata_models import EssayProcessingInputRefV1
+    from huleedu_service_libs.kafka_client import KafkaBus
 
     from config import Settings
 
@@ -24,8 +24,8 @@ from services.essay_lifecycle_service.protocols import SpecializedServiceRequest
 class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispatcher):
     """Default implementation of SpecializedServiceRequestDispatcher protocol."""
 
-    def __init__(self, producer: AIOKafkaProducer, settings: Settings) -> None:
-        self.producer = producer
+    def __init__(self, kafka_bus: KafkaBus, settings: Settings) -> None:
+        self.kafka_bus = kafka_bus
         self.settings = settings
 
     async def dispatch_spellcheck_requests(
@@ -91,8 +91,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
 
                 # Publish to Spell Checker Service
                 topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
-                message = envelope.model_dump_json().encode("utf-8")
-                await self.producer.send_and_wait(topic, message)
+                await self.kafka_bus.publish(topic, envelope)
 
                 logger.info(
                     f"Dispatched spellcheck request for essay {essay_ref.essay_id}",
@@ -215,8 +214,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
 
             # Publish to CJ Assessment Service
             topic = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
-            message = envelope.model_dump_json().encode("utf-8")
-            await self.producer.send_and_wait(topic, message)
+            await self.kafka_bus.publish(topic, envelope)
 
             logger.info(
                 "Successfully dispatched CJ assessment request",

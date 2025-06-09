@@ -137,7 +137,16 @@ services/file_service/
 - `pdm run start`: Production server with Hypercorn
 - `pdm run dev`: Development server with debug mode (port 7001)
 
-## 9. Monitoring and Logging
+## 9. Production Implementation Standards
+
+### 9.1. Mandatory Production Patterns
+- **MUST** implement graceful shutdown with proper async resource cleanup
+- **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
+- **MUST** use manual Kafka commits with error boundaries (no auto-commit)
+- **MUST** implement `/healthz` with consistent JSON response format
+- **MUST** fail fast on startup errors with `logger.critical()` and `raise`
+
+## 10. Monitoring and Logging
 
 ### 9.1. Logging
 - **Utility**: `huleedu_service_libs.logging_utils` (centralized)

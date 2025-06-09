@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Dict
 
 import aiohttp
-from aiokafka import AIOKafkaProducer
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.kafka_client import KafkaBus
 from prometheus_client import CollectorRegistry
 
 from services.cj_assessment_service.config import Settings
@@ -57,14 +57,14 @@ class CJAssessmentServiceProvider(Provider):
         return aiohttp.ClientSession()
 
     @provide(scope=Scope.APP)
-    async def provide_kafka_producer(self, settings: Settings) -> AIOKafkaProducer:
-        """Provide Kafka producer."""
-        producer = AIOKafkaProducer(
-            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+    async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
+        """Provide Kafka bus for event publishing."""
+        kafka_bus = KafkaBus(
             client_id=settings.PRODUCER_CLIENT_ID_CJ,
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS
         )
-        await producer.start()
-        return producer
+        await kafka_bus.start()
+        return kafka_bus
 
     @provide(scope=Scope.APP)
     def provide_cache_manager(self, settings: Settings) -> CacheProtocol:
@@ -168,7 +168,7 @@ class CJAssessmentServiceProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(
-        self, producer: AIOKafkaProducer, settings: Settings
+        self, kafka_bus: KafkaBus, settings: Settings
     ) -> CJEventPublisherProtocol:
         """Provide event publisher."""
-        return CJEventPublisherImpl(producer, settings)
+        return CJEventPublisherImpl(kafka_bus, settings)

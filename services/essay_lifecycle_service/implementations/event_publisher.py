@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from aiokafka import AIOKafkaProducer
     from common_core.enums import EssayStatus
     from common_core.metadata_models import EntityReference
+    from huleedu_service_libs.kafka_client import KafkaBus
 
     from config import Settings
 
@@ -22,15 +22,14 @@ from services.essay_lifecycle_service.protocols import EventPublisher
 class DefaultEventPublisher(EventPublisher):
     """Default implementation of EventPublisher protocol."""
 
-    def __init__(self, producer: AIOKafkaProducer, settings: Settings) -> None:
-        self.producer = producer
+    def __init__(self, kafka_bus: KafkaBus, settings: Settings) -> None:
+        self.kafka_bus = kafka_bus
         self.settings = settings
 
     async def publish_status_update(
         self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID | None = None
     ) -> None:
         """Publish essay status update event."""
-        import json
         from datetime import UTC, datetime
         from uuid import uuid4
 
@@ -56,10 +55,9 @@ class DefaultEventPublisher(EventPublisher):
             data=event_data,
         )
 
-        # Publish to Kafka
+        # Publish to Kafka using KafkaBus.publish()
         topic = "essay.status.events"
-        message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-        await self.producer.send_and_wait(topic, message)
+        await self.kafka_bus.publish(topic, envelope)
 
     async def publish_batch_phase_progress(
         self,
@@ -71,7 +69,6 @@ class DefaultEventPublisher(EventPublisher):
         correlation_id: UUID | None = None,
     ) -> None:
         """Report aggregated progress of a specific phase for a batch to BS."""
-        import json
         from datetime import UTC, datetime
         from uuid import uuid4
 
@@ -101,8 +98,7 @@ class DefaultEventPublisher(EventPublisher):
 
         # Publish to Batch Service topic
         topic = "batch.phase.progress.events"
-        message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-        await self.producer.send_and_wait(topic, message)
+        await self.kafka_bus.publish(topic, envelope)
 
     async def publish_batch_phase_concluded(
         self,
@@ -113,7 +109,6 @@ class DefaultEventPublisher(EventPublisher):
         correlation_id: UUID | None = None,
     ) -> None:
         """Report the final conclusion of a phase for a batch to BS."""
-        import json
         from datetime import UTC, datetime
         from uuid import uuid4
 
@@ -142,8 +137,7 @@ class DefaultEventPublisher(EventPublisher):
 
         # Publish to Batch Service topic
         topic = "batch.phase.concluded.events"
-        message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-        await self.producer.send_and_wait(topic, message)
+        await self.kafka_bus.publish(topic, envelope)
 
     def _get_topic_for_event_type(self, event_type: str) -> str:
         """Map event type to appropriate Kafka topic."""
@@ -162,7 +156,6 @@ class DefaultEventPublisher(EventPublisher):
         correlation_id: UUID | None = None,
     ) -> None:
         """Publish ExcessContentProvisionedV1 event when no slots are available."""
-        import json
         from uuid import uuid4
 
         from common_core.enums import ProcessingEvent, topic_name
@@ -178,8 +171,7 @@ class DefaultEventPublisher(EventPublisher):
 
         # Publish to the correct topic
         topic = topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
-        message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-        await self.producer.send_and_wait(topic, message)
+        await self.kafka_bus.publish(topic, envelope)
 
     async def publish_batch_essays_ready(
         self,
@@ -187,7 +179,6 @@ class DefaultEventPublisher(EventPublisher):
         correlation_id: UUID | None = None,
     ) -> None:
         """Publish BatchEssaysReady event when batch is complete."""
-        import json
         from uuid import uuid4
 
         from common_core.enums import ProcessingEvent, topic_name
@@ -201,18 +192,16 @@ class DefaultEventPublisher(EventPublisher):
             data=event_data,
         )
 
-        # Publish to the correct topic for BatchEssaysReady
+        # Publish to the correct topic
         topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
-        message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-        await self.producer.send_and_wait(topic, message)
+        await self.kafka_bus.publish(topic, envelope)
 
     async def publish_els_batch_phase_outcome(
         self,
         event_data: Any,  # ELSBatchPhaseOutcomeV1
         correlation_id: UUID | None = None,
     ) -> None:
-        """Publish ELSBatchPhaseOutcomeV1 event when batch phase is complete."""
-        import json
+        """Publish ELSBatchPhaseOutcomeV1 event when phase is complete."""
         from uuid import uuid4
 
         from common_core.enums import ProcessingEvent, topic_name
@@ -220,13 +209,12 @@ class DefaultEventPublisher(EventPublisher):
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type=topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
+            event_type="huleedu.els.batch_phase.outcome.v1",
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
         )
 
-        # Publish to the correct topic for ELSBatchPhaseOutcomeV1
+        # Publish to the correct topic
         topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
-        message = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-        await self.producer.send_and_wait(topic, message)
+        await self.kafka_bus.publish(topic, envelope)

@@ -4,10 +4,9 @@ from typing import Optional, Protocol
 from uuid import UUID
 
 from aiohttp import ClientSession  # Changed from placeholder
+from huleedu_service_libs.kafka_client import KafkaBus
 
 # Import concrete types instead of placeholders if they are stable
-from aiokafka import AIOKafkaProducer  # Changed from placeholder
-
 # Assuming common_core models might be used in signatures
 from common_core.enums import ContentType
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
@@ -52,7 +51,7 @@ class ResultStoreProtocol(Protocol):
 class SpellcheckEventPublisherProtocol(Protocol):
     async def publish_spellcheck_result(
         self,
-        producer: AIOKafkaProducer,
+        kafka_bus: KafkaBus,
         event_data: SpellcheckResultDataV1,
         correlation_id: Optional[UUID],
     ) -> None:

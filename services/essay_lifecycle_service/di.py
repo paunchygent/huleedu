@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from aiohttp import ClientSession
-from aiokafka import AIOKafkaProducer
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.kafka_client import KafkaBus
 from prometheus_client import CollectorRegistry
 
 from services.essay_lifecycle_service.config import Settings
@@ -77,14 +77,14 @@ class CoreInfrastructureProvider(Provider):
         return CollectorRegistry()
 
     @provide(scope=Scope.APP)
-    async def provide_kafka_producer(self, settings: Settings) -> AIOKafkaProducer:
-        """Provide Kafka producer for event publishing."""
-        producer = AIOKafkaProducer(
-            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+    async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
+        """Provide Kafka bus for event publishing."""
+        kafka_bus = KafkaBus(
             client_id=settings.PRODUCER_CLIENT_ID,
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS
         )
-        await producer.start()
-        return producer
+        await kafka_bus.start()
+        return kafka_bus
 
     @provide(scope=Scope.APP)
     async def provide_http_session(self) -> ClientSession:
@@ -123,10 +123,10 @@ class ServiceClientsProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(
-        self, producer: AIOKafkaProducer, settings: Settings
+        self, kafka_bus: KafkaBus, settings: Settings
     ) -> EventPublisher:
         """Provide event publisher implementation."""
-        return DefaultEventPublisher(producer, settings)
+        return DefaultEventPublisher(kafka_bus, settings)
 
     @provide(scope=Scope.APP)
     def provide_content_client(
@@ -142,10 +142,10 @@ class ServiceClientsProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_specialized_service_request_dispatcher(
-        self, producer: AIOKafkaProducer, settings: Settings
+        self, kafka_bus: KafkaBus, settings: Settings
     ) -> SpecializedServiceRequestDispatcher:
         """Provide specialized service request dispatcher implementation."""
-        return DefaultSpecializedServiceRequestDispatcher(producer, settings)
+        return DefaultSpecializedServiceRequestDispatcher(kafka_bus, settings)
 
 
 class CommandHandlerProvider(Provider):

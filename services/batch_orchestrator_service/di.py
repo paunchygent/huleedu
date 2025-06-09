@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from aiohttp import ClientSession
-from aiokafka import AIOKafkaProducer
 from config import Settings, settings
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.kafka_client import KafkaBus
 from implementations.ai_feedback_initiator_impl import AIFeedbackInitiatorImpl
 from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
 from implementations.batch_processing_service_impl import BatchProcessingServiceImpl
@@ -50,14 +50,14 @@ class CoreInfrastructureProvider(Provider):
         return CollectorRegistry()
 
     @provide(scope=Scope.APP)
-    async def provide_kafka_producer(self, settings: Settings) -> AIOKafkaProducer:
-        """Provide Kafka producer for event publishing."""
-        producer = AIOKafkaProducer(
-            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+    async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
+        """Provide Kafka bus for event publishing."""
+        kafka_bus = KafkaBus(
             client_id=f"{settings.SERVICE_NAME}-producer",
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS
         )
-        await producer.start()
-        return producer
+        await kafka_bus.start()
+        return kafka_bus
 
     @provide(scope=Scope.APP)
     async def provide_http_session(self) -> ClientSession:
@@ -78,10 +78,10 @@ class RepositoryAndPublishingProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_batch_event_publisher(
-        self, producer: AIOKafkaProducer
+        self, kafka_bus: KafkaBus
     ) -> BatchEventPublisherProtocol:
         """Provide batch event publisher implementation."""
-        return DefaultBatchEventPublisherImpl(producer)
+        return DefaultBatchEventPublisherImpl(kafka_bus)
 
 
 class ExternalClientsProvider(Provider):

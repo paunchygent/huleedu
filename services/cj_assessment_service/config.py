@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     USE_MOCK_LLM: bool = False  # Enable mock LLM for testing (no API calls)
 
     # Kafka configuration
-    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
+    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     CONSUMER_GROUP_ID_CJ: str = "cj_assessment_consumer_group"
     PRODUCER_CLIENT_ID_CJ: str = "cj_assessment_producer"
 

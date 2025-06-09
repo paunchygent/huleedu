@@ -93,10 +93,11 @@ alwaysApply: false
 - Integration tests for end-to-end message processing
 - All tests pass with architectural refactoring
 
-## 11. Architecture Evolution
+## 11. Production Implementation Standards
 
-**Completed**: Architectural debt remediation (2025-05-30)
-- Eliminated SRP violations and code duplication
-- Implemented clean dependency injection patterns
-- Created proper separation of concerns
-- Maintained full test coverage and functionality
+### 11.1. Mandatory Production Patterns
+- **MUST** implement graceful shutdown with proper async resource cleanup
+- **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
+- **MUST** use manual Kafka commits with error boundaries (no auto-commit)
+- **MUST** implement `/healthz` with consistent JSON response format
+- **MUST** fail fast on startup errors with `logger.critical()` and `raise`

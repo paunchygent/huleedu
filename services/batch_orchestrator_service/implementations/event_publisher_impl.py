@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from aiokafka import AIOKafkaProducer
+from huleedu_service_libs.kafka_client import KafkaBus
 from protocols import BatchEventPublisherProtocol
 
 from common_core.events.envelope import EventEnvelope
@@ -13,14 +13,12 @@ from common_core.events.envelope import EventEnvelope
 class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
     """Default implementation of BatchEventPublisherProtocol."""
 
-    def __init__(self, producer: AIOKafkaProducer) -> None:
-        """Initialize with Kafka producer dependency."""
-        self.producer = producer
+    def __init__(self, kafka_bus: KafkaBus) -> None:
+        """Initialize with Kafka bus dependency."""
+        self.kafka_bus = kafka_bus
 
     async def publish_batch_event(self, event_envelope: EventEnvelope[Any]) -> None:
         """Publish batch event to Kafka."""
         topic = event_envelope.event_type
-        # Use Pydantic's model_dump_json() to properly serialize the EventEnvelope
-        message = event_envelope.model_dump_json().encode("utf-8")
-
-        await self.producer.send_and_wait(topic, message)
+        # Use KafkaBus.publish() which handles EventEnvelope serialization
+        await self.kafka_bus.publish(topic, event_envelope)

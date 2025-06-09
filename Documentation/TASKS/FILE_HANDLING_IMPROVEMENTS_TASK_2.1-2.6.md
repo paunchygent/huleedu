@@ -1,11 +1,3 @@
-WoofWoof
-
-Read file: documentation/TASKS/FILE_HANDLING_IMPROVEMENTS_TASK_2.1-2.6.md
-
-WoofWoof
-Here is the formalized task ticket for `2.1-2.6` with immaculate markdown formatting:
-
-```markdown
 # Epic: Pre-emptive Raw File Storage (PIPELINE_HARDENING_V1.1)
 
 **Objective**: Refactor the File Service to persist the raw, unmodified file blob before any processing occurs. This establishes an immutable source of truth, enabling robust reprocessing and decoupling storage from interpretation.

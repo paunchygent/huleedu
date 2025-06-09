@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import json
 from typing import Optional
 from uuid import UUID
 
-from aiokafka import AIOKafkaProducer
+from huleedu_service_libs.kafka_client import KafkaBus
 
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
@@ -23,7 +22,7 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
 
     async def publish_spellcheck_result(
         self,
-        producer: AIOKafkaProducer,
+        kafka_bus: KafkaBus,
         event_data: SpellcheckResultDataV1,
         correlation_id: Optional[UUID],
     ) -> None:
@@ -35,14 +34,15 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
             data=event_data,
         )
 
-        key_to_encode = event_data.entity_ref.entity_id
-        if not isinstance(key_to_encode, str):
-            key_to_encode = str(key_to_encode)
+        # Use entity_id as the key for partitioning
+        key = str(event_data.entity_ref.entity_id)
 
-        encoded_key = key_to_encode.encode("utf-8")
-        encoded_message = json.dumps(result_envelope.model_dump(mode="json")).encode("utf-8")
-
-        await producer.send_and_wait(self.kafka_output_topic, encoded_message, key=encoded_key)
+        # Publish using KafkaBus which handles serialization
+        await kafka_bus.publish(
+            topic=self.kafka_output_topic,
+            envelope=result_envelope,
+            key=key
+        )
 
         # Add logging to track successful event publishing
         from huleedu_service_libs.logging_utils import create_service_logger

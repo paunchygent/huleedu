@@ -29,11 +29,8 @@ class Settings(BaseSettings):
     PRODUCER_CLIENT_ID: str = "spellchecker-service-producer"
     CONSUMER_CLIENT_ID: str = "spellchecker-service-consumer"
 
-    # Kafka Consumer Tuning Parameters
-    KAFKA_MAX_POLL_RECORDS: int = 500  # Maximum number of records returned in a single poll
-    KAFKA_MAX_POLL_INTERVAL_MS: int = 300000  # Maximum time between poll() calls (5 min)
-    KAFKA_SESSION_TIMEOUT_MS: int = 30000  # Session timeout for consumer group coordination (30s)
-    KAFKA_HEARTBEAT_INTERVAL_MS: int = 10000  # Heartbeat frequency for group coordination (10s)
+    # Note: Using aiokafka library defaults for consumer tuning parameters
+    # Premature optimizations removed in favor of proven defaults
 
     # Metrics Configuration
     METRICS_PORT: int = 8001  # Port for Prometheus metrics endpoint

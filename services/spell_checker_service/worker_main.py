@@ -77,10 +77,7 @@ async def kafka_clients(
         client_id=consumer_client_id,
         enable_auto_commit=False,
         auto_offset_reset="earliest",
-        max_poll_records=settings.KAFKA_MAX_POLL_RECORDS,  # from settings
-        max_poll_interval_ms=settings.KAFKA_MAX_POLL_INTERVAL_MS,  # from settings
-        session_timeout_ms=settings.KAFKA_SESSION_TIMEOUT_MS,  # from settings
-        heartbeat_interval_ms=settings.KAFKA_HEARTBEAT_INTERVAL_MS,  # from settings
+        # Using aiokafka defaults for consumer tuning - no premature optimization
     )
     producer = AIOKafkaProducer(bootstrap_servers=bootstrap_servers, client_id=producer_client_id)
 

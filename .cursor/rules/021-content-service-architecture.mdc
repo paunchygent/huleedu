@@ -120,15 +120,24 @@ services/content_service/
 - `pdm run start`: Production server with Hypercorn
 - `pdm run dev`: Development server with debug mode
 
-## 8. Monitoring and Logging
+## 8. Production Implementation Standards
 
-### 8.1. Logging
+### 8.1. Mandatory Production Patterns
+- **MUST** implement graceful shutdown with proper async resource cleanup
+- **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
+- **MUST** use manual Kafka commits with error boundaries (no auto-commit)
+- **MUST** implement `/healthz` with consistent JSON response format
+- **MUST** fail fast on startup errors with `logger.critical()` and `raise`
+
+## 9. Monitoring and Logging
+
+### 9.1. Logging
 - **Utility**: `huleedu_service_libs.logging_utils` (centralized)
 - **Levels**: INFO for operations, ERROR for failures
 - **Content**: Storage operations, retrieval requests, errors
 - **Correlation IDs**: Tracked for all operations
 
-### 8.2. Metrics
+### 9.2. Metrics
 - **Request Counts**: HTTP requests by method, endpoint, status
 - **Request Duration**: Response time histograms
 - **Content Operations**: Storage/retrieval operation counters

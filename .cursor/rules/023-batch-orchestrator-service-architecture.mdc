@@ -207,9 +207,18 @@ HTTP Request → Service Layer → Repository → Event Publisher → Kafka → 
 - **State Transitions**: Must prevent race conditions in concurrent environments
 - **Database Implementation**: Repository layer responsible for atomicity, not application layer
 
-## 14. Technical Debt
+## 14. Production Implementation Standards
 
-### 14.1. Teacher Name Inference (Priority: HIGH)
+### 14.1. Mandatory Production Patterns
+- **MUST** implement graceful shutdown with proper async resource cleanup
+- **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
+- **MUST** use manual Kafka commits with error boundaries (no auto-commit)
+- **MUST** implement `/healthz` with consistent JSON response format
+- **MUST** fail fast on startup errors with `logger.critical()` and `raise`
+
+## 15. Technical Debt
+
+### 15.1. Teacher Name Inference (Priority: HIGH)
 - **Current**: `teacher_name` manually provided in `BatchRegistrationRequestV1`
 - **Required**: Auto-inference from authenticated user when AUTH/USER services available
 - **Impact**: AI Feedback initiator and user identification across services
