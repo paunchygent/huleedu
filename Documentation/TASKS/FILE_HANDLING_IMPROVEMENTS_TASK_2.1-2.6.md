@@ -1,316 +1,246 @@
-# **TASK TICKET: `PIPELINE_HARDENING_V1.1`**
+WoofWoof
 
-* **Status:** `REVISED & READY FOR IMPLEMENTATION`
-* **Epic:** Pipeline Reliability & Robustness
-* **Owner:** `@LeadDeveloper`
-* **Labels:** `architecture`, `reliability`, `idempotency`, `redis`, `data-integrity`
+Read file: documentation/TASKS/FILE_HANDLING_IMPROVEMENTS_TASK_2.1-2.6.md
 
-## **1. Change Summary & Motivation**
+WoofWoof
+Here is the formalized task ticket for `2.1-2.6` with immaculate markdown formatting:
 
-This revised plan (`v1.1`) supersedes the previous document. It incorporates two critical architectural improvements to enhance data integrity and processing reliability:
+```markdown
+# Epic: Pre-emptive Raw File Storage (PIPELINE_HARDENING_V1.1)
 
-1. **Pre-emptive Raw File Storage:** The `File Service` will now persist the raw, unmodified file blob to the `Content Service` *before* any extraction or validation occurs. This establishes an immutable source of truth, enabling robust reprocessing and decoupling storage from interpretation.
-2. **Redis-backed Idempotency:** All Kafka consumers will implement a Redis-backed, check-and-set mechanism to guarantee that each event is processed exactly once. This prevents data corruption from inevitable event re-deliveries in a distributed system and is vastly more performant and scalable than using PostgreSQL for this purpose.
-
-## **2. Revised Solution Architecture Canvas**
-
-### **Canvas 1: New File Ingestion Flow (`File Service`)**
-
-This diagram illustrates the updated, more robust data flow for handling file uploads.
-
-```text
-                                            +-----------------------------+
-                                      ------> | 2. Extract Text from Bytes  |
-                                      |     |                             |
-+-----------------+   +---------------+     +-----------------------------+
-| Client Uploads  |-->| 1. Store Raw  |     | 3. Validate Extracted Text  |--> [FAIL?]-> 5b. Publish ValidationFailed
-| (Batch of Files)|   | Blob to CS    |     +-----------------------------+            Event (includes raw_id)
-+-----------------+   | (Get raw_id)  |     | 4. Store Extracted Text     |
-                      +---------------+     |    to CS (Get text_id)      |
-                                      |     +-----------------------------+
-                                      |     | 5a. Publish Content         |
-                                      ------> | Provisioned Event (with   |
-                                            |  raw_id and text_id)        |
-                                            +-----------------------------+
-```
-
-#### **Canvas 2: New Idempotent Consumer Logic (All Kafka Workers)**
-
-This diagram shows the new processing loop inside every Kafka consumer.
-
-```text
-+-------------------+   +----------------------------+   +----------------------+   +-------------------+
-| Message received  |-->| 1. Generate Deterministic  |-->| 2. Check & Set Key in  |-->| 3a. Is it a Dup?  |
-| from Kafka Topic  |   |    Event ID (SHA256)       |   |    Redis (SETNX)       |   |      (Key Exists) |
-+-------------------+   +----------------------------+   +----------------------+   +-------------------+
-                                                                 |                         |
-                                                        [ Is Key New? ]                  |
-                                                                 |                         v
-                                +--------------------------------+       +-------------------+
-                                | 3b. Process Message (Biz Logic)|------>| 5. Skip & Commit  |
-                                +--------------------------------+       |    Offset         |
-                                |  try...except...finally        |       +-------------------+
-                                +--------------------------------+
-                                       |            |
-                                 [ SUCCESS ]    [ FAILURE ]
-                                       |            |
-     +-----------------------------------+            +------------------------------------+
-     |                                                  |
-     v                                                  v
-+----+-------------------+                     +--------+----------+
-| 4a. Commit Offset      |                     | 4b. Unlock Key in |
-|    (Message Done)      |                     |      Redis        |
-+------------------------+                     +-------------------+
-```
-
-### **3. Revised Phased Implementation Plan**
-
-#### **Epic 1: Foundational Changes (Contracts & Infrastructure)**
-
-* **Sub-Task 1.1: Update `common_core` Event Contracts**
-  * **TDD (Write these tests first):**
-    * `test_essay_content_provisioned_v1_includes_raw_storage_id`: Verify the model contains the new field.
-    * `test_essay_validation_failed_v1_includes_raw_storage_id`: Verify the failure event also contains the raw ID for traceability.
-  * **Implementation Details:**
-    * **File:** 📂 `common_core/src/common_core/events/file_events.py`
-    * **Action:** Add the `raw_file_storage_id` field to the `EssayContentProvisionedV1` and `EssayValidationFailedV1` models. This ensures downstream services know where the original, untouched file is stored.
-
-        ```python
-        # common_core/src/common_core/events/file_events.py
-        class EssayContentProvisionedV1(BaseModel):
-            # ... existing fields
-            raw_file_storage_id: str = Field(description="Storage ID of the original, unmodified raw file blob.") # 
-            text_storage_id: str
-            # ...
-
-        class EssayValidationFailedV1(BaseModel):
-            # ... existing fields
-            raw_storage_id: str = Field(description="Storage ID of the raw file that failed validation.") # 
-            # ...
-        ```
-
-  * **Definition of DONE:**
-    * Both Pydantic models in `common_core` are updated with the new field.
-    * Unit tests for the models pass.
-    * The `common_core` package version is incremented, and `pdm.lock` is updated.
-
-* **Sub-Task 1.2: Add Redis to Infrastructure**
-  * **TDD (Write these tests first):**
-    * `test_redis_fixture_provides_running_client`: An integration test fixture that spins up a Redis container using Testcontainers and yields a connected client.
-  * **Implementation Details:**
-    * **File:** 📂 `docker-compose.yml`
-    * **Action:** Add a Redis service.
-
-    ```yaml
-    # docker-compose.yml
-    services:
-      # ... other services
-      redis:
-        image: redis:7-alpine
-        container_name: huleedu_redis
-        restart: unless-stopped
-        networks:
-          - huleedu_internal_network
-        ports:
-          - "6379:6379"
-        healthcheck:
-          test: ["CMD", "redis-cli", "ping"]
-          interval: 10s
-          timeout: 5s
-          retries: 5
-    ```
-
-    * **File:** 📂 `pyproject.toml` (root)
-    * **Action:** Add `redis` to the `dev` dependency group.
-    * **File:** 📂 `services/essay_lifecycle_service/di.py` (and other consumer DIs)
-    * **Action:** Create a provider that yields a Redis client.
-
-    ```python
-    # In a provider class within di.py
-    import redis.asyncio as redis
-
-    @provide(scope=Scope.APP)
-    async def provide_redis_client(self, settings: Settings) -> redis.Redis:
-        client = redis.from_url(settings.REDIS_URL)
-        await client.ping() # Verify connection on startup
-        return client
-    ```
-
-  * **Definition of DONE:**
-    * Redis service is defined in `docker-compose.yml` and starts successfully.
-    * A `RedisClientProtocol` and DI provider are created and available to consumer services.
-    * The Testcontainers fixture for Redis is implemented and passing.
+**Objective**: Refactor the File Service to persist the raw, unmodified file blob before any processing occurs. This establishes an immutable source of truth, enabling robust reprocessing and decoupling storage from interpretation.
 
 ---
 
-#### **Epic 2: Service Implementation**
+## Task 2.1: Enhance `ContentType` Enum
 
-* **Sub-Task 2.1: Refactor `File Service` for Pre-emptive Blob Storage**
-  * **TDD (Write these tests first):**
-    * `test_process_single_file_stores_raw_blob_first`: A unit test for the core logic function ensuring `content_client.store_content` is called with the raw bytes *before* text extraction.
-    * `test_content_provisioned_event_contains_both_storage_ids`: An integration test verifying the final Kafka event includes both `raw_file_storage_id` and `text_storage_id`.
-  * **Implementation (`services/file_service/core_logic.py`):**
-    Refactor `process_single_file_upload` to implement the new flow.
+**Motivation**: We must formalize the different types of content our system stores. Using a `ContentType` enum instead of "magic strings" like "raw_upload" makes the system's data contracts explicit, self-documenting, and type-safe.
 
-    ```python
-    # services/file_service/core_logic.py
-    
-    async def process_single_file_upload(
-        # ... function signature ...
-    ) -> Dict[str, Any]:
-        # ...
-        try:
-            # Store the raw, unmodified file first.
-            raw_storage_id = await content_client.store_content(file_content, content_type="raw_upload")
-
-            # Extract text from the same bytes.
-            text = await text_extractor.extract_text(file_content, file_name)
-
-            # Validate extracted text.
-            validation_result = await content_validator.validate_content(text, file_name)
-            if not validation_result.is_valid:
-                # Publish failure event, now including raw_storage_id
-                validation_failure_event = EssayValidationFailedV1(
-                    raw_storage_id=raw_storage_id,
-                    # ... other fields
-                    )
-                await event_publisher.publish_essay_validation_failed(...)
-                return { "status": "validation_failed", "raw_storage_id": raw_storage_id }
-
-            # Store the processed (extracted) text.
-            text_storage_id = await content_client.store_content(text.encode("utf-8"), content_type="extracted_text")
-
-            # Publish success event with BOTH storage IDs.
-            content_provisioned_event = EssayContentProvisionedV1(
-                # ...
-                raw_file_storage_id=raw_storage_id,
-                text_storage_id=text_storage_id,
-                # ...
-                )
-                await event_publisher.publish_essay_content_provisioned(...)
-
-                return { "status": "processing_success", "raw_storage_id": raw_storage_id, "text_storage_id": text_storage_id }
-        ```
-
-    **Definition of DONE:**
-    * `ContentServiceClientProtocol` is updated to accept an optional `content_type`.
-    * The `process_single_file_upload` function implements the new "store raw first" logic.
-    * The `EssayContentProvisionedV1` and `EssayValidationFailedV1` events are published with the `raw_storage_id`.
-    * All new and existing tests for the File Service pass.
-
-## Sub-Task 2.2: Implement Redis-backed Idempotent Consumer
-
-* **TDD (Write these tests first):**
-  * `test_consumer_skips_known_event_id`: Using a Redis test fixture, assert that publishing an event with the same deterministic ID twice results in the core logic being called only once.
-* **Implementation (`services/essay_lifecycle_service/worker_main.py`):**
-    Apply this pattern to all worker services.
-
-    ```python
-    # services/essay_lifecycle_service/worker_main.py
-    # ... inside run_consumer_loop, after deserializing the message
-    
-    async for msg in consumer:
-        # ... deserialize message into `envelope` ...
-    
-        # KEY CHANGE: Idempotency Check
-        # Assumes a deterministic key (e.g., from a hash of key fields or a unique event ID)
-        event_key = f"huleedu:events:{envelope.event_id}" 
-        
-        # Use SETNX to atomically check and set. If it returns 0, the key already existed.
-        if await redis_client.set(event_key, "1", ex=7200, nx=True) == 0:
-            logger.warning(f"Duplicate event skipped: {event_key}")
-            await consumer.commit() # Commit to advance past the duplicate
-            continue
-
-        try:
-            # This is your existing business logic call
-            success = await process_single_message(msg, ...)
-            if success:
-                await consumer.commit() # Commit on success
-        except Exception as e:
-            logger.error(f"Processing failed for event {event_key}. Unlocking for retry.", exc_info=True)
-            # Release the lock so the event can be retried later
-            await redis_client.delete(event_key)
-            # DO NOT commit, so Kafka will redeliver for another attempt
-        ```
-
-    **Definition of DONE:**
-    * A deterministic event key strategy is established.
-    * The Redis `SETNX` check is implemented in the consumer loop of ELS.
-    * The key is deleted from Redis on processing failure to allow retries.
-    * The offset is committed for both successfully processed messages and skipped duplicates.
-
-### **5. Architectural Rationale**
-
-Event-driven systems like yours (Kafka) guarantee **at-least-once** delivery. Without idempotency, duplicate events can trigger redundant operations—for example:
-
-* **EssayLifecycleService (ELS):** multiple state transitions or duplicate CJ assessment commands  
-* **BatchOrchestratorService (BOS):** repeated batch initiation commands causing cascades of work  
-* **SpellCheckerService:** duplicate spell-check runs and redundant content storage  
-
-By standardizing a Redis-backed decorator, you enforce **exactly-once** processing, eliminate boilerplate across services, and dramatically improve system resilience.
-
-### **6. Practical Implementation Strategy**
-
-Since the logic is identical in every consumer, abstract it into your shared libs:
-
-#### 6.1 Decorator Implementation
+-   **File to Edit**: 📂 `common_core/src/common_core/enums.py`
+-   **Action**: Add `RAW_UPLOAD_BLOB` and `EXTRACTED_PLAINTEXT` to the `ContentType` enum. This clearly distinguishes between the original file and its processed text version.
 
 ```python
-# services/libs/huleedu_service_libs/kafka_consumer_utils.py
-from __future__ import annotations
-import functools
-from typing import Any, Awaitable, Callable
+# common_core/src/common_core/enums.py
 
-import redis.asyncio as redis
-from aiokafka import ConsumerRecord
-from huleedu_service_libs.logging_utils import create_service_logger
-from common_core.events.utils import generate_deterministic_event_id
+class ContentType(str, Enum):
+    ORIGINAL_ESSAY = "original_essay"  # This may be deprecated in favor of the new, more specific types
+    CORRECTED_TEXT = "corrected_text"
+    PROCESSING_LOG = "processing_log"
+    NLP_METRICS_JSON = "nlp_metrics_json"
+    STUDENT_FACING_AI_FEEDBACK_TEXT = "student_facing_ai_feedback_text"
+    AI_EDITOR_REVISION_TEXT = "ai_editor_revision_text"
+    AI_DETAILED_ANALYSIS_JSON = "ai_detailed_analysis_json"
+    GRAMMAR_ANALYSIS_JSON = "grammar_analysis_json"
+    CJ_RESULTS_JSON = "cj_results_json"
+    
+    # ➕ ADD THESE NEW VARIANTS
+    RAW_UPLOAD_BLOB = "raw_upload_blob"
+    EXTRACTED_PLAINTEXT = "extracted_plaintext"
+```
 
-logger = create_service_logger("kafka.idempotency")
+---
 
-def idempotent_consumer(
-    redis_client: redis.Redis,
-    ttl_seconds: int = 7200  # 2 hours
-) -> Callable:
-    """Decorator to make a Kafka message handler idempotent using Redis."""
-    def decorator(func: Callable[[ConsumerRecord, ...], Awaitable[Any]]) -> Callable:
-        @functools.wraps(func)
-        async def wrapper(msg: ConsumerRecord, *args, **kwargs) -> Any:
-            key = f"huleedu:events:seen:{generate_deterministic_event_id(msg.value)}"
-            if not await redis_client.set(key, "1", ex=ttl_seconds, nx=True):
-                logger.warning(f"Duplicate event skipped: {key}")
-                return None
-            try:
-                return await func(msg, *args, **kwargs)
-            except Exception:
-                logger.error(f"Processing failed for event {key}; unlocking for retry.", exc_info=True)
-                await redis_client.delete(key)
-                raise
-        return wrapper
-    return decorator
+## Task 2.2: Update Event Contracts
 
-#### **6.2 Usage in Consumer Workers**
+**Motivation**: Downstream services need to know the location of the original, untouched file for traceability and potential reprocessing. Both success and failure events must carry this reference.
+
+- **File to Edit**: 📂 `common_core/src/common_core/events/file_events.py`
+- **Action**: Add the `raw_file_storage_id: str` field to the `EssayContentProvisionedV1` and `EssayValidationFailedV1` Pydantic models.
 
 ```python
-# services/spell_checker_service/worker_main.py
-from aiokafka import ConsumerRecord
-from huleedu_service_libs.kafka_consumer_utils import idempotent_consumer
+# common_core/src/common_core/events/file_events.py
 
-# Obtain Redis client via DI
-redis_client = await container.get(redis.Redis)
+from pydantic import BaseModel, Field
+# ... other imports
 
-@idempotent_consumer(redis_client=redis_client)
-async def handle_spellcheck(msg: ConsumerRecord):
-    return await process_single_message(msg)
+class EssayContentProvisionedV1(BaseModel):
+    # ... existing fields (event, batch_id, original_file_name, etc.)
+    
+    # ➕ ADD THIS FIELD
+    raw_file_storage_id: str = Field(
+        description="Storage ID of the original, unmodified raw file blob."
+    )
+    
+    # This field remains, but now specifically refers to the *processed* text
+    text_storage_id: str = Field(
+        description="Content Service storage ID for the extracted and validated text."
+    )
+    # ... other fields (file_size_bytes, etc.)
 
-async for msg in consumer:
-    try:
-        await handle_spellcheck(msg)
-        await consumer.commit()
-    except Exception:
-        # Retry or DLQ logic
+
+class EssayValidationFailedV1(BaseModel):
+    # ... existing fields (event, batch_id, etc.)
+
+    # ➕ ADD THIS FIELD (using a consistent name)
+    raw_file_storage_id: str = Field(
+        description="Storage ID of the raw file blob that failed validation."
+    )
+    
+    validation_error_code: str
+    # ... other fields
+```
+
+---
+
+## Task 2.3: Update `ContentServiceClientProtocol`
+
+**Motivation**: Before changing the implementation, the service's internal contract (the protocol) must be updated. This enforces a contract-first approach and ensures that any component depending on this protocol is aware of the change.
+
+- **File to Edit**: 📂 `services/file_service/protocols.py`
+- **Action**: Modify the `store_content` method signature to include the new `content_type` parameter.
+
+```python
+# services/file_service/protocols.py
+
+from common_core.enums import ContentType # ➕ Import the enum
+from typing import Protocol
+
+class ContentServiceClientProtocol(Protocol):
+    # 🔄 MODIFY THIS SIGNATURE
+    async def store_content(self, content_bytes: bytes, content_type: ContentType) -> str:
+        """
+        Store content in Content Service and return storage ID.
+
+        Args:
+            content_bytes: Raw binary content to store.
+            content_type: The type of content being stored (e.g., raw blob, extracted text).
+        """
         ...
 ```
 
-#### **7. Codebase Validation Findings**
+---
+
+## Task 2.4: Refactor `core_logic.py` to Implement New Flow
+
+**Motivation**: This is the core implementation change. The logic will now follow the robust "store raw first" pattern, ensuring the original artifact is always saved before any potentially fallible processing steps occur.
+
+- **File to Edit**: 📂 `services/file_service/core_logic.py`
+- **Action**: Replace the `process_single_file_upload` function with the new, refined logic.
+
+```python
+# services/file_service/core_logic.py
+
+# ➕ Add new imports
+import hashlib
+from common_core.enums import ContentType
+# ... other imports
+
+# 🔄 Replace the entire function
+async def process_single_file_upload(
+    # ... function signature remains the same
+    batch_id: str,
+    file_content: bytes,
+    file_name: str,
+    main_correlation_id: uuid.UUID,
+    text_extractor: TextExtractorProtocol,
+    content_validator: ContentValidatorProtocol,
+    content_client: ContentServiceClientProtocol,
+    event_publisher: EventPublisherProtocol,
+) -> dict:
+    logger.info(f"Processing file {file_name} for batch {batch_id}")
+    raw_storage_id = None
+    try:
+        # STEP 1: Store the raw, unmodified file blob first.
+        raw_storage_id = await content_client.store_content(
+            file_content, content_type=ContentType.RAW_UPLOAD_BLOB
+        )
+        logger.info(f"Stored raw file blob for {file_name}, raw_storage_id: {raw_storage_id}")
+
+        # STEP 2: Extract text content.
+        text = await text_extractor.extract_text(file_content, file_name)
+
+        # STEP 3: Validate the extracted text.
+        validation_result = await content_validator.validate_content(text, file_name)
+        if not validation_result.is_valid:
+            logger.warning(f"Content validation failed for {file_name}: {validation_result.error_message}")
+            
+            # STEP 3a: Publish a failure event, now including the raw_storage_id.
+            failure_event = EssayValidationFailedV1(
+                batch_id=batch_id,
+                original_file_name=file_name,
+                raw_file_storage_id=raw_storage_id, # Include the raw file reference
+                validation_error_code=validation_result.error_code or "UNKNOWN_ERROR",
+                # ... other fields
+            )
+            await event_publisher.publish_essay_validation_failed(failure_event, main_correlation_id)
+            return {"status": "validation_failed", "raw_storage_id": raw_storage_id}
+
+        # STEP 4: Store the processed (extracted) text.
+        text_storage_id = await content_client.store_content(
+            text.encode("utf-8"), content_type=ContentType.EXTRACTED_PLAINTEXT
+        )
+        logger.info(f"Stored extracted text for {file_name}, text_storage_id: {text_storage_id}")
+
+        # STEP 5: Publish the success event with BOTH storage IDs.
+        success_event = EssayContentProvisionedV1(
+            batch_id=batch_id,
+            original_file_name=file_name,
+            raw_file_storage_id=raw_storage_id,
+            text_storage_id=text_storage_id,
+            file_size_bytes=len(file_content),
+            content_md5_hash=hashlib.md5(file_content).hexdigest(),
+            # ... other fields
+        )
+        await event_publisher.publish_essay_content_provisioned(success_event, main_correlation_id)
+
+        return {
+            "status": "processing_success",
+            "raw_storage_id": raw_storage_id,
+            "text_storage_id": text_storage_id,
+        }
+    except Exception as e:
+        # ... (error handling logic remains similar but should also publish failure event with raw_id if available)
+```
+
+---
+
+## Task 2.5 & 2.6: Test Implementation
+
+**Motivation**: We must validate the new logic at both the unit and end-to-end levels.
+
+- **Files to Edit/Create**:
+  - 🧪 `services/file_service/tests/test_core_logic.py`
+  - 🧪 `tests/functional/test_e2e_file_workflows.py`
+
+- **Actions**:
+  - **Unit Test (Task 2.5)**: Create a test that mocks the `ContentServiceClientProtocol` and verifies the call order and arguments.
+
+    ```python
+    # services/file_service/tests/test_core_logic.py
+    from unittest.mock import AsyncMock, call
+    from common_core.enums import ContentType
+
+    @pytest.mark.asyncio
+    async def test_process_single_file_stores_raw_blob_first(mocker):
+        # ... setup mocks for protocols ...
+        mock_content_client = AsyncMock(spec=ContentServiceClientProtocol)
+        mock_content_client.store_content.side_effect = ["raw_id_123", "text_id_456"]
+
+        # ... call process_single_file_upload ...
+
+        # Assert that store_content was called twice with the correct content types
+        assert mock_content_client.store_content.call_count == 2
+        mock_content_client.store_content.assert_has_calls([
+            call(mocker.ANY, content_type=ContentType.RAW_UPLOAD_BLOB),
+            call(mocker.ANY, content_type=ContentType.EXTRACTED_PLAINTEXT)
+        ])
+    ```
+
+  - **E2E Test (Task 2.6)**: Modify an existing E2E test to validate the final event payload in Kafka.
+
+    ```python
+    # tests/functional/test_e2e_file_workflows.py
+    # Inside an existing test like test_file_upload_publishes_content_provisioned_event
+
+    # ... after collecting events ...
+    content_data = event_info["data"]["data"] # Drill down into the payload
+
+    # ➕ ADD THESE ASSERTIONS
+    assert "raw_file_storage_id" in content_data
+    assert "text_storage_id" in content_data
+    assert content_data["raw_file_storage_id"] is not None
+    assert content_data["raw_file_storage_id"] != content_data["text_storage_id"]
+
+    print(f"✅ Event validated with raw_id: {content_data['raw_file_storage_id']} "
+          f"and text_id: {content_data['text_storage_id']}")
+    ```
