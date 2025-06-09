@@ -130,7 +130,7 @@ This release marks the completion of Sprint 1 with a fully functional walking sk
 - Kafka event infrastructure
 - Core spell checking functionality
 
-### Infrastructure
+### Changed/Infrastructure
 
 - PDM monorepo structure
 - Basic CI/CD pipeline setup

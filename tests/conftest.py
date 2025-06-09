@@ -22,15 +22,11 @@ def pytest_configure(config):
 
 
 @pytest.fixture(scope="session")
-def event_loop(
-    event_loop_policy: asyncio.AbstractEventLoopPolicy
-) -> Generator[asyncio.AbstractEventLoop, None, None]:
+def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     """Create an instance of the default event loop for the test session."""
-    loop = event_loop_policy.new_event_loop()
-    asyncio.set_event_loop(loop)  # Set this loop as current for the session context
+    loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
-    asyncio.set_event_loop(None)  # Clean up by removing the loop from current context
 
 
 # TODO: Add common test data fixtures

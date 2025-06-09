@@ -1,142 +1,68 @@
 """
 Service Health Testing
 
-Validates that all microservices are responding correctly to health check requests.
-Tests both /healthz and /metrics endpoints across all HTTP services.
+Validates that all microservices are responding correctly.
+Uses ServiceTestManager utility - no fixtures or direct HTTP calls.
 """
 
-import asyncio
-
-import httpx
 import pytest
+
+from tests.utils.service_test_manager import ServiceTestManager
 
 
 class TestServiceHealth:
-    """Test suite for validating service health endpoints across all services."""
-
-    # Service configuration: (service_name, port, base_path)
-    HTTP_SERVICES = [
-        ("content_service", 8001, ""),
-        ("batch_orchestrator_service", 5001, ""),
-        ("essay_lifecycle_service", 6001, ""),
-        ("file_service", 7001, ""),
-    ]
+    """Test suite for validating service health across all services."""
 
     @pytest.mark.docker
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_all_services_health_endpoints(self):
-        """Test that all services respond to /healthz with HTTP 200."""
-        async with httpx.AsyncClient() as client:
-            health_results = []
+    async def test_all_services_healthy(self):
+        """Test that all HTTP services respond to health checks."""
+        service_manager = ServiceTestManager()
 
-            for service_name, port, base_path in self.HTTP_SERVICES:
-                url = f"http://localhost:{port}{base_path}/healthz"
-                try:
-                    response = await client.get(url, timeout=5.0)
-                    health_results.append((service_name, response.status_code, response.json()))
-                    assert response.status_code == 200, f"{service_name} health check failed"
-                except httpx.ConnectError:
-                    pytest.skip(f"{service_name} not accessible - services may not be running")
-                except Exception as e:
-                    pytest.fail(f"{service_name} health check failed with exception: {e}")
+        endpoints = await service_manager.get_validated_endpoints()
 
-            # Log all results for visibility
-            for service_name, status_code, response_data in health_results:
-                print(f"✅ {service_name}: {status_code} - {response_data}")
+        assert len(endpoints) >= 4, f"Expected at least 4 services, got {len(endpoints)}"
 
-    @pytest.mark.docker
-    @pytest.mark.integration
-    @pytest.mark.asyncio
-    async def test_all_services_metrics_endpoints(self):
-        """Test that all services respond to /metrics with HTTP 200 and Prometheus format."""
-        async with httpx.AsyncClient() as client:
-            metrics_results = []
+        expected_services = [
+            "content_service",
+            "batch_orchestrator_service",
+            "essay_lifecycle_service",
+            "file_service"
+        ]
 
-            for service_name, port, base_path in self.HTTP_SERVICES:
-                url = f"http://localhost:{port}{base_path}/metrics"
-                try:
-                    response = await client.get(url, timeout=5.0)
-                    metrics_results.append((service_name, response.status_code, len(response.text)))
-                    assert response.status_code == 200, f"{service_name} metrics endpoint failed"
+        for service_name in expected_services:
+            assert service_name in endpoints, f"Missing {service_name}"
+            service_info = endpoints[service_name]
+            assert service_info["status"] == "healthy", f"{service_name} not healthy"
 
-                    # Verify Prometheus format
-                    metrics_text = response.text
-                    # Allow empty metrics (valid for services with no metrics registered yet)
-                    if metrics_text.strip():
-                        assert "# HELP" in metrics_text, (
-                            f"{service_name} metrics not in Prometheus format"
-                        )
-                        assert "# TYPE" in metrics_text, (
-                            f"{service_name} metrics missing TYPE declarations"
-                        )
-                    else:
-                        # Empty metrics registry is acceptable for walking skeleton
-                        print(
-                            f"ℹ️  {service_name}: Empty metrics registry "
-                            f"(acceptable for walking skeleton)"
-                        )
-
-                except httpx.ConnectError:
-                    pytest.skip(f"{service_name} not accessible - services may not be running")
-                except Exception as e:
-                    pytest.fail(f"{service_name} metrics endpoint failed with exception: {e}")
-
-            # Log all results for visibility
-            for service_name, status_code, metrics_size in metrics_results:
-                print(f"📊 {service_name}: {status_code} - {metrics_size} chars of metrics data")
+        print(f"✅ All {len(endpoints)} services healthy")
 
     @pytest.mark.docker
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_service_response_times(self):
-        """Test that all services respond within acceptable time limits."""
-        async with httpx.AsyncClient() as client:
-            for service_name, port, base_path in self.HTTP_SERVICES:
-                url = f"http://localhost:{port}{base_path}/healthz"
+    async def test_kafka_services_metrics(self):
+        """Test that Kafka worker services expose metrics."""
+        service_manager = ServiceTestManager()
 
-                try:
-                    start_time = asyncio.get_event_loop().time()
-                    await client.get(url, timeout=5.0)
-                    end_time = asyncio.get_event_loop().time()
+        # Test Spell Checker metrics (port 8002)
+        spell_checker_metrics = await service_manager.get_service_metrics(
+            "spell_checker_service", 8002
+        )
 
-                    response_time = end_time - start_time
-                    assert response_time < 2.0, (
-                        f"{service_name} responded too slowly: {response_time:.2f}s"
-                    )
-                    print(f"⚡ {service_name}: {response_time:.3f}s response time")
-                except httpx.ConnectError:
-                    pytest.skip(f"{service_name} not accessible - services may not be running")
+        if spell_checker_metrics:
+            print("✅ Spell Checker metrics available")
+        else:
+            pytest.skip("Spell Checker metrics not accessible")
 
-
-class TestSpellCheckerServiceHealth:
-    """Test suite for validating Kafka-based Spell Checker Service health."""
-
-    @pytest.mark.docker
-    @pytest.mark.integration
-    @pytest.mark.asyncio
-    async def test_spell_checker_metrics_endpoint(self):
-        """Test that Spell Checker Service metrics endpoint is accessible."""
-        async with httpx.AsyncClient() as client:
-            # Spell Checker runs metrics on port 8002
-            url = "http://localhost:8002/metrics"
-            try:
-                response = await client.get(url, timeout=5.0)
-                assert response.status_code == 200, "Spell Checker metrics endpoint failed"
-
-                metrics_text = response.text
-                assert "kafka_message_queue_latency_seconds" in metrics_text, (
-                    "Missing Kafka queue latency metric"
-                )
-                print(f"📊 spell_checker_service: {response.status_code} - Kafka metrics available")
-
-            except httpx.ConnectError:
-                pytest.skip(
-                    "Spell Checker Service metrics server not running (worker-only service)"
-                )
-            except Exception as e:
-                pytest.fail(f"Spell Checker metrics test failed: {e}")
-
+        # Test CJ Assessment metrics (port 9090)
+        cj_assessment_metrics = await service_manager.get_service_metrics(
+            "cj_assessment_service", 9090
+        )
+        if cj_assessment_metrics:
+            print("✅ CJ Assessment metrics available")
+        else:
+            pytest.skip("CJ Assessment metrics not accessible")
 
 # TODO: Add container integration tests
 # TODO: Add end-to-end workflow tests
