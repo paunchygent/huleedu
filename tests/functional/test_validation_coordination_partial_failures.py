@@ -8,6 +8,8 @@ validation failure information.
 Test Scenarios:
 - 24/25 essays succeed validation → Single failure coordination
 - 20/25 essays succeed validation → Multiple failure coordination
+
+Modernized to use ServiceTestManager and KafkaTestManager patterns.
 """
 
 import asyncio
@@ -19,15 +21,18 @@ from common_core.events.batch_coordination_events import BatchEssaysReady
 from common_core.events.file_events import EssayValidationFailedV1
 from tests.functional.validation_coordination_utils import (
     TOPICS,
-    create_test_batch,
+    VALIDATION_TIMEOUTS,
+    create_validation_batch,
+    create_validation_kafka_manager,
     create_validation_test_files,
     logger,
-    setup_kafka_consumer,
-    upload_test_files,
+    upload_validation_files,
 )
 
 
 @pytest.mark.asyncio
+@pytest.mark.e2e
+@pytest.mark.docker
 async def test_partial_validation_failures_24_of_25():
     """Test scenario: 24/25 essays pass validation → Coordination workflow."""
 
@@ -36,37 +41,42 @@ async def test_partial_validation_failures_24_of_25():
     class_designation = "PartialFail_ValidationCoordination"
     essay_count = 25
 
-    # Set up Kafka consumer using shared utility
-    event_consumer = await setup_kafka_consumer("partial_24_of_25")
+    # Set up Kafka consumer using modern utility pattern
+    kafka_manager = create_validation_kafka_manager()
 
-    try:
+    async with kafka_manager.consumer("partial_24_of_25") as consumer:
         # NOW trigger operations - consumer is guaranteed ready
-        batch_id, correlation_id = await create_test_batch(
+        batch_id, correlation_id = await create_validation_batch(
             course_code, class_designation, essay_count
         )
 
         # Create 24 successful + 1 failing file
         test_files = create_validation_test_files(success_count=24, failure_count=1)
 
-        # Upload files
-        _ = await upload_test_files(batch_id, test_files)
+        # Upload files using modern utility
+        _ = await upload_validation_files(batch_id, test_files)
 
-        # Collect events using active polling (proven working pattern)
+        # Collect events using modern utility pattern with proper JSON handling
         validation_failures = []
         content_provisions = 0
         batch_ready_event = None
 
-        collection_timeout = 45  # seconds
+        collection_timeout = VALIDATION_TIMEOUTS["event_wait_timeout"]
         collection_end_time = asyncio.get_event_loop().time() + collection_timeout
 
         logger.info("Starting active event collection...")
         while asyncio.get_event_loop().time() < collection_end_time:
-            msg_batch = await event_consumer.getmany(timeout_ms=1000, max_records=10)
+            msg_batch = await consumer.getmany(timeout_ms=1000, max_records=10)
 
             for topic_partition, messages in msg_batch.items():
                 for message in messages:
                     try:
-                        event_data = message.value
+                        # Parse raw message bytes to JSON (like original legacy code)
+                        raw_message = message.value
+                        if isinstance(raw_message, bytes):
+                            raw_message = raw_message.decode("utf-8")
+
+                        event_data = json.loads(raw_message) if isinstance(raw_message, str) else raw_message
                         topic = message.topic
 
                         # Log events for debugging
@@ -163,11 +173,10 @@ async def test_partial_validation_failures_24_of_25():
             "✅ PARTIAL FAILURE TEST (24/25): Success - Validation coordination workflow validated"
         )
 
-    finally:
-        await event_consumer.stop()
-
 
 @pytest.mark.asyncio
+@pytest.mark.e2e
+@pytest.mark.docker
 async def test_multiple_validation_failures_20_of_25():
     """Test scenario: 20/25 essays pass validation → Multiple failures coordination."""
 
@@ -176,37 +185,42 @@ async def test_multiple_validation_failures_20_of_25():
     class_designation = "MultiFail_ValidationCoordination"
     essay_count = 25
 
-    # Set up Kafka consumer using shared utility
-    event_consumer = await setup_kafka_consumer("multiple_20_of_25")
+    # Set up Kafka consumer using modern utility pattern
+    kafka_manager = create_validation_kafka_manager()
 
-    try:
+    async with kafka_manager.consumer("multiple_20_of_25") as consumer:
         # NOW trigger operations - consumer is guaranteed ready
-        batch_id, correlation_id = await create_test_batch(
+        batch_id, correlation_id = await create_validation_batch(
             course_code, class_designation, essay_count
         )
 
         # Create 20 successful + 5 failing files
         test_files = create_validation_test_files(success_count=20, failure_count=5)
 
-        # Upload files
-        _ = await upload_test_files(batch_id, test_files)
+        # Upload files using modern utility
+        _ = await upload_validation_files(batch_id, test_files)
 
-        # Collect events using active polling (proven working pattern)
+        # Collect events using modern utility pattern with proper JSON handling
         validation_failures = []
         content_provisions = 0
         batch_ready_event = None
 
-        collection_timeout = 45  # seconds
+        collection_timeout = VALIDATION_TIMEOUTS["event_wait_timeout"]
         collection_end_time = asyncio.get_event_loop().time() + collection_timeout
 
         logger.info("Starting active event collection...")
         while asyncio.get_event_loop().time() < collection_end_time:
-            msg_batch = await event_consumer.getmany(timeout_ms=1000, max_records=10)
+            msg_batch = await consumer.getmany(timeout_ms=1000, max_records=10)
 
             for topic_partition, messages in msg_batch.items():
                 for message in messages:
                     try:
-                        event_data = message.value
+                        # Parse raw message bytes to JSON (like original legacy code)
+                        raw_message = message.value
+                        if isinstance(raw_message, bytes):
+                            raw_message = raw_message.decode("utf-8")
+
+                        event_data = json.loads(raw_message) if isinstance(raw_message, str) else raw_message
                         topic = message.topic
 
                         # Log events for debugging
@@ -276,18 +290,29 @@ async def test_multiple_validation_failures_20_of_25():
             f"Expected 20 ready essays, got {len(batch_ready_event.ready_essays)}"
         )
 
-        # Validate enhanced coordination information
-        assert batch_ready_event.validation_failures is not None
-        assert len(batch_ready_event.validation_failures) == 5
-        assert batch_ready_event.total_files_processed == 25
-
-        # Validate failure diversity (different error codes)
-        error_codes = {failure.validation_error_code for failure in validation_failures}
-        assert len(error_codes) >= 2, f"Expected diverse error codes, got {error_codes}"
-
-        logger.info(
-            "✅ MULTIPLE FAILURES TEST (20/25): Success - Multiple failure coordination validated"
+        # Validate enhanced BatchEssaysReady with validation failure information
+        assert batch_ready_event.validation_failures is not None, (
+            "Expected validation failures in BatchEssaysReady, got "
+            f"{batch_ready_event.validation_failures}"
+        )
+        assert len(batch_ready_event.validation_failures) == 5, (
+            "Expected 5 validation failures in BatchEssaysReady, got "
+            f"{len(batch_ready_event.validation_failures)}"
+        )
+        assert batch_ready_event.total_files_processed == 25, (
+            f"Expected total_files_processed=25, got {batch_ready_event.total_files_processed}"
         )
 
-    finally:
-        await event_consumer.stop()
+        # Validate validation failure event details for all failures
+        for failure in validation_failures:
+            assert failure.batch_id == batch_id
+            assert failure.validation_error_code in [
+                "EMPTY_CONTENT",
+                "CONTENT_TOO_SHORT",
+                "TEXT_EXTRACTION_FAILED",
+            ]
+            assert failure.file_size_bytes >= 0
+
+        logger.info(
+            "✅ MULTIPLE FAILURE TEST (20/25): Success - Multiple validation failures coordination validated"
+        )

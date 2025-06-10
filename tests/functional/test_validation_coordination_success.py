@@ -6,6 +6,8 @@ ensuring the normal workflow path functions correctly without failure coordinati
 
 Test Scenarios:
 - 25/25 essays succeed validation → Normal workflow path
+
+Modernized to use ServiceTestManager and KafkaTestManager patterns.
 """
 
 import asyncio
@@ -17,15 +19,18 @@ from common_core.events.batch_coordination_events import BatchEssaysReady
 from common_core.events.file_events import EssayValidationFailedV1
 from tests.functional.validation_coordination_utils import (
     TOPICS,
-    create_test_batch,
+    VALIDATION_TIMEOUTS,
+    create_validation_batch,
+    create_validation_kafka_manager,
     create_validation_test_files,
     logger,
-    setup_kafka_consumer,
-    upload_test_files,
+    upload_validation_files,
 )
 
 
 @pytest.mark.asyncio
+@pytest.mark.e2e
+@pytest.mark.docker
 async def test_all_essays_pass_validation():
     """Test scenario: 25/25 essays pass validation → Normal workflow."""
 
@@ -34,37 +39,46 @@ async def test_all_essays_pass_validation():
     class_designation = "AllPass_ValidationCoordination"
     essay_count = 25
 
-    # Set up Kafka consumer using shared utility
-    event_consumer = await setup_kafka_consumer("all_pass")
+    # Set up Kafka consumer using modern utility pattern
+    kafka_manager = create_validation_kafka_manager()
 
-    try:
+    async with kafka_manager.consumer("all_pass") as consumer:
         # NOW trigger operations - consumer is guaranteed ready
-        batch_id, correlation_id = await create_test_batch(
+        batch_id, correlation_id = await create_validation_batch(
             course_code, class_designation, essay_count
         )
 
         # Create all successful files
         test_files = create_validation_test_files(success_count=25, failure_count=0)
 
-        # Upload files
-        _ = await upload_test_files(batch_id, test_files)
+        # Upload files using modern utility
+        _ = await upload_validation_files(batch_id, test_files)
 
-        # Collect events using active polling (proven working pattern)
+        # Collect events using modern utility pattern with proper JSON handling
         validation_failures = []
         content_provisions = 0
         batch_ready_event = None
 
-        collection_timeout = 45  # seconds
+        collection_timeout = VALIDATION_TIMEOUTS["event_wait_timeout"]
         collection_end_time = asyncio.get_event_loop().time() + collection_timeout
 
         logger.info("Starting active event collection...")
         while asyncio.get_event_loop().time() < collection_end_time:
-            msg_batch = await event_consumer.getmany(timeout_ms=1000, max_records=10)
+            msg_batch = await consumer.getmany(timeout_ms=1000, max_records=10)
 
             for topic_partition, messages in msg_batch.items():
                 for message in messages:
                     try:
-                        event_data = message.value
+                        # Parse raw message bytes to JSON (like original legacy code)
+                        raw_message = message.value
+                        if isinstance(raw_message, bytes):
+                            raw_message = raw_message.decode("utf-8")
+
+                        event_data = (
+                            json.loads(raw_message)
+                            if isinstance(raw_message, str)
+                            else raw_message
+                        )
                         topic = message.topic
 
                         # Log events for debugging
@@ -135,6 +149,3 @@ async def test_all_essays_pass_validation():
         )
 
         logger.info("✅ ALL PASS VALIDATION TEST: Success - Normal workflow validated")
-
-    finally:
-        await event_consumer.stop()

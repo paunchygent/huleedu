@@ -6,6 +6,8 @@ for operational monitoring and observability.
 
 from __future__ import annotations
 
+from typing import Tuple
+
 from dishka import FromDishka
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry
 from quart import Blueprint, Response, jsonify
@@ -15,7 +17,7 @@ health_bp = Blueprint("health_routes", __name__)
 
 
 @health_bp.route("/healthz")
-async def health_check():
+async def health_check() -> Tuple[Response, int]:
     """Health check endpoint for Spell Checker Service.
 
     Performs basic service responsiveness check. Can be extended
