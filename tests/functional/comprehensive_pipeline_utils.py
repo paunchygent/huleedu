@@ -20,8 +20,11 @@ from tests.utils.service_test_manager import ServiceTestManager
 logger = create_service_logger("test.comprehensive_pipeline")
 
 
-# Pipeline-specific topics configuration (matching original working test exactly)
+# Pipeline-specific topics configuration (complete pipeline coverage)
 PIPELINE_TOPICS = {
+    "batch_essays_registered": topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),
+    "essay_content_provisioned": topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED),
+    "essay_validation_failed": topic_name(ProcessingEvent.ESSAY_VALIDATION_FAILED),
     "batch_ready": topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
     "batch_spellcheck_initiate": topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
     "els_batch_phase_outcome": topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
@@ -70,15 +73,15 @@ async def register_comprehensive_batch(
 ) -> str:
     """
     Register a batch specifically for comprehensive pipeline testing.
-    
+
     CRITICAL: Enables CJ assessment to ensure full pipeline execution.
     Matches original test logic: uses and keeps the ORIGINAL correlation_id throughout.
-    
+
     Args:
         service_manager: ServiceTestManager instance
         expected_essay_count: Number of essays to expect
         correlation_id: Original correlation ID to use throughout pipeline
-        
+
     Returns:
         batch_id only (original correlation_id continues to be used for events)
     """
@@ -111,10 +114,9 @@ async def register_comprehensive_batch(
                 raise RuntimeError(f"Batch creation failed: {response.status} - {error_text}")
 
             result = await response.json()
-            batch_id = result["batch_id"]
+            batch_id: str = result["batch_id"]
 
             logger.info(f"✅ Comprehensive batch registered: {batch_id} (CJ assessment enabled)")
-            # Return only batch_id like original test - keep using original correlation_id for events
             return batch_id
 
 
@@ -178,16 +180,30 @@ async def watch_pipeline_progression_with_consumer(
     consumer,
     batch_id: str,
     correlation_id: str,
+    expected_essay_count: int,
     timeout_seconds: int = 180
 ) -> Optional[Dict[str, Any]]:
     """
-    Watch pipeline progression using the EXACT logic from the working original test.
+    Watch complete pipeline progression with dynamic essay count.
+    
+    Args:
+        consumer: Kafka consumer
+        batch_id: Batch identifier
+        correlation_id: Correlation identifier for event filtering
+        expected_essay_count: Number of essays expected (dynamic)
+        timeout_seconds: Maximum wait time
+        
+    Returns:
+        Final completion event data or None if timeout
     """
     start_time = asyncio.get_event_loop().time()
     end_time = start_time + timeout_seconds
 
-    # Track spellcheck completion progress
+    # Track complete pipeline progression
+    batch_registered = False
     spellcheck_completions = 0
+    content_provisioned_count = 0
+    validation_failure_count = 0
 
     while asyncio.get_event_loop().time() < end_time:
         try:
@@ -197,7 +213,6 @@ async def watch_pipeline_progression_with_consumer(
                 for message in messages:
                     try:
                         # PRODUCTION FIDELITY: Handle raw bytes like real services
-                        # Real services: raw_message = msg.value.decode("utf-8")
                         if isinstance(message.value, bytes):
                             raw_message = message.value.decode("utf-8")
                         else:
@@ -208,23 +223,16 @@ async def watch_pipeline_progression_with_consumer(
                         event_data = envelope_data.get("data", {})
                         event_correlation_id = envelope_data.get("correlation_id")
 
-                        # DEBUG: Log ELS batch phase outcome messages regardless of correlation ID
-                        if message.topic == PIPELINE_TOPICS["els_batch_phase_outcome"]:
-                            phase_name = event_data.get('phase_name')
-                            phase_status = event_data.get('phase_status')
-                            entity_id = event_data.get("entity_ref", {}).get("entity_id")
-                            print(f"🔍 ELS BATCH PHASE OUTCOME: phase={phase_name}, status={phase_status}, entity_id={entity_id}, correlation_id={event_correlation_id}, expected_correlation={correlation_id}, expected_batch={batch_id}")
-
-                        # Primary filter: correlation_id MUST match.
+                        # Primary filter: correlation_id MUST match
                         if correlation_id is None or event_correlation_id != correlation_id:
                             continue
 
-                        # Secondary check: entity_id should match for batch-level events.
-                        # For essay-level events, this check is skipped as we rely on correlation_id.
+                        # Secondary check: entity_id should match for batch-level events
                         entity_match = False
 
                         # List of topics that are about the whole batch
                         batch_level_topics = [
+                            PIPELINE_TOPICS["batch_essays_registered"],
                             PIPELINE_TOPICS["batch_ready"],
                             PIPELINE_TOPICS["batch_spellcheck_initiate"],
                             PIPELINE_TOPICS["els_batch_phase_outcome"],
@@ -234,68 +242,93 @@ async def watch_pipeline_progression_with_consumer(
 
                         if message.topic in batch_level_topics:
                             entity_id_from_event = None
-                            if message.topic == PIPELINE_TOPICS["batch_ready"]:
+                            if message.topic == PIPELINE_TOPICS["batch_essays_registered"]:
+                                entity_id_from_event = event_data.get("batch_id")
+                            elif message.topic == PIPELINE_TOPICS["batch_ready"]:
                                 entity_id_from_event = event_data.get("batch_id")
                             elif message.topic == PIPELINE_TOPICS["els_batch_phase_outcome"]:
-                                # ELS batch phase outcome may not have entity_ref.entity_id
                                 # For correlation-matched events, we trust the correlation_id match
                                 entity_match = True
-                                print("🔍 ELS batch phase outcome - trusting correlation_id match")
                             else:
                                 entity_id_from_event = event_data.get("entity_ref", {}).get("entity_id")
 
                             if not entity_match and entity_id_from_event == batch_id:
                                 entity_match = True
-                        elif message.topic == PIPELINE_TOPICS["essay_spellcheck_completed"]:
-                            # This is an essay-level event. The correlation_id match is sufficient.
+                        elif message.topic in [PIPELINE_TOPICS["essay_spellcheck_completed"],
+                                               PIPELINE_TOPICS["essay_content_provisioned"],
+                                               PIPELINE_TOPICS["essay_validation_failed"]]:
+                            # Essay-level events - correlation_id match is sufficient
                             entity_match = True
                         else:
                             # Skip topics not relevant to this test's flow
                             continue
 
                         if entity_match:
-                            if message.topic == PIPELINE_TOPICS["batch_ready"]:
-                                essay_count = len(event_data.get("ready_essays", []))
-                                print(f"📨 1️⃣ ELS published BatchEssaysReady: {essay_count} essays ready")
+                            if message.topic == PIPELINE_TOPICS["batch_essays_registered"]:
+                                batch_registered = True
+                                essay_slots = len(event_data.get("essay_ids", []))
+                                print(f"📝 Batch registration: {essay_slots} essay slots created")
+                            elif message.topic == PIPELINE_TOPICS["essay_content_provisioned"]:
+                                content_provisioned_count += 1
+                                if content_provisioned_count == 1:
+                                    print("📨 0️⃣ File Service publishing content provisioned events...")
+                                elif content_provisioned_count == expected_essay_count:
+                                    print(f"📨 0️⃣ All {content_provisioned_count} essays content provisioned - ELS will aggregate")
+                            elif message.topic == PIPELINE_TOPICS["essay_validation_failed"]:
+                                validation_failure_count += 1
+                                if validation_failure_count == 1:
+                                    print("⚠️ Essay validation failures detected...")
+                                essay_file = event_data.get("essay_file_name", "unknown")
+                                reason = event_data.get("validation_error_reason", "unknown")
+                                print(f"❌ Validation failed: {essay_file} ({reason})")
+                            elif message.topic == PIPELINE_TOPICS["batch_ready"]:
+                                ready_essays = event_data.get("ready_essays", [])
+                                batch_validation_failures = event_data.get("validation_failures", [])
+                                ready_count = len(ready_essays) if ready_essays else 0
+                                failed_count = len(batch_validation_failures) if batch_validation_failures else 0
+                                total_processed = ready_count + failed_count
+                                print(f"📨 1️⃣ ELS published BatchEssaysReady: {ready_count} ready, {failed_count} failed ({total_processed} total)")
                             elif message.topic == PIPELINE_TOPICS["batch_spellcheck_initiate"]:
-                                print("📨 2️⃣ BOS published spellcheck initiate command")
+                                essays_to_process = event_data.get("essays_to_process", [])
+                                essay_count = len(essays_to_process) if essays_to_process else 0
+                                print(f"📨 2️⃣ BOS published spellcheck initiate command: {essay_count} essays")
                             elif message.topic == PIPELINE_TOPICS["essay_spellcheck_completed"]:
-                                # Count spellcheck completions - when we have enough, expect phase outcome
                                 spellcheck_completions += 1
-                                essay_id = event_data.get("entity_ref", {}).get("entity_id", "unknown")
-                                corrections_made = event_data.get("corrections_made", 0)
-                                print(f"📨 Essay spellcheck completed: {essay_id[:8]}... ({corrections_made} corrections) [{spellcheck_completions} total]")
-
-                                # Debug summary when all essays complete
-                                if spellcheck_completions == 25:
-                                    print("🎯 ALL 25 ESSAYS COMPLETED SPELLCHECK! Expecting ELS to publish batch phase outcome next...")
-                                elif spellcheck_completions > 25:
-                                    print(f"⚠️ More than 25 essays completed? Count: {spellcheck_completions}")
+                                if spellcheck_completions == 1:
+                                    print("📨 📝 Spell checker processing essays...")
                             elif message.topic == PIPELINE_TOPICS["els_batch_phase_outcome"]:
                                 phase_name = event_data.get('phase_name')
                                 phase_status = event_data.get('phase_status')
-                                print(f"📨 3️⃣ ELS published phase outcome: {phase_name} -> {phase_status}")
-                                # If spellcheck phase completed (successfully or with failures), expect CJ assessment next
-                                if phase_name == "spellcheck" and phase_status in ["COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"]:
-                                    print("✅ Spellcheck phase completed! Waiting for CJ assessment initiate...")
+                                if phase_name == "spellcheck":
+                                    print(f"📨 3️⃣ ELS published phase outcome: {phase_name} -> {phase_status}")
+                                    if phase_status in ["COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"]:
+                                        print("✅ Spellcheck phase completed! BOS will initiate CJ assessment...")
+                                elif phase_name == "cj_assessment":
+                                    print(f"📨 6️⃣ ELS published phase outcome: {phase_name} -> {phase_status}")
+                                    if phase_status in ["COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"]:
+                                        print("🎯 Pipeline SUCCESS! Complete end-to-end processing finished.")
+                                        return dict(envelope_data)
+                                else:
+                                    print(f"📨 🔧 ELS published phase outcome: {phase_name} -> {phase_status}")
                             elif message.topic == PIPELINE_TOPICS["batch_cj_assessment_initiate"]:
-                                essay_count = len(event_data.get("essays_to_process", []))
-                                print(f"📨 4️⃣ BOS published CJ assessment initiate command: {essay_count} essays")
+                                essays_to_assess_list = event_data.get("essays_to_process", [])
+                                essays_to_assess = len(essays_to_assess_list) if essays_to_assess_list else 0
+                                print(f"📨 4️⃣ BOS published CJ assessment initiate command: {essays_to_assess} essays")
                             elif message.topic == PIPELINE_TOPICS["cj_assessment_completed"]:
                                 rankings = event_data.get("rankings", [])
-                                print(f"📨 5️⃣ CJ assessment completed: {len(rankings)} essays ranked")
-                                print("🎯 Pipeline SUCCESS! Complete end-to-end processing finished.")
-                                return dict(envelope_data)
+                                ranking_count = len(rankings) if rankings else 0
+                                print(f"📨 5️⃣ CJ assessment completed: {ranking_count} essays ranked")
+                                # Pipeline continues - ELS will publish final phase outcome
 
                     except (json.JSONDecodeError, KeyError) as e:
-                        print(f"⚠️ Failed to parse message: {e}")
+                        logger.warning(f"Failed to parse pipeline message: {e}")
                         continue
 
             await asyncio.sleep(0.5)
 
         except Exception as e:
-            print(f"⚠️ Error polling for pipeline progression: {e}")
+            logger.warning(f"Error polling for pipeline progression: {e}")
             await asyncio.sleep(1)
 
-    print(f"⏰ Pipeline did not complete within {timeout_seconds} seconds")
+    logger.error(f"Pipeline did not complete within {timeout_seconds} seconds")
     return None

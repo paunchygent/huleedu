@@ -90,7 +90,7 @@ async def test_comprehensive_real_batch_pipeline():
         # Step 7: Watch pipeline progression with pre-positioned consumer
         print("⏳ Watching pipeline progression...")
         result = await watch_pipeline_progression_with_consumer(
-            consumer, batch_id, test_correlation_id, 50
+            consumer, batch_id, test_correlation_id, len(test_essays), 50
         )
 
         assert result is not None, "Pipeline did not complete"
