@@ -8,8 +8,8 @@
 
 **Motivation**: We must formalize the different types of content our system stores. Using a `ContentType` enum instead of "magic strings" like "raw_upload" makes the system's data contracts explicit, self-documenting, and type-safe.
 
--   **File to Edit**: 📂 `common_core/src/common_core/enums.py`
--   **Action**: Add `RAW_UPLOAD_BLOB` and `EXTRACTED_PLAINTEXT` to the `ContentType` enum. This clearly distinguishes between the original file and its processed text version.
+- **File to Edit**: 📂 `common_core/src/common_core/enums.py`
+- **Action**: Add `RAW_UPLOAD_BLOB` and `EXTRACTED_PLAINTEXT` to the `ContentType` enum. This clearly distinguishes between the original file and its processed text version.
 
 ```python
 # common_core/src/common_core/enums.py

@@ -48,7 +48,7 @@ async def create_validation_batch(
 ) -> tuple[str, str]:
     """
     Create a validation test batch using modern ServiceTestManager.
-    
+
     Returns (batch_id, correlation_id).
     """
     service_manager = ServiceTestManager()
@@ -107,7 +107,7 @@ def create_validation_test_files(success_count: int, failure_count: int) -> List
 async def upload_validation_files(batch_id: str, files: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Upload validation test files using modern ServiceTestManager.
-    
+
     Returns upload result.
     """
     service_manager = ServiceTestManager()
@@ -121,7 +121,7 @@ async def upload_validation_files(batch_id: str, files: List[Dict[str, Any]]) ->
 def create_validation_kafka_manager() -> KafkaTestManager:
     """
     Create KafkaTestManager configured for validation coordination testing.
-    
+
     Returns configured KafkaTestManager instance.
     """
     # Create Kafka configuration with validation coordination topics

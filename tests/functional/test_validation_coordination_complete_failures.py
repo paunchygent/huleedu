@@ -173,5 +173,6 @@ async def test_complete_validation_failures_0_of_25():
         assert len(error_codes) >= 2, f"Expected diverse error codes, got {error_codes}"
 
         logger.info(
-            "✅ COMPLETE FAILURE TEST (0/25): Success - Complete validation failure coordination validated"
+            "✅ COMPLETE FAILURE TEST (0/25): "
+            "Success - Complete validation failure coordination validated"
         )
