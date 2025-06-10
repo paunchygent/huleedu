@@ -1,6 +1,8 @@
 name: Walking Skeleton Smoke Test
 
 on:
+  push:
+    branches: [ main ]      # Auto-run on pushes to main 
   pull_request:
     branches: [ main ]      # Auto-run on PRs to main
   workflow_dispatch:        # Manual trigger anytime
@@ -8,7 +10,7 @@ on:
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20     # Increased for additional services
     
     steps:
       - name: Checkout code
@@ -20,6 +22,7 @@ jobs:
       - name: Start HuleEdu Services
         run: |
           echo "Starting HuleEdu walking skeleton services..."
+          docker compose down --remove-orphans
           docker compose up -d
           echo "Services starting, waiting for health checks..."
         
@@ -30,7 +33,14 @@ jobs:
           retry_interval=10
           
           # Expected healthy services (services that have health checks defined)
-          expected_healthy_services=("huleedu_batch_orchestrator_service" "huleedu_content_service" "huleedu_essay_lifecycle_api" "huleedu_file_service" "huleedu_kafka")
+          expected_healthy_services=(
+            "huleedu_batch_orchestrator_service" 
+            "huleedu_content_service" 
+            "huleedu_essay_lifecycle_api" 
+            "huleedu_file_service" 
+            "huleedu_spell_checker_service"
+            "huleedu_kafka"
+          )
           
           for ((i=1; i<=max_retries; i++)); do
             echo "Health check attempt $i/$max_retries"
@@ -38,12 +48,12 @@ jobs:
             # Count services that should be healthy but aren't
             healthy_count=$(docker compose ps --format json | jq -r 'select(.Health == "healthy") | .Name' 2>/dev/null | wc -l)
             
-            if [ "$healthy_count" -eq 5 ]; then
-              echo "✅ All 5 services with health checks are healthy"
+            if [ "$healthy_count" -eq 6 ]; then
+              echo "✅ All 6 services with health checks are healthy"
               docker compose ps --format json | jq -r 'select(.Health == "healthy") | "✅ \(.Name): \(.Health)"'
               break
             else
-              echo "⏳ Waiting for services to become healthy ($healthy_count/5 ready)..."
+              echo "⏳ Waiting for services to become healthy ($healthy_count/6 ready)..."
               docker compose ps --format json | jq -r 'select(.Health != null and .Health != "") | "   \(.Name): \(.Health)"'
               if [ $i -eq $max_retries ]; then
                 echo "❌ Services failed to become healthy after $max_retries attempts"
@@ -65,6 +75,7 @@ jobs:
             ["batch_orchestrator_service"]="http://localhost:5001/healthz"
             ["essay_lifecycle_service"]="http://localhost:6001/healthz"
             ["file_service"]="http://localhost:7001/healthz"
+            ["spell_checker_service"]="http://localhost:8002/healthz"
           )
           
           # Test each service health endpoint
@@ -98,6 +109,7 @@ jobs:
             ["essay_lifecycle_service"]="http://localhost:6001/metrics"
             ["file_service"]="http://localhost:7001/metrics"
             ["spell_checker_service"]="http://localhost:8002/metrics"
+            ["cj_assessment_service"]="http://localhost:9095/metrics"
           )
           
           # Test each service metrics endpoint
@@ -141,6 +153,10 @@ jobs:
             "huleedu.els.spellcheck.initiate.command.v1"
             "huleedu.essay.spellcheck.requested.v1"
             "huleedu.essay.spellcheck.completed.v1"
+            "huleedu.els.cj_assessment.requested.v1"
+            "huleedu.cj_assessment.completed.v1"
+            "huleedu.cj_assessment.failed.v1"
+            "huleedu.els.batch_phase.outcome.v1"
           )
           
           topics_list=$(docker exec huleedu_kafka kafka-topics.sh --bootstrap-server localhost:9092 --list)
@@ -175,12 +191,52 @@ jobs:
           # Test batch registration endpoint (expect validation error, but 400 is good)
           if curl -X POST http://localhost:5001/v1/batches/register \
                -H "Content-Type: application/json" \
-               -d '{}' | grep -q "error"; then
+               -d '{}' | grep -q "error\|validation"; then
             echo "✅ BOS: Registration endpoint responds with validation"
           else
             echo "❌ BOS: Registration endpoint failed"
             exit 1
           fi
+          
+          echo "Testing File Service health..."
+          if curl -f -s http://localhost:7001/healthz | grep -q "healthy"; then
+            echo "✅ File Service: Health endpoint responds correctly"
+          else
+            echo "❌ File Service: Health endpoint failed"
+            exit 1
+          fi
+          
+          echo "Testing Essay Lifecycle Service health..."
+          if curl -f -s http://localhost:6001/healthz | grep -q "healthy"; then
+            echo "✅ ELS: Health endpoint responds correctly"
+          else
+            echo "❌ ELS: Health endpoint failed"
+            exit 1
+          fi
+          
+      - name: Run Unit Test Suite
+        run: |
+          echo "=== Running Unit Test Suite ==="
+          
+          # Set up Python environment for testing
+          python -m pip install --upgrade pip
+          pip install pdm
+          pdm install --dev
+          
+          # Run unit tests with coverage
+          pdm run pytest tests/unit/ -v --tb=short --maxfail=5
+          
+          # Run contract tests 
+          if [ -d "tests/contract" ]; then
+            pdm run pytest tests/contract/ -v --tb=short --maxfail=3
+          fi
+          
+      - name: Run Service Health Tests
+        run: |
+          echo "=== Running Service Health Tests ==="
+          
+          # Run the functional service health tests using our test infrastructure
+          pdm run pytest tests/functional/test_service_health.py -v -s --tb=short
           
       - name: Display Service Logs on Failure
         if: failure()
@@ -195,11 +251,20 @@ jobs:
           echo "--- Batch Orchestrator Service Logs ---"
           docker compose logs --tail=50 batch_orchestrator_service
           
-          echo "--- Essay Lifecycle Service Logs ---"
+          echo "--- Essay Lifecycle Service API Logs ---"
           docker compose logs --tail=50 essay_lifecycle_api
+          
+          echo "--- Essay Lifecycle Service Worker Logs ---"
+          docker compose logs --tail=50 essay_lifecycle_worker
           
           echo "--- File Service Logs ---"
           docker compose logs --tail=50 file_service
+          
+          echo "--- Spell Checker Service Logs ---"
+          docker compose logs --tail=50 spell_checker_service
+          
+          echo "--- CJ Assessment Service Logs ---"
+          docker compose logs --tail=50 cj_assessment_service
           
           echo "--- Kafka Logs ---"
           docker compose logs --tail=30 kafka

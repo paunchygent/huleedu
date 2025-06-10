@@ -155,13 +155,14 @@ class KafkaTestManager:
 
         Production services access: msg.value -> EventEnvelope -> envelope.data
         Test utility returns: EventEnvelope with topic metadata for test validation
-        
+
         ACTUAL STRUCTURE RETURNED:
         - events[0] = {"topic": "topic_name", "data": EventEnvelope}
         - events[0]["data"] = EventEnvelope layer (event_id, event_type, correlation_id, data, etc.)
         - events[0]["data"]["data"] = Actual event payload (e.g., CJAssessmentCompletedV1)
-        
-        This provides both EventEnvelope structure and topic metadata for comprehensive test validation.
+
+        This provides both EventEnvelope structure and topic metadata for comprehensive
+        test validation.
 
         Args:
             consumer: Active Kafka consumer
@@ -190,7 +191,11 @@ class KafkaTestManager:
 
                     try:
                         # Parse JSON to get EventEnvelope data (like production services)
-                        event_data = json.loads(raw_message) if isinstance(raw_message, str) else raw_message
+                        event_data = (
+                            json.loads(raw_message)
+                            if isinstance(raw_message, str)
+                            else raw_message
+                        )
                     except json.JSONDecodeError:
                         logger.warning(f"Failed to parse message from {message.topic}")
                         continue

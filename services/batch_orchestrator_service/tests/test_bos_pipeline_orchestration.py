@@ -27,17 +27,21 @@ class TestBatchKafkaConsumerBusinessLogic:
     """Test BatchKafkaConsumer business logic without overmocking."""
 
     @pytest.fixture
-    def mock_batch_essays_ready_handler(self):
+    def mock_batch_essays_ready_handler(self) -> AsyncMock:
         """Mock the BatchEssaysReadyHandler external boundary."""
         return AsyncMock(spec=BatchEssaysReadyHandler)
 
     @pytest.fixture
-    def mock_els_batch_phase_outcome_handler(self):
+    def mock_els_batch_phase_outcome_handler(self) -> AsyncMock:
         """Mock the ELSBatchPhaseOutcomeHandler external boundary."""
         return AsyncMock(spec=ELSBatchPhaseOutcomeHandler)
 
     @pytest.fixture
-    def kafka_consumer(self, mock_batch_essays_ready_handler, mock_els_batch_phase_outcome_handler):
+    def kafka_consumer(
+        self,
+        mock_batch_essays_ready_handler: AsyncMock,
+        mock_els_batch_phase_outcome_handler: AsyncMock,
+    ) -> BatchKafkaConsumer:
         """Create Kafka consumer with mocked external dependencies."""
         return BatchKafkaConsumer(
             kafka_bootstrap_servers="localhost:9092",
@@ -47,8 +51,10 @@ class TestBatchKafkaConsumerBusinessLogic:
         )
 
     async def test_els_batch_phase_outcome_message_routing(
-        self, kafka_consumer, mock_els_batch_phase_outcome_handler
-    ):
+        self,
+        kafka_consumer: BatchKafkaConsumer,
+        mock_els_batch_phase_outcome_handler: AsyncMock,
+    ) -> None:
         """Test that ELS batch phase outcome messages are routed to the correct handler."""
         # Mock Kafka message for ELS batch phase outcome
         mock_message = Mock()
@@ -65,8 +71,10 @@ class TestBatchKafkaConsumerBusinessLogic:
         )
 
     async def test_batch_essays_ready_message_routing(
-        self, kafka_consumer, mock_batch_essays_ready_handler
-    ):
+        self,
+        kafka_consumer: BatchKafkaConsumer,
+        mock_batch_essays_ready_handler: AsyncMock,
+    ) -> None:
         """Test that BatchEssaysReady messages are routed to the correct handler."""
         # Mock Kafka message for BatchEssaysReady
         mock_message = Mock()
@@ -83,8 +91,11 @@ class TestBatchKafkaConsumerBusinessLogic:
         )
 
     async def test_unknown_topic_handling(
-        self, kafka_consumer, mock_batch_essays_ready_handler, mock_els_batch_phase_outcome_handler
-    ):
+        self,
+        kafka_consumer: BatchKafkaConsumer,
+        mock_batch_essays_ready_handler: AsyncMock,
+        mock_els_batch_phase_outcome_handler: AsyncMock,
+    ) -> None:
         """Test that unknown topics are handled gracefully without calling any handlers."""
         # Mock Kafka message for unknown topic
         mock_message = Mock()
@@ -104,18 +115,20 @@ class TestELSBatchPhaseOutcomeHandler:
     """Test ELSBatchPhaseOutcomeHandler business logic without overmocking."""
 
     @pytest.fixture
-    def mock_phase_coordinator(self):
+    def mock_phase_coordinator(self) -> AsyncMock:
         """Mock the external boundary - phase coordinator protocol."""
         return AsyncMock()
 
     @pytest.fixture
-    def outcome_handler(self, mock_phase_coordinator):
+    def outcome_handler(self, mock_phase_coordinator: AsyncMock) -> ELSBatchPhaseOutcomeHandler:
         """Create ELS outcome handler with mocked external dependencies."""
         return ELSBatchPhaseOutcomeHandler(phase_coordinator=mock_phase_coordinator)
 
     async def test_els_batch_phase_outcome_processing_with_data_propagation(
-        self, outcome_handler, mock_phase_coordinator
-    ):
+        self,
+        outcome_handler: ELSBatchPhaseOutcomeHandler,
+        mock_phase_coordinator: AsyncMock,
+    ) -> None:
         """Test processing of ELSBatchPhaseOutcomeV1 with data propagation to next phase."""
         batch_id = str(uuid4())
         correlation_id = uuid4()
