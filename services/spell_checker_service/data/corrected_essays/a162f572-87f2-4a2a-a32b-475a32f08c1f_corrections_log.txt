@@ -1,0 +1,45 @@
+Correction Analysis for Essay ID: a162f572-87f2-4a2a-a32b-475a32f08c1f
+================================================================================
+
+Section 1: Original Text Snippet:
+--------------------------------------------------------------------------------
+This is a tset essay with teh word recieve spelled incorrectly.
+
+Section 2: Initial L2 Corrections Applied:
+--------------------------------------------------------------------------------
+Total initial L2 corrections applied: 2
+  - 'teh' -> 'the' at indices 26-28 (Rule: L2 dictionary)
+  - 'recieve' -> 'receive' at indices 35-41 (Rule: L2 dictionary)
+
+Diff Original -> Initial L2 Corrected:
+--- Original Text
++++ Initial L2 Corrected Text
+@@ -1 +1 @@
+-This is a tset essay with teh word recieve spelled incorrectly.
++This is a tset essay with the word receive spelled incorrectly.
+
+Section 2b: Contextual L2 Reversions (Simplified Logging):
+--------------------------------------------------------------------------------
+Number of L2 corrections reverted by contextual validation: 0
+(Note: With the current simplified L2 flow, this count is expected to be 0.)
+
+Section 3: Text Entering Main Spell Checker (Initial L2 Corrected Text):
+--------------------------------------------------------------------------------
+This is a tset essay with the word receive spelled incorrectly.
+
+Section 4: Main Spell Checker Corrections (Applied to Initial L2 Corrected Text):
+--------------------------------------------------------------------------------
+  - 'tset' -> 'set' (indices 10-13)
+
+Diff Initial L2 Corrected -> Final Corrected (Caller Perspective):
+--- Initial L2 Corrected Text
++++ Final Corrected Text (Caller)
+@@ -1 +1 @@
+-This is a tset essay with the word receive spelled incorrectly.
++This is a set essay with the word receive spelled incorrectly.
+
+Section 5: Final Texts Overview:
+--------------------------------------------------------------------------------
+Original: This is a tset essay with teh word recieve spelled incorrectly.
+Initial L2 Corrected: This is a tset essay with the word receive spelled incorrectly.
+Final Main Checker Corrected (from Caller): This is a set essay with the word receive spelled incorrectly.

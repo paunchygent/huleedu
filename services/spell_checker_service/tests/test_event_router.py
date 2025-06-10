@@ -46,7 +46,7 @@ class TestProcessSingleMessage:
     async def test_successful_processing(
         self,
         kafka_message: Any,
-        mock_producer: Any,
+        mock_kafka_bus: Any,
         mock_http_session: Any,
         sample_essay_id: str,
         sample_text: str,
@@ -76,12 +76,12 @@ class TestProcessSingleMessage:
         # Act - The real algorithm will run, which is the correct behavior
         result = await process_single_message(
             kafka_message,
-            mock_producer,
             mock_http_session,
             mock_content_client,
             mock_result_store,
             mock_event_publisher,
             real_spell_logic,  # Use real implementation
+            mock_kafka_bus,
             consumer_group_id="test-group",
             kafka_queue_latency_metric=None,
         )
@@ -120,7 +120,7 @@ class TestProcessSingleMessage:
     async def test_fetch_content_failure(
         self,
         kafka_message: Any,
-        mock_producer: Any,
+        mock_kafka_bus: Any,
         mock_http_session: Any,
         sample_essay_id: str,
     ) -> None:
@@ -143,12 +143,12 @@ class TestProcessSingleMessage:
             # Act
             result = await process_single_message(
                 kafka_message,
-                mock_producer,
                 mock_http_session,
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
                 mock_spell_logic,
+                mock_kafka_bus,
                 consumer_group_id="test-group",
                 kafka_queue_latency_metric=None,
             )
@@ -188,7 +188,7 @@ class TestProcessSingleMessage:
     async def test_store_content_failure(
         self,
         kafka_message: Any,
-        mock_producer: Any,
+        mock_kafka_bus: Any,
         mock_http_session: Any,
         sample_essay_id: str,
         sample_text: str,
@@ -218,12 +218,12 @@ class TestProcessSingleMessage:
         # Act - Process message, expecting spell logic to fail during storage
         result = await process_single_message(
             kafka_message,
-            mock_producer,
             mock_http_session,
             mock_content_client,
             mock_result_store,
             mock_event_publisher,
             real_spell_logic,
+            mock_kafka_bus,
             consumer_group_id="test-group",
             kafka_queue_latency_metric=None,
         )
@@ -244,7 +244,7 @@ class TestProcessSingleMessage:
     async def test_spell_check_failure(
         self,
         kafka_message: Any,
-        mock_producer: Any,
+        mock_kafka_bus: Any,
         mock_http_session: Any,
         sample_essay_id: str,
         sample_text: str,
@@ -269,12 +269,12 @@ class TestProcessSingleMessage:
         # Act - Process message, expecting spell logic to fail
         result = await process_single_message(
             kafka_message,
-            mock_producer,
             mock_http_session,
             mock_content_client,
             mock_result_store,
             mock_event_publisher,
             mock_spell_logic,  # Use mock that fails
+            mock_kafka_bus,
             consumer_group_id="test-group",
             kafka_queue_latency_metric=None,
         )
@@ -298,7 +298,7 @@ class TestProcessSingleMessage:
     async def test_invalid_message_validation_error(
         self,
         invalid_kafka_message: Any,  # Fixture providing malformed message
-        mock_producer: Any,
+        mock_kafka_bus: Any,
         mock_http_session: Any,
     ) -> None:
         """Test handling of invalid message that causes validation error."""
@@ -317,12 +317,12 @@ class TestProcessSingleMessage:
             # Act
             result = await process_single_message(
                 invalid_kafka_message,
-                mock_producer,
                 mock_http_session,
                 mock_content_client,
                 mock_result_store,
                 mock_event_publisher,
                 mock_spell_logic,
+                mock_kafka_bus,
                 consumer_group_id="test-group",
                 kafka_queue_latency_metric=None,
             )
@@ -340,7 +340,7 @@ class TestProcessSingleMessage:
     async def test_producer_failure(
         self,
         kafka_message: Any,
-        mock_producer: Any,
+        mock_kafka_bus: Any,
         mock_http_session: Any,
         sample_essay_id: str,
         sample_text: str,
@@ -374,12 +374,12 @@ class TestProcessSingleMessage:
         # Act - Process message, expecting publisher to fail
         result = await process_single_message(
             kafka_message,
-            mock_producer,
             mock_http_session,
             mock_content_client,
             mock_result_store,
             mock_event_publisher,
             real_spell_logic,
+            mock_kafka_bus,
             consumer_group_id="test-group",
             kafka_queue_latency_metric=None,
         )

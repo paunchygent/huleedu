@@ -14,7 +14,7 @@ from uuid import uuid4
 
 import aiohttp
 import pytest
-from aiokafka import AIOKafkaProducer, ConsumerRecord
+from aiokafka import ConsumerRecord
 
 # CRITICAL: Import ALL enum types FIRST to ensure they're available for forward reference resolution
 # Note: We need BatchStatus even though spell checker doesn't use it directly,
@@ -150,11 +150,13 @@ def kafka_message(
 
 
 @pytest.fixture
-def mock_producer() -> AsyncMock:
-    """Provide a mock Kafka producer for testing."""
-    producer = AsyncMock(spec=AIOKafkaProducer)
-    producer.send_and_wait = AsyncMock()
-    return producer
+def mock_kafka_bus() -> AsyncMock:
+    """Provide a mock KafkaBus for testing."""
+    from huleedu_service_libs.kafka_client import KafkaBus
+
+    kafka_bus = AsyncMock(spec=KafkaBus)
+    kafka_bus.publish = AsyncMock()
+    return kafka_bus
 
 
 @pytest.fixture

@@ -44,7 +44,7 @@ class TestEventContractCompliance:
     async def test_published_event_structure(
         self,
         kafka_message: Any,
-        mock_producer: Any,  # AIOKafkaProducer mock
+        mock_kafka_bus: Any,  # Updated from mock_producer to mock_kafka_bus
         mock_http_session: Any,
         sample_essay_id: str,
         sample_text: str,
@@ -71,15 +71,15 @@ class TestEventContractCompliance:
             result_store=mock_result_store, http_session=mock_http_session
         )
 
-        # Act - Process message using real spell checking
+        # Act - Process message using real spell checking with NEW signature
         result = await process_single_message(
             kafka_message,
-            mock_producer,
             mock_http_session,
             mock_content_client,
             mock_result_store,
             mock_event_publisher,
             real_spell_logic,  # Use real implementation
+            mock_kafka_bus,  # Updated parameter order and name
             consumer_group_id="test-group",
             kafka_queue_latency_metric=None,
         )
@@ -114,7 +114,7 @@ class TestEventContractCompliance:
     async def test_correlation_id_propagation(
         self,
         kafka_message: Any,
-        mock_producer: Any,
+        mock_kafka_bus: Any,  # Updated from mock_producer to mock_kafka_bus
         mock_http_session: Any,
         sample_essay_id: str,
         sample_text: str,
@@ -141,15 +141,15 @@ class TestEventContractCompliance:
             result_store=mock_result_store, http_session=mock_http_session
         )
 
-        # Act - Process message using real spell checking
+        # Act - Process message using real spell checking with NEW signature
         result = await process_single_message(
             kafka_message,
-            mock_producer,
             mock_http_session,
             mock_content_client,
             mock_result_store,
             mock_event_publisher,
             real_spell_logic,  # Use real implementation
+            mock_kafka_bus,  # Updated parameter order and name
             consumer_group_id="test-group",
             kafka_queue_latency_metric=None,
         )

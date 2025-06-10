@@ -10,7 +10,8 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import aiohttp
-from aiokafka import AIOKafkaProducer, ConsumerRecord
+from aiokafka import ConsumerRecord
+from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
 from pydantic import ValidationError
 
@@ -33,12 +34,12 @@ logger = create_service_logger("spell_checker_service.event_processor")
 
 async def process_single_message(
     msg: ConsumerRecord,
-    producer: AIOKafkaProducer,
     http_session: aiohttp.ClientSession,
     content_client: ContentClientProtocol,
     result_store: ResultStoreProtocol,
     event_publisher: SpellcheckEventPublisherProtocol,
     spell_logic: SpellLogicProtocol,
+    kafka_bus: KafkaBus,
     consumer_group_id: str = "spell-checker-group",
     kafka_queue_latency_metric: Optional[Any] = None,
 ) -> bool:
@@ -46,11 +47,12 @@ async def process_single_message(
 
     Args:
         msg: The Kafka message to process
-        producer: Kafka producer for sending result events
         http_session: HTTP session for content service interaction
         content_client: Client for fetching content
         result_store: Client for storing content
         event_publisher: Client for publishing events
+        spell_logic: Spell logic implementation
+        kafka_bus: Kafka bus for event publishing
         consumer_group_id: Consumer group ID for metrics
         kafka_queue_latency_metric: Optional Prometheus metric for queue latency
 
@@ -109,7 +111,7 @@ async def process_single_message(
             extra={"correlation_id": str(request_envelope.correlation_id)},
         )
 
-        # Fetch original text content
+        # Fetch original text content - content_client now manages its own http_session
         original_text: Optional[str] = None
         try:
             original_text = await content_client.fetch_content(
@@ -147,7 +149,7 @@ async def process_single_message(
                 system_metadata=error_sys_meta,
             )
             await event_publisher.publish_spellcheck_result(
-                producer, failure_event_data, request_envelope.correlation_id
+                kafka_bus, failure_event_data, request_envelope.correlation_id
             )
             return True
 
@@ -175,7 +177,7 @@ async def process_single_message(
                 system_metadata=empty_content_sys_meta,
             )
             await event_publisher.publish_spellcheck_result(
-                producer, empty_content_failure_data, request_envelope.correlation_id
+                kafka_bus, empty_content_failure_data, request_envelope.correlation_id
             )
             return True
 
@@ -203,7 +205,7 @@ async def process_single_message(
 
         # Publish the result
         await event_publisher.publish_spellcheck_result(
-            producer, result_data, request_envelope.correlation_id
+            kafka_bus, result_data, request_envelope.correlation_id
         )
 
         # Log processing times for latency analysis
@@ -269,7 +271,7 @@ async def process_single_message(
                 )
                 # Publish the error event
                 await event_publisher.publish_spellcheck_result(
-                    producer, unhandled_failure_data, request_envelope.correlation_id
+                    kafka_bus, unhandled_failure_data, request_envelope.correlation_id
                 )
             except Exception as pub_e:
                 logger.error(

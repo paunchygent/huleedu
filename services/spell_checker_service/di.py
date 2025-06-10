@@ -5,10 +5,11 @@ from __future__ import annotations
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
-from prometheus_client import CollectorRegistry
+from prometheus_client import CollectorRegistry, Histogram
 
 from common_core.enums import ProcessingEvent, topic_name
 from services.spell_checker_service.config import Settings, settings
+from services.spell_checker_service.kafka_consumer import SpellCheckerKafkaConsumer
 from services.spell_checker_service.protocol_implementations.content_client_impl import (
     DefaultContentClient,
 )
@@ -17,6 +18,9 @@ from services.spell_checker_service.protocol_implementations.event_publisher_imp
 )
 from services.spell_checker_service.protocol_implementations.result_store_impl import (
     DefaultResultStore,
+)
+from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
+    DefaultSpellLogic,
 )
 from services.spell_checker_service.protocols import (
     ContentClientProtocol,
@@ -38,6 +42,16 @@ class SpellCheckerServiceProvider(Provider):
     def provide_metrics_registry(self) -> CollectorRegistry:
         """Provide Prometheus metrics registry."""
         return CollectorRegistry()
+
+    @provide(scope=Scope.APP)
+    def provide_kafka_queue_latency_metric(self, registry: CollectorRegistry) -> Histogram:
+        """Provide Kafka queue latency metric."""
+        return Histogram(
+            "kafka_message_queue_latency_seconds",
+            "Latency between event timestamp and processing start",
+            ["topic", "consumer_group"],
+            registry=registry,
+        )
 
     @provide(scope=Scope.APP)
     async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
@@ -65,6 +79,13 @@ class SpellCheckerServiceProvider(Provider):
         return DefaultResultStore(content_service_url=app_settings.CONTENT_SERVICE_URL)
 
     @provide(scope=Scope.APP)
+    def provide_spell_logic(
+        self, result_store: ResultStoreProtocol, http_session: ClientSession
+    ) -> SpellLogicProtocol:
+        """Provide spell logic implementation."""
+        return DefaultSpellLogic(result_store=result_store, http_session=http_session)
+
+    @provide(scope=Scope.APP)
     def provide_spellcheck_event_publisher(
         self, app_settings: Settings
     ) -> SpellcheckEventPublisherProtocol:
@@ -76,14 +97,25 @@ class SpellCheckerServiceProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    def provide_spell_logic(
+    def provide_spell_checker_kafka_consumer(
         self,
+        app_settings: Settings,
+        content_client: ContentClientProtocol,
         result_store: ResultStoreProtocol,
-        http_session: ClientSession,
-    ) -> SpellLogicProtocol:
-        """Provide spell logic implementation."""
-        from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
-            DefaultSpellLogic,
+        spell_logic: SpellLogicProtocol,
+        event_publisher: SpellcheckEventPublisherProtocol,
+        kafka_bus: KafkaBus,
+        kafka_queue_latency_metric: Histogram,
+    ) -> SpellCheckerKafkaConsumer:
+        """Provide Kafka consumer with injected dependencies."""
+        return SpellCheckerKafkaConsumer(
+            kafka_bootstrap_servers=app_settings.KAFKA_BOOTSTRAP_SERVERS,
+            consumer_group=app_settings.CONSUMER_GROUP,
+            consumer_client_id=app_settings.CONSUMER_CLIENT_ID,
+            content_client=content_client,
+            result_store=result_store,
+            spell_logic=spell_logic,
+            event_publisher=event_publisher,
+            kafka_bus=kafka_bus,
+            kafka_queue_latency_metric=kafka_queue_latency_metric,
         )
-
-        return DefaultSpellLogic(result_store, http_session)
