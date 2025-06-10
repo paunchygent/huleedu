@@ -11,6 +11,8 @@ Based on modern testing practices:
 - Context managers for resource safety
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import uuid
@@ -46,7 +48,7 @@ def create_kafka_test_config(
             "batch_spellcheck_initiate": "huleedu.batch.spellcheck.initiate.command.v1",
             "spellcheck_completed": "huleedu.essay.spellcheck.completed.v1",
             "batch_cj_assessment_initiate": "huleedu.batch.cj_assessment.initiate.command.v1",
-            "cj_assessment_completed": "huleedu.essay.cj_assessment.completed.v1",
+            "cj_assessment_completed": "huleedu.cj_assessment.completed.v1",
             "els_batch_phase_outcome": "huleedu.els.batch_phase.outcome.v1",
             "pipeline_progress": "huleedu.batch.pipeline.progress.updated.v1",
         }
@@ -93,7 +95,6 @@ class KafkaTestManager:
             group_id=consumer_group_id,
             auto_offset_reset=auto_offset_reset,
             enable_auto_commit=False,
-            value_deserializer=lambda x: json.loads(x.decode("utf-8")),
         )
 
         try:
@@ -152,6 +153,16 @@ class KafkaTestManager:
         """
         Collect events from Kafka consumer.
 
+        Production services access: msg.value -> EventEnvelope -> envelope.data
+        Test utility returns: EventEnvelope with topic metadata for test validation
+        
+        ACTUAL STRUCTURE RETURNED:
+        - events[0] = {"topic": "topic_name", "data": EventEnvelope}
+        - events[0]["data"] = EventEnvelope layer (event_id, event_type, correlation_id, data, etc.)
+        - events[0]["data"]["data"] = Actual event payload (e.g., CJAssessmentCompletedV1)
+        
+        This provides both EventEnvelope structure and topic metadata for comprehensive test validation.
+
         Args:
             consumer: Active Kafka consumer
             expected_count: Number of events to collect
@@ -159,7 +170,7 @@ class KafkaTestManager:
             event_filter: Optional filter function for events
 
         Returns:
-            List of collected events with metadata
+            List of EventEnvelope data (matching production EventEnvelope structure)
         """
         collected_events: List[Dict[str, Any]] = []
         end_time = asyncio.get_event_loop().time() + timeout_seconds
@@ -172,21 +183,28 @@ class KafkaTestManager:
 
             for topic_partition, messages in msg_batch.items():
                 for message in messages:
-                    event_data = message.value
+                    # Parse raw message like production services do
+                    raw_message = message.value
+                    if isinstance(raw_message, bytes):
+                        raw_message = raw_message.decode("utf-8")
 
-                    # Apply filter if provided
+                    try:
+                        # Parse JSON to get EventEnvelope data (like production services)
+                        event_data = json.loads(raw_message) if isinstance(raw_message, str) else raw_message
+                    except json.JSONDecodeError:
+                        logger.warning(f"Failed to parse message from {message.topic}")
+                        continue
+
+                    # Apply filter if provided (now works on EventEnvelope data directly)
                     if event_filter and not event_filter(event_data):
                         continue
 
-                    event_info = {
+                    # Return EventEnvelope data with topic metadata for test utilities
+                    enriched_event = {
                         "topic": message.topic,
-                        "data": event_data,
-                        "partition": message.partition,
-                        "offset": message.offset,
-                        "timestamp": message.timestamp
+                        "data": event_data  # EventEnvelope structure
                     }
-
-                    collected_events.append(event_info)
+                    collected_events.append(enriched_event)
                     logger.info(
                         f"Collected event from {message.topic}: "
                         f"{event_data.get('event_type', 'unknown')}"

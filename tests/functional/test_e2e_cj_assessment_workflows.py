@@ -135,37 +135,39 @@ class TestE2ECJAssessmentWorkflows:
 
             # Step 4: Monitor for CJAssessmentCompletedV1 response using utility
             def cj_result_filter(event_data: Dict[str, Any]) -> bool:
-                """Filter for CJ assessment results from our specific batch."""
+                """Filter for CJ assessment results from our specific test by correlation ID."""
                 return (
                     "data" in event_data
-                    and event_data["data"].get("entity_ref", {}).get("entity_id") == batch_id
                     and event_data.get("correlation_id") == correlation_id
                 )
 
             try:
+                # Wait for CJ assessment completion event
                 events = await kafka_manager.collect_events(
                     consumer,
                     expected_count=1,
                     timeout_seconds=240,  # 4 minutes for CJ processing
-                    event_filter=cj_result_filter
+                    event_filter=lambda event: (
+                        event.get("event_type") == "huleedu.cj_assessment.completed.v1"
+                        and event.get("correlation_id") == str(correlation_id)
+                    ),
                 )
 
                 assert len(events) == 1, f"Expected 1 CJ assessment result, got {len(events)}"
 
-                event_info = events[0]
-                cj_result = event_info["data"]["data"]  # EventEnvelope.data
+                cj_completed_data = events[0]["data"]["data"]  # CJAssessmentCompletedV1 payload
 
-                assert cj_result["status"] == BatchStatus.COMPLETED_SUCCESSFULLY.value
-                assert cj_result["rankings"] is not None
-                assert len(cj_result["rankings"]) >= 2  # Should have rankings
-                assert cj_result["cj_assessment_job_id"] is not None
+                assert cj_completed_data["status"] == BatchStatus.COMPLETED_SUCCESSFULLY.value
+                assert cj_completed_data["rankings"] is not None
+                assert len(cj_completed_data["rankings"]) >= 2  # Should have rankings
+                assert cj_completed_data["cj_assessment_job_id"] is not None
 
                 print(f"✅ CJ Assessment completed with job ID: "
-                      f"{cj_result['cj_assessment_job_id']}")
-                print(f"📊 Generated {len(cj_result['rankings'])} essay rankings")
+                      f"{cj_completed_data['cj_assessment_job_id']}")
+                print(f"📊 Generated {len(cj_completed_data['rankings'])} essay rankings")
 
                 # Step 5: Validate ranking structure and content
-                rankings = cj_result["rankings"]
+                rankings = cj_completed_data["rankings"]
                 for i, ranking in enumerate(rankings):
                     assert "els_essay_id" in ranking
                     assert "rank" in ranking or "score" in ranking
@@ -234,10 +236,9 @@ class TestE2ECJAssessmentWorkflows:
 
             # Monitor for results using utility
             def cj_result_filter(event_data: Dict[str, Any]) -> bool:
-                """Filter for CJ assessment results from our specific batch."""
+                """Filter for CJ assessment results from our specific test by correlation ID."""
                 return (
                     "data" in event_data
-                    and event_data["data"].get("entity_ref", {}).get("entity_id") == batch_id
                     and event_data.get("correlation_id") == correlation_id
                 )
 
@@ -250,10 +251,14 @@ class TestE2ECJAssessmentWorkflows:
                 )
 
                 assert len(events) == 1
-                cj_result = events[0]["data"]["data"]
 
-                assert cj_result["status"] == BatchStatus.COMPLETED_SUCCESSFULLY.value
-                assert len(cj_result["rankings"]) == 2  # Should rank both essays
+                # events[0] is the EventEnvelope, events[0]["data"] is the actual
+                # CJAssessmentCompletedV1 payload
+                event_envelope = events[0]
+                cj_completed_data = event_envelope["data"]["data"]
+
+                assert cj_completed_data["status"] == BatchStatus.COMPLETED_SUCCESSFULLY.value
+                assert len(cj_completed_data["rankings"]) == 2  # Should rank both essays
                 print("✅ Minimal CJ Assessment completed with 2 essays ranked")
 
             except Exception as e:

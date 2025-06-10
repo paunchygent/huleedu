@@ -7,14 +7,20 @@ alwaysApply: false
 
 ## 1. Service Identity
 - **Package**: `huleedu-spell-checker-service`
-- **Type**: Kafka Consumer Worker (no HTTP API)
-- **Stack**: aiokafka, aiohttp, Python asyncio, Dishka (for DI)
-- **Purpose**: Event-driven spell checking service
+- **Type**: Combined Service (Kafka Consumer Worker + HTTP Health API)
+- **Stack**: aiokafka, aiohttp, quart, quart-dishka, Python asyncio, Dishka (for DI)
+- **Purpose**: Event-driven spell checking service with health monitoring
 
-## 2. Internal Structure (✅ Refactored - Clean Architecture)
+## 2. Internal Structure (✅ Refactored - Clean Architecture + Combined Service Pattern)
 
-### 2.1. Core Components
+### 2.1. Combined Service Architecture
+- **`run_service.py`**: Main orchestrator running both HTTP API and Kafka worker concurrently using ServiceManager class
+- **`app.py`**: Lean Quart HTTP application factory with Blueprint registration and shared DI container
+- **`api/health_routes.py`**: Health (`/healthz`) and metrics (`/metrics`) endpoints using Blueprint pattern
+- **`startup_setup.py`**: Metrics initialization and app-level service setup
 - **`worker_main.py`**: Service lifecycle (startup, shutdown), Kafka client management (consumer/producer via `kafka_clients` context manager), signal handling, and the primary message consumption loop. Initializes Dishka DI container and passes protocol instances to `process_single_message`.
+
+### 2.2. Core Components
 - **`event_processor.py`**: Clean message processing logic that depends ONLY on injected protocol interfaces. Contains `process_single_message()` which handles incoming `ConsumerRecord`, deserializes `EventEnvelope[EssayLifecycleSpellcheckRequestV1]`, and orchestrates the fetch-spellcheck-store-publish flow with language parameter extraction.
 - **`protocols.py`**: Defines `typing.Protocol` interfaces for internal dependencies:
     - `ContentClientProtocol`
@@ -27,14 +33,14 @@ alwaysApply: false
     - `default_perform_spell_check_algorithm()`: Core L2 + pyspellchecker spell checking algorithm
 - **`di.py`**: Dishka dependency injection providers that import implementations from `protocol_implementations/` and configure them with constructor dependencies
 
-### 2.2. Protocol Implementations (Clean Architecture)
+### 2.3. Protocol Implementations (Clean Architecture)
 - **`protocol_implementations/`**: Directory containing canonical protocol implementations:
     - **`content_client_impl.py`**: `DefaultContentClientImpl` - HTTP content fetching with constructor-injected dependencies
     - **`result_store_impl.py`**: `DefaultResultStoreImpl` - HTTP content storage with constructor-injected dependencies
     - **`spell_logic_impl.py`**: `DefaultSpellLogicImpl` - Spell checking orchestration using `core_logic` functions
     - **`event_publisher_impl.py`**: `DefaultSpellcheckEventPublisherImpl` - Kafka event publishing with constructor-injected producer
 
-### 2.3. Architecture Benefits
+### 2.4. Architecture Benefits
 - ✅ **Single Responsibility**: Each file has one clear purpose
 - ✅ **Dependency Injection**: All business logic depends on abstractions, not concrete implementations  
 - ✅ **No Code Duplication**: Single canonical source for each protocol implementation
@@ -54,7 +60,8 @@ alwaysApply: false
 
 - **Content Service**: HTTP REST API via aiohttp.ClientSession (injected into protocol implementations)
 - **Kafka**: AIOKafkaConsumer/Producer with manual offset management
-- **Metrics**: Prometheus metrics server on port 8002
+- **Health API**: Quart HTTP server with `/healthz` and `/metrics` endpoints on port 8002
+- **Metrics**: Prometheus metrics via `/metrics` endpoint and service-specific counters/histograms
 
 ## 5. Spell Checking Implementation
 
@@ -81,9 +88,10 @@ alwaysApply: false
 
 ## 9. Deployment
 
-**Docker**: `python:3.11-slim` base, PDM, entry point: `python -m services.spell_checker_service.worker_main`
-**Port**: 8002 (Prometheus metrics)
-**Health**: Kafka consumer health monitoring
+**Docker**: `python:3.11-slim` base, PDM, entry point: `pdm run start_service`
+**Port**: 8002 (Health API with `/healthz` and `/metrics` endpoints)
+**Health**: HTTP health check via `/healthz` endpoint + Kafka consumer monitoring
+**Architecture**: Combined service running HTTP API and Kafka worker concurrently
 
 ## 10. Testing
 

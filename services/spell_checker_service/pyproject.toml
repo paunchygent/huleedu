@@ -17,6 +17,10 @@ dependencies = [
     "pydantic-settings",
     "prometheus-client",
     "dishka",
+    # HTTP API dependencies for Combined Service Pattern
+    "quart",
+    "quart-dishka", 
+    "hypercorn",
     # Spell checking library for core algorithm
     "pyspellchecker",
 ]
@@ -42,7 +46,9 @@ huleedu-common-core = "file:///app/common_core"
 huleedu-service-libs = "file:///app/services/libs"
 
 [tool.pdm.scripts]
+start_service = "python run_service.py"
 start_worker = "python worker_main.py"
+start_health_api = "python app.py"
 
 [tool.mypy]
 python_version = "3.11"

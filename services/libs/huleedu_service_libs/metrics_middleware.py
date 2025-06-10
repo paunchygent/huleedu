@@ -23,20 +23,20 @@ def setup_metrics_middleware(
     logger_name: Optional[str] = None,
 ) -> None:
     """Setup Prometheus metrics middleware for a Quart application.
-    
+
     This function sets up HTTP request/response middleware to automatically
     record metrics for all requests processed by the application.
-    
+
     Args:
         app: The Quart application to configure
         request_count_metric_name: Name of the request counter metric
             (e.g., "request_count" or "http_requests_total")
-        request_duration_metric_name: Name of the request duration metric  
+        request_duration_metric_name: Name of the request duration metric
             (e.g., "request_duration" or "http_request_duration_seconds")
         status_label_name: Name of the status code label
             (e.g., "status_code" or "status")
         logger_name: Optional custom logger name for this service
-    
+
     Note:
         The metrics instances must be stored in app.extensions["metrics"] as a dict
         containing the metric objects. This is typically done in startup_setup.py
@@ -92,10 +92,10 @@ def setup_metrics_middleware(
 
 def setup_content_service_metrics_middleware(app: Quart) -> None:
     """Setup metrics middleware with Content Service naming conventions.
-    
+
     Uses:
     - http_requests_total (request count)
-    - http_request_duration_seconds (request duration)  
+    - http_request_duration_seconds (request duration)
     - status_code (status label)
     """
     setup_metrics_middleware(
@@ -109,12 +109,12 @@ def setup_content_service_metrics_middleware(app: Quart) -> None:
 
 def setup_standard_service_metrics_middleware(app: Quart, service_name: str) -> None:
     """Setup metrics middleware with standard HuleEdu naming conventions.
-    
+
     Uses:
     - request_count (request count)
     - request_duration (request duration)
     - status_code (status label)
-    
+
     Args:
         app: The Quart application to configure
         service_name: Service name for logger (e.g., "bos", "els", "file_service")
@@ -130,9 +130,9 @@ def setup_standard_service_metrics_middleware(app: Quart, service_name: str) -> 
 
 def setup_file_service_metrics_middleware(app: Quart) -> None:
     """Setup metrics middleware with File Service naming conventions.
-    
+
     Uses:
-    - request_count (request count)  
+    - request_count (request count)
     - request_duration (request duration)
     - status (status label - different from others!)
     """

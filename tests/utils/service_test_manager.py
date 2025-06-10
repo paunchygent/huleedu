@@ -42,8 +42,8 @@ class ServiceTestManager:
         ServiceEndpoint("batch_orchestrator_service", 5001, has_http_api=True, has_metrics=True),
         ServiceEndpoint("essay_lifecycle_service", 6001, has_http_api=True, has_metrics=True),
         ServiceEndpoint("file_service", 7001, has_http_api=True, has_metrics=True),
-        ServiceEndpoint("spell_checker_service", 8002, has_http_api=False, has_metrics=True),
-        ServiceEndpoint("cj_assessment_service", 9095, has_http_api=False, has_metrics=True),
+        ServiceEndpoint("spell_checker_service", 8002, has_http_api=True, has_metrics=True),
+        ServiceEndpoint("cj_assessment_service", 9095, has_http_api=True, has_metrics=True),
     ]
 
     def __init__(self):

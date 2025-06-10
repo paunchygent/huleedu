@@ -12,8 +12,11 @@ ENV PYTHONUNBUFFERED=1 \
 # Set base WORKDIR for the application
 WORKDIR /app
 
-# Install PDM globally in the image
-RUN pip install --no-cache-dir pdm
+# Install system dependencies for health checks and PDM
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir pdm
 
 # Copy shared local dependencies first
 COPY common_core/ /app/common_core/
@@ -32,5 +35,9 @@ RUN pdm install --prod
 RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
 USER appuser
 
-# Command to run the application from service directory
-CMD ["pdm", "run", "start_worker"] 
+# Health check for combined service (HTTP API + Kafka worker)
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 --start-period=20s \
+    CMD curl -f http://localhost:8002/healthz || exit 1
+
+# Command to run the combined service (HTTP API + Kafka worker)
+CMD ["pdm", "run", "start_service"] 

@@ -29,29 +29,20 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
         """Publish CJ assessment completion event to Kafka.
 
         Args:
-            completion_data: The CJ assessment completion event data
+            completion_data: The CJ assessment completion event data (already an EventEnvelope)
             correlation_id: Optional correlation ID for event tracing
 
         Raises:
             Exception: If publishing fails
         """
-        topic = self.settings.CJ_ASSESSMENT_COMPLETED_TOPIC
-
-        # Create EventEnvelope for proper event structure
-        from common_core.events.envelope import EventEnvelope
-
-        envelope = EventEnvelope[Any](
-            event_type=topic,
-            source_service=self.settings.SERVICE_NAME,
-            correlation_id=correlation_id,
-            data=completion_data,
-        )
-
-        # Use correlation_id as partition key if available
+        # completion_data is already an EventEnvelope from event_processor.py
+        # No need to wrap it again - this was causing double-wrapping bug
         key = str(correlation_id) if correlation_id else None
 
         try:
-            await self.kafka_bus.publish(topic, envelope, key=key)
+            await self.kafka_bus.publish(
+                self.settings.CJ_ASSESSMENT_COMPLETED_TOPIC, completion_data, key=key
+            )
         except Exception as e:
             raise Exception(f"Failed to publish CJ assessment completion event: {e!s}") from e
 
@@ -61,28 +52,19 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
         """Publish CJ assessment failure event to Kafka.
 
         Args:
-            failure_data: The CJ assessment failure event data
+            failure_data: The CJ assessment failure event data (already an EventEnvelope)
             correlation_id: Optional correlation ID for event tracing
 
         Raises:
             Exception: If publishing fails
         """
-        topic = self.settings.CJ_ASSESSMENT_FAILED_TOPIC
-
-        # Create EventEnvelope for proper event structure
-        from common_core.events.envelope import EventEnvelope
-
-        envelope = EventEnvelope[Any](
-            event_type=topic,
-            source_service=self.settings.SERVICE_NAME,
-            correlation_id=correlation_id,
-            data=failure_data,
-        )
-
-        # Use correlation_id as partition key if available
+        # failure_data is already an EventEnvelope from event_processor.py
+        # No need to wrap it again - this was causing double-wrapping bug
         key = str(correlation_id) if correlation_id else None
 
         try:
-            await self.kafka_bus.publish(topic, envelope, key=key)
+            await self.kafka_bus.publish(
+                self.settings.CJ_ASSESSMENT_FAILED_TOPIC, failure_data, key=key
+            )
         except Exception as e:
             raise Exception(f"Failed to publish CJ assessment failure event: {e!s}") from e

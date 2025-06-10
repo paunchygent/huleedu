@@ -68,7 +68,7 @@ class TestE2EKafkaMonitoring:
 
             # Collect events using KafkaTestManager utility
             def event_filter(event_data: Dict[str, Any]) -> bool:
-                """Filter for events from our specific batch."""
+                """Filter for our specific batch (matching batch_id)."""
                 return (
                     "data" in event_data
                     and event_data["data"].get("batch_id") == batch_id
@@ -85,22 +85,22 @@ class TestE2EKafkaMonitoring:
                 assert len(events) == 1, f"Expected 1 event, got {len(events)}"
 
                 event_info = events[0]
-                event_data = event_info["data"]
+                envelope_data = event_info["data"]  # EventEnvelope structure
 
                 print(f"📨 Received Kafka event from topic: {event_info['topic']}")
 
                 # Validate EventEnvelope structure
                 required_envelope_fields = ["event_id", "event_type", "source_service", "data"]
                 for field in required_envelope_fields:
-                    assert field in event_data, f"Missing {field} in EventEnvelope"
+                    assert field in envelope_data, f"Missing {field} in EventEnvelope"
 
                 # Validate event metadata
-                assert event_data["event_type"] == "huleedu.file.essay.content.provisioned.v1", (
-                    f"Unexpected event_type: {event_data['event_type']}"
+                assert envelope_data["event_type"] == "huleedu.file.essay.content.provisioned.v1", (
+                    f"Unexpected event_type: {envelope_data['event_type']}"
                 )
 
                 # Validate EssayContentProvisionedV1 data
-                content_data = event_data["data"]
+                content_data = envelope_data["data"]
 
                 assert content_data["batch_id"] == batch_id, (
                     f"Event batch_id {content_data['batch_id']} doesn't match expected {batch_id}"
@@ -117,7 +117,7 @@ class TestE2EKafkaMonitoring:
                 assert content_data["file_size_bytes"] > 0, "Invalid file_size_bytes"
 
                 # Validate correlation ID matches
-                event_correlation_id = event_data.get("correlation_id")
+                event_correlation_id = envelope_data.get("correlation_id")
                 data_correlation_id = content_data.get("correlation_id")
 
                 correlation_match = False
@@ -191,7 +191,7 @@ class TestE2EKafkaMonitoring:
 
             # Collect events for all uploaded files using KafkaTestManager
             def event_filter(event_data: Dict[str, Any]) -> bool:
-                """Filter for events from our specific batch."""
+                """Filter for our specific batch (matching batch_id)."""
                 return (
                     "data" in event_data
                     and event_data["data"].get("batch_id") == batch_id
@@ -210,7 +210,7 @@ class TestE2EKafkaMonitoring:
                     f"Expected {len(test_file_paths)} events, got {len(events)}"
                 )
 
-                # Extract event data for validation
+                # Extract event data for validation - using single EventEnvelope structure
                 event_data_list = [event_info["data"]["data"] for event_info in events]
 
                 # Validate each file generated an event

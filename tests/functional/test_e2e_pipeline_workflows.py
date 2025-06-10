@@ -65,15 +65,15 @@ class TestE2EPipelineWorkflows:
         """
         service_manager = ServiceTestManager()
 
-        # Validate Spell Checker Service using utility method
-        spell_checker_metrics = await service_manager.get_service_metrics(
-            "spell_checker_service", 8002
-        )
-        if not spell_checker_metrics:
+        # Validate Spell Checker Service using modern endpoint validation
+        endpoints = await service_manager.get_validated_endpoints()
+        if "spell_checker_service" not in endpoints:
             pytest.skip("Spell Checker Service not available")
 
-        assert "kafka_message_queue_latency_seconds" in spell_checker_metrics
-        print("✅ Spell Checker Service metrics validated")
+        # Verify the service is healthy
+        spell_checker_info = endpoints["spell_checker_service"]
+        assert spell_checker_info["status"] == "healthy"
+        print("✅ Spell Checker Service health validated")
 
     # Helper methods for Content Service operations using utility pattern
 

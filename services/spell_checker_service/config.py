@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # Premature optimizations removed in favor of proven defaults
 
     # Metrics Configuration
-    METRICS_PORT: int = 8001  # Port for Prometheus metrics endpoint
+    HTTP_PORT: int = 8002  # Port for health API and Prometheus metrics endpoint
 
     # L2 Correction Settings - Service-local paths for autonomy
     L2_MASTER_DICT_PATH: str = "./data/l2_error_dict/nortvig_master_SWE_L2_corrections.txt"
