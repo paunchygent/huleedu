@@ -57,6 +57,7 @@ class TestEnhancedBatchEssaysReady:
                 validation_error_code="EMPTY_CONTENT",
                 validation_error_message="File content is empty",
                 file_size_bytes=0,
+                raw_file_storage_id="raw_failed_1",
             ),
             EssayValidationFailedV1(
                 batch_id="batch_123",
@@ -64,6 +65,7 @@ class TestEnhancedBatchEssaysReady:
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message="Content below minimum length",
                 file_size_bytes=25,
+                raw_file_storage_id="raw_failed_2",
             ),
         ]
 
@@ -165,6 +167,7 @@ class TestEnhancedBatchEssaysReady:
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message="Essay content below minimum threshold",
                 file_size_bytes=15,
+                raw_file_storage_id="raw_failed_25",
             )
         ]
 
@@ -198,6 +201,7 @@ class TestEnhancedBatchEssaysReady:
                 validation_error_code="EMPTY_CONTENT",
                 validation_error_message="Empty file content",
                 file_size_bytes=0,
+                raw_file_storage_id="raw_failed_N",
             )
             for i in range(1, 6)  # 5 failed essays
         ]
@@ -233,6 +237,7 @@ class TestEnhancedBatchEssaysReady:
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message="Too short",
                 file_size_bytes=10,
+                raw_file_storage_id="raw_failed_1",
             ),
             EssayValidationFailedV1(
                 batch_id="batch_metrics",
@@ -240,6 +245,7 @@ class TestEnhancedBatchEssaysReady:
                 validation_error_code="EMPTY_CONTENT",
                 validation_error_message="Empty",
                 file_size_bytes=0,
+                raw_file_storage_id="raw_failed_2",
             ),
         ]
 
@@ -324,6 +330,7 @@ class TestEnhancedBatchEssaysReady:
                 validation_error_code="EMPTY_CONTENT",
                 validation_error_message="Empty content",
                 file_size_bytes=0,
+                raw_file_storage_id="raw_failed_1",
                 correlation_id=correlation_id_1,
             ),
             EssayValidationFailedV1(
@@ -332,6 +339,7 @@ class TestEnhancedBatchEssaysReady:
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message="Too short",
                 file_size_bytes=10,
+                raw_file_storage_id="raw_failed_2",
                 correlation_id=correlation_id_2,
             ),
         ]

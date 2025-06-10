@@ -219,6 +219,12 @@ class TestOtherEnums:
         assert hasattr(ContentType, "CORRECTED_TEXT")
         assert hasattr(ContentType, "CJ_RESULTS_JSON")
 
+        # Test new pre-emptive raw file storage types
+        assert hasattr(ContentType, "RAW_UPLOAD_BLOB")
+        assert hasattr(ContentType, "EXTRACTED_PLAINTEXT")
+        assert ContentType.RAW_UPLOAD_BLOB.value == "raw_upload_blob"
+        assert ContentType.EXTRACTED_PLAINTEXT.value == "extracted_plaintext"
+
     def test_error_code_values(self) -> None:
         """Test that ErrorCode enum has expected values."""
         assert hasattr(ErrorCode, "UNKNOWN_ERROR")

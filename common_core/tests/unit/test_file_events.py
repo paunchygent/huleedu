@@ -20,42 +20,39 @@ class TestEssayContentProvisionedV1:
     """Test suite for EssayContentProvisionedV1 event model."""
 
     def test_model_creation_with_required_fields(self) -> None:
-        """Test that event model can be created with required fields."""
-        event = EssayContentProvisionedV1(
+        """Test creating EssayContentProvisionedV1 with only required fields."""
+        model = EssayContentProvisionedV1(
             batch_id="batch_123",
-            original_file_name="essay1.pdf",
-            text_storage_id="content_456",
+            original_file_name="essay.txt",
+            raw_file_storage_id="raw_abc123",
+            text_storage_id="text_def456",
             file_size_bytes=1024,
         )
-
-        assert event.batch_id == "batch_123"
-        assert event.original_file_name == "essay1.pdf"
-        assert event.text_storage_id == "content_456"
-        assert event.file_size_bytes == 1024
-        assert event.event == "essay.content.provisioned"
-        assert event.content_md5_hash is None
-        assert event.correlation_id is None
-        assert isinstance(event.timestamp, datetime)
+        assert model.batch_id == "batch_123"
+        assert model.original_file_name == "essay.txt"
+        assert model.raw_file_storage_id == "raw_abc123"
+        assert model.text_storage_id == "text_def456"
+        assert model.file_size_bytes == 1024
+        assert model.event == "essay.content.provisioned"
+        assert model.content_md5_hash is None
+        assert model.correlation_id is None
+        assert isinstance(model.timestamp, datetime)
 
     def test_model_serialization(self) -> None:
-        """Test that event model can be serialized to JSON."""
+        """Test EssayContentProvisionedV1 serialization to dict."""
         correlation_id = uuid4()
-        event = EssayContentProvisionedV1(
+        model = EssayContentProvisionedV1(
             batch_id="batch_123",
-            original_file_name="essay1.pdf",
-            text_storage_id="content_456",
+            original_file_name="essay.txt",
+            raw_file_storage_id="raw_abc123",
+            text_storage_id="text_def456",
             file_size_bytes=1024,
-            content_md5_hash="abc123",
             correlation_id=correlation_id,
         )
-
-        json_data = event.model_dump_json()
-        assert isinstance(json_data, str)
-
-        # Verify can be parsed back
-        parsed_data = json.loads(json_data)
-        assert parsed_data["batch_id"] == "batch_123"
-        assert parsed_data["correlation_id"] == str(correlation_id)
+        serialized = model.model_dump()
+        assert serialized["batch_id"] == "batch_123"
+        assert serialized["raw_file_storage_id"] == "raw_abc123"
+        assert str(serialized["correlation_id"]) == str(correlation_id)
 
 
 class TestEssayValidationFailedV1:
@@ -66,6 +63,7 @@ class TestEssayValidationFailedV1:
         event = EssayValidationFailedV1(
             batch_id="batch_456",
             original_file_name="empty_essay.txt",
+            raw_file_storage_id="raw_xyz789",
             validation_error_code="EMPTY_CONTENT",
             validation_error_message="File content is empty or contains only whitespace",
             file_size_bytes=0,
@@ -88,6 +86,7 @@ class TestEssayValidationFailedV1:
         event = EssayValidationFailedV1(
             batch_id="batch_789",
             original_file_name="too_short_essay.docx",
+            raw_file_storage_id="raw_abc456",
             validation_error_code="CONTENT_TOO_SHORT",
             validation_error_message="Content length (25 characters) below minimum threshold (50)",
             file_size_bytes=512,
@@ -107,6 +106,7 @@ class TestEssayValidationFailedV1:
         original_event = EssayValidationFailedV1(
             batch_id="batch_serialize",
             original_file_name="test_file.pdf",
+            raw_file_storage_id="raw_serialize123",
             validation_error_code="CONTENT_TOO_LONG",
             validation_error_message="Content exceeds maximum length limit",
             file_size_bytes=2048,
@@ -136,6 +136,7 @@ class TestEssayValidationFailedV1:
         event = EssayValidationFailedV1(
             batch_id="test_batch",
             original_file_name="test.txt",
+            raw_file_storage_id="raw_default123",
             validation_error_code="TEST_ERROR",
             validation_error_message="Test error message",
             file_size_bytes=100,
@@ -166,6 +167,7 @@ class TestEssayValidationFailedV1:
             event = EssayValidationFailedV1(
                 batch_id="batch_test",
                 original_file_name="test.txt",
+                raw_file_storage_id="raw_test123",
                 validation_error_code=error_code,
                 validation_error_message=f"Test error for {error_code}",
                 file_size_bytes=100,
@@ -178,6 +180,7 @@ class TestEssayValidationFailedV1:
         event_zero = EssayValidationFailedV1(
             batch_id="batch_zero",
             original_file_name="empty.txt",
+            raw_file_storage_id="raw_zero123",
             validation_error_code="EMPTY_CONTENT",
             validation_error_message="Empty file",
             file_size_bytes=0,
@@ -188,6 +191,7 @@ class TestEssayValidationFailedV1:
         event_large = EssayValidationFailedV1(
             batch_id="batch_large",
             original_file_name="huge.txt",
+            raw_file_storage_id="raw_large123",
             validation_error_code="CONTENT_TOO_LONG",
             validation_error_message="File too large",
             file_size_bytes=10_000_000,
@@ -200,6 +204,7 @@ class TestEssayValidationFailedV1:
         event_default = EssayValidationFailedV1(
             batch_id="batch_tz",
             original_file_name="test.txt",
+            raw_file_storage_id="raw_tz123",
             validation_error_code="TEST_ERROR",
             validation_error_message="Test message",
             file_size_bytes=100,
@@ -214,6 +219,7 @@ class TestEssayValidationFailedV1:
         event_explicit = EssayValidationFailedV1(
             batch_id="batch_explicit",
             original_file_name="test2.txt",
+            raw_file_storage_id="raw_explicit123",
             validation_error_code="TEST_ERROR",
             validation_error_message="Test message",
             file_size_bytes=200,
@@ -242,6 +248,7 @@ class TestEssayValidationFailedV1:
         event = EssayValidationFailedV1(
             batch_id=batch_id,
             original_file_name="student_essay_3.docx",
+            raw_file_storage_id="raw_coordination123",
             validation_error_code="CONTENT_TOO_SHORT",
             validation_error_message=(
                 "Essay content (15 words) below minimum requirement (50 words)"

@@ -69,7 +69,13 @@ Model service: `@batch_orchestrator_service/`
 - **FORBIDDEN**: Direct `AIOKafkaProducer`/`AIOKafkaConsumer` imports
 - **Producers**: Use `KafkaBus` class
 
-### 4.7. Production Patterns (Sprint 1 Hardened)
+### 4.7. Redis Client Standards
+- **MUST** use `huleedu_service_libs.redis_client` utilities
+- **FORBIDDEN**: Direct `redis.asyncio.Redis` imports in service code
+- **Pattern**: Use `RedisClient` class with protocol-based DI injection
+- **Lifecycle**: Managed through DI container with `start()`/`stop()` methods
+
+### 4.8. Production Patterns (Sprint 1 Hardened)
 - **MUST** implement graceful shutdown with proper async resource cleanup
 - **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
 - **MUST** use manual Kafka commits with error boundaries (no auto-commit)

@@ -37,8 +37,10 @@ class ProcessingStage(str, Enum):
 
 
 class ProcessingEvent(str, Enum):
-    # -------------  Batch orchestration -############
+    # -------------  Future Batch configuration events  -------------#
     BATCH_PIPELINE_REQUESTED = "batch.pipeline.requested"
+
+    # -------------  Future Batch phase observability and audit events   -------------#
     BATCH_PHASE_INITIATED = "batch.phase.initiated"
     BATCH_PIPELINE_PROGRESS_UPDATED = "batch.pipeline.progress.updated"
     BATCH_PHASE_CONCLUDED = "batch.phase.concluded"
@@ -254,6 +256,10 @@ class ContentType(str, Enum):
     AI_DETAILED_ANALYSIS_JSON = "ai_detailed_analysis_json"
     GRAMMAR_ANALYSIS_JSON = "grammar_analysis_json"
     CJ_RESULTS_JSON = "cj_results_json"
+
+    # Pre-emptive raw file storage types
+    RAW_UPLOAD_BLOB = "raw_upload_blob"
+    EXTRACTED_PLAINTEXT = "extracted_plaintext"
 
 
 # ---------------------------------------------------------------------------

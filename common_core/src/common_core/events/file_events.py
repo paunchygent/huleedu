@@ -27,6 +27,9 @@ class EssayContentProvisionedV1(BaseModel):
     event: str = Field(default="essay.content.provisioned", description="Event type identifier")
     batch_id: str = Field(description="Batch identifier this content belongs to")
     original_file_name: str = Field(description="Original uploaded file name")
+    raw_file_storage_id: str = Field(
+        description="Storage ID of the original, unmodified raw file blob."
+    )
     text_storage_id: str = Field(description="Content Service storage ID for extracted text")
     file_size_bytes: int = Field(description="Size of processed file in bytes")
     content_md5_hash: Optional[str] = Field(default=None, description="MD5 hash of file content")
@@ -47,6 +50,9 @@ class EssayValidationFailedV1(BaseModel):
     event: str = Field(default="essay.validation.failed", description="Event type identifier")
     batch_id: str = Field(description="Batch identifier this failed validation belongs to")
     original_file_name: str = Field(description="Name of the file that failed validation")
+    raw_file_storage_id: str = Field(
+        description="Storage ID of the raw file blob that failed validation."
+    )
     validation_error_code: str = Field(
         description="Specific validation error code (e.g., EMPTY_CONTENT, CONTENT_TOO_SHORT)"
     )
