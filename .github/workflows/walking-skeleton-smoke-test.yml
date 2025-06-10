@@ -28,35 +28,46 @@ jobs:
         
       - name: Wait for Services to be Healthy
         run: |
-          echo "Waiting for services to be healthy..."
+          echo "Waiting for essential services to be healthy..."
           max_retries=30
           retry_interval=10
           
-          # Expected healthy services (services that have health checks defined)
-          expected_healthy_services=(
+          # Define the list of CRITICAL services that MUST be healthy
+          essential_services=(
             "huleedu_batch_orchestrator_service" 
             "huleedu_content_service" 
             "huleedu_essay_lifecycle_api" 
             "huleedu_file_service" 
             "huleedu_spell_checker_service"
+            "huleedu_cj_assessment_service"
             "huleedu_kafka"
           )
           
           for ((i=1; i<=max_retries; i++)); do
             echo "Health check attempt $i/$max_retries"
+            all_healthy=true
             
-            # Count services that should be healthy but aren't
-            healthy_count=$(docker compose ps --format json | jq -r 'select(.Health == "healthy") | .Name' 2>/dev/null | wc -l)
+            # Get health status of all containers
+            health_status_json=$(docker compose ps --format json)
+
+            for service in "${essential_services[@]}"; do
+              # Use jq to check the health of THIS specific service
+              status=$(echo "$health_status_json" | jq -r --arg srv "$service" 'select(.Name == $srv) | .Health')
+              
+              if [[ "$status" == "healthy" ]]; then
+                echo "  ✅ $service is healthy."
+              else
+                echo "  ⏳ $service is not healthy (Status: ${status:-not running})."
+                all_healthy=false
+              fi
+            done
             
-            if [ "$healthy_count" -eq 6 ]; then
-              echo "✅ All 6 services with health checks are healthy"
-              docker compose ps --format json | jq -r 'select(.Health == "healthy") | "✅ \(.Name): \(.Health)"'
+            if [ "$all_healthy" = true ]; then
+              echo "✅ All essential services are healthy!"
               break
             else
-              echo "⏳ Waiting for services to become healthy ($healthy_count/6 ready)..."
-              docker compose ps --format json | jq -r 'select(.Health != null and .Health != "") | "   \(.Name): \(.Health)"'
               if [ $i -eq $max_retries ]; then
-                echo "❌ Services failed to become healthy after $max_retries attempts"
+                echo "❌ Essential services failed to become healthy after $max_retries attempts."
                 echo "Final service status:"
                 docker compose ps
                 exit 1
