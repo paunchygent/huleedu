@@ -11,6 +11,7 @@ dependencies = [
     "pydantic",
     "structlog",
     "huleedu-common-core",
+    "redis[hiredis]>=5.0.0",
 ]
 
 [build-system]

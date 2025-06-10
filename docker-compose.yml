@@ -8,6 +8,7 @@ volumes:
   batch_orchestrator_db_data:
   essay_lifecycle_db_data:
   cj_assessment_db_data:
+  redis_data:
 
 services:
   # PostgreSQL database for Batch Orchestrator Service
@@ -75,6 +76,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # Redis cache for idempotency and session management
+  redis:
+    image: redis:7-alpine
+    container_name: huleedu_redis
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   zookeeper:
     image: bitnami/zookeeper:3.9
