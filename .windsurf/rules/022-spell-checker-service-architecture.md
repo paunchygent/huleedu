@@ -5,13 +5,6 @@ globs:
 alwaysApply: true
 ---
 
----
-
-description: defines the architecture and implementation details of the HuleEdu Spell Checker Service
-globs:
-alwaysApply: false
----
-
 # 022: Spell Checker Service Architecture
 
 ## 1. Service Identity

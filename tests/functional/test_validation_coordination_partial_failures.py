@@ -76,7 +76,10 @@ async def test_partial_validation_failures_24_of_25():
                         if isinstance(raw_message, bytes):
                             raw_message = raw_message.decode("utf-8")
 
-                        event_data = json.loads(raw_message) if isinstance(raw_message, str) else raw_message
+                        event_data = (
+                            json.loads(raw_message) if isinstance(raw_message, str) else raw_message
+                        )
+                        print(f"🔴 VALIDATION FAILURE: {json.dumps(event_data, indent=2)}")
                         topic = message.topic
 
                         # Log events for debugging
@@ -220,7 +223,10 @@ async def test_multiple_validation_failures_20_of_25():
                         if isinstance(raw_message, bytes):
                             raw_message = raw_message.decode("utf-8")
 
-                        event_data = json.loads(raw_message) if isinstance(raw_message, str) else raw_message
+                        event_data = (
+                            json.loads(raw_message) if isinstance(raw_message, str) else raw_message
+                        )
+                        print(f"🔴 VALIDATION FAILURE: {json.dumps(event_data, indent=2)}")
                         topic = message.topic
 
                         # Log events for debugging
@@ -314,5 +320,6 @@ async def test_multiple_validation_failures_20_of_25():
             assert failure.file_size_bytes >= 0
 
         logger.info(
-            "✅ MULTIPLE FAILURE TEST (20/25): Success - Multiple validation failures coordination validated"
+            "✅ MULTIPLE FAILURE TEST (20/25): "
+            "Success - Multiple validation failures coordination validated"
         )

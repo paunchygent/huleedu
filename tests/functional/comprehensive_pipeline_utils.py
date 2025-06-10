@@ -29,7 +29,9 @@ PIPELINE_TOPICS = {
     "batch_spellcheck_initiate": topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
     "els_batch_phase_outcome": topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
     "essay_spellcheck_completed": topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
-    "batch_cj_assessment_initiate": topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
+    "batch_cj_assessment_initiate": topic_name(
+        ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND
+    ),
     "cj_assessment_completed": topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
 }
 
@@ -185,14 +187,14 @@ async def watch_pipeline_progression_with_consumer(
 ) -> Optional[Dict[str, Any]]:
     """
     Watch complete pipeline progression with dynamic essay count.
-    
+
     Args:
         consumer: Kafka consumer
         batch_id: Batch identifier
         correlation_id: Correlation identifier for event filtering
         expected_essay_count: Number of essays expected (dynamic)
         timeout_seconds: Maximum wait time
-        
+
     Returns:
         Final completion event data or None if timeout
     """
@@ -200,7 +202,6 @@ async def watch_pipeline_progression_with_consumer(
     end_time = start_time + timeout_seconds
 
     # Track complete pipeline progression
-    batch_registered = False
     spellcheck_completions = 0
     content_provisioned_count = 0
     validation_failure_count = 0
@@ -250,7 +251,9 @@ async def watch_pipeline_progression_with_consumer(
                                 # For correlation-matched events, we trust the correlation_id match
                                 entity_match = True
                             else:
-                                entity_id_from_event = event_data.get("entity_ref", {}).get("entity_id")
+                                entity_id_from_event = event_data.get("entity_ref", {}).get(
+                                    "entity_id"
+                                )
 
                             if not entity_match and entity_id_from_event == batch_id:
                                 entity_match = True
@@ -265,15 +268,19 @@ async def watch_pipeline_progression_with_consumer(
 
                         if entity_match:
                             if message.topic == PIPELINE_TOPICS["batch_essays_registered"]:
-                                batch_registered = True
                                 essay_slots = len(event_data.get("essay_ids", []))
                                 print(f"📝 Batch registration: {essay_slots} essay slots created")
                             elif message.topic == PIPELINE_TOPICS["essay_content_provisioned"]:
                                 content_provisioned_count += 1
                                 if content_provisioned_count == 1:
-                                    print("📨 0️⃣ File Service publishing content provisioned events...")
+                                    print(
+                                        "📨 0️⃣ File Service publishing content provisioned events..."
+                                    )
                                 elif content_provisioned_count == expected_essay_count:
-                                    print(f"📨 0️⃣ All {content_provisioned_count} essays content provisioned - ELS will aggregate")
+                                    print(
+                                        f"📨 0️⃣ All {content_provisioned_count} essays content "
+                                        "provisioned - ELS will aggregate"
+                                    )
                             elif message.topic == PIPELINE_TOPICS["essay_validation_failed"]:
                                 validation_failure_count += 1
                                 if validation_failure_count == 1:
@@ -283,15 +290,23 @@ async def watch_pipeline_progression_with_consumer(
                                 print(f"❌ Validation failed: {essay_file} ({reason})")
                             elif message.topic == PIPELINE_TOPICS["batch_ready"]:
                                 ready_essays = event_data.get("ready_essays", [])
-                                batch_validation_failures = event_data.get("validation_failures", [])
+                                validation_failures = event_data.get("validation_failures", [])
                                 ready_count = len(ready_essays) if ready_essays else 0
-                                failed_count = len(batch_validation_failures) if batch_validation_failures else 0
+                                failed_count = (
+                                    len(validation_failures) if validation_failures else 0
+                                )
                                 total_processed = ready_count + failed_count
-                                print(f"📨 1️⃣ ELS published BatchEssaysReady: {ready_count} ready, {failed_count} failed ({total_processed} total)")
+                                print(
+                                    f"📨 1️⃣ ELS published BatchEssaysReady: {ready_count} ready, "
+                                    f"{failed_count} failed ({total_processed} total)"
+                                )
                             elif message.topic == PIPELINE_TOPICS["batch_spellcheck_initiate"]:
                                 essays_to_process = event_data.get("essays_to_process", [])
                                 essay_count = len(essays_to_process) if essays_to_process else 0
-                                print(f"📨 2️⃣ BOS published spellcheck initiate command: {essay_count} essays")
+                                print(
+                                    f"📨 2️⃣ BOS published spellcheck initiate command: "
+                                    f"{essay_count} essays"
+                                )
                             elif message.topic == PIPELINE_TOPICS["essay_spellcheck_completed"]:
                                 spellcheck_completions += 1
                                 if spellcheck_completions == 1:
@@ -300,24 +315,52 @@ async def watch_pipeline_progression_with_consumer(
                                 phase_name = event_data.get('phase_name')
                                 phase_status = event_data.get('phase_status')
                                 if phase_name == "spellcheck":
-                                    print(f"📨 3️⃣ ELS published phase outcome: {phase_name} -> {phase_status}")
-                                    if phase_status in ["COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"]:
-                                        print("✅ Spellcheck phase completed! BOS will initiate CJ assessment...")
+                                    print(
+                                        f"📨 3️⃣ ELS published phase outcome: "
+                                        f"{phase_name} -> {phase_status}"
+                                    )
+                                    completion_statuses = [
+                                        "COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"
+                                    ]
+                                    if phase_status in completion_statuses:
+                                        print(
+                                            "✅ Spellcheck phase completed! "
+                                            "BOS will initiate CJ assessment..."
+                                        )
                                 elif phase_name == "cj_assessment":
-                                    print(f"📨 6️⃣ ELS published phase outcome: {phase_name} -> {phase_status}")
-                                    if phase_status in ["COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"]:
-                                        print("🎯 Pipeline SUCCESS! Complete end-to-end processing finished.")
+                                    print(
+                                        f"📨 6️⃣ ELS published phase outcome: "
+                                        f"{phase_name} -> {phase_status}"
+                                    )
+                                    completion_statuses = [
+                                        "COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"
+                                    ]
+                                    if phase_status in completion_statuses:
+                                        print(
+                                            "🎯 Pipeline SUCCESS! "
+                                            "Complete end-to-end processing finished."
+                                        )
                                         return dict(envelope_data)
                                 else:
-                                    print(f"📨 🔧 ELS published phase outcome: {phase_name} -> {phase_status}")
+                                    print(
+                                        f"📨 🔧 ELS published phase outcome: "
+                                        f"{phase_name} -> {phase_status}"
+                                    )
                             elif message.topic == PIPELINE_TOPICS["batch_cj_assessment_initiate"]:
                                 essays_to_assess_list = event_data.get("essays_to_process", [])
-                                essays_to_assess = len(essays_to_assess_list) if essays_to_assess_list else 0
-                                print(f"📨 4️⃣ BOS published CJ assessment initiate command: {essays_to_assess} essays")
+                                essays_to_assess = (
+                                    len(essays_to_assess_list) if essays_to_assess_list else 0
+                                )
+                                print(
+                                    f"📨 4️⃣ BOS published CJ assessment initiate command: "
+                                    f"{essays_to_assess} essays"
+                                )
                             elif message.topic == PIPELINE_TOPICS["cj_assessment_completed"]:
                                 rankings = event_data.get("rankings", [])
                                 ranking_count = len(rankings) if rankings else 0
-                                print(f"📨 5️⃣ CJ assessment completed: {ranking_count} essays ranked")
+                                print(
+                                    f"📨 5️⃣ CJ assessment completed: {ranking_count} essays ranked"
+                                )
                                 # Pipeline continues - ELS will publish final phase outcome
 
                     except (json.JSONDecodeError, KeyError) as e:
