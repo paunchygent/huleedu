@@ -68,6 +68,8 @@ The HuleEdu ecosystem currently comprises the following services:
   * **Location**: `services/cj_assessment_service/`
   * **API**: `/healthz` and `/metrics` endpoints for health checks and observability
   * **Architecture**: Concurrent execution with both Kafka worker and HTTP API, supports runtime LLM parameter overrides
+  * **DI Initialization Order**: `QuartDishka(app, container)` is called *before* Blueprint registration to satisfy Dishka injection requirements.
+  * **Database**: Async SQLAlchemy (SQLite in dev; **PostgreSQL recommended for production**)
 
 ## Key Technologies
 

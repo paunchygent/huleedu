@@ -5,6 +5,7 @@ from __future__ import annotations
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import CollectorRegistry
 
 from services.essay_lifecycle_service.config import Settings
@@ -56,6 +57,7 @@ from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
     EventPublisher,
     MetricsCollector,
+    RedisClientProtocol,
     ServiceResultHandler,
     SpecializedServiceRequestDispatcher,
     StateTransitionValidator,
@@ -90,6 +92,16 @@ class CoreInfrastructureProvider(Provider):
     async def provide_http_session(self) -> ClientSession:
         """Provide HTTP client session."""
         return ClientSession()
+
+    @provide(scope=Scope.APP)
+    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
+        """Provide Redis client for idempotency operations."""
+        redis_client = RedisClient(
+            client_id=f"{settings.SERVICE_NAME}-redis",
+            redis_url=settings.REDIS_URL
+        )
+        await redis_client.start()
+        return redis_client
 
     @provide(scope=Scope.APP)
     async def provide_essay_repository(self, settings: Settings) -> EssayRepositoryProtocol:

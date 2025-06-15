@@ -1,7 +1,6 @@
 ---
+trigger: model_decision
 description: "Rules for the Content Service. Follow for all content management, processing, and delivery features to maintain single responsibility and proper integration."
-globs: 
-alwaysApply: true
 ---
 
 ---

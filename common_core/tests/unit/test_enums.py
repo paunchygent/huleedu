@@ -15,6 +15,7 @@ from common_core.enums import (
     ContentType,
     ErrorCode,
     EssayStatus,
+    FileValidationErrorCode,
     ProcessingEvent,
     ProcessingStage,
     topic_name,
@@ -231,6 +232,27 @@ class TestOtherEnums:
         assert hasattr(ErrorCode, "VALIDATION_ERROR")
         assert hasattr(ErrorCode, "CJ_ASSESSMENT_SERVICE_ERROR")
 
+    def test_file_validation_error_code_values(self) -> None:
+        """Test that FileValidationErrorCode enum has expected values."""
+        # Test content validation error codes
+        assert hasattr(FileValidationErrorCode, "EMPTY_CONTENT")
+        assert hasattr(FileValidationErrorCode, "CONTENT_TOO_SHORT")
+        assert hasattr(FileValidationErrorCode, "CONTENT_TOO_LONG")
+        assert hasattr(FileValidationErrorCode, "INVALID_FORMAT")
+        assert hasattr(FileValidationErrorCode, "ENCODING_ERROR")
+
+        # Test processing error codes
+        assert hasattr(FileValidationErrorCode, "RAW_STORAGE_FAILED")
+        assert hasattr(FileValidationErrorCode, "TEXT_EXTRACTION_FAILED")
+
+        # Test fallback error code
+        assert hasattr(FileValidationErrorCode, "UNKNOWN_VALIDATION_ERROR")
+
+        # Test string values
+        assert FileValidationErrorCode.EMPTY_CONTENT.value == "EMPTY_CONTENT"
+        assert FileValidationErrorCode.RAW_STORAGE_FAILED.value == "RAW_STORAGE_FAILED"
+        assert FileValidationErrorCode.TEXT_EXTRACTION_FAILED.value == "TEXT_EXTRACTION_FAILED"
+
     def test_enum_values_are_strings(self) -> None:
         """Test that all enum values are strings."""
         # Test BatchStatus
@@ -247,6 +269,11 @@ class TestOtherEnums:
         for error_code in ErrorCode:
             assert isinstance(error_code.value, str)
             assert len(error_code.value) > 0
+
+        # Test FileValidationErrorCode
+        for validation_error_code in FileValidationErrorCode:
+            assert isinstance(validation_error_code.value, str)
+            assert len(validation_error_code.value) > 0
 
         # Test ProcessingEvent
         for event in ProcessingEvent:

@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "spell-checker-service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
+
+    # Redis configuration for idempotency
+    REDIS_URL: str = "redis://localhost:6379"
+
     CONSUMER_GROUP: str = "spellchecker-service-group-v1.1"
     PRODUCER_CLIENT_ID: str = "spellchecker-service-producer"
     CONSUMER_CLIENT_ID: str = "spellchecker-service-consumer"

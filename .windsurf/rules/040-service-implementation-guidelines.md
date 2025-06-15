@@ -10,17 +10,45 @@ alwaysApply: false
 ---
 # 040: Service Implementation Guidelines
 
-## 1. Core Stack
+The “walking skeleton” stack for all new services is:
+* **Quart** for HTTP APIs
+* **asyncio + aiokafka** for worker / consumer loops
+* **Dishka** for dependency-injection
+* **Prometheus-client** for metrics
+* **PDM** for dependency management
+* **Ruff, MyPy** for formatting / static analysis
 
 ## 3. Protocols, Dependency Injection, and Metrics
+@@
+ - All service contracts must use `typing.Protocol`. Do not use adapters/wrappers in prototypes.
+ - Use Dishka DI for all provider wiring. Orchestration maps (e.g., `phase_initiators_map`) must use enums as keys.
 
-- All service contracts must use `typing.Protocol`. Do not use adapters/wrappers in prototypes.
-- Use Dishka DI for all provider wiring. Orchestration maps (e.g., `phase_initiators_map`) must use enums as keys.
-- Expose Prometheus metrics for orchestration and state transitions (see README Sec 5).
+**Prometheus metrics REQUIRED**  
+  * Expose `/metrics` via `prometheus_client.generate_latest()` (HTTP services).  
+  * For workers, register custom collectors and call `push_to_gateway` **only** from graceful-shutdown hooks.  
+  * Each long-running state machine must increment a **`*_total`** counter and, if relevant, update a histogram (`_duration_seconds`).  
 
-- **Framework**: Quart for async HTTP services, direct `asyncio` and `aiokafka` for worker services.
-- **Dependencies**: PDM exclusively (`pyproject.toml`, `pdm.lock`)
-- **Programming**: `async/await` for all I/O operations
+### 3.1 Defining Protocol Contracts
+1. Place them in `<service>/protocols.py`.  
+2. Only *behaviour* (method signatures), no concrete imports.  
+3. Name each interface `*Protocol` (e.g., [ContentClientProtocol](cci:2://file:///Users/olofs_mba/Documents/Repos/huledu-reboot/services/cj_assessment_service/protocols.py:14:0-29:11)).  
+4. All business logic (routes, processors, core_logic) **depends on the protocol**, never the implementation.
+
+### 3.2 Dishka Integration Rules
+* **HTTP services**  
+  * `container = make_async_container(ServiceProvider())`  
+  * **MUST** call `QuartDishka(app, container)` **before** any `app.register_blueprint(...)`.  
+  * Use `@inject` and `FromDishka[T]` in route handlers.
+* **Worker services**  
+  * Build the container once in [main()](cci:1://file:///Users/olofs_mba/Documents/Repos/huledu-reboot/services/cj_assessment_service/worker_main.py:31:0-102:69); for each message, use `async with container(): ...` to create a request-scope.  
+  * Never share DB sessions or HTTP sessions across scopes unless they are `Scope.APP` singletons supplied by the provider.
+
++### 3.3 Prometheus Metric Patterns
+* Standard counters:  
+  `cj_assessment_pairs_total`, `spellchecker_documents_total`, etc.  
+* Histogram template:  
+  `request_duration_seconds = Histogram("service_request_duration_seconds", "Time spent", ("route",))`
+* Register metrics in [di.py](cci:7://file:///Users/olofs_mba/Documents/Repos/huledu-reboot/services/cj_assessment_service/di.py:0:0-0:0) (Scope.APP) and inject where needed.
 
 ## 2. HTTP Service Blueprint Architecture **MANDATORY**
 

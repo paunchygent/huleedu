@@ -7,6 +7,7 @@ from typing import Dict
 import aiohttp
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import CollectorRegistry
 
 from services.cj_assessment_service.config import Settings
@@ -34,6 +35,7 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     LLMProviderProtocol,
+    RedisClientProtocol,
     RetryManagerProtocol,
 )
 
@@ -65,6 +67,16 @@ class CJAssessmentServiceProvider(Provider):
         )
         await kafka_bus.start()
         return kafka_bus
+
+    @provide(scope=Scope.APP)
+    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
+        """Provide Redis client for idempotency operations."""
+        redis_client = RedisClient(
+            client_id=f"{settings.SERVICE_NAME}-redis",
+            redis_url=settings.REDIS_URL
+        )
+        await redis_client.start()
+        return redis_client
 
     @provide(scope=Scope.APP)
     def provide_cache_manager(self, settings: Settings) -> CacheProtocol:

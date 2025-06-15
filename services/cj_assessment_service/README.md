@@ -11,6 +11,7 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
 - **Pattern**: Hybrid Kafka Worker + HTTP API Service
 - **Framework**: Quart (HTTP API) + Direct `asyncio` and `aiokafka` for message processing
 - **Dependency Injection**: Dishka framework for clean architecture
+- **DI Initialization Order**: `QuartDishka(app, container)` is invoked *before* Blueprint registration to satisfy Dishka route injection requirements (see `app.py`)
 - **Concurrency**: Both HTTP API and Kafka worker run concurrently via `run_service.py`
 
 ### Key Internal Modules
@@ -31,7 +32,7 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
 
 - **Content Service**: HTTP client for fetching spellchecked essay content
 - **LLM Providers**: Multiple provider support (OpenAI, Anthropic, Google, OpenRouter)
-- **Database**: SQLite with async SQLAlchemy for CJ-specific data persistence
+- **Database**: Async SQLAlchemy (SQLite by default for development; **PostgreSQL recommended for production deployments**)
 - **Kafka**: Event consumption and publishing via EventEnvelope pattern
 
 ## LLM Configuration & Dynamic Overrides

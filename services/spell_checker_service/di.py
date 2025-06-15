@@ -5,6 +5,7 @@ from __future__ import annotations
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import CollectorRegistry, Histogram
 
 from common_core.enums import ProcessingEvent, topic_name
@@ -24,6 +25,7 @@ from services.spell_checker_service.protocol_implementations.spell_logic_impl im
 )
 from services.spell_checker_service.protocols import (
     ContentClientProtocol,
+    RedisClientProtocol,
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
     SpellLogicProtocol,
@@ -62,6 +64,16 @@ class SpellCheckerServiceProvider(Provider):
         )
         await kafka_bus.start()
         return kafka_bus
+
+    @provide(scope=Scope.APP)
+    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
+        """Provide Redis client for idempotency operations."""
+        redis_client = RedisClient(
+            client_id=f"{settings.SERVICE_NAME}-redis",
+            redis_url=settings.REDIS_URL
+        )
+        await redis_client.start()
+        return redis_client
 
     @provide(scope=Scope.APP)
     async def provide_http_session(self) -> ClientSession:

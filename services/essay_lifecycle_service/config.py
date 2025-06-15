@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     DATABASE_POOL_PRE_PING: bool = True
     DATABASE_POOL_RECYCLE: int = 3600  # 1 hour
 
+    # Redis Configuration
+    REDIS_URL: str = "redis://localhost:6379"  # Development/test default
+
     # Observability Configuration
     PROMETHEUS_PORT: int = 9090
     ENABLE_METRICS: bool = True

@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     CONSUMER_GROUP_ID_CJ: str = "cj_assessment_consumer_group"
     PRODUCER_CLIENT_ID_CJ: str = "cj_assessment_producer"
 
+    # Redis configuration for idempotency
+    REDIS_URL: str = "redis://localhost:6379"
+
     # Kafka topic names
     CJ_ASSESSMENT_REQUEST_TOPIC: str = "huleedu.els.cj_assessment.requested.v1"
     CJ_ASSESSMENT_COMPLETED_TOPIC: str = "huleedu.cj_assessment.completed.v1"

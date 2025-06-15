@@ -7,6 +7,7 @@ meet quality standards before processing by downstream services.
 
 from __future__ import annotations
 
+from common_core.enums import FileValidationErrorCode
 from services.file_service.validation_models import ValidationResult
 
 
@@ -45,7 +46,7 @@ class FileContentValidator:
         if not text or not text.strip():
             return ValidationResult(
                 is_valid=False,
-                error_code="EMPTY_CONTENT",
+                error_code=FileValidationErrorCode.EMPTY_CONTENT,
                 error_message=f"File '{file_name}' contains no readable text content.",
             )
 
@@ -54,7 +55,7 @@ class FileContentValidator:
         if content_length < self.min_length:
             return ValidationResult(
                 is_valid=False,
-                error_code="CONTENT_TOO_SHORT",
+                error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
                 error_message=(
                     f"File '{file_name}' contains only "
                     f"{content_length} characters. Essays must contain at least "
@@ -65,7 +66,7 @@ class FileContentValidator:
         if content_length > self.max_length:
             return ValidationResult(
                 is_valid=False,
-                error_code="CONTENT_TOO_LONG",
+                error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
                 error_message=(
                     f"File '{file_name}' contains "
                     f"{content_length} characters. Essays must not exceed "

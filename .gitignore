@@ -10,6 +10,7 @@ __pycache__/
 **/.env
 .DS_Store
 .vscode/settings.json
+.md-to-html-converter/
 
 # temp_folders and temp_files used for testing or development
 cj_essay_assessment/

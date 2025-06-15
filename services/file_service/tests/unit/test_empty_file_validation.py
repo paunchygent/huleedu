@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from common_core.enums import ContentType, FileValidationErrorCode
 from common_core.events.file_events import EssayValidationFailedV1
 from services.file_service.core_logic import process_single_file_upload
 from services.file_service.validation_models import ValidationResult
@@ -21,6 +22,7 @@ async def test_empty_file_uses_content_validation() -> None:
     Test that empty files are handled by content validation with proper EMPTY_CONTENT error code.
 
     This ensures the elegant separation of concerns:
+    - Raw storage happens first (pre-emptive storage)
     - Text extraction succeeds (returns empty string)
     - Content validation fails with EMPTY_CONTENT error code
     """
@@ -37,11 +39,13 @@ async def test_empty_file_uses_content_validation() -> None:
     content_validator = AsyncMock()
     content_validator.validate_content.return_value = ValidationResult(
         is_valid=False,
-        error_code="EMPTY_CONTENT",
+        error_code=FileValidationErrorCode.EMPTY_CONTENT,
         error_message="File 'empty_essay.txt' contains no readable text content.",
     )
 
     content_client = AsyncMock()
+    content_client.store_content.return_value = "raw_storage_empty_12345"  # Proper string return
+
     event_publisher = AsyncMock()
 
     # Act
@@ -62,28 +66,32 @@ async def test_empty_file_uses_content_validation() -> None:
     # Assert - Content validation was called with empty string
     content_validator.validate_content.assert_called_once_with("", file_name)
 
-    # Assert - Content storage was NOT called (validation failed)
-    content_client.store_content.assert_not_called()
+    # Assert - Raw storage was called (NEW BEHAVIOR)
+    content_client.store_content.assert_called_once_with(
+        empty_file_content, ContentType.RAW_UPLOAD_BLOB
+    )
 
     # Assert - Validation failure event was published with correct error code
     event_publisher.publish_essay_validation_failed.assert_called_once()
     published_event = event_publisher.publish_essay_validation_failed.call_args[0][0]
 
     assert isinstance(published_event, EssayValidationFailedV1)
-    assert published_event.validation_error_code == "EMPTY_CONTENT"
+    assert published_event.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
     assert published_event.validation_error_message == (
         "File 'empty_essay.txt' contains no readable text content."
     )
     assert published_event.batch_id == batch_id
     assert published_event.original_file_name == file_name
+    assert published_event.raw_file_storage_id == "raw_storage_empty_12345"  # NEW: includes raw storage ID
 
     # Assert - Success event was NOT published
     event_publisher.publish_essay_content_provisioned.assert_not_called()
 
     # Assert - Correct return status
     assert result["status"] == "content_validation_failed"
-    assert result["error_code"] == "EMPTY_CONTENT"
+    assert result["error_code"] == FileValidationErrorCode.EMPTY_CONTENT
     assert result["file_name"] == file_name
+    assert result["raw_file_storage_id"] == "raw_storage_empty_12345"
 
 
 @pytest.mark.asyncio
@@ -106,7 +114,10 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     text_extractor.extract_text.side_effect = Exception("File format not supported")
 
     content_validator = AsyncMock()
+
     content_client = AsyncMock()
+    content_client.store_content.return_value = "raw_storage_corrupted_67890"  # Proper string return
+
     event_publisher = AsyncMock()
 
     # Act
@@ -124,6 +135,11 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     # Assert - Text extraction was attempted
     text_extractor.extract_text.assert_called_once_with(file_content, file_name)
 
+    # Assert - Raw storage was called (NEW BEHAVIOR - happens before extraction)
+    content_client.store_content.assert_called_once_with(
+        file_content, ContentType.RAW_UPLOAD_BLOB
+    )
+
     # Assert - Content validation was NOT called (extraction failed)
     content_validator.validate_content.assert_not_called()
 
@@ -131,13 +147,15 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     event_publisher.publish_essay_validation_failed.assert_called_once()
     published_event = event_publisher.publish_essay_validation_failed.call_args[0][0]
 
-    assert published_event.validation_error_code == "TEXT_EXTRACTION_FAILED"
+    assert published_event.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
     assert "Technical text extraction failure" in published_event.validation_error_message
     assert "File format not supported" in published_event.validation_error_message
+    assert published_event.raw_file_storage_id == "raw_storage_corrupted_67890"  # NEW: includes raw storage ID
 
     # Assert - Correct return status
     assert result["status"] == "extraction_failed"
     assert result["file_name"] == file_name
+    assert result["raw_file_storage_id"] == "raw_storage_corrupted_67890"
 
 
 @pytest.mark.asyncio
@@ -160,7 +178,7 @@ async def test_content_too_short_validation() -> None:
     content_validator = AsyncMock()
     content_validator.validate_content.return_value = ValidationResult(
         is_valid=False,
-        error_code="CONTENT_TOO_SHORT",
+        error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
         error_message=(
             "File 'too_short.txt' contains only 2 characters. "
             "Essays must contain at least 50 characters."
@@ -168,6 +186,8 @@ async def test_content_too_short_validation() -> None:
     )
 
     content_client = AsyncMock()
+    content_client.store_content.return_value = "raw_storage_short_11111"  # Proper string return
+
     event_publisher = AsyncMock()
 
     # Act
@@ -186,10 +206,18 @@ async def test_content_too_short_validation() -> None:
     text_extractor.extract_text.assert_called_once()
     content_validator.validate_content.assert_called_once_with("Hi", file_name)
 
+    # Assert - Raw storage was called (NEW BEHAVIOR)
+    content_client.store_content.assert_called_once_with(
+        short_file_content, ContentType.RAW_UPLOAD_BLOB
+    )
+
     # Assert - Correct validation failure event
+    event_publisher.publish_essay_validation_failed.assert_called_once()
     published_event = event_publisher.publish_essay_validation_failed.call_args[0][0]
-    assert published_event.validation_error_code == "CONTENT_TOO_SHORT"
+    assert published_event.validation_error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
+    assert published_event.raw_file_storage_id == "raw_storage_short_11111"
 
     # Assert - Correct return status
     assert result["status"] == "content_validation_failed"
-    assert result["error_code"] == "CONTENT_TOO_SHORT"
+    assert result["error_code"] == FileValidationErrorCode.CONTENT_TOO_SHORT
+    assert result["raw_file_storage_id"] == "raw_storage_short_11111"

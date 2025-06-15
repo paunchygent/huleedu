@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional, Protocol
 
+from common_core.enums import ContentType
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from services.file_service.validation_models import ValidationResult
 
@@ -17,19 +18,20 @@ from services.file_service.validation_models import ValidationResult
 class ContentServiceClientProtocol(Protocol):
     """Protocol for HTTP client interactions with Content Service."""
 
-    async def store_content(self, content_bytes: bytes) -> str:
+    async def store_content(self, content_bytes: bytes, content_type: ContentType) -> str:
         """
         Store content in Content Service and return storage ID.
 
         Args:
             content_bytes: Raw binary content to store
+            content_type: Type of content being stored (RAW_UPLOAD_BLOB, EXTRACTED_PLAINTEXT, etc.)
 
         Returns:
             storage_id: Unique identifier for stored content
 
         Note:
-            Aligned with current Content Service API (POST /v1/content)
-            which accepts raw binary data.
+            Updated to support ContentType for pre-emptive raw file storage.
+            Enables differentiation between raw file blobs and processed text content.
         """
         ...
 

@@ -279,3 +279,30 @@ class ErrorCode(str, Enum):
     NLP_SERVICE_ERROR = "NLP_SERVICE_ERROR"
     AI_FEEDBACK_SERVICE_ERROR = "AI_FEEDBACK_SERVICE_ERROR"
     CJ_ASSESSMENT_SERVICE_ERROR = "CJ_ASSESSMENT_SERVICE_ERROR"
+
+
+# ---------------------------------------------------------------------------
+# File validation error codes
+# ---------------------------------------------------------------------------
+
+
+class FileValidationErrorCode(str, Enum):
+    """
+    Specific error codes for file validation failures.
+    
+    Used in EssayValidationFailedV1 events to provide precise
+    error categorization for BOS/ELS coordination and debugging.
+    """
+    # Content validation errors
+    EMPTY_CONTENT = "EMPTY_CONTENT"
+    CONTENT_TOO_SHORT = "CONTENT_TOO_SHORT"
+    CONTENT_TOO_LONG = "CONTENT_TOO_LONG"
+    INVALID_FORMAT = "INVALID_FORMAT"
+    ENCODING_ERROR = "ENCODING_ERROR"
+
+    # Processing errors
+    RAW_STORAGE_FAILED = "RAW_STORAGE_FAILED"
+    TEXT_EXTRACTION_FAILED = "TEXT_EXTRACTION_FAILED"
+
+    # Generic fallback
+    UNKNOWN_VALIDATION_ERROR = "UNKNOWN_VALIDATION_ERROR"

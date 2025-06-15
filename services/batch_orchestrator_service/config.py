@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # Repository configuration
     USE_MOCK_REPOSITORY: bool = False  # Set to True to use mock repository for testing
 
+    # Redis Configuration
+    REDIS_URL: str = "redis://localhost:6379"  # Development/test default
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

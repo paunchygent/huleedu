@@ -6,6 +6,7 @@ from aiohttp import ClientSession
 from config import Settings, settings
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.redis_client import RedisClient
 from implementations.ai_feedback_initiator_impl import AIFeedbackInitiatorImpl
 from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
 from implementations.batch_processing_service_impl import BatchProcessingServiceImpl
@@ -30,6 +31,7 @@ from protocols import (
     NLPInitiatorProtocol,
     PipelinePhaseCoordinatorProtocol,
     PipelinePhaseInitiatorProtocol,
+    RedisClientProtocol,
     SpellcheckInitiatorProtocol,
 )
 
@@ -63,6 +65,16 @@ class CoreInfrastructureProvider(Provider):
     async def provide_http_session(self) -> ClientSession:
         """Provide HTTP client session."""
         return ClientSession()
+
+    @provide(scope=Scope.APP)
+    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
+        """Provide Redis client for idempotency operations."""
+        redis_client = RedisClient(
+            client_id=f"{settings.SERVICE_NAME}-redis",
+            redis_url=settings.REDIS_URL
+        )
+        await redis_client.start()
+        return redis_client
 
 
 class RepositoryAndPublishingProvider(Provider):

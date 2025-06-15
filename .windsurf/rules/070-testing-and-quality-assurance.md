@@ -32,7 +32,49 @@ async def process_function(
 ) -> bool:
 ```
 
-### 3.2. Async Context Manager Mocking
+ ### 3.2. Async Context Manager Mocking
+
+```python
+@asynccontextmanager
+async def fake_aiokafka_consumer(records: list[bytes]):
+    yield FakeConsumer(records)  # implements aiokafka-like API
+```
+
+### 3.3. Protocol and DI Testing Patterns
+
+ - Override Dishka providers in tests to inject mocks/fakes.
+- Example override helper:
+
+```python
+from dishka import make_async_container, Provider, Scope, provide
+
+class TestOverrides(Provider):
+    @provide(scope=Scope.APP)
+    def content_client(self) -> ContentClientProtocol:  # mock impl
+        return FakeContentClient()
+
+container = make_async_container(ServiceProvider(), TestOverrides())
+```
+
+- When testing Quart routes:
+
+```python
+test_app = create_app()  # factory returns Quart app
+QuartDishka(app=test_app, container=container)  # inject mocks
+```
+
+- Verifying Prometheus metrics in unit tests:
+
+```python
+import prometheus_client
+
++def test_metric_increment():
+    registry = prometheus_client.CollectorRegistry()
+    counter = Counter("pairs_total", "desc", registry=registry)
+    counter.inc()
+    sample = registry.get_sample_value("pairs_total")
+    assert sample == 1
+```
 
 ### 3.3. Protocol and DI Testing Patterns
 

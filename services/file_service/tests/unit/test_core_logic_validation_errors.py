@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from common_core.enums import FileValidationErrorCode
 from services.file_service.core_logic import process_single_file_upload
 from services.file_service.tests.unit.core_logic_validation_utils import (
     TEST_BATCH_IDS,
@@ -67,7 +68,7 @@ class TestCoreLogicValidationErrors:
         mock_event_publisher.publish_essay_validation_failed.assert_called_once()
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
-        assert event_data.validation_error_code == "TEXT_EXTRACTION_FAILED"
+        assert event_data.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
         assert "Technical text extraction failure" in event_data.validation_error_message
 
         # Verify success event was NOT published
@@ -104,12 +105,22 @@ class TestCoreLogicValidationErrors:
         )
 
         # Assert
-        assert result["status"] == "processing_error"
-        assert "Content Service unavailable" in result["detail"]
+        assert result["status"] == "raw_storage_failed"
+        assert "Content Service unavailable" in result["error_detail"]
 
-        # Verify validation was called and passed
-        mock_content_validator.validate_content.assert_called_once()
+        # Verify text extraction was NOT called (raw storage failed first)
+        mock_text_extractor.extract_text.assert_not_called()
 
-        # Verify no events were published (storage failed)
+        # Verify validation was NOT called (raw storage failed first)
+        mock_content_validator.validate_content.assert_not_called()
+
+        # Verify raw storage failure event was published
+        mock_event_publisher.publish_essay_validation_failed.assert_called_once()
+        failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
+        event_data = failure_event_call[0][0]
+        assert event_data.validation_error_code == FileValidationErrorCode.RAW_STORAGE_FAILED
+        assert "Failed to store raw file" in event_data.validation_error_message
+        assert event_data.raw_file_storage_id == "STORAGE_FAILED"
+
+        # Verify success event was NOT published
         mock_event_publisher.publish_essay_content_provisioned.assert_not_called()
-        mock_event_publisher.publish_essay_validation_failed.assert_not_called()

@@ -17,6 +17,7 @@ from .enums import (
     ContentType,
     ErrorCode,
     EssayStatus,
+    FileValidationErrorCode,
     ProcessingEvent,
     ProcessingStage,
     topic_name,
@@ -73,6 +74,7 @@ __all__ = [
     "BatchStatus",
     "ContentType",
     "ErrorCode",
+    "FileValidationErrorCode",
     "topic_name",
     # Metadata Models
     "EntityReference",

@@ -43,6 +43,7 @@ htmlcov/
 README.md
 TASKS/
 .cursor/ # Rules are not needed in images
+.md-to-html-converter/
 
 # MyPy cache
 .mypy_cache/ 

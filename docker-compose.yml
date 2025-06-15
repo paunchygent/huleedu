@@ -199,6 +199,8 @@ services:
         condition: service_completed_successfully
       content_service:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:
@@ -230,6 +232,8 @@ services:
       essay_lifecycle_api:
         condition: service_healthy
       batch_orchestrator_db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - huleedu_internal_network
@@ -269,6 +273,8 @@ services:
       file_service:
         condition: service_healthy
       essay_lifecycle_db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - huleedu_internal_network
@@ -315,6 +321,8 @@ services:
       file_service:
         condition: service_healthy
       essay_lifecycle_db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - huleedu_internal_network
@@ -379,6 +387,8 @@ services:
       content_service:
         condition: service_healthy
       cj_assessment_db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - huleedu_internal_network

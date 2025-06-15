@@ -380,11 +380,24 @@ class BatchEssayTracker(Protocol):
         ...
 
     async def handle_validation_failure(
-        self, event: Any
+        self, event_data: Any
     ) -> Any | None:  # EssayValidationFailedV1 -> BatchEssaysReady | None
         """Handle validation failure event for batch coordination."""
         ...
 
-    def check_batch_completion(self, batch_id: str) -> Any | None:  # BatchEssaysReady | None
-        """Check if batch is complete and return BatchEssaysReady event if so."""
+
+class RedisClientProtocol(Protocol):
+    """Protocol for Redis client operations."""
+
+    async def set_if_not_exists(
+        self, key: str, value: Any, ttl_seconds: int | None = None
+    ) -> bool:
+        """Set key-value pair if key doesn't exist (SETNX).
+        Returns True if set, False if key existed.
+        """
         ...
+
+    async def delete_key(self, key: str) -> int:
+        """Delete a key. Returns number of keys deleted (0 or 1)."""
+        ...
+

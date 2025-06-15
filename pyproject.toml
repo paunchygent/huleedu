@@ -12,6 +12,7 @@ license = {text = "MIT"}
 # Minimal root dependencies - most deps are per-service or in common_core
 dependencies = [
     "python-dotenv",
+    "pypandoc",
 ]
 
 [tool.pdm]

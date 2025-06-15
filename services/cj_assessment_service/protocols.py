@@ -12,6 +12,33 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
+class RedisClientProtocol(Protocol):
+    """Protocol for Redis client operations, primarily for idempotency patterns."""
+
+    async def set_if_not_exists(
+        self,
+        key: str,
+        value: Any,
+        ttl_seconds: Optional[int] = None
+    ) -> bool:
+        """
+        Atomic SET if NOT EXISTS operation for idempotency.
+
+        Returns:
+            True if key was set (first time processing), False if key already exists
+        """
+        ...
+
+    async def delete_key(self, key: str) -> int:
+        """
+        Delete a key from Redis.
+
+        Returns:
+            Number of keys deleted (0 or 1)
+        """
+        ...
+
+
 class ContentClientProtocol(Protocol):
     """Protocol for fetching spellchecked essay text from content service."""
 
