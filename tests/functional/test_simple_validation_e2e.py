@@ -120,8 +120,10 @@ async def test_content_validation_failures_publish_events():
             )
 
             # Check that validation failure events have the expected error codes
+            # Note: With the new "store raw first" workflow, empty files now fail with RAW_STORAGE_FAILED
             empty_content_failures = []
             content_too_short_failures = []
+            raw_storage_failures = []
 
             for event in validation_failure_events:
                 event_data = event["data"]
@@ -136,11 +138,14 @@ async def test_content_validation_failures_publish_events():
                     empty_content_failures.append(failure_data)
                 elif error_code == "CONTENT_TOO_SHORT":
                     content_too_short_failures.append(failure_data)
+                elif error_code == "RAW_STORAGE_FAILED":
+                    raw_storage_failures.append(failure_data)
 
             # Critical validation failure assertions
-            assert len(empty_content_failures) >= 1, (
-                f"Should have at least 1 EMPTY_CONTENT validation failure event, "
-                f"got {len(empty_content_failures)}"
+            # Empty files now fail with RAW_STORAGE_FAILED due to new "store raw first" workflow
+            assert len(raw_storage_failures) >= 1, (
+                f"Should have at least 1 RAW_STORAGE_FAILED validation failure event (empty file), "
+                f"got {len(raw_storage_failures)}"
             )
             assert len(content_too_short_failures) >= 1, (
                 f"Should have at least 1 CONTENT_TOO_SHORT validation failure event, "

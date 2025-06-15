@@ -169,6 +169,7 @@ async def test_partial_validation_failures_24_of_25():
             "EMPTY_CONTENT",
             "CONTENT_TOO_SHORT",
             "TEXT_EXTRACTION_FAILED",
+            "RAW_STORAGE_FAILED",
         ]
         assert failure.file_size_bytes >= 0
 
@@ -316,6 +317,7 @@ async def test_multiple_validation_failures_20_of_25():
                 "EMPTY_CONTENT",
                 "CONTENT_TOO_SHORT",
                 "TEXT_EXTRACTION_FAILED",
+                "RAW_STORAGE_FAILED",
             ]
             assert failure.file_size_bytes >= 0
 

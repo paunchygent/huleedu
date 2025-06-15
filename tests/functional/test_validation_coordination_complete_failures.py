@@ -169,6 +169,7 @@ async def test_complete_validation_failures_0_of_25():
                 "EMPTY_CONTENT",
                 "CONTENT_TOO_SHORT",
                 "TEXT_EXTRACTION_FAILED",
+                "RAW_STORAGE_FAILED",
             ]
             assert failure.file_size_bytes >= 0
 

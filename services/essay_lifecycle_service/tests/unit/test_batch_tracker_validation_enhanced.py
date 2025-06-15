@@ -55,6 +55,7 @@ class TestEnhancedBatchEssayTracker:
             validation_error_code="EMPTY_CONTENT",
             validation_error_message="File content is empty or contains only whitespace",
             file_size_bytes=0,
+            raw_file_storage_id="test_storage_id_001",
             correlation_id=uuid4(),
         )
 
@@ -130,6 +131,7 @@ class TestEnhancedBatchEssayTracker:
                     validation_error_code="CONTENT_TOO_SHORT",
                     validation_error_message="Content below minimum threshold",
                     file_size_bytes=10,
+                    raw_file_storage_id=f"test_storage_id_{i:03d}",
                 )
                 await tracker.handle_validation_failure(failure)
 
@@ -172,6 +174,7 @@ class TestEnhancedBatchEssayTracker:
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message="Essay content below minimum threshold",
                 file_size_bytes=15,
+                raw_file_storage_id="test_storage_id_025",
             )
             await tracker.handle_validation_failure(failure)
 
@@ -198,6 +201,7 @@ class TestEnhancedBatchEssayTracker:
                 validation_error_code="EMPTY_CONTENT",
                 validation_error_message=f"Failed file {i}",
                 file_size_bytes=0,
+                raw_file_storage_id=f"test_storage_id_{i:03d}",
             )
             for i in range(1, 4)
         ]
@@ -230,6 +234,7 @@ class TestEnhancedBatchEssayTracker:
             validation_error_code="CONTENT_TOO_SHORT",
             validation_error_message="Failed file 4",
             file_size_bytes=10,
+            raw_file_storage_id="test_storage_id_004",
         )
         await tracker.handle_validation_failure(failure)
 
@@ -243,6 +248,7 @@ class TestEnhancedBatchEssayTracker:
             validation_error_code="CONTENT_TOO_SHORT",
             validation_error_message="Failed file 5",
             file_size_bytes=10,
+            raw_file_storage_id="test_storage_id_005",
         )
         tracker.validation_failures["batch_test"].append(failure2)
 
@@ -283,6 +289,7 @@ class TestEnhancedBatchEssayTracker:
                     validation_error_code="EMPTY_CONTENT",
                     validation_error_message="Empty file content",
                     file_size_bytes=0,
+                    raw_file_storage_id=f"test_storage_id_failed_{i:03d}",
                 )
                 await tracker.handle_validation_failure(failure)
 
@@ -307,6 +314,7 @@ class TestEnhancedBatchEssayTracker:
             validation_error_code="CONTENT_TOO_LONG",
             validation_error_message="Content exceeds maximum length",
             file_size_bytes=100000,
+            raw_file_storage_id="test_storage_id_tracked",
             correlation_id=correlation_id,
         )
 
@@ -339,6 +347,7 @@ class TestEnhancedBatchEssayTracker:
                 validation_error_code="VALIDATION_ERROR",
                 validation_error_message="Final validation error",
                 file_size_bytes=50,
+                raw_file_storage_id="test_storage_id_final",
             )
             await tracker.handle_validation_failure(failure)
 
@@ -362,6 +371,7 @@ class TestEnhancedBatchEssayTracker:
                     validation_error_code="EMPTY_CONTENT",
                     validation_error_message="Empty content",
                     file_size_bytes=0,
+                    raw_file_storage_id=f"test_storage_id_empty_{i:03d}",
                 )
                 await tracker.handle_validation_failure(failure)
 
@@ -386,6 +396,7 @@ class TestEnhancedBatchEssayTracker:
             validation_error_code="CONTENT_TOO_SHORT",
             validation_error_message="Content too short: file 4",
             file_size_bytes=20,
+            raw_file_storage_id="test_storage_id_short_4",
         )
         await tracker.handle_validation_failure(failure)
 
@@ -407,6 +418,7 @@ class TestEnhancedBatchEssayTracker:
             validation_error_code="CONTENT_TOO_SHORT",
             validation_error_message="Content too short: file 5",
             file_size_bytes=20,
+            raw_file_storage_id="test_storage_id_short_5",
         )
         await tracker.handle_validation_failure(failure2)
 
@@ -431,6 +443,7 @@ class TestEnhancedBatchEssayTracker:
                     validation_error_code="CONTENT_TOO_SHORT",
                     validation_error_message=f"Concurrent failure {i}",
                     file_size_bytes=10,
+                    raw_file_storage_id=f"test_storage_id_concurrent_{i:03d}",
                 )
                 for i in range(1, 6)
             ]

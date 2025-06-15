@@ -40,6 +40,7 @@ class TestValidationEventConsumerIntegration:
             validation_error_code="EMPTY_CONTENT",
             validation_error_message="File content is empty or contains only whitespace",
             file_size_bytes=0,
+            raw_file_storage_id="test_storage_id_consumer",
             correlation_id=uuid4(),
         )
 
@@ -131,6 +132,7 @@ class TestValidationEventConsumerIntegration:
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message=f"Content too short: file {i}",
                 file_size_bytes=10,
+                raw_file_storage_id=f"test_storage_id_multiple_{i:03d}",
             )
             for i in range(1, 4)
         ]
@@ -154,6 +156,7 @@ class TestValidationEventConsumerIntegration:
             validation_error_code="CONTENT_TOO_LONG",
             validation_error_message="Content exceeds maximum length",
             file_size_bytes=100000,
+            raw_file_storage_id="test_storage_id_correlation",
             correlation_id=correlation_id,
         )
 
@@ -178,6 +181,7 @@ class TestValidationEventConsumerIntegration:
                 validation_error_code="TEST_ERROR",
                 validation_error_message="Test error",
                 file_size_bytes=100,
+                raw_file_storage_id="test_storage_id_invalid",
             ),
         )
 
@@ -200,6 +204,7 @@ class TestValidationEventConsumerIntegration:
             validation_error_code="TEST_ERROR",
             validation_error_message="Test error message",
             file_size_bytes=50,
+            raw_file_storage_id="test_storage_id_error",
         )
 
         # Processing should handle the exception
@@ -238,6 +243,7 @@ class TestValidationEventConsumerIntegration:
             validation_error_code="EMPTY_CONTENT",
             validation_error_message="Empty content test",
             file_size_bytes=0,
+            raw_file_storage_id="test_storage_id_consistency",
         )
 
         envelope = EventEnvelope(
@@ -268,6 +274,7 @@ class TestValidationEventConsumerIntegration:
                 validation_error_code="CONTENT_TOO_SHORT",
                 validation_error_message=f"Concurrent processing test {i}",
                 file_size_bytes=15,
+                raw_file_storage_id=f"test_storage_id_concurrent_{i:03d}",
             )
             for i in range(1, 6)
         ]
@@ -329,6 +336,7 @@ class TestValidationEventConsumerIntegration:
                 validation_error_code=error_code,
                 validation_error_message=f"Test message for {error_code}",
                 file_size_bytes=100,
+                raw_file_storage_id=f"test_storage_id_{error_code.lower()}",
             )
 
             await mock_batch_tracker.handle_validation_failure(validation_failure)
