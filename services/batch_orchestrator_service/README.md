@@ -44,14 +44,15 @@ BOS follows **Clean Architecture** patterns with strict separation of concerns:
 services/batch_orchestrator_service/
 ├── app.py                         # Lean Quart entry point (< 50 lines)
 ├── startup_setup.py               # DI initialization, service lifecycle
-├── metrics.py                     # Prometheus metrics middleware
 ├── api/                           # HTTP Blueprint routes
 │   ├── health_routes.py           # Health and metrics endpoints
 │   └── batch_routes.py            # Batch operations (thin HTTP adapters)
 ├── implementations/               # Clean Architecture implementations
-│   ├── batch_repository_impl.py   # MockBatchRepositoryImpl
+│   ├── batch_repository_postgres_impl.py # Production PostgreSQL repository
+│   ├── batch_repository_impl.py   # Mock repository for testing
 │   ├── event_publisher_impl.py    # DefaultBatchEventPublisherImpl
-│   ├── essay_lifecycle_client_impl.py # DefaultEssayLifecycleClientImpl
+│   ├── batch_essays_ready_handler.py # Handler for ready events
+│   ├── els_batch_phase_outcome_handler.py # Handler for phase completion events
 │   └── batch_processing_service_impl.py # Service layer business logic
 ├── protocols.py                   # Protocol definitions for DI
 ├── di.py                          # Dishka providers importing implementations
@@ -73,95 +74,79 @@ services/batch_orchestrator_service/
 ### Current Endpoints
 
 * **`POST /v1/batches/register`**:
-  * Accepts batch registration requests with essay IDs, course code, class designation, and instructions
-  * Delegates to `BatchProcessingServiceProtocol.register_new_batch()` service layer
-  * Publishes `BatchEssaysRegistered` event to ELS for readiness tracking
-  * Returns `202 Accepted` with `batch_id` and `correlation_id`
-
-* **`POST /v1/batches/trigger-spellcheck-test`**:
-  * Test endpoint for integration validation
-  * Stores dummy content via Content Service
-  * Publishes `SpellcheckRequestedDataV1` event to Kafka
-  * Returns `202 Accepted` with event details
-
-* **`GET /healthz`**: Service health check returning `{"status": "ok"}`
-* **`GET /metrics`**: Prometheus metrics in OpenMetrics format
-
-### Planned Endpoints
-
-* `POST /v1/batches/{batch_id}/initiate-spellcheck`: Initiate batch spellchecking
-* `GET /v1/batches/{batch_id}/status`: Get batch processing status
+  * Accepts batch registration requests with essay details.
+  * Delegates to `BatchProcessingServiceProtocol.register_new_batch()` service layer.
+  * Publishes `BatchEssaysRegistered` event to ELS for readiness tracking.
+  * Returns `202 Accepted` with `batch_id` and `correlation_id`.
+* **`GET /v1/batches/{batch_id}/status`**:
+  * Retrieves the current status and detailed pipeline state of a specific batch.
+  * Returns `200 OK` with batch context and pipeline state information.
+* **`GET /healthz`**: Service health check returning `{"status": "ok"}`.
+* **`GET /metrics`**: Prometheus metrics in OpenMetrics format.
 
 ## Event Publishing
 
 Published to Kafka topics for downstream coordination:
 
 * **`huleedu.batch.essays.registered.v1`**:
-  * **Data**: `BatchEssaysRegistered` with internal essay ID slots and batch context
-  * **Trigger**: After successful batch registration
-  * **Consumer**: Essay Lifecycle Service for slot assignment
-
-* **`huleedu.els.spellcheck.initiate.command.v1`**:
-  * **Data**: `BatchServiceSpellcheckInitiateCommandDataV1` with batch processing command
-  * **Trigger**: After receiving `BatchEssaysReady` event from ELS
-  * **Consumer**: Essay Lifecycle Service for command processing
-
-* **`huleedu.essay.spellcheck.requested.v1`**:
-  * **Data**: `SpellcheckRequestedDataV1` with essay content reference  
-  * **Trigger**: Test endpoint for integration validation
-  * **Consumer**: Spell Checker Service
+  * **Data**: `BatchEssaysRegistered` with internal essay ID slots and batch context.
+  * **Trigger**: After successful batch registration.
+  * **Consumer**: Essay Lifecycle Service for slot assignment.
+* **`huleedu.batch.*.initiate.command.v1`**:
+  * **Data**: `BatchService<Phase>InitiateCommandDataV1` (e.g., for spellcheck, cj_assessment).
+  * **Trigger**: After receiving a phase completion event from ELS, to start the next phase.
+  * **Consumer**: Essay Lifecycle Service for command processing.
 
 ## Event Consumption
 
 Consumed from Kafka for batch coordination:
 
 * **`huleedu.els.batch.essays.ready.v1`**:
-  * **Data**: `BatchEssaysReady` with ready essays including actual essay IDs and text_storage_ids
-  * **Handler**: Generates spellcheck commands with real essay data and publishes to ELS
-  * **Implementation**: Kafka consumer running as background task
+  * **Data**: `BatchEssaysReady` with ready essays including actual essay IDs and text_storage_ids.
+  * **Handler**: `BatchEssaysReadyHandler` initiates the first phase of the processing pipeline.
+* **`huleedu.els.batch_phase.outcome.v1`**:
+  * **Data**: `ELSBatchPhaseOutcomeV1` detailing the results of a completed phase from ELS.
+  * **Handler**: `ELSBatchPhaseOutcomeHandler` processes the outcome and triggers the next pipeline phase. This is critical for dynamic orchestration.
 
-## Dependency Injection Architecture
+## Dependency Injection and Repository Architecture
 
 ### Dishka Configuration
 
-* **Container**: Configured in `startup_setup.py` using `BatchOrchestratorServiceProvider`
-* **Integration**: `quart-dishka` for HTTP route injection via `@inject` decorator
-* **Lifecycle**: App-scoped singletons for stateful dependencies (Kafka producer, HTTP client)
+* **Container**: Configured in `startup_setup.py` using providers from `di.py`.
+* **Integration**: `quart-dishka` for HTTP route injection via `@inject` decorator.
+* **Lifecycle**: App-scoped singletons for stateful dependencies (Kafka producer, HTTP client, DB repository).
 
-### Protocol Implementations
+### Repository Pattern
 
-* **Repository Layer**: `MockBatchRepositoryImpl` (in-memory storage for Phase 1.2)
-* **Event Publishing**: `DefaultBatchEventPublisherImpl` (Kafka producer wrapper)
-* **Service Integration**: `DefaultEssayLifecycleClientImpl` (HTTP client for ELS)
-* **Business Logic**: `BatchProcessingServiceImpl` (service layer orchestration)
+* **Production**: `PostgreSQLBatchRepositoryImpl` provides the production-ready persistence layer using `asyncpg` and SQLAlchemy. It is composed of smaller, single-responsibility modules for CRUD, context, and pipeline state management.
+* **Testing**: `MockBatchRepositoryImpl` provides an in-memory storage implementation for testing purposes.
+* **Atomicity**: The production repository MUST ensure atomic updates of pipeline state to prevent race conditions. This is handled within the `PostgreSQLBatchRepositoryImpl`.
 
 ## Configuration
 
 Environment variables (managed via Pydantic `BaseSettings`):
 
-* **`SERVICE_NAME`**: Service identifier (default: "batch-service")
-* **`PORT`**: HTTP server port (default: 5000)
-* **`LOG_LEVEL`**: Logging verbosity (default: INFO)
-* **`KAFKA_BOOTSTRAP_SERVERS`**: Kafka connection (default: "kafka:9092")
-* **`CONTENT_SERVICE_URL`**: Content Service API URL
-* **`ESSAY_LIFECYCLE_SERVICE_URL`**: ELS API URL
+* **`BATCH_ORCHESTRATOR_SERVICE_PORT`**: HTTP server port (default: 5000).
+* **`BATCH_ORCHESTRATOR_DB_HOST`, `_PORT`, `_NAME`, `_USER`, `_PASSWORD`**: PostgreSQL connection details.
+* **`KAFKA_BOOTSTRAP_SERVERS`**: Kafka connection (default: "kafka:9092").
+* **`REDIS_URL`**: Redis connection for idempotency.
 
 ## Dependencies
 
 ### HuleEdu Services
 
-* **Content Service**: HTTP API for essay content storage
-* **Essay Lifecycle Service**: Event coordination and essay state management
-* **Kafka**: Event publishing and consumption
+* **Essay Lifecycle Service**: Event coordination and individual essay state management.
+* **Kafka**: Event publishing and consumption.
 
 ### Core Libraries
 
-* **Quart + Hypercorn**: Asynchronous HTTP API framework
-* **Dishka + quart-dishka**: Dependency injection with HTTP integration
-* **aiokafka**: Kafka client for event handling
-* **aiohttp**: HTTP client for service communication
-* **huleedu-common-core**: Shared models and event schemas
-* **huleedu-service-libs**: Logging and service utilities
+* **Quart + Hypercorn**: Asynchronous HTTP API framework.
+* **Dishka + quart-dishka**: Dependency injection with HTTP integration.
+* **aiokafka**: Kafka client for event handling.
+* **aiohttp**: HTTP client for service communication.
+* **SQLAlchemy + asyncpg**: PostgreSQL database interaction.
+* **huleedu-common-core**: Shared models and event schemas.
+* **huledu-service-libs**: Logging and service utilities.
 
 ## Local Development
 
@@ -179,8 +164,7 @@ Create `.env` file in service directory:
 ```env
 BATCH_ORCHESTRATOR_SERVICE_LOG_LEVEL=DEBUG
 BATCH_ORCHESTRATOR_SERVICE_KAFKA_BOOTSTRAP_SERVERS=localhost:9093
-BATCH_ORCHESTRATOR_SERVICE_CONTENT_SERVICE_URL=http://localhost:8001/v1/content
-BATCH_ORCHESTRATOR_SERVICE_ESSAY_LIFECYCLE_SERVICE_URL=http://localhost:6001
+# ... other variables like DB credentials
 ```
 
 ### Run Service
@@ -197,11 +181,10 @@ pdm run -p services/batch_orchestrator_service dev
 
 ### Test Coverage
 
-* **API Endpoints**: Registration, health, metrics functionality
-* **Service Layer**: Business logic in `BatchProcessingServiceImpl`
-* **Event Publishing**: Kafka message publishing and serialization
-* **Integration**: Content Service communication (mocked)
-* **DI Container**: Protocol implementation injection
+* **API Endpoints**: Registration, status, health, metrics functionality.
+* **Service Layer**: Business logic in `BatchProcessingServiceImpl`.
+* **Event Publishing & Consumption**: Kafka message handling and serialization.
+* **DI Container**: Protocol implementation injection.
 
 ### Run Tests
 
@@ -217,12 +200,12 @@ pdm run pytest services/batch_orchestrator_service/tests/ --cov=. -v
 
 ### Prometheus Metrics
 
-* **HTTP Requests**: `http_requests_total`, `http_request_duration_seconds`
-* **Batch Operations**: `batch_operations_total` with operation and status labels
-* **Endpoint**: `GET /metrics` (OpenMetrics format)
+* **HTTP Requests**: `http_requests_total`, `http_request_duration_seconds`.
+* **Batch Operations**: `batch_operations_total` with operation and status labels.
+* **Endpoint**: `GET /metrics`.
 
 ### Logging
 
-* **Structured Logging**: JSON format with correlation IDs
-* **Service Context**: All logs tagged with service name and request context
-* **Integration**: Uses `huleedu_service_libs.logging_utils` patterns
+* **Structured Logging**: JSON format with correlation IDs.
+* **Service Context**: All logs tagged with service name and request context.
+* **Integration**: Uses `huleedu_service_libs.logging_utils` patterns.

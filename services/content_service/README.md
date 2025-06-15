@@ -45,6 +45,10 @@ The service API is versioned under `/v1`:
   * **Success Response (200)**: JSON `{"status": "ok", "message": "Content Service is healthy."}`.
   * **Error Response (503)**: If storage is not accessible or other health issues.
 
+* **`GET /metrics`**
+  * **Description**: Prometheus metrics endpoint.
+  * **Success Response (200)**: Metrics in OpenMetrics format.
+
 ## ⚙️ Configuration
 
 Configuration is managed via `services/content_service/config.py` using Pydantic's `BaseSettings`.

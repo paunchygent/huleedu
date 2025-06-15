@@ -109,7 +109,7 @@ Key vars from `Settings` (env prefix `CJ_ASSESSMENT_SERVICE_`):
 
 ---
 
-**CRITICAL IMPLEMENTATION NOTES**
+## 13. **CRITICAL IMPLEMENTATION NOTES**
 
 - DI container **must** be created *before* Blueprint registration – see Memory `55c2a6bd-...`.
 - When serializing envelopes, use `json.dumps(envelope.model_dump(mode="json"))` to ensure UUIDs encode (Rule 026 §12.1 pattern applies here too).

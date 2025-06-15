@@ -3,106 +3,63 @@ description: Defines the architecture and implementation details of the HuleEdu 
 globs: 
 alwaysApply: false
 ---
-
----
-description: Defines the architecture and implementation details of the HuleEdu Essay Lifecycle Service
-globs: 
-alwaysApply: false
----
 # 025: Essay Lifecycle Service Architecture
 
-**STATUS**: ✅ **OPERATIONAL** - Service tested and confirmed working (Jan 2025)
-- **Health Endpoint**: `/healthz` returns HTTP 200 with service status
-- **Metrics Endpoint**: `/metrics` returns Prometheus metrics with request counters and duration histograms
-- **Container**: Running successfully on port 6001 with proper health checks
-
 ## 1. Service Identity
-- **Package**: `huleedu-essay-lifecycle-service`  
-- **HTTP Port**: 6000 (API), **Metrics Port**: 6001
-- **Stack**: Quart, aiokafka, aiosqlite, Hypercorn
-- **Purpose**: Essay slot assignment, state management, and command processing
 
-## 2. Dual Architecture Pattern
+- **Package**: `huleedu-essay-lifecycle-service`
+- **Ports (Host:Container)**: `6001:6000` (HTTP API), `9091:9090` (Metrics)
+- **Stack**: Quart, `aiokafka`, SQLAlchemy (`asyncpg`), Dishka, `transitions`
+- **Purpose**: Manage individual essay states via a formal state machine, process batch commands from BOS, and publish batch phase outcomes to drive dynamic pipeline orchestration.
 
-### 2.1. HTTP API (`app.py`)
-- **GET /healthz**: Service health
-- **GET /metrics**: Prometheus metrics
-- **Future**: Essay status queries, manual state transitions
+## 2. Core Architecture
 
-### 2.2. Kafka Worker (`worker_main.py`)  
-- **Consumer**: Batch coordination events
-- **Producer**: Essay lifecycle state updates
-- **Topics**: `huleedu.batch.coordination.*`
+### 2.1. Dual-Mode Service
 
-## 3. Core Components
+- **HTTP API (`app.py`)**: Provides read-only query endpoints for essay and batch status. **FORBIDDEN**: Control operations.
+- **Kafka Worker (`worker_main.py`)**: Consumes commands from BOS and results from specialized services, driving all state changes.
 
-### 3.1. Slot Assignment Architecture
-- **`batch_tracker.py`**: Slot-based coordination (BOS slots → content assignment)
-- **`state_store.py`**: SQLite essay state persistence with slot assignment methods
-- **Pattern**: BOS generates slots → ELS assigns content → publishes `BatchEssaysReady`
+### 2.2. State Machine Driven
 
-### 3.2. Command Processing
-- **`batch_command_handlers.py`**: BOS command routing and event handlers
-- **`implementations/batch_command_handler_impl.py`**: Command processing logic
-- **`implementations/service_request_dispatcher.py`**: ELS → specialized service dispatch
-- **Pattern**: BOS command → essay state updates → specialized service requests
+- **MANDATORY**: All essay state transitions **MUST** be governed by the `EssayStateMachine` class.
+- Business logic (e.g., in handlers) **MUST** use triggers (e.g., `CMD_INITIATE_SPELLCHECK`, `EVT_SPELLCHECK_SUCCEEDED`) to change state, not direct status updates.
 
-## 4. Event Integration
+### 2.3. Clean DI Architecture
 
-### 4.1. Consumed Events
-- `BATCH_ESSAYS_REGISTERED`: BOS slot registration
-- `ESSAY_CONTENT_PROVISIONED`: File Service content provisioning
-- `BATCH_SPELLCHECK_INITIATE_COMMAND`: BOS spellcheck commands
+- **DI**: `di.py` is a lean provider importing from the `implementations/` directory.
+- **Protocols**: All dependencies are defined in `protocols.py`.
+- **Implementations**: Business logic is encapsulated in single-responsibility classes within the `implementations/` directory.
 
-### 4.2. Published Events  
-- `BATCH_ESSAYS_READY`: Complete batch readiness notification
-- `EXCESS_CONTENT_PROVISIONED`: Content overflow notifications
-- `ESSAY_LIFECYCLE_SPELLCHECK_REQUEST`: Spellcheck requests to specialized services
+## 3. Event Integration
+
+### 3.1. Consumed Events
+
+- **BOS Commands**: `BATCH_SPELLCHECK_INITIATE_COMMAND`, `BATCH_CJ_ASSESSMENT_INITIATE_COMMAND`
+- **Coordination Events**: `BATCH_ESSAYS_REGISTERED`, `ESSAY_CONTENT_PROVISIONED`, `ESSAY_VALIDATION_FAILED`
+- **Service Results**: `ESSAY_SPELLCHECK_COMPLETED`, `CJ_ASSESSMENT_COMPLETED`
+
+### 3.2. Published Events
+
+- **Phase Outcome (CRITICAL)**: `ELS_BATCH_PHASE_OUTCOME` is published to BOS to report the result of a phase for an entire batch, enabling the next pipeline step.
+- **Service Requests**: Publishes requests to specialized services (e.g., `ESSAY_LIFECYCLE_SPELLCHECK_REQUEST`).
+- **Coordination Events**: `BATCH_ESSAYS_READY`, `EXCESS_CONTENT_PROVISIONED`.
+
+## 4. Database & Repository
+
+- **Production**: PostgreSQL, using `PostgreSQLEssayRepository`.
+- **Development/Testing**: SQLite, using `SQLiteEssayStateStore`.
+- **Schema**: Defined in `models_db.py` for PostgreSQL.
+- **Standard Compliance**: Follows all SQLAlchemy standards from Rule `052`.
 
 ## 5. Configuration
 
-**Environment Variables**:
-- `HTTP_PORT` (default: 6000), `METRICS_PORT` (default: 6001)
-- `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_CONSUMER_GROUP_ID`
-- `DATABASE_PATH` (default: "essay_lifecycle.db")
-- `LOG_LEVEL`, `KAFKA_*` consumer settings
+- **Environment Prefix**: `ESSAY_LIFECYCLE_SERVICE_`
+- **Database URL**: `ELS_DATABASE_URL` for production PostgreSQL connection.
+- **Mock Repository**: Controlled by `USE_MOCK_REPOSITORY` flag.
 
-## 6. Database Schema
+## 6. Mandatory Production Patterns
 
-**SQLite Tables**:
-- `processed_essays`: Essay state and metadata
-- `batch_uploads`: Batch coordination data  
-- `processing_pipeline_states`: Pipeline progress tracking
-
-**Migrations**: Automatic on startup via `state_store.py`
-
-## 7. Dependencies
-
-**Core**: quart, hypercorn, aiokafka, aiosqlite
-**HuleEdu**: huleedu-common-core, huleedu-service-libs
-**DI**: dishka, quart-dishka
-
-## 8. Deployment
-
-**Docker**: Multi-stage with HTTP API and Kafka worker
-**Commands**: `pdm run start-http`, `pdm run start-worker`, `pdm run dev`
-**Health**: HTTP healthz endpoint and Kafka consumer health
-
-## 9. Error Handling
-
-**Database**: Connection failures, constraint violations
-**Kafka**: Consumer lag, deserialization errors
-**State**: Invalid transitions, missing entities
-**Response**: Structured error messages with correlation IDs
-
-## 10. Monitoring
-
-**Metrics**: HTTP requests, Kafka processing, database operations
-**Logging**: Correlation ID tracking, state change audit trail
-**Health**: Database connectivity, Kafka consumer lag
-
-## 11. Future Evolution
-
-**Planned**: REST API for essay queries, manual state overrides, batch analytics
-**Database**: Migration to PostgreSQL for production scalability
-**Events**: Fine-grained essay state change events for downstream services
+- **MUST** implement graceful shutdown (`worker_main.py` signal handling).
+- **MUST** use DI-managed `aiohttp.ClientSession` and `KafkaBus`.
+- **MUST** use manual Kafka commits (`enable_auto_commit=False`).
+- **MUST** implement `/healthz` and `/metrics` endpoints.

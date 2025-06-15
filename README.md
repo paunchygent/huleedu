@@ -53,7 +53,7 @@ The HuleEdu ecosystem currently comprises the following services:
   * **Description**: A dual-mode service (HTTP API + Kafka worker) that manages individual essay states via a formal state machine (`EssayStateMachine`). It is responsible for reporting batch-level phase outcomes (including updated `text_storage_id`s) to BOS, enabling dynamic pipeline progression.
   * **Ports**: 6001 (HTTP API), 9091 (Metrics)
   * **Location**: `services/essay_lifecycle_service/`
-  * **Architecture**: SQLite-based state management with event-driven coordination
+  * **Database**: Follows a dual-repository pattern. The production implementation uses **PostgreSQL**, while SQLite is used for local development and testing.
 
 * **File Service** ✅ **IMPLEMENTED**:
   * **Description**: A Quart-based HTTP service with Kafka event publishing for file upload handling, text extraction, and content ingestion coordination. Accepts multipart file uploads, processes files to extract text content, coordinates with Content Service for storage, and emits essay readiness events.
@@ -64,12 +64,10 @@ The HuleEdu ecosystem currently comprises the following services:
 
 * **CJ Assessment Service** ✅ **IMPLEMENTED**:
   * **Description**: A hybrid Kafka worker + HTTP API service for Comparative Judgment assessment of essays using Large Language Model (LLM) based pairwise comparisons. Features dynamic LLM configuration support with multi-provider capabilities (OpenAI, Anthropic, Google, OpenRouter).
-  * **Port**: 9090 (Health API & Metrics)
+  * **Port**: 9095 (Health API & Metrics)
   * **Location**: `services/cj_assessment_service/`
   * **API**: `/healthz` and `/metrics` endpoints for health checks and observability
-  * **Architecture**: Concurrent execution with both Kafka worker and HTTP API, supports runtime LLM parameter overrides
-  * **DI Initialization Order**: `QuartDishka(app, container)` is called *before* Blueprint registration to satisfy Dishka injection requirements.
-  * **Database**: Async SQLAlchemy (SQLite in dev; **PostgreSQL recommended for production**)
+  * **Database**: The primary implementation uses **PostgreSQL**, provisioned via `docker-compose.yml` and configured in the service's DI provider.
 
 ## Key Technologies
 
@@ -83,7 +81,7 @@ The HuleEdu ecosystem currently comprises the following services:
 * **MyPy**: For static type checking.
 * **Pytest**: For testing (unit, integration, contract).
 * **Dishka**: For dependency injection.
-* **SQLite**: For service-local data persistence (ELS).
+* **PostgreSQL / SQLite**: For service data persistence.
 
 ## Development Environment Setup
 

@@ -48,19 +48,15 @@ The service follows a clean architecture pattern with clear separation of concer
 
 ### **Consumes**
 
-* **Event Type**: `huleedu.essay_lifecycle.spellcheck.request.v1`
-  * **Topic**: Dynamically determined by `topic_name(ProcessingEvent.ESSAY_LIFECYCLE_SPELLCHECK_REQUESTED)`.
+* **Event Topic**: `huleedu.essay.spellcheck.requested.v1`
   * **Data Model**: `EventEnvelope[EssayLifecycleSpellcheckRequestV1]`.
-  * Contains essay entity reference, text storage ID, and language parameter for multilingual support.
-  * Triggered by Essay Lifecycle Service (ELS) after essay slot assignment coordination.
-  * Triggers the spell checking workflow.
+  * **Trigger**: Triggered by Essay Lifecycle Service (ELS) after essay slot assignment coordination. The event is derived from `topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)`.
 
 ### **Produces**
 
-* **Event Type String in Envelope**: `huleedu.spellchecker.essay.concluded.v1` (defined as `KAFKA_EVENT_TYPE_SPELLCHECK_COMPLETED` in `event_processor.py`).
-  * **Topic**: Dynamically determined by `topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)`.
+* **Event Topic**: `huleedu.essay.spellcheck.completed.v1`
   * **Data Model**: `EventEnvelope[SpellcheckResultDataV1]`.
-  * Contains correction results and storage references.
+  * **Description**: Contains correction results and storage references.
 
 ### **Consumer Group**
 

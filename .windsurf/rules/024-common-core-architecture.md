@@ -4,19 +4,11 @@ globs:
   - "**/common_core/**/*.py"
 alwaysApply: true
 ---
-
----
-
-description: Defines the all pydantic models: event contracts, enums, and Kafka topics. ALL IMPLEMENTATION MUST COMPLY TO THESE
-globs:
-alwaysApply: false
----
-
 # 024: Common Core Architecture
 
 ## 1. Purpose
 
-Defines HuleEdu's Common Core package with shared models, enums, and event schemas.
+Defines HuleEdu's Common Core package with shared models, enums, and event schemas. This package **IS** the single source of truth for all data contracts.
 
 ## 2. Package Overview
 
@@ -28,7 +20,7 @@ Defines HuleEdu's Common Core package with shared models, enums, and event schem
 
 ### 2.2. Module Structure
 
-```
+```text
 common_core/
 ├── enums.py                    # Business enums, ProcessingEvent, topic mapping
 ├── metadata_models.py          # Metadata/reference models  
@@ -40,6 +32,7 @@ common_core/
     ├── base_event_models.py    # Base event classes
     ├── file_events.py          # File Service domain events
     ├── batch_coordination_events.py # Batch coordination events
+    ├── els_bos_events.py       # ELS to BOS communication events
     ├── spellcheck_models.py    # Spellcheck event data
     └── ai_feedback_events.py   # AI feedback event data
 ```
@@ -48,162 +41,90 @@ common_core/
 
 ### 3.1. ProcessingStage
 
-`PENDING`, `INITIALIZED`, `PROCESSING`, `CONCLUDED`, `FAILED`, `CANCELLED`
-
-- **Terminal States**: `CONCLUDED`, `FAILED`, `CANCELLED`
-- **Active States**: `CONCLUDED`, `INITIALIZED`, `PROCESSING`
+`PENDING`, `INITIALIZED`, `PROCESSING`, `COMPLETED`, `FAILED`, `CANCELLED`
 
 ### 3.2. ProcessingEvent
 
-- **Batch Orchestration**: `BATCH_PIPELINE_REQUESTED`, `BATCH_PHASE_INITIATED`, `BATCH_PIPELINE_PROGRESS_UPDATED`, `BATCH_PHASE_CONCLUDED`
-- **Batch Coordination**: `BATCH_ESSAYS_REGISTERED`, `BATCH_ESSAYS_READY`
-- **Essay Lifecycle**: `ESSAY_PHASE_INITIATION_REQUESTED`, `ESSAY_LIFECYCLE_STATE_UPDATED`
-- **Essay Content**: `ESSAY_CONTENT_PROVISIONED`, `EXCESS_CONTENT_PROVISIONED`
-- **Service Commands**: `BATCH_SPELLCHECK_INITIATE_COMMAND`
-- **Specialized Services**: `ESSAY_SPELLCHECK_REQUESTED`, `ESSAY_SPELLCHECK_COMPLETED`, `ESSAY_NLP_COMPLETED`, `ESSAY_AIFEEDBACK_COMPLETED`, etc.
-- **Generic**: `PROCESSING_STARTED`, `PROCESSING_CONCLUDED`, `PROCESSING_FAILED`
+- **Pattern**: MUST be used to identify event types semantically.
+- **Example**: `ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED`
 
 ### 3.3. EssayStatus
 
-- **File Service**: `UPLOADED`, `TEXT_EXTRACTED`, `CONTENT_INGESTING`, `CONTENT_INGESTION_FAILED`
-- **ELS Pipeline**: `READY_FOR_PROCESSING`
-- **Spellcheck**: `AWAITING_SPELLCHECK`, `SPELLCHECKING_IN_PROGRESS`, `SPELLCHECKED_SUCCESS`, `SPELLCHECK_FAILED`
-- **NLP**: `AWAITING_NLP`, `NLP_IN_PROGRESS`, `NLP_SUCCESS`, `NLP_FAILED`
-- **AI Feedback**: `AWAITING_AI_FEEDBACK`, `AI_FEEDBACK_IN_PROGRESS`, `AI_FEEDBACK_SUCCESS`, `AI_FEEDBACK_FAILED`
-- **System**: `ESSAY_CRITICAL_FAILURE`
+- **Pattern**: MUST be used to represent the state of an individual essay within a processing pipeline.
+- **Example**: `EssayStatus.AWAITING_SPELLCHECK`, `EssayStatus.SPELLCHECKED_SUCCESS`
 
 ### 3.4. BatchStatus
 
-- **Ingestion**: `AWAITING_CONTENT_VALIDATION`, `CONTENT_INGESTION_FAILED`, `AWAITING_PIPELINE_CONFIGURATION`
-- **Processing**: `READY_FOR_PIPELINE_EXECUTION`, `PROCESSING_PIPELINES`
-- **Terminal**: `COMPLETED_SUCCESSFULLY`, `COMPLETED_WITH_FAILURES`, `FAILED_CRITICALLY`, `CANCELLED`
+- **Pattern**: MUST be used to represent the high-level state of an entire batch upload.
+- **Example**: `BatchStatus.PROCESSING_PIPELINES`, `BatchStatus.COMPLETED_SUCCESSFULLY`
 
 ### 3.5. ContentType
 
-`ORIGINAL_ESSAY`, `CORRECTED_TEXT`, `PROCESSING_LOG`, `NLP_METRICS_JSON`, `STUDENT_FACING_AI_FEEDBACK_TEXT`, `AI_EDITOR_REVISION_TEXT`, `AI_DETAILED_ANALYSIS_JSON`, `GRAMMAR_ANALYSIS_JSON`, `CJ_RESULTS_JSON`
+`ORIGINAL_ESSAY`, `CORRECTED_TEXT`, `RAW_UPLOAD_BLOB`, `EXTRACTED_PLAINTEXT`, etc.
 
-### 3.6. Topic Mapping Function
+### 3.6. ErrorCode
 
-```python
-def topic_name(event: ProcessingEvent) -> str:
-    """Convert ProcessingEvent to Kafka topic name with explicit mapping."""
-```
+- **Pattern**: Provides generic, system-wide error categories.
+- **Example**: `ErrorCode.VALIDATION_ERROR`, `ErrorCode.EXTERNAL_SERVICE_ERROR`
 
-**Current Mappings**:
+### 3.7. FileValidationErrorCode
 
-- `ESSAY_SPELLCHECK_REQUESTED` → `"huleedu.essay.spellcheck.requested.v1"`
-- `ESSAY_SPELLCHECK_COMPLETED` → `"huleedu.essay.spellcheck.completed.v1"`
-- `BATCH_ESSAYS_REGISTERED` → `"huleedu.batch.essays.registered.v1"`
-- `BATCH_ESSAYS_READY` → `"huleedu.els.batch.essays.ready.v1"`
-- `ESSAY_CONTENT_PROVISIONED` → `"huleedu.file.essay.content.provisioned.v1"`
-- `EXCESS_CONTENT_PROVISIONED` → `"huleedu.els.excess.content.provisioned.v1"`
-- `BATCH_SPELLCHECK_INITIATE_COMMAND` → `"huleedu.els.spellcheck.initiate.command.v1"`
+- **Pattern**: Provides specific error codes for file validation failures.
+- **Example**: `FileValidationErrorCode.EMPTY_CONTENT`, `FileValidationErrorCode.RAW_STORAGE_FAILED`
 
-## 4. Models
+### 3.8. Topic Mapping Function
+
+- **MUST** use `topic_name(event: ProcessingEvent)` to get Kafka topic names.
+- **FORBIDDEN**: Hardcoding topic names in services.
+- Events intended for Kafka **MUST** have an explicit mapping in the `_TOPIC_MAPPING` dictionary within `enums.py`.
+
+## 4. Core Models
 
 ### 4.1. EntityReference
 
-```python
-entity_id: str
-entity_type: str
-parent_id: Optional[str] = None
-```
+- **Purpose**: A standard, immutable way to refer to any entity within the system.
+- **Fields**: `entity_id: str`, `entity_type: str`, `parent_id: Optional[str]`
 
 ### 4.2. SystemProcessingMetadata
 
-```python
-entity: EntityReference
-timestamp: datetime
-processing_stage: Optional[ProcessingStage] = None
-started_at: Optional[datetime] = None
-completed_at: Optional[datetime] = None
-event: Optional[str] = None
-error_info: Dict[str, Any] = Field(default_factory=dict)
-```
+- **Pattern**: MUST be embedded in event data to provide processing context (entity, stage, errors).
+- **Example Instantiation**:
 
-### 4.3. StorageReferenceMetadata
+  ```python
+  SystemProcessingMetadata(
+      entity=EntityReference(entity_id="essay-123", entity_type="essay"),
+      timestamp=datetime.now(timezone.utc),
+      processing_stage=ProcessingStage.COMPLETED,
+      event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
+      error_info={}
+  )
+  ```
 
-```python
-references: Dict[ContentType, Dict[str, str]] = Field(default_factory=dict)
+### 4.3. EssayProcessingInputRefV1
 
-def add_reference(self, ctype: ContentType, storage_id: str, path_hint: Optional[str] = None) -> None
-```
-
-### 4.4. EssayProcessingInputRefV1
-
-```python
-essay_id: str
-text_storage_id: str
-```
+- **Purpose**: A minimal, general-purpose contract for referencing an essay and its input text for a processing phase.
+- **Fields**: `essay_id: str`, `text_storage_id: str`
 
 ## 5. Event System
 
 ### 5.1. EventEnvelope
 
-```python
-event_id: UUID = Field(default_factory=uuid4)
-event_type: str  # e.g., "huleedu.essay.spellcheck_completed.v1"
-event_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-source_service: str
-schema_version: int = 1
-correlation_id: Optional[UUID] = None
-data_schema_uri: Optional[str] = None
-data: T_EventData
-```
+- **MUST** be used as the standard wrapper for all asynchronous messages published to Kafka.
+- **Fields MUST include**: `event_id`, `event_type`, `source_service`, `correlation_id`, `schema_version`, and `data`.
 
 ### 5.2. Base Event Models
 
-**BaseEventData**: Foundation for all event payloads
-**ProcessingUpdate**: Extends BaseEventData with status and metadata
-**EventTracker**: Event tracking capabilities
+- `BaseEventData`: The foundation for all event payloads.
+- `ProcessingUpdate`: Extends `BaseEventData` to include a `status` and `system_metadata`. Used for events that represent a change in an entity's state.
 
-### 5.3. Event Domain Models
+### 5.3. Key Event Domain Models
 
-**file_events.py**: `EssayContentProvisionedV1` (File Service → ELS)
-**batch_coordination_events.py**: `BatchEssaysRegistered`, `BatchEssaysReady` (BOS ↔ ELS), `ExcessContentProvisionedV1` (ELS → BOS)
+- **`file_events.py`**: Defines `EssayContentProvisionedV1` and `EssayValidationFailedV1`. These are critical for the File Service -> ELS coordination.
+- **`batch_coordination_events.py`**: Defines `BatchEssaysRegistered` (BOS->ELS) and `BatchEssaysReady` (ELS->BOS).
+- **`els_bos_events.py`**: Defines `ELSBatchPhaseOutcomeV1`. This event is **CRITICAL** for dynamic pipeline orchestration, as it's how ELS reports the completion of a phase back to BOS.
 
-### 5.4. Service Models
+## 6. Implementation & Type Safety
 
-**essay_service_models.py**: Request models from ELS to Specialized Services
-**batch_service_models.py**: Command models from BOS to ELS
-
-## 6. Implementation
-
-### 6.1. Pydantic
-
-- All models inherit `BaseModel`
-- Type hints required with `from __future__ import annotations`
-- Custom validators as needed
-- Frozen models where immutability required
-
-### 6.2. Type Checking
-
-- MyPy with strict mode
-- No untyped definitions
-- No `Any` returns where avoidable
-- Generic TypeVar for EventEnvelope
-
-### 6.3. Dependencies
-
-- Core: `pydantic[email]>=2.0`
-- Dev: MyPy, Pytest, Ruff
-
-## 7. Versioning
-
-- Semantic versioning (0.1.0)
-- Breaking changes = major version
-- Event models use V1, V2 suffixes
-- EventEnvelope includes schema_version field
-- Backward compatibility within major versions
-
-## 8. Error Handling
-
-### 8.1. ErrorCode Enum
-
-`UNKNOWN_ERROR`, `VALIDATION_ERROR`, `RESOURCE_NOT_FOUND`, `CONFIGURATION_ERROR`, `EXTERNAL_SERVICE_ERROR`, `KAFKA_PUBLISH_ERROR`, service-specific errors
-
-## 9. Future Event Files (Not Yet Implemented)
-
-- `nlp_events.py`: NLP service event models
-- `cj_assessment_events.py`: CJ assessment event models
-- Additional specialized service events as services are implemented
+- All models **MUST** inherit from Pydantic's `BaseModel`.
+- The `__init__.py` file **MUST** explicitly call `model_rebuild(raise_errors=True)` on all models with forward references to ensure type safety and prevent runtime errors.
+- The package **MUST** include a `py.typed` file to support type checking by consumer services.
