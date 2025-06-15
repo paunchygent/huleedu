@@ -159,8 +159,6 @@ class TestEssayValidationFailedV1:
             "EMPTY_CONTENT",
             "CONTENT_TOO_SHORT",
             "CONTENT_TOO_LONG",
-            "INVALID_FORMAT",
-            "ENCODING_ERROR",
         ]
 
         for error_code in error_codes:

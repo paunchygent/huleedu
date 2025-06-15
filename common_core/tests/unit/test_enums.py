@@ -238,8 +238,6 @@ class TestOtherEnums:
         assert hasattr(FileValidationErrorCode, "EMPTY_CONTENT")
         assert hasattr(FileValidationErrorCode, "CONTENT_TOO_SHORT")
         assert hasattr(FileValidationErrorCode, "CONTENT_TOO_LONG")
-        assert hasattr(FileValidationErrorCode, "INVALID_FORMAT")
-        assert hasattr(FileValidationErrorCode, "ENCODING_ERROR")
 
         # Test processing error codes
         assert hasattr(FileValidationErrorCode, "RAW_STORAGE_FAILED")

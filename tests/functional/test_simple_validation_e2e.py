@@ -46,7 +46,7 @@ async def test_content_validation_failures_publish_events():
         },
         {
             "name": "invalid_essay_empty.txt",
-            "content": "",  # This will trigger EMPTY_CONTENT validation failure
+            "content": "",  # This will trigger RAW_STORAGE_FAILED (Content Service rejects empty bodies)
         },
         {
             "name": "invalid_essay_short.txt",
@@ -120,7 +120,7 @@ async def test_content_validation_failures_publish_events():
             )
 
             # Check that validation failure events have the expected error codes
-            # Note: With the new "store raw first" workflow, empty files now fail with RAW_STORAGE_FAILED
+            # Note: Empty files fail with RAW_STORAGE_FAILED because Content Service rejects empty request bodies
             empty_content_failures = []
             content_too_short_failures = []
             raw_storage_failures = []
@@ -142,7 +142,7 @@ async def test_content_validation_failures_publish_events():
                     raw_storage_failures.append(failure_data)
 
             # Critical validation failure assertions
-            # Empty files now fail with RAW_STORAGE_FAILED due to new "store raw first" workflow
+            # Empty files fail with RAW_STORAGE_FAILED because Content Service rejects empty request bodies
             assert len(raw_storage_failures) >= 1, (
                 f"Should have at least 1 RAW_STORAGE_FAILED validation failure event (empty file), "
                 f"got {len(raw_storage_failures)}"

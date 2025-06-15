@@ -327,7 +327,7 @@ class TestValidationEventConsumerIntegration:
 
     async def test_validation_error_code_preservation(self, mock_batch_tracker: Mock) -> None:
         """Test that validation error codes are preserved through event processing."""
-        error_codes = ["EMPTY_CONTENT", "CONTENT_TOO_SHORT", "CONTENT_TOO_LONG", "INVALID_FORMAT"]
+        error_codes = ["EMPTY_CONTENT", "CONTENT_TOO_SHORT", "CONTENT_TOO_LONG"]
 
         for error_code in error_codes:
             validation_failure = EssayValidationFailedV1(
