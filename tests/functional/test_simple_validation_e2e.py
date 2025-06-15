@@ -46,7 +46,7 @@ async def test_content_validation_failures_publish_events():
         },
         {
             "name": "invalid_essay_empty.txt",
-            "content": "",  # This will trigger RAW_STORAGE_FAILED (Content Service rejects empty bodies)
+            "content": "",  # Triggers RAW_STORAGE_FAILED (Content Service rejects empty bodies)
         },
         {
             "name": "invalid_essay_short.txt",
@@ -120,29 +120,30 @@ async def test_content_validation_failures_publish_events():
             )
 
             # Check that validation failure events have the expected error codes
-            # Note: Empty files fail with RAW_STORAGE_FAILED because Content Service rejects empty request bodies
+            # Note: Empty files fail with RAW_STORAGE_FAILED because Content Service
+            # rejects empty request bodies
             empty_content_failures = []
             content_too_short_failures = []
             raw_storage_failures = []
 
             for event in validation_failure_events:
-                event_data = event["data"]
-                # Handle EventEnvelope format
-                if "data" in event_data and isinstance(event_data["data"], dict):
-                    failure_data = event_data["data"]
-                else:
-                    failure_data = event_data
-
-                error_code = failure_data.get("validation_error_code")
+                event_envelope = event.get("data", {})
+                event_payload = event_envelope.get("data", {})
+                error_code = event_payload.get("validation_error_code")
                 if error_code == "EMPTY_CONTENT":
-                    empty_content_failures.append(failure_data)
+                    empty_content_failures.append(event)
                 elif error_code == "CONTENT_TOO_SHORT":
-                    content_too_short_failures.append(failure_data)
+                    content_too_short_failures.append(event)
                 elif error_code == "RAW_STORAGE_FAILED":
-                    raw_storage_failures.append(failure_data)
+                    raw_storage_failures.append(event)
+
+            print(f"Empty content failures: {len(empty_content_failures)}")
+            print(f"Content too short failures: {len(content_too_short_failures)}")
+            print(f"Raw storage failures: {len(raw_storage_failures)}")
 
             # Critical validation failure assertions
-            # Empty files fail with RAW_STORAGE_FAILED because Content Service rejects empty request bodies
+            # Empty files fail with RAW_STORAGE_FAILED because Content Service
+            # rejects empty request bodies
             assert len(raw_storage_failures) >= 1, (
                 f"Should have at least 1 RAW_STORAGE_FAILED validation failure event (empty file), "
                 f"got {len(raw_storage_failures)}"

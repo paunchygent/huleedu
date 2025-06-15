@@ -32,7 +32,8 @@ class DefaultContentServiceClient(ContentServiceClientProtocol):
                     storage_id = result.get("storage_id")
                     if isinstance(storage_id, str) and storage_id:
                         logger.info(
-                            f"Successfully stored content (type: {content_type.value}), storage_id: {storage_id}"
+                            f"Successfully stored content (type: {content_type.value}), "
+                            f"storage_id: {storage_id}"
                         )
                         return storage_id
                     else:

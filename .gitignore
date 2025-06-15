@@ -17,4 +17,26 @@ cj_essay_assessment/
 cj_ai_essay_assessment/*.xml
 /*.xml
 
+# Service data directories
+services/spell_checker_service/data/corrected_essays
+data/corrected_essays
+test_uploads/
+
+# Local development stores and caches
+.local_*
+services/*/.local_*
+.pdm-build/
+services/*/.pdm-build/
+
+# Coverage and test artifacts
+.coverage
+coverage.xml
+htmlcov/
+
+# Service-specific temporary files
+services/*/logs/
+services/*/tmp/
+*.log
+*.pid
+
 .DS_Store

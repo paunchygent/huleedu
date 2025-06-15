@@ -289,7 +289,7 @@ class ErrorCode(str, Enum):
 class FileValidationErrorCode(str, Enum):
     """
     Specific error codes for file validation failures.
-    
+
     Used in EssayValidationFailedV1 events to provide precise
     error categorization for BOS/ELS coordination and debugging.
     """

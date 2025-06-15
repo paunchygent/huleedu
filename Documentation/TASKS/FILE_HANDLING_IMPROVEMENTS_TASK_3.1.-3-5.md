@@ -9,138 +9,36 @@ Objective: Transition the platform from at-least-once event delivery to effectiv
 
 ---
 
-## Task 3.1: Add Redis to Infrastructure
+## ✅ **COMPLETED TASKS**
 
-**Motivation**: We need a high-throughput, low-latency datastore for atomic check-and-set operations. A relational database is ill-suited for this task and would become a bottleneck. Redis, with its `SETNX` command, is the industry-standard tool for managing distributed locks and idempotency keys at scale.
+### Task 3.1: Add Redis to Infrastructure ✅ COMPLETED
 
-**Actions**:
+**Implementation**: Redis infrastructure fully deployed with service library integration following KafkaBus patterns. All 4 consumer services (BOS, ELS, CJ Assessment, Spell Checker) configured with RedisClientProtocol and DI providers. 15 Redis integration tests passing.
 
-- ⚙️ **Update `docker-compose.yml`**: Add a Redis service with a health check and place it on the internal network.
+**Technical Details**: 
+- Redis 7-alpine in docker-compose.yml with persistence (AOF) and memory management
+- `huleedu_service_libs/redis_client.py` wrapper with lifecycle management
+- Protocol-based DI injection with APP scope across all services
+- Environment variable configuration: `REDIS_URL: str = "redis://localhost:6379"`
 
-    ```yaml
-    # docker-compose.yml
+### Task 3.2: Generate Deterministic Event ID ✅ COMPLETED
 
-    services:
-      # ... other services (kafka, content_service, etc.)
+**Implementation**: Created `common_core/src/common_core/events/utils.py` with `generate_deterministic_event_id()` function for stable, content-based event hashing critical to idempotency guarantees.
 
-      redis:
-        image: redis:7.2-alpine
-        container_name: huleedu_redis
-        restart: unless-stopped
-        ports:
-          - "6379:6379"
-        healthcheck:
-          test: ["CMD", "redis-cli", "ping"]
-          interval: 10s
-          timeout: 5s
-          retries: 5
-        networks:
-          - huleedu_internal_network # Ensure it's on the same network as other services
-
-    # ... networks definition
-    ```
-
-- ⚙️ **Update `pyproject.toml`**: Add the async Redis client library to the root dependency group for all services to use.
-
-    ```toml
-    # pyproject.toml (root)
-
-    [dependency-groups]
-    dev = [
-        # ... existing dependencies
-        "redis>=5.0.0", # ➕ Add this
-    ]
-    ```
-
-- ➕ **Define `RedisClientProtocol`**: In each consumer service (e.g., ELS, Spell Checker), define the protocol for the Redis client to enable type-safe dependency injection.
-
-    ```python
-    # services/essay_lifecycle_service/protocols.py
-
-    import redis.asyncio as redis
-    from typing import Protocol, runtime_checkable, Any, Optional
-
-    @runtime_checkable
-    class RedisClientProtocol(Protocol):
-        async def set(self, key: str, value: Any, ex: Optional[int] = None, nx: bool = False) -> bool: ...
-        async def delete(self, key: str) -> int: ...
-        async def ping(self) -> bool: ...
-    ```
-
-- ➕ **Create DI Provider**: In each consumer service's `di.py`, add a provider for the Redis client. This provider will be responsible for creating and verifying the connection.
-
-    ```python
-    # services/essay_lifecycle_service/di.py
-
-    import redis.asyncio as redis
-    from dishka import Provider, Scope, provide
-    from .config import Settings
-    from .protocols import RedisClientProtocol
-    import logging
-
-    logger = logging.getLogger(__name__) # ➕ Add logger import if not present
-
-    class CoreInfrastructureProvider(Provider):
-        # ... other providers (kafka, http_session) ...
-
-        @provide(scope=Scope.APP)
-        async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
-            """Provides a connected and verified Redis client."""
-            # Assuming settings.REDIS_URL is configured, e.g., "redis://localhost:6379"
-            client = redis.from_url(settings.REDIS_URL, decode_responses=True)
-            await client.ping() # Verify connection on startup
-            logger.info("Successfully connected to Redis.")
-            return client
-    ```
-
----
-
-## Task 3.2: Generate Deterministic Event ID
-
-**Motivation**: An idempotency key must be deterministic and stable. It must be generated from the event's core data, not from transient metadata. A producer-generated `event_id` (like a UUID) is unsuitable because a producer retry due to a network blip would generate a new `event_id` for the exact same logical event, causing our idempotency check to fail and process the duplicate. Hashing the stable data payload solves this permanently.
-
-- **File to Create**: 📂 `common_core/src/common_core/events/utils.py`
-- **Action**: Implement a robust utility function to generate a stable hash from the message content.
-
+**Technical Details**:
 ```python
-# common_core/src/common_core/events/utils.py
-
-import hashlib
-import json
-from typing import Any
-
 def generate_deterministic_event_id(msg_value: bytes) -> str:
-    """
-    Generates a deterministic ID for an event based on its stable content.
-
-    This function ignores transient envelope metadata (like event_id, timestamp)
-    by focusing on the 'data' payload, ensuring that retried events produce
-    the same key.
-
-    Args:
-        msg_value: The raw bytes of the Kafka message value.
-
-    Returns:
-        A SHA256 hexdigest representing the stable event content.
-    """
-    try:
-        event_dict = json.loads(msg_value)
-
-        # The 'data' field contains the business payload, which is stable.
-        data_payload = event_dict.get('data', {})
-
-        # Create a canonical representation by sorting keys. This ensures that
-        # {"b": 2, "a": 1} and {"a": 1, "b": 2} produce the same hash.
-        stable_string = json.dumps(data_payload, sort_keys=True, separators=(",", ":"))
-
-        return hashlib.sha256(stable_string.encode('utf-8')).hexdigest()
-    except (json.JSONDecodeError, TypeError):
-        # Fallback for malformed messages or events without a 'data' field.
-        # Hashing the entire raw message value is a safe default.
-        return hashlib.sha256(msg_value).hexdigest()
+    # Hash stable 'data' payload only, ignoring transient envelope metadata
+    # Handles JSON key order independence via sort_keys=True
+    # Fallback to raw message hash for malformed/non-UTF8 content
+    return hashlib.sha256(stable_string.encode('utf-8')).hexdigest()
 ```
 
+**Validation**: 12 comprehensive unit tests covering edge cases (malformed JSON, non-UTF8 bytes, missing data field, key order independence). All tests passing with full exception handling for `UnicodeDecodeError`, `JSONDecodeError`, and `TypeError`.
+
 ---
+
+## ⏳ **PENDING TASKS**
 
 ## Task 3.3 & 3.4: Create and Apply Idempotency Decorator
 

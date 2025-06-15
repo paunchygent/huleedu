@@ -178,7 +178,9 @@ async def process_single_file_upload(
                 batch_id=batch_id,
                 original_file_name=file_name,
                 raw_file_storage_id=raw_file_storage_id,
-                validation_error_code=validation_result.error_code or FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
+                validation_error_code=(
+                    validation_result.error_code or FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR
+                ),
                 validation_error_message=(
                     validation_result.error_message or "Content validation failed"
                 ),

@@ -82,7 +82,7 @@ async def test_empty_file_uses_content_validation() -> None:
     )
     assert published_event.batch_id == batch_id
     assert published_event.original_file_name == file_name
-    assert published_event.raw_file_storage_id == "raw_storage_empty_12345"  # NEW: includes raw storage ID
+    assert published_event.raw_file_storage_id == "raw_storage_empty_12345"  # Raw storage ID
 
     # Assert - Success event was NOT published
     event_publisher.publish_essay_content_provisioned.assert_not_called()
@@ -116,7 +116,7 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     content_validator = AsyncMock()
 
     content_client = AsyncMock()
-    content_client.store_content.return_value = "raw_storage_corrupted_67890"  # Proper string return
+    content_client.store_content.return_value = "raw_storage_corrupted_67890"  # String return
 
     event_publisher = AsyncMock()
 
@@ -150,7 +150,7 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     assert published_event.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
     assert "Technical text extraction failure" in published_event.validation_error_message
     assert "File format not supported" in published_event.validation_error_message
-    assert published_event.raw_file_storage_id == "raw_storage_corrupted_67890"  # NEW: includes raw storage ID
+    assert published_event.raw_file_storage_id == "raw_storage_corrupted_67890"  # Raw ID
 
     # Assert - Correct return status
     assert result["status"] == "extraction_failed"
@@ -186,7 +186,7 @@ async def test_content_too_short_validation() -> None:
     )
 
     content_client = AsyncMock()
-    content_client.store_content.return_value = "raw_storage_short_11111"  # Proper string return
+    content_client.store_content.return_value = "raw_storage_short_11111"
 
     event_publisher = AsyncMock()
 

@@ -22,12 +22,12 @@ services:
       - "5432:5432"
     environment:
       - POSTGRES_DB=batch_orchestrator
-      - POSTGRES_USER=huleedu_user
-      - POSTGRES_PASSWORD=REDACTED_DEFAULT_PASSWORD
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
       - batch_orchestrator_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U huleedu_user -d batch_orchestrator"]
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d batch_orchestrator"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,12 +44,12 @@ services:
       - "5433:5432"  # Different port from BOS database
     environment:
       - POSTGRES_DB=essay_lifecycle
-      - POSTGRES_USER=huleedu_user
-      - POSTGRES_PASSWORD=REDACTED_DEFAULT_PASSWORD
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
       - essay_lifecycle_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U huleedu_user -d essay_lifecycle"]
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d essay_lifecycle"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -66,12 +66,12 @@ services:
       - "5434:5432"  # Different port from other databases
     environment:
       - POSTGRES_DB=cj_assessment
-      - POSTGRES_USER=huleedu_user
-      - POSTGRES_PASSWORD=REDACTED_DEFAULT_PASSWORD
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
       - cj_assessment_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U huleedu_user -d cj_assessment"]
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d cj_assessment"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -249,8 +249,8 @@ services:
       - BATCH_ORCHESTRATOR_DB_HOST=batch_orchestrator_db
       - BATCH_ORCHESTRATOR_DB_PORT=5432
       - BATCH_ORCHESTRATOR_DB_NAME=batch_orchestrator
-      - BATCH_ORCHESTRATOR_DB_USER=huleedu_user
-      - BATCH_ORCHESTRATOR_DB_PASSWORD=REDACTED_DEFAULT_PASSWORD
+      - BATCH_ORCHESTRATOR_DB_USER=${HULEEDU_DB_USER}
+      - BATCH_ORCHESTRATOR_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/healthz || exit 1"]
       interval: 15s
@@ -290,12 +290,12 @@ services:
       - ESSAY_LIFECYCLE_SERVICE_USE_MOCK_REPOSITORY=false  # Use PostgreSQL in production
       - ESSAY_LIFECYCLE_SERVICE_DATABASE_PATH=/data/essay_lifecycle/essay_lifecycle.db
       # PostgreSQL configuration
-      - ELS_DATABASE_URL=postgresql+asyncpg://huleedu_user:REDACTED_DEFAULT_PASSWORD@essay_lifecycle_db:5432/essay_lifecycle
+      - ELS_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@essay_lifecycle_db:5432/essay_lifecycle
       - ELS_DB_HOST=essay_lifecycle_db
       - ELS_DB_PORT=5432
       - ELS_DB_NAME=essay_lifecycle
-      - ELS_DB_USER=huleedu_user
-      - ELS_DB_PASSWORD=REDACTED_DEFAULT_PASSWORD
+      - ELS_DB_USER=${HULEEDU_DB_USER}
+      - ELS_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - LOG_LEVEL=INFO
     volumes:
       - essay_lifecycle_data:/data/essay_lifecycle
@@ -333,12 +333,12 @@ services:
       - ESSAY_LIFECYCLE_SERVICE_USE_MOCK_REPOSITORY=false  # Use PostgreSQL in production
       - ESSAY_LIFECYCLE_SERVICE_DATABASE_PATH=/data/essay_lifecycle/essay_lifecycle.db
       # PostgreSQL configuration
-      - ELS_DATABASE_URL=postgresql+asyncpg://huleedu_user:REDACTED_DEFAULT_PASSWORD@essay_lifecycle_db:5432/essay_lifecycle
+      - ELS_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@essay_lifecycle_db:5432/essay_lifecycle
       - ELS_DB_HOST=essay_lifecycle_db
       - ELS_DB_PORT=5432
       - ELS_DB_NAME=essay_lifecycle
-      - ELS_DB_USER=huleedu_user
-      - ELS_DB_PASSWORD=REDACTED_DEFAULT_PASSWORD
+      - ELS_DB_USER=${HULEEDU_DB_USER}
+      - ELS_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - LOG_LEVEL=INFO
     volumes:
       - essay_lifecycle_data:/data/essay_lifecycle
@@ -401,12 +401,12 @@ services:
       - CJ_ASSESSMENT_SERVICE_LOG_LEVEL=INFO
       - CJ_ASSESSMENT_SERVICE_METRICS_PORT=9090
       # Database configuration
-      - CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ=postgresql+asyncpg://huleedu_user:REDACTED_DEFAULT_PASSWORD@cj_assessment_db:5432/cj_assessment
+      - CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@cj_assessment_db:5432/cj_assessment
       # Testing configuration
       - CJ_ASSESSMENT_SERVICE_USE_MOCK_LLM=true  # Use mock LLM for E2E testing (no API costs)
       # LLM API Keys for real testing if mock is disabled
-      - ***REMOVED***
-      - ***REMOVED***
-      - ***REMOVED***
-      - ***REMOVED***
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     # Note: cj_assessment_service is a worker service with metrics endpoint only 
