@@ -15,7 +15,8 @@ Objective: Transition the platform from at-least-once event delivery to effectiv
 
 **Implementation**: Redis infrastructure fully deployed with service library integration following KafkaBus patterns. All 4 consumer services (BOS, ELS, CJ Assessment, Spell Checker) configured with RedisClientProtocol and DI providers. 15 Redis integration tests passing.
 
-**Technical Details**: 
+**Technical Details**:
+
 - Redis 7-alpine in docker-compose.yml with persistence (AOF) and memory management
 - `huleedu_service_libs/redis_client.py` wrapper with lifecycle management
 - Protocol-based DI injection with APP scope across all services
@@ -26,6 +27,7 @@ Objective: Transition the platform from at-least-once event delivery to effectiv
 **Implementation**: Created `common_core/src/common_core/events/utils.py` with `generate_deterministic_event_id()` function for stable, content-based event hashing critical to idempotency guarantees.
 
 **Technical Details**:
+
 ```python
 def generate_deterministic_event_id(msg_value: bytes) -> str:
     # Hash stable 'data' payload only, ignoring transient envelope metadata
@@ -36,24 +38,22 @@ def generate_deterministic_event_id(msg_value: bytes) -> str:
 
 **Validation**: 12 comprehensive unit tests covering edge cases (malformed JSON, non-UTF8 bytes, missing data field, key order independence). All tests passing with full exception handling for `UnicodeDecodeError`, `JSONDecodeError`, and `TypeError`.
 
----
-
-## ⏳ **PENDING TASKS**
-
-## ✅ **Task 3.3: Create Idempotency Decorator - COMPLETE**
+### Task 3.3: Create Idempotency Decorator ✅ COMPLETED
 
 **Implementation**: Successfully created `services/libs/huleedu_service_libs/idempotency.py` with production-ready idempotency decorator following established service library patterns.
 
 **Technical Features**:
+
 - DRY decorator pattern using `@idempotent_consumer(redis_client, ttl_seconds=86400)`
 - Redis SETNX operations with configurable TTL for duplicate detection
 - Deterministic event ID generation using existing `common_core.events.utils`
 - Fail-open approach: processes without idempotency protection if Redis fails
 - Proper error handling with automatic key cleanup on processing failures
 - Structured logging for duplicate detection and debugging
-- Type-safe integration with service-specific RedisClientProtocol
+- Type-safe integration with central RedisClientProtocol
 
 **Unit Tests**: Created comprehensive test suite `services/libs/huleedu_service_libs/tests/test_idempotency.py` with 8 test scenarios:
+
 - ✅ First-time event processing with real handlers (not mocks)
 - ✅ Duplicate event detection and skipping
 - ✅ Processing failure recovery with key cleanup
@@ -64,141 +64,76 @@ def generate_deterministic_event_id(msg_value: bytes) -> str:
 
 **Validation**: All 8 unit tests passing, follows testing best practices (real handler functions, only external dependencies mocked).
 
+### 🏗️ **ARCHITECTURAL REFINEMENT COMPLETED**
+
+**Lead Architect Feedback Implementation**: Successfully implemented the recommended architectural refinement to centralize `RedisClientProtocol` and eliminate technical debt.
+
+**Changes Made**:
+
+1. **Central Protocol Creation**: Created `services/libs/huleedu_service_libs/protocols.py` with canonical `RedisClientProtocol`
+2. **Type Safety Enhancement**: Updated idempotency decorator to use `RedisClientProtocol` instead of `Any` type workaround
+3. **DRY Compliance**: Removed 4 duplicate protocol definitions across services → 1 authoritative source
+4. **Service Migration**: Updated all 4 services (BOS, ELS, CJ Assessment, Spell Checker) to import from central location:
+   - Updated `di.py` files to import from `huleedu_service_libs.protocols`
+   - Updated `protocols.py` files to remove duplicate definitions
+   - Updated test files to use central protocol
+
+**Quality Assurance**:
+- ✅ All 23 tests passing (8 idempotency + 15 Redis integration)
+- ✅ Zero linting errors across all modified files
+- ✅ MyPy type checking passes with full type safety
+- ✅ No breaking changes to existing functionality
+
+**Benefits Achieved**:
+- **Type Safety**: Eliminated `Any` workaround, achieved full type safety
+- **Maintainability**: Single source of truth for Redis protocol interface
+- **Consistency**: All services use identical protocol definition
+- **Encapsulation**: Protocol belongs with its implementation in service libs
+
+---
+
+## ⏳ **PENDING TASKS**
+
 ## ⏳ **Task 3.4: Apply Decorator to All Consumers - PENDING**
 
-**Ready for Implementation**: Decorator infrastructure complete and tested.
+**Ready for Implementation**: Decorator infrastructure complete, tested, and architecturally refined.
 
 ### Implementation Pattern
 
 ```python
-# services/libs/huleedu_service_libs/idempotency.py
+# Example: services/essay_lifecycle_service/worker_main.py
 
-import functools
-from typing import Awaitable, Callable, Any
-import redis.asyncio as redis
-from aiokafka import ConsumerRecord
-from .logging_utils import create_service_logger # Assuming this exists or is created
-from common_core.events.utils import generate_deterministic_event_id
+from huleedu_service_libs.idempotency import idempotent_consumer
+from huleedu_service_libs.protocols import RedisClientProtocol
 
-logger = create_service_logger("idempotency_decorator") # ➕ Ensure create_service_logger is available
-
-def idempotent_consumer(
-    redis_client: redis.Redis,
-    ttl_seconds: int = 86400  # 24 hours
-) -> Callable:
-    """
-    Decorator to make a Kafka message handler idempotent using Redis.
-
-    Args:
-        redis_client: An active async Redis client instance.
-        ttl_seconds: The time-to-live for the idempotency key in Redis.
-    """
-    def decorator(func: Callable[[ConsumerRecord, ...], Awaitable[Any]]) -> Callable:
-        @functools.wraps(func)
-        async def wrapper(msg: ConsumerRecord, *args, **kwargs) -> Any:
-            deterministic_id = generate_deterministic_event_id(msg.value)
-            key = f"huleedu:events:seen:{deterministic_id}"
-
-            # Atomically set the key if it does not exist.
-            # If set returns 0, the key already existed, so this is a duplicate.
-            if await redis_client.set(key, "1", ex=ttl_seconds, nx=True) == 0:
-                logger.warning(f"Duplicate event skipped: {key}")
-                return None # Return None to signal the caller to just commit the offset.
-
-            try:
-                # Execute the actual business logic.
-                return await func(msg, *args, **kwargs)
-            except Exception as e:
-                # If processing fails, release the lock so the event can be retried.
-                logger.error(f"Processing failed for event {key}. Unlocking for retry.", exc_info=True)
-                await redis_client.delete(key)
-                raise # Re-raise the exception so the caller knows it failed.
-        return wrapper
-    return decorator
-```
-
-### Step 2: Apply the Decorator (Example from ELS)
-
-```python
-# services/essay_lifecycle_service/worker_main.py
-# ... imports, including the new decorator and Redis client ...
-
-import asyncio # ➕ Ensure asyncio is imported
-from aiokafka import AIOKafkaConsumer # ➕ Ensure AIOKafkaConsumer is imported
-from dishka import make_async_container # ➕ Ensure make_async_container is imported
-from .di import CoreInfrastructureProvider # ➕ Ensure CoreInfrastructureProvider is imported
-from .protocols import RedisClientProtocol # ➕ Ensure RedisClientProtocol is imported
-from services.libs.huleedu_service_libs.idempotency import idempotent_consumer # ➕ Import the decorator
-import logging # ➕ Ensure logging is imported
-
-logger = logging.getLogger(__name__) # ➕ Get logger instance
-
-# Define or import TOPICS if not already defined
-TOPICS = {"batch_registered": "huleedu.test.batch.registered"} # Example, replace with actual topics
-
-# Mock implementations for demonstration if not in actual code
-class BatchCoordinationHandler:
-    async def handle_batch_essays_registered(self, *args, **kwargs):
-        logger.info("BatchCoordinationHandler: handle_batch_essays_registered called.")
-
-async def process_single_message(msg, batch_coordination_handler):
-    logger.info(f"Processing message: {msg.offset}")
-    # Simulate some processing
-    await batch_coordination_handler.handle_batch_essays_registered()
-    return True
-
-
-async def main(): # Assuming main function exists for consumer loop
+async def main():
     container = make_async_container(CoreInfrastructureProvider())
     
-    # 🔄 UPDATE THE CONSUMER SETUP
-    consumer = AIOKafkaConsumer(
-        TOPICS["batch_registered"],
-        bootstrap_servers='localhost:9092', # Replace with actual Kafka brokers
-        group_id="els_consumer_group",
-        auto_offset_reset="earliest"
-    )
-    await consumer.start()
+    async with container() as request_container:
+        # Get dependencies from DI
+        redis_client = await request_container.get(RedisClientProtocol)
+        batch_coordination_handler = await request_container.get(BatchCoordinationHandlerProtocol)
 
-    try:
-        async with container() as request_container:
-            # Get dependencies from DI
-            redis_client = await request_container.get(RedisClientProtocol)
-            batch_coordination_handler = BatchCoordinationHandler() # Replace with actual DI resolution
-            # ... other handlers ...
+        # Apply decorator to message handler
+        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+        async def handle_message_idempotently(msg: ConsumerRecord) -> Any:
+            return await process_single_message(msg, batch_coordination_handler)
 
-            # 🔄 WRAP THE CORE LOGIC with the decorator
-            @idempotent_consumer(redis_client=redis_client)
-            async def handle_message_idempotently(msg: ConsumerRecord) -> Any: # Changed return to Any to match decorator
-                return await process_single_message(
-                    msg, 
-                    batch_coordination_handler=batch_coordination_handler,
-                    # ... pass other handlers ...
-                )
-
-            # 🔄 UPDATE THE CONSUMER LOOP
-            async for msg in consumer:
-                try:
-                    # The handle_message_idempotently function now contains the check.
-                    # It will return None for duplicates, or raise an exception on failure.
-                    result = await handle_message_idempotently(msg)
-
-                    # If no exception was raised, commit the offset.
-                    # This covers both successful processing and skipped duplicates.
-                    if result is not None: # Only commit if not a skipped duplicate
-                        await consumer.commit()
-                except Exception:
-                    # The decorator already logged the error and unlocked the key.
-                    # The consumer loop should NOT commit the offset, allowing Kafka to redeliver.
-                    logger.warning(f"Message processing failed for offset {msg.offset}, not committing.")
-                    # Optional: Add a small delay or advanced retry/DLQ logic here.
-    finally:
-        await consumer.stop()
-
-# Example of how to run main, usually from worker_main.py
-# if __name__ == "__main__":
-#    asyncio.run(main())
+        # Consumer loop with idempotency
+        async for msg in consumer:
+            try:
+                result = await handle_message_idempotently(msg)
+                if result is not None:  # Only commit if not a skipped duplicate
+                    await consumer.commit()
+            except Exception:
+                logger.warning(f"Message processing failed for offset {msg.offset}, not committing.")
 ```
+
+### Services to Update:
+1. **Batch Orchestrator Service** - `services/batch_orchestrator_service/kafka_consumer.py`
+2. **Essay Lifecycle Service** - `services/essay_lifecycle_service/worker_main.py`
+3. **CJ Assessment Service** - `services/cj_assessment_service/worker_main.py`
+4. **Spell Checker Service** - `services/spell_checker_service/worker_main.py`
 
 ---
 
