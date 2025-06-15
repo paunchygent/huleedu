@@ -117,6 +117,7 @@ class SpellCheckerServiceProvider(Provider):
         spell_logic: SpellLogicProtocol,
         event_publisher: SpellcheckEventPublisherProtocol,
         kafka_bus: KafkaBus,
+        http_session: ClientSession,
         kafka_queue_latency_metric: Histogram,
     ) -> SpellCheckerKafkaConsumer:
         """Provide Kafka consumer with injected dependencies."""
@@ -129,5 +130,6 @@ class SpellCheckerServiceProvider(Provider):
             spell_logic=spell_logic,
             event_publisher=event_publisher,
             kafka_bus=kafka_bus,
+            http_session=http_session,
             kafka_queue_latency_metric=kafka_queue_latency_metric,
         )

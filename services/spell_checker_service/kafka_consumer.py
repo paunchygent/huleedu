@@ -42,6 +42,7 @@ class SpellCheckerKafkaConsumer:
         spell_logic: SpellLogicProtocol,
         event_publisher: SpellcheckEventPublisherProtocol,
         kafka_bus: KafkaBus,
+        http_session: aiohttp.ClientSession,
         kafka_queue_latency_metric: Optional[Histogram] = None,
     ) -> None:
         """Initialize with injected dependencies."""
@@ -53,6 +54,7 @@ class SpellCheckerKafkaConsumer:
         self.spell_logic = spell_logic
         self.event_publisher = event_publisher
         self.kafka_bus = kafka_bus
+        self.http_session = http_session
         self.kafka_queue_latency_metric = kafka_queue_latency_metric
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
@@ -113,48 +115,47 @@ class SpellCheckerKafkaConsumer:
 
         while not self.should_stop:
             try:
-                # Process in batches with managed http_session
-                async with aiohttp.ClientSession() as http_session:
-                    result = await self.consumer.getmany(timeout_ms=1000, max_records=10)
-                    if not result:
-                        await asyncio.sleep(0.1)  # Short sleep if no messages
-                        continue
+                # Use DI-provided HTTP session instead of creating ad-hoc sessions
+                result = await self.consumer.getmany(timeout_ms=1000, max_records=10)
+                if not result:
+                    await asyncio.sleep(0.1)  # Short sleep if no messages
+                    continue
 
-                    for tp, messages in result.items():
-                        logger.debug(
-                            f"Received {len(messages)} messages from {tp.topic} "
-                            f"partition {tp.partition}"
-                        )
-                        for msg_count, msg in enumerate(messages):
-                            if self.should_stop:
-                                break
-                            logger.info(
-                                f"Processing message {msg_count + 1}/{len(messages)} "
-                                f"from {tp}"
-                            )
-
-                            should_commit = await process_single_message(
-                                msg=msg,
-                                http_session=http_session,
-                                content_client=self.content_client,
-                                result_store=self.result_store,
-                                event_publisher=self.event_publisher,
-                                spell_logic=self.spell_logic,
-                                kafka_bus=self.kafka_bus,
-                                consumer_group_id=self.consumer_group,
-                                kafka_queue_latency_metric=self.kafka_queue_latency_metric,
-                            )
-
-                            if should_commit:
-                                # Store offset for this specific message
-                                tp_instance = TopicPartition(msg.topic, msg.partition)
-                                offsets = {tp_instance: msg.offset + 1}
-                                await self.consumer.commit(offsets)
-                                logger.debug(
-                                    f"Committed offset {msg.offset + 1} for {tp_instance}"
-                                )
+                for tp, messages in result.items():
+                    logger.debug(
+                        f"Received {len(messages)} messages from {tp.topic} "
+                        f"partition {tp.partition}"
+                    )
+                    for msg_count, msg in enumerate(messages):
                         if self.should_stop:
                             break
+                        logger.info(
+                            f"Processing message {msg_count + 1}/{len(messages)} "
+                            f"from {tp}"
+                        )
+
+                        should_commit = await process_single_message(
+                            msg=msg,
+                            http_session=self.http_session,
+                            content_client=self.content_client,
+                            result_store=self.result_store,
+                            event_publisher=self.event_publisher,
+                            spell_logic=self.spell_logic,
+                            kafka_bus=self.kafka_bus,
+                            consumer_group_id=self.consumer_group,
+                            kafka_queue_latency_metric=self.kafka_queue_latency_metric,
+                        )
+
+                        if should_commit:
+                            # Store offset for this specific message
+                            tp_instance = TopicPartition(msg.topic, msg.partition)
+                            offsets = {tp_instance: msg.offset + 1}
+                            await self.consumer.commit(offsets)
+                            logger.debug(
+                                f"Committed offset {msg.offset + 1} for {tp_instance}"
+                            )
+                    if self.should_stop:
+                        break
 
                 retry_count = 0  # Reset retries on successful processing
 
