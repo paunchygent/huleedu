@@ -7,6 +7,7 @@ from typing import Dict
 import aiohttp
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import CollectorRegistry
 
@@ -35,7 +36,6 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     LLMProviderProtocol,
-    RedisClientProtocol,
     RetryManagerProtocol,
 )
 

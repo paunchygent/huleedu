@@ -228,3 +228,4 @@ The Docker image is built and run as part of the `docker-compose.yml` setup.
   * **ELS Integration**: Now receives spell check requests from Essay Lifecycle Service after essay slot coordination
   * **Backward Compatibility**: Maintains fallback to English if language parameter is missing
   * **All 71 tests pass** with new event model and language support
+  

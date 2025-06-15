@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import pytest
 from dishka import make_async_container
+from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
-from services.cj_assessment_service.protocols import RedisClientProtocol
 
 
 @pytest.fixture

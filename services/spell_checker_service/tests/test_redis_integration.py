@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import pytest
 from dishka import make_async_container
+from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 
 from services.spell_checker_service.config import Settings
 from services.spell_checker_service.di import SpellCheckerServiceProvider
-from services.spell_checker_service.protocols import RedisClientProtocol
 
 
 @pytest.fixture

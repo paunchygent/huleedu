@@ -40,14 +40,35 @@ def generate_deterministic_event_id(msg_value: bytes) -> str:
 
 ## ⏳ **PENDING TASKS**
 
-## Task 3.3 & 3.4: Create and Apply Idempotency Decorator
+## ✅ **Task 3.3: Create Idempotency Decorator - COMPLETE**
 
-**Motivation**: The logic for checking and setting the idempotency key is identical for every consumer. A decorator is the perfect pattern to apply this cross-cutting concern in a clean, DRY (Don't Repeat Yourself), and non-invasive manner.
+**Implementation**: Successfully created `services/libs/huleedu_service_libs/idempotency.py` with production-ready idempotency decorator following established service library patterns.
 
-- **File to Create**: 📂 `services/libs/huleedu_service_libs/idempotency.py`
-- **Action**: Implement the decorator and then apply it to the message handlers in all consumer services.
+**Technical Features**:
+- DRY decorator pattern using `@idempotent_consumer(redis_client, ttl_seconds=86400)`
+- Redis SETNX operations with configurable TTL for duplicate detection
+- Deterministic event ID generation using existing `common_core.events.utils`
+- Fail-open approach: processes without idempotency protection if Redis fails
+- Proper error handling with automatic key cleanup on processing failures
+- Structured logging for duplicate detection and debugging
+- Type-safe integration with service-specific RedisClientProtocol
 
-### Step 1: Create the Decorator
+**Unit Tests**: Created comprehensive test suite `services/libs/huleedu_service_libs/tests/test_idempotency.py` with 8 test scenarios:
+- ✅ First-time event processing with real handlers (not mocks)
+- ✅ Duplicate event detection and skipping
+- ✅ Processing failure recovery with key cleanup
+- ✅ Redis failure fallback behavior
+- ✅ Default TTL application (24 hours)
+- ✅ Deterministic key generation validation
+- ✅ Call tracking verification without mocking business logic
+
+**Validation**: All 8 unit tests passing, follows testing best practices (real handler functions, only external dependencies mocked).
+
+## ⏳ **Task 3.4: Apply Decorator to All Consumers - PENDING**
+
+**Ready for Implementation**: Decorator infrastructure complete and tested.
+
+### Implementation Pattern
 
 ```python
 # services/libs/huleedu_service_libs/idempotency.py

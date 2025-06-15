@@ -5,6 +5,7 @@ from __future__ import annotations
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import CollectorRegistry
 
@@ -57,7 +58,6 @@ from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
     EventPublisher,
     MetricsCollector,
-    RedisClientProtocol,
     ServiceResultHandler,
     SpecializedServiceRequestDispatcher,
     StateTransitionValidator,

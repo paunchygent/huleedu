@@ -13,8 +13,8 @@ import pytest
 from config import Settings
 from di import CoreInfrastructureProvider
 from dishka import make_async_container
+from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
-from protocols import RedisClientProtocol
 
 
 @pytest.fixture

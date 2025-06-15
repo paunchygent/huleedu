@@ -6,6 +6,7 @@ from aiohttp import ClientSession
 from config import Settings, settings
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from implementations.ai_feedback_initiator_impl import AIFeedbackInitiatorImpl
 from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
@@ -31,7 +32,6 @@ from protocols import (
     NLPInitiatorProtocol,
     PipelinePhaseCoordinatorProtocol,
     PipelinePhaseInitiatorProtocol,
-    RedisClientProtocol,
     SpellcheckInitiatorProtocol,
 )
 

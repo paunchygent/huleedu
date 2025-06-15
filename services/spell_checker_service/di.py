@@ -5,6 +5,7 @@ from __future__ import annotations
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import CollectorRegistry, Histogram
 
@@ -25,7 +26,6 @@ from services.spell_checker_service.protocol_implementations.spell_logic_impl im
 )
 from services.spell_checker_service.protocols import (
     ContentClientProtocol,
-    RedisClientProtocol,
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
     SpellLogicProtocol,

@@ -11,11 +11,11 @@ from typing import Any
 
 import pytest
 from dishka import make_async_container
+from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.di import CoreInfrastructureProvider
-from services.essay_lifecycle_service.protocols import RedisClientProtocol
 
 
 @pytest.fixture

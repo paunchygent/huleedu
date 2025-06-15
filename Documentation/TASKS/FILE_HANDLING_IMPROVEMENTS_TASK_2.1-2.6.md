@@ -1,6 +1,6 @@
 # Epic: Pre-emptive Raw File Storage (PIPELINE_HARDENING_V1.1)
 
-**Status**: Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Complete ✅  
+**Status**: Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Complete ✅ | Phase 4 Complete ✅  
 **Objective**: Refactor the File Service to persist the raw, unmodified file blob before any processing occurs. This establishes an immutable source of truth, enabling robust reprocessing and decoupling storage from interpretation.
 
 ---
@@ -233,7 +233,79 @@ event = EssayContentProvisionedV1(
 
 ---
 
-## ✅ **PHASE 3 VALIDATION RESULTS**
+## ✅ **PHASE 4 COMPLETE: Idempotency Infrastructure**
+
+### Task 3.2: Generate Deterministic Event ID ✅ COMPLETED
+
+**Implementation**: Created `common_core/src/common_core/events/utils.py` with `generate_deterministic_event_id()` function for stable, content-based event hashing critical to idempotency guarantees.
+
+**Technical Details**:
+
+```python
+def generate_deterministic_event_id(msg_value: bytes) -> str:
+    # Hash stable 'data' payload only, ignoring transient envelope metadata
+    # Handles JSON key order independence via sort_keys=True
+    # Fallback to raw message hash for malformed/non-UTF8 content
+    return hashlib.sha256(stable_string.encode('utf-8')).hexdigest()
+```
+
+**Validation**: 12 comprehensive unit tests covering edge cases (malformed JSON, non-UTF8 bytes, missing data field, key order independence). All tests passing with full exception handling.
+
+### Task 3.3: Create Idempotency Decorator ✅ COMPLETED
+
+**Implementation**: Successfully created `services/libs/huleedu_service_libs/idempotency.py` with production-ready idempotency decorator following established service library patterns.
+
+**Technical Features**:
+
+- DRY decorator pattern using `@idempotent_consumer(redis_client, ttl_seconds=86400)`
+- Redis SETNX operations with configurable TTL for duplicate detection
+- Deterministic event ID generation using existing `common_core.events.utils`
+- Fail-open approach: processes without idempotency protection if Redis fails
+- Proper error handling with automatic key cleanup on processing failures
+- Structured logging for duplicate detection and debugging
+- Type-safe integration with central RedisClientProtocol
+
+**Unit Tests**: Created comprehensive test suite `services/libs/huleedu_service_libs/tests/test_idempotency.py` with 8 test scenarios:
+
+- ✅ First-time event processing with real handlers (not mocks)
+- ✅ Duplicate event detection and skipping
+- ✅ Processing failure recovery with key cleanup
+- ✅ Redis failure fallback behavior
+- ✅ Default TTL application (24 hours)
+- ✅ Deterministic key generation validation
+- ✅ Call tracking verification without mocking business logic
+
+**Validation**: All 8 unit tests passing, follows testing best practices (real handler functions, only external dependencies mocked).
+
+### 🏗️ **ARCHITECTURAL REFINEMENT COMPLETED**
+
+**Lead Architect Feedback Implementation**: Successfully implemented the recommended architectural refinement to centralize `RedisClientProtocol` and eliminate technical debt.
+
+**Changes Made**:
+
+1. **Central Protocol Creation**: Created `services/libs/huleedu_service_libs/protocols.py` with canonical `RedisClientProtocol`
+2. **Type Safety Enhancement**: Updated idempotency decorator to use `RedisClientProtocol` instead of `Any` type workaround
+3. **DRY Compliance**: Removed 4 duplicate protocol definitions across services → 1 authoritative source
+4. **Service Migration**: Updated all 4 services (BOS, ELS, CJ Assessment, Spell Checker) to import from central location:
+   - Updated `di.py` files to import from `huleedu_service_libs.protocols`
+   - Updated `protocols.py` files to remove duplicate definitions
+   - Updated test files to use central protocol
+
+**Quality Assurance**:
+- ✅ All 23 tests passing (8 idempotency + 15 Redis integration)
+- ✅ Zero linting errors across all modified files
+- ✅ MyPy type checking passes with full type safety
+- ✅ No breaking changes to existing functionality
+
+**Benefits Achieved**:
+- **Type Safety**: Eliminated `Any` workaround, achieved full type safety
+- **Maintainability**: Single source of truth for Redis protocol interface
+- **Consistency**: All services use identical protocol definition
+- **Encapsulation**: Protocol belongs with its implementation in service libs
+
+---
+
+## ✅ **PHASE 4 VALIDATION RESULTS**
 
 **Breaking Change Fixed**: The File Service now successfully populates the required `raw_file_storage_id` field in all events, resolving the Pydantic validation failures that were breaking the pipeline.
 
@@ -248,13 +320,20 @@ event = EssayContentProvisionedV1(
 
 **Pipeline Status**: The File Service is now compatible with Phase 1 contract changes and should restore full pipeline functionality.
 
+**Infrastructure Status**: Redis infrastructure and idempotency decorator are production-ready and architecturally sound, ready for application to consumer services.
+
 ---
 
-## 🚀 **PENDING PHASES**
+## 🚀 **NEXT STEPS**
 
-### Phase 4: Idempotency Layer (Tasks 3.2-3.5)
+### Phase 5: Apply Idempotency to Consumers (Task 3.4)
 
-- Generate deterministic event IDs
-- Create idempotency decorator in service libs
-- Apply decorator to all consumer services
-- Chaos testing and validation
+- Apply `@idempotent_consumer` decorator to all 4 consumer services
+- Update consumer loops to handle duplicate detection
+- Validate idempotency behavior in integration tests
+
+### Phase 6: End-to-End Validation (Task 3.5)
+
+- Create comprehensive E2E idempotency tests
+- Chaos testing with intentional duplicate events
+- Performance validation under load
