@@ -202,13 +202,15 @@ class EventHandlingProvider(Provider):
         settings: Settings,
         batch_essays_ready_handler: BatchEssaysReadyHandler,
         els_batch_phase_outcome_handler: ELSBatchPhaseOutcomeHandler,
+        redis_client: RedisClientProtocol,
     ) -> BatchKafkaConsumer:
-        """Provide Kafka consumer for batch events."""
+        """Provide Kafka consumer with idempotency support."""
         return BatchKafkaConsumer(
             kafka_bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-            consumer_group="batch-orchestrator-group",
+            consumer_group=settings.KAFKA_CONSUMER_GROUP_ID,
             batch_essays_ready_handler=batch_essays_ready_handler,
             els_batch_phase_outcome_handler=els_batch_phase_outcome_handler,
+            redis_client=redis_client,
         )
 
 

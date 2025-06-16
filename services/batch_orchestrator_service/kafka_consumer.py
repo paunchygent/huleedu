@@ -11,6 +11,7 @@ from typing import Any
 
 from aiokafka import AIOKafkaConsumer
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.protocols import RedisClientProtocol
 from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
 from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
 
@@ -28,11 +29,13 @@ class BatchKafkaConsumer:
         consumer_group: str,
         batch_essays_ready_handler: BatchEssaysReadyHandler,
         els_batch_phase_outcome_handler: ELSBatchPhaseOutcomeHandler,
+        redis_client: RedisClientProtocol,
     ) -> None:
         self.kafka_bootstrap_servers = kafka_bootstrap_servers
         self.consumer_group = consumer_group
         self.batch_essays_ready_handler = batch_essays_ready_handler
         self.els_batch_phase_outcome_handler = els_batch_phase_outcome_handler
+        self.redis_client = redis_client
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
 
@@ -90,11 +93,20 @@ class BatchKafkaConsumer:
                 self.consumer = None
 
     async def _process_messages(self) -> None:
-        """Main message processing loop."""
+        """Main message processing loop with idempotency support."""
         if not self.consumer:
             return
 
-        logger.info("Starting BOS message processing loop")
+        logger.info("Starting BOS message processing loop with idempotency")
+
+        # Import decorator locally to avoid circular imports
+        from huleedu_service_libs.idempotency import idempotent_consumer
+
+        # Apply idempotency decorator (following ELS pattern exactly)
+        @idempotent_consumer(redis_client=self.redis_client, ttl_seconds=86400)
+        async def handle_message_idempotently(msg: Any) -> bool:
+            await self._handle_message(msg)
+            return True  # Success - existing _handle_message raises on failure
 
         try:
             async for msg in self.consumer:
@@ -103,20 +115,44 @@ class BatchKafkaConsumer:
                     break
 
                 try:
-                    await self._handle_message(msg)
-                    # Commit offset only after successful processing (manual commit pattern)
-                    await self.consumer.commit()
-                    logger.debug(
-                        "Successfully processed and committed BOS message",
-                        extra={
-                            "topic": msg.topic,
-                            "partition": msg.partition,
-                            "offset": msg.offset,
-                        },
-                    )
+                    result = await handle_message_idempotently(msg)
+
+                    if result is not None:
+                        # Only commit if not a skipped duplicate
+                        if result:
+                            # Commit offset only after successful processing (manual commit pattern)
+                            await self.consumer.commit()
+                            logger.debug(
+                                "Successfully processed and committed BOS message",
+                                extra={
+                                    "topic": msg.topic,
+                                    "partition": msg.partition,
+                                    "offset": msg.offset,
+                                },
+                            )
+                        else:
+                            logger.warning(
+                                "Failed to process message, not committing offset",
+                                extra={
+                                    "topic": msg.topic,
+                                    "partition": msg.partition,
+                                    "offset": msg.offset,
+                                },
+                            )
+                    else:
+                        # Message was a duplicate and skipped
+                        logger.info(
+                            "Duplicate message skipped, not committing offset",
+                            extra={
+                                "topic": msg.topic,
+                                "partition": msg.partition,
+                                "offset": msg.offset,
+                            },
+                        )
+
                 except Exception as e:
                     logger.error(
-                        "Error processing message in BOS, not committing offset",
+                        "Error processing message in BOS",
                         extra={
                             "error": str(e),
                             "topic": msg.topic,

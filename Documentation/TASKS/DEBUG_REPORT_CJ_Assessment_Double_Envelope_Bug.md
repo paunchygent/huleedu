@@ -133,7 +133,7 @@ cj_result_data = CJAssessmentCompletedV1.model_validate(envelope.data)
 
 #### **Data Flow (BEFORE Fix)**
 
-```
+```text
 1. CJAssessmentCompletedV1 payload
    ↓
 2. EventEnvelope[CJAssessmentCompletedV1] (event_processor.py) ✅ 
@@ -147,7 +147,7 @@ cj_result_data = CJAssessmentCompletedV1.model_validate(envelope.data)
 
 #### **Data Flow (AFTER Fix)**
 
-```
+```text
 1. CJAssessmentCompletedV1 payload
    ↓
 2. EventEnvelope[CJAssessmentCompletedV1] (event_processor.py) ✅
@@ -277,7 +277,8 @@ pdm run pytest tests/functional/test_e2e_cj_assessment_workflows.py::TestE2ECJAs
 
 ### **Debug Output Validation**
 
-```
+```text
+
 DEBUG: Single-wrapping detected! Using events[0]['data']
 DEBUG: CJAssessmentCompletedV1 keys: ['event_name', 'entity_ref', 'timestamp', 'status', 'system_metadata', 'cj_assessment_job_id', 'rankings']
 DEBUG: status value: completed_successfully

@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
+from huleedu_service_libs.protocols import RedisClientProtocol
 
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
@@ -37,10 +38,16 @@ class TestBatchKafkaConsumerBusinessLogic:
         return AsyncMock(spec=ELSBatchPhaseOutcomeHandler)
 
     @pytest.fixture
+    def mock_redis_client(self) -> AsyncMock:
+        """Mock Redis client for idempotency support."""
+        return AsyncMock(spec=RedisClientProtocol)
+
+    @pytest.fixture
     def kafka_consumer(
         self,
         mock_batch_essays_ready_handler: AsyncMock,
         mock_els_batch_phase_outcome_handler: AsyncMock,
+        mock_redis_client: AsyncMock,
     ) -> BatchKafkaConsumer:
         """Create Kafka consumer with mocked external dependencies."""
         return BatchKafkaConsumer(
@@ -48,6 +55,7 @@ class TestBatchKafkaConsumerBusinessLogic:
             consumer_group="test-group",
             batch_essays_ready_handler=mock_batch_essays_ready_handler,
             els_batch_phase_outcome_handler=mock_els_batch_phase_outcome_handler,
+            redis_client=mock_redis_client,
         )
 
     async def test_els_batch_phase_outcome_message_routing(

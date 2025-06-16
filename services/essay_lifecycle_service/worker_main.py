@@ -11,10 +11,12 @@ import asyncio
 import signal
 import sys
 
-from aiokafka import AIOKafkaConsumer
+from aiokafka import AIOKafkaConsumer, ConsumerRecord
 from common_core.enums import ProcessingEvent, topic_name
 from dishka import make_async_container
+from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from huleedu_service_libs.protocols import RedisClientProtocol
 
 from services.essay_lifecycle_service.batch_command_handlers import process_single_message
 from services.essay_lifecycle_service.config import settings
@@ -87,11 +89,22 @@ async def run_consumer_loop(
     batch_coordination_handler: BatchCoordinationHandler,
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
+    redis_client: RedisClientProtocol,
 ) -> None:
-    """Main message processing loop."""
+    """Main message processing loop with idempotency support."""
     global should_stop
 
-    logger.info("Starting message processing loop")
+    logger.info("Starting message processing loop with idempotency")
+
+    # Apply idempotency decorator to message processing
+    @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
+        return await process_single_message(
+            msg=msg,
+            batch_coordination_handler=batch_coordination_handler,
+            batch_command_handler=batch_command_handler,
+            service_result_handler=service_result_handler,
+        )
 
     try:
         async for msg in consumer:
@@ -100,27 +113,34 @@ async def run_consumer_loop(
                 break
 
             try:
-                success = await process_single_message(
-                    msg=msg,
-                    batch_coordination_handler=batch_coordination_handler,
-                    batch_command_handler=batch_command_handler,
-                    service_result_handler=service_result_handler,
-                )
+                result = await handle_message_idempotently(msg)
 
-                if success:
-                    # Commit offset only after successful processing (manual commit pattern)
-                    await consumer.commit()
-                    logger.debug(
-                        "Successfully processed and committed message",
-                        extra={
-                            "topic": msg.topic,
-                            "partition": msg.partition,
-                            "offset": msg.offset,
-                        },
-                    )
+                if result is not None:
+                    # Only commit if not a skipped duplicate
+                    if result:
+                        # Commit offset only after successful processing (manual commit pattern)
+                        await consumer.commit()
+                        logger.debug(
+                            "Successfully processed and committed message",
+                            extra={
+                                "topic": msg.topic,
+                                "partition": msg.partition,
+                                "offset": msg.offset,
+                            },
+                        )
+                    else:
+                        logger.warning(
+                            "Failed to process message, not committing offset",
+                            extra={
+                                "topic": msg.topic,
+                                "partition": msg.partition,
+                                "offset": msg.offset,
+                            },
+                        )
                 else:
-                    logger.warning(
-                        "Failed to process message, not committing offset",
+                    # Message was a duplicate and skipped
+                    logger.info(
+                        "Duplicate message skipped, not committing offset",
                         extra={
                             "topic": msg.topic,
                             "partition": msg.partition,
@@ -172,6 +192,7 @@ async def main() -> None:
             batch_coordination_handler = await request_container.get(BatchCoordinationHandler)
             batch_command_handler = await request_container.get(BatchCommandHandler)
             service_result_handler = await request_container.get(ServiceResultHandler)
+            redis_client = await request_container.get(RedisClientProtocol)
 
             logger.info("Dependencies injected successfully")
 
@@ -184,6 +205,7 @@ async def main() -> None:
                 batch_coordination_handler=batch_coordination_handler,
                 batch_command_handler=batch_command_handler,
                 service_result_handler=service_result_handler,
+                redis_client=redis_client,
             )
 
     except KeyboardInterrupt:

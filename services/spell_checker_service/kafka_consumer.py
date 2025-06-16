@@ -13,8 +13,10 @@ from typing import Optional
 import aiohttp
 from aiokafka import AIOKafkaConsumer, TopicPartition
 from aiokafka.errors import KafkaConnectionError
+from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.protocols import RedisClientProtocol
 from prometheus_client import Histogram
 
 from common_core.enums import ProcessingEvent, topic_name
@@ -43,6 +45,7 @@ class SpellCheckerKafkaConsumer:
         event_publisher: SpellcheckEventPublisherProtocol,
         kafka_bus: KafkaBus,
         http_session: aiohttp.ClientSession,
+        redis_client: RedisClientProtocol,
         kafka_queue_latency_metric: Optional[Histogram] = None,
     ) -> None:
         """Initialize with injected dependencies."""
@@ -55,9 +58,27 @@ class SpellCheckerKafkaConsumer:
         self.event_publisher = event_publisher
         self.kafka_bus = kafka_bus
         self.http_session = http_session
+        self.redis_client = redis_client
         self.kafka_queue_latency_metric = kafka_queue_latency_metric
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
+
+        # Create idempotent message processor with 24-hour TTL
+        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+        async def process_message_idempotently(msg: object) -> bool | None:
+            return await process_single_message(
+                msg=msg,
+                http_session=self.http_session,
+                content_client=self.content_client,
+                result_store=self.result_store,
+                event_publisher=self.event_publisher,
+                spell_logic=self.spell_logic,
+                kafka_bus=self.kafka_bus,
+                consumer_group_id=self.consumer_group,
+                kafka_queue_latency_metric=self.kafka_queue_latency_metric,
+            )
+
+        self._process_message_idempotently = process_message_idempotently
 
     async def start_consumer(self) -> None:
         """Start the Kafka consumer and begin processing messages."""
@@ -134,25 +155,28 @@ class SpellCheckerKafkaConsumer:
                             f"from {tp}"
                         )
 
-                        should_commit = await process_single_message(
-                            msg=msg,
-                            http_session=self.http_session,
-                            content_client=self.content_client,
-                            result_store=self.result_store,
-                            event_publisher=self.event_publisher,
-                            spell_logic=self.spell_logic,
-                            kafka_bus=self.kafka_bus,
-                            consumer_group_id=self.consumer_group,
-                            kafka_queue_latency_metric=self.kafka_queue_latency_metric,
-                        )
+                        processing_result = await self._process_message_idempotently(msg)
 
-                        if should_commit:
+                        # Handle three states: True (success),
+                        # False (business failure), None (duplicate)
+                        # Commit offset for all cases to avoid reprocessing
+                        if processing_result is not None:  # True or False - processed message
                             # Store offset for this specific message
                             tp_instance = TopicPartition(msg.topic, msg.partition)
                             offsets = {tp_instance: msg.offset + 1}
                             await self.consumer.commit(offsets)
                             logger.debug(
-                                f"Committed offset {msg.offset + 1} for {tp_instance}"
+                                f"Committed offset {msg.offset + 1} for {tp_instance} "
+                                f"(processing_result: {processing_result})"
+                            )
+                        elif processing_result is None:  # Duplicate - already processed
+                            # Still commit to avoid reprocessing the duplicate
+                            tp_instance = TopicPartition(msg.topic, msg.partition)
+                            offsets = {tp_instance: msg.offset + 1}
+                            await self.consumer.commit(offsets)
+                            logger.debug(
+                                f"Committed offset {msg.offset + 1} for {tp_instance} "
+                                f"(duplicate skipped)"
                             )
                     if self.should_stop:
                         break

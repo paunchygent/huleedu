@@ -36,6 +36,18 @@ from services.batch_orchestrator_service.implementations.els_batch_phase_outcome
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
 
 
+class MockRedisClient:
+    """Minimal Redis client mock for idempotency integration tests."""
+
+    async def set_if_not_exists(
+        self, key: str, value: str, ttl_seconds: int | None = None
+    ) -> bool:  # noqa: D401
+        return True  # Always pretend the key was new (first-time processing)
+
+    async def delete_key(self, key: str) -> int:  # noqa: D401
+        return 1  # Pretend a key was deleted
+
+
 class RealKafkaMessage:
     """Real Kafka message structure for integration testing."""
 
@@ -68,11 +80,13 @@ class TestBosElsPhaseCoordination:
     @pytest.fixture
     def kafka_consumer(self, mock_batch_essays_ready_handler, real_els_outcome_handler):
         """Create real BatchKafkaConsumer with real outcome handler and mocked dependencies."""
+        redis_client = MockRedisClient()
         return BatchKafkaConsumer(
             kafka_bootstrap_servers="localhost:9092",
             consumer_group="test-group",
             batch_essays_ready_handler=mock_batch_essays_ready_handler,
             els_batch_phase_outcome_handler=real_els_outcome_handler,
+            redis_client=redis_client,
         )
 
     async def test_real_bos_els_kafka_integration_with_data_propagation(

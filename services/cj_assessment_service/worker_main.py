@@ -9,7 +9,9 @@ from typing import Any
 
 from aiokafka import AIOKafkaConsumer
 from dishka import make_async_container
+from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from huleedu_service_libs.protocols import RedisClientProtocol
 
 from services.cj_assessment_service.config import settings
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
@@ -37,63 +39,83 @@ async def main() -> None:
     container = make_async_container(CJAssessmentServiceProvider())
 
     try:
-        # Initialize database schema
-        database = await container.get(CJRepositoryProtocol)
-        await database.initialize_db_schema()
-        logger.info("Database schema initialized")
+        async with container() as request_container:
+            # Initialize database schema
+            database = await request_container.get(CJRepositoryProtocol)
+            await database.initialize_db_schema()
+            logger.info("Database schema initialized")
 
-        # Set up Kafka consumer
-        consumer = AIOKafkaConsumer(
-            settings.CJ_ASSESSMENT_REQUEST_TOPIC,
-            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-            group_id=settings.CONSUMER_GROUP_ID_CJ,
-            auto_offset_reset="latest",
-            enable_auto_commit=False,
-        )
+            # Set up Kafka consumer
+            consumer = AIOKafkaConsumer(
+                settings.CJ_ASSESSMENT_REQUEST_TOPIC,
+                bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+                group_id=settings.CONSUMER_GROUP_ID_CJ,
+                auto_offset_reset="latest",
+                enable_auto_commit=False,
+            )
 
-        await consumer.start()
-        logger.info(f"Kafka consumer started for topic: {settings.CJ_ASSESSMENT_REQUEST_TOPIC}")
+            await consumer.start()
+            logger.info(f"Kafka consumer started for topic: {settings.CJ_ASSESSMENT_REQUEST_TOPIC}")
 
-        # Get dependencies from container
-        content_client = await container.get(ContentClientProtocol)
-        event_publisher = await container.get(CJEventPublisherProtocol)
-        llm_interaction = await container.get(LLMInteractionProtocol)
+            # Get dependencies from container
+            content_client = await request_container.get(ContentClientProtocol)
+            event_publisher = await request_container.get(CJEventPublisherProtocol)
+            llm_interaction = await request_container.get(LLMInteractionProtocol)
+            redis_client = await request_container.get(RedisClientProtocol)
 
-        logger.info("CJ Assessment Service worker ready")
+            logger.info("CJ Assessment Service worker ready with idempotency support")
 
-        # Message consumption loop
-        try:
-            async for msg in consumer:
-                if shutdown_event.is_set():
-                    break
+            # Apply idempotency decorator to message processing
+            @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+            async def handle_message_idempotently(msg: Any) -> bool:
+                return await process_single_message(
+                    msg=msg,
+                    database=database,
+                    content_client=content_client,
+                    event_publisher=event_publisher,
+                    llm_interaction=llm_interaction,
+                    settings_obj=settings,
+                )
 
-                try:
-                    success = await process_single_message(
-                        msg=msg,
-                        database=database,
-                        content_client=content_client,
-                        event_publisher=event_publisher,
-                        llm_interaction=llm_interaction,
-                        settings_obj=settings,
-                    )
+            # Message consumption loop with idempotency support
+            try:
+                async for msg in consumer:
+                    if shutdown_event.is_set():
+                        break
 
-                    if success:
-                        await consumer.commit()
-                        logger.debug(f"Message committed: {msg.topic}:{msg.partition}:{msg.offset}")
-                    else:
-                        logger.warning(
-                            f"Message processing failed, not committing: "
-                            f"{msg.topic}:{msg.partition}:{msg.offset}"
-                        )
+                    try:
+                        result = await handle_message_idempotently(msg)
 
-                except Exception as e:
-                    logger.error(f"Error processing message: {e}", exc_info=True)
+                        if result is not None:
+                            # Only commit if not a skipped duplicate
+                            if result:
+                                await consumer.commit()
+                                logger.debug(
+                                    "Message committed: %s:%s:%s",
+                                    msg.topic,
+                                    msg.partition,
+                                    msg.offset,
+                                )
+                            else:
+                                logger.warning(
+                                    f"Message processing failed, not committing: "
+                                    f"{msg.topic}:{msg.partition}:{msg.offset}"
+                                )
+                        else:
+                            # Message was a duplicate and skipped
+                            logger.info(
+                                f"Duplicate message skipped, not committing offset: "
+                                f"{msg.topic}:{msg.partition}:{msg.offset}"
+                            )
 
-        except asyncio.CancelledError:
-            logger.info("Message consumption cancelled")
-        finally:
-            await consumer.stop()
-            logger.info("Kafka consumer stopped")
+                    except Exception as e:
+                        logger.error(f"Error processing message: {e}", exc_info=True)
+
+            except asyncio.CancelledError:
+                logger.info("Message consumption cancelled")
+            finally:
+                await consumer.stop()
+                logger.info("Kafka consumer stopped")
 
     except Exception as e:
         logger.error(f"Worker initialization failed: {e}", exc_info=True)
