@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import enum
 
-# BatchStatusEnum REMOVED - use common_core.enums.BatchStatus instead
+# No BatchStatusEnum - use common_core.enums.BatchStatus instead
 # This eliminates duplication and ensures contract consistency
 
 
