@@ -4,19 +4,23 @@ description: "Testing and QA standards. Follow when writing, maintaining, or rev
 ---
 
 ---
-description: 
-globs: 
+
+description:
+globs:
 alwaysApply: true
 ---
+
 # 070: Testing and Quality Assurance
 
 ## 1. Testing Pyramid
+
 - **Unit Tests**: Individual components in isolation (high coverage)
 - **Contract Tests**: **CRITICAL** - Verify Pydantic contracts between services
 - **Integration Tests**: Limited scope component interactions
 - **E2E Tests**: Major user flows (use sparingly)
 
 ## 2. Core Rules
+
 - **Runner**: `pdm run pytest`
 - **Naming**: `test_*.py` files, `test_*` functions
 - **Isolation**: Tests must be independent
@@ -25,6 +29,7 @@ alwaysApply: true
 ## 3. Testing Patterns
 
 ### 3.1. Dependency Injection
+
 ```python
 async def process_function(
     core_data, external_dependencies,
@@ -32,7 +37,7 @@ async def process_function(
 ) -> bool:
 ```
 
- ### 3.2. Async Context Manager Mocking
+### 3.2. Async Context Manager Mocking
 
 ```python
 @asynccontextmanager
@@ -42,7 +47,7 @@ async def fake_aiokafka_consumer(records: list[bytes]):
 
 ### 3.3. Protocol and DI Testing Patterns
 
- - Override Dishka providers in tests to inject mocks/fakes.
+- Override Dishka providers in tests to inject mocks/fakes.
 - Example override helper:
 
 ```python
@@ -89,16 +94,19 @@ async def mock_http_context_manager(mock_response: AsyncMock) -> Any:
 ```
 
 ## 4. Execution Rules
+
 - **Command**: `pdm run pytest` (always use PDM)
 - **Debug**: `pdm run pytest -s` for print statements
 - **FORBIDDEN**: Simplifying tests to make them pass - fix underlying issues
 
 ## 5. Type Checking Standards
+
 - **FORBIDDEN**: Creating `py.typed` marker files for internal modules
 - **REQUIRED**: Add missing type stubs to `pyproject.toml` MyPy external libraries section
 - **Pattern**: Use `ignore_missing_imports = true` in MyPy overrides for libraries without stubs
 
 ## 5. Anti-Patterns
+
 - **FORBIDDEN**: `try/except pass` blocks hiding model rebuilding failures
 - **FORBIDDEN**: Mocking at wrong abstraction levels
 - **FORBIDDEN**: Using `AsyncMock()` directly for async context managers
@@ -106,5 +114,6 @@ async def mock_http_context_manager(mock_response: AsyncMock) -> Any:
 See [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc) Section 8.2 for Pydantic testing patterns.
 
 ---
+
 **Fix underlying issues, don't simplify tests.**
 ===
