@@ -55,27 +55,3 @@ class BatchRegistrationRequestV1(BaseModel):
                     f"expected_essay_count ({self.expected_essay_count})"
                 )
         return self
-
-
-class BatchStatusResponseV1(BaseModel):
-    """Response model for batch status endpoint.
-
-    This model provides comprehensive status information for all pipeline phases.
-    """
-
-    batch_id: str = Field(..., description="Unique identifier for the batch.")
-    overall_status: str = Field(..., description="Overall batch processing status.")
-
-    # Pipeline phase statuses
-    spellcheck_status: str = Field(..., description="Status of spellcheck pipeline phase.")
-    cj_assessment_status: str = Field(..., description="Status of CJ assessment pipeline phase.")
-
-    # Timestamps
-    created_at: Optional[str] = Field(None, description="Batch creation timestamp.")
-    last_updated_at: Optional[str] = Field(None, description="Last status update timestamp.")
-
-    # Processing details
-    total_essays: int = Field(..., description="Total number of essays in the batch.")
-    pipeline_details: dict = Field(
-        default_factory=dict, description="Detailed pipeline state information."
-    )

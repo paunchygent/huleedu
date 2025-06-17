@@ -18,31 +18,10 @@ from common_core.enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
+from .utils import _infer_language_from_course_code
 
 logger = create_service_logger("bos.cj.initiator")
 
-
-def _infer_language_from_course_code(course_code: str) -> str:
-    """
-    Infer language from course code for pipeline processing.
-
-    Args:
-        course_code: Course code (e.g., "SV1", "ENG5")
-
-    Returns:
-        Language code (e.g., "sv", "en")
-    """
-    # Simple mapping logic - can be enhanced as needed
-    course_code_upper = course_code.upper()
-
-    if course_code_upper.startswith("SV"):
-        return "sv"  # Swedish
-    elif course_code_upper.startswith("ENG"):
-        return "en"  # English
-    else:
-        # Default to English if course code is unrecognized
-        logger.warning(f"Unknown course code '{course_code}', defaulting to English")
-        return "en"
 
 
 class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):

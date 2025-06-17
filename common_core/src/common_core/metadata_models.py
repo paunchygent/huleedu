@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 from .enums import (  # Assuming enums.py is in the same directory
     ContentType,
@@ -16,8 +16,6 @@ __all__ = [
     "EntityReference",
     "SystemProcessingMetadata",
     "StorageReferenceMetadata",
-    "UserActivityMetadata",
-    "CancellationMetadata",
     "EssayProcessingInputRefV1",
 ]
 
@@ -50,21 +48,6 @@ class StorageReferenceMetadata(BaseModel):
         self, ctype: ContentType, storage_id: str, path_hint: Optional[str] = None
     ) -> None:
         self.references[ctype] = {"storage_id": storage_id, "path": path_hint or ""}
-
-
-class UserActivityMetadata(BaseModel):
-    username: str
-    email: Optional[EmailStr] = None
-    event_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    session_id: Optional[str] = None
-    previous_status: Optional[str] = None
-    activity_details: Optional[Dict[str, Any]] = None
-
-
-class CancellationMetadata(BaseModel):
-    cancelled_by: Optional[str] = None
-    reason: Optional[str] = None
-    cancellation_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EssayProcessingInputRefV1(BaseModel):

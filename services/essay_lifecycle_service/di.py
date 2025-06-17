@@ -11,9 +11,6 @@ from prometheus_client import CollectorRegistry
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.config import settings as app_settings
-from services.essay_lifecycle_service.core_logic import (
-    StateTransitionValidator as ConcreteStateTransitionValidator,
-)
 from services.essay_lifecycle_service.implementations.batch_command_handler_impl import (
     DefaultBatchCommandHandler,
 )
@@ -29,7 +26,6 @@ from services.essay_lifecycle_service.implementations.batch_phase_coordinator_im
 from services.essay_lifecycle_service.implementations.cj_assessment_command_handler import (
     CJAssessmentCommandHandler,
 )
-from services.essay_lifecycle_service.implementations.content_client import DefaultContentClient
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
@@ -54,13 +50,11 @@ from services.essay_lifecycle_service.protocols import (
     BatchCoordinationHandler,
     BatchEssayTracker,
     BatchPhaseCoordinator,
-    ContentClient,
     EssayRepositoryProtocol,
     EventPublisher,
     MetricsCollector,
     ServiceResultHandler,
     SpecializedServiceRequestDispatcher,
-    StateTransitionValidator,
 )
 from services.essay_lifecycle_service.state_store import SQLiteEssayStateStore
 
@@ -124,11 +118,6 @@ class CoreInfrastructureProvider(Provider):
             await postgres_repo.initialize_db_schema()
             return postgres_repo
 
-    @provide(scope=Scope.APP)
-    def provide_state_transition_validator(self) -> StateTransitionValidator:
-        """Provide state transition validator implementation."""
-        return ConcreteStateTransitionValidator()
-
 
 class ServiceClientsProvider(Provider):
     """Provider for external service client implementations."""
@@ -139,13 +128,6 @@ class ServiceClientsProvider(Provider):
     ) -> EventPublisher:
         """Provide event publisher implementation."""
         return DefaultEventPublisher(kafka_bus, settings)
-
-    @provide(scope=Scope.APP)
-    def provide_content_client(
-        self, http_session: ClientSession, settings: Settings
-    ) -> ContentClient:
-        """Provide content client implementation."""
-        return DefaultContentClient(http_session, settings)
 
     @provide(scope=Scope.APP)
     def provide_metrics_collector(self, registry: CollectorRegistry) -> MetricsCollector:
@@ -198,12 +180,10 @@ class CommandHandlerProvider(Provider):
         self,
         spellcheck_handler: SpellcheckCommandHandler,
         cj_assessment_handler: CJAssessmentCommandHandler,
-        future_services_handler: FutureServicesCommandHandler,
+        future_handler: FutureServicesCommandHandler,
     ) -> BatchCommandHandler:
-        """Provide batch command handler implementation with injected service handlers."""
-        return DefaultBatchCommandHandler(
-            spellcheck_handler, cj_assessment_handler, future_services_handler
-        )
+        """Provide batch command handler implementation."""
+        return DefaultBatchCommandHandler(spellcheck_handler, cj_assessment_handler, future_handler)
 
 
 class BatchCoordinationProvider(Provider):

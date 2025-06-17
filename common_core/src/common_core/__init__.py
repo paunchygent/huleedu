@@ -51,12 +51,10 @@ from .events.file_events import (
 )
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .metadata_models import (
-    CancellationMetadata,
     EntityReference,
     EssayProcessingInputRefV1,
     StorageReferenceMetadata,
     SystemProcessingMetadata,
-    UserActivityMetadata,
 )
 from .pipeline_models import (
     EssayProcessingCounts,
@@ -80,8 +78,8 @@ __all__ = [
     "EntityReference",
     "SystemProcessingMetadata",
     "StorageReferenceMetadata",
-    "UserActivityMetadata",
-    "CancellationMetadata",
+
+
     "EssayProcessingInputRefV1",
     # Pipeline Models
     "PhaseName",

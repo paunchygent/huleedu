@@ -190,39 +190,42 @@ def test_multi_phase_transitions():
         return False
 
 
-def test_state_transition_validator_integration():
-    """Test StateTransitionValidator integration with state machine."""
-    print("🧪 Testing StateTransitionValidator integration...")
+def test_state_machine_validation_capabilities():
+    """Test EssayStateMachine validation and trigger capabilities."""
+    print("🧪 Testing EssayStateMachine validation capabilities...")
 
     try:
-        from core_logic import StateTransitionValidator
         from essay_state_machine import CMD_INITIATE_SPELLCHECK, EssayStateMachine
 
         from common_core.enums import EssayStatus
 
-        validator = StateTransitionValidator()
-        machine = EssayStateMachine("test-validator", EssayStatus.READY_FOR_PROCESSING)
+        machine = EssayStateMachine("test-validation", EssayStatus.READY_FOR_PROCESSING)
 
-        # Test validation method works with state machine
-        valid = validator.validate_transition(machine, CMD_INITIATE_SPELLCHECK)
-        assert valid, "StateTransitionValidator should validate via state machine"
+        # Test can_trigger method works correctly
+        can_trigger = machine.can_trigger(CMD_INITIATE_SPELLCHECK)
+        assert can_trigger, "EssayStateMachine should allow CMD_INITIATE_SPELLCHECK from READY_FOR_PROCESSING"
 
-        # Test getting possible triggers
-        possible_triggers = validator.get_possible_triggers(machine)
-        assert isinstance(possible_triggers, list)
-        assert len(possible_triggers) > 0
+        # Test getting valid triggers
+        valid_triggers = machine.get_valid_triggers()
+        assert isinstance(valid_triggers, list)
+        assert len(valid_triggers) > 0
+        assert CMD_INITIATE_SPELLCHECK in valid_triggers
 
-        print("✅ StateTransitionValidator integration working correctly")
+        # Test invalid trigger validation
+        invalid_trigger = machine.can_trigger("INVALID_TRIGGER")
+        assert not invalid_trigger, "EssayStateMachine should reject invalid triggers"
+
+        print("✅ EssayStateMachine validation capabilities working correctly")
         return True
 
     except ImportError as e:
-        print(f"❌ Failed to import for validator integration test: {e}")
+        print(f"❌ Failed to import for validation test: {e}")
         return False
     except AssertionError as e:
-        print(f"❌ StateTransitionValidator integration failed: {e}")
+        print(f"❌ EssayStateMachine validation failed: {e}")
         return False
     except Exception as e:
-        print(f"❌ Unexpected error in validator integration test: {e}")
+        print(f"❌ Unexpected error in validation test: {e}")
         return False
 
 
@@ -344,7 +347,7 @@ async def main():
         test_essay_state_machine_creation,
         test_state_machine_triggers,
         test_multi_phase_transitions,
-        test_state_transition_validator_integration,
+        test_state_machine_validation_capabilities,
         test_convenience_methods,
     ]
 

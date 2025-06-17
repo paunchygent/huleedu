@@ -306,46 +306,6 @@ class SpecializedServiceRequestDispatcher(Protocol):
         ...
 
 
-class StateTransitionValidator(Protocol):
-    """Protocol for validating essay state transitions."""
-
-    def validate_transition(self, current_status: EssayStatus, target_status: EssayStatus) -> bool:
-        """Validate if state transition is allowed."""
-        ...
-
-    def get_next_valid_statuses(self, current_status: EssayStatus) -> list[EssayStatus]:
-        """Get list of valid next statuses from current state."""
-        ...
-
-
-class ContentClient(Protocol):
-    """Protocol for interacting with Content Service."""
-
-    async def fetch_content(self, storage_id: str) -> bytes:
-        """Fetch content from storage by ID."""
-        ...
-
-    async def store_content(self, content: bytes, content_type: ContentType) -> str:
-        """Store content and return storage ID."""
-        ...
-
-
-class MetricsCollector(Protocol):
-    """Protocol for collecting service metrics."""
-
-    def record_state_transition(self, from_status: str, to_status: str) -> None:
-        """Record a state transition metric."""
-        ...
-
-    def record_processing_time(self, operation: str, duration_ms: float) -> None:
-        """Record processing time for an operation."""
-        ...
-
-    def increment_counter(self, metric_name: str, labels: dict[str, str] | None = None) -> None:
-        """Increment a counter metric."""
-        ...
-
-
 class BatchEssayTracker(Protocol):
     """Protocol for tracking batch readiness and coordination."""
 
@@ -383,4 +343,20 @@ class BatchEssayTracker(Protocol):
         self, event_data: Any
     ) -> Any | None:  # EssayValidationFailedV1 -> BatchEssaysReady | None
         """Handle validation failure event for batch coordination."""
+        ...
+
+
+class MetricsCollector(Protocol):
+    """Protocol for collecting service metrics."""
+
+    def record_state_transition(self, from_status: str, to_status: str) -> None:
+        """Record a state transition metric."""
+        ...
+
+    def record_processing_time(self, operation: str, duration_ms: float) -> None:
+        """Record processing time for an operation."""
+        ...
+
+    def increment_counter(self, metric_name: str, labels: dict[str, str] | None = None) -> None:
+        """Increment a counter metric."""
         ...

@@ -14,12 +14,14 @@ tests/
 ├── functional/                     # Functional test modules
 │   ├── __init__.py
 │   ├── test_service_health.py      # Health and metrics endpoint testing
-│   ├── test_metrics_endpoints.py   # Prometheus metrics validation
-│   ├── test_end_to_end_workflows.py    # TODO: End-to-end workflow testing
-│   └── test_container_integration.py   # TODO: Docker integration testing
-└── fixtures/                      # Test fixtures and utilities
+│   ├── test_e2e_cj_assessment_workflows.py  # CJ assessment E2E workflows
+│   ├── test_e2e_spellcheck_workflows.py     # Spellcheck E2E workflows
+│   └── ...                         # Other E2E and validation tests
+└── utils/                          # Test utilities and managers
     ├── __init__.py
-    └── docker_services.py         # Docker Compose management fixtures
+    ├── service_test_manager.py
+    ├── kafka_test_manager.py
+    └── redis_test_manager.py
 ```
 
 ## Test Categories
@@ -31,7 +33,7 @@ tests/
 - **Response Times**: Ensures services respond within acceptable time limits
 - **Kafka Service Health**: Special handling for Kafka-based services
 
-### 📊 **Metrics Validation** (`test_metrics_endpoints.py`)
+### 📊 **Metrics Validation** (Integrated)
 
 - **Format Compliance**: Validates Prometheus metrics format requirements
 - **Standard Metrics**: Ensures HTTP services expose standard request metrics  
@@ -179,7 +181,7 @@ async def test_service_functionality(self):
 
 ### **Phase 1** (Immediate)
 
-- [ ] Complete `test_metrics_endpoints.py` implementation
+- [ ] Expand metrics validation coverage
 - [ ] Add container integration tests with DockerComposeManager
 - [ ] Add test data fixtures for common scenarios
 

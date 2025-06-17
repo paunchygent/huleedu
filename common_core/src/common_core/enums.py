@@ -37,13 +37,7 @@ class ProcessingStage(str, Enum):
 
 
 class ProcessingEvent(str, Enum):
-    # -------------  Future Batch configuration events  -------------#
-    BATCH_PIPELINE_REQUESTED = "batch.pipeline.requested"
 
-    # -------------  Future Batch phase observability and audit events   -------------#
-    BATCH_PHASE_INITIATED = "batch.phase.initiated"
-    BATCH_PIPELINE_PROGRESS_UPDATED = "batch.pipeline.progress.updated"
-    BATCH_PHASE_CONCLUDED = "batch.phase.concluded"
 
     # -------------  Batch coordination events  -------------#
     BATCH_ESSAYS_REGISTERED = "batch.essays.registered"

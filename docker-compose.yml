@@ -4,7 +4,6 @@ networks:
 
 volumes:
   huleedu_content_store_data:
-  essay_lifecycle_data:
   batch_orchestrator_db_data:
   essay_lifecycle_db_data:
   cj_assessment_db_data:
@@ -175,7 +174,7 @@ services:
     ports:
       - "8001:8000"
     volumes:
-      - huleedu_content_store_data:/data/huleedu_content_store 
+      - huleedu_content_store_data:/data/huleedu_content_store
     environment:
       - ENV_TYPE=docker
       - CONTENT_STORE_ROOT_PATH=/data/huleedu_content_store
@@ -300,8 +299,7 @@ services:
       - ELS_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - LOG_LEVEL=INFO
       - ESSAY_LIFECYCLE_SERVICE_REDIS_URL=redis://redis:6379
-    volumes:
-      - essay_lifecycle_data:/data/essay_lifecycle
+
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:6000/healthz || exit 1"]
       interval: 15s
@@ -344,8 +342,7 @@ services:
       - ELS_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - LOG_LEVEL=INFO
       - ESSAY_LIFECYCLE_SERVICE_REDIS_URL=redis://redis:6379
-    volumes:
-      - essay_lifecycle_data:/data/essay_lifecycle
+
     # Note: essay_lifecycle_worker is a worker service, no health check needed
 
   file_service:

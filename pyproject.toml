@@ -62,8 +62,11 @@ test-sequential = "pytest -n 0"
 docker-build = "docker compose build"
 docker-up = "docker compose up -d"
 docker-down = "docker compose down"
+docker-down-clean = "docker compose down --remove-orphans"
 docker-logs = "docker compose logs -f --tail=100"
 docker-restart = {composite = ["docker compose down", "docker compose up -d --build"]}
+docker-rebuild = {composite = ["docker compose down --remove-orphans", "docker compose build", "docker compose up -d"]}
+docker-reset = {composite = ["docker compose down --remove-orphans --volumes", "docker compose build", "docker compose up -d"]}
 
 # Individual service development
 dev-content = "pdm run -p services/content_service dev"
