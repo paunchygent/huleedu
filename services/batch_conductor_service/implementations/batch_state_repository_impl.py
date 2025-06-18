@@ -9,6 +9,7 @@ Follows established patterns from ELS state_store.py and BOS postgres repository
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -107,7 +108,9 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             # Cache miss - try PostgreSQL fallback
             if self.postgres_repository:
                 try:
-                    steps = await self.postgres_repository.get_essay_completed_steps(batch_id, essay_id)
+                    steps = await self.postgres_repository.get_essay_completed_steps(
+                        batch_id, essay_id
+                    )
                     # Warm cache for future queries
                     if steps:
                         essay_state["completed_steps"] = steps
@@ -207,31 +210,31 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             return {}
 
     async def _get_json_from_redis(self, key: str) -> dict[str, Any] | None:
-        """Get JSON data from Redis, handling serialization."""
+        """Get JSON data from Redis using string operations."""
         try:
-            # Use Redis GET operation (extending the basic RedisClient interface)
-            # This would require extending RedisClient or using direct redis operations
-            # For now, using the pattern from existing services
-
-            # Note: This assumes we extend RedisClient with JSON operations
-            # or use Redis JSON module if available
-            return None  # Placeholder - would implement actual JSON get
-
+            json_str = await self.redis_client.get(key)
+            if json_str:
+                data = json.loads(json_str)
+                # Ensure we return the correct type
+                return dict(data) if isinstance(data, dict) else None
+            return None
+        except json.JSONDecodeError as e:
+            logger.warning(f"Invalid JSON in Redis key {key}: {e}")
+            return None
         except Exception as e:
             logger.warning(f"Failed to get JSON from Redis key {key}: {e}")
             return None
 
     async def _set_json_with_ttl(self, key: str, data: dict[str, Any], ttl_seconds: int) -> bool:
-        """Set JSON data in Redis with TTL, handling serialization."""
+        """Set JSON data in Redis using string operations with TTL."""
         try:
-            # For now, using a placeholder implementation
-            # This would use Redis SET operation with JSON string and TTL
-            # After converting sets to lists for JSON serialization
-
-            # Note: This would require extending RedisClient with regular SET operations
-            # or using Redis directly for non-idempotency operations
-            return True  # Placeholder - would implement actual JSON set
-
+            # Convert sets to lists for JSON serialization
+            serializable_data = self._make_json_serializable(data)
+            json_str = json.dumps(serializable_data)
+            return await self.redis_client.setex(key, ttl_seconds, json_str)
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"Failed to serialize data for Redis key {key}: {e}", exc_info=True)
+            return False
         except Exception as e:
             logger.error(f"Failed to set JSON in Redis key {key}: {e}", exc_info=True)
             return False

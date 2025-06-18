@@ -2,8 +2,21 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from dishka import FromDishka
-from quart import Blueprint, Response, jsonify, request
+
+# Import protocol at runtime; Dishka resolves type hints using get_type_hints,
+# so the symbol must exist at import time. We also assign it to a dummy var so
+# Ruff treats it as used without ignore comments.
+from services.batch_conductor_service.protocols import DlqProducerProtocol
+
+_DLP_REF: type[DlqProducerProtocol] = DlqProducerProtocol
+
+if TYPE_CHECKING:
+    from services.batch_conductor_service.protocols import DlqProducerProtocol
+from pydantic import ValidationError
+from quart import Blueprint, Response, current_app, jsonify, request
 from quart_dishka import inject
 
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -20,6 +33,7 @@ pipeline_bp = Blueprint("pipeline_routes", __name__)
 @inject
 async def define_pipeline(
     pipeline_service: FromDishka[PipelineResolutionServiceProtocol],
+    dlq_producer: FromDishka[DlqProducerProtocol],
 ) -> tuple[Response, int]:
     """
     Internal endpoint for pipeline dependency resolution.
@@ -43,6 +57,13 @@ async def define_pipeline(
         # Resolve pipeline through service
         response_data = await pipeline_service.resolve_pipeline_request(pipeline_request)
 
+        # Metrics – success (skip if metrics not initialised)
+        metrics_ext = current_app.extensions.get("metrics")
+        if metrics_ext:
+            metrics_ext["pipeline_resolutions"].labels(
+                requested_pipeline=pipeline_request.requested_pipeline, status="success",
+            ).inc()
+
         logger.info(
             "Pipeline resolution completed successfully",
             extra={
@@ -54,7 +75,24 @@ async def define_pipeline(
 
         return jsonify(response_data.model_dump()), 200
 
+    except ValidationError as err:
+        # Bad request – validation error
+        logger.warning("Invalid pipeline request", exc_info=True)
+        return jsonify({"detail": err.errors()}), 400
+
     except ValueError as e:
+        # Dependency error – produce DLQ and mark metric
+        await dlq_producer.publish(
+            envelope=pipeline_request.model_dump(),
+            reason="PipelineValidationError",
+        )
+
+        metrics_ext = current_app.extensions.get("metrics")
+        if metrics_ext:
+            metrics_ext["pipeline_resolutions"].labels(
+                requested_pipeline=pipeline_request.requested_pipeline, status="failure",
+            ).inc()
+
         logger.warning(f"Invalid pipeline resolution request: {e}")
         return jsonify({"error": "Invalid request", "detail": str(e)}), 400
 
@@ -63,5 +101,21 @@ async def define_pipeline(
         return jsonify({"error": "External service unavailable", "detail": str(e)}), 503
 
     except Exception as e:
+        # Push to DLQ for any unexpected errors
+        try:
+            await dlq_producer.publish(
+                envelope=pipeline_request.model_dump() if "pipeline_request" in locals() else {},
+                reason="InternalError",
+            )
+        except Exception as dlq_err:  # pragma: no cover – swallow dlq error to avoid masking original
+            logger.error(f"Failed emitting DLQ for internal error: {dlq_err}")
+
+        metrics_ext = current_app.extensions.get("metrics")
+        if metrics_ext:
+            metrics_ext["pipeline_resolutions"].labels(
+                requested_pipeline=pipeline_request.requested_pipeline if "pipeline_request" in locals() else "unknown",
+                status="error",
+            ).inc()
+
         logger.error(f"Unexpected error during pipeline resolution: {e}", exc_info=True)
         return jsonify({"error": "Internal server error"}), 500

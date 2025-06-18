@@ -28,7 +28,7 @@ class TestPipelineResolutionAPI:
         data = await response.get_json()
         # Response structure validation
         assert data["batch_id"] == "batch_001"
-        assert data["final_pipeline"] == ["ai_feedback"]
+        assert data["final_pipeline"] == ["spellcheck", "nlp", "ai_feedback"]
         assert "analysis_summary" in data
 
     async def test_pipeline_resolution_validation_error(

@@ -187,6 +187,98 @@ services/batch_conductor_service/
 - [x] **Comprehensive testing** — 16/16 tests passing including boundary testing, event processing, API validation, and business logic
 - [x] **Production-ready architecture** — Protocol-based DI, proper error boundaries, structured logging, metrics integration
 
+### 4.2B. Phase 2B: Batch Conductor Service Hardening (Week 2)
+
+**Objective:** Enhance persistence robustness, failure isolation, and observability for BCS prior to external integrations.
+
+**✅ FOUNDATION COMPLETE - Week 1 Day 1-2:**
+
+- [x] **Redis Basic Operations Implementation** — Extended RedisClientProtocol with get/setex operations, implemented working JSON operations in BCS repository, fixed mypy typing issues. All 22 BCS tests and 8 service library tests passing.
+
+**Remaining Work**:
+
+- [ ] Redis atomic state update with `WATCH/MULTI` or Lua script and guaranteed persistence hand-off to Postgres
+- [ ] Kafka DLQ production for pipeline-resolution failures (include original event envelope + `dlq_reason` in `<base_topic>.DLQ`)
+- [ ] Expose Prometheus counter `bcs_pipeline_resolutions_total{status="success"|"failure"}` at `/metrics`
+- [ ] Integration tests covering Redis↔Postgres sync happy-path and DLQ flow using test-containers (Redis, Postgres, Redpanda)
+- [ ] Update README §5 and diagrams (`documentation/diagrams/bcs_sequence.drawio`) to reflect new persistence & DLQ flows
+
+**Status:** ⏳ IN PROGRESS — Foundation completed, atomic operations next.
+
+#### Design Notes (draft)
+
+##### Redis atomic update & Postgres hand-off
+
+- Pattern: Redis `WATCH` → `MULTI`/`EXEC` on `bcs:essay_state:{batch_id}:{essay_id}`.
+- Steps:
+  1. `WATCH essay_key`
+  2. Read JSON, merge new step, ensure `completed_steps` set updated.
+  3. `MULTI`
+     • `SET essay_key <json> EX 604800` (7 days)
+     • `DEL bcs:batch_summary:{batch_id}` (summary invalidation)
+  4. `EXEC` – on failure retry up to 5× with back-off.
+- Persistence: push `(batch_id, essay_id, step_name, metadata)` onto Redis list `bcs:persistence_queue`; background worker dequeues and writes to Postgres.
+- Failure handling: after 3 Postgres retries emit `bcs.persistence.failed` event.
+- Metrics:
+  `bcs_batch_state_persist_total{layer="redis"|"postgres",outcome="success"|"failure"}`
+
+##### Kafka DLQ message schema
+
+Topic: `<base_topic>.DLQ` (e.g., `huleedu.pipelines.resolution.DLQ`)
+
+Value (JSON):
+
+```json
+{
+  "schema_version": 1,
+  "failed_event_envelope": { "...": "full original envelope" },
+  "dlq_reason": "DependencyCycleDetected",
+  "timestamp": "2025-06-18T20:40:00Z",
+  "service": "batch_conductor_service"
+}
+```
+
+Key: same as original event key (usually `batch_id`).
+Producers must record metric `bcs_pipeline_resolution_fail_total`.
+
+#### Phase-2B Work-Package Stubs
+
+### Redis Atomic Update with Postgres Hand-Off ⏳ IN PROGRESS
+
+_Implementation branch: `bcs/redis-atomic-update`*
+
+- [ ] Implement Redis transaction & background worker
+- [ ] Prometheus counters
+- [ ] Unit tests with fakeredis & test-containers Postgres
+
+### Kafka DLQ Production for Resolution Failures ⏳ IN PROGRESS
+
+- [ ] `DlqProducerProtocol` + `KafkaDlqProducerImpl`
+- [ ] Hook into pipeline resolver error path
+- [ ] Counter `bcs_pipeline_resolution_fail_total`
+- [ ] Unit test producing to DLQ
+
+### Expose `bcs_pipeline_resolutions_total` Counter ⏳ IN PROGRESS
+
+- [ ] Register counter in `startup_setup.py`
+- [ ] Increment in resolver success/failure paths
+- [ ] Verify via `/metrics` test
+
+### Integration Tests Redis↔PG & DLQ ⏳ IN PROGRESS
+
+- [ ] Docker-compose test-containers harness
+- [ ] Happy-path persistence sync
+- [ ] Forced failure → DLQ assertion
+- [ ] Metrics verification
+
+### README & Diagram Updates ⏳ IN PROGRESS
+
+- [ ] Expand README §5 observability
+- [ ] Update `bcs_sequence.drawio`
+- [ ] Compress doc section per rule 090 once completed
+
+---
+
 ### 4.3. Phase 3: API Gateway Service (Week 3)
 
 **Service Implementation**:

@@ -126,3 +126,78 @@ class RedisClient:
                 exc_info=True,
             )
             raise
+
+    async def get(self, key: str) -> str | None:
+        """
+        Get string value from Redis.
+
+        Args:
+            key: Redis key to retrieve
+
+        Returns:
+            String value if key exists, None otherwise
+        """
+        if not self._started:
+            logger.warning(f"Redis client '{self.client_id}' not started. Attempting to start.")
+            await self.start()
+            if not self._started:
+                logger.error(
+                    f"Cannot perform operation, Redis client '{self.client_id}' is not running."
+                )
+                raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            value = await self.client.get(key)
+            logger.debug(
+                f"Redis GET by '{self.client_id}': key='{key}' "
+                f"result={'HIT' if value is not None else 'MISS'}"
+            )
+            return str(value) if value is not None else None
+        except RedisTimeoutError:
+            logger.error(f"Timeout on Redis GET operation by '{self.client_id}' for key '{key}'")
+            raise
+        except Exception as e:
+            logger.error(
+                f"Error in Redis GET operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
+        """
+        Set string value with TTL.
+
+        Args:
+            key: Redis key to set
+            ttl_seconds: TTL in seconds
+            value: String value to store
+
+        Returns:
+            True if operation succeeded
+        """
+        if not self._started:
+            logger.warning(f"Redis client '{self.client_id}' not started. Attempting to start.")
+            await self.start()
+            if not self._started:
+                logger.error(
+                    f"Cannot perform operation, Redis client '{self.client_id}' is not running."
+                )
+                raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            result = await self.client.setex(key, ttl_seconds, value)
+            success = bool(result)
+            logger.debug(
+                f"Redis SETEX by '{self.client_id}': key='{key}' "
+                f"ttl={ttl_seconds}s result={'SUCCESS' if success else 'FAILED'}"
+            )
+            return success
+        except RedisTimeoutError:
+            logger.error(f"Timeout on Redis SETEX operation by '{self.client_id}' for key '{key}'")
+            raise
+        except Exception as e:
+            logger.error(
+                f"Error in Redis SETEX operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise

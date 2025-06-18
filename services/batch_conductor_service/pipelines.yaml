@@ -1,10 +1,80 @@
 pipelines:
   ai_feedback:
-    description: "A standard pipeline that provides AI-driven feedback on an essay."
+    description: "Pipeline that runs spellcheck, NLP analysis, then AI-driven feedback on an essay."
     steps:
-      - service_name: "spell_checker_service"
-        event_type: "huleedu.batch.spellcheck.initiate.v1"
+      - name: "spellcheck"
+        service_name: "spell_checker_service"
+        event_type: "huleedu.els.spellcheck.initiate.command.v1"
         event_data_model: "BatchServiceSpellcheckInitiateCommandDataV1"
-      - service_name: "ai_feedback_service"
-        event_type: "huleedu.batch.ai_feedback.initiate.v1"
+        depends_on: []
+      - name: "nlp"
+        service_name: "nlp_service"
+        event_type: "huleedu.batch.nlp.initiate.command.v1"
+        event_data_model: "BatchServiceNLPInitiateCommandDataV1"
+        depends_on:
+          - "spellcheck"
+      - name: "ai_feedback"
+        service_name: "ai_feedback_service"
+        event_type: "huleedu.batch.ai_feedback.initiate.command.v1"
         event_data_model: "BatchServiceAIFeedbackInitiateCommandDataV1"
+        depends_on:
+          - "spellcheck"
+          - "nlp"
+
+  cj_assessment:
+    description: "Pipeline that performs CJ Comparative Judgment assessment after spellchecking."
+    steps:
+      - name: "spellcheck"
+        service_name: "spell_checker_service"
+        event_type: "huleedu.els.spellcheck.initiate.command.v1"
+        event_data_model: "BatchServiceSpellcheckInitiateCommandDataV1"
+        depends_on: []
+      - name: "cj_assessment"
+        service_name: "cj_assessment_service"
+        event_type: "huleedu.batch.cj_assessment.initiate.command.v1"
+        event_data_model: "BatchServiceCJAssessmentInitiateCommandDataV1"
+        depends_on:
+          - "spellcheck"
+
+  nlp:
+    description: "Pipeline that executes NLP analysis after spellchecking."
+    steps:
+      - name: "spellcheck"
+        service_name: "spell_checker_service"
+        event_type: "huleedu.els.spellcheck.initiate.command.v1"
+        event_data_model: "BatchServiceSpellcheckInitiateCommandDataV1"
+        depends_on: []
+      - name: "nlp"
+        service_name: "nlp_service"
+        event_type: "huleedu.batch.nlp.initiate.command.v1"
+        event_data_model: "BatchServiceNLPInitiateCommandDataV1"
+        depends_on:
+          - "spellcheck"
+
+  comprehensive:
+    description: "Comprehensive pipeline covering spellcheck, NLP analysis, AI feedback, and CJ assessment."
+    steps:
+      - name: "spellcheck"
+        service_name: "spell_checker_service"
+        event_type: "huleedu.els.spellcheck.initiate.command.v1"
+        event_data_model: "BatchServiceSpellcheckInitiateCommandDataV1"
+        depends_on: []
+      - name: "cj_assessment"
+        service_name: "cj_assessment_service"
+        event_type: "huleedu.batch.cj_assessment.initiate.command.v1"
+        event_data_model: "BatchServiceCJAssessmentInitiateCommandDataV1"
+        depends_on:
+          - "spellcheck"
+      - name: "nlp"
+        service_name: "nlp_service"
+        event_type: "huleedu.batch.nlp.initiate.command.v1"
+        event_data_model: "BatchServiceNLPInitiateCommandDataV1"
+        depends_on:
+          - "spellcheck"
+      - name: "ai_feedback"
+        service_name: "ai_feedback_service"
+        event_type: "huleedu.batch.ai_feedback.initiate.command.v1"
+        event_data_model: "BatchServiceAIFeedbackInitiateCommandDataV1"
+        depends_on:
+          - "spellcheck"
+          - "nlp"

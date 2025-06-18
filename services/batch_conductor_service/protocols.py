@@ -204,6 +204,21 @@ class PipelineGeneratorProtocol(Protocol):
         ...
 
 
+
+
+class DlqProducerProtocol(Protocol):
+    """Protocol for producing messages to a dedicated dead-letter topic."""
+
+    async def publish(self, envelope: dict, reason: str) -> None:
+        """Publish *envelope* to the DLQ together with *reason* string.
+
+        Args:
+            envelope: Original event envelope (already json-serialisable)
+            reason: Short machine-readable failure reason (e.g. "DependencyCycleDetected")
+        """
+        ...
+
+
 class PipelineResolutionServiceProtocol(Protocol):
     """
     Protocol for the main pipeline resolution service.

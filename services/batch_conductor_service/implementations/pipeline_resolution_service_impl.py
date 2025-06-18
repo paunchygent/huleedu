@@ -7,6 +7,7 @@ from services.batch_conductor_service.api_models import (
     BCSPipelineDefinitionResponseV1,
 )
 from services.batch_conductor_service.protocols import (
+    DlqProducerProtocol,
     PipelineGeneratorProtocol,
     PipelineRulesProtocol,
 )
@@ -19,9 +20,11 @@ class DefaultPipelineResolutionService:
         self,
         pipeline_rules: PipelineRulesProtocol,
         pipeline_generator: PipelineGeneratorProtocol,
+        dlq_producer: DlqProducerProtocol,
     ):
         self.pipeline_rules = pipeline_rules
         self.pipeline_generator = pipeline_generator
+        self.dlq_producer = dlq_producer
 
     async def resolve_pipeline_request(
         self, request: BCSPipelineDefinitionRequestV1

@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from aiohttp import ClientSession, ClientTimeout
+
+# DlqProducerProtocol must be importable at runtime for Dishka type analysis
+from services.batch_conductor_service.protocols import DlqProducerProtocol
+_DLP_RT: type[DlqProducerProtocol] = DlqProducerProtocol
+
+if TYPE_CHECKING:
+    from services.batch_conductor_service.protocols import DlqProducerProtocol
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry
 
@@ -63,6 +72,24 @@ class EventDrivenServicesProvider(Provider):
         return RedisCachedBatchStateRepositoryImpl(redis_client=redis_client)
 
     @provide(scope=Scope.APP)
+    def provide_dlq_producer(self, settings: Settings) -> "DlqProducerProtocol":
+        """Provide Kafka DLQ producer implementation."""
+                # Use in-memory no-op producer for local/test to avoid Kafka requirement
+        if settings.ENV_TYPE not in {"docker", "production"}:
+            class _NoOpDlqProducer:
+                async def publish(self, envelope: dict, reason: str) -> None:
+                    pass
+            return _NoOpDlqProducer()
+
+        from services.batch_conductor_service.implementations.kafka_dlq_producer_impl import (
+            KafkaDlqProducerImpl,
+        )
+
+        return KafkaDlqProducerImpl(
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            base_topic="huleedu.pipelines.resolution",
+        )
+
     def provide_kafka_consumer(
         self,
         batch_state_repository: BatchStateRepositoryProtocol,
@@ -110,10 +137,11 @@ class PipelineServicesProvider(Provider):
         self,
         pipeline_rules: PipelineRulesProtocol,
         pipeline_generator: PipelineGeneratorProtocol,
+        dlq_producer: "DlqProducerProtocol",
     ) -> PipelineResolutionServiceProtocol:
         """Provide pipeline resolution service implementation."""
         from services.batch_conductor_service.implementations.pipeline_resolution_service_impl import (
             DefaultPipelineResolutionService,
         )
 
-        return DefaultPipelineResolutionService(pipeline_rules, pipeline_generator)
+        return DefaultPipelineResolutionService(pipeline_rules, pipeline_generator, dlq_producer)
