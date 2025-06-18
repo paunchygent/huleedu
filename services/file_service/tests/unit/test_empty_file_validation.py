@@ -136,9 +136,7 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     text_extractor.extract_text.assert_called_once_with(file_content, file_name)
 
     # Assert - Raw storage was called (NEW BEHAVIOR - happens before extraction)
-    content_client.store_content.assert_called_once_with(
-        file_content, ContentType.RAW_UPLOAD_BLOB
-    )
+    content_client.store_content.assert_called_once_with(file_content, ContentType.RAW_UPLOAD_BLOB)
 
     # Assert - Content validation was NOT called (extraction failed)
     content_validator.validate_content.assert_not_called()

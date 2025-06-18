@@ -69,9 +69,9 @@ def create_sample_spellcheck_event() -> dict:
                 "entity": {"entity_id": essay_id, "entity_type": "essay"},
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "processing_stage": "pending",
-                "event": "essay.spellcheck.requested"
-            }
-        }
+                "event": "essay.spellcheck.requested",
+            },
+        },
     }
 
 
@@ -126,7 +126,7 @@ def mock_dependencies() -> tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, Asy
 
 @pytest.mark.asyncio
 async def test_kafka_consumer_with_idempotency_first_time_processing(
-    mock_dependencies: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock, MagicMock]
+    mock_dependencies: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock, MagicMock],
 ) -> None:
     """Test SpellCheckerKafkaConsumer processes first-time events with idempotency."""
     (
@@ -173,7 +173,7 @@ async def test_kafka_consumer_with_idempotency_first_time_processing(
 
 @pytest.mark.asyncio
 async def test_kafka_consumer_with_idempotency_duplicate_detection(
-    mock_dependencies: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock, MagicMock]
+    mock_dependencies: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock, MagicMock],
 ) -> None:
     """Test SpellCheckerKafkaConsumer skips duplicate events."""
     (
@@ -224,7 +224,7 @@ async def test_kafka_consumer_with_idempotency_duplicate_detection(
 
 @pytest.mark.asyncio
 async def test_kafka_consumer_di_integration(
-    mock_dependencies: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock, MagicMock]
+    mock_dependencies: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock, MagicMock],
 ) -> None:
     """Test that SpellCheckerKafkaConsumer correctly integrates with DI system."""
     (
@@ -262,13 +262,13 @@ async def test_kafka_consumer_di_integration(
     assert consumer.redis_client is redis_client
 
     # Verify idempotent decorator was created
-    assert hasattr(consumer, '_process_message_idempotently')
+    assert hasattr(consumer, "_process_message_idempotently")
     assert callable(consumer._process_message_idempotently)
 
 
 @pytest.mark.asyncio
 async def test_kafka_consumer_business_failure_handling(
-    mock_dependencies: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock, MagicMock]
+    mock_dependencies: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock, MagicMock],
 ) -> None:
     """Test SpellCheckerKafkaConsumer handles business failures correctly with idempotency."""
     (

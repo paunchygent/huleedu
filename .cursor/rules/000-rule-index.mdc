@@ -22,6 +22,7 @@ alwaysApply: false
 ## Implementation & Coding Standards
 - [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc): High-level service implementation principles and stack requirements
 - [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc): HTTP service architecture patterns and Blueprint implementation
+- [041-fastapi-integration-patterns.md](mdc:041-fastapi-integration-patterns.md): FastAPI integration patterns for client-facing services with React frontend support
 - [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc): Async patterns, protocols, dependency injection, and worker service structure
 - [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc): Configuration management and logging standards
 - [044-service-debugging-and-troubleshooting.md](mdc:044-service-debugging-and-troubleshooting.md): CRITICAL debugging priority: service configuration over import patterns

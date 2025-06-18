@@ -115,4 +115,3 @@ async def get_batch_status(
     except Exception as e:
         current_app.logger.error(f"Error getting batch status for {batch_id}: {e}")
         return jsonify({"error": "Failed to get batch status"}), 500
-

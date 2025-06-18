@@ -21,6 +21,7 @@ from common_core.enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
+
 from .utils import _infer_language_from_course_code
 
 logger = create_service_logger("bos.ai_feedback.initiator")

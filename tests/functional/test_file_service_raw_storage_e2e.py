@@ -32,7 +32,7 @@ async def test_file_service_events_contain_raw_storage_id():
     kafka_manager = KafkaTestManager()
     topics = [
         "huleedu.file.essay.content.provisioned.v1",
-        "huleedu.file.essay.validation.failed.v1"
+        "huleedu.file.essay.validation.failed.v1",
     ]
 
     # Step 1: Validate File Service is healthy
@@ -52,17 +52,10 @@ async def test_file_service_events_contain_raw_storage_id():
         test_file_content = "This is a valid test essay content."
 
         # Prepare files for upload using ServiceTestManager format
-        files = [
-            {
-                "name": "test_essay.txt",
-                "content": test_file_content.encode()
-            }
-        ]
+        files = [{"name": "test_essay.txt", "content": test_file_content.encode()}]
 
         response = await service_manager.upload_files(
-            batch_id=batch_id,
-            files=files,
-            correlation_id=correlation_id
+            batch_id=batch_id, files=files, correlation_id=correlation_id
         )
 
         print(f"✅ File uploaded successfully for batch: {batch_id}")
@@ -153,17 +146,10 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
         empty_file_content = ""  # This should trigger validation failure
 
         # Prepare empty file for upload
-        files = [
-            {
-                "name": "empty_essay.txt",
-                "content": empty_file_content.encode()
-            }
-        ]
+        files = [{"name": "empty_essay.txt", "content": empty_file_content.encode()}]
 
         response = await service_manager.upload_files(
-            batch_id=batch_id,
-            files=files,
-            correlation_id=correlation_id
+            batch_id=batch_id, files=files, correlation_id=correlation_id
         )
 
         print(f"✅ Empty file uploaded for batch: {batch_id}")
@@ -179,9 +165,10 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
                 event_data = message_value.get("data", {})
 
                 # Check if this is our validation failure event
-                if (event_data.get("batch_id") == batch_id and
-                    event_data.get("original_file_name") == "empty_essay.txt"):
-
+                if (
+                    event_data.get("batch_id") == batch_id
+                    and event_data.get("original_file_name") == "empty_essay.txt"
+                ):
                     print(f"📨 Received validation failure event for batch {batch_id}")
 
                     # Validate event contains raw_file_storage_id

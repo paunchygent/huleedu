@@ -48,10 +48,7 @@ class TestE2EFileWorkflows:
 
         # Prepare file data for ServiceTestManager
         with open(test_file_path, "rb") as f:
-            files = [{
-                "name": test_file_path.name,
-                "content": f.read()
-            }]
+            files = [{"name": test_file_path.name, "content": f.read()}]
 
         # Upload using ServiceTestManager utility (not direct HTTP)
         try:
@@ -104,10 +101,7 @@ class TestE2EFileWorkflows:
         files: List[Dict[str, Any]] = []
         for test_file in test_file_paths:
             with open(test_file, "rb") as f:
-                files.append({
-                    "name": test_file.name,
-                    "content": f.read()
-                })
+                files.append({"name": test_file.name, "content": f.read()})
 
         # Upload using ServiceTestManager utility
         try:
@@ -157,10 +151,7 @@ class TestE2EFileWorkflows:
 
         # Test 2: Invalid batch_id format (if service validates)
         with open(test_file_path, "rb") as f:
-            files = [{
-                "name": test_file_path.name,
-                "content": f.read()
-            }]
+            files = [{"name": test_file_path.name, "content": f.read()}]
 
         # The important thing is ServiceTestManager propagates service errors
         try:
@@ -197,9 +188,7 @@ class TestE2EFileWorkflows:
         # Step 1: Create batch using ServiceTestManager utility
         try:
             batch_id, correlation_id = await service_manager.create_batch(
-                expected_essay_count=1,
-                course_code="E2E",
-                class_designation="CompleteWorkflow"
+                expected_essay_count=1, course_code="E2E", class_designation="CompleteWorkflow"
             )
 
             print(f"✅ Batch created: {batch_id}")
@@ -210,15 +199,10 @@ class TestE2EFileWorkflows:
 
         # Step 2: Upload files to created batch using ServiceTestManager utility
         with open(test_file_path, "rb") as f:
-            files = [{
-                "name": test_file_path.name,
-                "content": f.read()
-            }]
+            files = [{"name": test_file_path.name, "content": f.read()}]
 
         try:
-            upload_result = await service_manager.upload_files(
-                batch_id, files, correlation_id
-            )
+            upload_result = await service_manager.upload_files(batch_id, files, correlation_id)
 
             # Validate workflow integration
             assert upload_result["batch_id"] == batch_id

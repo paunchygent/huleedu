@@ -24,8 +24,7 @@ class DefaultContentServiceClient(ContentServiceClientProtocol):
         try:
             # Content Service expects raw bytes data in request body
             async with self.http_session.post(
-                self.settings.CONTENT_SERVICE_URL,
-                data=content_bytes
+                self.settings.CONTENT_SERVICE_URL, data=content_bytes
             ) as response:
                 if response.status == 201:
                     result = await response.json()

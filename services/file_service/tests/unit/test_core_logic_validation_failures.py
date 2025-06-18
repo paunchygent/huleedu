@@ -232,7 +232,7 @@ class TestCoreLogicValidationFailures:
         mock_content_validator.validate_content.return_value = ValidationResult(
             is_valid=False,
             error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
-            error_message="Content too short"
+            error_message="Content too short",
         )
 
         # Act

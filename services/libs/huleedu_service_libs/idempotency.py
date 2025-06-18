@@ -20,8 +20,8 @@ from .protocols import RedisClientProtocol
 logger = create_service_logger("idempotency-decorator")
 
 # Type variable for the handler function
-P = TypeVar('P')
-T = TypeVar('T')
+P = TypeVar("P")
+T = TypeVar("T")
 
 
 def idempotent_consumer(
@@ -50,13 +50,9 @@ def idempotent_consumer(
         ```
     """
 
-    def decorator(
-        func: Callable[..., Awaitable[Any]]
-    ) -> Callable[..., Awaitable[Optional[Any]]]:
+    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Optional[Any]]]:
         @functools.wraps(func)
-        async def wrapper(
-            msg: ConsumerRecord, *args: Any, **kwargs: Any
-        ) -> Optional[Any]:
+        async def wrapper(msg: ConsumerRecord, *args: Any, **kwargs: Any) -> Optional[Any]:
             # Generate deterministic ID from message content
             deterministic_id = generate_deterministic_event_id(msg.value)
             key = f"huleedu:events:seen:{deterministic_id}"
@@ -72,8 +68,7 @@ def idempotent_consumer(
 
                 if not is_first_time:
                     logger.warning(
-                        f"Duplicate event skipped: {deterministic_id} "
-                        f"(Redis key: {key})"
+                        f"Duplicate event skipped: {deterministic_id} (Redis key: {key})"
                     )
                     return None  # Signal to caller that this was a duplicate
 

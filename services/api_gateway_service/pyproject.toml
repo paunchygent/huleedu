@@ -1,0 +1,75 @@
+[project]
+name = "huleedu-api-gateway-service"
+version = "1.0.0"
+description = "HuleEdu API Gateway Service - Client-facing API for React frontend"
+authors = [
+    { name = "HuleEdu Team", email = "dev@huleedu.com" }
+]
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "dishka>=1.3.0",
+    "dishka[fastapi]>=1.3.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "huleedu-common-core",
+    "huleedu-service-libs",
+    "prometheus-client>=0.19.0",
+    "slowapi>=0.1.8",  # Rate limiting
+]
+readme = "README.md"
+requires-python = ">=3.11"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "httpx>=0.24.0",
+    "respx>=0.20.0",
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.scripts]
+start = "uvicorn services.api_gateway_service.main:app --host 0.0.0.0 --port 4001"
+dev = "uvicorn services.api_gateway_service.main:app --host 0.0.0.0 --port 4001 --reload"
+test = "pytest services/api_gateway_service/tests/ -v"
+lint = "ruff check services/api_gateway_service/ --fix"
+format = "ruff format services/api_gateway_service/"
+typecheck = "mypy services/api_gateway_service/"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "ICN", "PIE", "T20", "Q"]
+ignore = ["E501"]  # Line too long (handled by formatter)
+
+[tool.ruff.lint.isort]
+known-first-party = ["services", "common_core", "huleedu_service_libs"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["uvicorn.*", "slowapi.*", "respx.*"]
+ignore_missing_imports = true 

@@ -75,9 +75,7 @@ async def test_all_essays_pass_validation():
                             raw_message = raw_message.decode("utf-8")
 
                         event_data = (
-                            json.loads(raw_message)
-                            if isinstance(raw_message, str)
-                            else raw_message
+                            json.loads(raw_message) if isinstance(raw_message, str) else raw_message
                         )
                         topic = message.topic
 

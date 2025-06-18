@@ -39,9 +39,7 @@ from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsume
 class MockRedisClient:
     """Minimal Redis client mock for idempotency integration tests."""
 
-    async def set_if_not_exists(
-        self, key: str, value: str, ttl_seconds: int | None = None
-    ) -> bool:  # noqa: D401
+    async def set_if_not_exists(self, key: str, value: str, ttl_seconds: int | None = None) -> bool:  # noqa: D401
         return True  # Always pretend the key was new (first-time processing)
 
     async def delete_key(self, key: str) -> int:  # noqa: D401

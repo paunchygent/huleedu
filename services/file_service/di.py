@@ -40,7 +40,7 @@ class CoreInfrastructureProvider(Provider):
         """Provide Kafka bus for event publishing."""
         kafka_bus = KafkaBus(
             client_id=f"{settings.SERVICE_NAME}-producer",
-            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         )
         await kafka_bus.start()
         return kafka_bus

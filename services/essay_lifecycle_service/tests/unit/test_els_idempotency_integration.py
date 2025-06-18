@@ -91,15 +91,12 @@ def sample_batch_registered_event() -> dict:
             "expected_essay_count": 3,
             "essay_ids": ["essay-1", "essay-2", "essay-3"],
             "metadata": {
-                "entity": {
-                    "entity_id": "test-batch-001",
-                    "entity_type": "batch"
-                },
+                "entity": {"entity_id": "test-batch-001", "entity_type": "batch"},
                 "timestamp": datetime.now(UTC).isoformat(),
                 "processing_stage": "pending",
-                "event": "batch.essays.registered"
-            }
-        }
+                "event": "batch.essays.registered",
+            },
+        },
     }
 
 
@@ -120,8 +117,7 @@ def mock_handlers() -> tuple[AsyncMock, AsyncMock, AsyncMock]:
 
 @pytest.mark.asyncio
 async def test_first_time_event_processing_success(
-    sample_batch_registered_event: dict,
-    mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
+    sample_batch_registered_event: dict, mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
 ) -> None:
     """Test that first-time events are processed successfully with idempotency."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -162,8 +158,7 @@ async def test_first_time_event_processing_success(
 
 @pytest.mark.asyncio
 async def test_duplicate_event_skipped(
-    sample_batch_registered_event: dict,
-    mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
+    sample_batch_registered_event: dict, mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
 ) -> None:
     """Test that duplicate events are skipped without processing business logic."""
     from common_core.events.utils import generate_deterministic_event_id
@@ -203,8 +198,7 @@ async def test_duplicate_event_skipped(
 
 @pytest.mark.asyncio
 async def test_processing_failure_keeps_lock(
-    sample_batch_registered_event: dict,
-    mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
+    sample_batch_registered_event: dict, mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
 ) -> None:
     """Test that business logic failures keep the idempotency lock (no retry)."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -213,7 +207,9 @@ async def test_processing_failure_keeps_lock(
     batch_coordination_handler, batch_command_handler, service_result_handler = mock_handlers
 
     # Configure business logic to fail
-    batch_coordination_handler.handle_batch_essays_registered.side_effect = Exception("Processing failed")
+    batch_coordination_handler.handle_batch_essays_registered.side_effect = Exception(
+        "Processing failed"
+    )
 
     # Create Kafka message
     kafka_msg = create_mock_kafka_message(sample_batch_registered_event)
@@ -269,8 +265,7 @@ async def test_exception_failure_releases_lock(
 
 @pytest.mark.asyncio
 async def test_redis_failure_fallback(
-    sample_batch_registered_event: dict,
-    mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
+    sample_batch_registered_event: dict, mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
 ) -> None:
     """Test that Redis failures fall back to processing without idempotency."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -306,7 +301,7 @@ async def test_redis_failure_fallback(
 
 @pytest.mark.asyncio
 async def test_deterministic_event_id_generation(
-    mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
+    mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock],
 ) -> None:
     """Test that identical message content generates identical Redis keys."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -327,15 +322,12 @@ async def test_deterministic_event_id_generation(
             "expected_essay_count": 2,
             "essay_ids": ["essay-1", "essay-2"],
             "metadata": {
-                "entity": {
-                    "entity_id": "same-batch-123",
-                    "entity_type": "batch"
-                },
+                "entity": {"entity_id": "same-batch-123", "entity_type": "batch"},
                 "timestamp": datetime.now(UTC).isoformat(),
                 "processing_stage": "pending",
-                "event": "batch.essays.registered"
-            }
-        }
+                "event": "batch.essays.registered",
+            },
+        },
     }
 
     # Create two messages with identical data content

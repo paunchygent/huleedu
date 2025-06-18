@@ -1,0 +1,10 @@
+pipelines:
+  ai_feedback:
+    description: "A standard pipeline that provides AI-driven feedback on an essay."
+    steps:
+      - service_name: "spell_checker_service"
+        event_type: "huleedu.batch.spellcheck.initiate.v1"
+        event_data_model: "BatchServiceSpellcheckInitiateCommandDataV1"
+      - service_name: "ai_feedback_service"
+        event_type: "huleedu.batch.ai_feedback.initiate.v1"
+        event_data_model: "BatchServiceAIFeedbackInitiateCommandDataV1"

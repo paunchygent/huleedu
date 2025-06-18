@@ -56,7 +56,7 @@ async def create_validation_batch(
     batch_id, correlation_id = await service_manager.create_batch(
         expected_essay_count=essay_count,
         course_code=course_code,
-        class_designation=class_designation
+        class_designation=class_designation,
     )
 
     logger.info(f"Created validation test batch {batch_id} with {essay_count} expected essays")
@@ -126,9 +126,7 @@ def create_validation_kafka_manager() -> KafkaTestManager:
     """
     # Create Kafka configuration with validation coordination topics
     kafka_config = create_kafka_test_config(
-        bootstrap_servers="localhost:9093",
-        topics=TOPICS,
-        assignment_timeout=15
+        bootstrap_servers="localhost:9093", topics=TOPICS, assignment_timeout=15
     )
 
     return KafkaTestManager(kafka_config)

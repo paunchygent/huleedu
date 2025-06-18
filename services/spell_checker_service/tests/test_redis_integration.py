@@ -42,10 +42,7 @@ async def test_redis_client_di_injection(test_settings: Settings) -> None:
 async def test_redis_client_lifecycle() -> None:
     """Test Redis client lifecycle management."""
     # Create client directly for testing
-    redis_client = RedisClient(
-        client_id="spell-test-client",
-        redis_url="redis://localhost:6379"
-    )
+    redis_client = RedisClient(client_id="spell-test-client", redis_url="redis://localhost:6379")
 
     # Test lifecycle
     assert not redis_client._started
@@ -76,14 +73,11 @@ async def test_redis_client_lifecycle() -> None:
 @pytest.mark.asyncio
 async def test_redis_protocol_compliance() -> None:
     """Test that RedisClient implements the RedisClientProtocol correctly."""
-    redis_client = RedisClient(
-        client_id="spell-protocol-test",
-        redis_url="redis://localhost:6379"
-    )
+    redis_client = RedisClient(client_id="spell-protocol-test", redis_url="redis://localhost:6379")
 
     # Verify protocol compliance
-    assert hasattr(redis_client, 'set_if_not_exists')
-    assert hasattr(redis_client, 'delete_key')
+    assert hasattr(redis_client, "set_if_not_exists")
+    assert hasattr(redis_client, "delete_key")
     assert callable(redis_client.set_if_not_exists)
     assert callable(redis_client.delete_key)
 
@@ -91,10 +85,7 @@ async def test_redis_protocol_compliance() -> None:
 @pytest.mark.asyncio
 async def test_redis_idempotency_pattern() -> None:
     """Test Redis SETNX operation for idempotency patterns."""
-    redis_client = RedisClient(
-        client_id="idempotency-test",
-        redis_url="redis://localhost:6379"
-    )
+    redis_client = RedisClient(client_id="idempotency-test", redis_url="redis://localhost:6379")
 
     # This test validates the interface even if Redis isn't running
     try:

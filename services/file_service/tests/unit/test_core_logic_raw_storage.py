@@ -104,9 +104,7 @@ async def test_extraction_failure_includes_raw_storage_id() -> None:
     )
 
     # Assert - Raw storage happened first
-    content_client.store_content.assert_called_once_with(
-        file_content, ContentType.RAW_UPLOAD_BLOB
-    )
+    content_client.store_content.assert_called_once_with(file_content, ContentType.RAW_UPLOAD_BLOB)
 
     # Validation failure event published with raw_file_storage_id
     event_publisher.publish_essay_validation_failed.assert_called_once()
@@ -140,9 +138,7 @@ async def test_validation_failure_includes_raw_storage_id() -> None:
     content_client.store_content.return_value = "raw_storage_id_123"
     text_extractor.extract_text.return_value = ""  # Empty content
     content_validator.validate_content.return_value = ValidationResult(
-        is_valid=False,
-        error_code="CONTENT_TOO_SHORT",
-        error_message="Content is too short"
+        is_valid=False, error_code="CONTENT_TOO_SHORT", error_message="Content is too short"
     )
 
     # Act
@@ -158,9 +154,7 @@ async def test_validation_failure_includes_raw_storage_id() -> None:
     )
 
     # Assert - Raw storage happened first
-    content_client.store_content.assert_called_once_with(
-        file_content, ContentType.RAW_UPLOAD_BLOB
-    )
+    content_client.store_content.assert_called_once_with(file_content, ContentType.RAW_UPLOAD_BLOB)
 
     # Validation failure event published with raw_file_storage_id
     event_publisher.publish_essay_validation_failed.assert_called_once()

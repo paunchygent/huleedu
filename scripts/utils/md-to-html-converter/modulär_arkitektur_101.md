@@ -4,9 +4,11 @@ Hej Camilla och Anders,
 
 Kul att ni är igång igen. Bra löst med tid och utrymme. Jag hoppas att ni får ett tydligt mandat att driva vad ni tror är bäst för verksamheten. Att ni så uppenbart har tagit strid för skolans särställning och plats i den kommunala förvaltningen hedrar er. Innan jag går på sommarferie och helhjärtat kan ägna mig åt de projekt som under vårterminen har tvingat mig till en helt ohållbart usel mängd sömn vill jag som en gentjänst ta tillfället i akt att dela med mig av mina erfarenheter från ett drygt halvårs vedermödor.
 
-Jag har, som ni kanske har förstått, under en längre tid försökt hitta ett sätt att i kod knacka fram lösningar på problem som jag tidigare har avfärdat som omöjliga att lösa för en enkel kommunal knegare. I huvudsak är problemet att hitta ett sätt att utan expertkunskaper bygga och underhålla robusta och skalbara backendlösningar för webbaserade appar. Tack vare det arbetet har jag också fått förmånen att misslyckas tillräckligt många gånger och på tillräckligt många sätt för att anse mig ha identifierat i alla fall utkastet till en modell som faktiskt fungerar i praktiken (end-to-end test av hela kedjan från uppladdning till flerledad bearbetning och tillbaka igen fungerar). Huvudtanken bakom bygger på att utgå från *vad* man vill åstadkomma, inte *hur* det ska åstadkommas, och låta verkliga användarbehov styra val av teknik. I nästa avsnitt följer ett koncentrerat planeringsunderlag som sammanfattar problemen jag tror ni vill lösa, den arkitektur jag tror ni vill använda och varför den passar kommunens behov. Innan vi hoppar till väsentligheterna vill jag dock delge ytterligare några av de insikter som arbetet har bibringat mig.
+Jag har, som ni kanske har förstått, under en längre tid försökt hitta ett sätt att i kod knacka fram lösningar på problem som jag tidigare har avfärdat som omöjliga att lösa för en enkel kommunal knegare. I huvudsak är problemet att hitta ett sätt att utan expertkunskaper bygga och underhålla robusta och skalbara backendlösningar för webbaserade appar. Tack vare det arbetet har jag också fått förmånen att misslyckas tillräckligt många gånger och på tillräckligt många sätt för att anse mig ha identifierat i alla fall utkastet till en modell som faktiskt fungerar i praktiken (end-to-end test av hela kedjan från uppladdning till flerledad bearbetning och tillbaka igen fungerar). 
 
-Den kanske viktigaste av mina insikter rör dagen kommunala infrastruktur och dess brist på anpassning till skolans behov och verklighet. I arkitekturen jag snart ska försöka beskriva ryms därför ett tydligt om än implicit SKA-krav: att den ska hålla allt vad kommunala IT-avdelningar heter så långt från alla projekt som det bara går. Det är förstås bara min intuition som talar, men om det är något jag anser mig ha insett är det att några kommunala IT-nissar aldrig kommer att få röra något jag har snickrat ihop. De saknar nämligen helt förståelse för utbildningssektorns unika behov. Samma sekund som de träder in drar de därför ofelaktigen med sig ett tankesätt där det är IT:s behov och logik som ska styra snarare än de verksamheter som IT en gång skapades för att stödja. Detta är tydligt för var och en som har arbetat med skolans IT-system och de policys som har utformats för till exempel datorhantering och dokumentationssystem.
+Huvudtanken bakom bygger på att utgå från *vad* man vill åstadkomma, inte *hur* det ska åstadkommas, och låta verkliga användarbehov styra val av teknik. I nästa avsnitt följer ett koncentrerat planeringsunderlag som sammanfattar problemen jag tror ni vill lösa, den arkitektur jag tror ni vill använda och varför den passar kommunens behov. Innan vi hoppar till väsentligheterna vill jag dock delge ytterligare några av de insikter som arbetet har bibringat mig.
+
+Den kanske viktigaste av mina insikter rör den kommunala infrastrukturen och dess brist på anpassning till skolans behov och verklighet. I arkitekturen jag snart ska försöka beskriva ryms därför ett tydligt om än implicit SKA-krav: att den ska hålla allt vad kommunala IT-avdelningar heter så långt från alla projekt som det bara går. Det är förstås bara min intuition som talar, men om det är något jag anser mig ha insett är det att några kommunala IT-nissar aldrig kommer att få röra något jag har snickrat ihop. De saknar nämligen helt förståelse för utbildningssektorns unika behov. Samma sekund som de träder in drar de därför ofelaktigen med sig ett tankesätt där det är IT:s behov och logik som ska styra snarare än de verksamheter som IT en gång skapades för att stödja. Detta är tydligt för var och en som har arbetat med skolans IT-system och de policys som har utformats för till exempel datorhantering och kommunikationssystem.
 
 Jag förstår att min inställning inte är särskilt fruktbar för er del, men eftersom jag inte är beroende av IT-avdelningens välvilja kan jag kosta på mig att tycka vad jag vill. Oavsett finns det inga som helst skäl för er heller att släppa in IT förrän det finns en färdig och härdad produkt med en stabil användarbas. Mitt eget projekts CI/CD-setup är redan förberedd via Docker och Github Actions och kommer alphatestas på min hemmaserver och vid behov uppgraderas till Kubernetes. På så sätt slipper mina berörda kollegor de "big bang"-lanseringar som numera tillhör stenåldern. De får också tillfälle att skapa goda argument för Sveriges kommuner och regioner att släppa taget om höftskynke och flintsten och uppnå en lite högre resurseffektivitet.
 
@@ -20,7 +22,7 @@ Anledningen är enkel: det är den enda lämpliga lösningen om man vill undvika
 
 Själv väntade jag alldeles för länge eftersom jag överallt hade läst att man först bör lära sig bygga traditionella monoliter innan man ger sig in i mer komplexa projekt. Sådana "best practice"-råd var säkert vettiga för två år sedan. Då var du ju i princip tvungen att bygga allt för hand. Idag, när AI kan hålla dig i handen och dessutom knacka fram all standardkod ("boilerplate"), skulle jag säga att det är precis tvärtom.
 
-Genom att bygga decentraliserade mikrotjänster löser man nämligen ett av de svåraste problemen inom AI-assisterad utveckling: bristen på avgränsning och överblickbarhet i stora kodbaser. En AI-modell behöver nämligen förstå hur allt i arkitekturen fungerar för att kunna tillämpa relevanta designval, men dess begränsade kontextfönster gör att den tappar den förståelsen så snart en kodbas börjar växa och kodens struktur utvecklas åt olika håll, något som dessutom späs på av generativ AI:s outplånliga förkärlek till inveckling och överutveckling.
+Genom att bygga decentraliserade mikrotjänster löser man ett av de svåraste problemen inom AI-assisterad utveckling: bristen på avgränsning och överblickbarhet i stora kodbaser. En AI-modell behöver nämligen förstå hur allt i arkitekturen fungerar för att kunna tillämpa relevanta designval, men dess begränsade kontextfönster gör att den tappar den förståelsen så snart en kodbas börjar växa och kodens struktur utvecklas åt olika håll, något som dessutom späs på av generativ AI:s outplånliga förkärlek till inveckling och överutveckling.
 
 Denna fundamentala brist blir snabbt plågsam påtaglig i traditionella monolitiska system, eftersom alla delar är mer eller mindre beroende av varandra och måste rymmas under ett och samma tvingande tak. Etter värre blir det om projektet dessutom växer organiskt, vilket tvingar fram nya lösningar som inte är förenliga med de val man gjorde i ett tidigare skede. I mitt fall blev slutresultatet ett helt ohållbart antal lager av olika, inbördes svårförenliga tjänster och lösningar som till slut tvingade mig att kasta 150 000 rader kod i papperskorgen (vilket till stor del bör tillskrivas min initala och totala oförmåga).
 
@@ -40,7 +42,7 @@ Kommuner behöver digitala lösningar som kan växa stegvis efter verkliga behov
 2. **Höga startkostnader** innan någon nytta märks.
 3. **Svårigheter att byta ut delar** utan omfattande refaktorering/ny tjänst.
 4. **Begränsad kontroll** över den data som genereras.
-5. **En kultur präglad rädsla för misslyckanden** En "Håll ryggen fri"-mentalitet som bromsar experiment och innovation (fail fast and cheap)
+5. **En kultur präglad rädsla för misslyckanden** En "Håll ryggen fri"-mentalitet som bromsar experiment och innovation.
 
 ## Mål
 
@@ -48,6 +50,7 @@ Kommuner behöver digitala lösningar som kan växa stegvis efter verkliga behov
 2. **Flera leverantörer**: skapa förutsättningar för små företag att bidra med specialisttjänster vid upphandling. Tjänsterna bör kunna utvecklas och skalas helt oberoende av kärnarkitekturen och främst kommunicera via språkoberoende datakontrakt.
 3. **Kontroll över data**: säkerställa att kommunen äger och kan analysera all data.
 4. **Datadrivna beslut**: använda faktisk data från tjänsten för att prioritera vidareutveckling, till exempel via "desire paths" i användarstatistik och inbyggd användarfeedback.
+5. **kreativ och iterativ utveckling**: "Fail fast and cheap". Skapa en kultur där man inte är rädd för att misslyckas eller bygga en tjänst som inte fungerar.
 
 ## Lösning – HuleDU:s Arkitektur
 
@@ -143,7 +146,7 @@ flowchart TB
     Logs -.-> ProcessingLayer
 ```
 
-### Händelseflöde - Från Uppladdning till slutresultat
+### Händelseflöde - Från uppladdning till slutresultat
 
 ```mermaid
 sequenceDiagram

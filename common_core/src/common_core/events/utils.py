@@ -37,13 +37,13 @@ def generate_deterministic_event_id(msg_value: bytes) -> str:
 
         # The 'data' field contains the business payload, which is stable.
         # This excludes transient envelope fields like event_id, timestamp.
-        data_payload = event_dict.get('data', {})
+        data_payload = event_dict.get("data", {})
 
         # Create a canonical representation by sorting keys. This ensures that
         # {"b": 2, "a": 1} and {"a": 1, "b": 2} produce the same hash.
         stable_string = json.dumps(data_payload, sort_keys=True, separators=(",", ":"))
 
-        return hashlib.sha256(stable_string.encode('utf-8')).hexdigest()
+        return hashlib.sha256(stable_string.encode("utf-8")).hexdigest()
 
     except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
         # Fallback for malformed messages, events without a 'data' field,
@@ -64,6 +64,6 @@ def extract_correlation_id_from_event(msg_value: bytes) -> str | None:
     """
     try:
         event_dict = json.loads(msg_value)
-        return event_dict.get('correlation_id')
+        return event_dict.get("correlation_id")
     except (json.JSONDecodeError, TypeError, KeyError):
         return None

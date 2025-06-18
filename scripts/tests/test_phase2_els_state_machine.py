@@ -203,7 +203,9 @@ def test_state_machine_validation_capabilities():
 
         # Test can_trigger method works correctly
         can_trigger = machine.can_trigger(CMD_INITIATE_SPELLCHECK)
-        assert can_trigger, "EssayStateMachine should allow CMD_INITIATE_SPELLCHECK from READY_FOR_PROCESSING"
+        assert can_trigger, (
+            "EssayStateMachine should allow CMD_INITIATE_SPELLCHECK from READY_FOR_PROCESSING"
+        )
 
         # Test getting valid triggers
         valid_triggers = machine.get_valid_triggers()

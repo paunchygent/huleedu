@@ -60,9 +60,7 @@ class MockRedisClient:
         self.should_fail_set = False
         self.should_fail_delete = False
 
-    async def set_if_not_exists(
-        self, key: str, value: str, ttl_seconds: int | None = None
-    ) -> bool:
+    async def set_if_not_exists(self, key: str, value: str, ttl_seconds: int | None = None) -> bool:
         """Mock SETNX operation."""
         self.set_calls.append((key, value, ttl_seconds))
 
@@ -98,7 +96,7 @@ def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
         timestamp=int(datetime.now(timezone.utc).timestamp() * 1000),
         timestamp_type=1,
         key=b"test-key",
-        value=message_json.encode('utf-8'),
+        value=message_json.encode("utf-8"),
         headers=[],
         checksum=None,
         serialized_key_size=8,
@@ -121,10 +119,7 @@ def sample_event_data() -> dict:
         "event_timestamp": datetime.now(timezone.utc).isoformat(),
         "source_service": "test-service",
         "correlation_id": str(uuid.uuid4()),
-        "data": {
-            "test_field": "test_value",
-            "batch_id": "test-batch-123"
-        }
+        "data": {"test_field": "test_value", "batch_id": "test-batch-123"},
     }
 
 
@@ -175,6 +170,7 @@ async def test_duplicate_event_skipped(
 
     # Pre-populate Redis with the event key to simulate duplicate
     from common_core.events.utils import generate_deterministic_event_id
+
     deterministic_id = generate_deterministic_event_id(kafka_msg.value)
     mock_redis_client.keys[f"huleedu:events:seen:{deterministic_id}"] = "1"
 
@@ -309,10 +305,7 @@ async def test_deterministic_key_generation(mock_redis_client: MockRedisClient) 
         "event_timestamp": datetime.now(timezone.utc).isoformat(),
         "source_service": "test-service",
         "correlation_id": str(uuid.uuid4()),  # Different UUID each time
-        "data": {
-            "test_field": "identical_value",
-            "batch_id": "same-batch-123"
-        }
+        "data": {"test_field": "identical_value", "batch_id": "same-batch-123"},
     }
 
     # Create two messages with identical data content but different envelope metadata
@@ -349,12 +342,8 @@ async def test_deterministic_key_generation(mock_redis_client: MockRedisClient) 
 async def test_different_data_generates_different_keys(mock_redis_client: MockRedisClient) -> None:
     """Test that different message data generates different Redis keys."""
     # Create two different event payloads
-    event_data_1 = {
-        "data": {"batch_id": "batch-1", "value": "different"}
-    }
-    event_data_2 = {
-        "data": {"batch_id": "batch-2", "value": "content"}
-    }
+    event_data_1 = {"data": {"batch_id": "batch-1", "value": "different"}}
+    event_data_2 = {"data": {"batch_id": "batch-2", "value": "content"}}
 
     # Create messages
     msg1 = create_mock_kafka_message(event_data_1)

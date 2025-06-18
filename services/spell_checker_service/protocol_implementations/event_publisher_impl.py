@@ -38,11 +38,7 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
         key = str(event_data.entity_ref.entity_id)
 
         # Publish using KafkaBus which handles serialization
-        await kafka_bus.publish(
-            topic=self.kafka_output_topic,
-            envelope=result_envelope,
-            key=key
-        )
+        await kafka_bus.publish(topic=self.kafka_output_topic, envelope=result_envelope, key=key)
 
         # Add logging to track successful event publishing
         from huleedu_service_libs.logging_utils import create_service_logger

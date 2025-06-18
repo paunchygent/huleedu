@@ -61,13 +61,10 @@ async def test_content_validation_failures_publish_events():
     ]
 
     async with kafka_event_monitor("validation_failures_test", validation_topics) as consumer:
-
         # Upload files using utility
         try:
             upload_result = await service_manager.upload_files(
-                batch_id=batch_id,
-                files=files,
-                correlation_id=correlation_id
+                batch_id=batch_id, files=files, correlation_id=correlation_id
             )
             print(f"✅ File upload successful: {upload_result}")
         except RuntimeError as e:
@@ -86,10 +83,7 @@ async def test_content_validation_failures_publish_events():
         try:
             # Collect events - expect 1 content provision + 2 validation failures
             events = await kafka_manager.collect_events(
-                consumer,
-                expected_count=3,
-                timeout_seconds=30,
-                event_filter=validation_event_filter
+                consumer, expected_count=3, timeout_seconds=30, event_filter=validation_event_filter
             )
 
             print(f"📊 Collected {len(events)} validation events")
@@ -153,8 +147,10 @@ async def test_content_validation_failures_publish_events():
                 f"got {len(content_too_short_failures)}"
             )
 
-            print("✅ Test passed: Content validation failures correctly publish "
-                  "appropriate validation failure events!")
+            print(
+                "✅ Test passed: Content validation failures correctly publish "
+                "appropriate validation failure events!"
+            )
 
         except Exception as e:
             pytest.fail(f"Event collection or validation failed: {e}")

@@ -8,6 +8,7 @@ from .cj_assessment_events import (
     CJAssessmentFailedV1,
     ELS_CJAssessmentRequestV1,
 )
+from .client_commands import ClientBatchPipelineRequestV1
 from .envelope import EventEnvelope
 from .spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 
@@ -21,4 +22,5 @@ __all__ = [
     "ELS_CJAssessmentRequestV1",
     "CJAssessmentCompletedV1",
     "CJAssessmentFailedV1",
+    "ClientBatchPipelineRequestV1",
 ]

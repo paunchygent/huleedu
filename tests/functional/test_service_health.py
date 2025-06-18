@@ -28,7 +28,7 @@ class TestServiceHealth:
             "content_service",
             "batch_orchestrator_service",
             "essay_lifecycle_service",
-            "file_service"
+            "file_service",
         ]
 
         for service_name in expected_services:
@@ -58,6 +58,7 @@ class TestServiceHealth:
                 print(f"✅ {service_name} health and metrics endpoints available")
             else:
                 print(f"⚠️  {service_name} not available or not configured with HTTP API")
+
 
 # TODO: Add container integration tests
 # TODO: Add end-to-end workflow tests

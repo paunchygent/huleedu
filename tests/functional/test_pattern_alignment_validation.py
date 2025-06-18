@@ -51,8 +51,7 @@ class TestPatternAlignmentValidation:
 
             # Find service pattern type from ServiceTestManager configuration
             service_endpoint = next(
-                (ep for ep in service_manager.SERVICE_ENDPOINTS if ep.name == service_name),
-                None
+                (ep for ep in service_manager.SERVICE_ENDPOINTS if ep.name == service_name), None
             )
             pattern_type = (
                 "HTTP Service" if service_endpoint and service_endpoint.has_http_api else "Worker"
@@ -142,9 +141,7 @@ class TestPatternAlignmentValidation:
             print(f"⚡ {service_name}: Validated in {validation_time:.2f}s")
 
         # Pattern alignment should improve startup reliability
-        assert validation_time < 30.0, (
-            f"Service validation took too long: {validation_time:.2f}s"
-        )
+        assert validation_time < 30.0, f"Service validation took too long: {validation_time:.2f}s"
 
         # Validate we tested multiple services
         assert len(startup_times) >= 4, "Not all services started successfully"
@@ -270,12 +267,13 @@ class TestPatternAlignmentValidation:
                     success_metrics["metrics_endpoints_working"] += 1
 
         # Pattern alignment success criteria
-        total_expected_services = len([
-            ep for ep in service_manager.SERVICE_ENDPOINTS if ep.has_http_api
-        ])
+        total_expected_services = len(
+            [ep for ep in service_manager.SERVICE_ENDPOINTS if ep.has_http_api]
+        )
         success_rate = (
             success_metrics["services_aligned"] / total_expected_services
-            if total_expected_services > 0 else 0
+            if total_expected_services > 0
+            else 0
         )
 
         print("\n🎯 Pattern Alignment Success Summary:")

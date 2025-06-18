@@ -1,0 +1,125 @@
+# This file defines the core third-party infrastructure for the HuleEdu platform.
+services:
+  # PostgreSQL database for Batch Orchestrator Service
+  batch_orchestrator_db:
+    image: postgres:15
+    container_name: huleedu_batch_orchestrator_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=batch_orchestrator
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
+    volumes:
+      - batch_orchestrator_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d batch_orchestrator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # PostgreSQL database for Essay Lifecycle Service
+  essay_lifecycle_db:
+    image: postgres:15
+    container_name: huleedu_essay_lifecycle_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5433:5432"  # Different port from BOS database
+    environment:
+      - POSTGRES_DB=essay_lifecycle
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
+    volumes:
+      - essay_lifecycle_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d essay_lifecycle"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # PostgreSQL database for CJ Assessment Service
+  cj_assessment_db:
+    image: postgres:15
+    container_name: huleedu_cj_assessment_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5434:5432"  # Different port from other databases
+    environment:
+      - POSTGRES_DB=cj_assessment
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
+    volumes:
+      - cj_assessment_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d cj_assessment"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis cache for idempotency and session management
+  redis:
+    image: redis:7-alpine
+    container_name: huleedu_redis
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    container_name: huleedu_zookeeper
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  kafka:
+    image: bitnami/kafka:3.7 
+    container_name: huleedu_kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092,EXTERNAL://0.0.0.0:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

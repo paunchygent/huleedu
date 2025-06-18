@@ -27,6 +27,7 @@ logger = create_service_logger("test.kafka_manager")
 
 class KafkaTestConfig(NamedTuple):
     """Kafka testing configuration."""
+
     bootstrap_servers: str
     topics: Dict[str, str]
     assignment_timeout: int
@@ -35,7 +36,7 @@ class KafkaTestConfig(NamedTuple):
 def create_kafka_test_config(
     bootstrap_servers: str = "localhost:9093",
     topics: Optional[Dict[str, str]] = None,
-    assignment_timeout: int = 15
+    assignment_timeout: int = 15,
 ) -> KafkaTestConfig:
     """Create KafkaTestConfig with default HuleEdu topics if not provided."""
     if topics is None:
@@ -68,10 +69,7 @@ class KafkaTestManager:
 
     @asynccontextmanager
     async def consumer(
-        self,
-        test_name: str,
-        topics: Optional[List[str]] = None,
-        auto_offset_reset: str = "latest"
+        self, test_name: str, topics: Optional[List[str]] = None, auto_offset_reset: str = "latest"
     ) -> AsyncIterator[AIOKafkaConsumer]:
         """
         Context manager for Kafka consumer with automatic cleanup.
@@ -121,9 +119,7 @@ class KafkaTestManager:
                 logger.warning(f"Error stopping consumer for {test_name}: {e}")
 
     async def _wait_for_partition_assignment(
-        self,
-        consumer: AIOKafkaConsumer,
-        test_name: str
+        self, consumer: AIOKafkaConsumer, test_name: str
     ) -> None:
         """Wait for consumer to get partition assignment."""
         partitions_assigned = False
@@ -148,7 +144,7 @@ class KafkaTestManager:
         consumer: AIOKafkaConsumer,
         expected_count: int,
         timeout_seconds: int = 30,
-        event_filter: Optional[Callable[[Dict[str, Any]], bool]] = None
+        event_filter: Optional[Callable[[Dict[str, Any]], bool]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Collect events from Kafka consumer.
@@ -176,10 +172,7 @@ class KafkaTestManager:
         collected_events: List[Dict[str, Any]] = []
         end_time = asyncio.get_event_loop().time() + timeout_seconds
 
-        while (
-            len(collected_events) < expected_count
-            and asyncio.get_event_loop().time() < end_time
-        ):
+        while len(collected_events) < expected_count and asyncio.get_event_loop().time() < end_time:
             msg_batch = await consumer.getmany(timeout_ms=1000, max_records=10)
 
             for topic_partition, messages in msg_batch.items():
@@ -192,9 +185,7 @@ class KafkaTestManager:
                     try:
                         # Parse JSON to get EventEnvelope data (like production services)
                         event_data = (
-                            json.loads(raw_message)
-                            if isinstance(raw_message, str)
-                            else raw_message
+                            json.loads(raw_message) if isinstance(raw_message, str) else raw_message
                         )
                     except json.JSONDecodeError:
                         logger.warning(f"Failed to parse message from {message.topic}")
@@ -207,7 +198,7 @@ class KafkaTestManager:
                     # Return EventEnvelope data with topic metadata for test utilities
                     enriched_event = {
                         "topic": message.topic,
-                        "data": event_data  # EventEnvelope structure
+                        "data": event_data,  # EventEnvelope structure
                     }
                     collected_events.append(enriched_event)
                     logger.info(
@@ -249,8 +240,8 @@ class KafkaTestManager:
             await producer.start()
             # Use essay_id as message key if available (matches original implementation)
             message_key = None
-            if 'data' in event_data and 'entity_ref' in event_data['data']:
-                essay_id = event_data['data']['entity_ref'].get('entity_id')
+            if "data" in event_data and "entity_ref" in event_data["data"]:
+                essay_id = event_data["data"]["entity_ref"].get("entity_id")
                 if essay_id:
                     message_key = essay_id.encode("utf-8")
 
@@ -279,7 +270,7 @@ async def collect_kafka_events(
     expected_count: int,
     timeout_seconds: int = 30,
     topics: Optional[List[str]] = None,
-    event_filter: Optional[Callable[[Dict[str, Any]], bool]] = None
+    event_filter: Optional[Callable[[Dict[str, Any]], bool]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Convenience function for collecting events.

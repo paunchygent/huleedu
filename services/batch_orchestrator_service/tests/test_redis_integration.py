@@ -60,8 +60,8 @@ async def test_redis_protocol_compliance(di_container: Any) -> None:
     redis_client = await di_container.get(RedisClientProtocol)
 
     # Verify protocol methods exist and are callable
-    assert hasattr(redis_client, 'set_if_not_exists')
-    assert hasattr(redis_client, 'delete_key')
+    assert hasattr(redis_client, "set_if_not_exists")
+    assert hasattr(redis_client, "delete_key")
     assert callable(redis_client.set_if_not_exists)
     assert callable(redis_client.delete_key)
 

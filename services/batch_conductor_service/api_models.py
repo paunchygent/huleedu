@@ -1,0 +1,72 @@
+"""
+API models for Batch Conductor Service.
+
+Defines request and response models for internal HTTP communication
+between the Batch Orchestrator Service (BOS) and Batch Conductor Service (BCS).
+"""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+
+class BCSPipelineDefinitionRequestV1(BaseModel):
+    """
+    Request model for pipeline definition endpoint.
+
+    Used by BOS to request pipeline dependency resolution from BCS.
+    """
+
+    batch_id: str = Field(
+        description="The unique identifier of the target batch.", min_length=1, max_length=255
+    )
+    requested_pipeline: str = Field(
+        description="The final pipeline the user wants to run (e.g., 'ai_feedback', 'cj_assessment').",
+        min_length=1,
+        max_length=100,
+    )
+
+    model_config = {
+        "str_strip_whitespace": True,
+        "validate_assignment": True,
+        "json_schema_extra": {
+            "examples": [
+                {"batch_id": "batch_12345", "requested_pipeline": "ai_feedback"},
+                {"batch_id": "batch_67890", "requested_pipeline": "cj_assessment"},
+            ]
+        },
+    }
+
+
+class BCSPipelineDefinitionResponseV1(BaseModel):
+    """
+    Response model for pipeline definition endpoint.
+
+    Returns the resolved pipeline with all necessary dependencies in execution order.
+    """
+
+    batch_id: str = Field(description="The unique identifier of the target batch.")
+    final_pipeline: list[str] = Field(
+        description="Ordered list of pipeline phases to execute, including dependencies."
+    )
+    analysis_summary: str | None = Field(
+        default=None,
+        description="Optional summary of the analysis performed to generate the pipeline.",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "batch_id": "batch_12345",
+                    "final_pipeline": ["spellcheck", "ai_feedback"],
+                    "analysis_summary": "Added spellcheck dependency for ai_feedback pipeline",
+                },
+                {
+                    "batch_id": "batch_67890",
+                    "final_pipeline": ["spellcheck", "cj_assessment"],
+                    "analysis_summary": "Added spellcheck dependency for cj_assessment pipeline",
+                },
+            ]
+        }
+    }

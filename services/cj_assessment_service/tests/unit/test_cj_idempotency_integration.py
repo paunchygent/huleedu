@@ -81,6 +81,7 @@ class MockDatabase:
 
     def _setup_mock_session(self) -> None:
         """Setup the mock session with SQLAlchemy-like behavior."""
+
         # Mock execute() method for SQLAlchemy queries
         async def mock_execute(stmt):
             # Return a mock result that has fetchall() method (synchronous, not async)
@@ -155,12 +156,14 @@ class MockDatabase:
         essay = MagicMock()
         essay.current_bt_score = 0.5
         if cj_batch_id in self.essays:
-            self.essays[cj_batch_id].append({
-                "cj_batch_id": cj_batch_id,
-                "els_essay_id": els_essay_id,
-                "text_storage_id": text_storage_id,
-                "assessment_input_text": assessment_input_text,
-            })
+            self.essays[cj_batch_id].append(
+                {
+                    "cj_batch_id": cj_batch_id,
+                    "els_essay_id": els_essay_id,
+                    "text_storage_id": text_storage_id,
+                    "assessment_input_text": assessment_input_text,
+                }
+            )
         return essay
 
     async def get_essays_for_cj_batch(self, session: AsyncSession, cj_batch_id: int) -> list[Any]:
@@ -237,34 +240,22 @@ def sample_cj_request_event() -> dict:
         "source_service": "essay_lifecycle_service",
         "correlation_id": correlation_id,
         "data": {
-            "entity_ref": {
-                "entity_id": batch_id,
-                "entity_type": "batch"
-            },
+            "entity_ref": {"entity_id": batch_id, "entity_type": "batch"},
             "system_metadata": {
-                "entity": {
-                    "entity_id": batch_id,
-                    "entity_type": "batch"
-                },
+                "entity": {"entity_id": batch_id, "entity_type": "batch"},
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "processing_stage": "pending",
-                "event": "els.cj_assessment.requested"
+                "event": "els.cj_assessment.requested",
             },
             "essays_for_cj": [
-                {
-                    "essay_id": "essay-1",
-                    "text_storage_id": "storage-1"
-                },
-                {
-                    "essay_id": "essay-2",
-                    "text_storage_id": "storage-2"
-                }
+                {"essay_id": "essay-1", "text_storage_id": "storage-1"},
+                {"essay_id": "essay-2", "text_storage_id": "storage-2"},
             ],
             "language": "en",
             "course_code": "TEST_COURSE",
             "essay_instructions": "Write a test essay.",
-            "llm_config_overrides": None
-        }
+            "llm_config_overrides": None,
+        },
     }
 
 
@@ -291,11 +282,7 @@ def mock_boundary_services() -> tuple[MockDatabase, AsyncMock, AsyncMock, AsyncM
     essay_b = EssayForComparison(id="essay-2", text_content="Essay B content")
 
     # Create mock comparison task
-    mock_task = ComparisonTask(
-        essay_a=essay_a,
-        essay_b=essay_b,
-        prompt="Compare these essays"
-    )
+    mock_task = ComparisonTask(essay_a=essay_a, essay_b=essay_b, prompt="Compare these essays")
 
     # Create mock comparison result with correct structure
     mock_comparison_result = ComparisonResult(
@@ -303,8 +290,8 @@ def mock_boundary_services() -> tuple[MockDatabase, AsyncMock, AsyncMock, AsyncM
         llm_assessment=LLMAssessmentResponseSchema(
             winner="Essay A",  # Must be one of the literal values
             justification="Essay A is better written",
-            confidence=4.0  # Changed from confidence_level to confidence
-        )
+            confidence=4.0,  # Changed from confidence_level to confidence
+        ),
     )
     llm_interaction.perform_comparisons.return_value = [mock_comparison_result]
 
@@ -334,7 +321,7 @@ def mock_boundary_services() -> tuple[MockDatabase, AsyncMock, AsyncMock, AsyncM
 @pytest.mark.asyncio
 async def test_first_time_event_processing_success(
     sample_cj_request_event: dict,
-    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock]
+    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock],
 ) -> None:
     """Test that first-time CJ assessment events are processed successfully with idempotency."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -381,7 +368,7 @@ async def test_first_time_event_processing_success(
 @pytest.mark.asyncio
 async def test_duplicate_event_skipped(
     sample_cj_request_event: dict,
-    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock]
+    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock],
 ) -> None:
     """Test that duplicate events are skipped without processing business logic."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -427,7 +414,7 @@ async def test_duplicate_event_skipped(
 @pytest.mark.asyncio
 async def test_processing_failure_keeps_lock(
     sample_cj_request_event: dict,
-    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock]
+    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock],
 ) -> None:
     """Test that business logic failures keep Redis lock to prevent infinite retries."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -494,7 +481,7 @@ async def test_exception_failure_releases_lock(
 @pytest.mark.asyncio
 async def test_redis_failure_fallback(
     sample_cj_request_event: dict,
-    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock]
+    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock],
 ) -> None:
     """Test that Redis failures result in fail-open behavior."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -536,7 +523,7 @@ async def test_redis_failure_fallback(
 
 @pytest.mark.asyncio
 async def test_deterministic_event_id_generation(
-    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock]
+    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock],
 ) -> None:
     """Test that deterministic event IDs are generated correctly for CJ assessment events."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -551,13 +538,13 @@ async def test_deterministic_event_id_generation(
             "entity": {"entity_id": "test-batch-123", "entity_type": "batch"},
             "timestamp": "2024-01-01T12:00:00Z",
             "processing_stage": "pending",
-            "event": "els.cj_assessment.requested"
+            "event": "els.cj_assessment.requested",
         },
         "essays_for_cj": [{"essay_id": "essay-1", "text_storage_id": "storage-1"}],
         "language": "en",
         "course_code": "TEST",
         "essay_instructions": "Test instructions",
-        "llm_config_overrides": None
+        "llm_config_overrides": None,
     }
 
     # Event 1 - different envelope metadata
@@ -567,7 +554,7 @@ async def test_deterministic_event_id_generation(
         "event_timestamp": "2024-01-01T12:00:00Z",  # Different
         "source_service": "essay_lifecycle_service",
         "correlation_id": str(uuid.uuid4()),  # Different
-        "data": base_event_data  # Same data
+        "data": base_event_data,  # Same data
     }
 
     # Event 2 - different envelope metadata but same data
@@ -577,7 +564,7 @@ async def test_deterministic_event_id_generation(
         "event_timestamp": "2024-01-01T13:00:00Z",  # Different
         "source_service": "essay_lifecycle_service",
         "correlation_id": str(uuid.uuid4()),  # Different
-        "data": base_event_data  # Same data
+        "data": base_event_data,  # Same data
     }
 
     # Create Kafka messages

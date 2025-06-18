@@ -98,11 +98,13 @@ class TestE2ECJAssessmentWorkflows:
                 storage_id = await service_manager.upload_content_directly(essay_content)
                 essay_id = str(uuid.uuid4())  # Use standard UUID format (36 chars)
 
-                essay_storage_refs.append({
-                    "essay_id": essay_id,
-                    "storage_id": storage_id,
-                    "file_name": essay_file.split("/")[-1]
-                })
+                essay_storage_refs.append(
+                    {
+                        "essay_id": essay_id,
+                        "storage_id": storage_id,
+                        "file_name": essay_file.split("/")[-1],
+                    }
+                )
 
                 print(f"✅ Essay {i + 1} uploaded: {storage_id}")
             except RuntimeError as e:
@@ -112,9 +114,9 @@ class TestE2ECJAssessmentWorkflows:
         completed_topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
         failed_topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED)
 
-        async with kafka_event_monitor("cj_assessment_pipeline_test",
-                                       [completed_topic, failed_topic]) as consumer:
-
+        async with kafka_event_monitor(
+            "cj_assessment_pipeline_test", [completed_topic, failed_topic]
+        ) as consumer:
             # Step 3: Publish ELS_CJAssessmentRequestV1 event using utility
             cj_request = self._create_cj_assessment_request_event(
                 batch_id=batch_id,
@@ -136,10 +138,7 @@ class TestE2ECJAssessmentWorkflows:
             # Step 4: Monitor for CJAssessmentCompletedV1 response using utility
             def cj_result_filter(event_data: Dict[str, Any]) -> bool:
                 """Filter for CJ assessment results from our specific test by correlation ID."""
-                return (
-                    "data" in event_data
-                    and event_data.get("correlation_id") == correlation_id
-                )
+                return "data" in event_data and event_data.get("correlation_id") == correlation_id
 
             try:
                 # Wait for CJ assessment completion event
@@ -162,8 +161,10 @@ class TestE2ECJAssessmentWorkflows:
                 assert len(cj_completed_data["rankings"]) >= 2  # Should have rankings
                 assert cj_completed_data["cj_assessment_job_id"] is not None
 
-                print(f"✅ CJ Assessment completed with job ID: "
-                      f"{cj_completed_data['cj_assessment_job_id']}")
+                print(
+                    f"✅ CJ Assessment completed with job ID: "
+                    f"{cj_completed_data['cj_assessment_job_id']}"
+                )
                 print(f"📊 Generated {len(cj_completed_data['rankings'])} essay rankings")
 
                 # Step 5: Validate ranking structure and content
@@ -216,7 +217,6 @@ class TestE2ECJAssessmentWorkflows:
         completed_topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         async with kafka_event_monitor("minimal_cj_assessment_test", [completed_topic]) as consumer:
-
             # Publish event using utility
             cj_request = self._create_cj_assessment_request_event(
                 batch_id=batch_id,
@@ -237,17 +237,14 @@ class TestE2ECJAssessmentWorkflows:
             # Monitor for results using utility
             def cj_result_filter(event_data: Dict[str, Any]) -> bool:
                 """Filter for CJ assessment results from our specific test by correlation ID."""
-                return (
-                    "data" in event_data
-                    and event_data.get("correlation_id") == correlation_id
-                )
+                return "data" in event_data and event_data.get("correlation_id") == correlation_id
 
             try:
                 events = await kafka_manager.collect_events(
                     consumer,
                     expected_count=1,
                     timeout_seconds=180,  # 3 minutes for minimal CJ processing
-                    event_filter=cj_result_filter
+                    event_filter=cj_result_filter,
                 )
 
                 assert len(events) == 1
@@ -284,8 +281,7 @@ class TestE2ECJAssessmentWorkflows:
         essay_inputs = []
         for ref in essay_storage_refs:
             essay_input = EssayProcessingInputRefV1(
-                essay_id=ref["essay_id"],
-                text_storage_id=ref["storage_id"]
+                essay_id=ref["essay_id"], text_storage_id=ref["storage_id"]
             )
             essay_inputs.append(essay_input)
 
@@ -318,8 +314,8 @@ class TestE2ECJAssessmentWorkflows:
             event_timestamp=datetime.now(timezone.utc),
             source_service="test_cj_assessment_workflows",
             correlation_id=uuid.UUID(correlation_id),
-            data=cj_request_data
+            data=cj_request_data,
         )
 
         # Convert to dict for Kafka publishing, serializing UUIDs to strings
-        return event_envelope.model_dump(mode='json')
+        return event_envelope.model_dump(mode="json")

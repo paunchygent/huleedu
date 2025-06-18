@@ -113,7 +113,7 @@ async def process_single_file_upload(
             return {
                 "file_name": file_name,
                 "status": "raw_storage_failed",
-                "error_detail": str(storage_error)
+                "error_detail": str(storage_error),
             }
 
         # Step 2: Extract text content from file
@@ -156,7 +156,7 @@ async def process_single_file_upload(
             return {
                 "file_name": file_name,
                 "raw_file_storage_id": raw_file_storage_id,
-                "status": "extraction_failed"
+                "status": "extraction_failed",
             }
 
         # Step 3: Validate extracted content against business rules

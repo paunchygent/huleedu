@@ -29,27 +29,68 @@ def convert_md_to_pdf(md_file: str, output_file: str | None = None):
         return False
 
     # Build pandoc command
+    css_path = script_dir / "pdf_toc_style.css"
     cmd = [
         "pandoc",
         str(md_path),
         f"--lua-filter={filter_path}",
+        "--toc",  # Include table of contents
+        "--metadata", "toc-title=Innehållsförteckning", # Custom TOC title
+        f"--css={css_path}",  # Custom TOC and PDF styles
         "--pdf-engine=weasyprint",  # Use weasyprint instead of LaTeX
+        # Add specific WeasyPrint parameters to control diagram sizing and page breaks
+        "--variable", "papersize=a4",
+        "--variable", "geometry:margin=2cm", 
+        "--variable", "fontsize=10pt",
+        # Add HTML options to control page breaks
+        "--epub-embed-font=Arial",  # Force embed fonts
+        "--html-q-tags",           # Use quotes for quotes
+        "--variable", "documentclass=report", # More compact spacing
         "-o", str(output_file)
     ]
 
-    print(f"Converting {md_file} to {output_file}...")
-    print(f"Command: {' '.join(cmd)}")
+    # Define HTML output file for debugging structure
+    html_output_file = str(md_path.with_name(md_path.stem + "_debug.html"))
+
+    # Command to generate intermediate HTML (without WeasyPrint, using Pandoc's default HTML writer)
+    html_cmd = [
+        "pandoc",
+        str(md_path),
+        f"--lua-filter={filter_path}",
+        "--toc", # Keep TOC for structure
+        "--metadata", "toc-title=Innehållsförteckning", # Keep custom TOC title
+        "--standalone", # Ensure full HTML document
+        "--self-contained", # Embed assets if any, for easier viewing (optional)
+        "-o", html_output_file
+    ]
+    print(f"Generating intermediate HTML: {html_output_file}...")
+    print(f"HTML Command: {' '.join(html_cmd)}")
+    try:
+        html_result = subprocess.run(html_cmd, capture_output=True, text=True, check=False)
+        if html_result.returncode == 0:
+            print(f"✅ Successfully generated intermediate HTML: {html_output_file}")
+        else:
+            print("❌ Error during intermediate HTML generation:")
+            print(f"STDOUT: {html_result.stdout}")
+            print(f"STDERR: {html_result.stderr}")
+            # Continue to PDF generation even if HTML debug fails, but notify
+    except Exception as e_html:
+        print(f"❌ Unexpected error during intermediate HTML generation: {e_html}")
+
+    # Proceed with PDF generation
+    print(f"Converting {md_file} to {output_file} (PDF)..." )
+    print(f"PDF Command: {' '.join(cmd)}") # cmd is the original PDF command
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=script_dir)
+        pdf_result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
-        if result.returncode == 0:
-            print(f"✅ Successfully converted to {output_file}")
+        if pdf_result.returncode == 0:
+            print(f"✅ Successfully converted to {output_file} (PDF)")
             return True
         else:
-            print("❌ Error during conversion:")
-            print(f"STDOUT: {result.stdout}")
-            print(f"STDERR: {result.stderr}")
+            print("❌ Error during PDF conversion:")
+            print(f"STDOUT: {pdf_result.stdout}")
+            print(f"STDERR: {pdf_result.stderr}")
             return False
 
     except FileNotFoundError:

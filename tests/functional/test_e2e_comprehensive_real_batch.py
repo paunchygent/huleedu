@@ -67,6 +67,7 @@ async def test_comprehensive_real_batch_pipeline():
 
     # Get the pipeline topics for monitoring
     from tests.functional.comprehensive_pipeline_utils import PIPELINE_TOPICS
+
     pipeline_topics = list(PIPELINE_TOPICS.values())
 
     # Use KafkaTestManager (modern framework) with raw bytes (production fidelity)

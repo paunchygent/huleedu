@@ -43,10 +43,7 @@ async def test_redis_client_di_injection(test_settings: Settings) -> None:
 async def test_redis_client_lifecycle() -> None:
     """Test Redis client lifecycle management."""
     # Create client directly for testing
-    redis_client = RedisClient(
-        client_id="test-client",
-        redis_url="redis://localhost:6379"
-    )
+    redis_client = RedisClient(client_id="test-client", redis_url="redis://localhost:6379")
 
     # Test lifecycle
     assert not redis_client._started
@@ -75,13 +72,10 @@ async def test_redis_client_lifecycle() -> None:
 @pytest.mark.asyncio
 async def test_redis_protocol_interface() -> None:
     """Test that RedisClient implements the protocol correctly."""
-    redis_client = RedisClient(
-        client_id="protocol-test",
-        redis_url="redis://localhost:6379"
-    )
+    redis_client = RedisClient(client_id="protocol-test", redis_url="redis://localhost:6379")
 
     # Verify protocol compliance
-    assert hasattr(redis_client, 'set_if_not_exists')
-    assert hasattr(redis_client, 'delete_key')
+    assert hasattr(redis_client, "set_if_not_exists")
+    assert hasattr(redis_client, "delete_key")
     assert callable(redis_client.set_if_not_exists)
     assert callable(redis_client.delete_key)

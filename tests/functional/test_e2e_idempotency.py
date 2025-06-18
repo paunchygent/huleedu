@@ -27,6 +27,7 @@ from tests.utils.service_test_manager import ServiceTestManager
 # AUTHENTIC REDIS TESTS - Using Real Redis Instance
 # =============================================================================
 
+
 class RealRedisTestHelper:
     """Helper for testing with the actual Redis instance running in docker-compose."""
 
@@ -38,6 +39,7 @@ class RealRedisTestHelper:
         """Clean up test keys from real Redis."""
         try:
             import redis.asyncio as redis
+
             client = redis.from_url(self.redis_url)
             # Delete all keys with our test prefix
             keys = await client.keys(f"{self.test_key_prefix}:*")
@@ -55,7 +57,7 @@ class RealRedisTestHelper:
             "event_timestamp": datetime.now(timezone.utc).isoformat(),
             "source_service": "test_service",
             "correlation_id": str(uuid.uuid4()),
-            "data": data
+            "data": data,
         }
 
 
@@ -78,8 +80,8 @@ class TestAuthenticRedisIdempotency:
                 "batch_id": "test-batch-12345",
                 "essays": [
                     {"essay_id": "essay-1", "text_storage_id": "storage-1"},
-                    {"essay_id": "essay-2", "text_storage_id": "storage-2"}
-                ]
+                    {"essay_id": "essay-2", "text_storage_id": "storage-2"},
+                ],
             }
 
             # Create three events with same data but different envelope metadata
@@ -94,7 +96,7 @@ class TestAuthenticRedisIdempotency:
             # Generate deterministic IDs for all events
             deterministic_ids = []
             for event in events:
-                event_bytes = json.dumps(event).encode('utf-8')
+                event_bytes = json.dumps(event).encode("utf-8")
                 det_id = generate_deterministic_event_id(event_bytes)
                 deterministic_ids.append(det_id)
 
@@ -120,6 +122,7 @@ class TestAuthenticRedisIdempotency:
 
         try:
             import redis.asyncio as redis
+
             client = redis.from_url(helper.redis_url)
 
             # Test basic Redis operations
@@ -155,6 +158,7 @@ class TestAuthenticRedisIdempotency:
 # =============================================================================
 # CONTROLLED SCENARIO TESTS - Using Test Utilities
 # =============================================================================
+
 
 class MockRedisClient:
     """Mock Redis client for controlled testing scenarios."""
@@ -206,13 +210,13 @@ class MockRedisClient:
             "active_keys": list(self.keys.keys()),
             "set_calls": len(self.set_calls),
             "delete_calls": len(self.delete_calls),
-            "connected_services": len(set(self.connected_services))
+            "connected_services": len(set(self.connected_services)),
         }
 
 
 def create_mock_kafka_message(event_data: Dict[str, Any]) -> ConsumerRecord:
     """Create a mock Kafka message from event data."""
-    message_value = json.dumps(event_data).encode('utf-8')
+    message_value = json.dumps(event_data).encode("utf-8")
 
     return ConsumerRecord(
         topic="huleedu.test.idempotency.v1",
@@ -225,7 +229,7 @@ def create_mock_kafka_message(event_data: Dict[str, Any]) -> ConsumerRecord:
         checksum=None,
         serialized_key_size=0,
         serialized_value_size=len(message_value),
-        headers=[]
+        headers=[],
     )
 
 
@@ -250,13 +254,13 @@ def sample_batch_event() -> Dict[str, Any]:
             "batch_id": batch_id,
             "ready_essays": [
                 {"essay_id": "essay-1", "text_storage_id": "storage-1"},
-                {"essay_id": "essay-2", "text_storage_id": "storage-2"}
+                {"essay_id": "essay-2", "text_storage_id": "storage-2"},
             ],
             "metadata": {
                 "entity": {"entity_type": "batch", "entity_id": batch_id},
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        }
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        },
     }
 
 
@@ -380,7 +384,7 @@ class TestControlledIdempotencyScenarios:
         # Generate deterministic IDs
         deterministic_ids = []
         for event in events:
-            event_bytes = json.dumps(event).encode('utf-8')
+            event_bytes = json.dumps(event).encode("utf-8")
             det_id = generate_deterministic_event_id(event_bytes)
             deterministic_ids.append(det_id)
 
@@ -417,7 +421,7 @@ class TestE2EPipelineIdempotency:
         test_topics = [
             "huleedu.batch.essays.registered.v1",
             "huleedu.file.essay.content.provisioned.v1",
-            "huleedu.els.batch.essays.ready.v1"
+            "huleedu.els.batch.essays.ready.v1",
         ]
 
         async with kafka_manager.consumer("pipeline_idempotency", test_topics) as consumer:
@@ -426,14 +430,13 @@ class TestE2EPipelineIdempotency:
 
             try:
                 batch_id, _ = await service_manager.create_batch(
-                    expected_essay_count=2,
-                    correlation_id=correlation_id
+                    expected_essay_count=2, correlation_id=correlation_id
                 )
 
                 # Upload test files to trigger pipeline
                 test_files = [
                     {"filename": "test1.txt", "content": "Test essay content 1"},
-                    {"filename": "test2.txt", "content": "Test essay content 2"}
+                    {"filename": "test2.txt", "content": "Test essay content 2"},
                 ]
 
                 await service_manager.upload_files(batch_id, test_files, correlation_id)
@@ -461,6 +464,7 @@ class TestE2EPipelineIdempotency:
 # TEST UTILITIES AND HELPERS
 # =============================================================================
 
+
 def create_event_with_same_data(base_data: Dict[str, Any], count: int = 3) -> List[Dict[str, Any]]:
     """Create multiple events with identical data but different envelope metadata."""
     events = []
@@ -471,7 +475,7 @@ def create_event_with_same_data(base_data: Dict[str, Any], count: int = 3) -> Li
             "event_timestamp": f"2024-01-15T10:0{i}:00Z",  # Different timestamps
             "source_service": "test_service",
             "correlation_id": str(uuid.uuid4()),  # Different correlation
-            "data": base_data  # IDENTICAL DATA - key for deterministic ID
+            "data": base_data,  # IDENTICAL DATA - key for deterministic ID
         }
         events.append(event)
     return events
@@ -479,7 +483,7 @@ def create_event_with_same_data(base_data: Dict[str, Any], count: int = 3) -> Li
 
 async def validate_redis_key_pattern(event_data: Dict[str, Any]) -> str:
     """Validate Redis key pattern generation for an event."""
-    event_bytes = json.dumps(event_data).encode('utf-8')
+    event_bytes = json.dumps(event_data).encode("utf-8")
     deterministic_id = generate_deterministic_event_id(event_bytes)
     expected_key = f"huleedu:events:seen:{deterministic_id}"
     return expected_key

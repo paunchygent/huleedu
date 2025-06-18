@@ -23,6 +23,7 @@ logger = create_service_logger("test.service_manager")
 
 class ServiceEndpoint(NamedTuple):
     """Service endpoint configuration."""
+
     name: str
     port: int
     has_http_api: bool = True
@@ -89,7 +90,7 @@ class ServiceTestManager:
                             "health_url": health_url,
                             "metrics_url": f"http://localhost:{service.port}/metrics",
                             "base_url": f"http://localhost:{service.port}",
-                            "status": "healthy"
+                            "status": "healthy",
                         }
                         logger.info(f"✅ {service.name} HTTP API healthy")
 
@@ -135,7 +136,7 @@ class ServiceTestManager:
         expected_essay_count: int,
         course_code: str = "TEST",
         class_designation: str = "UtilityTest",
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
     ) -> tuple[str, str]:
         """
         Create a test batch via BOS API.
@@ -149,6 +150,7 @@ class ServiceTestManager:
             raise RuntimeError("Batch Orchestrator Service not available for batch creation")
 
         import uuid
+
         if correlation_id is None:
             correlation_id = str(uuid.uuid4())
 
@@ -166,7 +168,7 @@ class ServiceTestManager:
             async with session.post(
                 f"{bos_base_url}/v1/batches/register",
                 json=batch_request,
-                headers={"X-Correlation-ID": correlation_id}
+                headers={"X-Correlation-ID": correlation_id},
             ) as response:
                 if response.status != 202:
                     error_text = await response.text()
@@ -180,15 +182,12 @@ class ServiceTestManager:
                 return batch_id, returned_correlation_id
 
     async def upload_files(
-        self,
-        batch_id: str,
-        files: List[Dict[str, Any]],
-        correlation_id: Optional[str] = None
+        self, batch_id: str, files: List[Dict[str, Any]], correlation_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Upload files to File Service batch endpoint.
-'
-        Replaces the file_upload_helper fixture.
+                Upload files to File Service batch endpoint.
+        '
+                Replaces the file_upload_helper fixture.
         """
         endpoints = await self.get_validated_endpoints()
 
@@ -206,7 +205,7 @@ class ServiceTestManager:
                     "files",
                     file_info["content"],
                     filename=file_info["name"],
-                    content_type="text/plain"
+                    content_type="text/plain",
                 )
 
             headers = {}
@@ -217,7 +216,7 @@ class ServiceTestManager:
                 f"{file_service_base}/v1/files/batch",
                 data=data,
                 headers=headers,
-                timeout=aiohttp.ClientTimeout(total=60)
+                timeout=aiohttp.ClientTimeout(total=60),
             ) as response:
                 if response.status == 202:
                     result: Dict[str, Any] = await response.json()
@@ -272,8 +271,8 @@ class ServiceTestManager:
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{content_service_base}/v1/content",
-                data=content.encode('utf-8'),
-                timeout=aiohttp.ClientTimeout(total=30)
+                data=content.encode("utf-8"),
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status == 201:
                     result = await response.json()
@@ -311,11 +310,11 @@ class ServiceTestManager:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"{content_service_base}/v1/content/{storage_id}",
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status == 200:
                     content_bytes = await response.read()
-                    content: str = content_bytes.decode('utf-8')
+                    content: str = content_bytes.decode("utf-8")
                     logger.info(f"Content fetched directly from Content Service: {storage_id}")
                     return content
                 else:
@@ -339,7 +338,7 @@ async def create_test_batch(
     expected_essay_count: int,
     course_code: str = "TEST",
     class_designation: str = "UtilityTest",
-    correlation_id: Optional[str] = None
+    correlation_id: Optional[str] = None,
 ) -> tuple[str, str]:
     """Convenience function that uses global service manager."""
     return await service_manager.create_batch(
@@ -348,9 +347,7 @@ async def create_test_batch(
 
 
 async def upload_test_files(
-    batch_id: str,
-    files: List[Dict[str, Any]],
-    correlation_id: Optional[str] = None
+    batch_id: str, files: List[Dict[str, Any]], correlation_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """Convenience function that uses global service manager."""
     return await service_manager.upload_files(batch_id, files, correlation_id)

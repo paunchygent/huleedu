@@ -48,13 +48,9 @@ class TestE2EKafkaMonitoring:
         # Use KafkaTestManager context manager for event monitoring
         topics = ["huleedu.file.essay.content.provisioned.v1"]
         async with kafka_event_monitor("content_provisioned_test", topics) as consumer:
-
             # Upload file using ServiceTestManager utility
             with open(test_file_path, "rb") as f:
-                files = [{
-                    "name": test_file_path.name,
-                    "content": f.read()
-                }]
+                files = [{"name": test_file_path.name, "content": f.read()}]
 
             try:
                 upload_result = await service_manager.upload_files(batch_id, files)
@@ -69,17 +65,11 @@ class TestE2EKafkaMonitoring:
             # Collect events using KafkaTestManager utility
             def event_filter(event_data: Dict[str, Any]) -> bool:
                 """Filter for our specific batch (matching batch_id)."""
-                return (
-                    "data" in event_data
-                    and event_data["data"].get("batch_id") == batch_id
-                )
+                return "data" in event_data and event_data["data"].get("batch_id") == batch_id
 
             try:
                 events = await kafka_manager.collect_events(
-                    consumer,
-                    expected_count=1,
-                    timeout_seconds=30,
-                    event_filter=event_filter
+                    consumer, expected_count=1, timeout_seconds=30, event_filter=event_filter
                 )
 
                 assert len(events) == 1, f"Expected 1 event, got {len(events)}"
@@ -169,15 +159,11 @@ class TestE2EKafkaMonitoring:
         # Use KafkaTestManager for event monitoring
         topics = ["huleedu.file.essay.content.provisioned.v1"]
         async with kafka_event_monitor("multi_file_events_test", topics) as consumer:
-
             # Upload multiple files using ServiceTestManager utility
             files: List[Dict[str, Any]] = []
             for test_file in test_file_paths:
                 with open(test_file, "rb") as f:
-                    files.append({
-                        "name": test_file.name,
-                        "content": f.read()
-                    })
+                    files.append({"name": test_file.name, "content": f.read()})
 
             try:
                 upload_result = await service_manager.upload_files(batch_id, files)
@@ -192,17 +178,14 @@ class TestE2EKafkaMonitoring:
             # Collect events for all uploaded files using KafkaTestManager
             def event_filter(event_data: Dict[str, Any]) -> bool:
                 """Filter for our specific batch (matching batch_id)."""
-                return (
-                    "data" in event_data
-                    and event_data["data"].get("batch_id") == batch_id
-                )
+                return "data" in event_data and event_data["data"].get("batch_id") == batch_id
 
             try:
                 events = await kafka_manager.collect_events(
                     consumer,
                     expected_count=len(test_file_paths),
                     timeout_seconds=45,
-                    event_filter=event_filter
+                    event_filter=event_filter,
                 )
 
                 # Validate we got the expected number of events
@@ -214,8 +197,9 @@ class TestE2EKafkaMonitoring:
                 event_data_list = [event_info["data"]["data"] for event_info in events]
 
                 # Validate each file generated an event
-                uploaded_files = {event_data["original_file_name"]
-                                  for event_data in event_data_list}
+                uploaded_files = {
+                    event_data["original_file_name"] for event_data in event_data_list
+                }
                 expected_files = {test_file.name for test_file in test_file_paths}
                 assert uploaded_files == expected_files, (
                     f"File name mismatch. Expected: {expected_files}, Got: {uploaded_files}"
@@ -231,7 +215,7 @@ class TestE2EKafkaMonitoring:
                     assert storage_id not in storage_ids, f"Duplicate storage_id: {storage_id}"
                     storage_ids.add(storage_id)
 
-                    print(f"📨 Event #{i+1}: {event_data['original_file_name']}")
+                    print(f"📨 Event #{i + 1}: {event_data['original_file_name']}")
 
                 print(f"✅ All {len(test_file_paths)} files generated separate events correctly")
 
@@ -253,7 +237,7 @@ class TestE2EKafkaMonitoring:
         # Use KafkaTestManager to validate Kafka connectivity
         test_topics = [
             "huleedu.file.essay.content.provisioned.v1",
-            "huleedu.batch.essays.registered.v1"
+            "huleedu.batch.essays.registered.v1",
         ]
 
         try:

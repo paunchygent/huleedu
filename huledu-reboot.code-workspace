@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"terminal.integrated.env.osx": {
+			"PDM_IGNORE_SAVED_PYTHON": "1"
+		},
+		"terminal.integrated.env.linux": {
+			"PDM_IGNORE_SAVED_PYTHON": "1"
+		}
+	}
+}

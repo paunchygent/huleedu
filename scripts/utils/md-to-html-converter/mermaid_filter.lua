@@ -58,7 +58,7 @@ local function render_mermaid(diagram_src)
   f:close()
 
   -- Build mermaid-cli command
-  local cmd = string.format("%s -i %s -o %s --quiet --width 2400 --height 1600 --scale 2", MERMAID_CLI, tmp_mmd, outfile)
+  local cmd = string.format("%s -i %s -o %s --quiet --width 1200 --height 800 --scale 1.2", MERMAID_CLI, tmp_mmd, outfile)
   local ok, _, code = os.execute(cmd)
   if not ok or code ~= 0 then
     io.stderr:write("[mermaid_filter] Error rendering diagram with command: " .. cmd .. "\n")
@@ -72,8 +72,10 @@ end
 function CodeBlock(block)
   if block.classes:includes("mermaid") or block.classes:includes("language-mermaid") then
     local img_path = render_mermaid(block.text)
-    return pandoc.Para { pandoc.Image({pandoc.Str("")}, img_path) }
+    local image_para = pandoc.Para { pandoc.Image({pandoc.Str("")}, img_path) }
+    local container_div = pandoc.Div(image_para, {class = 'mermaid-container'})
+    return container_div
   end
   -- otherwise, return nil (no modification)
   return nil
-end 
+end

@@ -86,8 +86,8 @@ class TestE2EPipelineWorkflows:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{base_url}/v1/content",
-                content=content.encode('utf-8'),
-                headers={"Content-Type": "text/plain"}
+                content=content.encode("utf-8"),
+                headers={"Content-Type": "text/plain"},
             )
 
             if response.status_code not in [200, 201]:

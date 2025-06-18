@@ -18,6 +18,7 @@ cj_ai_essay_assessment/*.xml
 /*.xml
 
 # Service data directories
+scripts/utils
 services/spell_checker_service/data/corrected_essays
 data/corrected_essays
 test_uploads/

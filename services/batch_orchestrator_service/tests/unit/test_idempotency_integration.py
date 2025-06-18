@@ -52,7 +52,7 @@ class MockRedisClient:
 
 def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
     """Create a mock Kafka message from event data."""
-    message_value = json.dumps(event_data).encode('utf-8')
+    message_value = json.dumps(event_data).encode("utf-8")
 
     # Determine correct topic based on event type
     event_type = event_data.get("event_type", "")
@@ -74,7 +74,7 @@ def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
         checksum=None,
         serialized_key_size=0,
         serialized_value_size=len(message_value),
-        headers=[]
+        headers=[],
     )
 
 
@@ -94,28 +94,16 @@ def sample_batch_essays_ready_event() -> dict:
             "event": "batch.essays.ready",
             "batch_id": batch_id,
             "ready_essays": [
-                {
-                    "essay_id": "essay-1",
-                    "text_storage_id": "storage-1"
-                },
-                {
-                    "essay_id": "essay-2",
-                    "text_storage_id": "storage-2"
-                }
+                {"essay_id": "essay-1", "text_storage_id": "storage-1"},
+                {"essay_id": "essay-2", "text_storage_id": "storage-2"},
             ],
-            "batch_entity": {
-                "entity_type": "batch",
-                "entity_id": batch_id
-            },
+            "batch_entity": {"entity_type": "batch", "entity_id": batch_id},
             "validation_failures": [],
             "metadata": {
-                "entity": {
-                    "entity_type": "batch",
-                    "entity_id": batch_id
-                },
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        }
+                "entity": {"entity_type": "batch", "entity_id": batch_id},
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        },
     }
 
 
@@ -135,14 +123,9 @@ def sample_els_phase_outcome_event() -> dict:
             "batch_id": batch_id,
             "phase_name": "spellcheck",
             "phase_status": "COMPLETED_SUCCESSFULLY",
-            "processed_essays": [
-                {
-                    "essay_id": "essay-1",
-                    "text_storage_id": "storage-1-processed"
-                }
-            ],
-            "failed_essay_ids": []
-        }
+            "processed_essays": [{"essay_id": "essay-1", "text_storage_id": "storage-1-processed"}],
+            "failed_essay_ids": [],
+        },
     }
 
 
@@ -159,6 +142,7 @@ def mock_handlers() -> Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandle
 
     # Import PhaseName to create proper phase initiators map
     from protocols import PhaseName
+
     mock_phase_initiators_map: Dict[PhaseName, Any] = {
         PhaseName.SPELLCHECK: mock_spellcheck_initiator
     }
@@ -166,7 +150,7 @@ def mock_handlers() -> Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandle
     # Configure successful responses for BatchEssaysReadyHandler
     mock_batch_repo.get_processing_pipeline_state.return_value = {
         "requested_pipelines": ["spellcheck"],
-        "spellcheck_status": "PENDING_DEPENDENCIES"
+        "spellcheck_status": "PENDING_DEPENDENCIES",
     }
     mock_batch_repo.get_batch_context.return_value = {"some": "context"}
 
@@ -174,7 +158,7 @@ def mock_handlers() -> Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandle
     batch_essays_ready_handler = BatchEssaysReadyHandler(
         event_publisher=mock_event_publisher,
         batch_repo=mock_batch_repo,
-        phase_initiators_map=mock_phase_initiators_map
+        phase_initiators_map=mock_phase_initiators_map,
     )
 
     els_phase_outcome_handler = ELSBatchPhaseOutcomeHandler(
@@ -216,7 +200,7 @@ class TestBOSIdempotencyIntegration:
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
-                redis_client=redis_client
+                redis_client=redis_client,
             )
             await consumer._handle_message(msg)
             return True  # Success
@@ -273,7 +257,7 @@ class TestBOSIdempotencyIntegration:
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
-                redis_client=redis_client
+                redis_client=redis_client,
             )
             await consumer._handle_message(msg)
             return True  # Success
@@ -316,7 +300,7 @@ class TestBOSIdempotencyIntegration:
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
-                redis_client=redis_client
+                redis_client=redis_client,
             )
             await consumer._handle_message(msg)
             return True  # Success
@@ -351,8 +335,8 @@ class TestBOSIdempotencyIntegration:
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
 
         # Configure business logic to fail
-        batch_essays_ready_handler.batch_repo.get_processing_pipeline_state.side_effect = (
-            Exception("Business logic failure")
+        batch_essays_ready_handler.batch_repo.get_processing_pipeline_state.side_effect = Exception(
+            "Business logic failure"
         )
 
         # Create Kafka message
@@ -367,7 +351,7 @@ class TestBOSIdempotencyIntegration:
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
-                redis_client=redis_client
+                redis_client=redis_client,
             )
             await consumer._handle_message(msg)
             return True  # Success
@@ -437,7 +421,7 @@ class TestBOSIdempotencyIntegration:
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
-                redis_client=redis_client
+                redis_client=redis_client,
             )
             await consumer._handle_message(msg)
             return True  # Success

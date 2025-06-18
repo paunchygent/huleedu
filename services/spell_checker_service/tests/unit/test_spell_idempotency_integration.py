@@ -91,23 +91,17 @@ def sample_spellcheck_request_event() -> dict:
         "correlation_id": correlation_id,
         "data": {
             "event_name": "essay.spellcheck.requested",  # Required field
-            "entity_ref": {
-                "entity_id": essay_id,
-                "entity_type": "essay"
-            },
+            "entity_ref": {"entity_id": essay_id, "entity_type": "essay"},
             "status": "awaiting_spellcheck",  # Required field
             "system_metadata": {
-                "entity": {
-                    "entity_id": essay_id,
-                    "entity_type": "essay"
-                },
+                "entity": {"entity_id": essay_id, "entity_type": "essay"},
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "processing_stage": "pending",
-                "event": "essay.spellcheck.requested"
+                "event": "essay.spellcheck.requested",
             },
             "text_storage_id": "storage-123",
-            "language": "en"
-        }
+            "language": "en",
+        },
     }
 
 
@@ -138,9 +132,8 @@ def mock_boundary_services() -> tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock
 
 @pytest.fixture
 def real_spell_logic(
-    mock_boundary_services:
-    tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock]
-    ) -> SpellLogicProtocol:
+    mock_boundary_services: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock],
+) -> SpellLogicProtocol:
     """Create real spell logic implementation for testing business logic."""
     _, _, result_store, _, _ = mock_boundary_services
 
@@ -151,7 +144,7 @@ def real_spell_logic(
 
     return DefaultSpellLogic(
         result_store=result_store,
-        http_session=mock_boundary_services[0]  # http_session
+        http_session=mock_boundary_services[0],  # http_session
     )
 
 
@@ -159,7 +152,7 @@ def real_spell_logic(
 async def test_first_time_event_processing_success(
     sample_spellcheck_request_event: dict,
     mock_boundary_services: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock],
-    real_spell_logic: SpellLogicProtocol
+    real_spell_logic: SpellLogicProtocol,
 ) -> None:
     """Test that first-time spell check events are processed successfully with idempotency."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -209,7 +202,7 @@ async def test_first_time_event_processing_success(
 async def test_duplicate_event_skipped(
     sample_spellcheck_request_event: dict,
     mock_boundary_services: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock],
-    real_spell_logic: SpellLogicProtocol
+    real_spell_logic: SpellLogicProtocol,
 ) -> None:
     """Test that duplicate events are skipped without processing business logic."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -259,7 +252,7 @@ async def test_duplicate_event_skipped(
 async def test_processing_failure_keeps_lock(
     sample_spellcheck_request_event: dict,
     mock_boundary_services: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock],
-    real_spell_logic: SpellLogicProtocol
+    real_spell_logic: SpellLogicProtocol,
 ) -> None:
     """Test that business logic failures keep Redis lock to prevent infinite retries."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -330,7 +323,7 @@ async def test_exception_failure_releases_lock(
 async def test_redis_failure_fallback(
     sample_spellcheck_request_event: dict,
     mock_boundary_services: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock],
-    real_spell_logic: SpellLogicProtocol
+    real_spell_logic: SpellLogicProtocol,
 ) -> None:
     """Test that Redis failures result in fail-open behavior."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -376,7 +369,7 @@ async def test_redis_failure_fallback(
 @pytest.mark.asyncio
 async def test_deterministic_event_id_generation(
     mock_boundary_services: tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, AsyncMock],
-    real_spell_logic: SpellLogicProtocol
+    real_spell_logic: SpellLogicProtocol,
 ) -> None:
     """Test that deterministic event IDs are generated correctly for spell check events."""
     from huleedu_service_libs.idempotency import idempotent_consumer
@@ -393,10 +386,10 @@ async def test_deterministic_event_id_generation(
             "entity": {"entity_id": "test-essay-123", "entity_type": "essay"},
             "timestamp": "2024-01-01T12:00:00Z",
             "processing_stage": "pending",
-            "event": "essay.spellcheck.requested"
+            "event": "essay.spellcheck.requested",
         },
         "text_storage_id": "storage-123",
-        "language": "en"
+        "language": "en",
     }
 
     # Event 1 - different envelope metadata
@@ -406,7 +399,7 @@ async def test_deterministic_event_id_generation(
         "event_timestamp": "2024-01-01T12:00:00Z",  # Different
         "source_service": "essay_lifecycle_service",
         "correlation_id": str(uuid.uuid4()),  # Different
-        "data": base_event_data  # Same data
+        "data": base_event_data,  # Same data
     }
 
     # Event 2 - different envelope metadata but same data
@@ -416,7 +409,7 @@ async def test_deterministic_event_id_generation(
         "event_timestamp": "2024-01-01T13:00:00Z",  # Different
         "source_service": "essay_lifecycle_service",
         "correlation_id": str(uuid.uuid4()),  # Different
-        "data": base_event_data  # Same data
+        "data": base_event_data,  # Same data
     }
 
     # Create Kafka messages

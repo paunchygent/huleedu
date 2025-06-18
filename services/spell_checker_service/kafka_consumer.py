@@ -150,10 +150,7 @@ class SpellCheckerKafkaConsumer:
                     for msg_count, msg in enumerate(messages):
                         if self.should_stop:
                             break
-                        logger.info(
-                            f"Processing message {msg_count + 1}/{len(messages)} "
-                            f"from {tp}"
-                        )
+                        logger.info(f"Processing message {msg_count + 1}/{len(messages)} from {tp}")
 
                         processing_result = await self._process_message_idempotently(msg)
 

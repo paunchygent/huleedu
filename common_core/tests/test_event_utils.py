@@ -21,14 +21,10 @@ class TestGenerateDeterministicEventId:
         """Test that identical data payloads produce identical deterministic IDs."""
         # Arrange
         event_data = {
-            "data": {
-                "batch_id": "batch_123",
-                "essay_count": 5,
-                "status": "completed"
-            },
+            "data": {"batch_id": "batch_123", "essay_count": 5, "status": "completed"},
             "event_id": str(uuid4()),  # Different each time
             "event_timestamp": "2024-01-15T10:30:00Z",  # Different each time
-            "source_service": "batch_orchestrator_service"
+            "source_service": "batch_orchestrator_service",
         }
 
         # Create two identical events with different transient metadata
@@ -40,8 +36,8 @@ class TestGenerateDeterministicEventId:
         event2["event_id"] = str(uuid4())  # Different UUID
         event2["event_timestamp"] = "2024-01-15T10:31:00Z"  # Different timestamp
 
-        msg1 = json.dumps(event1).encode('utf-8')
-        msg2 = json.dumps(event2).encode('utf-8')
+        msg1 = json.dumps(event1).encode("utf-8")
+        msg2 = json.dumps(event2).encode("utf-8")
 
         # Act
         id1 = generate_deterministic_event_id(msg1)
@@ -56,16 +52,16 @@ class TestGenerateDeterministicEventId:
         # Arrange
         event1 = {
             "data": {"batch_id": "batch_123", "status": "completed"},
-            "event_id": str(uuid4())
+            "event_id": str(uuid4()),
         }
 
         event2 = {
             "data": {"batch_id": "batch_456", "status": "completed"},  # Different batch_id
-            "event_id": str(uuid4())
+            "event_id": str(uuid4()),
         }
 
-        msg1 = json.dumps(event1).encode('utf-8')
-        msg2 = json.dumps(event2).encode('utf-8')
+        msg1 = json.dumps(event1).encode("utf-8")
+        msg2 = json.dumps(event2).encode("utf-8")
 
         # Act
         id1 = generate_deterministic_event_id(msg1)
@@ -79,16 +75,16 @@ class TestGenerateDeterministicEventId:
         # Arrange
         event1 = {
             "data": {"batch_id": "123", "essay_count": 5, "status": "completed"},
-            "event_id": str(uuid4())
+            "event_id": str(uuid4()),
         }
 
         event2 = {
             "data": {"status": "completed", "batch_id": "123", "essay_count": 5},  # Different order
-            "event_id": str(uuid4())
+            "event_id": str(uuid4()),
         }
 
-        msg1 = json.dumps(event1).encode('utf-8')
-        msg2 = json.dumps(event2).encode('utf-8')
+        msg1 = json.dumps(event1).encode("utf-8")
+        msg2 = json.dumps(event2).encode("utf-8")
 
         # Act
         id1 = generate_deterministic_event_id(msg1)
@@ -104,7 +100,7 @@ class TestGenerateDeterministicEventId:
             "data": {
                 "batch_id": "123",
                 "metadata": {"source": "file_service", "version": "1.0"},
-                "essays": [{"id": "essay_1"}, {"id": "essay_2"}]
+                "essays": [{"id": "essay_1"}, {"id": "essay_2"}],
             }
         }
 
@@ -112,12 +108,12 @@ class TestGenerateDeterministicEventId:
             "data": {
                 "essays": [{"id": "essay_1"}, {"id": "essay_2"}],  # Same data, different order
                 "batch_id": "123",
-                "metadata": {"version": "1.0", "source": "file_service"}
+                "metadata": {"version": "1.0", "source": "file_service"},
             }
         }
 
-        msg1 = json.dumps(event1).encode('utf-8')
-        msg2 = json.dumps(event2).encode('utf-8')
+        msg1 = json.dumps(event1).encode("utf-8")
+        msg2 = json.dumps(event2).encode("utf-8")
 
         # Act
         id1 = generate_deterministic_event_id(msg1)
@@ -129,13 +125,9 @@ class TestGenerateDeterministicEventId:
     def test_empty_data_field(self) -> None:
         """Test handling of events with empty data field."""
         # Arrange
-        event = {
-            "data": {},
-            "event_id": str(uuid4()),
-            "source_service": "test_service"
-        }
+        event = {"data": {}, "event_id": str(uuid4()), "source_service": "test_service"}
 
-        msg = json.dumps(event).encode('utf-8')
+        msg = json.dumps(event).encode("utf-8")
 
         # Act
         result_id = generate_deterministic_event_id(msg)
@@ -149,11 +141,11 @@ class TestGenerateDeterministicEventId:
         # Arrange
         event = {
             "event_id": str(uuid4()),
-            "source_service": "test_service"
+            "source_service": "test_service",
             # No 'data' field
         }
 
-        msg = json.dumps(event).encode('utf-8')
+        msg = json.dumps(event).encode("utf-8")
 
         # Act
         result_id = generate_deterministic_event_id(msg)
@@ -185,7 +177,7 @@ class TestGenerateDeterministicEventId:
     def test_non_utf8_bytes_fallback(self) -> None:
         """Test fallback behavior with non-UTF8 bytes."""
         # Arrange
-        non_utf8_msg = b'\xff\xfe\x00\x00invalid_bytes'
+        non_utf8_msg = b"\xff\xfe\x00\x00invalid_bytes"
 
         # Act
         result_id = generate_deterministic_event_id(non_utf8_msg)
@@ -210,12 +202,12 @@ class TestGenerateDeterministicEventId:
                 "text_storage_id": "text_storage_101",
                 "student_metadata": {
                     "student_name": "John Doe",
-                    "student_email": "john@example.com"
-                }
-            }
+                    "student_email": "john@example.com",
+                },
+            },
         }
 
-        msg = json.dumps(event).encode('utf-8')
+        msg = json.dumps(event).encode("utf-8")
 
         # Act
         result_id = generate_deterministic_event_id(msg)
@@ -235,10 +227,10 @@ class TestExtractCorrelationIdFromEvent:
         event = {
             "event_id": str(uuid4()),
             "correlation_id": correlation_id,
-            "data": {"batch_id": "123"}
+            "data": {"batch_id": "123"},
         }
 
-        msg = json.dumps(event).encode('utf-8')
+        msg = json.dumps(event).encode("utf-8")
 
         # Act
         result = extract_correlation_id_from_event(msg)
@@ -251,11 +243,11 @@ class TestExtractCorrelationIdFromEvent:
         # Arrange
         event = {
             "event_id": str(uuid4()),
-            "data": {"batch_id": "123"}
+            "data": {"batch_id": "123"},
             # No correlation_id field
         }
 
-        msg = json.dumps(event).encode('utf-8')
+        msg = json.dumps(event).encode("utf-8")
 
         # Act
         result = extract_correlation_id_from_event(msg)

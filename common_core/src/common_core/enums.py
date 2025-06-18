@@ -37,8 +37,6 @@ class ProcessingStage(str, Enum):
 
 
 class ProcessingEvent(str, Enum):
-
-
     # -------------  Batch coordination events  -------------#
     BATCH_ESSAYS_REGISTERED = "batch.essays.registered"
     BATCH_ESSAYS_READY = "batch.essays.ready"
@@ -287,6 +285,7 @@ class FileValidationErrorCode(str, Enum):
     Used in EssayValidationFailedV1 events to provide precise
     error categorization for BOS/ELS coordination and debugging.
     """
+
     # Content validation errors
     EMPTY_CONTENT = "EMPTY_CONTENT"
     CONTENT_TOO_SHORT = "CONTENT_TOO_SHORT"

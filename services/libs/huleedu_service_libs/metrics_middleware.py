@@ -74,15 +74,10 @@ def setup_metrics_middleware(
 
                 if request_count:
                     request_count.labels(
-                        method=method,
-                        endpoint=endpoint,
-                        **{status_label_name: status_code}
+                        method=method, endpoint=endpoint, **{status_label_name: status_code}
                     ).inc()
                 if request_duration:
-                    request_duration.labels(
-                        method=method,
-                        endpoint=endpoint
-                    ).observe(duration)
+                    request_duration.labels(method=method, endpoint=endpoint).observe(duration)
 
         except Exception as e:
             service_logger.error(f"Error recording request metrics: {e}")
@@ -103,7 +98,7 @@ def setup_content_service_metrics_middleware(app: Quart) -> None:
         request_count_metric_name="http_requests_total",
         request_duration_metric_name="http_request_duration_seconds",
         status_label_name="status_code",
-        logger_name="content.metrics"
+        logger_name="content.metrics",
     )
 
 
@@ -124,7 +119,7 @@ def setup_standard_service_metrics_middleware(app: Quart, service_name: str) -> 
         request_count_metric_name="request_count",
         request_duration_metric_name="request_duration",
         status_label_name="status_code",
-        logger_name=f"{service_name}.metrics"
+        logger_name=f"{service_name}.metrics",
     )
 
 
@@ -141,5 +136,5 @@ def setup_file_service_metrics_middleware(app: Quart) -> None:
         request_count_metric_name="request_count",
         request_duration_metric_name="request_duration",
         status_label_name="status",  # File service uses "status" instead of "status_code"
-        logger_name="file_service.metrics"
+        logger_name="file_service.metrics",
     )

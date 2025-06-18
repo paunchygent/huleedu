@@ -86,8 +86,9 @@ class RedisKeyTracker:
 class MockRedisClient:
     """Mock Redis client for individual service connections."""
 
-    def __init__(self, service_name: str, key_tracker: RedisKeyTracker,
-                 fail_mode: Optional[str] = None) -> None:
+    def __init__(
+        self, service_name: str, key_tracker: RedisKeyTracker, fail_mode: Optional[str] = None
+    ) -> None:
         self.service_name = service_name
         self.key_tracker = key_tracker
         self.fail_mode = fail_mode  # "set", "delete", "get", "all", None
@@ -172,8 +173,9 @@ class RedisTestManager:
         self.service_clients: Dict[str, MockRedisClient] = {}
         self._cleanup_tasks: List[asyncio.Task] = []
 
-    def create_service_client(self, service_name: str,
-                             fail_mode: Optional[str] = None) -> MockRedisClient:
+    def create_service_client(
+        self, service_name: str, fail_mode: Optional[str] = None
+    ) -> MockRedisClient:
         """
         Create a Redis client for a specific service.
 
@@ -221,7 +223,7 @@ class RedisTestManager:
             "delete_calls_by_service": {
                 service: len([call for call in self.key_tracker.delete_calls if call[0] == service])
                 for service in self.key_tracker.service_connections
-            }
+            },
         }
 
     def clear_all_keys(self) -> None:
@@ -277,12 +279,12 @@ def create_deterministic_event_test_data() -> List[Dict[str, Any]]:
         "batch_id": "test-batch-123",
         "essays": [
             {"essay_id": "essay-1", "text_storage_id": "storage-1"},
-            {"essay_id": "essay-2", "text_storage_id": "storage-2"}
+            {"essay_id": "essay-2", "text_storage_id": "storage-2"},
         ],
         "metadata": {
             "entity": {"entity_type": "batch", "entity_id": "test-batch-123"},
-            "timestamp": "2024-01-15T10:00:00Z"
-        }
+            "timestamp": "2024-01-15T10:00:00Z",
+        },
     }
 
     # Create multiple events with same data but different envelope metadata
@@ -294,7 +296,7 @@ def create_deterministic_event_test_data() -> List[Dict[str, Any]]:
             "event_timestamp": f"2024-01-15T10:0{i}:00Z",  # Different timestamps
             "source_service": "test_service",
             "correlation_id": str(uuid.uuid4()),  # Different correlation IDs
-            "data": base_data  # SAME DATA - should produce same deterministic ID
+            "data": base_data,  # SAME DATA - should produce same deterministic ID
         }
         events.append(event)
 

@@ -92,7 +92,6 @@ class TestE2ESpellcheckWorkflows:
         result_topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         async with kafka_event_monitor("spellcheck_pipeline_test", [result_topic]) as consumer:
-
             # Step 3: Publish SpellcheckRequestedV1 event using utility
             spellcheck_request = self._create_spellcheck_request_event(
                 essay_id=essay_id,
@@ -123,7 +122,7 @@ class TestE2ESpellcheckWorkflows:
                     consumer,
                     expected_count=1,
                     timeout_seconds=90,
-                    event_filter=spellcheck_result_filter
+                    event_filter=spellcheck_result_filter,
                 )
 
                 assert len(events) == 1, f"Expected 1 spellcheck result, got {len(events)}"
@@ -134,15 +133,15 @@ class TestE2ESpellcheckWorkflows:
                 assert spellcheck_result["status"] == EssayStatus.SPELLCHECKED_SUCCESS.value
                 assert spellcheck_result["corrections_made"] is not None
                 assert spellcheck_result["corrections_made"] > 0  # Should have found errors
-                print(f"✅ Spellcheck completed with "
-                      f"{spellcheck_result['corrections_made']} corrections")
+                print(
+                    f"✅ Spellcheck completed with "
+                    f"{spellcheck_result['corrections_made']} corrections"
+                )
 
                 # Step 5: Validate corrected content stored in Content Service using utility
                 storage_metadata = spellcheck_result.get("storage_metadata", {})
                 corrected_storage_id = (
-                    storage_metadata.get("references", {})
-                    .get("corrected_text", {})
-                    .get("default")
+                    storage_metadata.get("references", {}).get("corrected_text", {}).get("default")
                 )
 
                 assert corrected_storage_id is not None, (
@@ -203,7 +202,6 @@ class TestE2ESpellcheckWorkflows:
         result_topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         async with kafka_event_monitor("perfect_spellcheck_test", [result_topic]) as consumer:
-
             # Publish event using utility
             spellcheck_request = self._create_spellcheck_request_event(
                 essay_id=essay_id,
@@ -233,7 +231,7 @@ class TestE2ESpellcheckWorkflows:
                     consumer,
                     expected_count=1,
                     timeout_seconds=60,
-                    event_filter=spellcheck_result_filter
+                    event_filter=spellcheck_result_filter,
                 )
 
                 assert len(events) == 1
@@ -249,11 +247,7 @@ class TestE2ESpellcheckWorkflows:
                 pytest.fail(f"Event collection or validation failed: {e}")
 
     def _create_spellcheck_request_event(
-        self,
-        essay_id: str,
-        text_storage_id: str,
-        correlation_id: str,
-        language: str = "en"
+        self, essay_id: str, text_storage_id: str, correlation_id: str, language: str = "en"
     ) -> Dict[str, Any]:
         """
         Create SpellcheckRequestedV1 event structure.
@@ -263,12 +257,9 @@ class TestE2ESpellcheckWorkflows:
         from datetime import datetime, timezone
 
         # Create entity reference for the essay
-        essay_entity_ref = EntityReference(
-            entity_id=essay_id,
-            entity_type="essay"
-        )
+        essay_entity_ref = EntityReference(entity_id=essay_id, entity_type="essay")
 
-                # Create system metadata (match original working implementation)
+        # Create system metadata (match original working implementation)
         system_metadata = SystemProcessingMetadata(
             entity=essay_entity_ref,
             timestamp=datetime.now(timezone.utc),
@@ -295,8 +286,8 @@ class TestE2ESpellcheckWorkflows:
             event_timestamp=datetime.now(timezone.utc),
             source_service="test_spellcheck_workflows",
             correlation_id=uuid.UUID(correlation_id) if correlation_id else None,
-            data=spellcheck_request_data
+            data=spellcheck_request_data,
         )
 
         # Convert to dict for Kafka publishing, serializing UUIDs to strings
-        return event_envelope.model_dump(mode='json')
+        return event_envelope.model_dump(mode="json")

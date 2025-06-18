@@ -63,7 +63,7 @@ class CJAssessmentServiceProvider(Provider):
         """Provide Kafka bus for event publishing."""
         kafka_bus = KafkaBus(
             client_id=settings.PRODUCER_CLIENT_ID_CJ,
-            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         )
         await kafka_bus.start()
         return kafka_bus
@@ -72,8 +72,7 @@ class CJAssessmentServiceProvider(Provider):
     async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
         """Provide Redis client for idempotency operations."""
         redis_client = RedisClient(
-            client_id=f"{settings.SERVICE_NAME}-redis",
-            redis_url=settings.REDIS_URL
+            client_id=f"{settings.SERVICE_NAME}-redis", redis_url=settings.REDIS_URL
         )
         await redis_client.start()
         return redis_client

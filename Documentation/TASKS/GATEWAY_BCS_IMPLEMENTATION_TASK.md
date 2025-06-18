@@ -1,320 +1,593 @@
 # EPIC: CLIENT_INTERFACE_AND_DYNAMIC_PIPELINE_V1
 
 TASK TICKET: Implement API Gateway and Batch Conductor Service
-Status: Ready for Development
+Status: Ready for Development - Comprehensive Plan Approved
 
 Owner: @LeadDeveloper
 
-Labels: architecture, feature, api-gateway, bcs, quart, fastapi
+Labels: architecture, feature, api-gateway, bcs, fastapi, quart, react-frontend
 
 Depends On: PIPELINE_HARDENING_V1.1 (Event Idempotency)
 
 ## 1. Objective
 
-To enable client-facing interactions and dynamic, state-aware pipeline generation by implementing two new core services: the API Gateway Service and the Batch Conductor Service (BCS). This will decouple the client from the internal orchestration logic and introduce intelligent, dependency-aware pipeline construction, moving the platform closer to the vision outlined in the PRD.
+To enable client-facing interactions and dynamic, state-aware pipeline generation by implementing two new core services: the **API Gateway Service** (FastAPI-based for React frontend) and the **Batch Conductor Service** (Quart-based for internal orchestration). This introduces intelligent, dependency-aware pipeline construction while establishing a robust client-facing API architecture.
 
-## 2. Key Deliverables
+## 2. Architectural Decisions
 
-### 2.1. API Gateway Service
+### 2.1. Mixed Framework Approach - APPROVED
 
-[ ] A new FastAPI-based microservice (api_gateway_service).
+**API Gateway Service**: FastAPI
 
-[ ] An HTTP endpoint (POST /v1/batches/{batch_id}/pipelines) to accept user requests for processing pipelines, with automatic interactive documentation (Swagger UI).
+- **Justification**: Superior React frontend integration capabilities
+- **Benefits**: Automatic OpenAPI/Swagger docs, enhanced CORS handling, better request/response validation, performance optimization for client-facing APIs
+- **Integration**: Must maintain service library compliance (Kafka, logging, metrics)
 
-[ ] Logic to validate client requests and publish a ClientBatchPipelineRequestV1 command to a new Kafka topic.
+**Batch Conductor Service**: Quart
 
-[ ] Standardized health (/healthz) and metrics (/metrics) endpoints.
+- **Justification**: Maintains consistency with internal service architecture
+- **Benefits**: Consistent with existing internal service patterns, proven DI integration
 
-[ ] Integration into docker-compose.yml and the monorepo build/test process.
+### 2.2. Service Responsibilities
 
-### 2.2. Batch Conductor Service (BCS)
+**API Gateway Service** (Client-Facing):
 
-[ ] A new Quart-based microservice (batch_conductor_service).
+- React frontend API endpoints
+- Client request validation and rate limiting
+- Authentication/authorization (future-ready)
+- Kafka command publishing
+- Comprehensive API documentation
 
-[ ] An internal HTTP endpoint (POST /internal/v1/pipelines/define) that accepts a batch ID and a requested pipeline.
+**Batch Conductor Service** (Internal):
 
-[ ] Core logic to query the Essay Lifecycle Service (ELS) for the current state of essays in the specified batch.
+- Pipeline dependency resolution
+- Batch state analysis via ELS integration
+- Internal HTTP API for BOS
 
-[ ] A rules engine to determine necessary prerequisite processing steps (e.g., ensuring spellcheck runs before ai_feedback).
+## 3. Key Deliverables
 
-[ ] Logic to return a final, ordered list of pipeline phases to the caller (BOS).
+### 3.1. API Gateway Service (FastAPI-based)
 
-### 2.3. Modifications to Existing Services
+**Core Features**:
 
-[ ] Batch Orchestrator Service (BOS):
+- [ ] FastAPI-based microservice (api_gateway_service) with uvicorn
+- [ ] Client-facing HTTP endpoint: `POST /v1/batches/{batch_id}/pipelines`
+- [ ] Batch status endpoint: `GET /v1/batches/{batch_id}/status`
+- [ ] Automatic OpenAPI documentation at `/docs` and `/redoc`
+- [ ] CORS configuration for React frontend integration
+- [ ] Rate limiting and request validation
+- [ ] Standardized health (`/healthz`) and metrics (`/metrics`) endpoints
 
-[ ] Create a new Kafka consumer to listen for ClientBatchPipelineRequestV1 commands from the API Gateway.
+**React Frontend Integration**:
 
-[ ] Implement an HTTP client to call the new BCS endpoint to resolve the full pipeline definition.
+- [ ] CORS middleware configured for React dev/prod environments
+- [ ] Frontend-optimized error response format
+- [ ] Request/response models optimized for React state management
+- [ ] Comprehensive input validation with helpful error messages
 
-[ ] Update the BatchEssaysReadyHandler to transition the batch to a READY_FOR_PIPELINE_EXECUTION state instead of immediately initiating a pipeline.
+**Security & Production Readiness**:
 
-[ ] common_core:
+- [ ] Rate limiting per client/endpoint
+- [ ] Authentication middleware hooks (JWT-ready)
+- [ ] Comprehensive audit logging
+- [ ] Input sanitization and validation
 
-[ ] Define new Pydantic models for the ClientBatchPipelineRequestV1 command and the BCSPipelineDefinitionResponseV1 response.
+### 3.2. Batch Conductor Service (Quart-based)
 
-### 3. Architectural Implementation Plan
+**Core Features**:
 
-3.1. New Event & Command Contracts
-ClientBatchPipelineRequestV1
-This command is published by the API Gateway to Kafka when a user requests a pipeline to be run on a batch.
+- [x] Quart-based microservice (batch_conductor_service) with hypercorn  
+  *Implemented in Phase 2A. Lean Quart app with DI wired via Dishka before blueprint registration; hypercorn dev runner integrated in `app.py`.*
+- [x] Internal HTTP endpoint: `POST /internal/v1/pipelines/define`  
+  *Stub implementation compliant with request/response models, DI-injected service layer, and logging & error handling.*
+- [ ] Pipeline dependency resolution engine
+- [ ] **REVISED: Event-Driven State Projection.** BCS will consume `common_core` events (e.g., `SpellcheckResultDataV1`) from Kafka to build its own real-time view of batch state. This enhances decoupling and resilience.
+  - *Note: This deprecates the need for `els_client_impl.py`. The service will not make synchronous API calls to ELS.*
+- [ ] Concurrent request handling with proper error boundaries
+- [x] Standard health and metrics endpoints  
+  *`/healthz` and `/metrics` delivered with Prometheus registry injection; tests validate responses.*
+
+**Pipeline Intelligence**:
+
+- [ ] Dependency rules engine (e.g., ai_feedback requires spellcheck)
+- [ ] Batch state analysis and prerequisite checking
+- [ ] Optimized pipeline generation based on current essay states
+- [ ] Error handling for ELS communication failures
 
-File: common_core/src/common_core/events/client_commands.py
+### 3.3. Integration & Orchestration
 
-from __future__ import annotations
-import uuid
-from pydantic import BaseModel, Field
+**BOS Modifications**:
+
+- [ ] New Kafka consumer for `ClientBatchPipelineRequestV1` commands
+- [ ] HTTP client integration with BCS internal API
+- [ ] Pipeline orchestration with resolved dependencies
+- [x] **Implement Config-Driven Pipeline Generation:** ✅ **Completed**
+  - **Architecture:** As per the CTO's recommendation, the pipeline generation logic was implemented using a config-driven approach from day one to avoid technical debt and ensure adherence to our architectural principles.
+  - **Components:**
+    - **Definitions:** Pydantic models for type-safe configuration are defined in `services/batch_conductor_service/pipeline_definitions.py`.
+    - **Configuration:** The actual pipeline structures are defined in a human-readable YAML file at `services/batch_conductor_service/pipelines.yaml`.
+    - **Generator:** The `PipelineGenerator` class, responsible for loading and serving pipeline definitions, is implemented in `services/batch_conductor_service/pipeline_generator.py`.
+
+**Common Core Updates**:
+
+- [ ] `ClientBatchPipelineRequestV1` command contract
+- [ ] Kafka topic: `huleedu.commands.batch.pipeline.v1`
+- [x] BCS internal API request/response models  
+  *Implemented in `api_models.py` with Pydantic v2 for type safety and validation.*
+
+## 4. Implementation Plan
+
+### 4.1. Phase 1: Architectural Foundation (COMPLETE)
+
+**Status:** All foundational architecture for BCS and API Gateway is implemented and aligned with system rules.
+
+- [x] **Directory structure created** for both BCS (`services/batch_conductor_service/`) and API Gateway (`services/api_gateway_service/`).
+- [x] **Event contracts defined and tested** in `common_core/events/client_commands.py` and `common_core/events/__init__.py`.
+- [x] **Config-driven pipeline orchestration implemented**:
+  - `pipeline_definitions.py` — Pydantic models for pipeline config
+  - `pipelines.yaml` — YAML file with actual pipeline definitions
+  - `pipeline_generator.py` — Loader and accessor for config-driven pipelines
+- [x] **Service configuration patterns established** using Pydantic settings (`config.py`).
+- [x] **Initial test scaffolding and README files** created for both services.
+- [x] **Documentation and rules updated** to reflect FastAPI + Dishka and Quart + Dishka integration patterns.
+ (Week 1)
+
+**Event Contracts & Standards**:
+
+- [x] Create `common_core/src/common_core/events/client_commands.py`  
+  → File exists and is implemented.
+- [x] Define `ClientBatchPipelineRequestV1` with proper validation  
+  → Model is implemented using Pydantic v2, with correct validation logic.
+- [x] Update event exports in `common_core/events/__init__.py`  
+  → The event and its type constant are exported for use by other services.
+- [x] Document mixed-framework integration standards  
+  → FastAPI + Dishka and Quart + Dishka integration patterns are documented in `.cursor/rules/041-fastapi-integration-patterns.mdc` and related docs.
+
+**Service Structure Setup**:
+
+- [x] Create directory structures for both services  
+  → Both `services/batch_conductor_service/` and `services/api_gateway_service/` exist with correct initial structure.
+- [x] Establish FastAPI + Dishka integration patterns  
+  → Patterns are documented and initial scaffolding is present in the API Gateway service.
+- [x] Define service library integration for FastAPI services  
+  → FastAPI service setup follows the `huleedu-service-libs` pattern, as shown in the initial code and config.
+
+### 4.2. Phase 2: Batch Conductor Service (COMPLETE)
+
+**Status:** BCS is fully implemented with event-driven architecture, comprehensive testing, and production-ready patterns.
+
+**Service Implementation**:
+
+```text
+services/batch_conductor_service/
+├── app.py                        # ✅ Lean Quart setup with DI and hypercorn
+├── startup_setup.py              # ✅ DI + metrics initialization  
+├── api/
+│   ├── health_routes.py          # ✅ Standard endpoints with JSON responses
+│   └── pipeline_routes.py        # ✅ Internal pipeline endpoint
+├── implementations/
+│   ├── pipeline_rules_impl.py    # ✅ Dependency resolution logic
+│   ├── pipeline_resolution_service_impl.py  # ✅ Core business logic
+│   ├── pipeline_generator_impl.py          # ✅ Config-driven pipeline generation
+│   └── batch_state_repository_impl.py      # ✅ Redis-cached state management
+├── kafka_consumer.py             # ✅ Event-driven state projection
+├── protocols.py                  # ✅ Service behavioral contracts  
+├── di.py                         # ✅ Dishka providers with proper typing
+├── api_models.py                 # ✅ Request/response models
+├── config.py                     # ✅ Pydantic settings with Kafka/Redis
+└── tests/                        # ✅ Comprehensive test suite (16/16 passing)
+```
+
+**Key Components Completed**:
+
+- [x] **Pipeline dependency rules engine** — Implemented with comprehensive dependency resolution, prerequisite validation, and intelligent step pruning based on batch state
+- [x] **Event-driven batch state projection** — BCS consumes spellcheck/CJ assessment completion events via Kafka to maintain real-time batch state (replaces ELS HTTP polling)
+- [x] **Internal API endpoint implementation** — `/internal/v1/pipelines/define` with full request/response validation and error handling
+- [x] **Redis-cached state repository** — High-performance batch state management with PostgreSQL persistence patterns
+- [x] **Comprehensive testing** — 16/16 tests passing including boundary testing, event processing, API validation, and business logic
+- [x] **Production-ready architecture** — Protocol-based DI, proper error boundaries, structured logging, metrics integration
+
+### 4.3. Phase 3: API Gateway Service (Week 3)
+
+**Service Implementation**:
+
+```text
+services/api_gateway_service/
+├── main.py                       # FastAPI app setup
+├── startup_setup.py              # DI + middleware initialization
+├── routers/
+│   ├── health_routes.py          # Standard + docs endpoints
+│   └── pipeline_routes.py        # Client-facing endpoints
+├── middleware/
+│   ├── cors_middleware.py        # React CORS configuration
+│   ├── auth_middleware.py        # Authentication hooks
+│   └── rate_limit_middleware.py  # Rate limiting
+├── models/
+│   ├── requests.py               # Client request models
+│   ├── responses.py              # Client response models
+│   └── errors.py                 # Error response models
+├── implementations/
+│   └── kafka_publisher_impl.py   # Event publishing
+├── protocols.py                  # Service contracts
+├── di.py                         # FastAPI + Dishka providers
+├── config.py                     # Settings with CORS origins
+└── tests/
+```
 
-class ClientBatchPipelineRequestV1(BaseModel):
-    """
-    Command sent from the API Gateway to signal a user's request to run a
-    processing pipeline on an existing, fully uploaded batch.
-    """
-    batch_id: str = Field(description="The unique identifier of the target batch.")
-    requested_pipeline: str = Field(description="The final pipeline the user wants to run (e.g., 'ai_feedback').")
-    # user_id: str - To be added once authentication is in place.
+**Key Components**:
 
-BCSPipelineDefinitionRequestV1
-This is the internal request model for the HTTP call from BOS to BCS.
+- [ ] FastAPI + Dishka DI integration
+- [ ] CORS middleware for React frontend
+- [ ] Rate limiting and authentication middleware
+- [ ] Comprehensive API documentation
+- [ ] Client-optimized request/response models
 
-File: services/batch_conductor_service/api_models.py
+### 4.4. Phase 4: BOS Integration (Week 4)
 
-from __future__ import annotations
-from pydantic import BaseModel
+**BOS Modifications**:
 
-class BCSPipelineDefinitionRequestV1(BaseModel):
-    batch_id: str
-    requested_pipeline: str
+- [ ] Add `ClientBatchPipelineRequestHandler` to kafka_consumer.py
+- [ ] Implement `BatchConductorClientProtocol` and implementation
+- [ ] Update pipeline orchestration logic
+- [ ] Integration with existing Dishka DI patterns
 
-BCSPipelineDefinitionResponseV1
-This is the internal response model for the HTTP call from BOS to BCS.
+**Pipeline Orchestration Flow**:
 
-File: services/batch_conductor_service/api_models.py
+1. API Gateway receives client request
+2. Publishes `ClientBatchPipelineRequestV1` to Kafka
+3. BOS consumes command and calls BCS internal API
+4. BCS analyzes batch state and returns resolved pipeline
+5. BOS stores pipeline and initiates first phase
 
-from __future__ import annotations
-from typing import List
-from pydantic import BaseModel
+### 4.5. Phase 5: Infrastructure & Deployment (Week 5)
 
-class BCSPipelineDefinitionResponseV1(BaseModel):
-    batch_id: str
-    final_pipeline: List[str]
+**Docker Configuration**:
 
-### 3.2. API Gateway Service Implementation (api_gateway_service)
+- [ ] API Gateway: FastAPI + uvicorn Dockerfile
+- [ ] BCS: Quart + hypercorn Dockerfile (consistent with existing services)
+- [ ] docker-compose.yml updates with proper networking
 
-This service acts as the new front door. It will be built using FastAPI to leverage its automatic API documentation capabilities.
+**Port Assignments**:
 
-Directory Structure: Create services/api_gateway_service/ mirroring other services, but with a simpler app.py structure idiomatic to FastAPI.
+- API Gateway: 4001 (client-facing)
+- BCS: 4002 (internal)
 
-Dependencies (pyproject.toml): fastapi, uvicorn[standard], dishka, huleedu-common-core, huleedu-service-libs.
+**Service Discovery**:
 
-Core Logic:
+- [ ] Environment variable configuration
+- [ ] Health check endpoints
+- [ ] Proper service dependency ordering
 
-di.py: Provides KafkaBus and Settings.
+## 5. Testing Strategy
 
-app.py: FastAPI application setup, DI integration, startup/shutdown events, and route definitions.
+### 5.1. Unit Testing
 
-Endpoint: POST /v1/batches/{batch_id}/pipelines
+**API Gateway (FastAPI)**:
 
-## In services/api_gateway_service/app.py
+- [ ] FastAPI TestClient for all endpoints
+- [ ] CORS configuration testing
+- [ ] Request validation testing
+- [ ] Rate limiting testing
+- [ ] Kafka event publishing testing
 
-from fastapi import FastAPI, Request, status, Depends
-from fastapi.responses import JSONResponse
-from dishka.integrations.fastapi import DishkaRoute, FromDishka
+**BCS (Quart)** - COMPLETE:
 
-from huleedu_service_libs.kafka_client import KafkaBus
-from common_core.events.client_commands import ClientBatchPipelineRequestV1
-from common_core.events.envelope import EventEnvelope
-import uuid
+- [x] **Pipeline rules engine comprehensive testing** — 7/7 tests covering dependency resolution, prerequisite validation, step pruning scenarios
+- [x] **Event-driven integration testing** — 4/4 Kafka consumer tests including event processing, lifecycle management, error handling
+- [x] **API endpoint testing** — 4/4 tests covering success scenarios, validation errors, method restrictions
+- [x] **Boundary and error scenario testing** — 1/1 health endpoint test, comprehensive edge case coverage
 
-### ... (app setup, DI setup, startup/shutdown events)
+### 5.2. Integration Testing
 
-## The route for handling pipeline requests
+**Service Integration**:
 
-@app.post("/v1/batches/{batch_id}/pipelines", status_code=status.HTTP_202_ACCEPTED)
-async def run_pipeline(
-    batch_id: str,
-    command_data: ClientBatchPipelineRequestV1, # FastAPI automatically validates the request body
-    kafka_bus: FromDishka[KafkaBus]
-):
-    # FastAPI ensures command_data is a valid Pydantic model
-    # We just need to ensure the batch_id from the path matches
-    if batch_id != command_data.batch_id:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"error": "Path batch_id does not match request body batch_id."}
-        )
+- [ ] BOS ↔ BCS HTTP API contract testing
+- [ ] API Gateway ↔ Kafka integration testing
+- [ ] Mixed framework service communication testing
 
-    correlation_id = uuid.uuid4()
-    envelope = EventEnvelope[ClientBatchPipelineRequestV1](
-        event_type="client.batch.pipeline.request.v1",
-        source_service="api-gateway",
-        correlation_id=correlation_id,
-        data=command_data
-    )
+**Frontend Integration**:
 
-    await kafka_bus.publish("huleedu.commands.batch.pipeline.v1", envelope)
+- [ ] CORS validation with React development server
+- [ ] OpenAPI schema validation
+- [ ] Error response format validation
+- [ ] Request/response model testing
 
-    return {
-        "message": "Pipeline request accepted.",
-        "batch_id": command_data.batch_id,
-        "correlation_id": str(correlation_id)
-    }
+### 5.3. Performance Testing
 
-### 3.3. Batch Conductor Service (BCS) Implementation (batch_conductor_service)
+**Load Testing**:
 
-This is the new "pipeline brain." It is an internal HTTP service queried by BOS. It will be built with Quart for consistency with other internal services.
+- [ ] API Gateway: 100+ concurrent requests/minute
+- [ ] BCS: Multiple simultaneous pipeline requests
+- [ ] End-to-end pipeline resolution performance (< 2 second response)
 
-Directory Structure: Create services/batch_conductor_service/ mirroring batch_orchestrator_service.
+### 5.4. End-to-End Testing
 
-Dependencies (pyproject.toml): quart, hypercorn, dishka, aiohttp, huleedu-common-core.
+**Comprehensive Workflow**:
 
-Core Logic:
+- [ ] Create E2E test in `tests/functional/test_e2e_client_pipeline_workflow.py`
+- [ ] Test complete flow: Client request → API Gateway → BOS → BCS → Pipeline initiation
+- [ ] Include error scenarios and edge cases
+- [ ] Validate proper event ordering and state transitions
 
-di.py: Provides an aiohttp.ClientSession for calling ELS.
+## 6. Security Considerations
 
-pipeline_rules.py: Contains the logic for dependency resolution (e.g., {'ai_feedback': ['spellcheck']}).
+### 6.1. Client-Facing API Security
 
-api/pipeline_routes.py: Implements the internal endpoint for BOS.
+**Input Validation**:
 
-Endpoint: POST /internal/v1/pipelines/define
+- [ ] Strict validation for all client inputs
+- [ ] SQL injection prevention
+- [ ] XSS prevention in error messages
 
-### In services/batch_conductor_service/api/pipeline_routes.py
+**Rate Limiting**:
 
-from quart import Blueprint, request, jsonify
-from quart_dishka import inject
-from dishka import FromDishka
-import aiohttp
-from .api_models import BCSPipelineDefinitionRequestV1, BCSPipelineDefinitionResponseV1
+- [ ] Per-client rate limiting
+- [ ] Per-endpoint rate limiting
+- [ ] Burst protection
 
-pipeline_bp = Blueprint("pipeline_routes", __name__)
+**Authentication (Future-Ready)**:
 
-### Hardcoded rules for this implementation
+- [ ] JWT middleware hooks
+- [ ] OAuth integration preparation
+- [ ] Role-based access control framework
 
-PIPELINE_DEPENDENCIES = {
-    "ai_feedback": ["spellcheck"],
-    "cj_assessment": ["spellcheck"]
-}
+### 6.2. Internal Service Security
 
-@pipeline_bp.route("/internal/v1/pipelines/define", methods=["POST"])
-@inject
-async def define_pipeline(session: FromDishka[aiohttp.ClientSession]):
-    req_data = await request.get_json()
-    validated_req = BCSPipelineDefinitionRequestV1(**req_data)
-    batch_id = validated_req.batch_id
-    requested_pipeline = validated_req.requested_pipeline
+**API Security**:
 
-    # 1. Query ELS for current essay statuses
-    els_url = f"http://essay_lifecycle_service:6001/v1/batches/{batch_id}/status"
-    async with session.get(els_url) as response:
-        if response.status != 200:
-            return jsonify({"error": "Failed to get batch state from ELS"}), 502
-        els_status_data = await response.json()
+- [ ] Internal API authentication between BOS and BCS
+- [ ] Request/response validation
+- [ ] Proper error handling without information leakage
 
-    # 2. Analyze statuses and apply rules
-    # (Simplified logic for demonstration)
-    final_pipeline = []
-    dependencies = PIPELINE_DEPENDENCIES.get(requested_pipeline, [])
+## 7. API Documentation
 
-    # For each dependency, check if it's already done. If not, add it.
-    # This logic would be more robust in production.
-    if "spellcheck" in dependencies:
-        # A more robust check would see if ALL essays are in SPELLCHECKED_SUCCESS state
-        # For now, we assume if any are not, we need to run it.
-        final_pipeline.append("spellcheck")
+### 7.1. Client-Facing Documentation
 
-    final_pipeline.append(requested_pipeline)
+**Automatic Documentation**:
 
-    response_model = BCSPipelineDefinitionResponseV1(
-        batch_id=batch_id,
-        final_pipeline=final_pipeline
-    )
-    return jsonify(response_model.model_dump()), 200
+- [ ] OpenAPI/Swagger specification generation
+- [ ] Interactive documentation at `/docs`
+- [ ] Alternative documentation at `/redoc`
+- [ ] Comprehensive request/response examples
 
-### 3.4. Modifications to Batch Orchestrator Service (BOS)
+**Developer Resources**:
 
-New Kafka Consumer: Create a new consumer function in kafka_consumer.py to listen on huleedu.commands.batch.pipeline.v1.
+- [ ] API versioning strategy
+- [ ] Error code documentation
+- [ ] Rate limiting documentation
+- [ ] Authentication flow documentation (when implemented)
 
-Handler Logic:
+### 7.2. Internal Documentation
 
-On receiving ClientBatchPipelineRequestV1, extract batch_id and requested_pipeline.
+**Service Architecture**:
 
-Make a POST request to the BCS internal endpoint (/internal/v1/pipelines/define).
+- [ ] Mixed-framework integration guidelines
+- [ ] Service library compliance documentation
+- [ ] Deployment and configuration guides
 
-Receive the BCSPipelineDefinitionResponseV1 containing the final_pipeline list.
+## 8. Monitoring & Observability
 
-Save this final_pipeline list to the ProcessingPipelineState for the batch.
+### 8.1. Metrics
 
-Initiate the first step of the final_pipeline using the existing initiator logic.
+**API Gateway Metrics**:
 
-## 4. Updated System Workflow
+- [ ] Request count by endpoint and status code
+- [ ] Request duration histograms
+- [ ] Rate limiting metrics
+- [ ] Error rate tracking
 
-sequenceDiagram
-    participant User
-    participant API Gateway
-    participant Kafka
-    participant BOS as Batch Orchestrator
-    participant BCS as Batch Conductor
-    participant ELS as Essay Lifecycle
+**BCS Metrics**:
 
-    User->>API Gateway: POST /v1/batches/{id}/pipelines (req: "ai_feedback")
-    API Gateway->>Kafka: Publishes ClientBatchPipelineRequestV1
-    Kafka-->>BOS: Consumes command
+- [ ] Pipeline resolution count and duration
+- [ ] ELS client success/failure rates
+- [ ] Concurrent request handling metrics
 
-    BOS->>BCS: POST /internal/pipelines/define (batch_id, "ai_feedback")
-    BCS->>ELS: GET /v1/batches/{id}/status
-    ELS-->>BCS: Returns essay statuses (all are "READY_FOR_PROCESSING")
-    BCS-->>BOS: Returns final_pipeline: ["spellcheck", "ai_feedback"]
+### 8.2. Logging
 
-    BOS->>BOS: Stores final_pipeline in its state
-    BOS->>Kafka: Publishes BatchServiceSpellcheckInitiateCommand
-    Kafka-->>ELS: ELS processes spellcheck...
-    ELS->>Kafka: ELS publishes ELSBatchPhaseOutcome for spellcheck
-    Kafka-->>BOS: BOS consumes spellcheck outcome...
+**Structured Logging**:
 
-    BOS->>Kafka: Publishes BatchServiceAIFeedbackInitiateCommand
-    Kafka-->>ELS: ELS processes AI feedback...
-    Note right of ELS: Cycle continues...
+- [ ] Correlation ID tracking across services
+- [ ] Client request audit logging
+- [ ] Error logging with proper context
+- [ ] Performance logging for slow requests
 
-## 5. Validation & Testing Strategy
+## 9. Acceptance Criteria
 
-Unit Tests:
+### 9.1. Functional Requirements
 
-Test the BCS pipeline_rules.py logic in isolation.
+**API Gateway**:
 
-Test the new Pydantic command/response models.
+- [ ] Client can successfully request pipeline execution
+- [ ] Proper CORS configuration for React frontend
+- [ ] Comprehensive API documentation generated
+- [ ] Rate limiting prevents abuse
+- [ ] Proper error responses for all scenarios
 
-Integration Tests:
+**BCS** - COMPLETE:
 
-Test the API Gateway's ability to publish to Kafka correctly.
+- [x] **Correctly resolves pipeline dependencies** — Intelligent dependency resolution with batch-aware state analysis
+- [x] **Event-driven architecture** — Real-time batch state projection via Kafka events (spellcheck, CJ assessment completion)
+- [x] **Proper error handling and validation** — Comprehensive error boundaries, Pydantic validation, graceful degradation
+- [x] **Production-ready performance** — Redis-cached state management, protocol-based DI, structured logging
 
-Test BOS's ability to call the BCS HTTP endpoint and process the response.
+**Integration**:
 
-Test BCS's ability to call the ELS HTTP endpoint.
+- [ ] BOS successfully integrates with both services
+- [ ] Complete pipeline orchestration flow works
+- [ ] Proper event ordering and state management
 
-End-to-End (E2E) Test:
+### 9.2. Non-Functional Requirements
 
-Create a new test in tests/functional/ that simulates the full sequence diagram above.
+**Performance**:
 
-The test will:
+- [ ] API Gateway handles 100+ requests/minute
+- [ ] BCS handles 50+ concurrent pipeline requests
+- [ ] End-to-end response time < 5 seconds
 
-Register a batch and upload files (setup).
+**Reliability**:
 
-Call the new API Gateway endpoint.
+- [ ] Graceful degradation when services are unavailable
+- [ ] Proper error recovery and retry logic
+- [ ] Circuit breaker patterns for external dependencies
 
-Monitor Kafka to ensure BOS correctly initiates spellcheck first, not ai_feedback.
+**Security**:
 
-(Optional) Mock the spellcheck service's response to trigger the next phase and verify ai_feedback is initiated correctly.
+- [ ] All client inputs properly validated
+- [ ] Rate limiting prevents abuse
+- [ ] Audit logging for all client interactions
 
-## 6. Acceptance Criteria
+### 9.3. Technical Requirements
 
-[ ] All new services (api_gateway_service, batch_conductor_service) are created with the correct directory structure and dependencies.
+**Code Quality**:
 
-[ ] The API Gateway has a functioning endpoint that publishes commands to Kafka.
+- [x] **BCS: All code passes linting and type checking** — Zero MyPy errors, zero Ruff warnings
+- [x] **BCS: Comprehensive test coverage** — 16/16 tests passing covering all critical business logic paths
+- [x] **BCS: Proper documentation and comments** — Comprehensive docstrings, architectural documentation
+- [ ] API Gateway: Code quality validation pending
 
-[ ] The BCS has a functioning internal endpoint that correctly queries ELS and returns a dependency-aware pipeline.
+**Service Integration**:
 
-[ ] BOS is modified to consume the new command, call the BCS, and initiate the correct first phase of the returned pipeline.
+- [x] **BCS: Service library compliance** — Full integration with huleedu-service-libs (logging, metrics, Kafka, Redis)
+- [x] **BCS: Dishka DI integration** — Protocol-based dependency injection with proper typing
+- [x] **BCS: Consistent logging and metrics patterns** — Structured logging, Prometheus metrics, health checks
+- [ ] API Gateway: Service integration pending
 
-[ ] All new code is linted, type-checked, and includes unit tests with sufficient coverage.
+## 10. Deployment Checklist
 
-[ ] A new E2E test successfully validates the updated orchestration flow.
+### 10.1. Pre-Deployment
+
+**Code Quality**:
+
+- [x] **BCS: All tests pass** — 16/16 tests passing (`pdm run pytest services/batch_conductor_service/`)
+- [x] **BCS: Linting passes** — Zero Ruff warnings (`pdm run ruff check services/batch_conductor_service/`)
+- [x] **BCS: Type checking passes** — Zero MyPy errors (`pdm run mypy services/batch_conductor_service/`)
+- [ ] API Gateway: Code quality validation pending
+
+**Infrastructure**:
+
+- [ ] Docker images build successfully
+- [ ] Health checks respond correctly
+- [ ] Services start and shut down gracefully
+
+### 10.2. Deployment Validation
+
+**Service Health**:
+
+- [ ] All services pass health checks
+- [ ] Metrics endpoints respond correctly
+- [ ] Proper service discovery and communication
+
+**Functional Testing**:
+
+- [ ] End-to-end workflow testing
+- [ ] Error scenario validation
+- [ ] Performance benchmarking
+
+## 11. Future Considerations
+
+### 11.1. React Frontend Integration
+
+**Phase 2 Enhancements**:
+
+- [ ] WebSocket support for real-time status updates
+- [ ] File upload proxy/orchestration
+- [ ] Advanced authentication/authorization
+- [ ] Multi-tenant support
+
+### 11.2. Scalability
+
+**Horizontal Scaling**:
+
+- [ ] Load balancing for API Gateway
+- [ ] BCS scaling patterns
+- [ ] Caching strategies for improved performance
+
+---
+
+**Implementation Start Date**: [To be determined]
+**Estimated Completion**: 5 weeks
+**Priority**: High - Critical for React frontend integration
+
+**Final Review Required**: Architecture review before Phase 3 (API Gateway implementation)
+**Reliability**:
+
+- [ ] Graceful degradation when services are unavailable
+- [ ] Proper error recovery and retry logic
+- [ ] Circuit breaker patterns for external dependencies
+
+**Security**:
+
+- [ ] All client inputs properly validated
+- [ ] Rate limiting prevents abuse
+- [ ] Audit logging for all client interactions
+
+### 9.3. Technical Requirements
+
+**Code Quality**:
+
+- [ ] All code passes linting and type checking
+- [ ] Comprehensive test coverage (>90% for critical paths)
+- [ ] Proper documentation and comments
+
+**Service Integration**:
+
+- [ ] Maintains service library compliance
+- [ ] Proper Dishka DI integration for both frameworks
+- [ ] Consistent logging and metrics patterns
+
+## 10. Deployment Checklist
+
+### 10.1. Pre-Deployment
+
+**Code Quality**:
+
+- [ ] All tests pass (`pdm run pytest`)
+- [ ] Linting passes (`pdm run lint-all`)
+- [ ] Type checking passes (`pdm run typecheck-all`)
+
+**Infrastructure**:
+
+- [ ] Docker images build successfully
+- [ ] Health checks respond correctly
+- [ ] Services start and shut down gracefully
+
+### 10.2. Deployment Validation
+
+**Service Health**:
+
+- [ ] All services pass health checks
+- [ ] Metrics endpoints respond correctly
+- [ ] Proper service discovery and communication
+
+**Functional Testing**:
+
+- [ ] End-to-end workflow testing
+- [ ] Error scenario validation
+- [ ] Performance benchmarking
+
+## 11. Future Considerations
+
+### 11.1. React Frontend Integration
+
+**Phase 2 Enhancements**:
+
+- [ ] WebSocket support for real-time status updates
+- [ ] File upload proxy/orchestration
+- [ ] Advanced authentication/authorization
+- [ ] Multi-tenant support
+
+### 11.2. Scalability
+
+**Horizontal Scaling**:
+
+- [ ] Load balancing for API Gateway
+- [ ] BCS scaling patterns
+- [ ] Caching strategies for improved performance
+
+---
+
+**Implementation Start Date**: [To be determined]
+**Estimated Completion**: 5 weeks
+**Priority**: High - Critical for React frontend integration
+
+**Final Review Required**: Architecture review before Phase 3 (API Gateway implementation)

@@ -166,6 +166,7 @@ module = [
     "redis.*",  # Redis client library
     "enums_db",       # Database enum module without type stubs
     "models_db",      # Database models module without type stubs
+    "yaml.*",       # PyYAML stubs
 ]
 ignore_missing_imports = true
 
