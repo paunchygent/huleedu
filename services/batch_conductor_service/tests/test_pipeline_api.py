@@ -31,9 +31,7 @@ class TestPipelineResolutionAPI:
         assert data["final_pipeline"] == ["spellcheck", "nlp", "ai_feedback"]
         assert "analysis_summary" in data
 
-    async def test_pipeline_resolution_validation_error(
-        self, app_client: QuartTestClient
-    ) -> None:
+    async def test_pipeline_resolution_validation_error(self, app_client: QuartTestClient) -> None:
         # Missing requested_pipeline field
         payload = {"batch_id": "batch_002"}
         response = await app_client.post("/internal/v1/pipelines/define", json=payload)
@@ -49,11 +47,10 @@ class TestPipelineResolutionAPI:
 async def test_pipeline_resolution_endpoint_exists() -> None:
     """Test that the pipeline resolution endpoint responds."""
     async with app.test_client() as client:
-        response = await client.post("/internal/v1/pipelines/define", json={
-            "requested_pipeline": "comprehensive",
-            "batch_id": "test-batch",
-            "essays": []
-        })
+        response = await client.post(
+            "/internal/v1/pipelines/define",
+            json={"requested_pipeline": "comprehensive", "batch_id": "test-batch", "essays": []},
+        )
 
         # Should respond (even if with error due to incomplete implementation)
         assert response.status_code in [200, 400, 500]

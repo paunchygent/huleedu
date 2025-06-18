@@ -192,8 +192,6 @@ class BCSKafkaConsumer:
             logger.error(f"Error processing spellcheck completion: {e}", exc_info=True)
             raise
 
-
-
     async def _handle_cj_assessment_completed(self, msg: ConsumerRecord) -> None:
         """Handle CJ assessment completion events."""
         try:
@@ -224,7 +222,8 @@ class BCSKafkaConsumer:
 
                     if success:
                         logger.info(
-                            f"Recorded CJ assessment completion for essay {essay_id} in batch {batch_id}",
+                            f"Recorded CJ assessment completion for essay {essay_id} "
+                            f"in batch {batch_id}",
                             extra={"correlation_id": str(envelope.correlation_id)},
                         )
                     else:

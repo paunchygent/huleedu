@@ -56,21 +56,21 @@ def sample_message_data():
             "entity_ref": {
                 "entity_id": "essay-123",
                 "entity_type": "essay",
-                "parent_id": "batch-456"
+                "parent_id": "batch-456",
             },
             "status": "spellchecked_success",
             "system_metadata": {
                 "entity": {
                     "entity_id": "essay-123",
                     "entity_type": "essay",
-                    "parent_id": "batch-456"
+                    "parent_id": "batch-456",
                 },
                 "processing_stage": "completed",
-                "event": "essay.spellcheck.completed"
+                "event": "essay.spellcheck.completed",
             },
             "original_text_storage_id": "text-storage-123",
-            "corrections_made": 5
-        }
+            "corrections_made": 5,
+        },
     }
 
 

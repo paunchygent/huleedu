@@ -70,3 +70,63 @@ class RedisClientProtocol(Protocol):
             True if operation succeeded
         """
         ...
+
+
+class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
+    """
+    Extended protocol for atomic Redis operations using WATCH/MULTI/EXEC pattern.
+
+    Extends basic RedisClientProtocol for services needing atomic transactions.
+    Services using only idempotency can continue using RedisClientProtocol.
+    """
+
+    async def watch(self, *keys: str) -> bool:
+        """
+        Watch one or more keys for changes during transaction.
+
+        Args:
+            keys: Redis keys to watch
+
+        Returns:
+            True if WATCH command succeeded
+        """
+        ...
+
+    async def multi(self) -> bool:
+        """
+        Start a Redis transaction (MULTI).
+
+        Returns:
+            True if MULTI command succeeded
+        """
+        ...
+
+    async def exec(self) -> list[Any] | None:
+        """
+        Execute a Redis transaction (EXEC).
+
+        Returns:
+            List of results if transaction succeeded, None if transaction was discarded
+        """
+        ...
+
+    async def unwatch(self) -> bool:
+        """
+        Unwatch all keys (UNWATCH).
+
+        Returns:
+            True if UNWATCH command succeeded
+        """
+        ...
+
+    async def scan_pattern(self, pattern: str) -> list[str]:
+        """
+        Scan for keys matching a pattern.
+
+        Args:
+            pattern: Redis pattern to match (e.g., "bcs:essay_state:batch_001:*")
+
+        Returns:
+            List of keys matching the pattern
+        """
+        ...

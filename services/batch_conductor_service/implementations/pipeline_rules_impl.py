@@ -8,14 +8,13 @@ if TYPE_CHECKING:
     from prometheus_client import CollectorRegistry
 
 from collections import defaultdict, deque
-from typing import List
 
+from services.batch_conductor_service.pipeline_definitions import PipelineDefinition, PipelineStep
 from services.batch_conductor_service.protocols import (
     BatchStateRepositoryProtocol,
     PipelineGeneratorProtocol,
     PipelineRulesProtocol,
 )
-from services.batch_conductor_service.pipeline_definitions import PipelineStep, PipelineDefinition
 
 
 class DefaultPipelineRules(PipelineRulesProtocol):
@@ -25,9 +24,9 @@ class DefaultPipelineRules(PipelineRulesProtocol):
         self,
         pipeline_generator: PipelineGeneratorProtocol,
         batch_state_repository: BatchStateRepositoryProtocol,
-        registry: "CollectorRegistry | None" = None,
+        registry: CollectorRegistry | None = None,
     ):
-        from prometheus_client import Counter, CollectorRegistry  # local import
+        from prometheus_client import CollectorRegistry, Counter  # local import
 
         self.pipeline_generator = pipeline_generator
         self.batch_state_repository = batch_state_repository
@@ -117,9 +116,7 @@ class DefaultPipelineRules(PipelineRulesProtocol):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    async def _find_pipeline_containing_step(
-        self, step_name: str
-    ) -> PipelineDefinition | None:
+    async def _find_pipeline_containing_step(self, step_name: str) -> PipelineDefinition | None:
         """Return the PipelineDefinition that contains *step_name*, else None."""
         for pipeline_name in await self.pipeline_generator.list_available_pipelines():
             definition = await self.pipeline_generator.get_pipeline_definition(pipeline_name)
@@ -127,7 +124,7 @@ class DefaultPipelineRules(PipelineRulesProtocol):
                 return definition
         return None
 
-    def _topological_sort(self, definition: PipelineDefinition, root_step: str) -> List[str]:
+    def _topological_sort(self, definition: PipelineDefinition, root_step: str) -> list[str]:
         """Return ordered list starting with dependencies and ending with *root_step*."""
         # Gather reachable nodes via DFS
         step_map: dict[str, PipelineStep] = {s.name: s for s in definition.steps}

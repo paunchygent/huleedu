@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-"""Validation tests for :pyclass:`DefaultPipelineGenerator`.
-
-These tests focus solely on static YAML validation – cycles and undefined
-dependencies – without hitting any external systems.
-"""
-
-import tempfile
 from pathlib import Path
 
 import pytest
 import yaml
 
+from services.batch_conductor_service.config import Settings
 from services.batch_conductor_service.implementations.pipeline_generator_impl import (
     DefaultPipelineGenerator,
 )
-from services.batch_conductor_service.config import Settings
+
+"""Validation tests for :pyclass:`DefaultPipelineGenerator`.
+
+These tests focus solely on static YAML validation, cycles and undefined
+dependencies, without hitting any external systems.
+"""
 
 
 @pytest.fixture()

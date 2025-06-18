@@ -7,13 +7,9 @@ event-driven state management, and configuration-driven pipeline generation.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol
 
-from services.batch_conductor_service.api_models import (
-    BCSPipelineDefinitionRequestV1,
-    BCSPipelineDefinitionResponseV1,
-)
-from services.batch_conductor_service.pipeline_definitions import PipelineDefinition
+from common_core.events.envelope import EventEnvelope
 
 
 class BatchStateRepositoryProtocol(Protocol):
@@ -89,47 +85,15 @@ class PipelineRulesProtocol(Protocol):
     """
 
     async def resolve_pipeline_dependencies(
-        self, requested_pipeline: str, batch_id: str | None = None
-    ) -> list[str]:
-        """
-        Resolve pipeline dependencies into an ordered execution sequence.
-
-        Args:
-            requested_pipeline: The target pipeline requested by the client
-            batch_id: Batch ID for state-based optimization (optional)
-
-        Returns:
-            List of pipeline names in execution order
-
-        Raises:
-            ValueError: If requested pipeline is unknown or has circular dependencies
-        """
+        self, requested_pipeline: str, current_batch_state: dict[str, set[str]]
+    ) -> dict[str, list[str]]:
+        """Resolve pipeline dependencies based on current batch state."""
         ...
 
-    async def validate_pipeline_prerequisites(self, pipeline_name: str, batch_id: str) -> bool:
-        """
-        Validate that a pipeline's prerequisites are met for the given batch.
-
-        Args:
-            pipeline_name: Name of the pipeline to validate
-            batch_id: Batch ID for state checking
-
-        Returns:
-            True if prerequisites are met, False otherwise
-        """
-        ...
-
-    async def prune_completed_steps(self, pipeline_steps: list[str], batch_id: str) -> list[str]:
-        """
-        Remove already-completed steps from pipeline execution list.
-
-        Args:
-            pipeline_steps: Ordered list of pipeline steps
-            batch_id: Batch ID for completion state checking
-
-        Returns:
-            Filtered list with only remaining steps to execute
-        """
+    async def validate_pipeline_compatibility(
+        self, pipeline_name: str, batch_metadata: dict | None = None
+    ) -> tuple[bool, str | None]:
+        """Validate if pipeline can be executed with given batch metadata."""
         ...
 
 
@@ -173,16 +137,8 @@ class PipelineGeneratorProtocol(Protocol):
     with proper validation and error handling.
     """
 
-    async def get_pipeline_definition(self, pipeline_name: str) -> PipelineDefinition | None:
-        """
-        Retrieve pipeline definition by name.
-
-        Args:
-            pipeline_name: Name of the pipeline to retrieve
-
-        Returns:
-            PipelineDefinition object or None if not found
-        """
+    async def get_pipeline_definition(self, pipeline_name: str) -> dict | None:
+        """Get pipeline definition by name."""
         ...
 
     async def list_available_pipelines(self) -> list[str]:
@@ -195,26 +151,43 @@ class PipelineGeneratorProtocol(Protocol):
         ...
 
     async def validate_pipeline_config(self) -> bool:
-        """
-        Validate the current pipeline configuration.
+        """Validate pipeline configuration."""
+        ...
 
-        Returns:
-            True if configuration is valid, False otherwise
-        """
+    def get_pipeline_steps(self, pipeline_name: str) -> list[str] | None:
+        """Get steps for a named pipeline configuration (synchronous version)."""
+        ...
+
+    def get_all_pipeline_names(self) -> list[str]:
+        """Get all available pipeline names."""
+        ...
+
+    def validate_configuration(self) -> tuple[bool, str]:
+        """Validate pipeline configuration for cycles and dependencies."""
         ...
 
 
-
-
 class DlqProducerProtocol(Protocol):
-    """Protocol for producing messages to a dedicated dead-letter topic."""
+    """Protocol for Dead Letter Queue message production."""
 
-    async def publish(self, envelope: dict, reason: str) -> None:
-        """Publish *envelope* to the DLQ together with *reason* string.
+    async def publish_to_dlq(
+        self,
+        base_topic: str,
+        failed_event_envelope: EventEnvelope | dict,
+        dlq_reason: str,
+        additional_metadata: dict | None = None,
+    ) -> bool:
+        """
+        Publish failed event to Dead Letter Queue.
 
         Args:
-            envelope: Original event envelope (already json-serialisable)
-            reason: Short machine-readable failure reason (e.g. "DependencyCycleDetected")
+            base_topic: Original topic name (DLQ topic will be base_topic.DLQ)
+            failed_event_envelope: The original event that failed processing
+            dlq_reason: Reason for DLQ (e.g., "DependencyCycleDetected", "ValidationFailed")
+            additional_metadata: Optional additional context
+
+        Returns:
+            True if published successfully, False otherwise
         """
         ...
 
@@ -227,20 +200,11 @@ class PipelineResolutionServiceProtocol(Protocol):
     to provide complete pipeline resolution responses.
     """
 
-    async def resolve_pipeline_request(
-        self, request: BCSPipelineDefinitionRequestV1
-    ) -> BCSPipelineDefinitionResponseV1:
-        """
-        Resolve a complete pipeline request from BOS.
-
-        Args:
-            request: Pipeline resolution request from BOS
-
-        Returns:
-            Complete pipeline resolution response
-
-        Raises:
-            ValueError: If request is invalid
-            RuntimeError: If batch state is unavailable
-        """
+    async def resolve_optimal_pipeline(
+        self,
+        batch_id: str,
+        requested_pipeline: str,
+        additional_metadata: dict | None = None,
+    ) -> dict[str, Any]:
+        """Resolve optimal pipeline configuration for a batch."""
         ...

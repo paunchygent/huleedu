@@ -21,7 +21,9 @@ class BCSPipelineDefinitionRequestV1(BaseModel):
         description="The unique identifier of the target batch.", min_length=1, max_length=255
     )
     requested_pipeline: str = Field(
-        description="The final pipeline the user wants to run (e.g., 'ai_feedback', 'cj_assessment').",
+        description=(
+            "The final pipeline the user wants to run (e.g., 'ai_feedback', 'cj_assessment')."
+        ),
         min_length=1,
         max_length=100,
     )

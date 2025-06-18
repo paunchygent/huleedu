@@ -5,25 +5,22 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from aiohttp import ClientSession, ClientTimeout
-
-# DlqProducerProtocol must be importable at runtime for Dishka type analysis
-from services.batch_conductor_service.protocols import DlqProducerProtocol
-_DLP_RT: type[DlqProducerProtocol] = DlqProducerProtocol
-
-if TYPE_CHECKING:
-    from services.batch_conductor_service.protocols import DlqProducerProtocol
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry
 
-from huleedu_service_libs.protocols import RedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, RedisClientProtocol
 from services.batch_conductor_service.config import Settings, settings
 from services.batch_conductor_service.protocols import (
     BatchStateRepositoryProtocol,
+    DlqProducerProtocol,
     KafkaEventConsumerProtocol,
     PipelineGeneratorProtocol,
     PipelineResolutionServiceProtocol,
     PipelineRulesProtocol,
 )
+
+if TYPE_CHECKING:
+    pass
 
 
 class CoreInfrastructureProvider(Provider):
@@ -46,13 +43,13 @@ class CoreInfrastructureProvider(Provider):
         return ClientSession(timeout=timeout)
 
     @provide(scope=Scope.APP)
-    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
-        """Provide Redis client implementation."""
+    def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
+        """Provide Redis client with atomic operations support."""
         from huleedu_service_libs.redis_client import RedisClient
 
         return RedisClient(
-            client_id="batch-conductor-service",
-            redis_url=settings.REDIS_URL
+            client_id=f"bcs-{settings.SERVICE_NAME}",
+            redis_url=settings.REDIS_URL,
         )
 
 
@@ -61,33 +58,49 @@ class EventDrivenServicesProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_batch_state_repository(
-        self, redis_client: RedisClientProtocol, settings: Settings
+        self, redis_client: AtomicRedisClientProtocol, settings: Settings
     ) -> BatchStateRepositoryProtocol:
         """Provide batch state repository implementation."""
         from services.batch_conductor_service.implementations.batch_state_repository_impl import (
             RedisCachedBatchStateRepositoryImpl,
         )
 
-        # For now, use Redis-only. PostgreSQL integration would be added later
-        return RedisCachedBatchStateRepositoryImpl(redis_client=redis_client)
+        return RedisCachedBatchStateRepositoryImpl(
+            redis_client=redis_client,
+        )
 
     @provide(scope=Scope.APP)
-    def provide_dlq_producer(self, settings: Settings) -> "DlqProducerProtocol":
+    def provide_dlq_producer(self, settings: Settings) -> DlqProducerProtocol:
         """Provide Kafka DLQ producer implementation."""
-                # Use in-memory no-op producer for local/test to avoid Kafka requirement
+        # Use in-memory no-op producer for local/test to avoid Kafka requirement
         if settings.ENV_TYPE not in {"docker", "production"}:
+
             class _NoOpDlqProducer:
-                async def publish(self, envelope: dict, reason: str) -> None:
-                    pass
+                async def publish_to_dlq(
+                    self,
+                    base_topic: str,
+                    failed_event_envelope,
+                    dlq_reason: str,
+                    additional_metadata=None,
+                ) -> bool:
+                    return True
+
             return _NoOpDlqProducer()
 
+        from huleedu_service_libs.kafka_client import KafkaBus
         from services.batch_conductor_service.implementations.kafka_dlq_producer_impl import (
             KafkaDlqProducerImpl,
         )
 
-        return KafkaDlqProducerImpl(
+        # Create KafkaBus for DLQ publishing
+        kafka_bus = KafkaBus(
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-            base_topic="huleedu.pipelines.resolution",
+            client_id=f"bcs-dlq-{settings.SERVICE_NAME}",
+        )
+
+        return KafkaDlqProducerImpl(
+            kafka_bus=kafka_bus,
+            service_name=settings.SERVICE_NAME,
         )
 
     def provide_kafka_consumer(
@@ -111,13 +124,16 @@ class PipelineServicesProvider(Provider):
     """Provider for pipeline-related service dependencies."""
 
     @provide(scope=Scope.APP)
-    def provide_pipeline_generator(self, settings: Settings) -> PipelineGeneratorProtocol:
+    async def provide_pipeline_generator(self, settings: Settings) -> PipelineGeneratorProtocol:
         """Provide pipeline generator implementation."""
         from services.batch_conductor_service.implementations.pipeline_generator_impl import (
             DefaultPipelineGenerator,
         )
 
-        return DefaultPipelineGenerator(settings)
+        generator = DefaultPipelineGenerator(settings)
+        # Ensure configuration is loaded during initialization
+        await generator._ensure_loaded()
+        return generator
 
     @provide(scope=Scope.APP)
     def provide_pipeline_rules(
@@ -137,11 +153,13 @@ class PipelineServicesProvider(Provider):
         self,
         pipeline_rules: PipelineRulesProtocol,
         pipeline_generator: PipelineGeneratorProtocol,
-        dlq_producer: "DlqProducerProtocol",
+        dlq_producer: DlqProducerProtocol,
     ) -> PipelineResolutionServiceProtocol:
         """Provide pipeline resolution service implementation."""
-        from services.batch_conductor_service.implementations.pipeline_resolution_service_impl import (
-            DefaultPipelineResolutionService,
+        from services.batch_conductor_service.implementations import (
+            pipeline_resolution_service_impl as prs_impl,
         )
 
-        return DefaultPipelineResolutionService(pipeline_rules, pipeline_generator, dlq_producer)
+        return prs_impl.DefaultPipelineResolutionService(
+            pipeline_rules, pipeline_generator, dlq_producer
+        )

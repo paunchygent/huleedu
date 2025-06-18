@@ -34,9 +34,12 @@ class DefaultPipelineGenerator:
     def __init__(
         self,
         settings: Settings,
-        registry: "CollectorRegistry | None" = None,
+        registry: CollectorRegistry | None = None,
     ):
-        from prometheus_client import Counter, CollectorRegistry  # local import to avoid hard dep if unused
+        from prometheus_client import (  # local import to avoid hard dep if unused
+            CollectorRegistry,
+            Counter,
+        )
 
         # Re-use the default registry if none is supplied (e.g. in unit tests)
         self._registry: CollectorRegistry = registry or CollectorRegistry()
@@ -91,9 +94,7 @@ class DefaultPipelineGenerator:
     # Public API
     # ---------------------------------------------------------------------
 
-    async def get_pipeline_definition(
-        self, pipeline_name: str
-    ) -> PipelineDefinition | None:
+    async def get_pipeline_definition(self, pipeline_name: str) -> PipelineDefinition | None:
         """Retrieve pipeline definition by name."""
         await self._ensure_loaded()
         return self._pipelines.get(pipeline_name)
@@ -116,6 +117,36 @@ class DefaultPipelineGenerator:
         await self._ensure_loaded()
         return True
 
+    def get_pipeline_steps(self, pipeline_name: str) -> list[str] | None:
+        """Get steps for a named pipeline configuration (synchronous version)."""
+        if not self._loaded:
+            # For sync calls, we can't await, so return None if not loaded
+            return None
+
+        definition = self._pipelines.get(pipeline_name)
+        if not definition:
+            return None
+
+        return [step.name for step in definition.steps]
+
+    def get_all_pipeline_names(self) -> list[str]:
+        """Get all available pipeline names (synchronous version)."""
+        if not self._loaded:
+            return []
+        return list(self._pipelines.keys())
+
+    def validate_configuration(self) -> tuple[bool, str]:
+        """Validate pipeline configuration for cycles and dependencies (synchronous version)."""
+        try:
+            if not self._loaded:
+                return False, "Configuration not loaded"
+
+            # Re-run validation on current config
+            self._validate_cycles()
+            return True, "Configuration is valid"
+        except Exception as e:
+            return False, str(e)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -134,7 +165,8 @@ class DefaultPipelineGenerator:
                 for dep in step.depends_on:
                     if dep not in step_names:
                         raise ValueError(
-                            f"Step '{step.name}' in pipeline '{pipeline_name}' depends on unknown step '{dep}'."
+                            f"Step '{step.name}' in pipeline '{pipeline_name}' "
+                            f"depends on unknown step '{dep}'."
                         )
 
                     adjacency[dep].append(step.name)
@@ -154,7 +186,4 @@ class DefaultPipelineGenerator:
                         q.append(neighbor)
 
             if visited != len(in_degree):
-                raise ValueError(
-                    f"Dependency cycle detected in pipeline '{pipeline_name}'."
-                )
-        
+                raise ValueError(f"Dependency cycle detected in pipeline '{pipeline_name}'.")

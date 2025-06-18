@@ -3,6 +3,7 @@
 These tests verify dependency ordering, pruning, and prerequisite validation
 using mocked dependencies to isolate rules logic.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
@@ -79,7 +80,9 @@ async def test_resolve_pipeline_dependencies_basic(pipeline_rules):
 
 
 @pytest.mark.asyncio
-async def test_resolve_pipeline_dependencies_with_batch_id(pipeline_rules, mock_batch_state_repository):
+async def test_resolve_pipeline_dependencies_with_batch_id(
+    pipeline_rules, mock_batch_state_repository
+):
     """Test pipeline dependency resolution with batch context."""
 
     # Mark spellcheck as already done for this batch
@@ -88,9 +91,7 @@ async def test_resolve_pipeline_dependencies_with_batch_id(pipeline_rules, mock_
 
     mock_batch_state_repository.is_batch_step_complete.side_effect = _is_complete
 
-    result = await pipeline_rules.resolve_pipeline_dependencies(
-        "ai_feedback", batch_id="batch-123"
-    )
+    result = await pipeline_rules.resolve_pipeline_dependencies("ai_feedback", batch_id="batch-123")
 
     assert result == ["ai_feedback"]
 
@@ -115,27 +116,21 @@ async def test_validate_pipeline_prerequisites(pipeline_rules, mock_batch_state_
 
 
 @pytest.mark.asyncio
-async def test_prune_completed_steps_none_complete(
-    pipeline_rules, mock_batch_state_repository
-):
+async def test_prune_completed_steps_none_complete(pipeline_rules, mock_batch_state_repository):
     """Test pruning when no steps are complete."""
 
     # Mock all steps as incomplete
     mock_batch_state_repository.is_batch_step_complete.return_value = False
 
     pipeline_steps = ["spellcheck", "ai_feedback", "cj_assessment"]
-    result = await pipeline_rules.prune_completed_steps(
-        pipeline_steps, batch_id="batch-123"
-    )
+    result = await pipeline_rules.prune_completed_steps(pipeline_steps, batch_id="batch-123")
 
     # All steps should remain since none are complete
     assert result == ["spellcheck", "ai_feedback", "cj_assessment"]
 
 
 @pytest.mark.asyncio
-async def test_prune_completed_steps_some_complete(
-    pipeline_rules, mock_batch_state_repository
-):
+async def test_prune_completed_steps_some_complete(pipeline_rules, mock_batch_state_repository):
     """Test pruning when some steps are complete."""
 
     # Mock spellcheck as complete, others as incomplete
@@ -145,36 +140,28 @@ async def test_prune_completed_steps_some_complete(
     mock_batch_state_repository.is_batch_step_complete.side_effect = mock_completion_status
 
     pipeline_steps = ["spellcheck", "ai_feedback", "cj_assessment"]
-    result = await pipeline_rules.prune_completed_steps(
-        pipeline_steps, batch_id="batch-123"
-    )
+    result = await pipeline_rules.prune_completed_steps(pipeline_steps, batch_id="batch-123")
 
     # Only incomplete steps should remain
     assert result == ["ai_feedback", "cj_assessment"]
 
 
 @pytest.mark.asyncio
-async def test_prune_completed_steps_all_complete(
-    pipeline_rules, mock_batch_state_repository
-):
+async def test_prune_completed_steps_all_complete(pipeline_rules, mock_batch_state_repository):
     """Test pruning when all steps are complete."""
 
     # Mock all steps as complete
     mock_batch_state_repository.is_batch_step_complete.return_value = True
 
     pipeline_steps = ["spellcheck", "ai_feedback"]
-    result = await pipeline_rules.prune_completed_steps(
-        pipeline_steps, batch_id="batch-123"
-    )
+    result = await pipeline_rules.prune_completed_steps(pipeline_steps, batch_id="batch-123")
 
     # No steps should remain since all are complete
     assert result == []
 
 
 @pytest.mark.asyncio
-async def test_prune_completed_steps_empty_pipeline(
-    pipeline_rules, mock_batch_state_repository
-):
+async def test_prune_completed_steps_empty_pipeline(pipeline_rules, mock_batch_state_repository):
     """Test pruning with empty pipeline."""
 
     result = await pipeline_rules.prune_completed_steps([], batch_id="batch-123")

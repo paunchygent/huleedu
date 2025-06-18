@@ -48,24 +48,25 @@ class Settings(BaseSettings):
 
     # Event-driven architecture configuration
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
-        default="localhost:9092",
-        description="Kafka bootstrap servers for event consumption"
+        default="localhost:9092", description="Kafka bootstrap servers for event consumption"
     )
 
     REDIS_URL: str = Field(
-        default="redis://localhost:6379",
-        description="Redis URL for state caching and idempotency"
+        default="redis://localhost:6379", description="Redis URL for state caching and idempotency"
+    )
+
+    REDIS_TTL_SECONDS: int = Field(
+        default=604800,  # 7 days
+        description="Redis TTL for essay state data in seconds",
     )
 
     # Kafka consumer configuration
     KAFKA_CONSUMER_GROUP_ID: str = Field(
-        default="bcs-event-consumer",
-        description="Kafka consumer group ID"
+        default="bcs-event-consumer", description="Kafka consumer group ID"
     )
 
     KAFKA_AUTO_OFFSET_RESET: str = Field(
-        default="latest",
-        description="Kafka auto offset reset policy"
+        default="latest", description="Kafka auto offset reset policy"
     )
 
 

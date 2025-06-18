@@ -1,0 +1,358 @@
+"""
+Redis-cached batch state repository implementation for BCS.
+
+Implements Redis cache + PostgreSQL persistence pattern for essay processing
+state management, optimized for frequent BOS polling during pipeline resolution.
+
+Follows established patterns from ELS state_store.py and BOS postgres repository.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import random
+from datetime import UTC, datetime
+from typing import Any
+
+from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from services.batch_conductor_service.protocols import BatchStateRepositoryProtocol
+
+logger = create_service_logger("bcs.batch_state_repository")
+
+
+class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
+    """
+    High-performance essay processing state with Redis cache + PostgreSQL persistence.
+
+    Cache-aside pattern optimized for BOS frequent polling during pipeline resolution.
+    Redis TTL: 7 days (covers typical batch processing timeframes)
+    PostgreSQL: Permanent historical record for audit and reprocessing scenarios
+    """
+
+    def __init__(
+        self,
+        redis_client: AtomicRedisClientProtocol,
+        postgres_repository: BatchStateRepositoryProtocol | None = None,
+    ):
+        self.redis_client = redis_client
+        self.postgres_repository = postgres_repository
+        self.redis_ttl = 7 * 24 * 60 * 60  # 7 days in seconds
+
+    async def record_essay_step_completion(
+        self, batch_id: str, essay_id: str, step_name: str, metadata: dict | None = None
+    ) -> bool:
+        """
+        Record completion of a processing step for an essay using atomic operations.
+
+        Uses WATCH/MULTI/EXEC pattern with exponential backoff retries for race condition safety.
+        Falls back to non-atomic operation if atomic retries are exhausted.
+        """
+        # Try atomic operation first (up to 5 retries as per task spec)
+        atomic_success = await self._atomic_record_essay_step_completion(
+            batch_id, essay_id, step_name, metadata
+        )
+
+        if atomic_success:
+            return True
+
+        # Fallback to original non-atomic operation if atomic fails
+        logger.warning(
+            f"Atomic operation failed, falling back to non-atomic for essay "
+            f"batch {batch_id} essay {essay_id} step {step_name}",
+            extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name},
+        )
+        return await self._non_atomic_record_essay_step_completion(
+            batch_id, essay_id, step_name, metadata
+        )
+
+    async def _atomic_record_essay_step_completion(
+        self, batch_id: str, essay_id: str, step_name: str, metadata: dict | None = None
+    ) -> bool:
+        """
+        Atomic version using WATCH/MULTI/EXEC pattern with exponential backoff.
+
+        Returns True if successful, False if all retries exhausted.
+        """
+        essay_key = f"bcs:essay_state:{batch_id}:{essay_id}"
+        batch_summary_key = f"bcs:batch_summary:{batch_id}"
+
+        max_retries = 5
+        base_delay = 0.01  # 10ms base delay
+
+        for attempt in range(max_retries):
+            try:
+                # WATCH the essay key for changes
+                await self.redis_client.watch(essay_key)
+
+                # Get current essay state
+                essay_state = await self._get_essay_state_from_redis(essay_key)
+
+                # Check if step already completed (idempotency)
+                if step_name in essay_state["completed_steps"]:
+                    await self.redis_client.unwatch()
+                    logger.debug(
+                        f"Step {step_name} already completed for essay {essay_id}, skipping",
+                        extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name}
+                    )
+                    return True
+
+                # Prepare updated state
+                essay_state["completed_steps"].add(step_name)
+                essay_state["step_metadata"][step_name] = metadata or {}
+                essay_state["last_updated"] = self._get_current_timestamp()
+
+                # Start transaction
+                await self.redis_client.multi()
+
+                # Queue commands in transaction - use pipeline methods directly
+                # Note: Commands are queued, not executed until EXEC
+                serializable_data = self._make_json_serializable(essay_state)
+                json_str = json.dumps(serializable_data)
+
+                # Queue the setex operation
+                await self.redis_client.setex(essay_key, self.redis_ttl, json_str)
+                # Queue the delete operation
+                await self.redis_client.delete_key(batch_summary_key)
+
+                # Execute transaction
+                result = await self.redis_client.exec()
+
+                if result is not None:
+                    # Transaction succeeded
+                    logger.info(
+                        f"Atomically recorded completion: "
+                        f"batch={batch_id}, essay={essay_id}, step={step_name}",
+                        extra={
+                            "batch_id": batch_id,
+                            "essay_id": essay_id,
+                            "step_name": step_name,
+                            "attempt": attempt + 1,
+                        },
+                    )
+
+                    # Persist to PostgreSQL if available
+                    if self.postgres_repository:
+                        try:
+                            await self.postgres_repository.record_essay_step_completion(
+                                batch_id, essay_id, step_name, metadata
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"PostgreSQL persistence failed (continuing with Redis): {e}"
+                            )
+
+                    return True
+                else:
+                    # Transaction was discarded (watched key changed)
+                    logger.debug(
+                        f"Atomic transaction discarded "
+                        f"(key changed), attempt {attempt + 1}/{max_retries}",
+                        extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name},
+                    )
+
+                    if attempt < max_retries - 1:
+                        # Exponential backoff with jitter
+                        delay = base_delay * (2 ** attempt) + random.uniform(0, 0.01)
+                        await asyncio.sleep(delay)
+                        continue
+
+            except Exception as e:
+                await self.redis_client.unwatch()  # Clean up on error
+                logger.error(
+                    f"Error in atomic operation attempt {attempt + 1}/{max_retries}: {e}",
+                    extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name},
+                    exc_info=True
+                )
+
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt) + random.uniform(0, 0.01)
+                    await asyncio.sleep(delay)
+                    continue
+
+        logger.error(
+            f"Atomic operation failed after {max_retries} attempts",
+            extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name}
+        )
+        return False
+
+    async def _non_atomic_record_essay_step_completion(
+        self, batch_id: str, essay_id: str, step_name: str, metadata: dict | None = None
+    ) -> bool:
+        """
+        Original non-atomic implementation as fallback.
+
+        Updates both Redis cache (for performance) and PostgreSQL (for persistence).
+        """
+        try:
+            # Build Redis keys
+            essay_key = f"bcs:essay_state:{batch_id}:{essay_id}"
+            batch_summary_key = f"bcs:batch_summary:{batch_id}"
+
+            # Get current essay state from Redis
+            essay_state = await self._get_essay_state_from_redis(essay_key)
+
+            # Add the completed step
+            essay_state["completed_steps"].add(step_name)
+            essay_state["step_metadata"][step_name] = metadata or {}
+            essay_state["last_updated"] = self._get_current_timestamp()
+
+            # Update Redis with essay state (with TTL)
+            success = await self._set_json_with_ttl(essay_key, essay_state, self.redis_ttl)
+            if not success:
+                logger.error(f"Failed to update Redis for essay {essay_id}")
+                return False
+
+            # Invalidate batch summary cache
+            await self.redis_client.delete_key(batch_summary_key)
+
+            # Persist to PostgreSQL if available
+            if self.postgres_repository:
+                try:
+                    await self.postgres_repository.record_essay_step_completion(
+                        batch_id, essay_id, step_name, metadata
+                    )
+                except Exception as e:
+                    logger.warning(f"PostgreSQL persistence failed (continuing with Redis): {e}")
+
+            logger.info(
+                f"Recorded completion: batch={batch_id}, essay={essay_id}, step={step_name}",
+                extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name},
+            )
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Failed to record essay step completion: {e}",
+                extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name},
+                exc_info=True,
+            )
+            return False
+
+    async def get_essay_completed_steps(self, batch_id: str, essay_id: str) -> set[str]:
+        """Get completed steps for a specific essay."""
+        essay_key = f"bcs:essay_state:{batch_id}:{essay_id}"
+        essay_state = await self._get_essay_state_from_redis(essay_key)
+        return essay_state["completed_steps"]
+
+    async def get_batch_completion_summary(self, batch_id: str) -> dict[str, dict[str, int]]:
+        """
+        Get batch completion summary with caching.
+
+        Returns summary by step -> {completed: count, total: count}.
+        Cached with shorter TTL since this data changes frequently during processing.
+        """
+        batch_summary_key = f"bcs:batch_summary:{batch_id}"
+
+        # Try to get cached summary first
+        cached_summary = await self._get_json_from_redis(batch_summary_key)
+        if cached_summary:
+            logger.debug(f"Batch summary cache hit for {batch_id}")
+            return cached_summary
+
+        # Build summary from individual essay states
+        logger.debug(f"Building batch summary for {batch_id}")
+        summary = await self._build_batch_summary(batch_id)
+
+        # Cache the summary with shorter TTL (1 hour) since it changes during processing
+        cache_ttl = 60 * 60  # 1 hour
+        await self._set_json_with_ttl(batch_summary_key, summary, cache_ttl)
+
+        return summary
+
+    async def is_batch_step_complete(self, batch_id: str, step_name: str) -> bool:
+        """
+        Check if a processing step is complete for the entire batch.
+
+        A step is considered complete when all essays in the batch have completed that step.
+        """
+        summary = await self.get_batch_completion_summary(batch_id)
+
+        if step_name not in summary:
+            return False
+
+        step_summary = summary[step_name]
+        return step_summary["completed"] == step_summary["total"]
+
+    async def _get_essay_state_from_redis(self, essay_key: str) -> dict[str, Any]:
+        """Get essay state from Redis, returning default state if not found."""
+        essay_data = await self._get_json_from_redis(essay_key)
+
+        if essay_data is None:
+            # Return default state for new essay
+            return {
+                "completed_steps": set(),
+                "step_metadata": {},
+                "created_at": self._get_current_timestamp(),
+                "last_updated": self._get_current_timestamp(),
+            }
+
+        # Convert completed_steps from list back to set
+        essay_data["completed_steps"] = set(essay_data.get("completed_steps", []))
+        return essay_data
+
+    async def _build_batch_summary(self, batch_id: str) -> dict[str, dict[str, int]]:
+        """Build batch completion summary by scanning all essay states."""
+        # Use Redis SCAN to find all essay keys for this batch
+        pattern = f"bcs:essay_state:{batch_id}:*"
+        essay_keys = await self.redis_client.scan_pattern(pattern)
+
+        step_counts: dict[str, dict[str, int]] = {}
+
+        for essay_key in essay_keys:
+            essay_state = await self._get_essay_state_from_redis(essay_key)
+            completed_steps = essay_state["completed_steps"]
+
+            # Update counts for each step that has any progress
+            all_possible_steps = set(completed_steps)
+            # Note: We could extend this to include all known steps from configuration
+
+            for step in all_possible_steps:
+                if step not in step_counts:
+                    step_counts[step] = {"completed": 0, "total": 0}
+
+                step_counts[step]["total"] += 1
+                if step in completed_steps:
+                    step_counts[step]["completed"] += 1
+
+        return step_counts
+
+    async def _get_json_from_redis(self, key: str) -> dict[str, Any] | None:
+        """Get and deserialize JSON data from Redis."""
+        try:
+            data = await self.redis_client.get(key)
+            if data is None:
+                return None
+
+            if isinstance(data, bytes):
+                data = data.decode("utf-8")
+
+            return json.loads(data)
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            logger.warning(f"Failed to deserialize Redis data for key {key}: {e}")
+            return None
+
+    async def _set_json_with_ttl(self, key: str, data: dict[str, Any], ttl_seconds: int) -> bool:
+        """Serialize and store JSON data in Redis with TTL."""
+        try:
+            serializable_data = self._make_json_serializable(data)
+            json_str = json.dumps(serializable_data)
+            return await self.redis_client.setex(key, ttl_seconds, json_str)
+        except (TypeError, ValueError) as e:
+            logger.error(f"Failed to serialize data for Redis key {key}: {e}")
+            return False
+
+    def _make_json_serializable(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Convert sets to lists for JSON serialization."""
+        result = {}
+        for key, value in data.items():
+            if isinstance(value, set):
+                result[key] = list(value)
+            else:
+                result[key] = value
+        return result
+
+    def _get_current_timestamp(self) -> str:
+        """Get current UTC timestamp as ISO string."""
+        return datetime.now(UTC).isoformat()
