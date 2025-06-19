@@ -51,6 +51,7 @@ services/batch_orchestrator_service/
 │   ├── batch_repository_postgres_impl.py # Production PostgreSQL repository
 │   ├── batch_repository_impl.py   # Mock repository for testing
 │   ├── event_publisher_impl.py    # DefaultBatchEventPublisherImpl
+│   ├── batch_conductor_client_impl.py # HTTP client for BCS pipeline resolution
 │   ├── batch_essays_ready_handler.py # Handler for ready events
 │   ├── els_batch_phase_outcome_handler.py # Handler for phase completion events
 │   └── batch_processing_service_impl.py # Service layer business logic
@@ -130,12 +131,14 @@ Environment variables (managed via Pydantic `BaseSettings`):
 * **`BATCH_ORCHESTRATOR_DB_HOST`, `_PORT`, `_NAME`, `_USER`, `_PASSWORD`**: PostgreSQL connection details.
 * **`KAFKA_BOOTSTRAP_SERVERS`**: Kafka connection (default: "kafka:9092").
 * **`REDIS_URL`**: Redis connection for idempotency.
+* **`BCS_URL`**: Batch Conductor Service URL for pipeline resolution (default: "http://batch-conductor-service:4002").
 
 ## Dependencies
 
 ### HuleEdu Services
 
 * **Essay Lifecycle Service**: Event coordination and individual essay state management.
+* **Batch Conductor Service (BCS)**: ✅ **INTEGRATED** - HTTP client integration for intelligent pipeline dependency resolution. BOS calls BCS internal API to analyze batch state and resolve optimized pipelines based on current essay processing states.
 * **Kafka**: Event publishing and consumption.
 
 ### Core Libraries
@@ -185,6 +188,7 @@ pdm run -p services/batch_orchestrator_service dev
 * **Service Layer**: Business logic in `BatchProcessingServiceImpl`.
 * **Event Publishing & Consumption**: Kafka message handling and serialization.
 * **DI Container**: Protocol implementation injection.
+* **BCS Integration**: HTTP client integration and pipeline resolution workflows.
 
 ### Run Tests
 

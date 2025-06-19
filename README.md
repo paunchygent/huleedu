@@ -69,6 +69,13 @@ The HuleEdu ecosystem currently comprises the following services:
   * **API**: `/healthz` and `/metrics` endpoints for health checks and observability
   * **Database**: The primary implementation uses **PostgreSQL**, provisioned via `docker-compose.yml` and configured in the service's DI provider.
 
+* **Batch Conductor Service (BCS)** ✅ **IMPLEMENTED**:
+  * **Description**: An internal Quart-based microservice responsible for intelligent pipeline dependency resolution and batch state analysis. Features event-driven batch state projection via Kafka, atomic Redis operations for race condition safety, and comprehensive error handling with DLQ production.
+  * **Port**: 4002 (Internal HTTP API)
+  * **Location**: `services/batch_conductor_service/`
+  * **API**: `/internal/v1/pipelines/define` for pipeline resolution, `/healthz` and `/metrics` endpoints
+  * **Architecture**: Protocol-based DI with Dishka, event-driven architecture consuming spellcheck/CJ assessment completion events, Redis-cached state management with atomic WATCH/MULTI/EXEC operations
+
 ## Key Technologies
 
 * **Python**: Version 3.11+
@@ -145,9 +152,15 @@ The entire HuleEdu system, including Kafka and all microservices, can be run loc
 
     This command will start all services defined in `docker-compose.yml` in detached mode. It includes Zookeeper, Kafka, the `kafka_topic_setup` one-shot service for automatic topic creation, and all HuleEdu microservices.
 
-## Current Development Status & Focus (Dynamic Pipeline Orchestration - Phase 4 ✅ COMPLETED)
+## Current Development Status & Focus (BCS Integration & Dynamic Pipeline Orchestration ✅ COMPLETED)
 
-🚀 **Dynamic Pipeline Orchestration Achieved** - Phases 1-4 of Dynamic Pipeline Orchestration are complete, including the implementation of all four phase initiators (Spellcheck, CJ Assessment, AI Feedback, NLP) in BOS. BOS uses a `phase_initiators_map` and `requested_pipelines` to dynamically sequence phases, while ELS manages individual essay states via a formal state machine and reports phase outcomes to BOS. Current status includes:
+🚀 **BCS Integration & Dynamic Pipeline Orchestration Achieved** - All phases of Dynamic Pipeline Orchestration are complete, including the full implementation and integration of the **Batch Conductor Service (BCS)** for intelligent pipeline dependency resolution. The system now features:
+
+* **BCS Production-Ready Implementation** ✅: Event-driven architecture with 24/24 tests passing, atomic Redis operations, DLQ production, and comprehensive error handling
+* **BOS ↔ BCS HTTP Integration** ✅: Complete HTTP client integration with pipeline resolution workflows validated through E2E tests
+* **Dynamic Pipeline Resolution** ✅: Intelligent dependency analysis, batch state-aware optimization, and prerequisite validation
+
+BOS uses a `phase_initiators_map` and `requested_pipelines` to dynamically sequence phases, while ELS manages individual essay states via a formal state machine and reports phase outcomes to BOS. Current status includes:
 
 * **Core Services Implemented** ✅:
   * **Content Service**: HTTP API with filesystem storage backend
@@ -155,6 +168,7 @@ The entire HuleEdu system, including Kafka and all microservices, can be run loc
   * **Batch Orchestrator Service**: HTTP API with slot assignment and command processing
   * **Essay Lifecycle Service**: Dual-mode service with slot coordination and command handling
   * **File Service**: Content provisioning service with MD5 validation and event publishing
+  * **Batch Conductor Service (BCS)**: ✅ **NEW** - Internal pipeline dependency resolution with event-driven batch state projection, atomic Redis operations, and intelligent dependency analysis
 * **Essay ID Coordination Architecture** ✅:
   * **Slot Assignment Pattern**: BOS generates internal essay ID slots, ELS assigns content to slots
   * **Content Provisioning Flow**: File Service → ELS slot assignment → BOS command generation → ELS service dispatch

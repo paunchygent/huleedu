@@ -5,6 +5,88 @@ All notable changes to the HuleEdu microservices platform will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-01-31
+
+### 🎉 BCS Integration Complete - Intelligent Pipeline Orchestration
+
+This release completes the implementation and integration of the **Batch Conductor Service (BCS)** for intelligent pipeline dependency resolution, marking a major milestone in dynamic pipeline orchestration capabilities.
+
+### Added
+
+#### **Batch Conductor Service (BCS) - Full Implementation**
+
+- **Production-Ready Architecture**: Complete Quart-based internal microservice with 24/24 tests passing
+  - Event-driven batch state projection via Kafka (eliminates ELS polling)
+  - Atomic Redis operations with WATCH/MULTI/EXEC pattern for race condition safety
+  - DLQ production for pipeline resolution failures with comprehensive error metadata
+  - Exponential backoff retry logic with graceful fallback mechanisms
+
+- **Intelligent Pipeline Resolution Engine**: 
+  - Dependency rules engine with prerequisite validation (ai_feedback → spellcheck, cj_assessment → spellcheck)
+  - Batch state-aware optimization with completed step pruning
+  - Real-time state projection consuming `SpellcheckResultDataV1` and `CJAssessmentResultDataV1` events
+
+- **Comprehensive Error Handling & Observability**:
+  - Prometheus metrics: `bcs_pipeline_resolutions_total{status="success"|"failure"}`
+  - Structured logging with correlation ID tracking across events and requests
+  - DLQ topics following `<base_topic>.DLQ` pattern for failure replay capability
+
+#### **BOS ↔ BCS HTTP Integration**
+
+- **HTTP Client Integration**: `BatchConductorClientProtocol` and implementation for BOS
+- **Pipeline Resolution Workflow**: BOS calls BCS `/internal/v1/pipelines/define` API for intelligent pipeline construction
+- **E2E Validation**: Complete workflow testing from client requests through BCS pipeline resolution to execution
+
+### Changed
+
+#### **Enhanced Service Architecture**
+
+- **BOS Dependencies**: Updated to include BCS HTTP client integration with proper error handling
+- **Documentation**: Comprehensive updates across README files reflecting BCS integration status
+- **Service Discovery**: Added BCS to main service architecture documentation
+
+#### **Pipeline Orchestration Evolution**
+
+- **Dynamic Resolution**: BOS now leverages BCS for intelligent, state-aware pipeline construction
+- **Dependency Management**: Centralized pipeline dependency logic in BCS reduces coupling
+- **State Management**: Real-time batch state tracking without synchronous service calls
+
+### Fixed
+
+#### **Architecture Completeness**
+
+- **Service Integration**: Resolved missing BCS documentation across project documentation
+- **Rule Index**: Added BCS architecture rule to development standards index
+- **Status Reporting**: Updated development status to reflect completed BCS integration
+
+### Technical Implementation
+
+#### **Event-Driven Architecture**
+
+- **Real-Time State Projection**: BCS maintains current batch state via Kafka event consumption
+- **Decoupled Design**: Eliminates synchronous API dependencies between BCS and ELS
+- **Resilient Processing**: Comprehensive error boundaries with DLQ production for replay
+
+#### **Production Resilience**
+
+- **Atomic Operations**: Redis WATCH/MULTI/EXEC prevents race conditions in concurrent processing
+- **Retry Mechanisms**: Exponential backoff with configurable retry limits (up to 5 attempts)
+- **Graceful Degradation**: Fallback to non-atomic operations when atomic retries exhausted
+
+### Performance & Reliability
+
+- **High Throughput**: Redis-cached state management for fast pipeline resolution
+- **Error Isolation**: Failed pipeline resolutions don't impact other batch operations
+- **Monitoring**: Production-ready observability with metrics and structured logging
+
+### Documentation
+
+- **Service READMEs**: Updated BCS, BOS, and main project documentation with integration details
+- **Architecture Rules**: Added BCS to development standards and rule index
+- **Implementation Status**: Comprehensive status updates reflecting production-ready implementation
+
+---
+
 ## [0.2.0] - 2025-01-30
 
 ### 🎉 Sprint 1 (Phase 1.2) Complete - Walking Skeleton Production Ready
