@@ -159,6 +159,15 @@ class MockRedisClient:
         self.key_tracker.add_service_connection(self.service_name)
         logger.info(f"[{self.service_name}] Reconnected to Redis")
 
+    async def get(self, key: str) -> str | None:
+        """Mock GET operation required by RedisClientProtocol."""
+        return self.key_tracker.keys.get(key)
+
+    async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
+        """Mock SETEX operation required by RedisClientProtocol."""
+        self.key_tracker.keys[key] = value
+        return True
+
 
 class RedisTestManager:
     """

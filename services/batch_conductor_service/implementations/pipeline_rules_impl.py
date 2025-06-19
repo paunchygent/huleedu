@@ -112,6 +112,23 @@ class DefaultPipelineRules(PipelineRulesProtocol):
 
         return remaining_steps
 
+    async def validate_pipeline_compatibility(
+        self, pipeline_name: str, batch_metadata: dict | None = None
+    ) -> tuple[bool, str | None]:
+        """Validate if pipeline can be executed with given batch metadata."""
+        try:
+            # Check if pipeline definition exists
+            definition = await self._find_pipeline_containing_step(pipeline_name)
+            if definition is None:
+                return False, f"Pipeline '{pipeline_name}' not found in configuration"
+
+            # Basic validation - pipeline exists and is well-formed
+            # Additional metadata-based validation can be added here as needed
+            return True, None
+
+        except Exception as e:
+            return False, f"Pipeline validation error: {str(e)}"
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

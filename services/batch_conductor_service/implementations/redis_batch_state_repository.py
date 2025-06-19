@@ -234,7 +234,11 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
         """Get completed steps for a specific essay."""
         essay_key = f"bcs:essay_state:{batch_id}:{essay_id}"
         essay_state = await self._get_essay_state_from_redis(essay_key)
-        return essay_state["completed_steps"]
+        completed_steps = essay_state["completed_steps"]
+        # Ensure we return a proper set of strings
+        if isinstance(completed_steps, set):
+            return completed_steps
+        return set(completed_steps) if completed_steps else set()
 
     async def get_batch_completion_summary(self, batch_id: str) -> dict[str, dict[str, int]]:
         """
@@ -328,7 +332,9 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             if isinstance(data, bytes):
                 data = data.decode("utf-8")
 
-            return json.loads(data)
+            parsed_data = json.loads(data)
+            # Ensure we return a proper dict or None
+            return parsed_data if isinstance(parsed_data, dict) else None
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
             logger.warning(f"Failed to deserialize Redis data for key {key}: {e}")
             return None

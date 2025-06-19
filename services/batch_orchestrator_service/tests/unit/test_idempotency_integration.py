@@ -50,6 +50,15 @@ class MockRedisClient:
             return 1
         return 0
 
+    async def get(self, key: str) -> str | None:
+        """Mock GET operation that retrieves values."""
+        return self.keys.get(key)
+
+    async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
+        """Mock SETEX operation that sets values with TTL."""
+        self.keys[key] = value
+        return True
+
 
 def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
     """Create a mock Kafka message from event data."""

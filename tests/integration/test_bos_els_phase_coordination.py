@@ -37,13 +37,37 @@ from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsume
 
 
 class MockRedisClient:
-    """Minimal Redis client mock for idempotency integration tests."""
+    """Mock Redis client for integration testing."""
 
-    async def set_if_not_exists(self, key: str, value: str, ttl_seconds: int | None = None) -> bool:  # noqa: D401
-        return True  # Always pretend the key was new (first-time processing)
+    def __init__(self) -> None:
+        self.keys: dict[str, str] = {}
+        self.set_calls: list[tuple[str, str, int | None]] = []
+        self.delete_calls: list[str] = []
 
-    async def delete_key(self, key: str) -> int:  # noqa: D401
-        return 1  # Pretend a key was deleted
+    async def set_if_not_exists(self, key: str, value: str, ttl_seconds: int | None = None) -> bool:
+        """Mock Redis SETNX operation."""
+        self.set_calls.append((key, value, ttl_seconds))
+        if key in self.keys:
+            return False  # Key already exists
+        self.keys[key] = value
+        return True  # Key was set
+
+    async def delete_key(self, key: str) -> int:
+        """Mock Redis DELETE operation."""
+        self.delete_calls.append(key)
+        if key in self.keys:
+            del self.keys[key]
+            return 1
+        return 0
+
+    async def get(self, key: str) -> str | None:
+        """Mock GET operation that retrieves values."""
+        return self.keys.get(key)
+
+    async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
+        """Mock SETEX operation that sets values with TTL."""
+        self.keys[key] = value
+        return True
 
 
 class RealKafkaMessage:
@@ -76,7 +100,15 @@ class TestBosElsPhaseCoordination:
         return ELSBatchPhaseOutcomeHandler(phase_coordinator=mock_phase_coordinator)
 
     @pytest.fixture
-    def kafka_consumer(self, mock_batch_essays_ready_handler, real_els_outcome_handler):
+    def mock_client_pipeline_request_handler(self):
+        """Mock the ClientPipelineRequestHandler external boundary."""
+        from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
+            ClientPipelineRequestHandler,
+        )
+        return AsyncMock(spec=ClientPipelineRequestHandler)
+
+    @pytest.fixture
+    def kafka_consumer(self, mock_batch_essays_ready_handler, real_els_outcome_handler, mock_client_pipeline_request_handler):
         """Create real BatchKafkaConsumer with real outcome handler and mocked dependencies."""
         redis_client = MockRedisClient()
         return BatchKafkaConsumer(
@@ -84,6 +116,7 @@ class TestBosElsPhaseCoordination:
             consumer_group="test-group",
             batch_essays_ready_handler=mock_batch_essays_ready_handler,
             els_batch_phase_outcome_handler=real_els_outcome_handler,
+            client_pipeline_request_handler=mock_client_pipeline_request_handler,
             redis_client=redis_client,
         )
 

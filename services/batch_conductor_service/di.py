@@ -100,7 +100,6 @@ class EventDrivenServicesProvider(Provider):
 
         return KafkaDlqProducerImpl(
             kafka_bus=kafka_bus,
-            service_name=settings.SERVICE_NAME,
         )
 
     def provide_kafka_consumer(

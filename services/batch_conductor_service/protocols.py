@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from common_core.events.envelope import EventEnvelope
+from services.batch_conductor_service.pipeline_definitions import PipelineDefinition
 
 
 class BatchStateRepositoryProtocol(Protocol):
@@ -85,9 +86,9 @@ class PipelineRulesProtocol(Protocol):
     """
 
     async def resolve_pipeline_dependencies(
-        self, requested_pipeline: str, current_batch_state: dict[str, set[str]]
-    ) -> dict[str, list[str]]:
-        """Resolve pipeline dependencies based on current batch state."""
+        self, requested_pipeline: str, batch_id: str | None = None
+    ) -> list[str]:
+        """Resolve pipeline dependencies based on batch state for the given batch_id."""
         ...
 
     async def validate_pipeline_compatibility(
@@ -137,7 +138,7 @@ class PipelineGeneratorProtocol(Protocol):
     with proper validation and error handling.
     """
 
-    async def get_pipeline_definition(self, pipeline_name: str) -> dict | None:
+    async def get_pipeline_definition(self, pipeline_name: str) -> PipelineDefinition | None:
         """Get pipeline definition by name."""
         ...
 
@@ -207,4 +208,10 @@ class PipelineResolutionServiceProtocol(Protocol):
         additional_metadata: dict | None = None,
     ) -> dict[str, Any]:
         """Resolve optimal pipeline configuration for a batch."""
+        ...
+
+    async def resolve_pipeline_request(
+        self, request: Any
+    ) -> Any:
+        """Resolve a complete pipeline request from BOS."""
         ...

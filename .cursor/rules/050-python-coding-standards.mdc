@@ -25,15 +25,23 @@ alwaysApply: true
 - **MUST** type-annotate all public functions, methods, class attributes
 - **MUST** use `from __future__ import annotations`
 - **MUST** prefer precise types over `typing.Any`
-- **MUST** pass `pdm run typecheck-all`
+- **MUST** pass `pdm run typecheck-all` (run from repository root)
 - **FORBIDDEN**: `typing.Any` where precise type possible
 
-### 3.2. Missing Type Stubs
+### 3.2. Execution Patterns
+**MUST** run mypy from repository root:
+
+```bash
+# ✅ CORRECT
+pdm run typecheck-all        # Standard command
+pdm run mypy services/       # Check services
+
+### 3.3. Missing Type Stubs
 - **FORBIDDEN**: Creating `py.typed` marker files for internal modules
 - **REQUIRED**: Add modules without type stubs to `pyproject.toml` MyPy overrides
 - **Pattern**: Add to external libraries section with `ignore_missing_imports = true`
 
-### 3.3. Protocol Implementation Patterns
+### 3.4. Protocol Implementation Patterns
 - **MUST** use explicit protocol inheritance to resolve DI type issues
 - **PATTERN**: Use `TYPE_CHECKING` imports for protocol type aliases when needed
 
@@ -54,7 +62,7 @@ class ConcreteImpl:
         # MyPy accepts this as implementing ProtocolMyProtocol
 ```
 
-### 3.4. Dependency Injection Principle
+### 3.5. Dependency Injection Principle
 - Business logic **MUST** depend on abstractions (`typing.Protocol`), not concrete implementations.
 - **MUST** use Dishka DI framework; every provider lives in `<service>/di.py`
 - HTTP services **MUST** use `quart-dishka` integration with `@inject` decorator

@@ -45,9 +45,15 @@ async def mock_http_context_manager(mock_response: AsyncMock) -> Any:
 - **FORBIDDEN**: Simplifying tests to make them pass - fix underlying issues
 
 ## 5. Type Checking Standards
+- **REQUIRED**: Run `pdm run typecheck-all` from repository root
 - **FORBIDDEN**: Creating `py.typed` marker files for internal modules
 - **REQUIRED**: Add missing type stubs to `pyproject.toml` MyPy external libraries section
 - **Pattern**: Use `ignore_missing_imports = true` in MyPy overrides for libraries without stubs
+
+**Root execution is mandatory for**:
+- Proper absolute import resolution in monorepo architecture
+- Cross-service protocol compliance validation  
+- Complete dependency graph type checking
 
 ## 6. Anti-Patterns
 - **FORBIDDEN**: `try/except pass` blocks hiding model rebuilding failures

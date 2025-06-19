@@ -39,7 +39,7 @@ class KafkaDlqProducerImpl(DlqProducerProtocol):
     async def publish_to_dlq(
         self,
         base_topic: str,
-        failed_event_envelope: EventEnvelope[Any],
+        failed_event_envelope: EventEnvelope[Any] | dict[Any, Any],
         dlq_reason: str,
         additional_metadata: dict[str, Any] | None = None,
     ) -> bool:
@@ -54,9 +54,17 @@ class KafkaDlqProducerImpl(DlqProducerProtocol):
             dlq_topic = f"{base_topic}.DLQ"
 
             # Build DLQ message following task specification schema
+            if isinstance(failed_event_envelope, EventEnvelope):
+                envelope_data = failed_event_envelope.model_dump(mode="json")
+                event_id = str(failed_event_envelope.event_id)
+            else:
+                # Handle dict case
+                envelope_data = failed_event_envelope
+                event_id = str(failed_event_envelope.get("event_id", "unknown"))
+
             dlq_message = {
                 "schema_version": 1,
-                "failed_event_envelope": failed_event_envelope.model_dump(mode="json"),
+                "failed_event_envelope": envelope_data,
                 "dlq_reason": dlq_reason,
                 "timestamp": datetime.now(UTC).isoformat(),
                 "service": "batch_conductor_service",
@@ -79,7 +87,7 @@ class KafkaDlqProducerImpl(DlqProducerProtocol):
                     message_key = data.entity_ref.entity_id
 
             # Publish to DLQ topic
-            await self.kafka_bus.produce(
+            await self.kafka_bus.producer.send(
                 topic=dlq_topic, key=message_key, value=json.dumps(dlq_message), headers={}
             )
 
@@ -88,7 +96,7 @@ class KafkaDlqProducerImpl(DlqProducerProtocol):
                 extra={
                     "dlq_topic": dlq_topic,
                     "dlq_reason": dlq_reason,
-                    "original_event_id": str(failed_event_envelope.event_id),
+                    "original_event_id": event_id,
                     "message_key": message_key,
                 },
             )
@@ -100,9 +108,7 @@ class KafkaDlqProducerImpl(DlqProducerProtocol):
                 extra={
                     "base_topic": base_topic,
                     "dlq_reason": dlq_reason,
-                    "original_event_id": str(failed_event_envelope.event_id)
-                    if failed_event_envelope
-                    else "unknown",
+                    "original_event_id": event_id,
                 },
                 exc_info=True,
             )

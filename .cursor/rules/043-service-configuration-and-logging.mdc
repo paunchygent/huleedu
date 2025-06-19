@@ -1,5 +1,5 @@
 ---
-description: 
+description: Defines configuration management and logging standards for all services.
 globs: 
 alwaysApply: false
 ---

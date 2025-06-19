@@ -14,7 +14,7 @@ import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import pytest
 from aiokafka import ConsumerRecord
@@ -161,39 +161,61 @@ class TestAuthenticRedisIdempotency:
 
 
 class MockRedisClient:
-    """Mock Redis client for controlled testing scenarios."""
+    """Mock Redis client for E2E testing."""
 
     def __init__(self) -> None:
-        self.keys: Dict[str, str] = {}
-        self.set_calls: List[Tuple[str, str, int]] = []
-        self.delete_calls: List[str] = []
+        self.keys: dict[str, str] = {}
+        self.set_calls: list[tuple[str, str, int | None]] = []
+        self.delete_calls: list[str] = []
         self.should_fail_operations = False
         self.connected_services: List[str] = []
 
     async def set_if_not_exists(self, key: str, value: str, ttl_seconds: int | None = None) -> bool:
-        """Mock SETNX operation with failure simulation."""
-        self.set_calls.append((key, value, ttl_seconds or 0))
+        """Mock Redis SETNX operation."""
+        self.set_calls.append((key, value, ttl_seconds))
 
+        # Check if outage is simulated
         if self.should_fail_operations:
-            raise Exception("Simulated Redis failure")
+            # Redis outage - raise exception to trigger fail-open behavior
+            raise Exception("Redis connection failed - simulated outage")
 
         if key in self.keys:
-            return False  # Key already exists (duplicate)
-
+            return False  # Key already exists
         self.keys[key] = value
-        return True  # Key set successfully (first time)
+        return True  # Key was set
 
     async def delete_key(self, key: str) -> int:
-        """Mock DELETE operation with failure simulation."""
+        """Mock Redis DELETE operation."""
         self.delete_calls.append(key)
 
+        # Check if outage is simulated
         if self.should_fail_operations:
-            raise Exception("Simulated Redis failure")
+            # Redis outage - raise exception to maintain consistency
+            raise Exception("Redis connection failed - simulated outage")
 
         if key in self.keys:
             del self.keys[key]
             return 1
         return 0
+
+    async def get(self, key: str) -> str | None:
+        """Mock GET operation that retrieves values."""
+        # Check if outage is simulated
+        if self.should_fail_operations:
+            # Redis outage - raise exception to maintain consistency
+            raise Exception("Redis connection failed - simulated outage")
+
+        return self.keys.get(key)
+
+    async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
+        """Mock SETEX operation that sets values with TTL."""
+        # Check if outage is simulated
+        if self.should_fail_operations:
+            # Redis outage - raise exception to maintain consistency
+            raise Exception("Redis connection failed - simulated outage")
+
+        self.keys[key] = value
+        return True
 
     def simulate_outage(self) -> None:
         """Simulate Redis outage."""

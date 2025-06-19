@@ -24,39 +24,43 @@ from services.essay_lifecycle_service.protocols import (
 
 
 class MockRedisClient:
-    """Mock Redis client for idempotency testing."""
+    """Mock Redis client for testing."""
 
     def __init__(self) -> None:
         self.keys: dict[str, str] = {}
-        self.set_calls: list[tuple[str, str, int | None]] = []
+        self.set_calls: list[tuple[str, str, int]] = []
         self.delete_calls: list[str] = []
         self.should_fail_set = False
-        self.should_fail_delete = False
 
     async def set_if_not_exists(self, key: str, value: str, ttl_seconds: int | None = None) -> bool:
-        """Mock Redis SETNX operation."""
-        self.set_calls.append((key, value, ttl_seconds))
+        """Mock SETNX operation."""
+        self.set_calls.append((key, value, ttl_seconds or 0))
 
         if self.should_fail_set:
-            raise RuntimeError("Mock Redis SET failure")
+            raise Exception("Redis connection failed")
 
         if key in self.keys:
-            return False  # Key already exists (duplicate)
+            return False  # Key already exists
 
         self.keys[key] = value
-        return True  # Key was set (first time)
+        return True  # Key set successfully
 
     async def delete_key(self, key: str) -> int:
-        """Mock Redis DELETE operation."""
+        """Mock DELETE operation."""
         self.delete_calls.append(key)
-
-        if self.should_fail_delete:
-            raise RuntimeError("Mock Redis DELETE failure")
-
         if key in self.keys:
             del self.keys[key]
             return 1
         return 0
+
+    async def get(self, key: str) -> str | None:
+        """Mock GET operation that retrieves values."""
+        return self.keys.get(key)
+
+    async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
+        """Mock SETEX operation that sets values with TTL."""
+        self.keys[key] = value
+        return True
 
 
 def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:

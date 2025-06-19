@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from common_core.events.envelope import EventEnvelope
@@ -165,7 +165,7 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
         """Publish pipeline resolution failure to DLQ for analysis."""
         try:
             # Create a synthetic event envelope for the failed resolution request
-            synthetic_envelope = EventEnvelope(
+            synthetic_envelope = EventEnvelope[Any](
                 event_id=uuid4(),
                 event_type="huleedu.batch.pipeline.resolution.failed.v1",
                 event_timestamp=datetime.now(UTC),
@@ -224,3 +224,27 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
             self._metrics["pipeline_resolutions"].labels(
                 requested_pipeline=requested_pipeline, status=failure_reason
             ).inc()
+
+    async def resolve_optimal_pipeline(
+        self,
+        batch_id: str,
+        requested_pipeline: str,
+        additional_metadata: dict | None = None,
+    ) -> dict[str, Any]:
+        """Resolve optimal pipeline configuration for a batch."""
+        success, resolved_pipeline, error_message = await self.resolve_pipeline(
+            batch_id, requested_pipeline
+        )
+
+        result = {
+            "success": success,
+            "batch_id": batch_id,
+            "requested_pipeline": requested_pipeline,
+            "resolved_pipeline": resolved_pipeline,
+            "error_message": error_message,
+        }
+
+        if additional_metadata:
+            result["additional_metadata"] = additional_metadata
+
+        return result

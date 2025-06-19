@@ -1,5 +1,5 @@
 ---
-description: 
+description: Defines all HTTP (Quart-based) service architectural patterns and directory structure.
 globs: 
 alwaysApply: false
 ---

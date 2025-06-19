@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
+from typing import Dict
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -24,21 +25,19 @@ from services.spell_checker_service.protocols import (
 
 
 class MockRedisClient:
-    """Mock Redis client for testing."""
+    """Mock Redis client for integration testing."""
 
     def __init__(self) -> None:
-        self.keys: dict[str, str] = {}
+        self.keys: Dict[str, str] = {}
         self.set_calls: list[tuple[str, str, int | None]] = []
 
     async def set_if_not_exists(self, key: str, value: str, ttl_seconds: int | None = None) -> bool:
         """Mock Redis SETNX operation."""
         self.set_calls.append((key, value, ttl_seconds))
-
         if key in self.keys:
-            return False  # Key already exists (duplicate)
-
+            return False
         self.keys[key] = value
-        return True  # Key was set (first time)
+        return True
 
     async def delete_key(self, key: str) -> int:
         """Mock Redis DELETE operation."""
@@ -46,6 +45,15 @@ class MockRedisClient:
             del self.keys[key]
             return 1
         return 0
+
+    async def get(self, key: str) -> str | None:
+        """Mock GET operation that retrieves values."""
+        return self.keys.get(key)
+
+    async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
+        """Mock SETEX operation that sets values with TTL."""
+        self.keys[key] = value
+        return True
 
 
 def create_sample_spellcheck_event() -> dict:
