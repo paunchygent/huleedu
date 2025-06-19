@@ -18,6 +18,9 @@ from common_core.metadata_models import EssayProcessingInputRefV1
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
+from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
+    ClientPipelineRequestHandler,
+)
 from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import (
     ELSBatchPhaseOutcomeHandler,
 )
@@ -38,6 +41,11 @@ class TestBatchKafkaConsumerBusinessLogic:
         return AsyncMock(spec=ELSBatchPhaseOutcomeHandler)
 
     @pytest.fixture
+    def mock_client_pipeline_request_handler(self) -> AsyncMock:
+        """Mock the ClientPipelineRequestHandler external boundary."""
+        return AsyncMock(spec=ClientPipelineRequestHandler)
+
+    @pytest.fixture
     def mock_redis_client(self) -> AsyncMock:
         """Mock Redis client for idempotency support."""
         return AsyncMock(spec=RedisClientProtocol)
@@ -47,6 +55,7 @@ class TestBatchKafkaConsumerBusinessLogic:
         self,
         mock_batch_essays_ready_handler: AsyncMock,
         mock_els_batch_phase_outcome_handler: AsyncMock,
+        mock_client_pipeline_request_handler: AsyncMock,
         mock_redis_client: AsyncMock,
     ) -> BatchKafkaConsumer:
         """Create Kafka consumer with mocked external dependencies."""
@@ -55,6 +64,7 @@ class TestBatchKafkaConsumerBusinessLogic:
             consumer_group="test-group",
             batch_essays_ready_handler=mock_batch_essays_ready_handler,
             els_batch_phase_outcome_handler=mock_els_batch_phase_outcome_handler,
+            client_pipeline_request_handler=mock_client_pipeline_request_handler,
             redis_client=mock_redis_client,
         )
 
@@ -98,18 +108,39 @@ class TestBatchKafkaConsumerBusinessLogic:
             mock_message
         )
 
+    async def test_client_pipeline_request_message_routing(
+        self,
+        kafka_consumer: BatchKafkaConsumer,
+        mock_client_pipeline_request_handler: AsyncMock,
+    ) -> None:
+        """Test that ClientBatchPipelineRequest messages are routed to the correct handler."""
+        # Mock Kafka message for ClientBatchPipelineRequest
+        mock_message = Mock()
+        mock_message.topic = "huleedu.commands.batch.pipeline.v1"
+        mock_message.partition = 0
+        mock_message.offset = 789
+
+        # Execute the message routing logic
+        await kafka_consumer._handle_message(mock_message)
+
+        # Verify the correct handler was called
+        mock_client_pipeline_request_handler.handle_client_pipeline_request.assert_called_once_with(
+            mock_message
+        )
+
     async def test_unknown_topic_handling(
         self,
         kafka_consumer: BatchKafkaConsumer,
         mock_batch_essays_ready_handler: AsyncMock,
         mock_els_batch_phase_outcome_handler: AsyncMock,
+        mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that unknown topics are handled gracefully without calling any handlers."""
         # Mock Kafka message for unknown topic
         mock_message = Mock()
         mock_message.topic = "unknown.topic.name"
         mock_message.partition = 0
-        mock_message.offset = 789
+        mock_message.offset = 999
 
         # Execute the message routing logic (should not raise exception)
         await kafka_consumer._handle_message(mock_message)
@@ -117,6 +148,7 @@ class TestBatchKafkaConsumerBusinessLogic:
         # Verify no handlers were called
         mock_batch_essays_ready_handler.handle_batch_essays_ready.assert_not_called()
         mock_els_batch_phase_outcome_handler.handle_els_batch_phase_outcome.assert_not_called()
+        mock_client_pipeline_request_handler.handle_client_pipeline_request.assert_not_called()
 
 
 class TestELSBatchPhaseOutcomeHandler:

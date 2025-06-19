@@ -364,7 +364,9 @@ class RedisClient:
             )
             return keys
         except RedisTimeoutError:
-            logger.error(f"Timeout on Redis SCAN operation by '{self.client_id}' for pattern '{pattern}'")
+            logger.error(
+                f"Timeout on Redis SCAN operation by '{self.client_id}' for pattern '{pattern}'"
+            )
             raise
         except Exception as e:
             logger.error(

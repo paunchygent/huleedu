@@ -13,6 +13,7 @@ dependencies = [
     "aiohttp",
     "pydantic",
     "pydantic-settings",
+    "pyyaml",
     "huleedu-common-core",
     "huleedu-service-libs",
     "prometheus-client",

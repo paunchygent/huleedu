@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "batch-conductor-service"
 
     # Pipeline configuration
-    PIPELINE_CONFIG_PATH: str = "services/batch_conductor_service/pipelines.yaml"
+    PIPELINE_CONFIG_PATH: str = "pipelines.yaml"
 
     # HTTP server configuration
     HTTP_HOST: str = Field(default="0.0.0.0", description="HTTP server host")

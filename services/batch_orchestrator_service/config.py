@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     # Redis Configuration
     REDIS_URL: str = "redis://localhost:6379"  # Development/test default
 
+    # Batch Conductor Service Configuration
+    BCS_BASE_URL: str = "http://batch_conductor_service:4002"
+    BCS_PIPELINE_ENDPOINT: str = "/internal/v1/pipelines/define"
+    BCS_REQUEST_TIMEOUT: int = 30  # Timeout in seconds for BCS HTTP requests
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -94,7 +94,7 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                     await self.redis_client.unwatch()
                     logger.debug(
                         f"Step {step_name} already completed for essay {essay_id}, skipping",
-                        extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name}
+                        extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name},
                     )
                     return True
 
@@ -154,7 +154,7 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
 
                     if attempt < max_retries - 1:
                         # Exponential backoff with jitter
-                        delay = base_delay * (2 ** attempt) + random.uniform(0, 0.01)
+                        delay = base_delay * (2**attempt) + random.uniform(0, 0.01)
                         await asyncio.sleep(delay)
                         continue
 
@@ -163,17 +163,17 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                 logger.error(
                     f"Error in atomic operation attempt {attempt + 1}/{max_retries}: {e}",
                     extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name},
-                    exc_info=True
+                    exc_info=True,
                 )
 
                 if attempt < max_retries - 1:
-                    delay = base_delay * (2 ** attempt) + random.uniform(0, 0.01)
+                    delay = base_delay * (2**attempt) + random.uniform(0, 0.01)
                     await asyncio.sleep(delay)
                     continue
 
         logger.error(
             f"Atomic operation failed after {max_retries} attempts",
-            extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name}
+            extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name},
         )
         return False
 

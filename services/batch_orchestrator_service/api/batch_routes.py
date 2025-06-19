@@ -83,11 +83,11 @@ async def register_batch(
         return jsonify({"error": "Failed to register batch."}), 500
 
 
-@batch_bp.route("/v1/batches/<batch_id>/status", methods=["GET"])
+@batch_bp.route("/<batch_id>/status", methods=["GET"])
 @inject
 async def get_batch_status(
     batch_id: str,
-    batch_repo: BatchRepositoryProtocol,
+    batch_repo: FromDishka[BatchRepositoryProtocol],
 ) -> Union[Response, tuple[Response, int]]:
     """Get the current status and pipeline state of a batch."""
     try:

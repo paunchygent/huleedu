@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock
 import pytest
 from aiokafka import ConsumerRecord
 from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
+from implementations.client_pipeline_request_handler import ClientPipelineRequestHandler
 from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
 from kafka_consumer import BatchKafkaConsumer
 
@@ -168,6 +169,16 @@ def mock_handlers() -> Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandle
     return batch_essays_ready_handler, els_phase_outcome_handler
 
 
+@pytest.fixture
+def mock_client_pipeline_request_handler() -> AsyncMock:
+    """Create mock ClientPipelineRequestHandler with external dependencies."""
+    handler = AsyncMock(spec=ClientPipelineRequestHandler)
+    handler.bcs_client = AsyncMock()
+    handler.batch_repo = AsyncMock()
+    handler.phase_coordinator = AsyncMock()
+    return handler
+
+
 class TestBOSIdempotencyIntegration:
     """Integration tests for BOS idempotency decorator with real business logic."""
 
@@ -179,6 +190,7 @@ class TestBOSIdempotencyIntegration:
             BatchEssaysReadyHandler,
             ELSBatchPhaseOutcomeHandler,
         ],
+        mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """
         Test that first-time BatchEssaysReady events are processed successfully with idempotency.
@@ -200,6 +212,7 @@ class TestBOSIdempotencyIntegration:
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
+                client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,
             )
             await consumer._handle_message(msg)
@@ -230,6 +243,7 @@ class TestBOSIdempotencyIntegration:
             BatchEssaysReadyHandler,
             ELSBatchPhaseOutcomeHandler,
         ],
+        mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """
         Test that duplicate BatchEssaysReady events are skipped without processing business logic.
@@ -257,6 +271,7 @@ class TestBOSIdempotencyIntegration:
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
+                client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,
             )
             await consumer._handle_message(msg)
@@ -281,6 +296,7 @@ class TestBOSIdempotencyIntegration:
             BatchEssaysReadyHandler,
             ELSBatchPhaseOutcomeHandler,
         ],
+        mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that first-time ELSBatchPhaseOutcome events are processed successfully."""
         from huleedu_service_libs.idempotency import idempotent_consumer
@@ -300,6 +316,7 @@ class TestBOSIdempotencyIntegration:
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
+                client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,
             )
             await consumer._handle_message(msg)
@@ -324,6 +341,7 @@ class TestBOSIdempotencyIntegration:
             BatchEssaysReadyHandler,
             ELSBatchPhaseOutcomeHandler,
         ],
+        mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """
         Test that business logic failures are treated as infrastructure failures
@@ -351,6 +369,7 @@ class TestBOSIdempotencyIntegration:
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
+                client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,
             )
             await consumer._handle_message(msg)
@@ -401,6 +420,7 @@ class TestBOSIdempotencyIntegration:
             BatchEssaysReadyHandler,
             ELSBatchPhaseOutcomeHandler,
         ],
+        mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that Redis failures fall back to processing without idempotency."""
         from huleedu_service_libs.idempotency import idempotent_consumer
@@ -421,6 +441,7 @@ class TestBOSIdempotencyIntegration:
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
+                client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,
             )
             await consumer._handle_message(msg)

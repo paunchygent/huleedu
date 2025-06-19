@@ -34,7 +34,7 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
         logger.info(
             f"PostgreSQL: Recorded completion for batch={batch_id}, "
             f"essay={essay_id}, step={step_name}",
-            extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name}
+            extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name},
         )
         return True
 

@@ -9,11 +9,13 @@ from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from implementations.ai_feedback_initiator_impl import AIFeedbackInitiatorImpl
+from implementations.batch_conductor_client_impl import BatchConductorClientImpl
 from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
 from implementations.batch_processing_service_impl import BatchProcessingServiceImpl
 from implementations.batch_repository_impl import MockBatchRepositoryImpl
 from implementations.batch_repository_postgres_impl import PostgreSQLBatchRepositoryImpl
 from implementations.cj_assessment_initiator_impl import DefaultCJAssessmentInitiator
+from implementations.client_pipeline_request_handler import ClientPipelineRequestHandler
 from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
 from implementations.essay_lifecycle_client_impl import DefaultEssayLifecycleClientImpl
 from implementations.event_publisher_impl import DefaultBatchEventPublisherImpl
@@ -24,6 +26,7 @@ from kafka_consumer import BatchKafkaConsumer
 from prometheus_client import CollectorRegistry
 from protocols import (
     AIFeedbackInitiatorProtocol,
+    BatchConductorClientProtocol,
     BatchEventPublisherProtocol,
     BatchProcessingServiceProtocol,
     BatchRepositoryProtocol,
@@ -102,6 +105,13 @@ class ExternalClientsProvider(Provider):
     ) -> EssayLifecycleClientProtocol:
         """Provide essay lifecycle service client implementation."""
         return DefaultEssayLifecycleClientImpl(http_session, settings)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_conductor_client(
+        self, http_session: ClientSession, settings: Settings
+    ) -> BatchConductorClientProtocol:
+        """Provide Batch Conductor Service HTTP client implementation."""
+        return BatchConductorClientImpl(http_session, settings)
 
 
 class PhaseInitiatorsProvider(Provider):
@@ -194,11 +204,22 @@ class EventHandlingProvider(Provider):
         return ELSBatchPhaseOutcomeHandler(phase_coordinator)
 
     @provide(scope=Scope.APP)
+    def provide_client_pipeline_request_handler(
+        self,
+        bcs_client: BatchConductorClientProtocol,
+        batch_repo: BatchRepositoryProtocol,
+        phase_coordinator: PipelinePhaseCoordinatorProtocol,
+    ) -> ClientPipelineRequestHandler:
+        """Provide ClientBatchPipelineRequest message handler."""
+        return ClientPipelineRequestHandler(bcs_client, batch_repo, phase_coordinator)
+
+    @provide(scope=Scope.APP)
     def provide_batch_kafka_consumer(
         self,
         settings: Settings,
         batch_essays_ready_handler: BatchEssaysReadyHandler,
         els_batch_phase_outcome_handler: ELSBatchPhaseOutcomeHandler,
+        client_pipeline_request_handler: ClientPipelineRequestHandler,
         redis_client: RedisClientProtocol,
     ) -> BatchKafkaConsumer:
         """Provide Kafka consumer with idempotency support."""
@@ -207,6 +228,7 @@ class EventHandlingProvider(Provider):
             consumer_group=settings.KAFKA_CONSUMER_GROUP_ID,
             batch_essays_ready_handler=batch_essays_ready_handler,
             els_batch_phase_outcome_handler=els_batch_phase_outcome_handler,
+            client_pipeline_request_handler=client_pipeline_request_handler,
             redis_client=redis_client,
         )
 

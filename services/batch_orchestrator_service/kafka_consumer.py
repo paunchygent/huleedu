@@ -1,7 +1,8 @@
 """
 Kafka consumer logic for Batch Orchestrator Service.
 
-Handles message routing to specialized handlers for BatchEssaysReady and ELSBatchPhaseOutcomeV1.
+Handles message routing to specialized handlers for BatchEssaysReady, ELSBatchPhaseOutcomeV1,
+and ClientBatchPipelineRequestV1 events.
 Refactored to follow clean architecture with extracted message handlers.
 """
 
@@ -13,6 +14,7 @@ from aiokafka import AIOKafkaConsumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
+from implementations.client_pipeline_request_handler import ClientPipelineRequestHandler
 from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
 
 from common_core.enums import ProcessingEvent, topic_name
@@ -21,7 +23,8 @@ logger = create_service_logger("bos.kafka.consumer")
 
 
 class BatchKafkaConsumer:
-    """Kafka consumer for handling BatchEssaysReady events and phase transitions."""
+    """Kafka consumer for handling BatchEssaysReady events,
+    phase transitions, and client pipeline requests."""
 
     def __init__(
         self,
@@ -29,22 +32,25 @@ class BatchKafkaConsumer:
         consumer_group: str,
         batch_essays_ready_handler: BatchEssaysReadyHandler,
         els_batch_phase_outcome_handler: ELSBatchPhaseOutcomeHandler,
+        client_pipeline_request_handler: ClientPipelineRequestHandler,
         redis_client: RedisClientProtocol,
     ) -> None:
         self.kafka_bootstrap_servers = kafka_bootstrap_servers
         self.consumer_group = consumer_group
         self.batch_essays_ready_handler = batch_essays_ready_handler
         self.els_batch_phase_outcome_handler = els_batch_phase_outcome_handler
+        self.client_pipeline_request_handler = client_pipeline_request_handler
         self.redis_client = redis_client
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
 
     async def start_consumer(self) -> None:
         """Start the Kafka consumer and begin processing messages."""
-        # Subscribe to BatchEssaysReady topic and ELS batch phase outcome topic (Phase 3)
+        # Subscribe to all relevant topics
         topics = [
             topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             "huleedu.els.batch_phase.outcome.v1",  # ELSBatchPhaseOutcomeV1 events from ELS
+            "huleedu.commands.batch.pipeline.v1",  # ClientBatchPipelineRequestV1 from API Gateway
         ]
 
         # TODO: Add subscription to ExcessContentProvisionedV1 topic for handling
@@ -56,7 +62,7 @@ class BatchKafkaConsumer:
             *topics,
             bootstrap_servers=self.kafka_bootstrap_servers,
             group_id=self.consumer_group,
-            client_id="bos-pipeline-initiator",
+            client_id="bos-pipeline-orchestrator",
             auto_offset_reset="earliest",
             enable_auto_commit=False,  # Manual commit for reliable message processing
         )
@@ -171,6 +177,8 @@ class BatchKafkaConsumer:
                 await self.batch_essays_ready_handler.handle_batch_essays_ready(msg)
             elif msg.topic == "huleedu.els.batch_phase.outcome.v1":
                 await self.els_batch_phase_outcome_handler.handle_els_batch_phase_outcome(msg)
+            elif msg.topic == "huleedu.commands.batch.pipeline.v1":
+                await self.client_pipeline_request_handler.handle_client_pipeline_request(msg)
             else:
                 logger.warning(f"Received message from unknown topic: {msg.topic}")
 

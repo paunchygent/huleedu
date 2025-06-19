@@ -229,3 +229,23 @@ class NLPInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     """
 
     pass
+
+
+class BatchConductorClientProtocol(Protocol):
+    """Protocol for HTTP communication with Batch Conductor Service."""
+
+    async def resolve_pipeline(self, batch_id: str, requested_pipeline: str) -> dict[str, Any]:
+        """
+        Request pipeline resolution from BCS internal API.
+
+        Args:
+            batch_id: The unique identifier of the target batch
+            requested_pipeline: The final pipeline the user wants to run
+
+        Returns:
+            BCS response containing resolved pipeline and analysis
+
+        Raises:
+            Exception: If BCS communication fails or returns error
+        """
+        ...
