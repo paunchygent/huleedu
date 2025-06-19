@@ -93,7 +93,7 @@ This release completes the implementation and integration of the **Batch Conduct
 
 This release marks the completion of Sprint 1 with a fully functional walking skeleton that demonstrates end-to-end essay processing capabilities across all microservices.
 
-### Added
+### Added in Sprint 1
 
 #### **CI/CD Infrastructure**
 
@@ -137,7 +137,7 @@ This release marks the completion of Sprint 1 with a fully functional walking sk
 - **Structured Logging**: Correlation ID propagation across service boundaries
 - **Health Check Endpoints**: Standardized `/healthz` endpoints for all HTTP services
 
-### Changed
+### Changed in Sprint 1
 
 #### **Event Schema Evolution**
 
@@ -151,7 +151,7 @@ This release marks the completion of Sprint 1 with a fully functional walking sk
 - **Standardized**: Consistent Blueprint structure for HTTP services
 - **Optimized**: Docker Compose configuration with proper health checks and dependencies
 
-### Fixed
+### Fixed in Sprint 1
 
 #### **Critical Architecture Issues**
 
@@ -193,7 +193,7 @@ This release marks the completion of Sprint 1 with a fully functional walking sk
 - **Event Processing**: Efficient Kafka message processing with proper error handling
 - **Resource Usage**: Optimized container resource allocation and management
 
-### Documentation
+### Documentation Updated
 
 - **Architecture Documentation**: Updated service interaction patterns and event flows
 - **API Documentation**: Comprehensive endpoint documentation for all HTTP services
@@ -204,7 +204,7 @@ This release marks the completion of Sprint 1 with a fully functional walking sk
 
 ## [0.1.0] - 2025-01-15
 
-### Added
+### Added during Walking Skeleton Sprint
 
 - Initial microservices architecture setup
 - Basic service implementations

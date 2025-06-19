@@ -8,48 +8,50 @@ alwaysApply: false
 **MUST** adhere to these rules for all development, especially when generating code.
 
 ## Core Principles & Architecture
-- [010-foundational-principles.md](mdc:010-foundational-principles.md): Core tenets and mindset
-- [015-project-structure-standards.md](mdc:015-project-structure-standards.md): File and folder organization standards
-- [020-architectural-mandates.md](mdc:020-architectural-mandates.md): DDD, Service Autonomy, Explicit Contracts
-- [021-content-service-architecture.md](mdc:021-content-service-architecture.md): Content Service architecture and implementation
-- [022-spell-checker-service-architecture.md](mdc:022-spell-checker-service-architecture.md): Spell Checker Service architecture and implementation
-- [023-batch-service-architecture.md](mdc:023-batch-service-architecture.md): Batch Service architecture and implementation
-- [024-common-core-architecture.md](mdc:024-common-core-architecture.md): Common Core package architecture and implementation
-- [025-essay-lifecycle-service-architecture.md](mdc:025-essay-lifecycle-service-architecture.md): Essay Lifecycle Service architecture and implementation
-- [026-file-service-architecture.md](mdc:026-file-service-architecture.md): File Service architecture and implementation
-- [027-cj-assessment-service.md](mdc:027-cj-assessment-service.md): CJ Assessment Service architecture and implementation
-- [028-batch-conductor-service.md](mdc:028-batch-conductor-service.md): Batch Conductor Service (BCS) architecture and implementation
-- [030-event-driven-architecture-eda-standards.md](mdc:030-event-driven-architecture-eda-standards.md): Event-driven communication standards
+- [010-foundational-principles.mdc](mdc:010-foundational-principles.mdc): Core tenets and mindset
+- [015-project-structure-standards.mdc](mdc:015-project-structure-standards.mdc): File and folder organization standards
+- [020-architectural-mandates.mdc](mdc:020-architectural-mandates.mdc): DDD, Service Autonomy, Explicit Contracts
+- [021-content-service-architecture.mdc](mdc:021-content-service-architecture.mdc): Content Service architecture and implementation
+- [022-spell-checker-service-architecture.mdc](mdc:022-spell-checker-service-architecture.mdc): Spell Checker Service architecture and implementation
+- [023-batch-orchestrator-service-architecture.mdc](mdc:023-batch-orchestrator-service-architecture.mdc): Batch Orchestrator Service architecture and implementation
+- [024-common-core-architecture.mdc](mdc:024-common-core-architecture.mdc): Common Core package architecture and implementation
+- [025-essay-lifecycle-service-architecture.mdc](mdc:025-essay-lifecycle-service-architecture.mdc): Essay Lifecycle Service architecture and implementation
+- [026-file-service-architecture.mdc](mdc:026-file-service-architecture.mdc): File Service architecture and implementation
+- [027-cj-assessment-service.mdc](mdc:027-cj-assessment-service.mdc): CJ Assessment Service architecture and implementation
+- [028-batch-conductor-service.mdc](mdc:028-batch-conductor-service.mdc): Batch Conductor Service (BCS) architecture and implementation
+- [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc): Event-driven communication standards
 
 ## Implementation & Coding Standards
 - [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc): High-level service implementation principles and stack requirements
 - [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc): HTTP service architecture patterns and Blueprint implementation
-- [041-fastapi-integration-patterns.md](mdc:041-fastapi-integration-patterns.md): FastAPI integration patterns for client-facing services with React frontend support
+- [041-fastapi-integration-patterns.mdc](mdc:041-fastapi-integration-patterns.mdc): FastAPI integration patterns for client-facing services with React frontend support
 - [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc): Async patterns, protocols, dependency injection, and worker service structure
 - [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc): Configuration management and logging standards
-- [044-service-debugging-and-troubleshooting.md](mdc:044-service-debugging-and-troubleshooting.md): CRITICAL debugging priority: service configuration over import patterns
-- [050-python-coding-standards.md](mdc:050-python-coding-standards.md): Python style, formatting, linting, typing, documentation
-- [051-pydantic-v2-standards.md](mdc:051-pydantic-v2-standards.md): Pydantic v2 usage patterns, serialization, and configuration standards
-- [052-sqlalchemy-standards.md](mdc:052-sqlalchemy-standards.md): Database models and SQLAlchemy patterns
+- [044-service-debugging-and-troubleshooting.mdc](mdc:044-service-debugging-and-troubleshooting.mdc): CRITICAL debugging priority: service configuration over import patterns
+- [050-python-coding-standards.mdc](mdc:050-python-coding-standards.mdc): Python style, formatting, linting, typing, documentation
+- [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc): Pydantic v2 usage patterns, serialization, and configuration standards
+- [052-event-contract-standards.mdc](mdc:052-event-contract-standards.mdc): Event contract standards and best practices
+- [053-sqlalchemy-standards.mdc](mdc:053-sqlalchemy-standards.mdc): Database models and SQLAlchemy patterns
 
 ## Quality, Workflow & Documentation
-- [070-testing-and-quality-assurance.md](mdc:070-testing-and-quality-assurance.md): Testing strategies (unit, contract, integration, E2E)
-- [080-repository-workflow-and-tooling.md](mdc:080-repository-workflow-and-tooling.md): PDM monorepo usage, version control, CI/CD
-- [081-pdm-dependency-management.md](mdc:081-pdm-dependency-management.md): PDM configuration and dependency management standards
-- [082-ruff-linting-standards.md](mdc:082-ruff-linting-standards.md): Ruff linting and formatting configuration
-- [083-pdm-standards-2025.mdc](mdc:.cursor/rules/083-pdm-standards-2025.mdc): Correct modern PDM syntax that must never be questioned
-- [084-docker-containerization-standards.mdc](mdc:.cursor/rules/084-docker-containerization-standards.mdc): Docker containerization patterns, import requirements, and troubleshooting
-- [085-docker-compose-v2-command-reference.mdc](mdc:.cursor/rules/085-docker-compose-v2-command-reference.mdc): Docker Compose v2 command reference
-- [090-documentation-standards.md](mdc:090-documentation-standards.md): Service, contract, and architectural documentation
+- [060-data-and-metadata-management.mdc](mdc:060-data-and-metadata-management.mdc): Data models and metadata management standards
+- [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc): Testing strategies (unit, contract, integration, E2E)
+- [080-repository-workflow-and-tooling.mdc](mdc:080-repository-workflow-and-tooling.mdc): PDM monorepo usage, version control, CI/CD
+- [081-pdm-dependency-management.mdc](mdc:081-pdm-dependency-management.mdc): PDM configuration and dependency management standards
+- [082-ruff-linting-standards.mdc](mdc:082-ruff-linting-standards.mdc): Ruff linting and formatting configuration
+- [083-pdm-standards-2025.mdc](mdc:083-pdm-standards-2025.mdc): Correct modern PDM syntax that must never be questioned
+- [084-docker-containerization-standards.mdc](mdc:084-docker-containerization-standards.mdc): Docker containerization patterns, import requirements, and troubleshooting
+- [085-docker-compose-v2-command-reference.mdc](mdc:085-docker-compose-v2-command-reference.mdc): Docker Compose v2 command reference
+- [090-documentation-standards.mdc](mdc:090-documentation-standards.mdc): Service, contract, and architectural documentation
 
 ## Terminology & Your Interaction Modes
-- [100-terminology-and-definitions.md](mdc:100-terminology-and-definitions.md): Shared vocabulary and glossary
-- [110-ai-agent-interaction-modes.md](mdc:110-ai-agent-interaction-modes.md): Your general interaction principles
-  - [110.1-planning-mode.md](mdc:110.1-planning-mode.md): Your guidelines for task planning
-  - [110.2-coding-mode.md](mdc:110.2-coding-mode.md): Your guidelines for code implementation
-  - [110.3-testing-mode.md](mdc:110.3-testing-mode.md): Your guidelines for test creation and execution
-  - [110.4-debugging-mode.md](mdc:110.4-debugging-mode.md): Your guidelines for debugging
-  - [110.5-refactoring-linting-mode.md](mdc:110.5-refactoring-linting-mode.md): Your guidelines for refactoring and linting
+- [100-terminology-and-definitions.mdc](mdc:100-terminology-and-definitions.mdc): Shared vocabulary and glossary
+- [110-ai-agent-interaction-modes.mdc](mdc:110-ai-agent-interaction-modes.mdc): Your general interaction principles
+  - [110.1-planning-mode.mdc](mdc:110.1-planning-mode.mdc): Your guidelines for task planning
+  - [110.2-coding-mode.mdc](mdc:110.2-coding-mode.mdc): Your guidelines for code implementation
+  - [110.3-testing-mode.mdc](mdc:110.3-testing-mode.mdc): Your guidelines for test creation and execution
+  - [110.4-debugging-mode.mdc](mdc:110.4-debugging-mode.mdc): Your guidelines for debugging
+  - [110.5-refactoring-linting-mode.mdc](mdc:110.5-refactoring-linting-mode.mdc): Your guidelines for refactoring and linting
 
 ## Rule Management
-- [999-rule-management.md](mdc:999-rule-management.md): Updating or proposing changes to these rules
+- [999-rule-management.mdc](mdc:999-rule-management.mdc): Updating or proposing changes to these rules

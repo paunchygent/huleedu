@@ -102,13 +102,18 @@ class TestBosElsPhaseCoordination:
     @pytest.fixture
     def mock_client_pipeline_request_handler(self):
         """Mock the ClientPipelineRequestHandler external boundary."""
-        from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
+        from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (  # noqa: E501
             ClientPipelineRequestHandler,
         )
         return AsyncMock(spec=ClientPipelineRequestHandler)
 
     @pytest.fixture
-    def kafka_consumer(self, mock_batch_essays_ready_handler, real_els_outcome_handler, mock_client_pipeline_request_handler):
+    def kafka_consumer(
+        self,
+        mock_batch_essays_ready_handler,
+        real_els_outcome_handler,
+        mock_client_pipeline_request_handler,
+    ):
         """Create real BatchKafkaConsumer with real outcome handler and mocked dependencies."""
         redis_client = MockRedisClient()
         return BatchKafkaConsumer(

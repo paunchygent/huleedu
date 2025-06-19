@@ -1,7 +1,7 @@
 """
-Idempotency Integration Tests for Batch Orchestrator Service
+Idempotency Integration Tests for Batch Orchestrator Service (Basic Scenarios)
 
-Tests the idempotency decorator integration with real business logic handlers.
+Tests the idempotency decorator for basic success and duplicate detection.
 Follows boundary mocking pattern - mocks Redis client but uses real handlers.
 """
 
@@ -30,17 +30,13 @@ class MockRedisClient:
 
     async def set_if_not_exists(self, key: str, value: str, ttl_seconds: int | None = None) -> bool:
         """Mock SETNX operation that tracks calls."""
-        # Always track the call, even if it fails
         self.set_calls.append((key, value, ttl_seconds or 0))
-
         if self.should_fail_set:
             raise Exception("Redis connection failed")
-
         if key in self.keys:
-            return False  # Key already exists (duplicate)
-
+            return False
         self.keys[key] = value
-        return True  # Key set successfully (first time)
+        return True
 
     async def delete_key(self, key: str) -> int:
         """Mock DELETE operation that tracks calls."""
@@ -63,8 +59,6 @@ class MockRedisClient:
 def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
     """Create a mock Kafka message from event data."""
     message_value = json.dumps(event_data).encode("utf-8")
-
-    # Determine correct topic based on event type
     event_type = event_data.get("event_type", "")
     if "batch.essays.ready" in event_type:
         topic = "huleedu.els.batch.essays.ready.v1"
@@ -72,7 +66,6 @@ def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
         topic = "huleedu.els.batch_phase.outcome.v1"
     else:
         topic = "huleedu.test.unknown"
-
     return ConsumerRecord(
         topic=topic,
         partition=0,
@@ -93,7 +86,6 @@ def sample_batch_essays_ready_event() -> dict:
     """Create sample BatchEssaysReady event for testing."""
     batch_id = str(uuid.uuid4())
     correlation_id = str(uuid.uuid4())
-
     return {
         "event_id": str(uuid.uuid4()),
         "event_type": "huleedu.batch.essays.ready.v1",
@@ -122,7 +114,6 @@ def sample_els_phase_outcome_event() -> dict:
     """Create sample ELSBatchPhaseOutcome event for testing."""
     batch_id = str(uuid.uuid4())
     correlation_id = str(uuid.uuid4())
-
     return {
         "event_id": str(uuid.uuid4()),
         "event_type": "huleedu.els.batch_phase.outcome.v1",
@@ -142,39 +133,27 @@ def sample_els_phase_outcome_event() -> dict:
 @pytest.fixture
 def mock_handlers() -> Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler]:
     """Create real handler instances with mocked dependencies (boundary mocking)."""
-    # Mock external dependencies that handlers need
     mock_event_publisher = AsyncMock()
     mock_batch_repo = AsyncMock()
     mock_phase_coordinator = AsyncMock()
-
-    # Create mock spellcheck initiator
     mock_spellcheck_initiator = AsyncMock()
-
-    # Import PhaseName to create proper phase initiators map
     from protocols import PhaseName
-
     mock_phase_initiators_map: Dict[PhaseName, Any] = {
         PhaseName.SPELLCHECK: mock_spellcheck_initiator
     }
-
-    # Configure successful responses for BatchEssaysReadyHandler
     mock_batch_repo.get_processing_pipeline_state.return_value = {
         "requested_pipelines": ["spellcheck"],
         "spellcheck_status": "PENDING_DEPENDENCIES",
     }
     mock_batch_repo.get_batch_context.return_value = {"some": "context"}
-
-    # Create real handler instances with mocked dependencies
     batch_essays_ready_handler = BatchEssaysReadyHandler(
         event_publisher=mock_event_publisher,
         batch_repo=mock_batch_repo,
         phase_initiators_map=mock_phase_initiators_map,
     )
-
     els_phase_outcome_handler = ELSBatchPhaseOutcomeHandler(
         phase_coordinator=mock_phase_coordinator
     )
-
     return batch_essays_ready_handler, els_phase_outcome_handler
 
 
@@ -188,34 +167,24 @@ def mock_client_pipeline_request_handler() -> AsyncMock:
     return handler
 
 
-class TestBOSIdempotencyIntegration:
-    """Integration tests for BOS idempotency decorator with real business logic."""
+class TestBOSIdempotencyBasic:
+    """Basic integration tests for BOS idempotency decorator."""
 
     @pytest.mark.asyncio
     async def test_first_time_batch_essays_ready_processing_success(
         self,
         sample_batch_essays_ready_event: dict,
-        mock_handlers: Tuple[
-            BatchEssaysReadyHandler,
-            ELSBatchPhaseOutcomeHandler,
-        ],
+        mock_handlers: Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
-        """
-        Test that first-time BatchEssaysReady events are processed successfully with idempotency.
-        """
+        """Test that first-time BatchEssaysReady events are processed successfully."""
         from huleedu_service_libs.idempotency import idempotent_consumer
-
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
-
-        # Create Kafka message
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
-        # Apply idempotency decorator to real message processor
         @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
         async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
-            # Create consumer instance to access _handle_message method
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
@@ -225,56 +194,37 @@ class TestBOSIdempotencyIntegration:
                 redis_client=redis_client,
             )
             await consumer._handle_message(msg)
-            return True  # Success
+            return True
 
-        # Process message
         result = await handle_message_idempotently(kafka_msg)
-
-        # Assertions
-        assert result is True  # Business logic succeeded
-        assert len(redis_client.set_calls) == 1  # SETNX was called
-        assert len(redis_client.delete_calls) == 0  # No cleanup needed
-
-        # Verify Redis key format and TTL
+        assert result is True
+        assert len(redis_client.set_calls) == 1
+        assert len(redis_client.delete_calls) == 0
         set_call = redis_client.set_calls[0]
         assert set_call[0].startswith("huleedu:events:seen:")
         assert set_call[1] == "1"
-        assert set_call[2] == 86400  # 24 hours
-
-        # Verify business logic was called
+        assert set_call[2] == 86400
         batch_essays_ready_handler.batch_repo.get_processing_pipeline_state.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_duplicate_batch_essays_ready_detection_and_skipping(
         self,
         sample_batch_essays_ready_event: dict,
-        mock_handlers: Tuple[
-            BatchEssaysReadyHandler,
-            ELSBatchPhaseOutcomeHandler,
-        ],
+        mock_handlers: Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
-        """
-        Test that duplicate BatchEssaysReady events are skipped without processing business logic.
-        """
+        """Test that duplicate BatchEssaysReady events are skipped."""
         from huleedu_service_libs.idempotency import idempotent_consumer
 
         from common_core.events.utils import generate_deterministic_event_id
-
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
-
-        # Create Kafka message
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
-
-        # Pre-populate Redis with the event key to simulate duplicate
         deterministic_id = generate_deterministic_event_id(kafka_msg.value)
         redis_client.keys[f"huleedu:events:seen:{deterministic_id}"] = "1"
 
-        # Apply idempotency decorator
         @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
         async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
-            # Create consumer instance to access _handle_message method
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
@@ -284,42 +234,29 @@ class TestBOSIdempotencyIntegration:
                 redis_client=redis_client,
             )
             await consumer._handle_message(msg)
-            return True  # Success
+            return True
 
-        # Process message
         result = await handle_message_idempotently(kafka_msg)
-
-        # Assertions
-        assert result is None  # Should return None for duplicates
-        assert len(redis_client.set_calls) == 1  # SETNX was attempted
-        assert len(redis_client.delete_calls) == 0  # No cleanup needed
-
-        # Business logic should NOT have been called
+        assert result is None
+        assert len(redis_client.set_calls) == 1
+        assert len(redis_client.delete_calls) == 0
         batch_essays_ready_handler.batch_repo.get_processing_pipeline_state.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_first_time_els_phase_outcome_processing_success(
         self,
         sample_els_phase_outcome_event: dict,
-        mock_handlers: Tuple[
-            BatchEssaysReadyHandler,
-            ELSBatchPhaseOutcomeHandler,
-        ],
+        mock_handlers: Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that first-time ELSBatchPhaseOutcome events are processed successfully."""
         from huleedu_service_libs.idempotency import idempotent_consumer
-
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
-
-        # Create Kafka message
         kafka_msg = create_mock_kafka_message(sample_els_phase_outcome_event)
 
-        # Apply idempotency decorator
         @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
         async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
-            # Create consumer instance to access _handle_message method
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
@@ -329,139 +266,10 @@ class TestBOSIdempotencyIntegration:
                 redis_client=redis_client,
             )
             await consumer._handle_message(msg)
-            return True  # Success
+            return True
 
-        # Process message
         result = await handle_message_idempotently(kafka_msg)
-
-        # Assertions
-        assert result is True  # Business logic succeeded
-        assert len(redis_client.set_calls) == 1  # SETNX was called
-        assert len(redis_client.delete_calls) == 0  # No cleanup needed
-
-        # Verify business logic was called
+        assert result is True
+        assert len(redis_client.set_calls) == 1
+        assert len(redis_client.delete_calls) == 0
         els_phase_outcome_handler.phase_coordinator.handle_phase_concluded.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_business_logic_failure_keeps_redis_lock(
-        self,
-        sample_batch_essays_ready_event: dict,
-        mock_handlers: Tuple[
-            BatchEssaysReadyHandler,
-            ELSBatchPhaseOutcomeHandler,
-        ],
-        mock_client_pipeline_request_handler: AsyncMock,
-    ) -> None:
-        """
-        Test that business logic failures are treated as infrastructure failures
-        and release the lock for retry.
-        """
-        from huleedu_service_libs.idempotency import idempotent_consumer
-
-        redis_client = MockRedisClient()
-        batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
-
-        # Configure business logic to fail
-        batch_essays_ready_handler.batch_repo.get_processing_pipeline_state.side_effect = Exception(
-            "Business logic failure"
-        )
-
-        # Create Kafka message
-        kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
-
-        # Apply idempotency decorator
-        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
-        async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
-            # Create consumer instance to access _handle_message method
-            consumer = BatchKafkaConsumer(
-                kafka_bootstrap_servers="test:9092",
-                consumer_group="test-group",
-                batch_essays_ready_handler=batch_essays_ready_handler,
-                els_batch_phase_outcome_handler=els_phase_outcome_handler,
-                client_pipeline_request_handler=mock_client_pipeline_request_handler,
-                redis_client=redis_client,
-            )
-            await consumer._handle_message(msg)
-            return True  # Success
-
-        # Process message - should raise exception (business logic failure)
-        with pytest.raises(Exception, match="Business logic failure"):
-            await handle_message_idempotently(kafka_msg)
-
-        # Assertions - BOS treats business logic failures as infrastructure failures
-        assert len(redis_client.set_calls) == 1  # SETNX was attempted
-        assert len(redis_client.delete_calls) == 1  # Key WAS deleted (allows retry)
-
-    @pytest.mark.asyncio
-    async def test_unhandled_exception_releases_redis_lock(
-        self, sample_batch_essays_ready_event: dict
-    ) -> None:
-        """Test that unhandled exceptions release the idempotency lock for retry."""
-        from huleedu_service_libs.idempotency import idempotent_consumer
-
-        redis_client = MockRedisClient()
-
-        # Create Kafka message
-        kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
-
-        # Apply idempotency decorator to a function that raises an exception
-        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
-        async def handle_message_with_exception(msg: ConsumerRecord) -> bool:
-            raise RuntimeError("Unhandled exception (e.g., network failure)")
-
-        # Process message - should raise exception
-        with pytest.raises(RuntimeError, match="Unhandled exception"):
-            await handle_message_with_exception(kafka_msg)
-
-        # Assertions
-        assert len(redis_client.set_calls) == 1  # SETNX was attempted
-        assert len(redis_client.delete_calls) == 1  # Key was deleted for retry
-
-        # Verify Redis key was deleted
-        delete_call = redis_client.delete_calls[0]
-        assert delete_call.startswith("huleedu:events:seen:")
-
-    @pytest.mark.asyncio
-    async def test_redis_failure_fallback_continues_processing(
-        self,
-        sample_batch_essays_ready_event: dict,
-        mock_handlers: Tuple[
-            BatchEssaysReadyHandler,
-            ELSBatchPhaseOutcomeHandler,
-        ],
-        mock_client_pipeline_request_handler: AsyncMock,
-    ) -> None:
-        """Test that Redis failures fall back to processing without idempotency."""
-        from huleedu_service_libs.idempotency import idempotent_consumer
-
-        redis_client = MockRedisClient()
-        redis_client.should_fail_set = True  # Force Redis failure
-        batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
-
-        # Create Kafka message
-        kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
-
-        # Apply idempotency decorator
-        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
-        async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
-            # Create consumer instance to access _handle_message method
-            consumer = BatchKafkaConsumer(
-                kafka_bootstrap_servers="test:9092",
-                consumer_group="test-group",
-                batch_essays_ready_handler=batch_essays_ready_handler,
-                els_batch_phase_outcome_handler=els_phase_outcome_handler,
-                client_pipeline_request_handler=mock_client_pipeline_request_handler,
-                redis_client=redis_client,
-            )
-            await consumer._handle_message(msg)
-            return True  # Success
-
-        # Process message - should succeed despite Redis failure
-        result = await handle_message_idempotently(kafka_msg)
-
-        # Assertions
-        assert result is True  # Business logic succeeded
-        assert len(redis_client.set_calls) == 1  # SETNX was attempted but failed
-
-        # Verify business logic was executed despite Redis failure
-        batch_essays_ready_handler.batch_repo.get_processing_pipeline_state.assert_called_once()

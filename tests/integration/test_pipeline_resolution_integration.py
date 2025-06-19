@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import datetime
 from typing import Any, Dict
 from unittest.mock import AsyncMock
 
@@ -43,24 +44,19 @@ class MockBatchConductorClient:
         self.endpoint = f"{base_url}/internal/v1/pipelines/define"
 
     async def resolve_pipeline(self, batch_id: str, requested_pipeline: str) -> dict[str, Any]:
-        """Request pipeline resolution from BCS internal API."""
-        request_data = {
-            "batch_id": batch_id,
-            "requested_pipeline": requested_pipeline,
-        }
+        """Resolve pipeline using real HTTP call to BCS."""
+        # Build URL for BCS pipeline resolution endpoint
+        url = f"{self.base_url}/internal/v1/pipelines/define"
+        headers = {"Content-Type": "application/json"}
+        data = {"batch_id": batch_id, "requested_pipeline": requested_pipeline}
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                self.endpoint,
-                json=request_data,
-                timeout=aiohttp.ClientTimeout(total=30.0),
-                headers={"Content-Type": "application/json"},
-            ) as response:
-                if response.status >= 400:
+            async with session.post(url, json=data, headers=headers) as response:
+                if response.status != 200:
                     error_text = await response.text()
                     raise ValueError(f"BCS returned error status {response.status}: {error_text}")
 
-                response_data = await response.json()
+                response_data: dict[str, Any] = await response.json()
                 return response_data
 
 
@@ -182,11 +178,11 @@ class TestPipelineResolutionIntegration:
         """
         # Create test event
         test_event = EventEnvelope(
-            event_id=str(uuid.uuid4()),
+            event_id=uuid.uuid4(),
             event_type="huleedu.commands.batch.pipeline.v1",
-            event_timestamp="2025-01-01T00:00:00Z",
+            event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
             source_service="api_gateway",
-            correlation_id=str(uuid.uuid4()),
+            correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
                 batch_id="test-batch-integration-001", requested_pipeline="ai_feedback"
             ),
@@ -232,11 +228,11 @@ class TestPipelineResolutionIntegration:
         mock_batch_repository.get_batch_context.return_value = None
 
         test_event = EventEnvelope(
-            event_id=str(uuid.uuid4()),
+            event_id=uuid.uuid4(),
             event_type="huleedu.commands.batch.pipeline.v1",
-            event_timestamp="2025-01-01T00:00:00Z",
+            event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
             source_service="api_gateway",
-            correlation_id=str(uuid.uuid4()),
+            correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
                 batch_id="non-existent-batch", requested_pipeline="ai_feedback"
             ),
@@ -286,11 +282,11 @@ class TestPipelineResolutionIntegration:
         mock_batch_repository.get_processing_pipeline_state.return_value = None
 
         test_event = EventEnvelope(
-            event_id=str(uuid.uuid4()),
+            event_id=uuid.uuid4(),
             event_type="huleedu.commands.batch.pipeline.v1",
-            event_timestamp="2025-01-01T00:00:00Z",
+            event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
             source_service="api_gateway",
-            correlation_id=str(uuid.uuid4()),
+            correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
                 batch_id="test-batch-bcs-error-001", requested_pipeline="invalid_pipeline_name"
             ),
@@ -338,11 +334,11 @@ class TestPipelineResolutionIntegration:
         }
 
         test_event = EventEnvelope(
-            event_id=str(uuid.uuid4()),
+            event_id=uuid.uuid4(),
             event_type="huleedu.commands.batch.pipeline.v1",
-            event_timestamp="2025-01-01T00:00:00Z",
+            event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
             source_service="api_gateway",
-            correlation_id=str(uuid.uuid4()),
+            correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
                 batch_id="test-batch-idempotent-001", requested_pipeline="ai_feedback"
             ),
@@ -394,11 +390,13 @@ class TestPipelineResolutionIntegration:
         concurrent_events = []
         for i in range(3):
             event = EventEnvelope(
-                event_id=str(uuid.uuid4()),
+                event_id=uuid.uuid4(),
                 event_type="huleedu.commands.batch.pipeline.v1",
-                event_timestamp="2025-01-01T00:00:00Z",
+                event_timestamp=datetime.fromisoformat(
+                    "2025-01-01T00:00:00Z".replace("Z", "+00:00")
+                ),
                 source_service="api_gateway",
-                correlation_id=str(uuid.uuid4()),
+                correlation_id=uuid.uuid4(),
                 data=ClientBatchPipelineRequestV1(
                     batch_id=f"test-batch-concurrent-{i:03d}", requested_pipeline="ai_feedback"
                 ),

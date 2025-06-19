@@ -167,6 +167,7 @@ module = [
     "enums_db",       # Database enum module without type stubs
     "models_db",      # Database models module without type stubs
     "yaml.*",       # PyYAML stubs
+    "pypandoc.*",   # pypandoc lacks type stubs
 ]
 ignore_missing_imports = true
 
@@ -203,6 +204,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
+
 testpaths = [
     "common_core/tests",
     "services/content_service/tests",

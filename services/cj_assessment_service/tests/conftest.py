@@ -294,3 +294,19 @@ def sample_comparison_results() -> list[Dict[str, Any]]:
         {"els_essay_id": str(uuid4()), "rank": 1, "score": 0.85},
         {"els_essay_id": str(uuid4()), "rank": 2, "score": 0.72},
     ]
+
+
+# --- Mock Protocol Implementations (for Idempotency Tests) ---
+
+@pytest.fixture
+def mock_redis_client(): # -> MockRedisClient
+    """Provide a mock Redis client for idempotency testing."""
+    from services.cj_assessment_service.tests.unit.mocks import MockRedisClient
+    return MockRedisClient()
+
+
+@pytest.fixture
+def mock_cj_repository(): # -> MockDatabase
+    """Provide a mock CJ repository for idempotency testing."""
+    from services.cj_assessment_service.tests.unit.mocks import MockDatabase
+    return MockDatabase()

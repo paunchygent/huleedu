@@ -43,6 +43,22 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 
+# Import idempotency test fixtures
+from .unit.spell_idempotency_test_utils import (
+    mock_boundary_services as _mock_boundary_services,
+)
+from .unit.spell_idempotency_test_utils import (
+    real_spell_logic as _real_spell_logic,
+)
+from .unit.spell_idempotency_test_utils import (
+    sample_spellcheck_request_event as _sample_spellcheck_request_event,
+)
+
+# Re-export fixtures properly
+mock_boundary_services = _mock_boundary_services
+real_spell_logic = _real_spell_logic
+sample_spellcheck_request_event = _sample_spellcheck_request_event
+
 # NOW rebuild models with all types available - use raise_errors=True to make failures visible
 # This ensures forward references like "ProcessingEvent", "EssayStatus", "BatchStatus" can be
 # resolved

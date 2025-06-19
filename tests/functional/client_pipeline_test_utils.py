@@ -8,6 +8,7 @@ in E2E integration tests.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Optional
 
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
@@ -23,11 +24,11 @@ async def create_client_pipeline_request_event(
         correlation_id = str(uuid.uuid4())
 
     return EventEnvelope(
-        event_id=str(uuid.uuid4()),
+        event_id=uuid.uuid4(),
         event_type="huleedu.commands.batch.pipeline.v1",
-        event_timestamp="2025-01-01T00:00:00Z",
+        event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
         source_service="api_gateway_service",
-        correlation_id=correlation_id,
+        correlation_id=uuid.UUID(correlation_id) if correlation_id else None,
         data=ClientBatchPipelineRequestV1(
             batch_id=batch_id,
             requested_pipeline=requested_pipeline,

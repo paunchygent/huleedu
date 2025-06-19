@@ -25,7 +25,7 @@ async def validate_batch_pipeline_state(
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{bos_base_url}/v1/batches/{batch_id}/status") as response:
             if response.status == 200:
-                batch_data = await response.json()
+                batch_data: Dict[str, Any] = await response.json()
                 print(f"📊 Batch state retrieved: {batch_data}")
                 return batch_data
             else:
