@@ -43,6 +43,9 @@ Model service: `@batch_orchestrator_service/`
 - Business logic **MUST** depend on protocols, not concrete implementations
 - **MUST** use Dishka DI framework with appropriate scoping
 
+### 4.2. HTTP + Worker Metrics pattern
+Services with multiple entry points (e.g., HTTP + Worker) **MUST** use a shared metrics module to ensure a single Prometheus registry instance."
+
 ### 4.2. Metrics and Monitoring
 - **MUST** expose Prometheus metrics via `/metrics` endpoint
 - **MUST** use centralized metrics collection patterns

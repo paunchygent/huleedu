@@ -131,7 +131,7 @@ Environment variables (managed via Pydantic `BaseSettings`):
 * **`BATCH_ORCHESTRATOR_DB_HOST`, `_PORT`, `_NAME`, `_USER`, `_PASSWORD`**: PostgreSQL connection details.
 * **`KAFKA_BOOTSTRAP_SERVERS`**: Kafka connection (default: "kafka:9092").
 * **`REDIS_URL`**: Redis connection for idempotency.
-* **`BCS_URL`**: Batch Conductor Service URL for pipeline resolution (default: "http://batch-conductor-service:4002").
+* **`BCS_URL`**: Batch Conductor Service URL for pipeline resolution (default: "<http://batch-conductor-service:4002>").
 
 ## Dependencies
 

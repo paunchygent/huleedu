@@ -14,9 +14,7 @@ from huleedu_service_libs.logging_utils import (
     configure_service_logging,
     create_service_logger,
 )
-from huleedu_service_libs.metrics_middleware import (
-    setup_standard_service_metrics_middleware,
-)
+from huleedu_service_libs.metrics_middleware import setup_metrics_middleware
 from services.batch_conductor_service.api.health_routes import health_bp
 from services.batch_conductor_service.api.pipeline_routes import pipeline_bp
 from services.batch_conductor_service.config import settings
@@ -43,7 +41,13 @@ async def startup() -> None:
     try:
         # Metrics rely on the DI container which is already wired
         await initialize_metrics(app, container)
-        setup_standard_service_metrics_middleware(app, "bcs")
+        setup_metrics_middleware(
+            app,
+            request_count_metric_name="http_requests_total",
+            request_duration_metric_name="http_request_duration_seconds",
+            status_label_name="status_code",
+            logger_name="bcs.metrics",
+        )
         logger.info("Batch Conductor Service startup completed successfully")
     except Exception as e:
         logger.critical("Failed to start Batch Conductor Service: %s", e, exc_info=True)

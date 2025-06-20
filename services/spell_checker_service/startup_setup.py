@@ -6,42 +6,14 @@ for the Quart-based health API component of the combined service.
 
 from __future__ import annotations
 
-from typing import Any
-
 from dishka import AsyncContainer
 from huleedu_service_libs.logging_utils import create_service_logger
-from prometheus_client import Counter, Histogram
 from quart import Quart
 
 from services.spell_checker_service.config import Settings
+from services.spell_checker_service.metrics import get_http_metrics
 
 logger = create_service_logger("spell_checker_service.startup_setup")
-
-
-def _create_metrics() -> dict[str, Any]:
-    """Create Prometheus metrics for the Spell Checker Service.
-
-    Returns:
-        Dictionary of metric instances keyed by metric name
-    """
-    metrics = {
-        "http_requests_total": Counter(
-            "spell_checker_http_requests_total",
-            "Total HTTP requests to spell checker service",
-            ["method", "endpoint", "status_code"],
-        ),
-        "http_request_duration_seconds": Histogram(
-            "spell_checker_http_request_duration_seconds",
-            "HTTP request duration in seconds",
-            ["method", "endpoint"],
-        ),
-        "spell_check_operations_total": Counter(
-            "spell_checker_operations_total",
-            "Total spell check operations performed",
-            ["language", "status"],
-        ),
-    }
-    return metrics
 
 
 async def initialize_services(app: Quart, settings: Settings, container: AsyncContainer) -> None:
@@ -54,12 +26,15 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
     """
     logger.info("Initializing Spell Checker Service health API components")
 
-    # Create and store metrics in app extensions
-    metrics = _create_metrics()
+    # Get shared metrics (thread-safe singleton pattern)
+    metrics = get_http_metrics()
+
+    # Store metrics in app context (proper Quart pattern)
+    app.extensions = getattr(app, "extensions", {})
     app.extensions["metrics"] = metrics
 
-    logger.info("Metrics created and stored in app extensions")
-    logger.info(f"Available metrics: {list(metrics.keys())}")
+    logger.info("HTTP metrics initialized and stored in app extensions")
+    logger.info(f"Available HTTP metrics: {list(metrics.keys())}")
 
     # TODO: Add additional service initialization here
     # - Database connections (if needed)

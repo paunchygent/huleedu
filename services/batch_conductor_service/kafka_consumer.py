@@ -21,6 +21,7 @@ from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
+from services.batch_conductor_service.metrics import get_kafka_consumer_metrics
 from services.batch_conductor_service.protocols import BatchStateRepositoryProtocol
 
 logger = create_service_logger("bcs.kafka_consumer")
@@ -48,6 +49,7 @@ class BCSKafkaConsumer:
         self._consumer: AIOKafkaConsumer | None = None
         self._consuming = False
         self._stop_event = asyncio.Event()
+        self._metrics = get_kafka_consumer_metrics()
 
     async def start_consuming(self) -> None:
         """Start consuming Kafka events with topic subscription."""
@@ -131,17 +133,46 @@ class BCSKafkaConsumer:
 
     async def _handle_message(self, msg: ConsumerRecord) -> None:
         """Route messages to appropriate handlers based on topic."""
+        event_type = self._extract_event_type_from_topic(msg.topic)
+
         try:
             if msg.topic == topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED):
                 await self._handle_spellcheck_completed(msg)
+                await self._track_event_success(event_type)
             elif msg.topic == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
                 await self._handle_cj_assessment_completed(msg)
+                await self._track_event_success(event_type)
             else:
                 logger.warning(f"Unknown topic: {msg.topic}")
+                await self._track_event_failure(event_type, "unknown_topic")
 
         except Exception as e:
             logger.error(f"Error handling message from topic {msg.topic}: {e}", exc_info=True)
+            await self._track_event_failure(event_type, "processing_error")
             raise
+
+    def _extract_event_type_from_topic(self, topic: str) -> str:
+        """Extract event type from Kafka topic name for metrics labeling."""
+        # Convert topic name to event type for metrics
+        # e.g., "huleedu.essay.spellcheck.completed" -> "spellcheck_completed"
+        parts = topic.split(".")
+        if len(parts) >= 4:
+            return f"{parts[-2]}_{parts[-1]}"  # e.g., "spellcheck_completed"
+        return "unknown_event"
+
+    async def _track_event_success(self, event_type: str) -> None:
+        """Track successful event processing in metrics."""
+        if self._metrics and "events_processed_total" in self._metrics:
+            self._metrics["events_processed_total"].labels(
+                event_type=event_type, outcome="success"
+            ).inc()
+
+    async def _track_event_failure(self, event_type: str, failure_reason: str) -> None:
+        """Track failed event processing in metrics."""
+        if self._metrics and "events_processed_total" in self._metrics:
+            self._metrics["events_processed_total"].labels(
+                event_type=event_type, outcome=failure_reason
+            ).inc()
 
     async def _handle_spellcheck_completed(self, msg: ConsumerRecord) -> None:
         """Handle spellcheck completion events."""

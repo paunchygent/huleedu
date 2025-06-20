@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional, Union
+from typing import Union
 
 from api_models import BatchRegistrationRequestV1
 from config import settings
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
-from prometheus_client import Counter
 from protocols import (
     BatchProcessingServiceProtocol,
     BatchRepositoryProtocol,
@@ -25,15 +24,6 @@ batch_bp = Blueprint("batch_routes", __name__, url_prefix="/v1/batches")
 
 CONTENT_SERVICE_URL = settings.CONTENT_SERVICE_URL
 OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
-
-# Global metrics reference (initialized in app.py)
-BATCH_OPERATIONS: Optional[Counter] = None
-
-
-def set_batch_operations_metric(metric: Counter) -> None:
-    """Set the batch operations metric reference."""
-    global BATCH_OPERATIONS
-    BATCH_OPERATIONS = metric
 
 
 @batch_bp.route("/register", methods=["POST"])
@@ -61,9 +51,21 @@ async def register_batch(
             extra={"correlation_id": str(correlation_id)},
         )
 
-        # Record metrics
-        if BATCH_OPERATIONS:
-            BATCH_OPERATIONS.labels(operation="register_batch", status="success").inc()
+        # Record metrics using shared metrics pattern
+        metrics = current_app.extensions.get("metrics", {})
+        pipeline_execution_metric = metrics.get("pipeline_execution_total")
+        if pipeline_execution_metric:
+            # Track pipeline execution requests - pipelines are determined by enable_cj_assessment
+            pipelines = ["spellcheck"]
+            if validated_data.enable_cj_assessment:
+                pipelines.append("cj_assessment")
+
+            for pipeline in pipelines:
+                pipeline_execution_metric.labels(
+                    pipeline_type=pipeline,
+                    outcome="requested",
+                    batch_id=str(batch_id)
+                ).inc()
 
         return jsonify(
             {"batch_id": batch_id, "correlation_id": str(correlation_id), "status": "registered"}
@@ -73,13 +75,27 @@ async def register_batch(
         logger.warning(
             f"Batch registration validation error. Correlation ID: {correlation_id}", exc_info=True
         )
-        if BATCH_OPERATIONS:
-            BATCH_OPERATIONS.labels(operation="register_batch", status="validation_error").inc()
+        # Record validation error metrics
+        metrics = current_app.extensions.get("metrics", {})
+        pipeline_execution_metric = metrics.get("pipeline_execution_total")
+        if pipeline_execution_metric:
+            pipeline_execution_metric.labels(
+                pipeline_type="unknown",
+                outcome="validation_error",
+                batch_id="unknown"
+            ).inc()
         return jsonify({"error": "Validation Error", "details": ve.errors()}), 400
     except Exception:
         logger.error(f"Error registering batch. Correlation ID: {correlation_id}", exc_info=True)
-        if BATCH_OPERATIONS:
-            BATCH_OPERATIONS.labels(operation="register_batch", status="error").inc()
+        # Record error metrics
+        metrics = current_app.extensions.get("metrics", {})
+        pipeline_execution_metric = metrics.get("pipeline_execution_total")
+        if pipeline_execution_metric:
+            pipeline_execution_metric.labels(
+                pipeline_type="unknown",
+                outcome="error",
+                batch_id="unknown"
+            ).inc()
         return jsonify({"error": "Failed to register batch."}), 500
 
 

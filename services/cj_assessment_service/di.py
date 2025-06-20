@@ -9,7 +9,7 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
-from prometheus_client import CollectorRegistry
+from prometheus_client import REGISTRY, CollectorRegistry
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.config import settings as service_settings
@@ -51,7 +51,7 @@ class CJAssessmentServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_metrics_registry(self) -> CollectorRegistry:
         """Provide Prometheus metrics registry."""
-        return CollectorRegistry()
+        return REGISTRY
 
     @provide(scope=Scope.APP)
     async def provide_http_session(self) -> aiohttp.ClientSession:

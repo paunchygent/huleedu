@@ -44,7 +44,6 @@ async def test_first_time_event_processing_success(
             spell_logic=real_spell_logic,
             kafka_bus=kafka_bus,
             consumer_group_id="test-group",
-            kafka_queue_latency_metric=None,
         )
 
     result = await handle_message_idempotently(kafka_msg)
@@ -87,7 +86,6 @@ async def test_duplicate_event_skipped(
             spell_logic=real_spell_logic,
             kafka_bus=kafka_bus,
             consumer_group_id="test-group",
-            kafka_queue_latency_metric=None,
         )
 
     result = await handle_message_idempotently(kafka_msg)
@@ -123,7 +121,6 @@ async def test_processing_failure_keeps_lock(
             spell_logic=real_spell_logic,
             kafka_bus=kafka_bus,
             consumer_group_id="test-group",
-            kafka_queue_latency_metric=None,
         )
 
     result = await handle_message_idempotently(kafka_msg)
@@ -185,7 +182,6 @@ async def test_deterministic_event_id_generation(
             spell_logic=real_spell_logic,
             kafka_bus=kafka_bus,
             consumer_group_id="test-group",
-            kafka_queue_latency_metric=None,
         )
 
     result1 = await handle_message_idempotently(kafka_msg1)

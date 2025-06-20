@@ -8,7 +8,6 @@ Refactored to follow clean architecture with DI pattern.
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
 
 import aiohttp
 from aiokafka import AIOKafkaConsumer, TopicPartition
@@ -17,7 +16,6 @@ from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
-from prometheus_client import Histogram
 
 from common_core.enums import ProcessingEvent, topic_name
 from services.spell_checker_service.event_processor import process_single_message
@@ -46,7 +44,6 @@ class SpellCheckerKafkaConsumer:
         kafka_bus: KafkaBus,
         http_session: aiohttp.ClientSession,
         redis_client: RedisClientProtocol,
-        kafka_queue_latency_metric: Optional[Histogram] = None,
     ) -> None:
         """Initialize with injected dependencies."""
         self.kafka_bootstrap_servers = kafka_bootstrap_servers
@@ -59,7 +56,6 @@ class SpellCheckerKafkaConsumer:
         self.kafka_bus = kafka_bus
         self.http_session = http_session
         self.redis_client = redis_client
-        self.kafka_queue_latency_metric = kafka_queue_latency_metric
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
 
@@ -75,7 +71,6 @@ class SpellCheckerKafkaConsumer:
                 spell_logic=self.spell_logic,
                 kafka_bus=self.kafka_bus,
                 consumer_group_id=self.consumer_group,
-                kafka_queue_latency_metric=self.kafka_queue_latency_metric,
             )
 
         self._process_message_idempotently = process_message_idempotently

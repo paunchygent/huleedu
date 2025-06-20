@@ -154,11 +154,19 @@ class PipelineServicesProvider(Provider):
         pipeline_generator: PipelineGeneratorProtocol,
         dlq_producer: DlqProducerProtocol,
     ) -> PipelineResolutionServiceProtocol:
-        """Provide pipeline resolution service implementation."""
+        """Provide pipeline resolution service implementation with metrics injection."""
         from services.batch_conductor_service.implementations import (
             pipeline_resolution_service_impl as prs_impl,
         )
+        from services.batch_conductor_service.metrics import get_pipeline_service_metrics
 
-        return prs_impl.DefaultPipelineResolutionService(
+        # Create service instance
+        service = prs_impl.DefaultPipelineResolutionService(
             pipeline_rules, pipeline_generator, dlq_producer
         )
+
+        # Inject shared metrics
+        metrics = get_pipeline_service_metrics()
+        service.set_metrics(metrics)
+
+        return service

@@ -16,6 +16,7 @@ from huleedu_service_libs.protocols import RedisClientProtocol
 from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
 from implementations.client_pipeline_request_handler import ClientPipelineRequestHandler
 from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
+from metrics import get_kafka_consumer_metrics
 
 from common_core.enums import ProcessingEvent, topic_name
 
@@ -173,10 +174,28 @@ class BatchKafkaConsumer:
     async def _handle_message(self, msg: Any) -> None:
         """Handle a single Kafka message based on topic type."""
         try:
+            # Get business metrics for instrumentation
+            business_metrics = get_kafka_consumer_metrics()
+            phase_transition_metric = business_metrics.get("phase_transition_duration_seconds")
+            commands_metric = business_metrics.get("orchestration_commands_total")
+
             if msg.topic == topic_name(ProcessingEvent.BATCH_ESSAYS_READY):
+                # Track command generation for BatchEssaysReady -> Spellcheck initiation
+                if commands_metric:
+                    # This will be incremented in the handler when commands are generated
+                    pass
                 await self.batch_essays_ready_handler.handle_batch_essays_ready(msg)
+
             elif msg.topic == "huleedu.els.batch_phase.outcome.v1":
+                # Track phase transitions with timing context manager
+                if phase_transition_metric:
+                    # The handler will use the metric for phase transition timing
+                    # Pass metrics to handler for instrumentation
+                    setattr(
+                        self.els_batch_phase_outcome_handler, '_phase_transition_metric', phase_transition_metric)
+                    setattr(self.els_batch_phase_outcome_handler, '_commands_metric', commands_metric)
                 await self.els_batch_phase_outcome_handler.handle_els_batch_phase_outcome(msg)
+
             elif msg.topic == "huleedu.commands.batch.pipeline.v1":
                 await self.client_pipeline_request_handler.handle_client_pipeline_request(msg)
             else:

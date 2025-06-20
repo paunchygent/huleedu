@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from quart import current_app, has_app_context
 
 from common_core.enums import ContentType, FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
@@ -24,6 +25,18 @@ from services.file_service.protocols import (
 )
 
 logger = create_service_logger("file_service.core_logic")
+
+
+# Helper to safely access metrics within or outside Quart app context
+
+def _get_metrics() -> Dict[str, Any]:
+    """Return metrics dict if a Quart app context is active, else empty dict."""
+    if has_app_context():
+        try:
+            return current_app.extensions.get("metrics", {})  # type: ignore[attr-defined]
+        except Exception:  # pragma: no cover – guard against unexpected edge cases
+            return {}
+    return {}
 
 
 async def process_single_file_upload(
@@ -110,6 +123,17 @@ async def process_single_file_upload(
                 extra={"correlation_id": str(main_correlation_id)},
             )
 
+            # Record metric for raw storage failure
+            file_ext = file_name.split('.')[-1].lower() if '.' in file_name else 'unknown'
+            metrics = _get_metrics()
+            files_uploaded_counter = metrics.get("files_uploaded_total")
+            if files_uploaded_counter:
+                files_uploaded_counter.labels(
+                    file_type=file_ext,
+                    validation_status='raw_storage_failed',
+                    batch_id=str(batch_id)
+                ).inc()
+
             return {
                 "file_name": file_name,
                 "status": "raw_storage_failed",
@@ -152,6 +176,17 @@ async def process_single_file_upload(
                 f"Published EssayValidationFailedV1 for technical extraction failure: {file_name}",
                 extra={"correlation_id": str(main_correlation_id)},
             )
+
+            # Record metric for text extraction failure
+            file_ext = file_name.split('.')[-1].lower() if '.' in file_name else 'unknown'
+            metrics = _get_metrics()
+            files_uploaded_counter = metrics.get("files_uploaded_total")
+            if files_uploaded_counter:
+                files_uploaded_counter.labels(
+                    file_type=file_ext,
+                    validation_status='extraction_failed',
+                    batch_id=str(batch_id)
+                ).inc()
 
             return {
                 "file_name": file_name,
@@ -198,6 +233,17 @@ async def process_single_file_upload(
                 extra={"correlation_id": str(main_correlation_id)},
             )
 
+            # Record metric for content validation failure
+            file_ext = file_name.split('.')[-1].lower() if '.' in file_name else 'unknown'
+            metrics = _get_metrics()
+            files_uploaded_counter = metrics.get("files_uploaded_total")
+            if files_uploaded_counter:
+                files_uploaded_counter.labels(
+                    file_type=file_ext,
+                    validation_status='content_validation_failed',
+                    batch_id=str(batch_id)
+                ).inc()
+
             return {
                 "file_name": file_name,
                 "raw_file_storage_id": raw_file_storage_id,
@@ -239,6 +285,17 @@ async def process_single_file_upload(
             f"Published EssayContentProvisionedV1 for file {file_name}",
             extra={"correlation_id": str(main_correlation_id)},
         )
+
+        # Record metric for successful file processing
+        file_ext = file_name.split('.')[-1].lower() if '.' in file_name else 'unknown'
+        metrics = _get_metrics()
+        files_uploaded_counter = metrics.get("files_uploaded_total")
+        if files_uploaded_counter:
+            files_uploaded_counter.labels(
+                file_type=file_ext,
+                validation_status='success',
+                batch_id=str(batch_id)
+            ).inc()
 
         return {
             "file_name": file_name,

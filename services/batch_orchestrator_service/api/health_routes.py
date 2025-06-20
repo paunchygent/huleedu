@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from typing import Union
 
-from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
-from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, generate_latest
 from quart import Blueprint, Response, jsonify
-from quart_dishka import inject
 
 logger = create_service_logger("bos.api.health")
 health_bp = Blueprint("health_routes", __name__)
@@ -29,11 +27,10 @@ async def health_check() -> Union[Response, tuple[Response, int]]:
 
 
 @health_bp.route("/metrics")
-@inject
-async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
+async def metrics() -> Response:
     """Prometheus metrics endpoint."""
     try:
-        metrics_data = generate_latest(registry)
+        metrics_data = generate_latest(REGISTRY)
         response = Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
         return response
     except Exception as e:

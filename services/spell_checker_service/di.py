@@ -7,7 +7,7 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
-from prometheus_client import CollectorRegistry, Histogram
+from prometheus_client import CollectorRegistry
 
 from common_core.enums import ProcessingEvent, topic_name
 from services.spell_checker_service.config import Settings, settings
@@ -43,17 +43,8 @@ class SpellCheckerServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_metrics_registry(self) -> CollectorRegistry:
         """Provide Prometheus metrics registry."""
-        return CollectorRegistry()
-
-    @provide(scope=Scope.APP)
-    def provide_kafka_queue_latency_metric(self, registry: CollectorRegistry) -> Histogram:
-        """Provide Kafka queue latency metric."""
-        return Histogram(
-            "kafka_message_queue_latency_seconds",
-            "Latency between event timestamp and processing start",
-            ["topic", "consumer_group"],
-            registry=registry,
-        )
+        from prometheus_client import REGISTRY
+        return REGISTRY
 
     @provide(scope=Scope.APP)
     async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
@@ -118,7 +109,6 @@ class SpellCheckerServiceProvider(Provider):
         kafka_bus: KafkaBus,
         http_session: ClientSession,
         redis_client: RedisClientProtocol,
-        kafka_queue_latency_metric: Histogram,
     ) -> SpellCheckerKafkaConsumer:
         """Provide Kafka consumer with injected dependencies."""
         return SpellCheckerKafkaConsumer(
@@ -132,5 +122,4 @@ class SpellCheckerServiceProvider(Provider):
             kafka_bus=kafka_bus,
             http_session=http_session,
             redis_client=redis_client,
-            kafka_queue_latency_metric=kafka_queue_latency_metric,
         )

@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 from typing import Optional
 
-from api.batch_routes import set_batch_operations_metric
 from config import Settings
 from di import (
     CoreInfrastructureProvider,
@@ -19,7 +18,7 @@ from di import (
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
 from kafka_consumer import BatchKafkaConsumer
-from prometheus_client import CollectorRegistry, Counter, Histogram
+from metrics import get_http_metrics
 from quart import Quart
 from quart_dishka import QuartDishka
 
@@ -56,17 +55,14 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         await db_repository.initialize_db_schema()
         logger.info("Database schema initialized successfully")
 
-        # Initialize metrics with DI registry and store in app context
+        # Initialize metrics using shared metrics module
+        metrics = get_http_metrics()
+
+        # Store metrics in app context (proper Quart pattern)
+        app.extensions = getattr(app, "extensions", {})
+        app.extensions["metrics"] = metrics
+
         async with container() as request_container:
-            registry = await request_container.get(CollectorRegistry)
-            metrics = _create_metrics(registry)
-
-            # Store metrics in app context (proper Quart pattern)
-            app.extensions = getattr(app, "extensions", {})
-            app.extensions["metrics"] = metrics
-
-            # Share batch operations metric with routes module (legacy support)
-            set_batch_operations_metric(metrics["batch_operations"])
 
             # Get Kafka consumer from DI container (properly configured)
             kafka_consumer_instance = await request_container.get(BatchKafkaConsumer)
@@ -106,25 +102,4 @@ async def shutdown_services() -> None:
         logger.error(f"Error during shutdown: {e}", exc_info=True)
 
 
-def _create_metrics(registry: CollectorRegistry) -> dict:
-    """Create Prometheus metrics instances."""
-    return {
-        "request_count": Counter(
-            "http_requests_total",
-            "Total HTTP requests",
-            ["method", "endpoint", "status_code"],
-            registry=registry,
-        ),
-        "request_duration": Histogram(
-            "http_request_duration_seconds",
-            "HTTP request duration in seconds",
-            ["method", "endpoint"],
-            registry=registry,
-        ),
-        "batch_operations": Counter(
-            "batch_operations_total",
-            "Total batch operations",
-            ["operation", "status"],
-            registry=registry,
-        ),
-    }
+

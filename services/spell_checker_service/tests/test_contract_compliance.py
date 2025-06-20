@@ -81,7 +81,6 @@ class TestEventContractCompliance:
             real_spell_logic,  # Use real implementation
             mock_kafka_bus,  # Updated parameter order and name
             consumer_group_id="test-group",
-            kafka_queue_latency_metric=None,
         )
 
         # Assert
@@ -151,7 +150,6 @@ class TestEventContractCompliance:
             real_spell_logic,  # Use real implementation
             mock_kafka_bus,  # Updated parameter order and name
             consumer_group_id="test-group",
-            kafka_queue_latency_metric=None,
         )
 
         # Assert

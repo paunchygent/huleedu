@@ -7,7 +7,7 @@ injected protocol implementations for all external interactions.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 import aiohttp
 from aiokafka import ConsumerRecord
@@ -22,6 +22,7 @@ from common_core.events.spellcheck_models import (
     SpellcheckResultDataV1,
 )
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from services.spell_checker_service.metrics import get_business_metrics
 from services.spell_checker_service.protocols import (
     ContentClientProtocol,
     ResultStoreProtocol,
@@ -41,7 +42,6 @@ async def process_single_message(
     spell_logic: SpellLogicProtocol,
     kafka_bus: KafkaBus,
     consumer_group_id: str = "spell-checker-group",
-    kafka_queue_latency_metric: Optional[Any] = None,
 ) -> bool:
     """Process a single Kafka message.
 
@@ -49,17 +49,22 @@ async def process_single_message(
         msg: The Kafka message to process
         http_session: HTTP session for content service interaction
         content_client: Client for fetching content
-        result_store: Client for storing content
-        event_publisher: Client for publishing events
-        spell_logic: Spell logic implementation
-        kafka_bus: Kafka bus for event publishing
+        result_store: Store for saving processed results
+        event_publisher: Publisher for result events
+        spell_logic: Spell checking logic implementation
+        kafka_bus: Kafka bus for publishing events
         consumer_group_id: Consumer group ID for metrics
-        kafka_queue_latency_metric: Optional Prometheus metric for queue latency
 
     Returns:
-        bool: True if the message should be committed, False otherwise
+        bool: True if processing succeeded, False otherwise
     """
     processing_started_at = datetime.now(timezone.utc)
+
+    # Get business metrics from shared module
+    business_metrics = get_business_metrics()
+    corrections_metric = business_metrics.get("spellcheck_corrections_made")
+    kafka_queue_latency_metric = business_metrics.get("kafka_queue_latency_seconds")
+
     request_envelope: Optional[EventEnvelope[EssayLifecycleSpellcheckRequestV1]] = None
     # Default if ID not parsed
     essay_id_for_logging: str = f"offset-{msg.offset}-partition-{msg.partition}"
@@ -81,9 +86,7 @@ async def process_single_message(
                 processing_started_at - request_envelope.event_timestamp
             ).total_seconds()
             if queue_latency_seconds >= 0:  # Avoid negative values from clock skew
-                kafka_queue_latency_metric.labels(
-                    topic=msg.topic, consumer_group=consumer_group_id
-                ).observe(queue_latency_seconds)
+                kafka_queue_latency_metric.observe(queue_latency_seconds)
                 logger.debug(
                     f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}"
                 )
@@ -197,6 +200,14 @@ async def process_single_message(
             request_data.system_metadata,
             language,
         )
+
+        # Record business metric for corrections made
+        if corrections_metric and result_data.corrections_made is not None:
+            corrections_metric.observe(result_data.corrections_made)
+            logger.debug(
+                f"Recorded {result_data.corrections_made} corrections for essay {essay_id_for_logging}",
+                extra={"correlation_id": str(request_envelope.correlation_id)},
+            )
 
         logger.info(
             f"Step 4: Publishing spell check result for essay {essay_id_for_logging}",

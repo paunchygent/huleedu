@@ -65,4 +65,10 @@ def _create_metrics(registry: CollectorRegistry) -> dict:
             ["method", "endpoint"],
             registry=registry,
         ),
+        "files_uploaded_total": Counter(
+            "huleedu_files_uploaded_total",
+            "Total number of files uploaded by type and validation status",
+            ["file_type", "validation_status", "batch_id"],
+            registry=registry,
+        ),
     }

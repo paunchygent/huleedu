@@ -18,6 +18,7 @@ from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
 from services.cj_assessment_service.cj_core_logic import run_cj_assessment_workflow
 from services.cj_assessment_service.config import Settings
+from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
@@ -49,6 +50,14 @@ async def process_single_message(
     Returns:
         True if message processed successfully, False otherwise
     """
+    processing_started_at = datetime.now(timezone.utc)
+
+    # Get business metrics from shared module
+    business_metrics = get_business_metrics()
+    comparisons_metric = business_metrics.get("cj_comparisons_made")
+    duration_metric = business_metrics.get("cj_assessment_duration_seconds")
+    kafka_queue_latency_metric = business_metrics.get("kafka_queue_latency_seconds")
+
     try:
         logger.info(f"Processing CJ assessment message: {msg.topic}:{msg.partition}:{msg.offset}")
 
@@ -58,6 +67,21 @@ async def process_single_message(
                 msg.value.decode("utf-8")
             )
             request_event_data: ELS_CJAssessmentRequestV1 = envelope.data
+
+            # Record queue latency metric if available
+            if (
+                kafka_queue_latency_metric
+                and hasattr(envelope, "event_timestamp")
+                and envelope.event_timestamp
+            ):
+                queue_latency_seconds = (
+                    processing_started_at - envelope.event_timestamp
+                ).total_seconds()
+                if queue_latency_seconds >= 0:  # Avoid negative values from clock skew
+                    kafka_queue_latency_metric.observe(queue_latency_seconds)
+                    logger.debug(
+                        f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}"
+                    )
 
             # Use correlation_id from envelope, fall back to system metadata entity reference
             correlation_id = (
@@ -132,6 +156,27 @@ async def process_single_message(
                 "rankings_preview": rankings[:2] if rankings else [],
             },
         )
+
+        # Record business metrics for completed assessment
+        processing_ended_at = datetime.now(timezone.utc)
+        processing_duration = (processing_ended_at - processing_started_at).total_seconds()
+
+        if duration_metric:
+            duration_metric.observe(processing_duration)
+            logger.debug(
+                f"Recorded assessment duration: {processing_duration:.2f}s for batch {converted_request_data['bos_batch_id']}",
+                extra=log_extra,
+            )
+
+        # Record comparisons made (estimated from rankings count)
+        if comparisons_metric and rankings:
+            # CJ assessments typically require n(n-1)/2 comparisons for n essays
+            estimated_comparisons = len(rankings) * (len(rankings) - 1) // 2
+            comparisons_metric.observe(estimated_comparisons)
+            logger.debug(
+                f"Recorded estimated comparisons: {estimated_comparisons} for batch {converted_request_data['bos_batch_id']}",
+                extra=log_extra,
+            )
 
         # Construct and publish CJAssessmentCompletedV1 event
         completed_event_data = CJAssessmentCompletedV1(

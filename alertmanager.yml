@@ -1,0 +1,16 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
+  receiver: 'default-receiver'
+
+receivers:
+- name: 'default-receiver'
+  # Placeholder - in a real scenario, this would be a webhook for Slack, PagerDuty, etc.
+  webhook_configs:
+  - url: 'http://localhost:5001/webhook' # A dummy URL for now
+    send_resolved: true 

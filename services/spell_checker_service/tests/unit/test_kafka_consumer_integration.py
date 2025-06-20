@@ -159,7 +159,6 @@ async def test_kafka_consumer_with_idempotency_first_time_processing(
         kafka_bus=kafka_bus,
         http_session=http_session,
         redis_client=redis_client,  # Real Redis client integration
-        kafka_queue_latency_metric=None,
     )
 
     # Create test message
@@ -206,7 +205,6 @@ async def test_kafka_consumer_with_idempotency_duplicate_detection(
         kafka_bus=kafka_bus,
         http_session=http_session,
         redis_client=redis_client,
-        kafka_queue_latency_metric=None,
     )
 
     # Create test message
@@ -257,7 +255,6 @@ async def test_kafka_consumer_di_integration(
         kafka_bus=kafka_bus,
         http_session=http_session,
         redis_client=redis_client,
-        kafka_queue_latency_metric=None,
     )
 
     # Verify all dependencies are properly assigned
@@ -304,7 +301,6 @@ async def test_kafka_consumer_business_failure_handling(
         kafka_bus=kafka_bus,
         http_session=http_session,
         redis_client=redis_client,
-        kafka_queue_latency_metric=None,
     )
 
     # Create test message

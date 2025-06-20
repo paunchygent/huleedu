@@ -83,7 +83,6 @@ class TestProcessSingleMessage:
             real_spell_logic,  # Use real implementation
             mock_kafka_bus,
             consumer_group_id="test-group",
-            kafka_queue_latency_metric=None,
         )
 
         # Assert
@@ -150,7 +149,6 @@ class TestProcessSingleMessage:
                 mock_spell_logic,
                 mock_kafka_bus,
                 consumer_group_id="test-group",
-                kafka_queue_latency_metric=None,
             )
 
             # Assert
@@ -225,7 +223,6 @@ class TestProcessSingleMessage:
             real_spell_logic,
             mock_kafka_bus,
             consumer_group_id="test-group",
-            kafka_queue_latency_metric=None,
         )
 
         # Assert
@@ -276,7 +273,6 @@ class TestProcessSingleMessage:
             mock_spell_logic,  # Use mock that fails
             mock_kafka_bus,
             consumer_group_id="test-group",
-            kafka_queue_latency_metric=None,
         )
 
         # Assert
@@ -324,7 +320,6 @@ class TestProcessSingleMessage:
                 mock_spell_logic,
                 mock_kafka_bus,
                 consumer_group_id="test-group",
-                kafka_queue_latency_metric=None,
             )
 
             # Assert
@@ -381,7 +376,6 @@ class TestProcessSingleMessage:
             real_spell_logic,
             mock_kafka_bus,
             consumer_group_id="test-group",
-            kafka_queue_latency_metric=None,
         )
 
         # Assert

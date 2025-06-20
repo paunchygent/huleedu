@@ -1,0 +1,50 @@
+global:
+  scrape_interval: 15s
+
+# AlertManager configuration
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - alertmanager:9093
+
+# Load alert rules from rules directory
+rule_files:
+  - "rules/*.yml"
+
+scrape_configs:
+  # ALL services expose /metrics on their main application port
+  - job_name: 'content_service'
+    static_configs:
+      - targets: ['content_service:8000']
+    metrics_path: '/metrics'
+    
+  - job_name: 'batch_conductor_service'
+    static_configs:
+      - targets: ['batch_conductor_service:4002']
+    metrics_path: '/metrics'
+    
+  - job_name: 'spell_checker_service'
+    static_configs:
+      - targets: ['spell_checker_service:8002']
+    metrics_path: '/metrics'
+    
+  - job_name: 'batch_orchestrator_service'
+    static_configs:
+      - targets: ['batch_orchestrator_service:5000']
+    metrics_path: '/metrics'
+    
+  - job_name: 'essay_lifecycle_api'
+    static_configs:
+      - targets: ['essay_lifecycle_api:6000']  # Main port, not dedicated metrics port
+    metrics_path: '/metrics'
+    
+  - job_name: 'file_service'
+    static_configs:
+      - targets: ['file_service:7001']  # Main port, not dedicated metrics port
+    metrics_path: '/metrics'
+      
+  - job_name: 'cj_assessment_service'
+    static_configs:
+      - targets: ['cj_assessment_service:9090']  # This service uses dedicated metrics port
+    metrics_path: '/metrics' 

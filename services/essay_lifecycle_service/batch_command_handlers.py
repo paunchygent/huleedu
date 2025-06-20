@@ -8,6 +8,7 @@ using the injected dependencies.
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 from aiokafka import ConsumerRecord
@@ -15,6 +16,7 @@ from common_core.enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.essay_lifecycle_service.metrics import get_business_metrics
 from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
     BatchCoordinationHandler,
@@ -44,11 +46,23 @@ async def process_single_message(
     Returns:
         True if message was processed successfully, False otherwise
     """
+    message_start_time = time.time()
+
     try:
         # Deserialize message
         envelope = _deserialize_message(msg)
         if envelope is None:
             return False
+
+        # Record Kafka queue latency
+        business_metrics = get_business_metrics()
+        kafka_latency_metric = business_metrics.get("kafka_queue_latency")
+        if kafka_latency_metric and envelope.event_timestamp:
+            queue_latency = time.time() - envelope.event_timestamp.timestamp()
+            kafka_latency_metric.labels(
+                topic=msg.topic,
+                service="essay_lifecycle_service"
+            ).observe(queue_latency)
 
         correlation_id = envelope.correlation_id
         logger.info(
@@ -108,12 +122,24 @@ async def _route_event(
     event_type = envelope.event_type
     correlation_id = envelope.correlation_id
 
+    # Get business metrics for coordination tracking
+    business_metrics = get_business_metrics()
+    coordination_events_metric = business_metrics.get("batch_coordination_events")
+
     try:
         # Handle batch coordination events
         if event_type == topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED):
             from common_core.events.batch_coordination_events import BatchEssaysRegistered
 
             batch_event_data = BatchEssaysRegistered.model_validate(envelope.data)
+
+            # Record batch coordination event
+            if coordination_events_metric:
+                coordination_events_metric.labels(
+                    event_type="batch_registered",
+                    batch_id=str(batch_event_data.batch_id)
+                ).inc()
+
             batch_result: bool = await batch_coordination_handler.handle_batch_essays_registered(
                 event_data=batch_event_data, correlation_id=correlation_id
             )
@@ -123,6 +149,14 @@ async def _route_event(
             from common_core.events.file_events import EssayContentProvisionedV1
 
             content_event_data = EssayContentProvisionedV1.model_validate(envelope.data)
+
+            # Record coordination event
+            if coordination_events_metric:
+                coordination_events_metric.labels(
+                    event_type="content_provisioned",
+                    batch_id=str(content_event_data.batch_id)
+                ).inc()
+
             content_result: bool = (
                 await batch_coordination_handler.handle_essay_content_provisioned(
                     event_data=content_event_data, correlation_id=correlation_id
@@ -134,6 +168,14 @@ async def _route_event(
             from common_core.events.file_events import EssayValidationFailedV1
 
             validation_event_data = EssayValidationFailedV1.model_validate(envelope.data)
+
+            # Record validation failure
+            if coordination_events_metric:
+                coordination_events_metric.labels(
+                    event_type="validation_failed",
+                    batch_id=str(validation_event_data.batch_id)
+                ).inc()
+
             validation_result: bool = (
                 await batch_coordination_handler.handle_essay_validation_failed(
                     event_data=validation_event_data, correlation_id=correlation_id
@@ -146,6 +188,14 @@ async def _route_event(
             from common_core.batch_service_models import BatchServiceSpellcheckInitiateCommandDataV1
 
             command_data = BatchServiceSpellcheckInitiateCommandDataV1.model_validate(envelope.data)
+
+            # Record command processing
+            if coordination_events_metric:
+                coordination_events_metric.labels(
+                    event_type="spellcheck_command",
+                    batch_id=str(command_data.entity_ref.entity_id)
+                ).inc()
+
             await batch_command_handler.process_initiate_spellcheck_command(
                 command_data=command_data, correlation_id=correlation_id
             )
@@ -159,6 +209,14 @@ async def _route_event(
             cj_command_data = BatchServiceCJAssessmentInitiateCommandDataV1.model_validate(
                 envelope.data
             )
+
+            # Record CJ command processing
+            if coordination_events_metric:
+                coordination_events_metric.labels(
+                    event_type="cj_command",
+                    batch_id=str(cj_command_data.entity_ref.entity_id)
+                ).inc()
+
             await batch_command_handler.process_initiate_cj_assessment_command(
                 command_data=cj_command_data, correlation_id=correlation_id
             )
@@ -169,6 +227,14 @@ async def _route_event(
             from common_core.events.spellcheck_models import SpellcheckResultDataV1
 
             result_data = SpellcheckResultDataV1.model_validate(envelope.data)
+
+            # Record spellcheck completion
+            if coordination_events_metric:
+                coordination_events_metric.labels(
+                    event_type="spellcheck_completed",
+                    batch_id=str(result_data.entity_ref.entity_id)
+                ).inc()
+
             spellcheck_result: bool = await service_result_handler.handle_spellcheck_result(
                 result_data=result_data, correlation_id=correlation_id
             )
@@ -178,6 +244,14 @@ async def _route_event(
             from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
 
             cj_result_data = CJAssessmentCompletedV1.model_validate(envelope.data)
+
+            # Record CJ assessment completion
+            if coordination_events_metric:
+                coordination_events_metric.labels(
+                    event_type="cj_completed",
+                    batch_id=str(cj_result_data.entity_ref.entity_id)
+                ).inc()
+
             cj_result: bool = await service_result_handler.handle_cj_assessment_completed(
                 result_data=cj_result_data, correlation_id=correlation_id
             )

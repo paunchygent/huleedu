@@ -27,22 +27,26 @@ The Batch Conductor Service (BCS) is an internal Quart-based microservice respon
 ## Core Features ✅ **IMPLEMENTED**
 
 ### Event-Driven Architecture
+
 - Consumes `SpellcheckResultDataV1` and `CJAssessmentResultDataV1` events
 - Maintains real-time batch state projection without ELS API polling
 - Structured event processing with correlation ID tracking
 
 ### Intelligent Pipeline Resolution  
+
 - Dependency rules engine (ai_feedback → spellcheck, cj_assessment → spellcheck)
 - Batch state analysis and prerequisite checking
 - Optimized pipeline generation with completed step pruning
 
 ### Production Resilience
+
 - Atomic Redis operations with WATCH/MULTI/EXEC pattern
 - DLQ production for failed pipeline resolutions with replay capability
 - Exponential backoff retry logic (up to 5 attempts)
 - Graceful fallback to non-atomic operations when retries exhausted
 
 ### Comprehensive Testing
+
 - 24/24 tests passing including boundary testing, event processing, API validation
 - Atomic operation testing with concurrency simulation
 - Business logic validation and error scenario coverage
@@ -75,11 +79,13 @@ Environment variables (prefix: `BCS_`):
 ## Pipeline Rules Engine
 
 ### Dependency Resolution
+
 - `ai_feedback` → requires `spellcheck` completion
 - `cj_assessment` → requires `spellcheck` completion  
 - `spellcheck` → no dependencies (can run immediately)
 
 ### State-Aware Optimization
+
 - Prunes completed steps from pipeline definitions
 - Validates prerequisites before pipeline construction
 - Handles partial completion scenarios gracefully
@@ -124,17 +130,20 @@ docker run -p 4002:4002 huleedu/batch-conductor-service
 ## Monitoring & Observability
 
 ### Prometheus Metrics
+
 - `bcs_pipeline_resolutions_total{status="success"|"failure"}`: Pipeline resolution outcomes
 - Standard HTTP request metrics via service library integration
 - Health check availability via `/healthz` endpoint
 
 ### Structured Logging
+
 - Correlation ID tracking across requests and events
 - Event processing lifecycle logging
 - Error boundary logging with context preservation
 - DLQ production logging with failure reasons
 
 ### Error Handling
+
 - DLQ topics: `<base_topic>.DLQ` pattern for replay capability
 - Comprehensive error metadata in DLQ messages
 - Circuit breaker patterns for external dependency failures

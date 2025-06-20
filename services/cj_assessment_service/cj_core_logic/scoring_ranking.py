@@ -205,11 +205,7 @@ async def get_essay_rankings(
     )
 
     stmt = (
-        select(
-            CJ_ProcessedEssay.els_essay_id,
-            CJ_ProcessedEssay.current_bt_score,
-            # Add CJ_ProcessedEssay.comparison_count if you implement it
-        )
+        select(CJ_ProcessedEssay)
         .where(CJ_ProcessedEssay.cj_batch_id == cj_batch_id)
         .order_by(CJ_ProcessedEssay.current_bt_score.desc().nulls_last())
     )

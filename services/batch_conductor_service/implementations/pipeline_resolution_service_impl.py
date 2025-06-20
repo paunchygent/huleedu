@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
@@ -20,7 +21,7 @@ from services.batch_conductor_service.protocols import (
 )
 
 if TYPE_CHECKING:
-    from prometheus_client import Counter
+    pass
 
 logger = create_service_logger("bcs.pipeline_resolution_service")
 
@@ -37,9 +38,9 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
         self.pipeline_rules = pipeline_rules
         self.pipeline_generator = pipeline_generator
         self.dlq_producer = dlq_producer
-        self._metrics: dict[str, Counter] | None = None
+        self._metrics: dict[str, Any] | None = None
 
-    def set_metrics(self, metrics: dict[str, Counter]) -> None:
+    def set_metrics(self, metrics: dict[str, Any]) -> None:
         """Set Prometheus metrics for tracking pipeline resolutions."""
         self._metrics = metrics
 
@@ -136,28 +137,42 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
     async def resolve_pipeline_request(
         self, request: BCSPipelineDefinitionRequestV1
     ) -> BCSPipelineDefinitionResponseV1:
-        """Resolve a complete pipeline request from BOS."""
-        success, resolved_pipeline, error_message = await self.resolve_pipeline(
-            request.batch_id, request.requested_pipeline
-        )
+        """Resolve a complete pipeline request from BOS with duration tracking."""
+        start_time = time.time()
 
-        if not success:
-            # Return error response for API consumers
-            return BCSPipelineDefinitionResponseV1(
-                batch_id=request.batch_id,
-                final_pipeline=[],
-                analysis_summary=f"Pipeline resolution failed: {error_message}",
+        try:
+            success, resolved_pipeline, error_message = await self.resolve_pipeline(
+                request.batch_id, request.requested_pipeline
             )
 
-        # Create successful response
-        return BCSPipelineDefinitionResponseV1(
-            batch_id=request.batch_id,
-            final_pipeline=resolved_pipeline,
-            analysis_summary=(
-                f"Resolved '{request.requested_pipeline}' pipeline to "
-                f"{len(resolved_pipeline)} steps"
-            ),
-        )
+            # Track duration regardless of success/failure
+            duration = time.time() - start_time
+            await self._track_duration_metrics(request.requested_pipeline, duration)
+
+            if not success:
+                # Return error response for API consumers
+                return BCSPipelineDefinitionResponseV1(
+                    batch_id=request.batch_id,
+                    final_pipeline=[],
+                    analysis_summary=f"Pipeline resolution failed: {error_message}",
+                )
+
+            # Create successful response
+            return BCSPipelineDefinitionResponseV1(
+                batch_id=request.batch_id,
+                final_pipeline=resolved_pipeline,
+                analysis_summary=(
+                    f"Resolved '{request.requested_pipeline}' pipeline to "
+                    f"{len(resolved_pipeline)} steps"
+                ),
+            )
+        except Exception:
+            # Track duration even for unexpected errors
+            duration = time.time() - start_time
+            await self._track_duration_metrics(request.requested_pipeline, duration)
+
+            # Re-raise the exception
+            raise
 
     async def _publish_resolution_failure_to_dlq(
         self, batch_id: str, requested_pipeline: str, failure_reason: str, error_details: str
@@ -213,17 +228,33 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
 
     async def _track_success_metrics(self, requested_pipeline: str) -> None:
         """Track successful pipeline resolution in Prometheus metrics."""
-        if self._metrics and "pipeline_resolutions" in self._metrics:
-            self._metrics["pipeline_resolutions"].labels(
-                requested_pipeline=requested_pipeline, status="success"
-            ).inc()
+        if self._metrics and "pipeline_resolutions_total" in self._metrics:
+            counter = self._metrics["pipeline_resolutions_total"]
+            # Safely handle the counter metric
+            if hasattr(counter, "labels") and hasattr(counter, "inc"):
+                counter.labels(
+                    requested_pipeline=requested_pipeline, outcome="success"
+                ).inc()
 
     async def _track_failure_metrics(self, requested_pipeline: str, failure_reason: str) -> None:
         """Track failed pipeline resolution in Prometheus metrics."""
-        if self._metrics and "pipeline_resolutions" in self._metrics:
-            self._metrics["pipeline_resolutions"].labels(
-                requested_pipeline=requested_pipeline, status=failure_reason
-            ).inc()
+        if self._metrics and "pipeline_resolutions_total" in self._metrics:
+            counter = self._metrics["pipeline_resolutions_total"]
+            # Safely handle the counter metric
+            if hasattr(counter, "labels") and hasattr(counter, "inc"):
+                counter.labels(
+                    requested_pipeline=requested_pipeline, outcome=failure_reason
+                ).inc()
+
+    async def _track_duration_metrics(self, requested_pipeline: str, duration: float) -> None:
+        """Track pipeline resolution duration in Prometheus metrics."""
+        if self._metrics and "pipeline_resolution_duration_seconds" in self._metrics:
+            histogram = self._metrics["pipeline_resolution_duration_seconds"]
+            # Safely handle the histogram metric
+            if hasattr(histogram, "labels") and hasattr(histogram, "observe"):
+                histogram.labels(
+                    requested_pipeline=requested_pipeline
+                ).observe(duration)
 
     async def resolve_optimal_pipeline(
         self,

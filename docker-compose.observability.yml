@@ -1,0 +1,102 @@
+# docker-compose.observability.yml
+# HuleEdu Core Observability Stack: Prometheus, Loki, Grafana
+
+volumes:
+  prometheus_data: {}
+  loki_data: {}
+  grafana_data: {}
+  alertmanager_data: {}
+
+# Networks are defined in main docker-compose.yml file
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: huleedu_prometheus
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "9091:9090"  # FIXED: Changed from 9092 to 9091 to avoid Kafka conflict
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: huleedu_alertmanager
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "9094:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/config.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9094'
+
+  loki:
+    image: grafana/loki:3.1.0
+    container_name: huleedu_loki
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+
+  promtail:
+    image: grafana/promtail:3.1.0
+    container_name: huleedu_promtail
+    restart: unless-stopped
+    depends_on:
+      - loki
+    networks:
+      - huleedu_internal_network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: huleedu_grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DATASOURCES_0_NAME=Prometheus
+      - GF_DATASOURCES_0_TYPE=prometheus
+      - GF_DATASOURCES_0_URL=http://prometheus:9090
+      - GF_DATASOURCES_0_IS_DEFAULT=true
+      - GF_DATASOURCES_1_NAME=Loki
+      - GF_DATASOURCES_1_TYPE=loki
+      - GF_DATASOURCES_1_URL=http://loki:3100 

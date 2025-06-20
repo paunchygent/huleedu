@@ -61,7 +61,6 @@ async def test_redis_failure_fallback(
             spell_logic=real_spell_logic,
             kafka_bus=kafka_bus,
             consumer_group_id="test-group",
-            kafka_queue_latency_metric=None,
         )
 
     result = await handle_message_idempotently(kafka_msg)

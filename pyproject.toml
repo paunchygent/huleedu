@@ -80,6 +80,12 @@ build-common-core = "pdm build -p common_core"
 # Kafka infrastructure
 kafka-setup-topics = "python scripts/kafka_topic_bootstrap.py"
 
+# Observability convenience scripts
+obs-up = {composite = ["docker compose up -d prometheus loki promtail grafana"]}
+obs-down = {composite = ["docker compose down prometheus loki promtail grafana"]}
+obs-logs = {composite = ["docker compose logs -f prometheus loki promtail grafana"]}
+obs-restart = {composite = ["docker compose restart prometheus loki promtail grafana"]}
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
