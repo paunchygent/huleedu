@@ -107,6 +107,8 @@ def get_pipeline_monitoring_topics() -> List[str]:
     return [
         "huleedu.commands.batch.pipeline.v1",
         "huleedu.els.spellcheck.initiate.command.v1",
+        "huleedu.batch.ai_feedback.initiate.command.v1",
+        "huleedu.batch.nlp.initiate.command.v1",
         "huleedu.batch.cj_assessment.initiate.command.v1",
         "huleedu.els.batch_phase.outcome.v1",
         "huleedu.events.batch.initiate_command.v1"
@@ -118,6 +120,8 @@ def get_state_aware_monitoring_topics() -> List[str]:
     return [
         "huleedu.commands.batch.pipeline.v1",
         "huleedu.els.spellcheck.initiate.command.v1",
+        "huleedu.batch.ai_feedback.initiate.command.v1",
+        "huleedu.batch.nlp.initiate.command.v1",
         "huleedu.batch.cj_assessment.initiate.command.v1",
         "huleedu.els.batch_phase.outcome.v1",
         "huleedu.events.batch.initiate_command.v1"
@@ -129,6 +133,10 @@ def get_concurrent_monitoring_topics() -> List[str]:
     return [
         "huleedu.commands.batch.pipeline.v1",
         "huleedu.els.spellcheck.initiate.command.v1",
+        "huleedu.batch.ai_feedback.initiate.command.v1",
+        "huleedu.batch.nlp.initiate.command.v1",
+        "huleedu.batch.ai_feedback.initiate.command.v1",
+        "huleedu.batch.nlp.initiate.command.v1",
         "huleedu.batch.cj_assessment.initiate.command.v1",
         "huleedu.els.batch_phase.outcome.v1"
     ]

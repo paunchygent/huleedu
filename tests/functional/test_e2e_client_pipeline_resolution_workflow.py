@@ -97,15 +97,30 @@ class TestClientPipelineResolutionWorkflow:
             # 1. Setup: Create batch with real essays
             batch_id, correlation_id = await create_test_batch_with_essays(service_manager, 3)
 
-            # 2. Setup pipeline monitoring
+            # 2. Wait for the automatically triggered 'spellcheck' pipeline to complete
+            print("⏳ Waiting for initial 'spellcheck' pipeline to complete...")
+            spellcheck_completed = False
+            start_time = asyncio.get_event_loop().time()
+            while asyncio.get_event_loop().time() - start_time < 120:  # 2-minute timeout
+                batch_state = await validate_batch_pipeline_state(service_manager, batch_id)
+                pipeline_state = batch_state.get("pipeline_state", {}) if batch_state else {}
+                if pipeline_state.get("spellcheck_status") == "COMPLETED_SUCCESSFULLY":
+                    spellcheck_completed = True
+                    print("✅ Initial 'spellcheck' pipeline completed; batch is idle.")
+                    break
+                await asyncio.sleep(2)
+
+            assert spellcheck_completed, "Initial spellcheck pipeline did not complete within timeout."
+
+            # 3. Setup pipeline monitoring for the client-initiated request (start at latest offset)
             pipeline_topics = get_pipeline_monitoring_topics()
 
             async with kafka_manager.consumer(
                 "client_pipeline_resolution_e2e",
                 pipeline_topics,
-                auto_offset_reset="earliest"
+                auto_offset_reset="latest"
             ) as consumer:
-                # 3. Publish ClientBatchPipelineRequestV1 event
+                # 4. Publish ClientBatchPipelineRequestV1 event
                 request_correlation_id = await publish_client_pipeline_request(
                     kafka_manager,
                     batch_id,

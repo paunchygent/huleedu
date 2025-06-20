@@ -79,23 +79,43 @@ def _create_metrics() -> Dict[str, Any]:
 
     except ValueError as e:
         if "Duplicated timeseries" in str(e):
-            logger.warning(f"Metrics already exist in registry: {e}")
-            # Return existing metrics from registry
+            logger.warning(
+                f"Metrics already exist in registry: {e} – reusing existing collectors."
+            )
             return _get_existing_metrics()
         else:
             raise
 
 
 def _get_existing_metrics() -> Dict[str, Any]:
-    """Retrieve existing metrics from registry.
-    
-    Returns:
-        Dictionary of existing metric instances
-    """
-    # For now, return empty dict - in practice, we'd need to implement
-    # registry lookup logic or ensure metrics are only created once
-    logger.warning("Using fallback empty metrics dict - metrics may not be recorded")
-    return {}
+    """Return already-registered collectors from the global Prometheus REGISTRY."""
+
+    from prometheus_client import REGISTRY
+
+    name_map: Dict[str, str] = {
+        "http_requests_total": "spell_checker_http_requests_total",
+        "http_request_duration_seconds": "spell_checker_http_request_duration_seconds",
+        "spell_check_operations_total": "spell_checker_operations_total",
+        "spellcheck_corrections_made": "huleedu_spellcheck_corrections_made",
+        "kafka_queue_latency_seconds": "kafka_message_queue_latency_seconds",
+    }
+
+    existing: Dict[str, Any] = {}
+    registry_collectors = getattr(REGISTRY, "_names_to_collectors", None)
+
+    for logical_key, metric_name in name_map.items():
+        try:
+            if registry_collectors and metric_name in registry_collectors:
+                existing[logical_key] = registry_collectors[metric_name]
+            else:
+                for collector in REGISTRY.collect():
+                    if collector.name == metric_name:
+                        existing[logical_key] = collector
+                        break
+        except Exception as exc:  # pragma: no cover
+            logger.error("Error retrieving Spell Checker metric '%s': %s", metric_name, exc)
+
+    return existing
 
 
 def get_business_metrics() -> Dict[str, Any]:

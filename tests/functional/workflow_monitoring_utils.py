@@ -55,11 +55,13 @@ async def monitor_pipeline_resolution_workflow(
 
     print(f"🔍 Monitoring pipeline resolution workflow for batch {batch_id}")
 
-    async for message in consumer:
-        current_time = asyncio.get_event_loop().time()
-        if current_time > end_time:
-            print(f"⏰ Timeout reached after {timeout_seconds}s")
-            break
+    while asyncio.get_event_loop().time() <= end_time:
+        try:
+            # Wait up to 1s for the next message; continue if none arrives.
+            message = await asyncio.wait_for(consumer.getone(), timeout=1.0)
+        except asyncio.TimeoutError:
+            continue  # No message within 1s; loop until deadline
+
 
         try:
             # Parse message for event analysis

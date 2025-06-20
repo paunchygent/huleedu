@@ -1,0 +1,310 @@
+# Implementation Guide: HuleEdu Client Interface Layer (3/3)
+
+This document provides the final implementation steps for the client interface layer, focusing on read queries, real-time updates, and modifications to existing services to support the new frontend architecture.
+
+## Part 3: Query Endpoints, WebSocket Layer & Backend Modifications
+
+This part completes the `api_gateway_service` by adding the read-path and real-time components. It also details the required changes in our existing backend services to publish data to the new WebSocket backplane.
+
+### Checkpoint 3.1: Implement Query Endpoint for Batch Status
+
+**Objective**: Implement the `GET /v1/batches/{batch_id}/status` endpoint in the API Gateway. This endpoint will serve as the "Hydrate" mechanism for the frontend, providing the initial state of a batch.
+
+**Affected Files**:
+
+- `services/api_gateway_service/routers/status_routes.py` (new)
+- `services/api_gateway_service/main.py` (modification)
+- `services/api_gateway_service/di.py` (modification)
+
+**Implementation Steps**:
+
+1. **Implement the Status Endpoint Router**: This router will handle querying the `result_aggregator_service`.
+
+    **File**: `services/api_gateway_service/routers/status_routes.py`
+
+    ```python
+    from fastapi import APIRouter, Depends, HTTPException, status
+    from dishka.integrations.fastapi import FromDishka
+    from aiohttp import ClientSession
+    from ..config import settings
+    from .. import auth
+
+    router = APIRouter()
+
+    @router.get("/batches/{batch_id}/status")
+    async def get_batch_status(
+        batch_id: str,
+        user_id: str = Depends(auth.get_current_user_id),
+        http_session: FromDishka[ClientSession],
+    ):
+        aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{batch_id}/status"
+
+        try:
+            async with http_session.get(aggregator_url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    # TODO in future: Add an authorization check here to ensure `user_id`
+                    # is allowed to view this `batch_id`.
+                    return data
+                elif response.status == 404:
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
+                else:
+                    response.raise_for_status()
+        except Exception as e:
+            # Log the error properly in a real implementation
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Result Aggregator service is unavailable: {e}")
+    ```
+
+2. **Update `main.py` to Register the New Router**:
+
+    **File**: `services/api_gateway_service/main.py`
+
+    ```python
+    // ... existing imports ...
+    from .routers import pipeline_routes, status_routes // Add status_routes
+
+    // ... app setup ...
+
+    // Register Routers
+    app.include_router(pipeline_routes.router, prefix="/v1", tags=["Pipelines"])
+    app.include_router(status_routes.router, prefix="/v1", tags=["Status"]) // Add this line
+    ```
+
+**Done When**:
+
+- ✅ A `GET` request to `/v1/batches/{batch_id}/status` with a valid JWT correctly queries the `result_aggregator_service` and returns the batch status, including the `last_updated` timestamp.
+- ✅ The endpoint returns a `404 Not Found` if the aggregator does not find the batch.
+- ✅ The endpoint is secured by the `get_current_user_id` dependency.
+
+### Checkpoint 3.2: Implement WebSocket Endpoint and Redis Backplane
+
+**Objective**: Implement the real-time "Update" mechanism by creating the WebSocket endpoint and its Redis Pub/Sub listener.
+
+**Affected Files**:
+
+- `services/api_gateway_service/routers/websocket_routes.py` (new)
+- `services/api_gateway_service/main.py` (modification)
+- `services/api_gateway_service/di.py` (modification)
+
+**Implementation Steps**:
+
+1. **Update DI to Provide the Redis Client**: The gateway needs the extended `AtomicRedisClientProtocol` to subscribe to channels.
+
+    **File**: `services/api_gateway_service/di.py`
+
+    ```python
+    // ... existing imports ...
+    from huleedu_service_libs.redis_client import RedisClient
+    from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+
+    // ... existing ApiGatewayProvider class ...
+
+        @provide(scope=Scope.APP)
+        async def provide_redis_client(self) -> AtomicRedisClientProtocol:
+            client = RedisClient(client_id=settings.SERVICE_NAME, redis_url=settings.REDIS_URL)
+            await client.start()
+            return client
+    ```
+
+2. **Implement the WebSocket Endpoint Router**: This handler manages the connection lifecycle, authentication, and message forwarding.
+
+    **File**: `services/api_gateway_service/routers/websocket_routes.py`
+
+    ```python
+    import asyncio
+    import json
+    from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query
+    from dishka.integrations.fastapi import FromDishka
+    from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+    from .. import auth
+
+    router = APIRouter()
+
+    # Define a separate auth function for WebSockets to handle token from query param
+    async def get_user_id_from_ws(token: str | None = Query(None)) -> str:
+        if token is None:
+             raise WebSocketDisconnect(code=1008, reason="Missing token")
+        return await auth.get_current_user_id(token)
+
+    @router.websocket("/ws")
+    async def websocket_endpoint(
+        websocket: WebSocket,
+        user_id: str = Depends(get_user_id_from_ws), # Authenticate via query parameter
+        redis_client: FromDishka[AtomicRedisClientProtocol],
+    ):
+        await websocket.accept()
+        user_channel = f"ws:{user_id}"
+
+        async def redis_listener(ws: WebSocket, ps_client):
+            async for message in ps_client.listen():
+                if message and message["type"] == "message":
+                    await ws.send_text(message["data"])
+
+        async def pinger(ws: WebSocket):
+            while True:
+                try:
+                    await asyncio.sleep(15)
+                    await ws.send_json({"type": "ping"})
+                except (WebSocketDisconnect, asyncio.CancelledError):
+                    break
+
+        listener_task = None
+        pinger_task = None
+        try:
+            async with redis_client.subscribe(user_channel) as pubsub:
+                listener_task = asyncio.create_task(redis_listener(websocket, pubsub))
+                pinger_task = asyncio.create_task(pinger(websocket))
+
+                done, pending = await asyncio.wait(
+                    [listener_task, pinger_task],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in pending:
+                    task.cancel()
+
+        except WebSocketDisconnect:
+            pass # Client disconnected gracefully
+        except Exception as e:
+            # Log error
+            pass
+        finally:
+            if listener_task and not listener_task.done():
+                listener_task.cancel()
+            if pinger_task and not pinger_task.done():
+                pinger_task.cancel()
+    ```
+
+3. **Update `main.py` to Register the WebSocket Router**:
+
+    **File**: `services/api_gateway_service/main.py`
+
+    ```python
+    // ... existing imports ...
+    from .routers import pipeline_routes, status_routes, websocket_routes // Add websocket_routes
+
+    // ... app setup ...
+
+    // Register Routers
+    app.include_router(pipeline_routes.router, prefix="/v1", tags=["Pipelines"])
+    app.include_router(status_routes.router, prefix="/v1", tags=["Status"])
+    app.include_router(websocket_routes.router, tags=["Real-time"]) // Add this line
+    ```
+
+**Done When**:
+
+- ✅ A client can establish an authenticated WebSocket connection via `/ws?token=<jwt>`.
+- ✅ The gateway correctly subscribes to the user-specific Redis channel (e.g., `ws:user_123`).
+- ✅ The connection is kept alive via a server-side heartbeat and gracefully closed on disconnect.
+
+### Checkpoint 3.3: Modify Backend Services to Publish Updates
+
+**Objective**: Complete the real-time feedback loop by making BOS and ELS publish state changes to the Redis backplane.
+
+**Affected Files**:
+
+- `services/batch_orchestrator_service/implementations/pipeline_phase_coordinator_impl.py`
+- `services/batch_orchestrator_service/di.py`
+- `services/essay_lifecycle_service/implementations/service_result_handler_impl.py`
+- `services/essay_lifecycle_service/di.py`
+
+**Implementation Steps**:
+
+1. **Inject Redis Client into BOS**: Update the Dishka provider and the `DefaultPipelinePhaseCoordinator` to accept the Redis client.
+
+    **File**: `services/batch_orchestrator_service/implementations/pipeline_phase_coordinator_impl.py`
+
+    ```python
+    // ...
+    from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+
+    class DefaultPipelinePhaseCoordinator:
+        def __init__(
+            self,
+            batch_repo: BatchRepositoryProtocol,
+            phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol],
+            redis_client: AtomicRedisClientProtocol, // Add this
+        ) -> None:
+            self.batch_repo = batch_repo
+            self.phase_initiators_map = phase_initiators_map
+            self.redis_client = redis_client // Add this
+    // ...
+    ```
+
+    Ensure the `redis_client` is added to the provider signature in `services/batch_orchestrator_service/di.py`.
+
+2. **Add Redis Publish Logic to BOS**: In the `handle_phase_concluded` method, after updating the database, publish the status change.
+
+    **File**: `services/batch_orchestrator_service/implementations/pipeline_phase_coordinator_impl.py`
+
+    ```python
+    // ... inside handle_phase_concluded method ...
+        await self.update_phase_status(
+            batch_id,
+            completed_phase,
+            updated_status,
+            datetime.now(timezone.utc).isoformat(),
+        )
+
+        # NEW LOGIC
+        # Note: Retrieve the user_id from the batch's processing_metadata.
+        batch_context = await self.batch_repo.get_batch_context(batch_id)
+        user_id = None
+        if batch_context and batch_context.processing_metadata:
+            user_id = batch_context.processing_metadata.get("user_id")
+
+        if user_id:
+            redis_message = {
+                "event": "batch_phase_concluded",
+                "batch_id": batch_id,
+                "phase": completed_phase,
+                "status": updated_status,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
+        else:
+            # Log a warning if user_id is not found, as real-time updates cannot be sent.
+            self.logger.warning(f"User ID not found in batch context for batch '{batch_id}'. Skipping real-time update.")
+    // ...
+    ```
+
+3. **Repeat for ELS**: Perform the same dependency injection and logic addition for the `DefaultServiceResultHandler` in the `essay_lifecycle_service`. The logic will be added within `handle_spellcheck_result` and `handle_cj_assessment_completed` after the essay's state is successfully updated in its database.
+
+**Done When**:
+
+- ✅ When BOS or ELS processes an event that changes the state of a batch or essay, a corresponding JSON message is published to the correct user-specific Redis channel.
+- ✅ End-to-end tests (see below) confirm that a client action triggers a backend workflow which results in a WebSocket message being received.
+
+### Checkpoint 3.4: Final Testing and Contract Generation
+
+**Objective**: Verify the entire workflow and formalize the client-backend contract.
+
+**Affected Files**:
+
+- `tests/functional/test_e2e_client_interface.py` (new)
+- `pyproject.toml` (modification in root)
+
+**Implementation Steps**:
+
+1. **Write End-to-End Test**: Create a new functional test that:
+    a. Mocks user authentication to generate a valid JWT.
+    b. Creates a test batch via the API gateway.
+    c. Establishes an authenticated WebSocket connection.
+    d. Triggers backend processing by publishing a `BatchEssaysReady` event to Kafka (simulating the ELS).
+    e. Listens on the WebSocket and asserts that the expected `batch_phase_concluded` message is received from BOS.
+
+2. **Automate Frontend Contract Generation**: Add a script to the root `pyproject.toml` to generate TypeScript types from the gateway's OpenAPI schema.
+
+    **File**: `pyproject.toml`
+
+    ```toml
+    [tool.pdm.scripts]
+    # ... existing scripts ...
+    generate-frontend-types = "pdm run -p services/api_gateway_service openapi-typescript http://localhost:4001/openapi.json -o ../frontend/src/api-client/schema.ts"
+    ```
+
+    This script will be added as a mandatory CI check.
+
+**Done When**:
+
+- ✅ The new E2E test passes, proving the entire loop from HTTP command to WebSocket update is functional.
+- ✅ The `pdm run generate-frontend-types` command successfully generates a `schema.ts` file.

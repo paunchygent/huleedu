@@ -14,11 +14,11 @@ from quart import Quart, Response, jsonify
 
 # Import Blueprints
 # Import local modules using absolute imports for containerized deployment
-import startup_setup
-from api.batch_routes import batch_bp
-from api.essay_routes import essay_bp
-from api.health_routes import health_bp
-from config import settings
+from services.essay_lifecycle_service import startup_setup
+from services.essay_lifecycle_service.api.batch_routes import batch_bp
+from services.essay_lifecycle_service.api.essay_routes import essay_bp
+from services.essay_lifecycle_service.api.health_routes import health_bp
+from services.essay_lifecycle_service.config import settings
 
 # Configure structured logging for the service
 configure_service_logging(

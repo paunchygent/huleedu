@@ -60,9 +60,10 @@ def _create_metrics() -> Dict[str, Any]:
         return metrics
     except ValueError as e:
         if "Duplicated timeseries" in str(e):
-            logger.warning(f"Metrics already registered: {e}. This can happen in test environments.")
-            # In a running service this indicates an architectural issue, but we allow it for test runners.
-            return {}
+            logger.warning(
+                f"Metrics already registered: {e} – reusing existing collectors from REGISTRY."
+            )
+            return _get_existing_metrics()
         raise
 
 def get_http_metrics() -> Dict[str, Any]:
@@ -73,6 +74,41 @@ def get_http_metrics() -> Dict[str, Any]:
         "http_request_duration_seconds": all_metrics.get("http_request_duration_seconds"),
         "pipeline_execution_total": all_metrics.get("pipeline_execution_total"), # For tracking requests that start pipelines
     }
+
+def _get_existing_metrics() -> Dict[str, Any]:
+    """Return already-registered collectors from the global REGISTRY.
+
+    Falling back to an empty dict disables metrics entirely. This helper looks up the
+    collectors by their canonical metric names so middleware and services keep
+    working even when the module is imported more than once (common during tests).
+    """
+
+    from prometheus_client import REGISTRY
+
+    name_map = {
+        "http_requests_total": "bos_http_requests_total",
+        "http_request_duration_seconds": "bos_http_request_duration_seconds",
+        "pipeline_execution_total": "huleedu_pipeline_execution_total",
+        "phase_transition_duration_seconds": "huleedu_phase_transition_duration_seconds",
+        "orchestration_commands_total": "huleedu_orchestration_commands_total",
+    }
+
+    existing: Dict[str, Any] = {}
+    registry_collectors = getattr(REGISTRY, "_names_to_collectors", None)
+    for logical_key, metric_name in name_map.items():
+        try:
+            if registry_collectors and metric_name in registry_collectors:
+                existing[logical_key] = registry_collectors[metric_name]
+            else:
+                for collector in REGISTRY.collect():
+                    if collector.name == metric_name:
+                        existing[logical_key] = collector
+                        break
+        except Exception as exc:  # pragma: no cover
+            logger.error("Error retrieving BOS metric '%s': %s", metric_name, exc)
+
+    return existing
+
 
 def get_kafka_consumer_metrics() -> Dict[str, Any]:
     """Get metrics required by the Kafka consumer component."""

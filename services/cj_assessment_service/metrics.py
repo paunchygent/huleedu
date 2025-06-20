@@ -102,15 +102,42 @@ def _create_metrics() -> Dict[str, Any]:
 
 
 def _get_existing_metrics() -> Dict[str, Any]:
-    """Retrieve existing metrics from registry.
-    
-    Returns:
-        Dictionary of existing metric instances
+    """Retrieve existing metric collectors from the global Prometheus REGISTRY.
+
+    Returning an empty dict disables metrics after duplicated-registration errors.
+    Instead, we re-hydrate the collectors so the service and middleware can
+    continue to record metrics even when the module is imported multiple times
+    (common in test runners or when both the worker and HTTP app import it).
     """
-    # For now, return empty dict - in practice, we'd need to implement
-    # registry lookup logic or ensure metrics are only created once
-    logger.warning("Using fallback empty metrics dict - metrics may not be recorded")
-    return {}
+
+    from prometheus_client import REGISTRY  # local import to avoid circular deps
+
+    name_map: Dict[str, str] = {
+        "request_count": "http_requests_total",
+        "request_duration": "http_request_duration_seconds",
+        "cj_assessment_operations": "cj_assessment_operations_total",
+        "llm_api_calls": "llm_api_calls_total",
+        "cj_comparisons_made": "huleedu_cj_comparisons_made",
+        "cj_assessment_duration_seconds": "huleedu_cj_assessment_duration_seconds",
+        "kafka_queue_latency_seconds": "kafka_message_queue_latency_seconds",
+    }
+
+    existing: Dict[str, Any] = {}
+    registry_collectors = getattr(REGISTRY, "_names_to_collectors", None)
+
+    for logical_key, metric_name in name_map.items():
+        try:
+            if registry_collectors and metric_name in registry_collectors:
+                existing[logical_key] = registry_collectors[metric_name]
+            else:
+                for collector in REGISTRY.collect():
+                    if collector.name == metric_name:
+                        existing[logical_key] = collector
+                        break
+        except Exception as exc:  # pragma: no cover
+            logger.error("Error retrieving CJ metric '%s': %s", metric_name, exc)
+
+    return existing
 
 
 def get_business_metrics() -> Dict[str, Any]:

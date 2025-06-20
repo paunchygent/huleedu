@@ -7,16 +7,20 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Quart
 from quart_dishka import QuartDishka
 
-from .api.batch_routes import set_essay_operations_metric as set_batch_essay_operations
-from .api.essay_routes import set_essay_operations_metric as set_essay_essay_operations
-from .config import Settings
-from .di import (
+from api.batch_routes import (
+    set_essay_operations_metric as set_batch_essay_operations,
+)
+from api.essay_routes import (
+    set_essay_operations_metric as set_essay_essay_operations,
+)
+from services.essay_lifecycle_service.config import Settings
+from services.essay_lifecycle_service.di import (
     BatchCoordinationProvider,
     CommandHandlerProvider,
     CoreInfrastructureProvider,
     ServiceClientsProvider,
 )
-from .metrics import get_http_metrics
+from services.essay_lifecycle_service.metrics import get_http_metrics
 
 logger = create_service_logger("els.startup")
 

@@ -8,7 +8,6 @@ in E2E integration tests.
 from __future__ import annotations
 
 from typing import Any, Dict
-
 from tests.utils.service_test_manager import ServiceTestManager
 
 
@@ -52,19 +51,28 @@ async def validate_bcs_integration_occurred(
         async with session.get(bcs_metrics_url) as response:
             metrics_text = await response.text()
 
-            # Look for HTTP request metrics to /internal/v1/pipelines/define
+            # Parse BCS HTTP request metrics for pipeline definition endpoint using regex
             pipeline_requests = 0
-            for line in metrics_text.split('\n'):
-                if ('bcs_http_requests_total' in line and
-                    '/internal/v1/pipelines/define' in line):
-                    # Extract count from prometheus metrics
-                    if 'POST' in line and 'status_code="200"' in line:
-                        parts = line.split()
-                        if len(parts) > 0:
-                            try:
-                                pipeline_requests = int(float(parts[-1]))
-                            except (ValueError, IndexError):
-                                pass
+            for line in metrics_text.splitlines():
+                if not line.startswith("bcs_http_requests_total{"):
+                    continue
+                try:
+                    labels_part, value_part = line.split("}")
+                    labels_str = labels_part[len("bcs_http_requests_total{") :]
+                    labels = {}
+                    for label in labels_str.split(","):
+                        if "=" in label:
+                            k, v = label.split("=", 1)
+                            labels[k.strip()] = v.strip().strip('"')
+                    # Validate required labels regardless of order
+                    if (
+                        labels.get("method") == "POST"
+                        and labels.get("endpoint") == "/internal/v1/pipelines/define"
+                        and labels.get("status_code") == "200"
+                    ):
+                        pipeline_requests += int(float(value_part.strip()))
+                except Exception:
+                    continue
 
     # 2. Check BOS for stored resolved pipeline
     bos_base_url = endpoints["batch_orchestrator_service"]["base_url"]
