@@ -14,11 +14,13 @@ This part is now re-ordered and expanded. It covers the critical prerequisite of
 Our real-time architecture depends on a "backplane"—a messaging system that allows multiple, independent instances of our API Gateway to communicate with backend services without knowing about each other. Redis Pub/Sub is the industry-standard solution for this. It provides a lightweight, high-speed channel where backend services can "publish" UI update events. The API Gateway instances will "subscribe" to these channels and forward the messages to the specific WebSocket clients they are connected to. This decouples the stateful WebSocket connections from our stateless backend, which is essential for horizontal scaling.
 
 **Affected Files**:
+
 - `services/libs/huleedu_service_libs/redis_client.py`
 - `services/libs/huleedu_service_libs/protocols.py`
 
 **Implementation Steps**:
-1.  **Update `AtomicRedisClientProtocol`**: Add `publish` and `subscribe` methods to the protocol definition. This ensures any service depending on this protocol can be type-checked correctly, maintaining our commitment to type safety.
+
+1. **Update `AtomicRedisClientProtocol`**: Add `publish` and `subscribe` methods to the protocol definition. This ensures any service depending on this protocol can be type-checked correctly, maintaining our commitment to type safety.
 
     **File**: `services/libs/huleedu_service_libs/protocols.py`
 
@@ -56,7 +58,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
             ...
     ```
 
-2.  **Implement `publish` and `subscribe` in `RedisClient`**: Add the concrete implementations to the main client class. It is critical to use `aclose()` instead of the deprecated `close()` to ensure the underlying connection pool is managed correctly by the `redis-py` async library, preventing resource leaks.
+2. **Implement `publish` and `subscribe` in `RedisClient`**: Add the concrete implementations to the main client class. It is critical to use `aclose()` instead of the deprecated `close()` to ensure the underlying connection pool is managed correctly by the `redis-py` async library, preventing resource leaks.
 
     **File**: `services/libs/huleedu_service_libs/redis_client.py`
 
@@ -101,6 +103,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
     ```
 
 **Done When**:
+
 - ✅ The `RedisClient` class and its corresponding protocol include fully functional and type-hinted `publish` and `subscribe` methods.
 - ✅ All existing service library tests pass without regression, confirming that the changes have not impacted the client's original idempotency-related functionality.
 
@@ -109,12 +112,14 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
 **Objective**: Create a new, internal-only HTTP endpoint in BOS to serve the detailed `ProcessingPipelineState` for a given batch. This is the cornerstone of the thin-event approach, establishing BOS as the single source of truth for pipeline state and allowing other services to query it without requiring "fat events."
 
 **Affected Files**:
+
 - `services/batch_orchestrator_service/api/batch_routes.py`
 - `services/batch_orchestrator_service/protocols.py`
 - `services/batch_orchestrator_service/implementations/batch_repository_postgres_impl.py`
 
 **Implementation Steps**:
-1.  **Add New Route to `batch_routes.py`**: Create a new Quart route for internal queries. This pattern mirrors the existing `/status` endpoint but is prefixed with `/internal` to signify it is not for public consumption and should not be exposed outside our Docker network. The implementation should be lean, delegating the data retrieval logic directly to the repository layer to maintain our clean architecture.
+
+1. **Add New Route to `batch_routes.py`**: Create a new Quart route for internal queries. This pattern mirrors the existing `/status` endpoint but is prefixed with `/internal` to signify it is not for public consumption and should not be exposed outside our Docker network. The implementation should be lean, delegating the data retrieval logic directly to the repository layer to maintain our clean architecture.
 
     **File**: `services/batch_orchestrator_service/api/batch_routes.py`
 
@@ -148,6 +153,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
     ```
 
 **Done When**:
+
 - ✅ The `batch_orchestrator_service` exposes a new, functional, and tested endpoint at `GET /internal/v1/batches/{batch_id}/pipeline-state`.
 - ✅ The endpoint correctly retrieves and returns the complete `ProcessingPipelineState` JSON object from the database, leveraging the existing `get_processing_pipeline_state` repository method.
 
@@ -156,12 +162,14 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
 **Objective**: Modify the core event contract to remove the large `pipeline_state` payload, in adherence with our "Thin Events" principle (`030-event-driven-architecture-eda-standards.mdc`). This change is critical for long-term performance and scalability of our Kafka cluster by reducing message size and consumer load.
 
 **Affected Files**:
+
 - `common_core/src/common_core/events/els_bos_events.py`
 - `services/essay_lifecycle_service/implementations/batch_phase_coordinator_impl.py` (publisher)
 - `services/batch_orchestrator_service/implementations/els_batch_phase_outcome_handler.py` (consumer)
 
 **Implementation Steps**:
-1.  **Update the Pydantic Model**: Remove fields that can be queried from the new BOS endpoint, leaving only the essential notification data. The `processed_essays` list is kept because it contains the output `text_storage_ids`, which are essential context for the next phase, not just a reflection of state.
+
+1. **Update the Pydantic Model**: Remove fields that can be queried from the new BOS endpoint, leaving only the essential notification data. The `processed_essays` list is kept because it contains the output `text_storage_ids`, which are essential context for the next phase, not just a reflection of state.
 
     **File**: `common_core/src/common_core/events/els_bos_events.py`
 
@@ -185,6 +193,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
     ```
 
 **Done When**:
+
 - ✅ The `ELSBatchPhaseOutcomeV1` model in `common_core` is updated to reflect the thin event structure.
 - ✅ The ELS service is updated to publish this new, leaner event, and the BOS service is updated to consume it.
 - ✅ All relevant contract tests are updated and pass, verifying the new event structure.
@@ -194,13 +203,15 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
 **Objective**: Establish a clear, secure path for propagating the authenticated `user_id` from the API Gateway into our backend systems. This is a critical prerequisite for targeted real-time updates.
 
 **Affected Files**:
+
 - `services/api_gateway_service/routers/pipeline_routes.py`
 - `common_core/src/common_core/events/client_commands.py`
 - `services/batch_orchestrator_service/api_models.py`
 - `services/batch_orchestrator_service/implementations/batch_context_operations.py`
 
 **Implementation Steps**:
-1.  **Update the Command Contract**: Add a `user_id` field to the `ClientBatchPipelineRequestV1` event. This makes user context an explicit part of the command.
+
+1. **Update the Command Contract**: Add a `user_id` field to the `ClientBatchPipelineRequestV1` event. This makes user context an explicit part of the command.
 
     **File**: `common_core/src/common_core/events/client_commands.py`
 
@@ -212,7 +223,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
         user_id: str  # <-- ADD THIS REQUIRED FIELD
     ```
 
-2.  **Update BOS Registration Model**: Add an optional `user_id` to the `BatchRegistrationRequestV1` model so it can be persisted.
+2. **Update BOS Registration Model**: Add an optional `user_id` to the `BatchRegistrationRequestV1` model so it can be persisted.
 
     **File**: `services/batch_orchestrator_service/api_models.py`
 
@@ -224,7 +235,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
         user_id: Optional[str] = Field(default=None, description="The ID of the user who owns this batch.") # <-- ADD THIS FIELD
     ```
 
-3.  **Update BOS Context Storage**: Modify the `store_batch_context` method in BOS to persist the `user_id` within the `processing_metadata` JSON blob. This makes it retrievable by any process that needs to publish a user-specific notification.
+3. **Update BOS Context Storage**: Modify the `store_batch_context` method in BOS to persist the `user_id` within the `processing_metadata` JSON blob. This makes it retrievable by any process that needs to publish a user-specific notification.
 
     **File**: `services/batch_orchestrator_service/implementations/batch_context_operations.py`
 
@@ -256,6 +267,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
     ```
 
 **Done When**:
+
 - ✅ The `user_id` is part of the `ClientBatchPipelineRequestV1` contract.
 - ✅ The API Gateway is capable of populating this field.
 - ✅ The Batch Orchestrator Service correctly persists the `user_id` as part of the batch context.
@@ -265,13 +277,15 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
 **Objective**: Build the aggregator service to use the new "thin event + query" pattern. This service acts as a performance-enhancing cache and a materialized view, shielding our frontend-facing gateway from the complexities of the internal event bus.
 
 **Affected Files**:
+
 - New service directory: `services/result_aggregator_service/`
 - `docker-compose.yml`, `docker-compose.infrastructure.yml`, `docker-compose.services.yml`
 
 **Implementation Steps**:
-1.  **Create Service Structure and DB Schema**: Create the new service directory `services/result_aggregator_service/`. Its structure must follow our standard Quart service pattern, as exemplified by `services/batch_orchestrator_service/`. This includes creating `app.py`, `config.py`, `di.py`, `models_db.py`, and `api/` directories. In the new `models_db.py`, define the `BatchStatusView` model as specified in the rationale.
 
-2.  **Implement `kafka_consumer.py` (Revised Logic)**: The consumer now has an additional step: it must call the new BOS internal API to fetch the full state after being notified by the thin event. This ensures the aggregator always has the most current and complete data, making it a reliable read model. It must also include retry logic to handle cases where BOS might be temporarily unavailable.
+1. **Create Service Structure and DB Schema**: Create the new service directory `services/result_aggregator_service/`. Its structure must follow our standard Quart service pattern, as exemplified by `services/batch_orchestrator_service/`. This includes creating `app.py`, `config.py`, `di.py`, `models_db.py`, and `api/` directories. In the new `models_db.py`, define the `BatchStatusView` model as specified in the rationale.
+
+2. **Implement `kafka_consumer.py` (Revised Logic)**: The consumer now has an additional step: it must call the new BOS internal API to fetch the full state after being notified by the thin event. This ensures the aggregator always has the most current and complete data, making it a reliable read model. It must also include retry logic to handle cases where BOS might be temporarily unavailable.
 
     **File**: `services/result_aggregator_service/kafka_consumer.py`
 
@@ -317,7 +331,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
                  return await response.json()
     ```
 
-3.  **Implement Internal API Endpoint**: The aggregator's own API must be implemented using Quart. It simply serves the data it has stored.
+3. **Implement Internal API Endpoint**: The aggregator's own API must be implemented using Quart. It simply serves the data it has stored.
 
     **File**: `services/result_aggregator_service/api/query_routes.py`
 
@@ -348,6 +362,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
     ```
 
 **Done When**:
+
 - ✅ The `result_aggregator_service` is fully containerized and functional.
 - ✅ Its consumer correctly processes the new thin event and successfully queries the new BOS internal API to fetch the full, authoritative state.
 - ✅ The fetched state is correctly persisted to the aggregator's own PostgreSQL database.
