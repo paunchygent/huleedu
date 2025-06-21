@@ -283,7 +283,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
 
 **Implementation Steps**:
 
-1. **Create Service Structure and DB Schema**: Create the new service directory `services/result_aggregator_service/`. Its structure must follow our standard Quart service pattern, as exemplified by `services/batch_orchestrator_service/`. This includes creating `app.py`, `config.py`, `di.py`, `models_db.py`, and `api/` directories. In the new `models_db.py`, define the `BatchStatusView` model as specified in the rationale.
+1. **Create Service Structure and DB Schema**: Create the new service directory `services/result_aggregator_service/`. Its structure must follow our standard Quart service pattern, as exemplified by `services/batch_orchestrator_service/`. This includes creating `app.py`, `config.py`, `di.py`, `models_db.py`, and `api/` directories. In the new `models_db.py`, define the `BatchStatusView` model as specified in the rationale **and include a `user_id` column** so ownership checks can be performed without querying BOS.
 
 2. **Implement `kafka_consumer.py` (Revised Logic)**: The consumer now has an additional step: it must call the new BOS internal API to fetch the full state after being notified by the thin event. This ensures the aggregator always has the most current and complete data, making it a reliable read model. It must also include retry logic to handle cases where BOS might be temporarily unavailable.
 
@@ -308,7 +308,8 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
             logger.info(f"Received thin event BatchPhaseOutcome for batch '{batch_id}'")
 
             # 2. Query BOS (the source of truth) for the FULL, up-to-date state.
-            # This operation includes retry logic for resilience.
+            # This operation includes retry logic for resilience. The returned
+            # JSON includes the batch owner's `user_id`.
             bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
             try:
                 full_pipeline_state = await self._fetch_state_with_retry(bos_url)
@@ -321,13 +322,14 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
             await self.repository.upsert_batch_status(
                 batch_id=batch_id,
                 pipeline_state_update=full_pipeline_state,
+                user_id=full_pipeline_state.get("user_id"),
             )
             logger.info(f"Successfully updated aggregator view for batch '{batch_id}' with fresh state from BOS.")
 
         @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
         async def _fetch_state_with_retry(self, url: str) -> dict:
-             async with self.http_session.get(url) as response:
-                 response.raise_for_status() # Will trigger tenacity retry on 4xx/5xx
+             async with self.http_session.get(url, timeout=5) as response:
+                 response.raise_for_status()  # Will trigger tenacity retry on 4xx/5xx
                  return await response.json()
     ```
 
@@ -357,6 +359,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
         return jsonify({
             "batch_id": status_view.batch_id,
             "pipeline_state": status_view.pipeline_state,
+            "user_id": status_view.user_id,
             "last_updated": status_view.last_updated.isoformat(),
         }), 200
     ```
@@ -367,5 +370,7 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
 - ✅ Its consumer correctly processes the new thin event and successfully queries the new BOS internal API to fetch the full, authoritative state.
 - ✅ The fetched state is correctly persisted to the aggregator's own PostgreSQL database.
 - ✅ The aggregator's internal API correctly serves the persisted state to its clients (i.e., the API Gateway).
+- ✅ `user_id` is stored with each batch status and returned by the aggregator API so the Gateway can enforce ownership checks.
+- ⚠️ New batches may not appear in the aggregator until the first phase event is processed; clients should handle `404` responses gracefully.
 
 This revised Part 1 establishes a more robust and architecturally pure foundation. Part 2 and 3 will now build upon this, but their own implementation details remain largely unchanged as their external contracts are unaffected.
