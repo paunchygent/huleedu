@@ -6,76 +6,247 @@ This document provides the final implementation steps for the client interface l
 
 This part completes the `api_gateway_service` by adding the read-path and real-time components. It also details the required changes in our existing backend services to publish data to the new WebSocket backplane.
 
-### Checkpoint 3.1: Implement Query Endpoint for Batch Status
+### Checkpoint 3.1: Implement Query Endpoint for Batch Status (Secured)
 
-**Objective**: Implement the `GET /v1/batches/{batch_id}/status` endpoint in the API Gateway. This endpoint will serve as the "Hydrate" mechanism for the frontend, providing the initial state of a batch.
+**Objective**: Implement the `GET /v1/batches/{batch_id}/status` endpoint in the API Gateway with critical security enforcement. This endpoint serves as the "Hydrate" mechanism for the frontend while ensuring users can only access their own batch data.
 
 **Affected Files**:
 
 - `services/api_gateway_service/routers/status_routes.py` (new)
 - `services/api_gateway_service/main.py` (modification)
-- `services/api_gateway_service/di.py` (modification)
+- `services/api_gateway_service/config.py` (modification)
 
 **Implementation Steps**:
 
-1. **Implement the Status Endpoint Router**: This router will handle querying the `result_aggregator_service`.
+1. **Implement the Secured Status Endpoint Router**: This router enforces ownership checks and handles all edge cases properly.
 
     **File**: `services/api_gateway_service/routers/status_routes.py`
 
     ```python
-    from fastapi import APIRouter, Depends, HTTPException, status
+    from fastapi import APIRouter, Depends, HTTPException, status, Request
     from dishka.integrations.fastapi import FromDishka
-    from aiohttp import ClientSession
+    from aiohttp import ClientSession, ClientResponseError, ClientTimeout
+    from huleedu_service_libs.logging_utils import create_service_logger
     from ..config import settings
+    from ..middleware.rate_limit_middleware import limiter
     from .. import auth
 
     router = APIRouter()
+    logger = create_service_logger("api_gateway.status_routes")
 
     @router.get("/batches/{batch_id}/status")
+    @limiter.limit("50/minute")  # Higher limit for read operations, but still protected
     async def get_batch_status(
+        request: Request,  # Required for rate limiting
         batch_id: str,
         user_id: str = Depends(auth.get_current_user_id),
         http_session: FromDishka[ClientSession],
     ):
+        """
+        Get batch status with strict ownership enforcement.
+        
+        CRITICAL: Implements architect feedback #1 for ownership checks.
+        This prevents any authenticated user from accessing another user's batch data.
+        """
+        correlation_id = getattr(request.state, 'correlation_id', None) or str(uuid4())
+        
+        logger.info(
+            f"Batch status request: batch_id='{batch_id}', user_id='{user_id}', "
+            f"correlation_id='{correlation_id}'"
+        )
+
         aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{batch_id}/status"
 
         try:
-            async with http_session.get(aggregator_url, timeout=5) as response:
+            # CRITICAL: Use configured timeout to prevent indefinite hangs (Architect Feedback #6)
+            async with http_session.get(aggregator_url) as response:
                 if response.status == 200:
                     data = await response.json()
-                    if data.get("user_id") != user_id:
-                        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your batch")
-                    return data
+                    
+                    # CRITICAL: Enforce ownership check (Architect Feedback #1)
+                    batch_owner_id = data.get("user_id")
+                    if not batch_owner_id:
+                        logger.warning(
+                            f"Batch status missing user_id: batch_id='{batch_id}', "
+                            f"requesting_user='{user_id}', correlation_id='{correlation_id}'"
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Batch ownership information unavailable"
+                        )
+                    
+                    if batch_owner_id != user_id:
+                        logger.warning(
+                            f"Ownership violation: batch_id='{batch_id}', "
+                            f"owner='{batch_owner_id}', requester='{user_id}', "
+                            f"correlation_id='{correlation_id}'"
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN, 
+                            detail="Access denied: You don't have permission to view this batch"
+                        )
+                    
+                    # CRITICAL: Remove internal user_id from client response
+                    client_response = {
+                        "batch_id": data["batch_id"],
+                        "pipeline_state": data["pipeline_state"],
+                        "last_updated": data["last_updated"],
+                        "status": "available"
+                    }
+                    
+                    logger.info(
+                        f"Batch status retrieved successfully: batch_id='{batch_id}', "
+                        f"user_id='{user_id}', correlation_id='{correlation_id}'"
+                    )
+                    
+                    return client_response
+                    
                 elif response.status == 404:
-                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
+                    # Handle initial seeding strategy (Architect Feedback #8)
+                    if settings.HANDLE_MISSING_BATCHES == "query_bos":
+                        logger.info(
+                            f"Batch not in aggregator, checking BOS: batch_id='{batch_id}', "
+                            f"user_id='{user_id}', correlation_id='{correlation_id}'"
+                        )
+                        
+                        # Fallback to BOS for initial state
+                        bos_url = f"{settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
+                        try:
+                            async with http_session.get(bos_url) as bos_response:
+                                if bos_response.status == 200:
+                                    bos_data = await bos_response.json()
+                                    
+                                    # CRITICAL: Enforce ownership on BOS data too
+                                    bos_user_id = bos_data.get("user_id")
+                                    if bos_user_id != user_id:
+                                        raise HTTPException(
+                                            status_code=status.HTTP_403_FORBIDDEN,
+                                            detail="Access denied: You don't have permission to view this batch"
+                                        )
+                                    
+                                    # Return BOS data in client format
+                                    return {
+                                        "batch_id": batch_id,
+                                        "pipeline_state": bos_data,
+                                        "last_updated": bos_data.get("updated_at", "unknown"),
+                                        "status": "pending_aggregation"
+                                    }
+                                elif bos_response.status == 404:
+                                    raise HTTPException(
+                                        status_code=status.HTTP_404_NOT_FOUND,
+                                        detail="Batch not found"
+                                    )
+                                else:
+                                    bos_response.raise_for_status()
+                                    
+                        except ClientResponseError as e:
+                            logger.error(
+                                f"BOS fallback failed: batch_id='{batch_id}', "
+                                f"user_id='{user_id}', correlation_id='{correlation_id}', error='{e}'"
+                            )
+                            raise HTTPException(
+                                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                                detail="Backend services temporarily unavailable"
+                            )
+                    else:
+                        # Return 404 immediately without BOS fallback
+                        logger.info(
+                            f"Batch not found in aggregator: batch_id='{batch_id}', "
+                            f"user_id='{user_id}', correlation_id='{correlation_id}'"
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Batch not found or not yet processed"
+                        )
+                        
                 else:
+                    logger.error(
+                        f"Aggregator service error: status={response.status}, "
+                        f"batch_id='{batch_id}', user_id='{user_id}', correlation_id='{correlation_id}'"
+                    )
                     response.raise_for_status()
+                    
+        except ClientResponseError as e:
+            if e.status == 404:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Batch not found"
+                )
+            else:
+                logger.error(
+                    f"HTTP error querying aggregator: batch_id='{batch_id}', "
+                    f"user_id='{user_id}', correlation_id='{correlation_id}', error='{e}'"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Result aggregator service is temporarily unavailable"
+                )
+                
         except Exception as e:
-            # Log the error properly in a real implementation
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Result Aggregator service is unavailable: {e}")
+            logger.error(
+                f"Unexpected error retrieving batch status: batch_id='{batch_id}', "
+                f"user_id='{user_id}', correlation_id='{correlation_id}', error='{e}'",
+                exc_info=True
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal server error"
+            )
     ```
 
-2. **Update `main.py` to Register the New Router**:
+2. **Update Configuration for Initial Batch Seeding Strategy**:
+
+    **File**: `services/api_gateway_service/config.py`
+
+    ```python
+    class Settings(BaseSettings):
+        # ... existing settings ...
+        
+        # Service URLs
+        RESULT_AGGREGATOR_URL: str = Field(
+            default="http://result_aggregator_service:8000",
+            description="Result Aggregator Service base URL"
+        )
+        BOS_URL: str = Field(
+            default="http://batch_orchestrator_service:8000",
+            description="Batch Orchestrator Service base URL for fallback queries"
+        )
+        
+        # Initial batch seeding strategy (Architect Feedback #8)
+        HANDLE_MISSING_BATCHES: str = Field(
+            default="query_bos",
+            description="Strategy for 404 batches: 'query_bos' or 'return_404'"
+        )
+    ```
+
+3. **Update `main.py` to Register the New Router**:
 
     **File**: `services/api_gateway_service/main.py`
 
     ```python
     // ... existing imports ...
-    from .routers import pipeline_routes, status_routes // Add status_routes
+    from .routers import pipeline_routes, status_routes  # Add status_routes
 
     // ... app setup ...
 
     // Register Routers
     app.include_router(pipeline_routes.router, prefix="/v1", tags=["Pipelines"])
-    app.include_router(status_routes.router, prefix="/v1", tags=["Status"]) // Add this line
+    app.include_router(status_routes.router, prefix="/v1", tags=["Status"])  # Add this line
     ```
 
 **Done When**:
 
-- ✅ A `GET` request to `/v1/batches/{batch_id}/status` with a valid JWT correctly queries the `result_aggregator_service` and returns the batch status, including the `last_updated` timestamp.
-- ✅ The endpoint returns a `404 Not Found` if the aggregator does not find the batch.
-- ✅ The endpoint is secured by the `get_current_user_id` dependency.
-- ✅ Authorization is enforced by comparing the aggregator's `user_id` to the authenticated user; mismatches return `403 Forbidden`.
+- ✅ **CRITICAL**: Ownership checks are enforced - users can only access their own batch data (Architect Feedback #1).
+- ✅ A `GET` request to `/v1/batches/{batch_id}/status` with valid JWT returns batch status only for owned batches.
+- ✅ The endpoint returns `403 Forbidden` when users try to access batches they don't own.
+- ✅ The endpoint returns `404 Not Found` when batches don't exist in the aggregator.
+- ✅ Fallback to BOS is implemented for initial batch seeding with configurable strategy (Architect Feedback #8).
+- ✅ HTTP timeouts prevent indefinite hangs when querying backend services (Architect Feedback #6).
+- ✅ Rate limiting protects against query abuse while allowing reasonable read volumes.
+- ✅ Comprehensive logging includes `batch_id`, `user_id`, and `correlation_id` for full traceability (Architect Feedback #9).
+- ✅ The `user_id` is not exposed in client responses (internal ownership data only).
+
+This secured implementation closes the major security gap identified by the architect while providing a robust query mechanism for the frontend.
 
 ### Checkpoint 3.2: Implement WebSocket Endpoint and Redis Backplane
 
@@ -187,7 +358,7 @@ This part completes the `api_gateway_service` by adding the read-path and real-t
 
     // Register Routers
     app.include_router(pipeline_routes.router, prefix="/v1", tags=["Pipelines"])
-    app.include_router(status_routes.router, prefix="/v1", tags=["Status"])
+    app.include_router(status_routes.router, prefix="/v1", tags=["Status"]) // Add this line
     app.include_router(websocket_routes.router, tags=["Real-time"]) // Add this line
     ```
 

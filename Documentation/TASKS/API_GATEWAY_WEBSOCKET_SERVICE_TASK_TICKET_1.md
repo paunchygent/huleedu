@@ -6,7 +6,7 @@ This document provides a step-by-step implementation plan for the foundational c
 
 This part is now re-ordered and expanded. It covers the critical prerequisite of creating a new internal API endpoint in the Batch Orchestrator Service (BOS), redefining the core event contract, and then building the `result_aggregator_service` to use these new components. This sequence is mandatory to ensure that the services built in Part 2 and 3 have the necessary infrastructure to function correctly.
 
-### Checkpoint 1.1: Extend Shared Redis Client for Pub/Sub
+### Checkpoint 1.1: Extend Shared Redis Client for Pub/Sub (Complete Implementation)
 
 **Objective**: Enhance our existing `RedisClient` in `huleedu-service-libs` to support the WebSocket backplane. This extension is foundational for the real-time communication required by the frontend, enabling a responsive user experience.
 
@@ -26,6 +26,11 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
 
     ```python
     // ... existing protocol code ...
+    
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    import redis.client
+
     class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         // ... existing methods: watch, multi, exec, etc. ...
 
@@ -63,20 +68,37 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
     **File**: `services/libs/huleedu_service_libs/redis_client.py`
 
     ```python
+    import json
+    from contextlib import asynccontextmanager
+    from typing import AsyncGenerator
+    import redis.client
+
     // ... existing RedisClient class code ...
 
+    class RedisClient:
+        // ... existing methods ...
+
         async def publish(self, channel: str, message: str) -> int:
+            """
+            Publish a message to a Redis channel with proper error handling and logging.
+            
+            CRITICAL: This method enables the WebSocket backplane by allowing backend
+            services to publish real-time updates to user-specific channels.
+            """
             if not self._started:
                 raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+            
             try:
+                # Publish message and get subscriber count
                 receiver_count = await self.client.publish(channel, message)
-                # We expect receiver_count to be an int, but cast for safety.
-                receiver_count = int(receiver_count) 
+                receiver_count = int(receiver_count)  # Ensure it's an integer
+                
                 logger.debug(
                     f"Redis PUBLISH by '{self.client_id}': channel='{channel}', "
                     f"message='{message[:75]}...', receivers={receiver_count}"
                 )
                 return receiver_count
+                
             except Exception as e:
                 logger.error(
                     f"Error in Redis PUBLISH operation by '{self.client_id}' for channel '{channel}': {e}",
@@ -86,6 +108,12 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
 
         @asynccontextmanager
         async def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
+            """
+            Subscribe to a Redis channel with proper lifecycle management.
+            
+            CRITICAL: This method enables API Gateway instances to listen for 
+            user-specific real-time updates from backend services.
+            """
             if not self._started:
                 raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
@@ -94,18 +122,124 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
                 await pubsub.subscribe(channel)
                 logger.info(f"Redis SUBSCRIBE by '{self.client_id}': channel='{channel}'")
                 yield pubsub
+                
+            except Exception as e:
+                logger.error(
+                    f"Error in Redis SUBSCRIBE operation by '{self.client_id}' for channel '{channel}': {e}",
+                    exc_info=True
+                )
+                raise
+                
             finally:
-                # This gracefully unsubscribes and cleans up the specific pubsub connection
-                # without affecting the main client connection pool.
-                await pubsub.unsubscribe(channel)
-                await pubsub.aclose()
-                logger.info(f"Redis UNSUBSCRIBE by '{self.client_id}': channel='{channel}'")
+                # CRITICAL: Proper cleanup to prevent resource leaks
+                try:
+                    await pubsub.unsubscribe(channel)
+                    await pubsub.aclose()  # Use aclose() instead of deprecated close()
+                    logger.info(f"Redis UNSUBSCRIBE by '{self.client_id}': channel='{channel}'")
+                except Exception as e:
+                    logger.error(
+                        f"Error during Redis UNSUBSCRIBE cleanup by '{self.client_id}': {e}",
+                        exc_info=True
+                    )
+
+        # CRITICAL: Helper method for user-specific channel management
+        def get_user_channel(self, user_id: str) -> str:
+            """
+            Generate standardized user-specific channel name.
+            
+            Args:
+                user_id: The authenticated user's ID
+                
+            Returns:
+                Standardized channel name for the user (e.g., "ws:user_123")
+            """
+            return f"ws:{user_id}"
+
+        async def publish_user_notification(self, user_id: str, notification: dict) -> int:
+            """
+            Convenience method to publish JSON notifications to user-specific channels.
+            
+            Args:
+                user_id: The target user's ID
+                notification: Dictionary to be serialized as JSON
+                
+            Returns:
+                Number of subscribers that received the notification
+            """
+            channel = self.get_user_channel(user_id)
+            message = json.dumps(notification)
+            return await self.publish(channel, message)
+    ```
+
+3. **Add Tests for Pub/Sub Functionality**: Ensure the new functionality is properly tested.
+
+    **File**: `services/libs/huleedu_service_libs/tests/test_redis_pubsub.py`
+
+    ```python
+    import asyncio
+    import json
+    import pytest
+    from unittest.mock import AsyncMock, patch
+    from ..redis_client import RedisClient
+
+    @pytest.mark.asyncio
+    async def test_publish_message():
+        """Test publishing messages to Redis channels."""
+        redis_client = RedisClient("test-client", "redis://localhost:6379")
+        
+        with patch.object(redis_client, 'client') as mock_client:
+            mock_client.publish.return_value = 2  # 2 subscribers received message
+            
+            result = await redis_client.publish("test:channel", "test message")
+            
+            assert result == 2
+            mock_client.publish.assert_called_once_with("test:channel", "test message")
+
+    @pytest.mark.asyncio
+    async def test_user_notification_helper():
+        """Test the convenience method for user notifications."""
+        redis_client = RedisClient("test-client", "redis://localhost:6379")
+        
+        with patch.object(redis_client, 'publish') as mock_publish:
+            mock_publish.return_value = 1
+            
+            notification = {"event": "batch_updated", "batch_id": "123"}
+            result = await redis_client.publish_user_notification("user_456", notification)
+            
+            expected_channel = "ws:user_456"
+            expected_message = json.dumps(notification)
+            
+            assert result == 1
+            mock_publish.assert_called_once_with(expected_channel, expected_message)
+
+    @pytest.mark.asyncio
+    async def test_subscribe_context_manager():
+        """Test subscription context manager proper cleanup."""
+        redis_client = RedisClient("test-client", "redis://localhost:6379")
+        mock_pubsub = AsyncMock()
+        
+        with patch.object(redis_client, 'client') as mock_client:
+            mock_client.pubsub.return_value = mock_pubsub
+            
+            async with redis_client.subscribe("test:channel") as pubsub:
+                assert pubsub == mock_pubsub
+                mock_pubsub.subscribe.assert_called_once_with("test:channel")
+            
+            # Verify cleanup was called
+            mock_pubsub.unsubscribe.assert_called_once_with("test:channel")
+            mock_pubsub.aclose.assert_called_once()
     ```
 
 **Done When**:
 
-- ✅ The `RedisClient` class and its corresponding protocol include fully functional and type-hinted `publish` and `subscribe` methods.
-- ✅ All existing service library tests pass without regression, confirming that the changes have not impacted the client's original idempotency-related functionality.
+- ✅ The `AtomicRedisClientProtocol` includes fully functional and type-hinted `publish` and `subscribe` methods.
+- ✅ The `RedisClient` class implements both methods with proper error handling and resource cleanup.
+- ✅ Helper methods for user-specific channels are available (`get_user_channel`, `publish_user_notification`).
+- ✅ All existing service library tests pass without regression, confirming backward compatibility.
+- ✅ New Pub/Sub functionality is covered by unit tests.
+- ✅ The implementation uses `aclose()` instead of deprecated `close()` for proper async resource management.
+
+This implementation provides the foundation for real-time user notifications while maintaining the established patterns and reliability standards of the service library.
 
 ### Checkpoint 1.2: Implement New Internal API in Batch Orchestrator Service
 
@@ -157,46 +291,152 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
 - ✅ The `batch_orchestrator_service` exposes a new, functional, and tested endpoint at `GET /internal/v1/batches/{batch_id}/pipeline-state`.
 - ✅ The endpoint correctly retrieves and returns the complete `ProcessingPipelineState` JSON object from the database, leveraging the existing `get_processing_pipeline_state` repository method.
 
-### Checkpoint 1.3: Redefine `ELSBatchPhaseOutcomeV1` as a Thin Event
+### Checkpoint 1.3: Implement Parallel Thin Event Migration (Revised)
 
-**Objective**: Modify the core event contract to remove the large `pipeline_state` payload, in adherence with our "Thin Events" principle (`030-event-driven-architecture-eda-standards.mdc`). This change is critical for long-term performance and scalability of our Kafka cluster by reducing message size and consumer load.
+**Objective**: Implement the "Thin Events" principle without breaking existing functionality by creating a parallel migration path. This approach maintains backward compatibility while achieving the architectural goal of reduced Kafka message payloads.
+
+**Context and Rationale**: The existing `ELSBatchPhaseOutcomeV1` event is extensively used across 15+ files in the codebase, including tests, integration scripts, and core handlers. A breaking change would require simultaneous updates across multiple services and risk system instability. The parallel migration approach allows gradual adoption while maintaining system reliability.
 
 **Affected Files**:
 
-- `common_core/src/common_core/events/els_bos_events.py`
-- `services/essay_lifecycle_service/implementations/batch_phase_coordinator_impl.py` (publisher)
-- `services/batch_orchestrator_service/implementations/els_batch_phase_outcome_handler.py` (consumer)
+- `common_core/src/common_core/events/els_bos_events.py` (new V2 contract)
+- `services/essay_lifecycle_service/implementations/batch_phase_coordinator_impl.py` (dual publisher)
+- `services/result_aggregator_service/` (consumes both V1 and V2)
 
 **Implementation Steps**:
 
-1. **Update the Pydantic Model**: Remove fields that can be queried from the new BOS endpoint, leaving only the essential notification data. The `processed_essays` list is kept because it contains the output `text_storage_ids`, which are essential context for the next phase, not just a reflection of state.
+1. **Create New Thin Event Contract V2**: Add a new, lean event contract alongside the existing V1 event. This preserves all existing functionality while enabling the new architecture.
 
     **File**: `common_core/src/common_core/events/els_bos_events.py`
 
     ```python
-    // ... imports ...
-    class ELSBatchPhaseOutcomeV1(BaseModel):
+    // ... existing ELSBatchPhaseOutcomeV1 remains unchanged ...
+
+    class ELSBatchPhaseOutcomeV2(BaseModel):
         """
-        [REVISED] Event published by ELS to notify BOS about the completion of a 
+        [THIN EVENT V2] Event published by ELS to notify BOS about the completion of a 
         processing phase for a batch. This is a thin event; the full updated 
         state must be queried from the authoritative service (BOS).
+        
+        This V2 contract implements the thin events principle while maintaining
+        backward compatibility with V1 consumers.
         """
         batch_id: str = Field(...)
         phase_name: str = Field(...)
         phase_status: str = Field(...)
-        # This field remains critical, as it provides the output storage IDs
-        # needed as input for the *next* phase. This is essential context.
+        # Essential output context for next phase - this data cannot be queried elsewhere
         processed_essays: List[EssayProcessingInputRefV1] = Field(...)
         failed_essay_ids: List[str] = Field(...)
         correlation_id: Optional[UUID] = Field(None)
+        
+        # REMOVED from V1: pipeline_state (query BOS instead)
+        # REMOVED from V1: phase_metadata (query BOS instead)
+    ```
 
+2. **Update Result Aggregator to Consume Both Events**: The aggregator must handle both V1 and V2 events during the migration period, ensuring no data loss while enabling gradual migration.
+
+    **File**: `services/result_aggregator_service/kafka_consumer.py`
+
+    ```python
+    // ... existing imports ...
+    from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1, ELSBatchPhaseOutcomeV2
+
+    class ResultAggregatorKafkaConsumer:
+        def __init__(self, ...):
+            # Register handlers for both event versions
+            self.event_handlers = {
+                "huleedu.els.batch_phase.outcome.v1": self._handle_v1_message,
+                "huleedu.els.batch_phase.outcome.v2": self._handle_v2_message,
+            }
+
+        async def _handle_v1_message(self, msg: Any):
+            """Handle legacy V1 events - extract state directly from event."""
+            envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(msg.value)
+            event_data = envelope.data
+            batch_id = event_data.batch_id
+
+            # V1 events contain full state - use it directly
+            pipeline_state = event_data.pipeline_state
+            user_id = pipeline_state.get("user_id") if pipeline_state else None
+
+            await self.repository.upsert_batch_status(
+                batch_id=batch_id,
+                pipeline_state_update=pipeline_state or {},
+                user_id=user_id,
+            )
+            logger.info(f"Processed V1 event for batch '{batch_id}'")
+
+        async def _handle_v2_message(self, msg: Any):
+            """Handle new V2 thin events - query BOS for full state."""
+            envelope = EventEnvelope[ELSBatchPhaseOutcomeV2].model_validate_json(msg.value)
+            event_data = envelope.data
+            batch_id = event_data.batch_id
+
+            # V2 events are thin - must query BOS for full state
+            bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
+            try:
+                full_pipeline_state = await self._fetch_state_with_retry(bos_url)
+            except Exception as e:
+                logger.error(f"Failed to query BOS for V2 event batch '{batch_id}': {e}")
+                raise
+
+            await self.repository.upsert_batch_status(
+                batch_id=batch_id,
+                pipeline_state_update=full_pipeline_state,
+                user_id=full_pipeline_state.get("user_id"),
+            )
+            logger.info(f"Processed V2 thin event for batch '{batch_id}'")
+    ```
+
+3. **Enable Gradual Publisher Migration**: Implement a feature flag in ELS to publish both events during transition, then gradually phase out V1.
+
+    **File**: `services/essay_lifecycle_service/implementations/batch_phase_coordinator_impl.py`
+
+    ```python
+    async def _publish_phase_outcome(self, ...):
+        """Publish phase outcome event - supports both V1 and V2 during migration."""
+        
+        # Continue publishing V1 for backward compatibility
+        outcome_event_v1 = ELSBatchPhaseOutcomeV1(
+            batch_id=batch_id,
+            phase_name=phase_name,
+            phase_status=phase_status,
+            processed_essays=processed_essays,
+            failed_essay_ids=failed_essay_ids,
+            pipeline_state=pipeline_state,  # V1 includes full state
+            correlation_id=correlation_id,
+        )
+        
+        await self.event_publisher.publish_batch_phase_outcome_v1(outcome_event_v1)
+
+        # FEATURE FLAG: Also publish V2 thin event for new consumers
+        if self.settings.PUBLISH_THIN_EVENTS_V2:
+            outcome_event_v2 = ELSBatchPhaseOutcomeV2(
+                batch_id=batch_id,
+                phase_name=phase_name,
+                phase_status=phase_status,
+                processed_essays=processed_essays,
+                failed_essay_ids=failed_essay_ids,
+                correlation_id=correlation_id,
+                # V2 omits pipeline_state - consumers must query BOS
+            )
+            
+            await self.event_publisher.publish_batch_phase_outcome_v2(outcome_event_v2)
     ```
 
 **Done When**:
 
-- ✅ The `ELSBatchPhaseOutcomeV1` model in `common_core` is updated to reflect the thin event structure.
-- ✅ The ELS service is updated to publish this new, leaner event, and the BOS service is updated to consume it.
-- ✅ All relevant contract tests are updated and pass, verifying the new event structure.
+- ✅ The `ELSBatchPhaseOutcomeV2` thin event contract is defined and validated.
+- ✅ The Result Aggregator Service correctly processes both V1 (with embedded state) and V2 (with BOS queries) events.
+- ✅ ELS can publish both event versions controlled by feature flag `PUBLISH_THIN_EVENTS_V2`.
+- ✅ All existing V1 consumers continue working without modification.
+- ✅ New consumers can choose to consume V2 thin events and benefit from reduced Kafka message sizes.
+
+**Migration Timeline**:
+- **Phase 1**: Deploy dual-publishing ELS and dual-consuming aggregator
+- **Phase 2**: Migrate consumers to V2 handlers one by one
+- **Phase 3**: Disable V1 publishing via feature flag once all consumers migrated
+- **Phase 4**: Remove V1 contract and handlers in future release
 
 ### Checkpoint 1.4: Implement User ID Propagation
 
@@ -272,9 +512,9 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
 - ✅ The API Gateway is capable of populating this field.
 - ✅ The Batch Orchestrator Service correctly persists the `user_id` as part of the batch context.
 
-### Checkpoint 1.5: Create and Implement the `result_aggregator_service` (Revised)
+### Checkpoint 1.5: Create and Implement the `result_aggregator_service` (Revised + Hardened)
 
-**Objective**: Build the aggregator service to use the new "thin event + query" pattern. This service acts as a performance-enhancing cache and a materialized view, shielding our frontend-facing gateway from the complexities of the internal event bus.
+**Objective**: Build the aggregator service to use the new "thin event + query" pattern with critical production hardening based on architect feedback. This service acts as a performance-enhancing cache and materialized view, shielding our frontend-facing gateway from the complexities of the internal event bus.
 
 **Affected Files**:
 
@@ -283,62 +523,156 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
 
 **Implementation Steps**:
 
-1. **Create Service Structure and DB Schema**: Create the new service directory `services/result_aggregator_service/`. Its structure must follow our standard Quart service pattern, as exemplified by `services/batch_orchestrator_service/`. This includes creating `app.py`, `config.py`, `di.py`, `models_db.py`, and `api/` directories. In the new `models_db.py`, define the `BatchStatusView` model as specified in the rationale **and include a `user_id` column** so ownership checks can be performed without querying BOS.
+1. **Create Service Structure and DB Schema with Security**: Create the new service directory `services/result_aggregator_service/`. Its structure must follow our standard Quart service pattern, as exemplified by `services/batch_orchestrator_service/`. In the new `models_db.py`, define the `BatchStatusView` model **with explicit `user_id` column** for fast ownership lookups without querying BOS.
 
-2. **Implement `kafka_consumer.py` (Revised Logic)**: The consumer now has an additional step: it must call the new BOS internal API to fetch the full state after being notified by the thin event. This ensures the aggregator always has the most current and complete data, making it a reliable read model. It must also include retry logic to handle cases where BOS might be temporarily unavailable.
+    **File**: `services/result_aggregator_service/models_db.py`
+
+    ```python
+    from sqlalchemy import Column, String, DateTime, Text
+    from sqlalchemy.ext.declarative import declarative_base
+    from datetime import datetime
+
+    Base = declarative_base()
+
+    class BatchStatusView(Base):
+        """Materialized view of batch status for fast client queries."""
+        __tablename__ = "batch_status_view"
+
+        batch_id = Column(String(255), primary_key=True)
+        user_id = Column(String(255), nullable=False, index=True)  # CRITICAL: Explicit user_id for ownership checks
+        pipeline_state = Column(Text, nullable=False)  # JSON blob
+        last_updated = Column(DateTime, nullable=False, default=datetime.utcnow)
+    ```
+
+2. **Implement Hardened `kafka_consumer.py`**: The consumer now includes critical production patterns: manual commits, proper timeouts, retry logic, and comprehensive error handling.
 
     **File**: `services/result_aggregator_service/kafka_consumer.py`
 
     ```python
-    // ... imports, including repository, aiohttp.ClientSession, and tenacity for retries ...
+    import asyncio
+    import json
+    from typing import Any
+    from aiohttp import ClientSession, ClientTimeout
+    from tenacity import retry, stop_after_attempt, wait_exponential
+    from huleedu_service_libs.logging_utils import create_service_logger
+    from huleedu_service_libs.kafka_client import KafkaBus
+
+    logger = create_service_logger("result_aggregator.kafka_consumer")
 
     class ResultAggregatorKafkaConsumer:
-        def __init__(self, ..., http_session: ClientSession, repository: ResultRepositoryProtocol, settings: Settings):
-            self.http_session = http_session
+        def __init__(self, 
+                     repository: ResultRepositoryProtocol, 
+                     http_session: ClientSession, 
+                     settings: Settings):
             self.repository = repository
+            self.http_session = http_session
             self.settings = settings
-            // ...
+            # CRITICAL: Manual commits for data consistency (Architect Feedback #11)
+            self.kafka_consumer = None  # Will be configured with enable_auto_commit=False
+
+        async def start_consuming(self):
+            """Start consuming with manual commit pattern for data consistency."""
+            topics = [
+                "huleedu.els.batch_phase.outcome.v1",
+                "huleedu.els.batch_phase.outcome.v2"  # Support both during migration
+            ]
+            
+            # CRITICAL: Manual commits disabled for at-least-once processing
+            consumer_config = {
+                "enable_auto_commit": False,  # Architect Feedback #11
+                "auto_offset_reset": "earliest",
+                "group_id": "result-aggregator-service"
+            }
+            
+            async for msg in self._consume_messages(topics, consumer_config):
+                try:
+                    await self._handle_message(msg)
+                    # CRITICAL: Only commit after successful processing
+                    await self.kafka_consumer.commit()
+                    logger.info(f"Successfully processed and committed message for batch {msg.key}")
+                except Exception as e:
+                    logger.error(f"Failed to process message: {e}", exc_info=True)
+                    # Do not commit - message will be reprocessed
 
         async def _handle_message(self, msg: Any):
-            envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(msg.value)
+            """Handle incoming messages with proper error boundaries."""
+            try:
+                # Determine event version and route accordingly
+                if msg.topic.endswith(".v1"):
+                    await self._handle_v1_message(msg)
+                elif msg.topic.endswith(".v2"):
+                    await self._handle_v2_message(msg)
+                else:
+                    logger.warning(f"Unknown topic version: {msg.topic}")
+                    
+            except Exception as e:
+                logger.error(f"Error handling message from {msg.topic}: {e}", exc_info=True)
+                raise  # Re-raise to prevent commit
+
+        async def _handle_v2_message(self, msg: Any):
+            """Handle V2 thin events with BOS state query and hardened error handling."""
+            envelope = EventEnvelope[ELSBatchPhaseOutcomeV2].model_validate_json(msg.value)
             event_data = envelope.data
             batch_id = event_data.batch_id
+            correlation_id = envelope.correlation_id
 
-            # 1. Receive THIN event notification
-            logger.info(f"Received thin event BatchPhaseOutcome for batch '{batch_id}'")
+            logger.info(f"Processing V2 thin event for batch '{batch_id}', correlation_id='{correlation_id}'")
 
-            # 2. Query BOS (the source of truth) for the FULL, up-to-date state.
-            # This operation includes retry logic for resilience. The returned
-            # JSON includes the batch owner's `user_id`.
+            # CRITICAL: Query BOS with timeout and retry (Architect Feedback #6)
             bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
             try:
-                full_pipeline_state = await self._fetch_state_with_retry(bos_url)
+                full_pipeline_state = await self._fetch_state_with_retry(bos_url, correlation_id)
             except Exception as e:
-                logger.error(f"Failed to query BOS for state of batch '{batch_id}' after retries: {e}", exc_info=True)
-                # Do not proceed. The message will be retried by the consumer loop later.
-                raise e
+                logger.error(
+                    f"Failed to query BOS for batch '{batch_id}' after retries, correlation_id='{correlation_id}': {e}",
+                    exc_info=True
+                )
+                raise  # Will prevent Kafka commit, enabling reprocessing
 
-            # 3. Persist the authoritative state to the aggregator's database.
+            # CRITICAL: Store with explicit user_id for ownership checks (Architect Feedback #7)
+            user_id = full_pipeline_state.get("user_id")
+            if not user_id:
+                logger.warning(f"No user_id found in pipeline state for batch '{batch_id}'")
+
             await self.repository.upsert_batch_status(
                 batch_id=batch_id,
                 pipeline_state_update=full_pipeline_state,
-                user_id=full_pipeline_state.get("user_id"),
+                user_id=user_id,
             )
-            logger.info(f"Successfully updated aggregator view for batch '{batch_id}' with fresh state from BOS.")
+            
+            # CRITICAL: Comprehensive logging for traceability (Architect Feedback #9)
+            logger.info(
+                f"Successfully updated aggregator view: batch_id='{batch_id}', "
+                f"user_id='{user_id}', correlation_id='{correlation_id}'"
+            )
 
-        @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-        async def _fetch_state_with_retry(self, url: str) -> dict:
-             async with self.http_session.get(url, timeout=5) as response:
-                 response.raise_for_status()  # Will trigger tenacity retry on 4xx/5xx
-                 return await response.json()
+        @retry(
+            stop=stop_after_attempt(3), 
+            wait=wait_exponential(multiplier=1, min=2, max=10),
+            reraise=True
+        )
+        async def _fetch_state_with_retry(self, url: str, correlation_id: str = None) -> dict:
+            """Fetch state from BOS with timeout and retry logic (Architect Feedback #6)."""
+            # CRITICAL: Explicit timeout to prevent indefinite hangs
+            timeout = ClientTimeout(total=self.settings.BOS_QUERY_TIMEOUT_SECONDS)
+            
+            async with self.http_session.get(url, timeout=timeout) as response:
+                if response.status == 200:
+                    state_data = await response.json()
+                    logger.debug(f"Successfully fetched state from BOS: correlation_id='{correlation_id}'")
+                    return state_data
+                elif response.status == 404:
+                    logger.warning(f"Batch not found in BOS: {url}, correlation_id='{correlation_id}'")
+                    return {}  # Return empty state for 404s
+                else:
+                    response.raise_for_status()  # Will trigger tenacity retry
     ```
 
-3. **Implement Internal API Endpoint**: The aggregator's own API must be implemented using Quart. It simply serves the data it has stored.
+3. **Implement Secured Internal API Endpoint**: The aggregator's API must enforce ownership checks to prevent users from accessing other users' batch data.
 
     **File**: `services/result_aggregator_service/api/query_routes.py`
 
     ```python
-    # Using Quart, our internal service standard.
     from quart import Blueprint, jsonify, Response
     from quart_dishka import inject
     from dishka import FromDishka
@@ -352,25 +686,103 @@ Our real-time architecture depends on a "backplane"—a messaging system that al
         batch_id: str,
         repo: FromDishka[ResultRepositoryProtocol]
     ) -> tuple[Response, int]:
-        status_view = await repo.get_batch_status(batch_id)
-        if not status_view:
-            return jsonify({"error": "Batch status not found"}), 404
+        """
+        Get aggregated batch status with explicit user_id for ownership enforcement.
+        
+        CRITICAL: This endpoint returns the user_id so the API Gateway can enforce
+        ownership checks without additional BOS queries (Architect Feedback #1, #7).
+        """
+        try:
+            status_view = await repo.get_batch_status(batch_id)
+            if not status_view:
+                return jsonify({"error": "Batch status not found"}), 404
 
-        return jsonify({
-            "batch_id": status_view.batch_id,
-            "pipeline_state": status_view.pipeline_state,
-            "user_id": status_view.user_id,
-            "last_updated": status_view.last_updated.isoformat(),
-        }), 200
+            # CRITICAL: Return user_id for Gateway ownership enforcement
+            response_data = {
+                "batch_id": status_view.batch_id,
+                "user_id": status_view.user_id,  # ESSENTIAL for ownership checks
+                "pipeline_state": status_view.pipeline_state,
+                "last_updated": status_view.last_updated.isoformat(),
+            }
+            
+            return jsonify(response_data), 200
+            
+        except Exception as e:
+            logger.error(f"Error retrieving batch status for {batch_id}: {e}", exc_info=True)
+            return jsonify({"error": "Internal server error"}), 500
     ```
+
+4. **Add Graceful Shutdown Hooks**: Implement proper resource cleanup to prevent hangs and resource leaks during deployment.
+
+    **File**: `services/result_aggregator_service/app.py`
+
+    ```python
+    from quart import Quart
+    from .startup_setup import initialize_service, cleanup_service
+
+    app = Quart(__name__)
+
+    @app.before_serving
+    async def startup():
+        """Initialize service resources."""
+        await initialize_service(app)
+
+    @app.after_serving  
+    async def shutdown():
+        """CRITICAL: Graceful shutdown with proper resource cleanup (Architect Feedback #4)."""
+        await cleanup_service(app)
+        logger.info("Result Aggregator Service shutdown complete")
+    ```
+
+    **File**: `services/result_aggregator_service/startup_setup.py`
+
+    ```python
+    async def cleanup_service(app: Quart):
+        """Clean up service resources to prevent leaks during deployment."""
+        try:
+            # Close HTTP session
+            if hasattr(app, 'http_session'):
+                await app.http_session.close()
+                logger.info("HTTP session closed")
+                
+            # Stop Kafka consumer
+            if hasattr(app, 'kafka_consumer'):
+                await app.kafka_consumer.stop()
+                logger.info("Kafka consumer stopped")
+                
+            # Close DI container
+            if hasattr(app, 'di_container'):
+                await app.di_container.close()
+                logger.info("DI container closed")
+                
+        except Exception as e:
+            logger.error(f"Error during service cleanup: {e}", exc_info=True)
+    ```
+
+**Configuration Updates**:
+
+**File**: `services/result_aggregator_service/config.py`
+
+```python
+class Settings(BaseSettings):
+    # ... existing settings ...
+    
+    # CRITICAL: Timeout configuration (Architect Feedback #6)
+    BOS_QUERY_TIMEOUT_SECONDS: int = Field(default=5, description="Timeout for BOS state queries")
+    BOS_QUERY_RETRY_ATTEMPTS: int = Field(default=3, description="Number of retry attempts for BOS queries")
+    
+    # Initial batch seeding strategy (Architect Feedback #8)
+    HANDLE_MISSING_BATCHES: str = Field(default="query_bos", description="Strategy for 404 batches: 'query_bos' or 'return_404'")
+```
 
 **Done When**:
 
-- ✅ The `result_aggregator_service` is fully containerized and functional.
-- ✅ Its consumer correctly processes the new thin event and successfully queries the new BOS internal API to fetch the full, authoritative state.
-- ✅ The fetched state is correctly persisted to the aggregator's own PostgreSQL database.
-- ✅ The aggregator's internal API correctly serves the persisted state to its clients (i.e., the API Gateway).
-- ✅ `user_id` is stored with each batch status and returned by the aggregator API so the Gateway can enforce ownership checks.
-- ⚠️ New batches may not appear in the aggregator until the first phase event is processed; clients should handle `404` responses gracefully.
+- ✅ The `result_aggregator_service` is fully containerized and production-hardened.
+- ✅ Its consumer correctly processes both V1 and V2 events with manual Kafka commits for data consistency.
+- ✅ HTTP queries to BOS include proper timeouts and retry logic to prevent indefinite hangs.
+- ✅ The aggregator's database includes explicit `user_id` column for fast ownership lookups.
+- ✅ The aggregator's API returns `user_id` so the Gateway can enforce ownership without additional queries.
+- ✅ Graceful shutdown hooks ensure proper resource cleanup during deployments.
+- ✅ Comprehensive logging includes `batch_id`, `user_id`, and `correlation_id` for full traceability.
 
-This revised Part 1 establishes a more robust and architecturally pure foundation. Part 2 and 3 will now build upon this, but their own implementation details remain largely unchanged as their external contracts are unaffected.
+This hardened implementation addresses the architect's critical feedback while maintaining the architectural vision of the thin events pattern.

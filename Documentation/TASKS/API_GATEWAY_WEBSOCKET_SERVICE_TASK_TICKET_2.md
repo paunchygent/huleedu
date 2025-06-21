@@ -129,9 +129,9 @@ This part covers the creation of the new FastAPI-based `api_gateway_service`, wh
 - ✅ The `api_gateway_service` directory and file structure are created as specified.
 - ✅ The service is added to `docker-compose.services.yml` and starts successfully with `docker compose up`.
 
-### Checkpoint 2.2: Implement Authentication & Command Endpoint
+### Checkpoint 2.2: Implement Authentication & Command Endpoint (Hardened)
 
-**Objective**: Secure the gateway and implement the primary endpoint for initiating backend workflows.
+**Objective**: Secure the gateway with production-grade authentication and implement the primary endpoint for initiating backend workflows, incorporating critical architect feedback for security and reliability.
 
 **Affected Files**:
 
@@ -139,149 +139,369 @@ This part covers the creation of the new FastAPI-based `api_gateway_service`, wh
 - `services/api_gateway_service/routers/pipeline_routes.py` (new)
 - `services/api_gateway_service/main.py` (new)
 - `services/api_gateway_service/di.py` (new)
+- `services/api_gateway_service/middleware/rate_limit_middleware.py` (new)
 
 **Implementation Steps**:
 
-1. **Create Authentication Dependency**: This reusable component will validate JWTs.
+1. **Create Hardened Authentication Dependency**: Implement JWT validation with expiry checks and comprehensive error handling.
 
     **File**: `services/api_gateway_service/auth.py`
 
     ```python
+    from datetime import datetime, timezone
     from fastapi import Depends, HTTPException, status
     from fastapi.security import OAuth2PasswordBearer
     import jwt
     from .config import settings
 
-    oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token") # Placeholder
+    oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token")
 
     async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> str:
+        """
+        Validate JWT token with expiry check and comprehensive error handling.
+        
+        CRITICAL: Implements architect feedback #2 for JWT expiry validation.
+        """
         try:
-            payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-            user_id: str | None = payload.get("sub") # 'sub' is standard for subject/user_id
+            # Decode and validate JWT
+            payload = jwt.decode(
+                token, 
+                settings.JWT_SECRET_KEY, 
+                algorithms=[settings.JWT_ALGORITHM]
+            )
+            
+            # CRITICAL: Validate token expiry (Architect Feedback #2)
+            exp_timestamp = payload.get("exp")
+            if exp_timestamp is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, 
+                    detail="Token missing expiration claim"
+                )
+            
+            current_time = datetime.now(timezone.utc).timestamp()
+            if current_time >= exp_timestamp:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has expired"
+                )
+            
+            # Extract user ID
+            user_id: str | None = payload.get("sub")
             if user_id is None:
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, 
+                    detail="Invalid token payload: missing subject"
+                )
+                
             return user_id
-        except jwt.PyJWTError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
+            
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has expired"
+            )
+        except jwt.InvalidTokenError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Could not validate credentials: {str(e)}"
+            )
+        except Exception as e:
+            # Log unexpected errors but don't expose internal details
+            logger.error(f"Unexpected error in JWT validation: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication failed"
+            )
     ```
 
-2. **Implement DI Providers**: Set up the Dishka provider to supply dependencies like `KafkaBus` and `aiohttp.ClientSession`.
+2. **Implement Rate Limiting Middleware**: Add protection against API abuse and accidental floods.
+
+    **File**: `services/api_gateway_service/middleware/rate_limit_middleware.py`
+
+    ```python
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    from fastapi import Request, Response
+    import redis.asyncio as redis
+
+    # CRITICAL: Rate limiting to protect against abuse (Architect Feedback #3)
+    def create_limiter() -> Limiter:
+        """Create rate limiter with Redis backend for distributed limiting."""
+        return Limiter(
+            key_func=get_remote_address,
+            storage_uri=f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}",
+            default_limits=["100/minute"]  # Global default
+        )
+
+    limiter = create_limiter()
+
+    async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+        """Custom rate limit exceeded handler with proper logging."""
+        client_ip = get_remote_address(request)
+        logger.warning(f"Rate limit exceeded for IP: {client_ip}, limit: {exc.detail}")
+        
+        response = Response(
+            content=f"Rate limit exceeded: {exc.detail}",
+            status_code=429,
+            headers={"Retry-After": str(exc.retry_after) if exc.retry_after else "60"}
+        )
+        return response
+    ```
+
+3. **Implement DI Providers with Graceful Shutdown**: Set up dependencies with proper lifecycle management.
 
     **File**: `services/api_gateway_service/di.py`
 
     ```python
-    from aiohttp import ClientSession
+    from aiohttp import ClientSession, ClientTimeout
     from dishka import Provider, Scope, provide
     from huleedu_service_libs.kafka_client import KafkaBus
+    from huleedu_service_libs.logging_utils import create_service_logger
     from .config import settings
 
+    logger = create_service_logger("api_gateway.di")
+
     class ApiGatewayProvider(Provider):
-        @provide(scope=Scope.APP)
+        scope = Scope.APP
+
+        @provide
         async def provide_kafka_bus(self) -> KafkaBus:
-            bus = KafkaBus(client_id=settings.SERVICE_NAME, bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS)
+            """Provide Kafka bus with proper lifecycle management."""
+            bus = KafkaBus(
+                client_id=settings.SERVICE_NAME, 
+                bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS
+            )
             await bus.start()
+            logger.info("Kafka bus started")
             return bus
 
-        @provide(scope=Scope.APP)
+        @provide
         async def provide_http_session(self) -> ClientSession:
-            return ClientSession()
+            """
+            Provide HTTP session with configured timeouts.
+            
+            CRITICAL: Properly configured timeouts prevent indefinite hangs
+            when querying internal services (Architect Feedback #6).
+            """
+            timeout = ClientTimeout(
+                total=settings.HTTP_CLIENT_TIMEOUT_SECONDS,
+                connect=settings.HTTP_CLIENT_CONNECT_TIMEOUT_SECONDS
+            )
+            session = ClientSession(timeout=timeout)
+            logger.info("HTTP session created with configured timeouts")
+            return session
 
-        async def shutdown(self, kafka_bus: KafkaBus, http_session: ClientSession) -> None:
-            await kafka_bus.stop()
-            await http_session.close()
+        async def finalize_kafka_bus(self, kafka_bus: KafkaBus) -> None:
+            """CRITICAL: Graceful shutdown to prevent resource leaks (Architect Feedback #4)."""
+            try:
+                await kafka_bus.stop()
+                logger.info("Kafka bus stopped gracefully")
+            except Exception as e:
+                logger.error(f"Error stopping Kafka bus: {e}", exc_info=True)
+
+        async def finalize_http_session(self, http_session: ClientSession) -> None:
+            """CRITICAL: Graceful shutdown to prevent resource leaks (Architect Feedback #4)."""
+            try:
+                await http_session.close()
+                logger.info("HTTP session closed gracefully")
+            except Exception as e:
+                logger.error(f"Error closing HTTP session: {e}", exc_info=True)
     ```
 
-3. **Implement the Command Endpoint Router**:
+4. **Implement the Hardened Command Endpoint Router**:
 
     **File**: `services/api_gateway_service/routers/pipeline_routes.py`
 
     ```python
     from uuid import uuid4
-    from fastapi import APIRouter, Depends, status
+    from fastapi import APIRouter, Depends, status, HTTPException
     from dishka.integrations.fastapi import FromDishka
     from huleedu_service_libs.kafka_client import KafkaBus
+    from huleedu_service_libs.logging_utils import create_service_logger
     from common_core.events.client_commands import ClientBatchPipelineRequestV1
     from common_core.events.envelope import EventEnvelope
+    from ..middleware.rate_limit_middleware import limiter
     from .. import auth
 
     router = APIRouter()
+    logger = create_service_logger("api_gateway.pipeline_routes")
 
     @router.post("/batches/{batch_id}/pipelines", status_code=status.HTTP_202_ACCEPTED)
+    @limiter.limit("10/minute")  # CRITICAL: Rate limiting on write endpoints (Architect Feedback #3)
     async def request_pipeline_execution(
+        request: Request,  # Required for rate limiting
         batch_id: str,
-        pipeline_request: ClientBatchPipelineRequestV1, # FastAPI validates request body against this
+        pipeline_request: ClientBatchPipelineRequestV1,
         user_id: str = Depends(auth.get_current_user_id),
         kafka_bus: FromDishka[KafkaBus],
     ):
+        """
+        Request pipeline execution for a batch with comprehensive validation and security.
+        
+        CRITICAL: This endpoint implements multiple architect feedback items:
+        - Rate limiting (#3)
+        - User ID propagation with authentication (#1, #2)
+        - Comprehensive logging (#9)
+        - Proper error handling
+        """
         correlation_id = uuid4()
+        
+        # CRITICAL: Validate batch_id consistency
+        if pipeline_request.batch_id and pipeline_request.batch_id != batch_id:
+            logger.warning(
+                f"Batch ID mismatch: path='{batch_id}', body='{pipeline_request.batch_id}', "
+                f"user_id='{user_id}', correlation_id='{correlation_id}'"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Batch ID in path must match batch ID in request body"
+            )
 
-        # Ensure the request batch_id matches the path batch_id
+        # Ensure path batch_id takes precedence
         pipeline_request.batch_id = batch_id
+        pipeline_request.user_id = user_id  # CRITICAL: Propagate authenticated user_id
+        pipeline_request.client_correlation_id = correlation_id
 
-        pipeline_request.user_id = user_id # Propagate the authenticated user_id
+        try:
+            envelope = EventEnvelope[ClientBatchPipelineRequestV1](
+                event_type="huleedu.commands.batch.pipeline.v1",
+                source_service="api_gateway_service",
+                correlation_id=correlation_id,
+                data=pipeline_request,
+            )
 
+            await kafka_bus.publish(
+                topic="huleedu.commands.batch.pipeline.v1",
+                envelope=envelope,
+                key=batch_id  # Partition by batch_id for ordering
+            )
 
-        envelope = EventEnvelope[ClientBatchPipelineRequestV1](
-            event_type="huleedu.commands.batch.pipeline.v1",
-            source_service="api_gateway_service",
-            correlation_id=correlation_id,
-            data=pipeline_request,
-        )
+            # CRITICAL: Comprehensive logging for traceability (Architect Feedback #9)
+            logger.info(
+                f"Pipeline request published: batch_id='{batch_id}', "
+                f"pipeline='{pipeline_request.requested_pipeline}', "
+                f"user_id='{user_id}', correlation_id='{correlation_id}'"
+            )
 
-        await kafka_bus.publish(
-            topic="huleedu.commands.batch.pipeline.v1",
-            envelope=envelope,
-            key=batch_id # Partition by batch_id
-        )
+            return {
+                "status": "accepted",
+                "message": "Pipeline execution request received",
+                "batch_id": batch_id,
+                "correlation_id": str(correlation_id)
+            }
 
-        return {"status": "accepted", "batch_id": batch_id, "correlation_id": str(correlation_id)}
+        except Exception as e:
+            logger.error(
+                f"Failed to publish pipeline request: batch_id='{batch_id}', "
+                f"user_id='{user_id}', correlation_id='{correlation_id}', error='{e}'",
+                exc_info=True
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to process pipeline request"
+            )
     ```
 
-4. **Assemble the Main Application**:
+5. **Assemble the Main Application with Hardening**:
 
     **File**: `services/api_gateway_service/main.py`
 
     ```python
-    from fastapi import FastAPI
+    from fastapi import FastAPI, Request
     from fastapi.middleware.cors import CORSMiddleware
     from dishka import make_async_container
     from dishka.integrations.fastapi import setup_dishka
+    from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+    
     from .config import settings
     from .di import ApiGatewayProvider
-    from .routers import pipeline_routes #, status_routes, websocket_routes
+    from .middleware.rate_limit_middleware import limiter, rate_limit_exceeded_handler
+    from .routers import pipeline_routes
 
-    app = FastAPI(title="HuleEdu API Gateway")
+    # CRITICAL: Configure logging first
+    configure_service_logging(settings.SERVICE_NAME, log_level=settings.LOG_LEVEL)
+    logger = create_service_logger("api_gateway.main")
 
-    # Setup DI
+    app = FastAPI(
+        title="HuleEdu API Gateway",
+        description="Secure client-facing API for React frontend",
+        version="1.0.0",
+        docs_url="/docs",
+        redoc_url="/redoc"
+    )
+
+    # CRITICAL: Setup DI with graceful shutdown
     container = make_async_container(ApiGatewayProvider())
     setup_dishka(container, app)
 
-    # Setup Middleware
+    # CRITICAL: Add rate limiting
+    app.state.limiter = limiter
+    app.add_exception_handler(429, rate_limit_exceeded_handler)
+
+    # Setup CORS for React frontend
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+        allow_methods=settings.CORS_ALLOW_METHODS,
+        allow_headers=settings.CORS_ALLOW_HEADERS,
     )
 
     # Register Routers
     app.include_router(pipeline_routes.router, prefix="/v1", tags=["Pipelines"])
-    # app.include_router(status_routes.router, prefix="/v1", tags=["Status"])
-    # app.include_router(websocket_routes.router, tags=["Real-time"])
+
+    @app.on_event("startup")
+    async def startup():
+        """Initialize service with comprehensive logging."""
+        logger.info(f"Starting {settings.SERVICE_NAME} on port {settings.HTTP_PORT}")
+        logger.info(f"CORS origins: {settings.CORS_ORIGINS}")
+        logger.info(f"Rate limiting: {limiter._default_limits}")
+
+    @app.on_event("shutdown") 
+    async def shutdown():
+        """CRITICAL: Graceful shutdown with proper resource cleanup (Architect Feedback #4)."""
+        logger.info("Shutting down API Gateway Service...")
+        try:
+            await container.close()
+            logger.info("API Gateway Service shutdown complete")
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}", exc_info=True)
     ```
 
-**Integration Points**:
+**Configuration Updates**:
 
-- **Publishes To**: Kafka topic `huleedu.commands.batch.pipeline.v1`.
-- **Consumed By**: The `batch_orchestrator_service`'s `ClientPipelineRequestHandler`.
+**File**: `services/api_gateway_service/config.py`
+
+```python
+class Settings(BaseSettings):
+    # ... existing settings ...
+    
+    # CRITICAL: Security configuration
+    JWT_SECRET_KEY: str = Field(..., description="JWT signing secret - MUST be in secrets manager")
+    JWT_ALGORITHM: str = Field(default="HS256", description="JWT signing algorithm")
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, description="JWT token expiry")
+    
+    # CRITICAL: Timeout configuration (Architect Feedback #6)  
+    HTTP_CLIENT_TIMEOUT_SECONDS: int = Field(default=10, description="Total HTTP client timeout")
+    HTTP_CLIENT_CONNECT_TIMEOUT_SECONDS: int = Field(default=5, description="HTTP client connect timeout")
+    
+    # Rate limiting configuration (Architect Feedback #3)
+    RATE_LIMIT_REQUESTS: int = Field(default=100, description="Rate limit: requests per minute per client")
+    REDIS_HOST: str = Field(default="redis", description="Redis host for rate limiting")
+    REDIS_PORT: int = Field(default=6379, description="Redis port for rate limiting")
+```
 
 **Done When**:
 
-- ✅ A request to `POST /v1/batches/{batch_id}/pipelines` with a valid JWT and Pydantic body successfully publishes a `ClientBatchPipelineRequestV1` event to Kafka.
-- ✅ The endpoint returns a `202 Accepted` response with a valid `correlation_id`.
-- ✅ Requests without a valid JWT are rejected with a `401 Unauthorized`.
-- ✅ Requests with an invalid request body are rejected with a `422 Unprocessable Entity`.
-- ✅ The service closes the Kafka bus and HTTP session during shutdown via `ApiGatewayProvider.shutdown`.
+- ✅ JWT validation includes expiry checks and comprehensive error handling (Architect Feedback #2).
+- ✅ Rate limiting is implemented on write endpoints to prevent abuse (Architect Feedback #3).
+- ✅ HTTP clients have configured timeouts to prevent indefinite hangs (Architect Feedback #6).
+- ✅ Graceful shutdown hooks ensure proper resource cleanup during deployments (Architect Feedback #4).
+- ✅ Comprehensive logging includes `batch_id`, `user_id`, and `correlation_id` for full traceability (Architect Feedback #9).
+- ✅ A `POST` request to `/v1/batches/{batch_id}/pipelines` with valid JWT successfully publishes events with user context.
+- ✅ The endpoint returns `202 Accepted` with proper correlation tracking.
+- ✅ Requests without valid JWT or with expired tokens are rejected with appropriate HTTP status codes.
+- ✅ Rate limiting triggers `429 Too Many Requests` responses when limits are exceeded.
 
 This completes Part 2 of the implementation guide. The API Gateway is now capable of receiving and processing commands. Part 3 will focus on implementing the query and real-time WebSocket components.
