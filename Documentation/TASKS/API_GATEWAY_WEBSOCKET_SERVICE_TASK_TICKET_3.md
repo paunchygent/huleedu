@@ -40,11 +40,11 @@ This part completes the `api_gateway_service` by adding the read-path and real-t
         aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{batch_id}/status"
 
         try:
-            async with http_session.get(aggregator_url) as response:
+            async with http_session.get(aggregator_url, timeout=5) as response:
                 if response.status == 200:
                     data = await response.json()
-                    # TODO in future: Add an authorization check here to ensure `user_id`
-                    # is allowed to view this `batch_id`.
+                    if data.get("user_id") != user_id:
+                        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your batch")
                     return data
                 elif response.status == 404:
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
@@ -75,6 +75,7 @@ This part completes the `api_gateway_service` by adding the read-path and real-t
 - ✅ A `GET` request to `/v1/batches/{batch_id}/status` with a valid JWT correctly queries the `result_aggregator_service` and returns the batch status, including the `last_updated` timestamp.
 - ✅ The endpoint returns a `404 Not Found` if the aggregator does not find the batch.
 - ✅ The endpoint is secured by the `get_current_user_id` dependency.
+- ✅ Authorization is enforced by comparing the aggregator's `user_id` to the authenticated user; mismatches return `403 Forbidden`.
 
 ### Checkpoint 3.2: Implement WebSocket Endpoint and Redis Backplane
 
@@ -144,7 +145,7 @@ This part completes the `api_gateway_service` by adding the read-path and real-t
             while True:
                 try:
                     await asyncio.sleep(15)
-                    await ws.send_json({"type": "ping"})
+                    await ws.send_json({"event": "ping"})
                 except (WebSocketDisconnect, asyncio.CancelledError):
                     break
 
@@ -195,6 +196,7 @@ This part completes the `api_gateway_service` by adding the read-path and real-t
 - ✅ A client can establish an authenticated WebSocket connection via `/ws?token=<jwt>`.
 - ✅ The gateway correctly subscribes to the user-specific Redis channel (e.g., `ws:user_123`).
 - ✅ The connection is kept alive via a server-side heartbeat and gracefully closed on disconnect.
+- ✅ Heartbeat messages use `{ "event": "ping" }` so all WebSocket payloads share the same `event` field.
 
 ### Checkpoint 3.3: Modify Backend Services to Publish Updates
 
@@ -292,14 +294,14 @@ This part completes the `api_gateway_service` by adding the read-path and real-t
     d. Triggers backend processing by publishing a `BatchEssaysReady` event to Kafka (simulating the ELS).
     e. Listens on the WebSocket and asserts that the expected `batch_phase_concluded` message is received from BOS.
 
-2. **Automate Frontend Contract Generation**: Add a script to the root `pyproject.toml` to generate TypeScript types from the gateway's OpenAPI schema.
+2. **Automate Frontend Contract Generation**: Add a script to the root `pyproject.toml` to generate TypeScript types from the gateway's OpenAPI schema. Use `app.openapi()` directly so the gateway does not need to be running.
 
     **File**: `pyproject.toml`
 
     ```toml
     [tool.pdm.scripts]
     # ... existing scripts ...
-    generate-frontend-types = "pdm run -p services/api_gateway_service openapi-typescript http://localhost:4001/openapi.json -o ../frontend/src/api-client/schema.ts"
+    generate-frontend-types = "python services/api_gateway_service/scripts/dump_openapi.py > openapi.json && openapi-typescript openapi.json -o frontend/src/api-client/schema.ts"
     ```
 
     This script will be added as a mandatory CI check.
@@ -307,4 +309,4 @@ This part completes the `api_gateway_service` by adding the read-path and real-t
 **Done When**:
 
 - ✅ The new E2E test passes, proving the entire loop from HTTP command to WebSocket update is functional.
-- ✅ The `pdm run generate-frontend-types` command successfully generates a `schema.ts` file.
+- ✅ The `pdm run generate-frontend-types` command successfully generates a `schema.ts` file without starting the gateway service.

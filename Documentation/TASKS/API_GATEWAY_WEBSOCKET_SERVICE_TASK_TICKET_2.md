@@ -185,6 +185,10 @@ This part covers the creation of the new FastAPI-based `api_gateway_service`, wh
         @provide(scope=Scope.APP)
         async def provide_http_session(self) -> ClientSession:
             return ClientSession()
+
+        async def shutdown(self, kafka_bus: KafkaBus, http_session: ClientSession) -> None:
+            await kafka_bus.stop()
+            await http_session.close()
     ```
 
 3. **Implement the Command Endpoint Router**:
@@ -278,5 +282,6 @@ This part covers the creation of the new FastAPI-based `api_gateway_service`, wh
 - ✅ The endpoint returns a `202 Accepted` response with a valid `correlation_id`.
 - ✅ Requests without a valid JWT are rejected with a `401 Unauthorized`.
 - ✅ Requests with an invalid request body are rejected with a `422 Unprocessable Entity`.
+- ✅ The service closes the Kafka bus and HTTP session during shutdown via `ApiGatewayProvider.shutdown`.
 
 This completes Part 2 of the implementation guide. The API Gateway is now capable of receiving and processing commands. Part 3 will focus on implementing the query and real-time WebSocket components.
