@@ -29,16 +29,5 @@ class PhaseStatusEnum(str, enum.Enum):
         return self.value
 
 
-class PipelinePhaseEnum(str, enum.Enum):
-    """Enum representing the different pipeline phases that can be executed.
-
-    Only includes phases that have actual service implementations or are clearly planned.
-    """
-
-    SPELLCHECK = "spellcheck"
-    NLP = "nlp"
-    AI_FEEDBACK = "ai_feedback"
-    CJ_ASSESSMENT = "cj_assessment"
-
-    def __str__(self) -> str:
-        return self.value
+# PipelinePhaseEnum removed - now using PhaseName from common_core.pipeline_models
+# This eliminates duplication and ensures contract consistency with dynamic orchestration

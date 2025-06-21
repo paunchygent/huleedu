@@ -18,9 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from common_core.enums import BatchStatus
+from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.enums_db import (
     PhaseStatusEnum,
-    PipelinePhaseEnum,
 )
 
 
@@ -108,9 +108,9 @@ class PhaseStatusLog(Base):
     )
 
     # Phase identification
-    phase: Mapped[PipelinePhaseEnum] = mapped_column(
+    phase: Mapped[PhaseName] = mapped_column(
         SQLAlchemyEnum(
-            PipelinePhaseEnum,
+            PhaseName,
             name="pipeline_phase_enum",
             values_callable=lambda obj: [e.value for e in obj],
         ),
