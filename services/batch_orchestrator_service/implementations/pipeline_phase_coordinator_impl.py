@@ -331,6 +331,106 @@ class DefaultPipelinePhaseCoordinator:
             )
             raise
 
+    async def initiate_resolved_pipeline(
+        self,
+        batch_id: str,
+        resolved_pipeline: list[str],
+        correlation_id: str,
+        batch_context: Any,
+    ) -> None:
+        """Initiate execution of the first phase in a BCS-resolved pipeline."""
+        logger.info(
+            f"Initiating resolved pipeline for batch {batch_id}",
+            extra={
+                "resolved_pipeline": resolved_pipeline,
+                "correlation_id": correlation_id,
+            },
+        )
+
+        # Validate resolved pipeline
+        if not resolved_pipeline:
+            raise DataValidationError(f"Empty resolved pipeline for batch {batch_id}")
+
+        # Get first phase from resolved pipeline
+        first_phase_str = resolved_pipeline[0]
+        try:
+            first_phase_name = PhaseName(first_phase_str)
+        except ValueError as e:
+            raise DataValidationError(
+                f"Invalid first phase '{first_phase_str}' in resolved pipeline for batch {batch_id}: {e}"
+            )
+
+        # Check idempotency - don't re-initiate if already started
+        current_pipeline_state = await self.batch_repo.get_processing_pipeline_state(batch_id)
+        if current_pipeline_state:
+            if hasattr(current_pipeline_state, "get_pipeline"):  # Pydantic object
+                pipeline_detail = current_pipeline_state.get_pipeline(first_phase_name.value)
+                if pipeline_detail and pipeline_detail.status in [
+                    PipelineExecutionStatus.DISPATCH_INITIATED,
+                    PipelineExecutionStatus.IN_PROGRESS,
+                    PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
+                ]:
+                    logger.info(
+                        f"First phase {first_phase_name.value} already initiated for batch {batch_id}, skipping",
+                        extra={"current_status": pipeline_detail.status.value},
+                    )
+                    return
+            else:  # Dictionary - backwards compatibility
+                phase_status_key = f"{first_phase_name.value}_status"
+                phase_status = current_pipeline_state.get(phase_status_key)
+                if phase_status in [
+                    "DISPATCH_INITIATED",
+                    "IN_PROGRESS",
+                    "COMPLETED_SUCCESSFULLY",
+                ]:
+                    logger.info(
+                        f"First phase {first_phase_name.value} already initiated for batch {batch_id}, skipping",
+                        extra={"current_status": phase_status},
+                    )
+                    return
+
+        # Get phase initiator
+        initiator = self.phase_initiators_map.get(first_phase_name)
+        if not initiator:
+            raise DataValidationError(f"No initiator found for first phase {first_phase_name}")
+
+        # Get essays that were stored from the original BatchEssaysReady event
+        essays_for_processing = await self.batch_repo.get_batch_essays(batch_id)
+
+        if not essays_for_processing:
+            raise DataValidationError(
+                f"No essays found for batch {batch_id}. Batch may not be ready for processing."
+            )
+
+        logger.info(f"Retrieved {len(essays_for_processing)} essays for pipeline initiation")
+
+        # Initiate first phase
+        try:
+            correlation_uuid = UUID(correlation_id) if correlation_id else None
+            await initiator.initiate_phase(
+                batch_id=batch_id,
+                phase_to_initiate=first_phase_name,
+                correlation_id=correlation_uuid,
+                essays_for_processing=essays_for_processing,
+                batch_context=batch_context,
+            )
+        except InitiationError as e:
+            logger.error(f"Failed to initiate first phase {first_phase_name} for batch {batch_id}: {e}")
+            raise
+
+        # Update pipeline state - mark first phase as DISPATCH_INITIATED
+        await self.update_phase_status(
+            batch_id=batch_id,
+            phase=first_phase_name.value,
+            status="DISPATCH_INITIATED",
+            completion_timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+        logger.info(
+            f"Successfully initiated first phase {first_phase_name.value} for batch {batch_id}",
+            extra={"correlation_id": correlation_id},
+        )
+
     def _get_phase_status(self, pipeline_state: dict, phase: str) -> str | None:
         """Extract phase status from pipeline state, handling both dict and object formats."""
         if hasattr(pipeline_state, phase):  # Pydantic object

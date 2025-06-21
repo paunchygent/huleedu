@@ -133,7 +133,7 @@ The coordination follows this refined flow:
 2. **Content Ingestion & Essay Readiness Reporting (Client → API Gateway → File Service → ELS)**: Client uploads files to API Gateway, which proxies to File Service. File Service processes files and emits `EssayContentReady` to ELS.
 3. **Aggregation Phase (ELS)**: ELS consumes `EssayContentReady` events and tracks readiness.
 4. **Batch Ready Notification (ELS → BOS)**: ELS publishes `BatchEssaysReady`.
-5. **Pipeline Orchestration (BOS)**: BOS consumes `BatchEssaysReady` and initiates processing pipelines.
+5. **Pipeline Orchestration (BOS)**: BOS consumes `BatchEssaysReady`, stores essay metadata and storage references in persistent database, and awaits client requests to initiate processing pipelines.
 
 ```mermaid
 sequenceDiagram

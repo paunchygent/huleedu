@@ -1,5 +1,5 @@
 ---
-description: 
+description: Describes the service providing pipeline definitions to BOS
 globs: 
 alwaysApply: false
 ---

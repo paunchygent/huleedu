@@ -6,6 +6,7 @@ import asyncio
 from typing import Dict
 
 from api_models import BatchRegistrationRequestV1
+from huleedu_service_libs.logging_utils import create_service_logger
 from protocols import BatchRepositoryProtocol
 
 
@@ -21,6 +22,8 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         self.batch_contexts: dict[str, BatchRegistrationRequestV1] = {}
         # Storage for pipeline states
         self.pipeline_states: dict[str, dict] = {}
+        # Storage for essay data from BatchEssaysReady events
+        self.batch_essays: dict[str, list] = {}
         # Simulate database-level locks for atomic operations
         self._locks: Dict[str, asyncio.Lock] = {}
 
@@ -95,3 +98,25 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
             else:
                 # Status already changed by another process - operation failed
                 return False
+
+    async def store_batch_essays(self, batch_id: str, essays: list) -> bool:
+        """Store essay data from BatchEssaysReady event for later pipeline processing."""
+        logger = create_service_logger("bos.repository.batch_essays")
+
+        async with self._get_lock(batch_id):
+            self.batch_essays[batch_id] = essays
+            logger.info(f"Stored {len(essays)} essays for batch {batch_id}")
+            logger.debug(f"Essays stored: {[essay.get('essay_id', 'unknown') for essay in essays]}")
+            return True
+
+    async def get_batch_essays(self, batch_id: str) -> list | None:
+        """Retrieve stored essay data for pipeline processing."""
+        logger = create_service_logger("bos.repository.batch_essays")
+
+        essays = self.batch_essays.get(batch_id)
+        if essays:
+            logger.info(f"Retrieved {len(essays)} essays for batch {batch_id}")
+            logger.debug(f"Essays retrieved: {[essay.get('essay_id', 'unknown') for essay in essays]}")
+        else:
+            logger.warning(f"No essays found for batch {batch_id}. Available batches: {list(self.batch_essays.keys())}")
+        return essays

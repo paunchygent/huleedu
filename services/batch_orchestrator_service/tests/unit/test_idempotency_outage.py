@@ -8,7 +8,7 @@ Follows boundary mocking pattern - mocks Redis client but uses real handlers.
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Tuple
+from typing import Dict, Tuple
 from unittest.mock import AsyncMock
 
 import pytest
@@ -115,20 +115,11 @@ def mock_handlers() -> Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandle
     mock_event_publisher = AsyncMock()
     mock_batch_repo = AsyncMock()
     mock_phase_coordinator = AsyncMock()
-    mock_spellcheck_initiator = AsyncMock()
-    from protocols import PhaseName
-    mock_phase_initiators_map: Dict[PhaseName, Any] = {
-        PhaseName.SPELLCHECK: mock_spellcheck_initiator
-    }
-    mock_batch_repo.get_processing_pipeline_state.return_value = {
-        "requested_pipelines": ["spellcheck"],
-        "spellcheck_status": "PENDING_DEPENDENCIES",
-    }
-    mock_batch_repo.get_batch_context.return_value = {"some": "context"}
+    # Mock setup for repository essay storage operations
+    mock_batch_repo.store_batch_essays.return_value = True
     batch_essays_ready_handler = BatchEssaysReadyHandler(
         event_publisher=mock_event_publisher,
         batch_repo=mock_batch_repo,
-        phase_initiators_map=mock_phase_initiators_map,
     )
     els_phase_outcome_handler = ELSBatchPhaseOutcomeHandler(
         phase_coordinator=mock_phase_coordinator
@@ -160,7 +151,7 @@ class TestBOSIdempotencyOutage:
         from huleedu_service_libs.idempotency import idempotent_consumer
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
-        batch_essays_ready_handler.batch_repo.get_processing_pipeline_state.side_effect = Exception(
+        batch_essays_ready_handler.batch_repo.store_batch_essays.side_effect = Exception(
             "Business logic failure"
         )
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
@@ -235,4 +226,5 @@ class TestBOSIdempotencyOutage:
         result = await handle_message_idempotently(kafka_msg)
         assert result is True
         assert len(redis_client.set_calls) == 1
-        batch_essays_ready_handler.batch_repo.get_processing_pipeline_state.assert_called_once()
+        # With new architecture, handler only stores essays
+        batch_essays_ready_handler.batch_repo.store_batch_essays.assert_called_once()

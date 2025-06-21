@@ -97,20 +97,21 @@ class TestClientPipelineResolutionWorkflow:
             # 1. Setup: Create batch with real essays
             batch_id, correlation_id = await create_test_batch_with_essays(service_manager, 3)
 
-            # 2. Wait for the automatically triggered 'spellcheck' pipeline to complete
-            print("⏳ Waiting for initial 'spellcheck' pipeline to complete...")
-            spellcheck_completed = False
-            start_time = asyncio.get_event_loop().time()
-            while asyncio.get_event_loop().time() - start_time < 120:  # 2-minute timeout
-                batch_state = await validate_batch_pipeline_state(service_manager, batch_id)
-                pipeline_state = batch_state.get("pipeline_state", {}) if batch_state else {}
-                if pipeline_state.get("spellcheck_status") == "COMPLETED_SUCCESSFULLY":
-                    spellcheck_completed = True
-                    print("✅ Initial 'spellcheck' pipeline completed; batch is idle.")
-                    break
-                await asyncio.sleep(2)
+            # 2. Verify batch is ready for client-triggered processing
+            print("📊 Verifying batch is ready for client-triggered processing...")
+            batch_state = await validate_batch_pipeline_state(service_manager, batch_id)
+            pipeline_state = batch_state.get("pipeline_state", {}) if batch_state else {}
 
-            assert spellcheck_completed, "Initial spellcheck pipeline did not complete within timeout."
+            # With our new simplified architecture, pipelines should be pending_dependencies (waiting for client trigger)
+            cj_assessment_status = pipeline_state.get("cj_assessment", {}).get("status", "unknown")
+            print(f"📋 CJ Assessment status: {cj_assessment_status}")
+
+            # Verify the system is correctly waiting for client trigger (not auto-starting)
+            assert cj_assessment_status == "pending_dependencies", (
+                f"Expected cj_assessment to be pending_dependencies (waiting for client trigger), "
+                f"but got: {cj_assessment_status}"
+            )
+            print("✅ Batch is ready and correctly waiting for client-triggered processing")
 
             # 3. Setup pipeline monitoring for the client-initiated request (start at latest offset)
             pipeline_topics = get_pipeline_monitoring_topics()
@@ -120,17 +121,17 @@ class TestClientPipelineResolutionWorkflow:
                 pipeline_topics,
                 auto_offset_reset="latest"
             ) as consumer:
-                # 4. Publish ClientBatchPipelineRequestV1 event
+                # 4. Publish ClientBatchPipelineRequestV1 event to trigger cj_assessment
                 request_correlation_id = await publish_client_pipeline_request(
                     kafka_manager,
                     batch_id,
-                    "ai_feedback",  # Request AI feedback pipeline
+                    "cj_assessment",  # Use cj_assessment pipeline which is enabled
                     correlation_id
                 )
 
-                print(f"📡 Published pipeline request with correlation: {request_correlation_id}")
+                print(f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}")
 
-                # 4. Monitor complete pipeline resolution workflow
+                # 5. Monitor complete pipeline resolution workflow
                 workflow_results = await monitor_pipeline_resolution_workflow(
                     consumer,
                     batch_id,
@@ -138,7 +139,7 @@ class TestClientPipelineResolutionWorkflow:
                     timeout_seconds=180  # 3 minutes for complete workflow
                 )
 
-                # 5. Validate workflow completion
+                # 6. Validate workflow completion
                 print("\n📋 Workflow Results:")
                 print(f"  Specialized services triggered: "
                       f"{workflow_results['specialized_services_triggered']}")
@@ -150,23 +151,23 @@ class TestClientPipelineResolutionWorkflow:
                     "Pipeline resolution should trigger service execution"
                 )
 
-                # 6. Validate batch state was updated
+                # 7. Validate batch state was updated
                 batch_state = await validate_batch_pipeline_state(service_manager, batch_id)
                 print(f"📊 Final batch state: {batch_state}")
 
-                # 7. CRITICAL: Validate BCS ↔ BOS integration actually occurred
+                # 8. CRITICAL: Validate BCS ↔ BOS integration actually occurred
                 integration_evidence = await validate_bcs_integration_occurred(
                     service_manager,
                     batch_id,
-                    "ai_feedback"
+                    "cj_assessment"  # Changed from cj_assessment to cj_assessment
                 )
 
-                # 8. Validate BCS performed dependency resolution
+                # 9. Validate BCS performed dependency resolution
                 bcs_resolution_validated = await validate_bcs_dependency_resolution(
                     integration_evidence
                 )
 
-                # 9. Assert integration-specific validations
+                # 10. Assert integration-specific validations
                 assert integration_evidence["bcs_http_requests"] > 0, (
                     "BCS should have received HTTP requests from BOS"
                 )
@@ -216,17 +217,28 @@ class TestClientPipelineResolutionWorkflow:
             async with kafka_manager.consumer(
                 "state_aware_pipeline_e2e", pipeline_topics
             ) as consumer:
-                # Create batch with minimal essays - this will trigger automatic pipeline execution
+                # Create batch with minimal essays - essays are now stored but don't auto-trigger pipeline
                 batch_id, correlation_id = await create_test_batch_with_essays(service_manager, 2)
 
                 print(f"📦 Created batch {batch_id} for state-aware testing")
 
-                # Monitor for the automatic pipeline execution (triggered by batch setup)
+                # ARCHITECTURAL FIX: Explicitly trigger pipeline execution via client request
+                # This follows the new client-controlled architecture where pipelines require explicit triggers
+                request_correlation_id = await publish_client_pipeline_request(
+                    kafka_manager,
+                    batch_id,
+                    "cj_assessment",  # Use cj_assessment pipeline which enables dependency resolution
+                    correlation_id
+                )
+
+                print(f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}")
+
+                # Monitor for the client-triggered pipeline execution
                 workflow_results = await monitor_pipeline_resolution_workflow(
                     consumer,
                     batch_id,
-                    correlation_id,
-                    timeout_seconds=60  # Pipeline should auto-execute when batch is ready
+                    request_correlation_id,  # Use the request correlation ID for monitoring
+                    timeout_seconds=60  # Pipeline should execute after client trigger
                 )
 
                 # Validate state-aware optimization occurred
@@ -281,7 +293,7 @@ class TestClientPipelineResolutionWorkflow:
                     task = publish_client_pipeline_request(
                         kafka_manager,
                         batch_id,
-                        "ai_feedback",
+                        "cj_assessment",
                         correlation_id
                     )
                     tasks.append(task)

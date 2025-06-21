@@ -160,7 +160,7 @@ The entire HuleEdu system, including Kafka and all microservices, can be run loc
 * **BOS ↔ BCS HTTP Integration** ✅: Complete HTTP client integration with pipeline resolution workflows validated through E2E tests
 * **Dynamic Pipeline Resolution** ✅: Intelligent dependency analysis, batch state-aware optimization, and prerequisite validation
 
-BOS uses a `phase_initiators_map` and `requested_pipelines` to dynamically sequence phases, while ELS manages individual essay states via a formal state machine and reports phase outcomes to BOS. Current status includes:
+BOS coordinates with the Batch Conductor Service (BCS) for intelligent pipeline dependency resolution when clients request pipeline execution, while ELS manages individual essay states via a formal state machine and reports phase outcomes to BOS. Current status includes:
 
 * **Core Services Implemented** ✅:
   * **Content Service**: HTTP API with filesystem storage backend
@@ -171,9 +171,10 @@ BOS uses a `phase_initiators_map` and `requested_pipelines` to dynamically seque
   * **Batch Conductor Service (BCS)**: ✅ **NEW** - Internal pipeline dependency resolution with event-driven batch state projection, atomic Redis operations, and intelligent dependency analysis
 * **Essay ID Coordination Architecture** ✅:
   * **Slot Assignment Pattern**: BOS generates internal essay ID slots, ELS assigns content to slots
-  * **Content Provisioning Flow**: File Service → ELS slot assignment → BOS command generation → ELS service dispatch
-  * **Command Processing**: Complete BOS→ELS→SpellChecker command flow with actual essay IDs, text_storage_ids, and language support
+  * **Content Provisioning Flow**: File Service → ELS slot assignment → BOS essay storage → Client pipeline request → BOS command generation → ELS service dispatch
+  * **Command Processing**: Complete client-triggered BOS→ELS→SpellChecker command flow with actual essay IDs, text_storage_ids, and language support
   * **Event-Driven Coordination**: `EssayContentProvisionedV1`, `BatchEssaysReady`, `BatchSpellcheckInitiateCommand` events
+  * **Persistent Storage**: Essay metadata and storage references stored in PostgreSQL database for data persistence across service restarts
 * **Foundational Architecture** ✅:
   * **Clean Architecture**: Protocol-based DI across all services with Dishka
   * **Event-Driven Communication**: Standardized EventEnvelope with Kafka integration

@@ -88,6 +88,11 @@ class Batch(Base):
         cascade="all, delete-orphan",
         order_by="ConfigurationSnapshot.created_at",
     )
+    essays: Mapped[list["BatchEssay"]] = relationship(
+        back_populates="batch",
+        cascade="all, delete-orphan",
+        order_by="BatchEssay.created_at",
+    )
 
 
 class PhaseStatusLog(Base):
@@ -192,3 +197,37 @@ class ConfigurationSnapshot(Base):
 
     # Relationships
     batch: Mapped["Batch"] = relationship(back_populates="configuration_snapshots")
+
+
+class BatchEssay(Base):
+    """Model for storing essay data from BatchEssaysReady events for pipeline processing."""
+
+    __tablename__ = "batch_essays"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    batch_id: Mapped[str] = mapped_column(
+        ForeignKey("batches.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Essay identification
+    essay_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+
+    # Essay content reference
+    content_reference: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+    # Student metadata
+    student_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # Processing metadata
+    processing_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("NOW()"), onupdate=text("NOW()")
+    )
+
+    # Relationships
+    batch: Mapped["Batch"] = relationship(back_populates="essays")

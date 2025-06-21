@@ -86,7 +86,7 @@ services/batch_orchestrator_service/
 ### 4.2. Event Consumption
 
 - **Topic**: `huleedu.els.batch.essays.ready.v1`
-  - **Handler**: `BatchEssaysReadyHandler` initiates the first phase of the defined pipeline.
+  - **Handler**: `BatchEssaysReadyHandler` stores essay metadata and storage references in persistent database, awaiting client pipeline trigger.
 - **Topic**: `huleedu.els.batch_phase.outcome.v1`
   - **Handler**: `ELSBatchPhaseOutcomeHandler` processes phase completion and triggers the next phase in the pipeline.
 

@@ -8,7 +8,7 @@ Follows boundary mocking pattern - mocks Redis client but uses real handlers.
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Tuple
+from typing import Dict, Tuple
 from unittest.mock import AsyncMock
 
 import pytest
@@ -136,20 +136,11 @@ def mock_handlers() -> Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandle
     mock_event_publisher = AsyncMock()
     mock_batch_repo = AsyncMock()
     mock_phase_coordinator = AsyncMock()
-    mock_spellcheck_initiator = AsyncMock()
-    from protocols import PhaseName
-    mock_phase_initiators_map: Dict[PhaseName, Any] = {
-        PhaseName.SPELLCHECK: mock_spellcheck_initiator
-    }
-    mock_batch_repo.get_processing_pipeline_state.return_value = {
-        "requested_pipelines": ["spellcheck"],
-        "spellcheck_status": "PENDING_DEPENDENCIES",
-    }
-    mock_batch_repo.get_batch_context.return_value = {"some": "context"}
+    # Mock setup for repository essay storage operations
+    mock_batch_repo.store_batch_essays.return_value = True
     batch_essays_ready_handler = BatchEssaysReadyHandler(
         event_publisher=mock_event_publisher,
         batch_repo=mock_batch_repo,
-        phase_initiators_map=mock_phase_initiators_map,
     )
     els_phase_outcome_handler = ELSBatchPhaseOutcomeHandler(
         phase_coordinator=mock_phase_coordinator
@@ -204,7 +195,8 @@ class TestBOSIdempotencyBasic:
         assert set_call[0].startswith("huleedu:events:seen:")
         assert set_call[1] == "1"
         assert set_call[2] == 86400
-        batch_essays_ready_handler.batch_repo.get_processing_pipeline_state.assert_called_once()
+        # With new architecture, BatchEssaysReadyHandler only stores essays - no pipeline state calls
+        batch_essays_ready_handler.batch_repo.store_batch_essays.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_duplicate_batch_essays_ready_detection_and_skipping(
@@ -240,7 +232,8 @@ class TestBOSIdempotencyBasic:
         assert result is None
         assert len(redis_client.set_calls) == 1
         assert len(redis_client.delete_calls) == 0
-        batch_essays_ready_handler.batch_repo.get_processing_pipeline_state.assert_not_called()
+        # With duplicate detection, handler should not be called at all
+        batch_essays_ready_handler.batch_repo.store_batch_essays.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_first_time_els_phase_outcome_processing_success(

@@ -22,8 +22,10 @@ BOS implements the **Count-Based Aggregation Pattern** as the central orchestrat
 1. **Batch Creation**: BOS creates batch with internal essay ID slots and registers with ELS (`BatchEssaysRegistered`)
 2. **Content Coordination**: File Service provisions content to ELS for slot assignment
 3. **Readiness Notification**: ELS notifies BOS when all slots are filled (`BatchEssaysReady`)
-4. **Command Processing**: BOS generates commands with actual essay IDs and dispatches to ELS (`BatchSpellcheckInitiateCommand`)
-5. **Progress Monitoring**: BOS tracks progress across all processing phases and provides status to clients
+4. **Essay Storage**: BOS stores ready essays in persistent PostgreSQL database, awaiting client pipeline requests
+5. **Client-Triggered Processing**: Client explicitly requests pipeline execution via HTTP API
+6. **Command Processing**: BOS generates commands with actual essay IDs and dispatches to ELS (`BatchSpellcheckInitiateCommand`)
+7. **Progress Monitoring**: BOS tracks progress across all processing phases and provides status to clients
 
 ### Service Boundary Responsibilities
 
@@ -104,7 +106,7 @@ Consumed from Kafka for batch coordination:
 
 * **`huleedu.els.batch.essays.ready.v1`**:
   * **Data**: `BatchEssaysReady` with ready essays including actual essay IDs and text_storage_ids.
-  * **Handler**: `BatchEssaysReadyHandler` initiates the first phase of the processing pipeline.
+  * **Handler**: `BatchEssaysReadyHandler` stores essay metadata and storage references in persistent database and logs readiness, awaiting client pipeline trigger.
 * **`huleedu.els.batch_phase.outcome.v1`**:
   * **Data**: `ELSBatchPhaseOutcomeV1` detailing the results of a completed phase from ELS.
   * **Handler**: `ELSBatchPhaseOutcomeHandler` processes the outcome and triggers the next pipeline phase. This is critical for dynamic orchestration.
@@ -119,7 +121,7 @@ Consumed from Kafka for batch coordination:
 
 ### Repository Pattern
 
-* **Production**: `PostgreSQLBatchRepositoryImpl` provides the production-ready persistence layer using `asyncpg` and SQLAlchemy. It is composed of smaller, single-responsibility modules for CRUD, context, and pipeline state management.
+* **Production**: `PostgreSQLBatchRepositoryImpl` provides the production-ready persistence layer using `asyncpg` and SQLAlchemy. It is composed of smaller, single-responsibility modules for CRUD, context, and pipeline state management. Essay metadata and storage references are persistently stored in PostgreSQL database, surviving container restarts and service scaling. The actual essay content remains in Content Service.
 * **Testing**: `MockBatchRepositoryImpl` provides an in-memory storage implementation for testing purposes.
 * **Atomicity**: The production repository MUST ensure atomic updates of pipeline state to prevent race conditions. This is handled within the `PostgreSQLBatchRepositoryImpl`.
 

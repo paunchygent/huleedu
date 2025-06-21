@@ -157,7 +157,7 @@ sequenceDiagram
 | **File Service** | File upload, text extraction, content provisioning | Emit: `EssayContentProvisionedV1` |
 | **Content Service** | Raw content storage and retrieval | HTTP API only |
 | **ELS** | Slot assignment, command processing, service dispatch | Consume: `EssayContentProvisionedV1`, `BatchSpellcheckInitiateCommand`; Emit: `BatchEssaysReady`, `EssayLifecycleSpellcheckRequestV1` |
-| **BOS** | Slot generation, command processing, pipeline orchestration | Consume: `BatchEssaysReady`; Emit: `BatchEssaysRegistered`, `BatchSpellcheckInitiateCommand` |
+| **BOS** | Slot generation, essay metadata storage, client-triggered pipeline orchestration | Consume: `BatchEssaysReady`; Emit: `BatchEssaysRegistered`, client-triggered `BatchSpellcheckInitiateCommand` |
 | **Spell Checker** | Spell checking processing | Consume: `EssayLifecycleSpellcheckRequestV1` |
 
 ---

@@ -144,17 +144,37 @@ class ClientPipelineRequestHandler:
                 batch_id, resolved_pipeline, batch_context
             )
 
-            # TODO: Initiate first phase of resolved pipeline
-            # This will be implemented in the next step with pipeline resolution coordinator
-            logger.info(
-                f"Pipeline resolution completed for batch {batch_id}",
-                extra={
-                    "batch_id": batch_id,
-                    "requested_pipeline": requested_pipeline,
-                    "resolved_pipeline": resolved_pipeline,
-                    "correlation_id": correlation_id,
-                },
-            )
+            # Initiate first phase of resolved pipeline
+            try:
+                await self.phase_coordinator.initiate_resolved_pipeline(
+                    batch_id=batch_id,
+                    resolved_pipeline=resolved_pipeline,
+                    correlation_id=correlation_id,
+                    batch_context=batch_context,
+                )
+
+                logger.info(
+                    f"Pipeline initiation completed for batch {batch_id}",
+                    extra={
+                        "batch_id": batch_id,
+                        "requested_pipeline": requested_pipeline,
+                        "resolved_pipeline": resolved_pipeline,
+                        "first_phase_initiated": resolved_pipeline[0] if resolved_pipeline else None,
+                        "correlation_id": correlation_id,
+                    },
+                )
+            except Exception as e:
+                error_msg = f"Failed to initiate resolved pipeline for batch {batch_id}: {e}"
+                logger.error(
+                    error_msg,
+                    extra={
+                        "batch_id": batch_id,
+                        "resolved_pipeline": resolved_pipeline,
+                        "correlation_id": correlation_id,
+                    },
+                    exc_info=True,
+                )
+                raise Exception(error_msg) from e
 
         except Exception as e:
             logger.error(

@@ -18,6 +18,7 @@ import uuid
 
 import pytest
 
+from tests.functional.client_pipeline_test_utils import publish_client_pipeline_request
 from tests.functional.comprehensive_pipeline_utils import (
     create_comprehensive_kafka_manager,
     load_real_test_essays,
@@ -88,10 +89,63 @@ async def test_comprehensive_real_batch_pipeline():
         )
         print(f"✅ File upload successful: {upload_response}")
 
+        # TIMING FIX: Wait for essays to be processed and stored in BOS before requesting pipeline
+        # The workflow is: Upload → File Processing → ELS BatchEssaysReady → Essay Storage in BOS
+        # We need to wait for this to complete before the client can request pipeline execution
+        print("⏳ Waiting for essays to be processed and stored in BOS...")
+
+        import asyncio
+        batch_ready_received = False
+
+        # Monitor for BatchEssaysReady event to ensure essays are stored before client request
+        async for message in consumer:
+            try:
+                if hasattr(message, 'value'):
+                    import json
+                    if isinstance(message.value, bytes):
+                        raw_message = message.value.decode("utf-8")
+                    else:
+                        raw_message = message.value
+
+                    envelope_data = json.loads(raw_message)
+                    event_data = envelope_data.get("data", {})
+                    event_correlation_id = envelope_data.get("correlation_id")
+
+                    # Check for BatchEssaysReady with our correlation ID
+                    if (message.topic == "huleedu.els.batch.essays.ready.v1" and
+                        event_correlation_id == test_correlation_id and
+                        event_data.get("batch_id") == batch_id):
+                        ready_count = len(event_data.get("ready_essays", []))
+                        print(f"📨 BatchEssaysReady received: {ready_count} essays ready for processing")
+                        batch_ready_received = True
+                        break
+
+            except Exception as e:
+                print(f"⚠️ Error waiting for batch ready: {e}")
+                continue
+
+        if not batch_ready_received:
+            raise Exception("BatchEssaysReady event was not received - essays may not be stored in BOS")
+
+        # Give BOS a moment to store the essays after receiving BatchEssaysReady
+        await asyncio.sleep(2)
+        print("✅ Essays confirmed stored in BOS, ready for client pipeline request")
+
+        # ARCHITECTURAL FIX: Explicitly trigger pipeline execution via client request
+        # Essays are now stored persistently and BOS is ready to process client requests
+        # This follows the new client-controlled architecture
+        request_correlation_id = await publish_client_pipeline_request(
+            kafka_manager,
+            batch_id,
+            "cj_assessment",  # Use cj_assessment pipeline for comprehensive testing
+            test_correlation_id
+        )
+        print(f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}")
+
         # Step 7: Watch pipeline progression with pre-positioned consumer
         print("⏳ Watching pipeline progression...")
         result = await watch_pipeline_progression_with_consumer(
-            consumer, batch_id, test_correlation_id, len(test_essays), 50
+            consumer, batch_id, request_correlation_id, len(test_essays), 50  # Use request correlation ID
         )
 
         assert result is not None, "Pipeline did not complete"

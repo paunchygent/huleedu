@@ -10,7 +10,11 @@ from implementations.batch_context_operations import BatchContextOperations
 from implementations.batch_crud_operations import BatchCrudOperations
 from implementations.batch_database_infrastructure import BatchDatabaseInfrastructure
 from implementations.batch_pipeline_state_manager import BatchPipelineStateManager
+from models_db import BatchEssay
 from protocols import BatchRepositoryProtocol
+from sqlalchemy import delete, select
+
+from common_core.metadata_models import EssayProcessingInputRefV1
 
 
 class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
@@ -111,3 +115,73 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
         """Get phase status history for a batch."""
         result: list[dict] = await self.config_manager.get_phase_status_history(batch_id)
         return result
+
+    # Essay storage operations - proper PostgreSQL implementation
+    async def store_batch_essays(self, batch_id: str, essays: list) -> bool:
+        """Store essay data from BatchEssaysReady event in PostgreSQL."""
+        logger = create_service_logger("bos.repository.batch_essays")
+
+        try:
+            async with self.db_infrastructure.session() as session:
+                # First, remove any existing essays for this batch (idempotency)
+                await session.execute(
+                    delete(BatchEssay).where(BatchEssay.batch_id == batch_id)
+                )
+
+                # Insert new essays - essays are EssayProcessingInputRefV1 objects
+                for essay_obj in essays:
+                    # Create content reference from the essay object
+                    content_reference = {
+                        "text_storage_id": essay_obj.text_storage_id,
+                        "type": "text_content"
+                    }
+
+                    essay_record = BatchEssay(
+                        batch_id=batch_id,
+                        essay_id=essay_obj.essay_id,
+                        content_reference=content_reference,
+                        student_metadata={},  # Not available in EssayProcessingInputRefV1
+                        processing_metadata={}  # Not available in EssayProcessingInputRefV1
+                    )
+                    session.add(essay_record)
+
+                await session.commit()
+                logger.info(f"Stored {len(essays)} essays for batch {batch_id} in PostgreSQL")
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to store essays for batch {batch_id}: {e}")
+            return False
+
+    async def get_batch_essays(self, batch_id: str) -> list | None:
+        """Retrieve stored essay data from PostgreSQL."""
+        logger = create_service_logger("bos.repository.batch_essays")
+
+        try:
+            async with self.db_infrastructure.session() as session:
+                result = await session.execute(
+                    select(BatchEssay).where(BatchEssay.batch_id == batch_id)
+                )
+                essay_records = result.scalars().all()
+
+                if not essay_records:
+                    logger.warning(f"No essays found for batch {batch_id} in PostgreSQL")
+                    return None
+
+                # Convert database records back to EssayProcessingInputRefV1 objects
+                # as expected by the PipelinePhaseInitiatorProtocol
+                essays = []
+                for record in essay_records:
+                    # Reconstruct EssayProcessingInputRefV1 object from stored data
+                    essay_obj = EssayProcessingInputRefV1(
+                        essay_id=record.essay_id,
+                        text_storage_id=record.content_reference.get("text_storage_id", "")
+                    )
+                    essays.append(essay_obj)
+
+                logger.info(f"Retrieved {len(essays)} essays for batch {batch_id} from PostgreSQL")
+                return essays
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve essays for batch {batch_id}: {e}")
+            return None

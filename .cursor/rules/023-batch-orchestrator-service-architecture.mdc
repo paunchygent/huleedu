@@ -77,13 +77,13 @@ services/batch_orchestrator_service/
 
 - **Topic**: `huleedu.els.spellcheck.initiate.command.v1`
   - **Data**: `BatchServiceSpellcheckInitiateCommandDataV1`
-  - **Trigger**: After `BatchEssaysReady` received
+  - **Trigger**: After client pipeline request received and processed
   - **Consumer**: Essay Lifecycle Service
 
 ### 4.2. Event Consumption
 - **Topic**: `huleedu.els.batch.essays.ready.v1`
   - **Data**: `BatchEssaysReady` (with `ready_essays: List[EssayProcessingInputRefV1]`)
-  - **Handler**: Generates spellcheck commands with actual essay IDs and text_storage_ids
+  - **Handler**: Stores essay metadata and storage references in persistent PostgreSQL database, awaiting client pipeline trigger
   - **Implementation**: Background Kafka consumer task
 
 ### 4.3. Event Flow
@@ -97,7 +97,7 @@ HTTP Request → Service Layer → Repository → Event Publisher → Kafka → 
 - **Lifecycle**: App-scoped singletons for stateful dependencies
 
 ### 5.2. Protocol Implementations
-- **`BatchRepositoryProtocol`**: `MockBatchRepositoryImpl` (in-memory storage)
+- **`BatchRepositoryProtocol`**: `PostgreSQLBatchRepositoryImpl` (production PostgreSQL) and `MockBatchRepositoryImpl` (testing)
 - **`BatchEventPublisherProtocol`**: `DefaultBatchEventPublisherImpl` (Kafka wrapper)
 - **`EssayLifecycleClientProtocol`**: `DefaultEssayLifecycleClientImpl` (HTTP client)
 - **`BatchProcessingServiceProtocol`**: `BatchProcessingServiceImpl` (service layer)
