@@ -189,8 +189,9 @@ class TestBosElsPhaseCoordination:
         malformed_msg.partition = 0
         malformed_msg.offset = 456
 
-        # Should properly raise the JSON decode error (proper error handling design)
-        with pytest.raises(json.JSONDecodeError):
+        # FIXED: With proper EventEnvelope parsing, malformed JSON raises ValidationError
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
             await kafka_consumer._handle_message(malformed_msg)
 
         # Phase coordinator should not be called for malformed messages
@@ -224,8 +225,10 @@ class TestBosElsPhaseCoordination:
         incomplete_msg.value = json.dumps(envelope_data).encode("utf-8")
         incomplete_msg.topic = "huleedu.els.batch_phase.outcome.v1"
 
-        # Should handle missing fields gracefully (with logging)
-        await kafka_consumer._handle_message(incomplete_msg)
+        # FIXED: With proper EventEnvelope parsing, missing required fields raise ValidationError
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            await kafka_consumer._handle_message(incomplete_msg)
 
         # Phase coordinator should not be called for incomplete events
         mock_phase_coordinator.handle_phase_concluded.assert_not_called()

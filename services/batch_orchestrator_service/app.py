@@ -10,7 +10,7 @@ from __future__ import annotations
 # Import Blueprints
 # Import local modules using absolute imports for containerized deployment
 import startup_setup
-from api.batch_routes import batch_bp
+from api.batch_routes import batch_bp, internal_bp
 from api.health_routes import health_bp
 from config import settings
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
@@ -48,6 +48,7 @@ async def shutdown() -> None:
 
 # Register Blueprints
 app.register_blueprint(batch_bp)
+app.register_blueprint(internal_bp)  # Internal API for Result Aggregator Service
 app.register_blueprint(health_bp)
 
 

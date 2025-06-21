@@ -131,3 +131,52 @@ async def get_batch_status(
     except Exception as e:
         current_app.logger.error(f"Error getting batch status for {batch_id}: {e}")
         return jsonify({"error": "Failed to get batch status"}), 500
+
+
+# Internal API Blueprint for service-to-service communication
+internal_bp = Blueprint("internal_routes", __name__, url_prefix="/internal/v1/batches")
+
+
+@internal_bp.route("/<batch_id>/pipeline-state", methods=["GET"])
+@inject
+async def get_internal_pipeline_state(
+    batch_id: str,
+    batch_repo: FromDishka[BatchRepositoryProtocol],
+) -> Union[Response, tuple[Response, int]]:
+    """
+    Internal endpoint to retrieve the complete pipeline processing state.
+
+    This endpoint is consumed by the Result Aggregator Service and other
+    internal systems, providing the single source of truth for batch pipeline state.
+    BOS maintains the authoritative pipeline state that other services query.
+    """
+    try:
+        # Directly use the existing, tested repository method. This call is highly
+        # efficient as it's a primary key lookup on the 'batches' table.
+        pipeline_state = await batch_repo.get_processing_pipeline_state(batch_id)
+
+        if pipeline_state is None:
+            # Return a clear 404 if the batch or its state doesn't exist.
+            return jsonify({"error": "Pipeline state not found for batch"}), 404
+
+        # Also get batch context to include user_id for ownership checks
+        batch_context = await batch_repo.get_batch_context(batch_id)
+        user_id = None
+        if batch_context and hasattr(batch_context, 'user_id'):
+            user_id = batch_context.user_id
+        elif isinstance(pipeline_state, dict):
+            user_id = pipeline_state.get("user_id")
+
+        # Build response with pipeline state and user_id for ownership enforcement
+        response_data = {
+            "batch_id": batch_id,
+            "pipeline_state": pipeline_state,
+            "user_id": user_id,  # Essential for Result Aggregator ownership checks
+        }
+
+        return jsonify(response_data), 200
+
+    except Exception as e:
+        # Log with context for easier debugging if the repository fails.
+        current_app.logger.error(f"Error getting internal pipeline state for {batch_id}: {e}", exc_info=True)
+        return jsonify({"error": "Failed to get internal pipeline state"}), 500

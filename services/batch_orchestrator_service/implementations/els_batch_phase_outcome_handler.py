@@ -7,13 +7,13 @@ Implements Phase 3 data propagation and dynamic phase coordination.
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from protocols import PipelinePhaseCoordinatorProtocol
 
-from common_core.metadata_models import EssayProcessingInputRefV1
+from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
+from common_core.events.envelope import EventEnvelope
 
 logger = create_service_logger("bos.handlers.els_batch_phase_outcome")
 
@@ -38,60 +38,36 @@ class ELSBatchPhaseOutcomeHandler:
         ====================================
         Extracts processed_essays from the event and passes them to the phase coordinator
         for proper text_storage_id propagation between pipeline phases.
+
+        FIXED: Now uses proper EventEnvelope deserialization for architectural compliance.
         """
         try:
-            # Deserialize the ELSBatchPhaseOutcomeV1 event
-            message_data = json.loads(msg.value.decode("utf-8"))
+            # FIXED: Use proper EventEnvelope deserialization like other services
+            envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(msg.value)
+            event_data = envelope.data  # Fully typed ELSBatchPhaseOutcomeV1 object
+            correlation_id = envelope.correlation_id
 
-            # Parse as EventEnvelope but access data directly since we don't have the
-            # ELSBatchPhaseOutcomeV1 import in this file
-            event_data = message_data.get("data", {})
-            batch_id = event_data.get("batch_id")
-            completed_phase = event_data.get("phase_name")
-            phase_status = event_data.get("phase_status")
-            processed_essays_data = event_data.get("processed_essays", [])
-            failed_essay_ids = event_data.get("failed_essay_ids", [])
-            correlation_id = message_data.get("correlation_id")
+            batch_id = event_data.batch_id
+            completed_phase = event_data.phase_name
+            phase_status = event_data.phase_status
+            processed_essays_for_next_phase = event_data.processed_essays
+            failed_essay_ids = event_data.failed_essay_ids
 
-            if not batch_id or not completed_phase:
-                logger.warning(
-                    "Received ELSBatchPhaseOutcomeV1 event with missing batch_id or phase_name"
-                )
-                return
+            # Note: No manual validation needed - Pydantic EventEnvelope parsing ensures required fields exist
 
             logger.info(
                 f"Received ELS batch phase outcome: batch={batch_id}, "
                 f"phase={completed_phase}, status={phase_status}, "
-                f"processed={len(processed_essays_data)}, failed={len(failed_essay_ids)}",
+                f"processed={len(processed_essays_for_next_phase)}, failed={len(failed_essay_ids)}",
                 extra={"correlation_id": str(correlation_id)},
             )
-
-            # PHASE 3 ENHANCEMENT: Convert processed_essays to proper type
-            processed_essays_for_next_phase = None
-            if processed_essays_data:
-                try:
-                    processed_essays_for_next_phase = [
-                        EssayProcessingInputRefV1(**essay_data)
-                        for essay_data in processed_essays_data
-                    ]
-                    logger.info(
-                        f"Extracted {len(processed_essays_for_next_phase)} processed essays "
-                        f"for next phase propagation",
-                        extra={"correlation_id": str(correlation_id)},
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error parsing processed_essays data: {e}",
-                        extra={"correlation_id": str(correlation_id)},
-                    )
-                    # Continue without processed essays - coordinator will handle gracefully
 
             # Delegate to phase coordinator for pipeline orchestration with data propagation
             await self.phase_coordinator.handle_phase_concluded(
                 batch_id=batch_id,
                 completed_phase=completed_phase,
                 phase_status=phase_status,
-                correlation_id=correlation_id,
+                correlation_id=str(correlation_id),
                 processed_essays_for_next_phase=processed_essays_for_next_phase,
             )
 

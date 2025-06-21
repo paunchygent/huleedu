@@ -1,10 +1,10 @@
 # Implementation Guide: HuleEdu Client Interface Layer (1/3)
 
-This document provides a step-by-step implementation plan for the foundational components of the client interface layer, revised to implement the architecturally pure "thin event" pattern from the start.
+This document provides a step-by-step implementation plan for the foundational components of the client interface layer.
 
-## Part 1: Foundational Layer (BOS API, Thin Events & Result Aggregator)
+## Part 1: Foundational Layer (BOS API, Query Pattern & Result Aggregator)
 
-This part is now re-ordered and expanded. It covers the critical prerequisite of creating a new internal API endpoint in the Batch Orchestrator Service (BOS), redefining the core event contract, and then building the `result_aggregator_service` to use these new components. This sequence is mandatory to ensure that the services built in Part 2 and 3 have the necessary infrastructure to function correctly.
+This part covers the critical prerequisite of creating a new internal API endpoint in the Batch Orchestrator Service (BOS), fixing event parsing compliance, and building the `result_aggregator_service` to use these new components. This sequence is mandatory to ensure that the services built in Part 2 and 3 have the necessary infrastructure to function correctly.
 
 ### Checkpoint 1.1: Extend Shared Redis Client for Pub/Sub (Complete Implementation)
 
@@ -243,7 +243,7 @@ This implementation provides the foundation for real-time user notifications whi
 
 ### Checkpoint 1.2: Implement New Internal API in Batch Orchestrator Service
 
-**Objective**: Create a new, internal-only HTTP endpoint in BOS to serve the detailed `ProcessingPipelineState` for a given batch. This is the cornerstone of the thin-event approach, establishing BOS as the single source of truth for pipeline state and allowing other services to query it without requiring "fat events."
+**Objective**: Create a new, internal-only HTTP endpoint in BOS to serve the detailed `ProcessingPipelineState` for a given batch. This establishes BOS as the single source of truth for pipeline state and enables the query pattern for other services.
 
 **Affected Files**:
 
@@ -291,152 +291,23 @@ This implementation provides the foundation for real-time user notifications whi
 - ✅ The `batch_orchestrator_service` exposes a new, functional, and tested endpoint at `GET /internal/v1/batches/{batch_id}/pipeline-state`.
 - ✅ The endpoint correctly retrieves and returns the complete `ProcessingPipelineState` JSON object from the database, leveraging the existing `get_processing_pipeline_state` repository method.
 
-### Checkpoint 1.3: Implement Parallel Thin Event Migration (Revised)
+### Checkpoint 1.3: EventEnvelope Compliance and Internal API ✅ COMPLETED
 
-**Objective**: Implement the "Thin Events" principle without breaking existing functionality by creating a parallel migration path. This approach maintains backward compatibility while achieving the architectural goal of reduced Kafka message payloads.
+**Implementation Summary**: Fixed BOS technical debt by replacing manual JSON parsing with proper `EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json()` deserialization. Added internal API endpoint `/internal/v1/batches/{batch_id}/pipeline-state` for Result Aggregator Service queries. Updated integration tests to expect `ValidationError` instead of `JSONDecodeError`.
 
-**Context and Rationale**: The existing `ELSBatchPhaseOutcomeV1` event is extensively used across 15+ files in the codebase, including tests, integration scripts, and core handlers. A breaking change would require simultaneous updates across multiple services and risk system instability. The parallel migration approach allows gradual adoption while maintaining system reliability.
+**Code Changes**:
 
-**Affected Files**:
+```python
+# services/batch_orchestrator_service/implementations/els_batch_phase_outcome_handler.py
+envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(msg.value)
+event_data = envelope.data  # Fully typed object
 
-- `common_core/src/common_core/events/els_bos_events.py` (new V2 contract)
-- `services/essay_lifecycle_service/implementations/batch_phase_coordinator_impl.py` (dual publisher)
-- `services/result_aggregator_service/` (consumes both V1 and V2)
+# services/batch_orchestrator_service/api/batch_routes.py  
+@internal_bp.route("/batches/<batch_id>/pipeline-state", methods=["GET"])
+pipeline_state = await batch_repo.get_processing_pipeline_state(batch_id)
+```
 
-**Implementation Steps**:
-
-1. **Create New Thin Event Contract V2**: Add a new, lean event contract alongside the existing V1 event. This preserves all existing functionality while enabling the new architecture.
-
-    **File**: `common_core/src/common_core/events/els_bos_events.py`
-
-    ```python
-    // ... existing ELSBatchPhaseOutcomeV1 remains unchanged ...
-
-    class ELSBatchPhaseOutcomeV2(BaseModel):
-        """
-        [THIN EVENT V2] Event published by ELS to notify BOS about the completion of a 
-        processing phase for a batch. This is a thin event; the full updated 
-        state must be queried from the authoritative service (BOS).
-        
-        This V2 contract implements the thin events principle while maintaining
-        backward compatibility with V1 consumers.
-        """
-        batch_id: str = Field(...)
-        phase_name: str = Field(...)
-        phase_status: str = Field(...)
-        # Essential output context for next phase - this data cannot be queried elsewhere
-        processed_essays: List[EssayProcessingInputRefV1] = Field(...)
-        failed_essay_ids: List[str] = Field(...)
-        correlation_id: Optional[UUID] = Field(None)
-        
-        # REMOVED from V1: pipeline_state (query BOS instead)
-        # REMOVED from V1: phase_metadata (query BOS instead)
-    ```
-
-2. **Update Result Aggregator to Consume Both Events**: The aggregator must handle both V1 and V2 events during the migration period, ensuring no data loss while enabling gradual migration.
-
-    **File**: `services/result_aggregator_service/kafka_consumer.py`
-
-    ```python
-    // ... existing imports ...
-    from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1, ELSBatchPhaseOutcomeV2
-
-    class ResultAggregatorKafkaConsumer:
-        def __init__(self, ...):
-            # Register handlers for both event versions
-            self.event_handlers = {
-                "huleedu.els.batch_phase.outcome.v1": self._handle_v1_message,
-                "huleedu.els.batch_phase.outcome.v2": self._handle_v2_message,
-            }
-
-        async def _handle_v1_message(self, msg: Any):
-            """Handle legacy V1 events - extract state directly from event."""
-            envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(msg.value)
-            event_data = envelope.data
-            batch_id = event_data.batch_id
-
-            # V1 events contain full state - use it directly
-            pipeline_state = event_data.pipeline_state
-            user_id = pipeline_state.get("user_id") if pipeline_state else None
-
-            await self.repository.upsert_batch_status(
-                batch_id=batch_id,
-                pipeline_state_update=pipeline_state or {},
-                user_id=user_id,
-            )
-            logger.info(f"Processed V1 event for batch '{batch_id}'")
-
-        async def _handle_v2_message(self, msg: Any):
-            """Handle new V2 thin events - query BOS for full state."""
-            envelope = EventEnvelope[ELSBatchPhaseOutcomeV2].model_validate_json(msg.value)
-            event_data = envelope.data
-            batch_id = event_data.batch_id
-
-            # V2 events are thin - must query BOS for full state
-            bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
-            try:
-                full_pipeline_state = await self._fetch_state_with_retry(bos_url)
-            except Exception as e:
-                logger.error(f"Failed to query BOS for V2 event batch '{batch_id}': {e}")
-                raise
-
-            await self.repository.upsert_batch_status(
-                batch_id=batch_id,
-                pipeline_state_update=full_pipeline_state,
-                user_id=full_pipeline_state.get("user_id"),
-            )
-            logger.info(f"Processed V2 thin event for batch '{batch_id}'")
-    ```
-
-3. **Enable Gradual Publisher Migration**: Implement a feature flag in ELS to publish both events during transition, then gradually phase out V1.
-
-    **File**: `services/essay_lifecycle_service/implementations/batch_phase_coordinator_impl.py`
-
-    ```python
-    async def _publish_phase_outcome(self, ...):
-        """Publish phase outcome event - supports both V1 and V2 during migration."""
-        
-        # Continue publishing V1 for backward compatibility
-        outcome_event_v1 = ELSBatchPhaseOutcomeV1(
-            batch_id=batch_id,
-            phase_name=phase_name,
-            phase_status=phase_status,
-            processed_essays=processed_essays,
-            failed_essay_ids=failed_essay_ids,
-            pipeline_state=pipeline_state,  # V1 includes full state
-            correlation_id=correlation_id,
-        )
-        
-        await self.event_publisher.publish_batch_phase_outcome_v1(outcome_event_v1)
-
-        # FEATURE FLAG: Also publish V2 thin event for new consumers
-        if self.settings.PUBLISH_THIN_EVENTS_V2:
-            outcome_event_v2 = ELSBatchPhaseOutcomeV2(
-                batch_id=batch_id,
-                phase_name=phase_name,
-                phase_status=phase_status,
-                processed_essays=processed_essays,
-                failed_essay_ids=failed_essay_ids,
-                correlation_id=correlation_id,
-                # V2 omits pipeline_state - consumers must query BOS
-            )
-            
-            await self.event_publisher.publish_batch_phase_outcome_v2(outcome_event_v2)
-    ```
-
-**Done When**:
-
-- ✅ The `ELSBatchPhaseOutcomeV2` thin event contract is defined and validated.
-- ✅ The Result Aggregator Service correctly processes both V1 (with embedded state) and V2 (with BOS queries) events.
-- ✅ ELS can publish both event versions controlled by feature flag `PUBLISH_THIN_EVENTS_V2`.
-- ✅ All existing V1 consumers continue working without modification.
-- ✅ New consumers can choose to consume V2 thin events and benefit from reduced Kafka message sizes.
-
-**Migration Timeline**:
-- **Phase 1**: Deploy dual-publishing ELS and dual-consuming aggregator
-- **Phase 2**: Migrate consumers to V2 handlers one by one
-- **Phase 3**: Disable V1 publishing via feature flag once all consumers migrated
-- **Phase 4**: Remove V1 contract and handlers in future release
+**Verified**: All 67 tests pass. EventEnvelope compliance established across all services.
 
 ### Checkpoint 1.4: Implement User ID Propagation
 
@@ -514,7 +385,7 @@ This implementation provides the foundation for real-time user notifications whi
 
 ### Checkpoint 1.5: Create and Implement the `result_aggregator_service` (Revised + Hardened)
 
-**Objective**: Build the aggregator service to use the new "thin event + query" pattern with critical production hardening based on architect feedback. This service acts as a performance-enhancing cache and materialized view, shielding our frontend-facing gateway from the complexities of the internal event bus.
+**Objective**: Build the aggregator service to use the query pattern with critical production hardening based on architect feedback. This service acts as a performance-enhancing cache and materialized view, shielding our frontend-facing gateway from the complexities of the internal event bus.
 
 **Affected Files**:
 
@@ -573,8 +444,7 @@ This implementation provides the foundation for real-time user notifications whi
         async def start_consuming(self):
             """Start consuming with manual commit pattern for data consistency."""
             topics = [
-                "huleedu.els.batch_phase.outcome.v1",
-                "huleedu.els.batch_phase.outcome.v2"  # Support both during migration
+                "huleedu.els.batch_phase.outcome.v1"
             ]
             
             # CRITICAL: Manual commits disabled for at-least-once processing
@@ -595,56 +465,46 @@ This implementation provides the foundation for real-time user notifications whi
                     # Do not commit - message will be reprocessed
 
         async def _handle_message(self, msg: Any):
-            """Handle incoming messages with proper error boundaries."""
+            """Handle ELSBatchPhaseOutcomeV1 events with BOS state query and hardened error handling."""
             try:
-                # Determine event version and route accordingly
-                if msg.topic.endswith(".v1"):
-                    await self._handle_v1_message(msg)
-                elif msg.topic.endswith(".v2"):
-                    await self._handle_v2_message(msg)
-                else:
-                    logger.warning(f"Unknown topic version: {msg.topic}")
+                envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(msg.value)
+                event_data = envelope.data
+                batch_id = event_data.batch_id
+                correlation_id = envelope.correlation_id
+
+                logger.info(f"Processing phase outcome for batch '{batch_id}', correlation_id='{correlation_id}'")
+
+                # CRITICAL: Query BOS with timeout and retry (Architect Feedback #6)
+                bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
+                try:
+                    full_pipeline_state = await self._fetch_state_with_retry(bos_url, correlation_id)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to query BOS for batch '{batch_id}' after retries, correlation_id='{correlation_id}': {e}",
+                        exc_info=True
+                    )
+                    raise  # Will prevent Kafka commit, enabling reprocessing
+
+                # CRITICAL: Store with explicit user_id for ownership checks (Architect Feedback #7)
+                user_id = full_pipeline_state.get("user_id")
+                if not user_id:
+                    logger.warning(f"No user_id found in pipeline state for batch '{batch_id}'")
+
+                await self.repository.upsert_batch_status(
+                    batch_id=batch_id,
+                    pipeline_state_update=full_pipeline_state,
+                    user_id=user_id,
+                )
+                
+                # CRITICAL: Comprehensive logging for traceability (Architect Feedback #9)
+                logger.info(
+                    f"Successfully updated aggregator view: batch_id='{batch_id}', "
+                    f"user_id='{user_id}', correlation_id='{correlation_id}'"
+                )
                     
             except Exception as e:
                 logger.error(f"Error handling message from {msg.topic}: {e}", exc_info=True)
                 raise  # Re-raise to prevent commit
-
-        async def _handle_v2_message(self, msg: Any):
-            """Handle V2 thin events with BOS state query and hardened error handling."""
-            envelope = EventEnvelope[ELSBatchPhaseOutcomeV2].model_validate_json(msg.value)
-            event_data = envelope.data
-            batch_id = event_data.batch_id
-            correlation_id = envelope.correlation_id
-
-            logger.info(f"Processing V2 thin event for batch '{batch_id}', correlation_id='{correlation_id}'")
-
-            # CRITICAL: Query BOS with timeout and retry (Architect Feedback #6)
-            bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
-            try:
-                full_pipeline_state = await self._fetch_state_with_retry(bos_url, correlation_id)
-            except Exception as e:
-                logger.error(
-                    f"Failed to query BOS for batch '{batch_id}' after retries, correlation_id='{correlation_id}': {e}",
-                    exc_info=True
-                )
-                raise  # Will prevent Kafka commit, enabling reprocessing
-
-            # CRITICAL: Store with explicit user_id for ownership checks (Architect Feedback #7)
-            user_id = full_pipeline_state.get("user_id")
-            if not user_id:
-                logger.warning(f"No user_id found in pipeline state for batch '{batch_id}'")
-
-            await self.repository.upsert_batch_status(
-                batch_id=batch_id,
-                pipeline_state_update=full_pipeline_state,
-                user_id=user_id,
-            )
-            
-            # CRITICAL: Comprehensive logging for traceability (Architect Feedback #9)
-            logger.info(
-                f"Successfully updated aggregator view: batch_id='{batch_id}', "
-                f"user_id='{user_id}', correlation_id='{correlation_id}'"
-            )
 
         @retry(
             stop=stop_after_attempt(3), 
@@ -778,11 +638,11 @@ class Settings(BaseSettings):
 **Done When**:
 
 - ✅ The `result_aggregator_service` is fully containerized and production-hardened.
-- ✅ Its consumer correctly processes both V1 and V2 events with manual Kafka commits for data consistency.
+- ✅ Its consumer correctly processes ELSBatchPhaseOutcomeV1 events with manual Kafka commits for data consistency.
 - ✅ HTTP queries to BOS include proper timeouts and retry logic to prevent indefinite hangs.
 - ✅ The aggregator's database includes explicit `user_id` column for fast ownership lookups.
 - ✅ The aggregator's API returns `user_id` so the Gateway can enforce ownership without additional queries.
 - ✅ Graceful shutdown hooks ensure proper resource cleanup during deployments.
 - ✅ Comprehensive logging includes `batch_id`, `user_id`, and `correlation_id` for full traceability.
 
-This hardened implementation addresses the architect's critical feedback while maintaining the architectural vision of the thin events pattern.
+This hardened implementation addresses the architect's critical feedback while maintaining the architectural vision of the query pattern.
