@@ -22,7 +22,7 @@ class ClientBatchPipelineRequestV1(BaseModel):
     """
 
     batch_id: str = Field(
-        description="The unique identifier of the target batch.", min_length=1, max_length=255
+        description="The unique identifier of the target batch.", min_length=1, max_length=255,
     )
     requested_pipeline: str = Field(
         description="""The final pipeline the user wants to run (e.g., 'ai_feedback',
@@ -31,7 +31,7 @@ class ClientBatchPipelineRequestV1(BaseModel):
         max_length=100,
     )
     client_correlation_id: UUID | None = Field(
-        default=None, description="Optional client-provided correlation ID for request tracking."
+        default=None, description="Optional client-provided correlation ID for request tracking.",
     )
     # user_id: str - To be added once authentication is in place
 
@@ -50,6 +50,6 @@ class ClientBatchPipelineRequestV1(BaseModel):
                     "requested_pipeline": "cj_assessment",
                     "client_correlation_id": None,
                 },
-            ]
+            ],
         },
     }

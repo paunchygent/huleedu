@@ -8,7 +8,6 @@ with dependency injection and mocked external dependencies.
 from __future__ import annotations
 
 import json
-from typing import Optional, Tuple
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -187,8 +186,8 @@ def mock_fetch_content_success(sample_text: str) -> AsyncMock:
     """Provide a mock fetch_content function that succeeds."""
 
     async def fetch_content(
-        session: aiohttp.ClientSession, storage_id: str, essay_id: str
-    ) -> Optional[str]:
+        session: aiohttp.ClientSession, storage_id: str, essay_id: str,
+    ) -> str | None:
         return sample_text
 
     return AsyncMock(side_effect=fetch_content)
@@ -199,8 +198,8 @@ def mock_fetch_content_failure() -> AsyncMock:
     """Provide a mock fetch_content function that fails."""
 
     async def fetch_content(
-        session: aiohttp.ClientSession, storage_id: str, essay_id: str
-    ) -> Optional[str]:
+        session: aiohttp.ClientSession, storage_id: str, essay_id: str,
+    ) -> str | None:
         return None
 
     return AsyncMock(side_effect=fetch_content)
@@ -211,8 +210,8 @@ def mock_store_content_success(sample_storage_id: str) -> AsyncMock:
     """Provide a mock store_content function that succeeds."""
 
     async def store_content(
-        session: aiohttp.ClientSession, text_content: str, essay_id: str
-    ) -> Optional[str]:
+        session: aiohttp.ClientSession, text_content: str, essay_id: str,
+    ) -> str | None:
         return f"corrected_{sample_storage_id}"
 
     return AsyncMock(side_effect=store_content)
@@ -223,8 +222,8 @@ def mock_store_content_failure() -> AsyncMock:
     """Provide a mock store_content function that fails."""
 
     async def store_content(
-        session: aiohttp.ClientSession, text_content: str, essay_id: str
-    ) -> Optional[str]:
+        session: aiohttp.ClientSession, text_content: str, essay_id: str,
+    ) -> str | None:
         return None
 
     return AsyncMock(side_effect=store_content)
@@ -234,7 +233,7 @@ def mock_store_content_failure() -> AsyncMock:
 def mock_spell_check_success(corrected_text: str) -> AsyncMock:
     """Provide a mock spell_check function that succeeds."""
 
-    async def spell_check(text: str, essay_id: str) -> Tuple[str, int]:
+    async def spell_check(text: str, essay_id: str) -> tuple[str, int]:
         # Count corrections made
         corrections = text.count("tset") + text.count("teh") + text.count("recieve")
         return corrected_text, corrections
@@ -246,7 +245,7 @@ def mock_spell_check_success(corrected_text: str) -> AsyncMock:
 def mock_spell_check_failure() -> AsyncMock:
     """Provide a mock spell_check function that raises an exception."""
 
-    async def spell_check(text: str, essay_id: str) -> Tuple[str, int]:
+    async def spell_check(text: str, essay_id: str) -> tuple[str, int]:
         raise Exception("Spell check service unavailable")
 
     return AsyncMock(side_effect=spell_check)

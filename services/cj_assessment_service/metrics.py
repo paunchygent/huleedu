@@ -6,7 +6,7 @@ preventing duplicate registration errors while maintaining unified metrics endpo
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import REGISTRY, Counter, Histogram
@@ -14,15 +14,15 @@ from prometheus_client import REGISTRY, Counter, Histogram
 logger = create_service_logger("cj_assessment_service.metrics")
 
 # Global metrics instances (created once, shared by HTTP and worker)
-_metrics: Optional[Dict[str, Any]] = None
+_metrics: dict[str, Any] | None = None
 
 
-def get_metrics() -> Dict[str, Any]:
+def get_metrics() -> dict[str, Any]:
     """Get or create shared metrics instances.
-    
+
     Returns:
         Dictionary of metric instances keyed by metric name
-        
+
     Thread-safe singleton pattern for metrics initialization.
     """
     global _metrics
@@ -35,9 +35,9 @@ def get_metrics() -> Dict[str, Any]:
     return _metrics
 
 
-def _create_metrics() -> Dict[str, Any]:
+def _create_metrics() -> dict[str, Any]:
     """Create Prometheus metrics for the CJ Assessment Service.
-    
+
     Returns:
         Dictionary of metric instances keyed by metric name
     """
@@ -101,7 +101,7 @@ def _create_metrics() -> Dict[str, Any]:
             raise
 
 
-def _get_existing_metrics() -> Dict[str, Any]:
+def _get_existing_metrics() -> dict[str, Any]:
     """Retrieve existing metric collectors from the global Prometheus REGISTRY.
 
     Returning an empty dict disables metrics after duplicated-registration errors.
@@ -112,7 +112,7 @@ def _get_existing_metrics() -> Dict[str, Any]:
 
     from prometheus_client import REGISTRY  # local import to avoid circular deps
 
-    name_map: Dict[str, str] = {
+    name_map: dict[str, str] = {
         "request_count": "http_requests_total",
         "request_duration": "http_request_duration_seconds",
         "cj_assessment_operations": "cj_assessment_operations_total",
@@ -122,7 +122,7 @@ def _get_existing_metrics() -> Dict[str, Any]:
         "kafka_queue_latency_seconds": "kafka_message_queue_latency_seconds",
     }
 
-    existing: Dict[str, Any] = {}
+    existing: dict[str, Any] = {}
     registry_collectors = getattr(REGISTRY, "_names_to_collectors", None)
 
     for logical_key, metric_name in name_map.items():
@@ -140,9 +140,9 @@ def _get_existing_metrics() -> Dict[str, Any]:
     return existing
 
 
-def get_business_metrics() -> Dict[str, Any]:
+def get_business_metrics() -> dict[str, Any]:
     """Get business intelligence metrics for worker components.
-    
+
     Returns:
         Dictionary containing business metrics
     """
@@ -155,9 +155,9 @@ def get_business_metrics() -> Dict[str, Any]:
     }
 
 
-def get_http_metrics() -> Dict[str, Any]:
+def get_http_metrics() -> dict[str, Any]:
     """Get HTTP operational metrics for web components.
-    
+
     Returns:
         Dictionary containing HTTP metrics
     """

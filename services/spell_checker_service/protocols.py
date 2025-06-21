@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Protocol
+from typing import Protocol
 from uuid import UUID
 
 from aiohttp import ClientSession  # Changed from placeholder
@@ -27,7 +27,7 @@ class SpellLogicProtocol(Protocol):
     async def perform_spell_check(
         self,
         text: str,
-        essay_id: Optional[str],
+        essay_id: str | None,
         original_text_storage_id: str,
         initial_system_metadata: SystemProcessingMetadata,
         language: str = "en",
@@ -53,7 +53,7 @@ class SpellcheckEventPublisherProtocol(Protocol):
         self,
         kafka_bus: KafkaBus,
         event_data: SpellcheckResultDataV1,
-        correlation_id: Optional[UUID],
+        correlation_id: UUID | None,
     ) -> None:
         """Publishes a spell check result event to Kafka."""
         ...

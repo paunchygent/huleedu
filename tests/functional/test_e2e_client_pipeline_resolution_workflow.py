@@ -11,7 +11,7 @@ This is the culminating test for the BCS ↔ BOS integration implementation.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -51,7 +51,7 @@ class TestClientPipelineResolutionWorkflow:
         return create_comprehensive_kafka_manager()
 
     @pytest.fixture
-    async def validated_services(self, service_manager: ServiceTestManager) -> Dict[str, Any]:
+    async def validated_services(self, service_manager: ServiceTestManager) -> dict[str, Any]:
         """
         Ensure all required services are available and validated.
 
@@ -80,7 +80,7 @@ class TestClientPipelineResolutionWorkflow:
         self,
         service_manager: ServiceTestManager,
         kafka_manager: KafkaTestManager,
-        validated_services: Dict[str, Any]
+        validated_services: dict[str, Any],
     ):
         """
         Test complete client pipeline resolution and execution workflow.
@@ -102,7 +102,8 @@ class TestClientPipelineResolutionWorkflow:
             batch_state = await validate_batch_pipeline_state(service_manager, batch_id)
             pipeline_state = batch_state.get("pipeline_state", {}) if batch_state else {}
 
-            # With our new simplified architecture, pipelines should be pending_dependencies (waiting for client trigger)
+            # With our new simplified architecture, pipelines should be pending_dependencies
+            # (waiting for client trigger)
             cj_assessment_status = pipeline_state.get("cj_assessment", {}).get("status", "unknown")
             print(f"📋 CJ Assessment status: {cj_assessment_status}")
 
@@ -117,32 +118,34 @@ class TestClientPipelineResolutionWorkflow:
             pipeline_topics = get_pipeline_monitoring_topics()
 
             async with kafka_manager.consumer(
-                "client_pipeline_resolution_e2e",
-                pipeline_topics,
-                auto_offset_reset="latest"
+                "client_pipeline_resolution_e2e", pipeline_topics, auto_offset_reset="latest",
             ) as consumer:
                 # 4. Publish ClientBatchPipelineRequestV1 event to trigger cj_assessment
                 request_correlation_id = await publish_client_pipeline_request(
                     kafka_manager,
                     batch_id,
                     "cj_assessment",  # Use cj_assessment pipeline which is enabled
-                    correlation_id
+                    correlation_id,
                 )
 
-                print(f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}")
+                print(
+                    f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}",
+                )
 
                 # 5. Monitor complete pipeline resolution workflow
                 workflow_results = await monitor_pipeline_resolution_workflow(
                     consumer,
                     batch_id,
                     request_correlation_id,
-                    timeout_seconds=180  # 3 minutes for complete workflow
+                    timeout_seconds=180,  # 3 minutes for complete workflow
                 )
 
                 # 6. Validate workflow completion
                 print("\n📋 Workflow Results:")
-                print(f"  Specialized services triggered: "
-                      f"{workflow_results['specialized_services_triggered']}")
+                print(
+                    f"  Specialized services triggered: "
+                    f"{workflow_results['specialized_services_triggered']}",
+                )
                 print(f"  Pipeline initiated: {workflow_results['pipeline_initiated']}")
                 print(f"  Completion events: {len(workflow_results['completion_events'])}")
 
@@ -159,12 +162,12 @@ class TestClientPipelineResolutionWorkflow:
                 integration_evidence = await validate_bcs_integration_occurred(
                     service_manager,
                     batch_id,
-                    "cj_assessment"  # Changed from cj_assessment to cj_assessment
+                    "cj_assessment",  # Changed from cj_assessment to cj_assessment
                 )
 
                 # 9. Validate BCS performed dependency resolution
                 bcs_resolution_validated = await validate_bcs_dependency_resolution(
-                    integration_evidence
+                    integration_evidence,
                 )
 
                 # 10. Assert integration-specific validations
@@ -198,7 +201,7 @@ class TestClientPipelineResolutionWorkflow:
         self,
         service_manager: ServiceTestManager,
         kafka_manager: KafkaTestManager,
-        validated_services: Dict[str, Any]
+        validated_services: dict[str, Any],
     ):
         """
         Test BCS intelligent pipeline resolution based on batch state.
@@ -215,7 +218,7 @@ class TestClientPipelineResolutionWorkflow:
             pipeline_topics = get_state_aware_monitoring_topics()
 
             async with kafka_manager.consumer(
-                "state_aware_pipeline_e2e", pipeline_topics
+                "state_aware_pipeline_e2e", pipeline_topics,
             ) as consumer:
                 # Create batch with minimal essays - essays are now stored but don't auto-trigger pipeline
                 batch_id, correlation_id = await create_test_batch_with_essays(service_manager, 2)
@@ -228,17 +231,19 @@ class TestClientPipelineResolutionWorkflow:
                     kafka_manager,
                     batch_id,
                     "cj_assessment",  # Use cj_assessment pipeline which enables dependency resolution
-                    correlation_id
+                    correlation_id,
                 )
 
-                print(f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}")
+                print(
+                    f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}",
+                )
 
                 # Monitor for the client-triggered pipeline execution
                 workflow_results = await monitor_pipeline_resolution_workflow(
                     consumer,
                     batch_id,
                     request_correlation_id,  # Use the request correlation ID for monitoring
-                    timeout_seconds=60  # Pipeline should execute after client trigger
+                    timeout_seconds=60,  # Pipeline should execute after client trigger
                 )
 
                 # Validate state-aware optimization occurred
@@ -265,7 +270,7 @@ class TestClientPipelineResolutionWorkflow:
         self,
         service_manager: ServiceTestManager,
         kafka_manager: KafkaTestManager,
-        validated_services: Dict[str, Any]
+        validated_services: dict[str, Any],
     ):
         """
         Test multiple concurrent client pipeline resolution requests.
@@ -285,16 +290,13 @@ class TestClientPipelineResolutionWorkflow:
             pipeline_topics = get_concurrent_monitoring_topics()
 
             async with kafka_manager.consumer(
-                "concurrent_pipeline_e2e", pipeline_topics
+                "concurrent_pipeline_e2e", pipeline_topics,
             ) as consumer:
                 # Publish concurrent pipeline requests
                 tasks = []
-                for batch_id, correlation_id in zip(batch_ids, correlation_ids):
+                for batch_id, correlation_id in zip(batch_ids, correlation_ids, strict=False):
                     task = publish_client_pipeline_request(
-                        kafka_manager,
-                        batch_id,
-                        "cj_assessment",
-                        correlation_id
+                        kafka_manager, batch_id, "cj_assessment", correlation_id,
                     )
                     tasks.append(task)
 
@@ -312,9 +314,10 @@ class TestClientPipelineResolutionWorkflow:
                         break
 
                     try:
-                        if hasattr(message, 'value'):
+                        if hasattr(message, "value"):
                             import json
-                            event_data = json.loads(message.value.decode('utf-8'))
+
+                            event_data = json.loads(message.value.decode("utf-8"))
 
                             # Check which batch this event belongs to
                             for batch_id in batch_ids:

@@ -59,10 +59,9 @@ async def process_single_message(
         kafka_latency_metric = business_metrics.get("kafka_queue_latency")
         if kafka_latency_metric and envelope.event_timestamp:
             queue_latency = time.time() - envelope.event_timestamp.timestamp()
-            kafka_latency_metric.labels(
-                topic=msg.topic,
-                service="essay_lifecycle_service"
-            ).observe(queue_latency)
+            kafka_latency_metric.labels(topic=msg.topic, service="essay_lifecycle_service").observe(
+                queue_latency
+            )
 
         correlation_id = envelope.correlation_id
         logger.info(
@@ -136,8 +135,7 @@ async def _route_event(
             # Record batch coordination event
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="batch_registered",
-                    batch_id=str(batch_event_data.batch_id)
+                    event_type="batch_registered", batch_id=str(batch_event_data.batch_id)
                 ).inc()
 
             batch_result: bool = await batch_coordination_handler.handle_batch_essays_registered(
@@ -153,8 +151,7 @@ async def _route_event(
             # Record coordination event
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="content_provisioned",
-                    batch_id=str(content_event_data.batch_id)
+                    event_type="content_provisioned", batch_id=str(content_event_data.batch_id)
                 ).inc()
 
             content_result: bool = (
@@ -172,8 +169,7 @@ async def _route_event(
             # Record validation failure
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="validation_failed",
-                    batch_id=str(validation_event_data.batch_id)
+                    event_type="validation_failed", batch_id=str(validation_event_data.batch_id)
                 ).inc()
 
             validation_result: bool = (
@@ -192,8 +188,7 @@ async def _route_event(
             # Record command processing
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="spellcheck_command",
-                    batch_id=str(command_data.entity_ref.entity_id)
+                    event_type="spellcheck_command", batch_id=str(command_data.entity_ref.entity_id)
                 ).inc()
 
             await batch_command_handler.process_initiate_spellcheck_command(
@@ -213,8 +208,7 @@ async def _route_event(
             # Record CJ command processing
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="cj_command",
-                    batch_id=str(cj_command_data.entity_ref.entity_id)
+                    event_type="cj_command", batch_id=str(cj_command_data.entity_ref.entity_id)
                 ).inc()
 
             await batch_command_handler.process_initiate_cj_assessment_command(
@@ -232,7 +226,7 @@ async def _route_event(
             if coordination_events_metric:
                 coordination_events_metric.labels(
                     event_type="spellcheck_completed",
-                    batch_id=str(result_data.entity_ref.entity_id)
+                    batch_id=str(result_data.entity_ref.entity_id),
                 ).inc()
 
             spellcheck_result: bool = await service_result_handler.handle_spellcheck_result(
@@ -248,8 +242,7 @@ async def _route_event(
             # Record CJ assessment completion
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="cj_completed",
-                    batch_id=str(cj_result_data.entity_ref.entity_id)
+                    event_type="cj_completed", batch_id=str(cj_result_data.entity_ref.entity_id)
                 ).inc()
 
             cj_result: bool = await service_result_handler.handle_cj_assessment_completed(

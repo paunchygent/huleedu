@@ -7,8 +7,6 @@ results and error states in the File Service validation framework.
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from pydantic import BaseModel, ConfigDict
 
 
@@ -24,6 +22,6 @@ class ValidationResult(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, validate_assignment=True)
 
     is_valid: bool
-    error_code: Optional[str] = None
-    error_message: Optional[str] = None
-    warnings: List[str] = []
+    error_code: str | None = None
+    error_message: str | None = None
+    warnings: list[str] = []

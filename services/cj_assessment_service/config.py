@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Dict, Optional
-
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,8 +11,8 @@ class LLMProviderSettings(BaseModel):
 
     api_base: str
     default_model: str
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
+    temperature: float | None = None
+    max_tokens: int | None = None
     api_key_env_var: str  # Environment variable name for API key
 
 
@@ -61,7 +59,7 @@ class Settings(BaseSettings):
     DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
 
     # Structured LLM provider configuration
-    LLM_PROVIDERS_CONFIG: Dict[str, LLMProviderSettings] = {
+    LLM_PROVIDERS_CONFIG: dict[str, LLMProviderSettings] = {
         "openai": LLMProviderSettings(
             api_base="https://api.openai.com/v1",
             default_model="gpt-4o-mini",

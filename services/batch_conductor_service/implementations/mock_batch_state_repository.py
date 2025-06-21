@@ -55,12 +55,15 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             if self._is_expired(essay_key):
                 self.essay_states.pop(essay_key, None)
 
-            essay_state = self.essay_states.get(essay_key, {
-                "completed_steps": set[str](),
-                "step_metadata": {},
-                "created_at": datetime.utcnow().isoformat(),
-                "last_updated": datetime.utcnow().isoformat(),
-            })
+            essay_state = self.essay_states.get(
+                essay_key,
+                {
+                    "completed_steps": set[str](),
+                    "step_metadata": {},
+                    "created_at": datetime.utcnow().isoformat(),
+                    "last_updated": datetime.utcnow().isoformat(),
+                },
+            )
 
             # Idempotency check
             if step_name in essay_state["completed_steps"]:
@@ -121,10 +124,7 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                     if step_name in essay_state["completed_steps"]:
                         completed_count += 1
 
-            summary[step_name] = {
-                "completed": completed_count,
-                "total": essay_count
-            }
+            summary[step_name] = {"completed": completed_count, "total": essay_count}
 
         return summary
 
@@ -147,10 +147,7 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
         current_time = datetime.utcnow()
 
         # Clean essay states
-        expired_keys = [
-            key for key, expiry in self.ttl_expiry.items()
-            if current_time > expiry
-        ]
+        expired_keys = [key for key, expiry in self.ttl_expiry.items() if current_time > expiry]
 
         for key in expired_keys:
             self.essay_states.pop(key, None)

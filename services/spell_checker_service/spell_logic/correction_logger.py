@@ -64,12 +64,12 @@ def log_essay_corrections(
     log_buffer.write("-" * 80 + "\n")
     if applied_initial_l2_corrections:
         log_buffer.write(
-            f"Total initial L2 corrections applied: {len(applied_initial_l2_corrections)}\n"
+            f"Total initial L2 corrections applied: {len(applied_initial_l2_corrections)}\n",
         )
         for corr in applied_initial_l2_corrections:
             log_buffer.write(
                 f"  - '{corr['original_word']}' -> '{corr['corrected_word']}' "
-                f"at indices {corr['start']}-{corr['end']} (Rule: {corr.get('rule', 'N/A')})\n"
+                f"at indices {corr['start']}-{corr['end']} (Rule: {corr.get('rule', 'N/A')})\n",
             )
         import difflib
 
@@ -81,14 +81,14 @@ def log_essay_corrections(
                 lineterm="",
                 fromfile="Original Text",
                 tofile="Initial L2 Corrected Text",
-            )
+            ),
         )
         if diff1.strip():  # Check if diff is not empty
             log_buffer.write("\nDiff Original -> Initial L2 Corrected:\n" + diff1 + "\n")
         else:
             log_buffer.write(
                 "No textual changes from Original to Initial L2 Corrected "
-                "(based on diff, check applied count).\n"
+                "(based on diff, check applied count).\n",
             )
     else:
         log_buffer.write("No initial L2 corrections were applied or data not provided.\n")
@@ -97,10 +97,11 @@ def log_essay_corrections(
     log_buffer.write("\nSection 2b: Contextual L2 Reversions (Simplified Logging):\n")
     log_buffer.write("-" * 80 + "\n")
     log_buffer.write(
-        f"Number of L2 corrections reverted by contextual validation: {l2_context_reverted_count}\n"
+        f"Number of L2 corrections reverted by contextual validation: "
+        f"{l2_context_reverted_count}\n",
     )
     log_buffer.write(
-        "(Note: With the current simplified L2 flow, this count is expected to be 0.)\n"
+        "(Note: With the current simplified L2 flow, this count is expected to be 0.)\n",
     )
 
     # --- Section 3: Text Entering Main Spell Checker (Initial L2 Corrected) ---
@@ -109,12 +110,12 @@ def log_essay_corrections(
     log_buffer.write(
         initial_l2_corrected_text[:200]
         + ("..." if len(initial_l2_corrected_text) > 200 else "")
-        + "\n"
+        + "\n",
     )
 
     # --- Section 4: Main Spell Checker Corrections (on Initial L2 Corrected Text) ---
     log_buffer.write(
-        "\nSection 4: Main Spell Checker Corrections (Applied to Initial L2 Corrected Text):\n"
+        "\nSection 4: Main Spell Checker Corrections (Applied to Initial L2 Corrected Text):\n",
     )
     log_buffer.write("-" * 80 + "\n")
 
@@ -129,19 +130,19 @@ def log_essay_corrections(
             if original_word != corrected_word:
                 log_buffer.write(
                     f"  - '{original_word}' -> '{corrected_word}' "
-                    f"(indices {start_offset}-{end_offset})\n"
+                    f"(indices {start_offset}-{end_offset})\n",
                 )
                 spell_changes_found = True
 
         if not spell_changes_found:
             log_buffer.write(
                 "No specific spell corrections made by the main spell checker "
-                "relative to Initial L2 Corrected Text.\n"
+                "relative to Initial L2 Corrected Text.\n",
             )
     else:
         log_buffer.write(
             "No main spell checker corrections provided or available to process "
-            "for detailed correction listing.\n"
+            "for detailed correction listing.\n",
         )
 
     import difflib
@@ -155,35 +156,35 @@ def log_essay_corrections(
             lineterm="",
             fromfile="Initial L2 Corrected Text",
             tofile="Final Corrected Text (Caller)",
-        )
+        ),
     )
     if diff2.strip():  # Check if diff is not empty
         log_buffer.write(
-            "\nDiff Initial L2 Corrected -> Final Corrected (Caller Perspective):\n" + diff2 + "\n"
+            "\nDiff Initial L2 Corrected -> Final Corrected (Caller Perspective):\n" + diff2 + "\n",
         )
     else:
         log_buffer.write(
             "No textual changes from Initial L2 Corrected to Final Corrected "
-            "(Caller Perspective based on diff).\n"
+            "(Caller Perspective based on diff).\n",
         )
 
     # --- Section 5: Final Text Overview ---
     log_buffer.write("\nSection 5: Final Texts Overview:\n")
     log_buffer.write("-" * 80 + "\n")
     log_buffer.write(
-        "Original: " + original_text[:100] + ("..." if len(original_text) > 100 else "") + "\n"
+        "Original: " + original_text[:100] + ("..." if len(original_text) > 100 else "") + "\n",
     )
     log_buffer.write(
         "Initial L2 Corrected: "
         + initial_l2_corrected_text[:100]
         + ("..." if len(initial_l2_corrected_text) > 100 else "")
-        + "\n"
+        + "\n",
     )
     log_buffer.write(
         "Final Main Checker Corrected (from Caller): "
         + final_corrected_text[:100]
         + ("..." if len(final_corrected_text) > 100 else "")
-        + "\n"
+        + "\n",
     )
 
     # --- Save the combined correction log to file ---

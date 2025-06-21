@@ -11,7 +11,7 @@ Uses modern utility patterns (ServiceTestManager) throughout - NO direct HTTP ca
 
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -98,7 +98,7 @@ class TestE2EFileWorkflows:
         batch_id = f"e2e-multi-test-{uuid.uuid4().hex[:8]}"
 
         # Prepare multiple files for ServiceTestManager
-        files: List[Dict[str, Any]] = []
+        files: list[dict[str, Any]] = []
         for test_file in test_file_paths:
             with open(test_file, "rb") as f:
                 files.append({"name": test_file.name, "content": f.read()})
@@ -138,7 +138,7 @@ class TestE2EFileWorkflows:
             pytest.skip(f"Test file {test_file_path} not found")
 
         # Test 1: Empty files list should be handled gracefully
-        empty_files: List[Dict[str, Any]] = []
+        empty_files: list[dict[str, Any]] = []
         batch_id = f"test-empty-{uuid.uuid4().hex[:8]}"
 
         try:
@@ -188,7 +188,7 @@ class TestE2EFileWorkflows:
         # Step 1: Create batch using ServiceTestManager utility
         try:
             batch_id, correlation_id = await service_manager.create_batch(
-                expected_essay_count=1, course_code="E2E", class_designation="CompleteWorkflow"
+                expected_essay_count=1, course_code="E2E", class_designation="CompleteWorkflow",
             )
 
             print(f"✅ Batch created: {batch_id}")

@@ -16,7 +16,7 @@ class DefaultEssayLifecycleClientImpl(EssayLifecycleClientProtocol):
         self.settings = settings
 
     async def request_essay_phase_initiation(
-        self, batch_id: str, essay_ids: list[str], phase: str
+        self, batch_id: str, essay_ids: list[str], phase: str,
     ) -> None:
         """Mock implementation - logs the request."""
         # TODO: Implement actual HTTP call to Essay Lifecycle Service

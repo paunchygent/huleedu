@@ -140,8 +140,9 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                 )
             else:
                 logger.error(
-                    f"State machine trigger '{trigger}' failed for essay {result_data.entity_ref.entity_id} "
-                    f"from status {essay_state.current_status.value}.",
+                    f"State machine trigger '{trigger}' failed for essay "
+                    f"{result_data.entity_ref.entity_id} from status "
+                    f"{essay_state.current_status.value}.",
                     extra={"correlation_id": str(correlation_id)},
                 )
                 return False
@@ -251,8 +252,9 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     )
                 else:
                     logger.error(
-                        f"State machine trigger '{EVT_CJ_ASSESSMENT_SUCCEEDED}' failed for essay {essay_id} "
-                        f"from status {essay_state.current_status.value}.",
+                        f"State machine trigger '{EVT_CJ_ASSESSMENT_SUCCEEDED}' failed "
+                        f"for essay {essay_id} from status "
+                        f"{essay_state.current_status.value}.",
                         extra={"correlation_id": str(correlation_id)},
                     )
                     continue
@@ -347,8 +349,9 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     )
                 else:
                     logger.error(
-                        f"State machine trigger '{EVT_CJ_ASSESSMENT_FAILED}' failed for essay {essay_state.essay_id} "
-                        f"from status {essay_state.current_status.value}.",
+                        f"State machine trigger '{EVT_CJ_ASSESSMENT_FAILED}' failed "
+                        f"for essay {essay_state.essay_id} from status "
+                        f"{essay_state.current_status.value}.",
                         extra={"correlation_id": str(correlation_id)},
                     )
                     continue

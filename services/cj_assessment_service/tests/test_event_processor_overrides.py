@@ -7,7 +7,7 @@ from Kafka message consumption through to core logic execution.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -40,7 +40,7 @@ class TestEventProcessorOverrides:
         return client
 
     @pytest.fixture
-    def mock_llm_interaction(self, sample_comparison_results: list[Dict[str, Any]]) -> AsyncMock:
+    def mock_llm_interaction(self, sample_comparison_results: list[dict[str, Any]]) -> AsyncMock:
         """Create mock LLM interaction protocol."""
         interaction = AsyncMock(spec=LLMInteractionProtocol)
         interaction.perform_comparisons = AsyncMock(return_value=[])
@@ -55,7 +55,7 @@ class TestEventProcessorOverrides:
         return publisher
 
     @pytest.fixture
-    def mock_core_workflow(self, sample_comparison_results: list[Dict[str, Any]]) -> AsyncMock:
+    def mock_core_workflow(self, sample_comparison_results: list[dict[str, Any]]) -> AsyncMock:
         """Create mock for core assessment workflow."""
         mock_workflow = AsyncMock()
         mock_workflow.return_value = (sample_comparison_results, "cj_batch_123")

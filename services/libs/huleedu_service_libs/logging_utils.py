@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from structlog.contextvars import bind_contextvars, clear_contextvars, merge_contextvars
@@ -27,7 +27,7 @@ from common_core.events.envelope import EventEnvelope
 
 def configure_service_logging(
     service_name: str,
-    environment: Optional[str] = None,
+    environment: str | None = None,
     log_level: str = "INFO",
 ) -> None:
     """
@@ -60,7 +60,7 @@ def configure_service_logging(
                     structlog.processors.CallsiteParameter.FILENAME,
                     structlog.processors.CallsiteParameter.FUNC_NAME,
                     structlog.processors.CallsiteParameter.LINENO,
-                ]
+                ],
             ),
             structlog.processors.format_exc_info,
             structlog.processors.JSONRenderer(),
@@ -76,7 +76,7 @@ def configure_service_logging(
                     structlog.processors.CallsiteParameter.FILENAME,
                     structlog.processors.CallsiteParameter.FUNC_NAME,
                     structlog.processors.CallsiteParameter.LINENO,
-                ]
+                ],
             ),
             structlog.dev.set_exc_info,
             # Note: format_exc_info removed for pretty exceptions in development
@@ -99,7 +99,7 @@ def configure_service_logging(
     )
 
 
-def create_service_logger(name: Optional[str] = None) -> Any:
+def create_service_logger(name: str | None = None) -> Any:
     """
     Create a service logger with optional name binding.
 

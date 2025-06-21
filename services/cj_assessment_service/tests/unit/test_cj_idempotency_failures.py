@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Tuple
+from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -27,7 +27,7 @@ def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
         topic="cj-assessment",
         partition=0,
         offset=0,
-        timestamp=int(datetime.now(timezone.utc).timestamp() * 1000),
+        timestamp=int(datetime.now(UTC).timestamp() * 1000),
         timestamp_type=0,
         key=None,
         value=json.dumps(event_data).encode(),
@@ -75,7 +75,7 @@ def sample_cj_request_event() -> dict:
 @pytest.fixture
 def mock_boundary_services(
     mock_cj_repository: MockDatabase,
-) -> Tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Any]:
+) -> tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Any]:
     """Create mock boundary services (external dependencies only)."""
     mock_content_client = AsyncMock()
     mock_content_client.fetch_content = AsyncMock(return_value={})
@@ -106,17 +106,13 @@ def mock_boundary_services(
 @pytest.mark.asyncio
 async def test_processing_failure_keeps_lock(
     sample_cj_request_event: dict,
-    mock_boundary_services: Tuple[
-        MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock
-    ],
+    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock],
     mock_redis_client: MockRedisClient,
 ) -> None:
     """Test that business logic failures keep Redis lock to prevent infinite retries."""
     from huleedu_service_libs.idempotency import idempotent_consumer
 
-    database, content_client, event_publisher, llm_interaction, settings = (
-        mock_boundary_services
-    )
+    database, content_client, event_publisher, llm_interaction, settings = mock_boundary_services
 
     database.should_fail_create_batch = True
 

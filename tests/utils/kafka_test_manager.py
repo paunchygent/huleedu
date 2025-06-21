@@ -16,8 +16,9 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Callable, Dict, List, NamedTuple, Optional
+from typing import Any, NamedTuple
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -29,13 +30,13 @@ class KafkaTestConfig(NamedTuple):
     """Kafka testing configuration."""
 
     bootstrap_servers: str
-    topics: Dict[str, str]
+    topics: dict[str, str]
     assignment_timeout: int
 
 
 def create_kafka_test_config(
     bootstrap_servers: str = "localhost:9093",
-    topics: Optional[Dict[str, str]] = None,
+    topics: dict[str, str] | None = None,
     assignment_timeout: int = 15,
 ) -> KafkaTestConfig:
     """Create KafkaTestConfig with default HuleEdu topics if not provided."""
@@ -63,13 +64,13 @@ class KafkaTestManager:
     Replaces complex Kafka fixtures with clear resource management.
     """
 
-    def __init__(self, config: Optional[KafkaTestConfig] = None):
+    def __init__(self, config: KafkaTestConfig | None = None):
         self.config = config or create_kafka_test_config()
-        self._created_consumers: List[AIOKafkaConsumer] = []
+        self._created_consumers: list[AIOKafkaConsumer] = []
 
     @asynccontextmanager
     async def consumer(
-        self, test_name: str, topics: Optional[List[str]] = None, auto_offset_reset: str = "latest"
+        self, test_name: str, topics: list[str] | None = None, auto_offset_reset: str = "latest",
     ) -> AsyncIterator[AIOKafkaConsumer]:
         """
         Context manager for Kafka consumer with automatic cleanup.
@@ -119,7 +120,7 @@ class KafkaTestManager:
                 logger.warning(f"Error stopping consumer for {test_name}: {e}")
 
     async def _wait_for_partition_assignment(
-        self, consumer: AIOKafkaConsumer, test_name: str
+        self, consumer: AIOKafkaConsumer, test_name: str,
     ) -> None:
         """Wait for consumer to get partition assignment."""
         partitions_assigned = False
@@ -129,7 +130,7 @@ class KafkaTestManager:
             if asyncio.get_event_loop().time() - start_time > self.config.assignment_timeout:
                 raise RuntimeError(
                     f"Kafka consumer for {test_name} did not get partition assignment "
-                    f"within {self.config.assignment_timeout}s"
+                    f"within {self.config.assignment_timeout}s",
                 )
 
             assigned_partitions = consumer.assignment()
@@ -144,8 +145,8 @@ class KafkaTestManager:
         consumer: AIOKafkaConsumer,
         expected_count: int,
         timeout_seconds: int = 30,
-        event_filter: Optional[Callable[[Dict[str, Any]], bool]] = None,
-    ) -> List[Dict[str, Any]]:
+        event_filter: Callable[[dict[str, Any]], bool] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Collect events from Kafka consumer.
 
@@ -169,7 +170,7 @@ class KafkaTestManager:
         Returns:
             List of EventEnvelope data (matching production EventEnvelope structure)
         """
-        collected_events: List[Dict[str, Any]] = []
+        collected_events: list[dict[str, Any]] = []
         end_time = asyncio.get_event_loop().time() + timeout_seconds
 
         while len(collected_events) < expected_count and asyncio.get_event_loop().time() < end_time:
@@ -203,7 +204,7 @@ class KafkaTestManager:
                     collected_events.append(enriched_event)
                     logger.info(
                         f"Collected event from {message.topic}: "
-                        f"{event_data.get('event_type', 'unknown')}"
+                        f"{event_data.get('event_type', 'unknown')}",
                     )
 
         return collected_events
@@ -217,7 +218,7 @@ class KafkaTestManager:
             except Exception as e:
                 logger.warning(f"Error cleaning up consumer: {e}")
 
-    async def publish_event(self, topic: str, event_data: Dict[str, Any]) -> None:
+    async def publish_event(self, topic: str, event_data: dict[str, Any]) -> None:
         """
         Publish an event to a Kafka topic.
 
@@ -259,7 +260,7 @@ kafka_manager = KafkaTestManager()
 
 # Convenience functions for common patterns
 @asynccontextmanager
-async def kafka_event_monitor(test_name: str, topics: Optional[List[str]] = None):
+async def kafka_event_monitor(test_name: str, topics: list[str] | None = None):
     """Convenience context manager for event monitoring."""
     async with kafka_manager.consumer(test_name, topics) as consumer:
         yield consumer
@@ -269,9 +270,9 @@ async def collect_kafka_events(
     test_name: str,
     expected_count: int,
     timeout_seconds: int = 30,
-    topics: Optional[List[str]] = None,
-    event_filter: Optional[Callable[[Dict[str, Any]], bool]] = None,
-) -> List[Dict[str, Any]]:
+    topics: list[str] | None = None,
+    event_filter: Callable[[dict[str, Any]], bool] | None = None,
+) -> list[dict[str, Any]]:
     """
     Convenience function for collecting events.
 
@@ -279,5 +280,5 @@ async def collect_kafka_events(
     """
     async with kafka_event_monitor(test_name, topics) as consumer:
         return await kafka_manager.collect_events(
-            consumer, expected_count, timeout_seconds, event_filter
+            consumer, expected_count, timeout_seconds, event_filter,
         )

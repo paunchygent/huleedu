@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
-from prometheus_client import CollectorRegistry
+from prometheus_client import REGISTRY, CollectorRegistry
 
 from services.file_service.config import Settings, settings
 from services.file_service.content_validator import FileContentValidator
@@ -14,6 +16,7 @@ from services.file_service.implementations.content_service_client_impl import (
 )
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
 from services.file_service.implementations.text_extractor_impl import DefaultTextExtractor
+from services.file_service.metrics import METRICS
 from services.file_service.protocols import (
     ContentServiceClientProtocol,
     ContentValidatorProtocol,
@@ -32,8 +35,13 @@ class CoreInfrastructureProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_metrics_registry(self) -> CollectorRegistry:
-        """Provide Prometheus metrics registry."""
-        return CollectorRegistry()
+        """Provide the global Prometheus metrics registry shared across collectors."""
+        return REGISTRY
+
+    @provide(scope=Scope.APP)
+    def provide_metrics(self) -> dict[str, Any]:
+        """Provide shared Prometheus metrics dictionary."""
+        return METRICS
 
     @provide(scope=Scope.APP)
     async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
@@ -56,14 +64,14 @@ class ServiceImplementationsProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_content_service_client(
-        self, http_session: ClientSession, settings: Settings
+        self, http_session: ClientSession, settings: Settings,
     ) -> ContentServiceClientProtocol:
         """Provide Content Service client implementation."""
         return DefaultContentServiceClient(http_session, settings)
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(
-        self, kafka_bus: KafkaBus, settings: Settings
+        self, kafka_bus: KafkaBus, settings: Settings,
     ) -> EventPublisherProtocol:
         """Provide event publisher implementation."""
         return DefaultEventPublisher(kafka_bus, settings)
@@ -77,5 +85,5 @@ class ServiceImplementationsProvider(Provider):
     def provide_content_validator(self, settings: Settings) -> ContentValidatorProtocol:
         """Provide content validator implementation."""
         return FileContentValidator(
-            min_length=settings.MIN_CONTENT_LENGTH, max_length=settings.MAX_CONTENT_LENGTH
+            min_length=settings.MIN_CONTENT_LENGTH, max_length=settings.MAX_CONTENT_LENGTH,
         )

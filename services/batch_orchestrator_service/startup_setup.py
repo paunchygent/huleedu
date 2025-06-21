@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
 
 from config import Settings
 from di import (
@@ -29,8 +28,8 @@ from services.batch_orchestrator_service.implementations.batch_repository_postgr
 logger = create_service_logger("bos.startup")
 
 # Global references for service management (unavoidable for Quart lifecycle)
-kafka_consumer_instance: Optional[BatchKafkaConsumer] = None
-consumer_task: Optional[asyncio.Task] = None
+kafka_consumer_instance: BatchKafkaConsumer | None = None
+consumer_task: asyncio.Task | None = None
 
 
 async def initialize_services(app: Quart, settings: Settings) -> None:
@@ -63,7 +62,6 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         app.extensions["metrics"] = metrics
 
         async with container() as request_container:
-
             # Get Kafka consumer from DI container (properly configured)
             kafka_consumer_instance = await request_container.get(BatchKafkaConsumer)
 
@@ -73,7 +71,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
 
         logger.info(
             "Batch Orchestrator Service DI container, quart-dishka integration, "
-            "and Kafka consumer initialized successfully."
+            "and Kafka consumer initialized successfully.",
         )
     except Exception as e:
         logger.critical(f"Failed to initialize Batch Orchestrator Service: {e}", exc_info=True)
@@ -100,6 +98,3 @@ async def shutdown_services() -> None:
         logger.info("Batch Orchestrator Service shutdown completed")
     except Exception as e:
         logger.error(f"Error during shutdown: {e}", exc_info=True)
-
-
-

@@ -102,7 +102,7 @@ class TestNLPInitiatorImpl:
 
         assert isinstance(published_envelope.data, BatchServiceNLPInitiateCommandDataV1)
         assert published_envelope.event_type == topic_name(
-            ProcessingEvent.BATCH_NLP_INITIATE_COMMAND
+            ProcessingEvent.BATCH_NLP_INITIATE_COMMAND,
         )
         assert published_envelope.source_service == "batch-orchestrator-service"
         assert published_envelope.correlation_id == sample_correlation_id

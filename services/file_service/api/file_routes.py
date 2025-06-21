@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Union
+from typing import Any
 
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -30,7 +30,8 @@ async def upload_batch_files(
     content_validator: FromDishka[ContentValidatorProtocol],
     content_client: FromDishka[ContentServiceClientProtocol],
     event_publisher: FromDishka[EventPublisherProtocol],
-) -> Union[Response, tuple[Response, int]]:
+    metrics: FromDishka[dict[str, Any]],
+) -> Response | tuple[Response, int]:
     """
     Handle batch file upload endpoint.
 
@@ -60,7 +61,7 @@ async def upload_batch_files(
             except ValueError:
                 logger.warning(
                     f"Invalid correlation ID format in header: {correlation_id_header}, "
-                    "generating new one"
+                    "generating new one",
                 )
                 main_correlation_id = uuid.uuid4()
         else:
@@ -68,7 +69,7 @@ async def upload_batch_files(
 
         logger.info(
             f"Received {len(uploaded_files)} files for batch {batch_id}. "
-            f"Correlation ID: {main_correlation_id}"
+            f"Correlation ID: {main_correlation_id}",
         )
 
         tasks = []
@@ -86,7 +87,8 @@ async def upload_batch_files(
                         content_validator=content_validator,
                         content_client=content_client,
                         event_publisher=event_publisher,
-                    )
+                        metrics=metrics,
+                    ),
                 )
                 tasks.append(task)
 
@@ -94,7 +96,8 @@ async def upload_batch_files(
         def _handle_task_result(task: asyncio.Task) -> None:
             if task.exception():
                 logger.error(
-                    f"Error processing uploaded file: {task.exception()}", exc_info=task.exception()
+                    f"Error processing uploaded file: {task.exception()}",
+                    exc_info=task.exception(),
                 )
 
         for task in tasks:
@@ -108,7 +111,7 @@ async def upload_batch_files(
                 ),
                 "batch_id": batch_id,
                 "correlation_id": str(main_correlation_id),
-            }
+            },
         ), 202
 
     except Exception as e:

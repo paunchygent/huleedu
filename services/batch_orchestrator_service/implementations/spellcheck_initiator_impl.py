@@ -55,13 +55,13 @@ class SpellcheckInitiatorImpl(SpellcheckInitiatorProtocol):
             # Validate that this is the correct phase
             if phase_to_initiate != PhaseName.SPELLCHECK:
                 raise DataValidationError(
-                    f"SpellcheckInitiatorImpl received incorrect phase: {phase_to_initiate}"
+                    f"SpellcheckInitiatorImpl received incorrect phase: {phase_to_initiate}",
                 )
 
             # Validate required data
             if not essays_for_processing:
                 raise DataValidationError(
-                    f"No essays provided for spellcheck initiation in batch {batch_id}"
+                    f"No essays provided for spellcheck initiation in batch {batch_id}",
                 )
 
             # Get language from course code

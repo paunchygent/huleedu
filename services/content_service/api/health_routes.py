@@ -1,6 +1,5 @@
 """Health and metrics routes for Content Service."""
 
-from typing import Union
 
 from config import settings
 from dishka import FromDishka
@@ -14,7 +13,7 @@ health_bp = Blueprint("health_routes", __name__)
 
 
 @health_bp.route("/healthz")
-async def health_check() -> Union[Response, tuple[Response, int]]:
+async def health_check() -> Response | tuple[Response, int]:
     """Health check endpoint."""
     try:
         store_path = settings.CONTENT_STORE_ROOT_PATH

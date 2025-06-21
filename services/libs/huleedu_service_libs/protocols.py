@@ -8,7 +8,10 @@ shared infrastructure components provided by huleedu_service_libs.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from typing import Any, Protocol
+
+import redis.client
 
 
 class RedisClientProtocol(Protocol):
@@ -74,10 +77,12 @@ class RedisClientProtocol(Protocol):
 
 class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
     """
-    Extended protocol for atomic Redis operations using WATCH/MULTI/EXEC pattern.
+    Extended protocol for atomic Redis operations using WATCH/MULTI/EXEC pattern
+    and Redis Pub/Sub for real-time communication.
 
-    Extends basic RedisClientProtocol for services needing atomic transactions.
-    Services using only idempotency can continue using RedisClientProtocol.
+    Extends basic RedisClientProtocol for services needing atomic transactions
+    and/or pub/sub capabilities. Services using only idempotency can continue
+    using RedisClientProtocol.
     """
 
     async def watch(self, *keys: str) -> bool:
@@ -129,4 +134,39 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         Returns:
             List of keys matching the pattern
         """
+        ...
+
+    async def publish(self, channel: str, message: str) -> int:
+        """
+        Publish a message to a Redis channel. This is a "fire-and-forget"
+        operation that sends the message to all active subscribers of the channel.
+
+        Args:
+            channel: The channel to publish to (e.g., "ws:user_123").
+            message: The message payload to publish, typically a JSON string.
+
+        Returns:
+            The integer number of clients that received the message.
+        """
+        ...
+
+    def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
+        """
+        Subscribe to a Redis channel within an async context manager, ensuring
+        proper connection and disconnection.
+
+        Args:
+            channel: The channel to subscribe to.
+
+        Yields:
+            A PubSub object that can be iterated over to listen for messages.
+        """
+        ...
+
+    def get_user_channel(self, user_id: str) -> str:
+        """Generate standardized user-specific channel name."""
+        ...
+
+    async def publish_user_notification(self, user_id: str, event_type: str, data: dict) -> int:
+        """Convenience method to publish structured notifications to user-specific channels."""
         ...

@@ -48,7 +48,7 @@ class TestPipelineFailureHandling:
         )
 
     async def test_failed_phase_handling(
-        self, pipeline_coordinator, batch_repository, mock_cj_initiator
+        self, pipeline_coordinator, batch_repository, mock_cj_initiator,
     ):
         """Test pipeline handling when a phase fails - should not proceed to next phase."""
         batch_id = str(uuid4())
@@ -91,7 +91,7 @@ class TestPipelineFailureHandling:
         mock_cj_initiator.initiate_phase.assert_not_called()
 
     async def test_completed_with_failures_phase_handling(
-        self, pipeline_coordinator, batch_repository, mock_cj_initiator
+        self, pipeline_coordinator, batch_repository, mock_cj_initiator,
     ):
         """
         Test pipeline handling when a phase completes with partial failures.

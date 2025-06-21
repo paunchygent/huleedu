@@ -276,11 +276,16 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
             "spellcheck": ContentType.CORRECTED_TEXT,
             # For AI Feedback, if it modifies text, it would be something like:
             # "ai_feedback": ContentType.AI_EDITOR_REVISION_TEXT,
-            # For CJ and NLP, they usually work on a stable input (e.g., corrected text or original)
-            # and produce analysis, not a new version of the essay text itself for further processing.
-            # So, the text_storage_id might not change *after* CJ or NLP for the *next text processing* phase.
+            #
+            # For CJ and NLP, they usually work on a stable input (e.g.,
+            # corrected text or original) and produce analysis, not a new version
+            # of the essay text itself for further processing. So, the
+            # text_storage_id might not change *after* CJ or NLP for the
+            # *next text processing* phase.
+            #
             # However, ELSBatchPhaseOutcomeV1 still needs *a* text_storage_id.
-            # Default to original if specific output type not found or not applicable.
+            # Default to original if specific output type not found or not
+            # applicable.
         }
 
         output_content_type = phase_output_content_type_map.get(phase_name)
@@ -290,13 +295,15 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
             return str(storage_id) if storage_id is not None else None
         else:
             # Fallback: if the phase doesn't produce a new text version,
-            # or if its specific output isn't found, use the original text as reference for the next phase.
+            # or if its specific output isn't found, use the original text as
+            # reference for the next phase.
             # This might need to be more sophisticated, e.g., using the LATEST_TEXT_VERSION.
             # For now, using ORIGINAL_ESSAY as a safe fallback.
             # If spellcheck was the phase, and CORRECTED_TEXT isn't there, something went wrong.
             if phase_name == "spellcheck":
                 logger.warning(
-                    f"Corrected text storage ID not found for essay {essay_state.essay_id} after spellcheck. Falling back to original.",
+                    "Corrected text storage ID not found for essay {essay_state.essay_id} "
+                    "after spellcheck. Falling back to original.",
                     extra={"essay_id": essay_state.essay_id, "phase_name": phase_name},
                 )
 
@@ -305,7 +312,8 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
                 return str(fallback_storage_id)
 
         logger.warning(
-            f"Could not determine relevant text_storage_id for essay {essay_state.essay_id} after phase {phase_name}",
+            "Could not determine relevant text_storage_id for essay "
+            f"{essay_state.essay_id} after phase {phase_name}",
             extra={"essay_id": essay_state.essay_id, "phase_name": phase_name},
         )
         return None

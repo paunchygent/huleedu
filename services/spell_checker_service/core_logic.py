@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional, Tuple
-
 import aiohttp  # For ClientSession type hint
 from aiohttp import ClientTimeout
 
@@ -27,7 +25,7 @@ async def default_fetch_content_impl(
     session: aiohttp.ClientSession,
     storage_id: str,
     content_service_url: str,
-    essay_id: Optional[str] = None,
+    essay_id: str | None = None,
 ) -> str:
     """
     Default implementation for fetching content from the content service.
@@ -42,7 +40,7 @@ async def default_fetch_content_impl(
             response.raise_for_status()
             content = await response.text()
             logger.debug(
-                f"{log_prefix}Fetched content from {storage_id} (first 100 chars: {content[:100]})"
+                f"{log_prefix}Fetched content from {storage_id} (first 100 chars: {content[:100]})",
             )
             return content
     except Exception as e:
@@ -57,7 +55,7 @@ async def default_store_content_impl(
     session: aiohttp.ClientSession,
     text_content: str,
     content_service_url: str,
-    essay_id: Optional[str] = None,
+    essay_id: str | None = None,
 ) -> str:
     """
     Default implementation for storing content to the content service.
@@ -66,12 +64,12 @@ async def default_store_content_impl(
     log_prefix = f"Essay {essay_id}: " if essay_id else ""
     logger.debug(
         f"{log_prefix}Storing content (length: {len(text_content)}) "
-        f"to Content Service via {content_service_url}"
+        f"to Content Service via {content_service_url}",
     )
     try:
         timeout = ClientTimeout(total=10)
         async with session.post(
-            content_service_url, data=text_content.encode("utf-8"), timeout=timeout
+            content_service_url, data=text_content.encode("utf-8"), timeout=timeout,
         ) as response:
             response.raise_for_status()
             # Assuming Content Service returns JSON like {"storage_id": "..."}
@@ -87,8 +85,8 @@ async def default_store_content_impl(
 
 
 async def default_perform_spell_check_algorithm(
-    text: str, essay_id: Optional[str] = None, language: str = "en"
-) -> Tuple[str, int]:
+    text: str, essay_id: str | None = None, language: str = "en",
+) -> tuple[str, int]:
     """
     Complete L2 + pyspellchecker pipeline implementation.
 
@@ -101,7 +99,7 @@ async def default_perform_spell_check_algorithm(
     """
     log_prefix = f"Essay {essay_id}: " if essay_id else ""
     logger.info(
-        f"{log_prefix}Performing L2 + pyspellchecker algorithm for text (length: {len(text)})"
+        f"{log_prefix}Performing L2 + pyspellchecker algorithm for text (length: {len(text)})",
     )
 
     # Skip empty content or content with less than 20 words
@@ -120,7 +118,8 @@ async def default_perform_spell_check_algorithm(
 
         # 1. Load L2 dictionaries using environment-aware configuration
         logger.debug(
-            f"{log_prefix}Loading L2 error dictionary from: {settings.effective_filtered_dict_path}"
+            f"{log_prefix}Loading L2 error dictionary from: "
+            f"{settings.effective_filtered_dict_path}",
         )
         l2_errors = load_l2_errors(settings.effective_filtered_dict_path, filter_entries=False)
 
@@ -140,7 +139,7 @@ async def default_perform_spell_check_algorithm(
             spell_checker = SpellChecker(language=language)
         except Exception as e:
             logger.error(
-                f"{log_prefix}Failed to initialize SpellChecker for language '{language}': {e}"
+                f"{log_prefix}Failed to initialize SpellChecker for language '{language}': {e}",
             )
             # Fallback to L2 corrections only
             return l2_corrected_text, l2_correction_count
@@ -212,7 +211,7 @@ async def default_perform_spell_check_algorithm(
                                     "start": current_pos,
                                     "end": current_pos + token_len - 1,
                                     "rule": "pyspellchecker",
-                                }
+                                },
                             )
                             final_corrected_tokens.append(corrected_word)
                         else:
@@ -245,7 +244,7 @@ async def default_perform_spell_check_algorithm(
                             "start": corr.get("start", 0),
                             "end": corr.get("end", 0),
                             "rule": corr.get("rule", "L2"),
-                        }
+                        },
                     )
 
                 log_essay_corrections(
@@ -266,7 +265,7 @@ async def default_perform_spell_check_algorithm(
             f"{log_prefix}L2 + pyspellchecker algorithm completed:\n"
             f"{l2_correction_count} L2 corrections, "
             f"{pyspell_correction_count} pyspellchecker corrections, "
-            f"{total_corrections} total corrections"
+            f"{total_corrections} total corrections",
         )
 
         return final_corrected_text, total_corrections

@@ -109,7 +109,7 @@ class BatchRepositoryProtocol(Protocol):
         ...
 
     async def store_batch_context(
-        self, batch_id: str, registration_data: BatchRegistrationRequestV1
+        self, batch_id: str, registration_data: BatchRegistrationRequestV1,
     ) -> bool:
         """Store batch context information."""
         ...
@@ -169,7 +169,7 @@ class BatchProcessingServiceProtocol(Protocol):
     """Protocol for batch processing service operations."""
 
     async def register_new_batch(
-        self, registration_data: BatchRegistrationRequestV1, correlation_id: uuid.UUID
+        self, registration_data: BatchRegistrationRequestV1, correlation_id: uuid.UUID,
     ) -> str:
         """Register a new batch for processing and return the batch ID."""
         ...
@@ -208,16 +208,16 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
     ) -> None:
         """
         Initiate execution of the first phase in a BCS-resolved pipeline.
-        
+
         Called after ClientBatchPipelineRequestV1 processing to start execution
         of the resolved pipeline returned by BCS.
-        
+
         Args:
             batch_id: Unique identifier of the batch
             resolved_pipeline: BCS-resolved pipeline sequence (e.g., ["spellcheck", "ai_feedback"])
             correlation_id: Event correlation ID for tracing
             batch_context: Full batch context for essay retrieval
-            
+
         Raises:
             InitiationError: If pipeline initiation fails
             DataValidationError: If resolved pipeline is invalid

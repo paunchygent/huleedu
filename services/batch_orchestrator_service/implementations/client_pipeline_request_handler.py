@@ -141,7 +141,7 @@ class ClientPipelineRequestHandler:
 
             # Update batch with resolved pipeline
             await self._update_batch_with_resolved_pipeline(
-                batch_id, resolved_pipeline, batch_context
+                batch_id, resolved_pipeline, batch_context,
             )
 
             # Initiate first phase of resolved pipeline
@@ -159,7 +159,9 @@ class ClientPipelineRequestHandler:
                         "batch_id": batch_id,
                         "requested_pipeline": requested_pipeline,
                         "resolved_pipeline": resolved_pipeline,
-                        "first_phase_initiated": resolved_pipeline[0] if resolved_pipeline else None,
+                        "first_phase_initiated": resolved_pipeline[0]
+                        if resolved_pipeline
+                        else None,
                         "correlation_id": correlation_id,
                     },
                 )
@@ -238,7 +240,7 @@ class ClientPipelineRequestHandler:
             return False
 
     async def _update_batch_with_resolved_pipeline(
-        self, batch_id: str, resolved_pipeline: list[str], batch_context: Any
+        self, batch_id: str, resolved_pipeline: list[str], batch_context: Any,
     ) -> None:
         """Update batch processing state with BCS-resolved pipeline."""
         from common_core.pipeline_models import (
@@ -253,28 +255,28 @@ class ClientPipelineRequestHandler:
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
                 if "spellcheck" in resolved_pipeline
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            )
+            ),
         )
         cj_assessment_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
                 if "cj_assessment" in resolved_pipeline
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            )
+            ),
         )
         ai_feedback_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
                 if "ai_feedback" in resolved_pipeline
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            )
+            ),
         )
         nlp_metrics_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
                 if "nlp_metrics" in resolved_pipeline
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            )
+            ),
         )
 
         # Create updated pipeline state
@@ -289,7 +291,7 @@ class ClientPipelineRequestHandler:
 
         # Save updated state
         await self.batch_repo.save_processing_pipeline_state(
-            batch_id, updated_pipeline_state.model_dump(mode="json")
+            batch_id, updated_pipeline_state.model_dump(mode="json"),
         )
 
         logger.info(

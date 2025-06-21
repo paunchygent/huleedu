@@ -9,7 +9,7 @@ corrections such as pluralization or very short words.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Optional, Union
+from typing import TYPE_CHECKING
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -22,7 +22,7 @@ MODULE_LOGGER = create_service_logger(__name__)
 class L2CorrectionFilter:
     """Filter L2 corrections using simple heuristic rules."""
 
-    def __init__(self, logger: Optional[Logger] = None) -> None:
+    def __init__(self, logger: Logger | None = None) -> None:
         """Initialize the filter with an optional logger dependency."""
         self.logger = logger or MODULE_LOGGER
 
@@ -64,7 +64,7 @@ class L2CorrectionFilter:
                 if correction == stem + corr_suff:
                     self.logger.debug(
                         f"Pluralization change: '{error}' <-> '{correction}' "
-                        f"via rule ('{err_suff}' -> '{corr_suff}')"
+                        f"via rule ('{err_suff}' -> '{corr_suff}')",
                     )
                     return True
         return False
@@ -91,7 +91,7 @@ class L2CorrectionFilter:
         return True
 
 
-def filter_l2_entries(l2_errors: Dict[str, str], logger: Optional[Logger] = None) -> Dict[str, str]:
+def filter_l2_entries(l2_errors: dict[str, str], logger: Logger | None = None) -> dict[str, str]:
     """Filter a dictionary of L2 errors to remove unwanted corrections.
 
     Args:
@@ -113,7 +113,7 @@ def filter_l2_entries(l2_errors: Dict[str, str], logger: Optional[Logger] = None
 
     try:
         correction_filter = L2CorrectionFilter(logger=log)
-        filtered: Dict[str, str] = {}
+        filtered: dict[str, str] = {}
         invalid_count = 0
         processed_count = 0
 
@@ -137,7 +137,7 @@ def filter_l2_entries(l2_errors: Dict[str, str], logger: Optional[Logger] = None
         if invalid_count > 0:
             log.info(
                 f"Filtered out {invalid_count} invalid corrections "
-                f"({len(filtered)} remaining out of {processed_count} processed)"
+                f"({len(filtered)} remaining out of {processed_count} processed)",
             )
 
         return filtered
@@ -149,7 +149,7 @@ def filter_l2_entries(l2_errors: Dict[str, str], logger: Optional[Logger] = None
 
 
 def create_filtered_l2_dictionary(
-    l2_errors: Dict[str, str], output_path: Union[str, Path], logger: Optional[Logger] = None
+    l2_errors: dict[str, str], output_path: str | Path, logger: Logger | None = None,
 ) -> bool:
     """Create a filtered L2 dictionary file with valid corrections.
 
@@ -196,13 +196,13 @@ def create_filtered_l2_dictionary(
             with output_path.open("w", encoding="utf-8") as f:
                 for wrong, correct in sorted_entries:
                     f.write(f"{wrong}:{correct}\n")
-        except (IOError, OSError) as e:
+        except OSError as e:
             log.error(f"Failed to write to {output_path}: {e}")
             return False
 
         log.info(
             f"Successfully created filtered L2 dictionary with {len(filtered_errors)} "
-            f"entries (of {len(l2_errors)} original entries) at {output_path}"
+            f"entries (of {len(l2_errors)} original entries) at {output_path}",
         )
         return True
 

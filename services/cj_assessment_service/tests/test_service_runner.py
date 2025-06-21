@@ -30,7 +30,7 @@ class TestServiceManager:
         return ServiceManager(settings)
 
     async def test_service_manager_initialization(
-        self, service_manager: ServiceManager, settings: Settings
+        self, service_manager: ServiceManager, settings: Settings,
     ) -> None:
         """Test ServiceManager initializes correctly."""
         assert service_manager.settings == settings
@@ -71,7 +71,7 @@ class TestServiceIntegration:
     async def test_service_runs_with_valid_config(self) -> None:
         """Test that services can be configured correctly."""
         settings = Settings(
-            KAFKA_BOOTSTRAP_SERVERS="localhost:9092", METRICS_PORT=9999, LOG_LEVEL="INFO"
+            KAFKA_BOOTSTRAP_SERVERS="localhost:9092", METRICS_PORT=9999, LOG_LEVEL="INFO",
         )
 
         # Test that we can create a service manager with these settings

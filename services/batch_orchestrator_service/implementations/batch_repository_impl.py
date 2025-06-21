@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Dict
 
 from api_models import BatchRegistrationRequestV1
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -25,7 +24,7 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         # Storage for essay data from BatchEssaysReady events
         self.batch_essays: dict[str, list] = {}
         # Simulate database-level locks for atomic operations
-        self._locks: Dict[str, asyncio.Lock] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
 
     def _get_lock(self, batch_id: str) -> asyncio.Lock:
         """Get or create a lock for a specific batch (simulates database row-level locking)."""
@@ -58,7 +57,7 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         return self.pipeline_states.get(batch_id)
 
     async def store_batch_context(
-        self, batch_id: str, registration_data: BatchRegistrationRequestV1
+        self, batch_id: str, registration_data: BatchRegistrationRequestV1,
     ) -> bool:
         """Store the full batch context including course info and essay instructions."""
         self.batch_contexts[batch_id] = registration_data
@@ -116,7 +115,12 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         essays = self.batch_essays.get(batch_id)
         if essays:
             logger.info(f"Retrieved {len(essays)} essays for batch {batch_id}")
-            logger.debug(f"Essays retrieved: {[essay.get('essay_id', 'unknown') for essay in essays]}")
+            logger.debug(
+                f"Essays retrieved: {[essay.get('essay_id', 'unknown') for essay in essays]}",
+            )
         else:
-            logger.warning(f"No essays found for batch {batch_id}. Available batches: {list(self.batch_essays.keys())}")
+            logger.warning(
+                f"No essays found for batch {batch_id}."
+                f" Available batches: {list(self.batch_essays.keys())}",
+            )
         return essays

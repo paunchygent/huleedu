@@ -48,7 +48,10 @@ class TestLLMInteractionImplOverrides:
 
     @pytest.fixture
     def llm_interaction_impl(
-        self, mock_cache_manager: AsyncMock, mock_provider: AsyncMock, mock_settings: MagicMock
+        self,
+        mock_cache_manager: AsyncMock,
+        mock_provider: AsyncMock,
+        mock_settings: MagicMock,
     ) -> LLMInteractionImpl:
         """Create LLMInteractionImpl instance for testing."""
         from typing import cast
@@ -64,20 +67,26 @@ class TestLLMInteractionImplOverrides:
 
     @pytest.fixture
     def sample_comparison_task(
-        self, sample_essay_id: str, sample_essay_text: str
+        self,
+        sample_essay_id: str,
+        sample_essay_text: str,
     ) -> ComparisonTask:
         """Create sample comparison task."""
         essay_a = EssayForComparison(
-            id=sample_essay_id, text_content=sample_essay_text, current_bt_score=0.0
+            id=sample_essay_id, text_content=sample_essay_text, current_bt_score=0.0,
         )
         essay_b = EssayForComparison(
-            id="essay_b_id", text_content="Another essay text for comparison.", current_bt_score=0.0
+            id="essay_b_id",
+            text_content="Another essay text for comparison.",
+            current_bt_score=0.0,
         )
 
         return ComparisonTask(
             essay_a=essay_a,
             essay_b=essay_b,
-            prompt="Compare these two essays and determine which is better.",
+            prompt=(
+                "Compare these two essays and determine which is better."
+            ),
         )
 
     @pytest.mark.asyncio
@@ -238,14 +247,14 @@ class TestLLMInteractionImplOverrides:
         """Test perform_comparisons with multiple tasks and overrides."""
         # Arrange - Create second task
         essay_c = EssayForComparison(
-            id="essay_c_id", text_content="Third essay for comparison.", current_bt_score=0.0
+            id="essay_c_id", text_content="Third essay for comparison.", current_bt_score=0.0,
         )
         essay_d = EssayForComparison(
-            id="essay_d_id", text_content="Fourth essay for comparison.", current_bt_score=0.0
+            id="essay_d_id", text_content="Fourth essay for comparison.", current_bt_score=0.0,
         )
 
         second_task = ComparisonTask(
-            essay_a=essay_c, essay_b=essay_d, prompt="Compare these other two essays."
+            essay_a=essay_c, essay_b=essay_d, prompt="Compare these other two essays.",
         )
 
         tasks = [sample_comparison_task, second_task]
@@ -285,7 +294,7 @@ class TestLLMInteractionImplOverrides:
         """Test error handling when provider fails with overrides."""
         # Arrange - Set up provider error
         mock_provider.generate_comparison = AsyncMock(
-            return_value=(None, "API rate limit exceeded")
+            return_value=(None, "API rate limit exceeded"),
         )
 
         # Act

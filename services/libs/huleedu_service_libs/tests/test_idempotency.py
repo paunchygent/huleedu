@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from aiokafka import ConsumerRecord
@@ -102,7 +102,7 @@ def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
         topic="test-topic",
         partition=0,
         offset=123,
-        timestamp=int(datetime.now(timezone.utc).timestamp() * 1000),
+        timestamp=int(datetime.now(UTC).timestamp() * 1000),
         timestamp_type=1,
         key=b"test-key",
         value=message_json.encode("utf-8"),
@@ -125,7 +125,7 @@ def sample_event_data() -> dict:
     return {
         "event_id": str(uuid.uuid4()),
         "event_type": "test.event.v1",
-        "event_timestamp": datetime.now(timezone.utc).isoformat(),
+        "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "test-service",
         "correlation_id": str(uuid.uuid4()),
         "data": {"test_field": "test_value", "batch_id": "test-batch-123"},
@@ -134,7 +134,7 @@ def sample_event_data() -> dict:
 
 @pytest.mark.asyncio
 async def test_first_time_event_processing(
-    mock_redis_client: MockRedisClient, sample_event_data: dict
+    mock_redis_client: MockRedisClient, sample_event_data: dict,
 ) -> None:
     """Test that first-time events are processed normally."""
     # Create Kafka message
@@ -171,7 +171,7 @@ async def test_first_time_event_processing(
 
 @pytest.mark.asyncio
 async def test_duplicate_event_skipped(
-    mock_redis_client: MockRedisClient, sample_event_data: dict
+    mock_redis_client: MockRedisClient, sample_event_data: dict,
 ) -> None:
     """Test that duplicate events are skipped without processing."""
     # Create Kafka message
@@ -205,7 +205,7 @@ async def test_duplicate_event_skipped(
 
 @pytest.mark.asyncio
 async def test_processing_failure_releases_lock(
-    mock_redis_client: MockRedisClient, sample_event_data: dict
+    mock_redis_client: MockRedisClient, sample_event_data: dict,
 ) -> None:
     """Test that processing failures release the idempotency lock for retry."""
     # Create Kafka message
@@ -231,7 +231,7 @@ async def test_processing_failure_releases_lock(
 
 @pytest.mark.asyncio
 async def test_redis_set_failure_fallback(
-    mock_redis_client: MockRedisClient, sample_event_data: dict
+    mock_redis_client: MockRedisClient, sample_event_data: dict,
 ) -> None:
     """Test that Redis SET failures fall back to processing without idempotency."""
     # Configure Redis client to fail on SET
@@ -256,7 +256,7 @@ async def test_redis_set_failure_fallback(
 
 @pytest.mark.asyncio
 async def test_redis_delete_failure_logged(
-    mock_redis_client: MockRedisClient, sample_event_data: dict
+    mock_redis_client: MockRedisClient, sample_event_data: dict,
 ) -> None:
     """Test that Redis DELETE failures are logged but don't prevent exception propagation."""
     # Configure Redis client to fail on DELETE
@@ -281,7 +281,7 @@ async def test_redis_delete_failure_logged(
 
 @pytest.mark.asyncio
 async def test_default_ttl_applied(
-    mock_redis_client: MockRedisClient, sample_event_data: dict
+    mock_redis_client: MockRedisClient, sample_event_data: dict,
 ) -> None:
     """Test that default TTL (24 hours) is applied when not specified."""
     # Create Kafka message
@@ -311,7 +311,7 @@ async def test_deterministic_key_generation(mock_redis_client: MockRedisClient) 
     event_data = {
         "event_id": str(uuid.uuid4()),  # Different UUID each time
         "event_type": "test.event.v1",
-        "event_timestamp": datetime.now(timezone.utc).isoformat(),
+        "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "test-service",
         "correlation_id": str(uuid.uuid4()),  # Different UUID each time
         "data": {"test_field": "identical_value", "batch_id": "same-batch-123"},

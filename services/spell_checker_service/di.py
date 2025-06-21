@@ -44,6 +44,7 @@ class SpellCheckerServiceProvider(Provider):
     def provide_metrics_registry(self) -> CollectorRegistry:
         """Provide Prometheus metrics registry."""
         from prometheus_client import REGISTRY
+
         return REGISTRY
 
     @provide(scope=Scope.APP)
@@ -60,7 +61,7 @@ class SpellCheckerServiceProvider(Provider):
     async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
         """Provide Redis client for idempotency operations."""
         redis_client = RedisClient(
-            client_id=f"{settings.SERVICE_NAME}-redis", redis_url=settings.REDIS_URL
+            client_id=f"{settings.SERVICE_NAME}-redis", redis_url=settings.REDIS_URL,
         )
         await redis_client.start()
         return redis_client
@@ -82,14 +83,14 @@ class SpellCheckerServiceProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_spell_logic(
-        self, result_store: ResultStoreProtocol, http_session: ClientSession
+        self, result_store: ResultStoreProtocol, http_session: ClientSession,
     ) -> SpellLogicProtocol:
         """Provide spell logic implementation."""
         return DefaultSpellLogic(result_store=result_store, http_session=http_session)
 
     @provide(scope=Scope.APP)
     def provide_spellcheck_event_publisher(
-        self, app_settings: Settings
+        self, app_settings: Settings,
     ) -> SpellcheckEventPublisherProtocol:
         """Provide spellcheck event publisher implementation."""
         return DefaultSpellcheckEventPublisher(

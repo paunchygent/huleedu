@@ -12,7 +12,7 @@ Uses real services, mocks only external boundaries.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 import aiohttp
 import pytest
@@ -29,7 +29,7 @@ class TestBCSBOSHttpIntegration:
         return ServiceTestManager()
 
     @pytest.fixture
-    async def validated_services(self, service_manager: ServiceTestManager) -> Dict[str, Any]:
+    async def validated_services(self, service_manager: ServiceTestManager) -> dict[str, Any]:
         """Ensure both BOS and BCS services are running and healthy."""
         endpoints = await service_manager.get_validated_endpoints()
 
@@ -49,7 +49,7 @@ class TestBCSBOSHttpIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_successful_pipeline_resolution(
-        self, validated_services: Dict[str, Any], bcs_endpoint_url: str
+        self, validated_services: dict[str, Any], bcs_endpoint_url: str,
     ):
         """
         Test successful HTTP communication and pipeline resolution.
@@ -96,7 +96,7 @@ class TestBCSBOSHttpIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_http_error_handling_400_bad_request(
-        self, validated_services: Dict[str, Any], bcs_endpoint_url: str
+        self, validated_services: dict[str, Any], bcs_endpoint_url: str,
     ):
         """
         Test BCS handles invalid requests with proper HTTP 400 responses.
@@ -144,7 +144,7 @@ class TestBCSBOSHttpIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_http_timeout_and_resilience(
-        self, validated_services: Dict[str, Any], bcs_endpoint_url: str
+        self, validated_services: dict[str, Any], bcs_endpoint_url: str,
     ):
         """
         Test HTTP timeout configuration and error handling.
@@ -199,7 +199,7 @@ class TestBCSBOSHttpIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_concurrent_http_requests(
-        self, validated_services: Dict[str, Any], bcs_endpoint_url: str
+        self, validated_services: dict[str, Any], bcs_endpoint_url: str,
     ):
         """
         Test BCS handles concurrent HTTP requests properly.
@@ -213,7 +213,7 @@ class TestBCSBOSHttpIntegration:
 
         request_data_template = {"requested_pipeline": "ai_feedback"}
 
-        async def make_request(session: aiohttp.ClientSession, batch_id: str) -> Dict[str, Any]:
+        async def make_request(session: aiohttp.ClientSession, batch_id: str) -> dict[str, Any]:
             """Make a single HTTP request to BCS."""
             request_data = {**request_data_template, "batch_id": batch_id}
 
@@ -226,7 +226,7 @@ class TestBCSBOSHttpIntegration:
                 assert response.status in [200, 400], (
                     f"Unexpected status for {batch_id}: {response.status}"
                 )
-                response_data: Dict[str, Any] = await response.json()
+                response_data: dict[str, Any] = await response.json()
                 response_data["_test_batch_id"] = batch_id  # Track which request this is
                 return response_data
 
@@ -270,7 +270,7 @@ class TestBCSBOSHttpIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_request_response_contract_validation(
-        self, validated_services: Dict[str, Any], bcs_endpoint_url: str
+        self, validated_services: dict[str, Any], bcs_endpoint_url: str,
     ):
         """
         Test detailed request/response contract validation.
@@ -312,7 +312,7 @@ class TestBCSBOSHttpIntegration:
                             assert response_data["batch_id"] == request_data["batch_id"]
 
                             print(
-                                f"✅ Contract validation {i}: {request_data['requested_pipeline']}"
+                                f"✅ Contract validation {i}: {request_data['requested_pipeline']}",
                             )
 
                         elif response.status == 400:
@@ -320,7 +320,7 @@ class TestBCSBOSHttpIntegration:
                             assert "detail" in response_data or "error" in response_data
                             print(
                                 f"✅ Error contract validation {i}: "
-                                f"{request_data['requested_pipeline']}"
+                                f"{request_data['requested_pipeline']}",
                             )
 
                         else:

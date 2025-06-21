@@ -101,7 +101,7 @@ class TestGenerateDeterministicEventId:
                 "batch_id": "123",
                 "metadata": {"source": "file_service", "version": "1.0"},
                 "essays": [{"id": "essay_1"}, {"id": "essay_2"}],
-            }
+            },
         }
 
         event2 = {
@@ -109,7 +109,7 @@ class TestGenerateDeterministicEventId:
                 "essays": [{"id": "essay_1"}, {"id": "essay_2"}],  # Same data, different order
                 "batch_id": "123",
                 "metadata": {"version": "1.0", "source": "file_service"},
-            }
+            },
         }
 
         msg1 = json.dumps(event1).encode("utf-8")

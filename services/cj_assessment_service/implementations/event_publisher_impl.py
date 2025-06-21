@@ -24,7 +24,7 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
         self.settings = settings
 
     async def publish_assessment_completed(
-        self, completion_data: Any, correlation_id: UUID | None
+        self, completion_data: Any, correlation_id: UUID | None,
     ) -> None:
         """Publish CJ assessment completion event to Kafka.
 
@@ -41,13 +41,13 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
 
         try:
             await self.kafka_bus.publish(
-                self.settings.CJ_ASSESSMENT_COMPLETED_TOPIC, completion_data, key=key
+                self.settings.CJ_ASSESSMENT_COMPLETED_TOPIC, completion_data, key=key,
             )
         except Exception as e:
             raise Exception(f"Failed to publish CJ assessment completion event: {e!s}") from e
 
     async def publish_assessment_failed(
-        self, failure_data: Any, correlation_id: UUID | None
+        self, failure_data: Any, correlation_id: UUID | None,
     ) -> None:
         """Publish CJ assessment failure event to Kafka.
 
@@ -64,7 +64,7 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
 
         try:
             await self.kafka_bus.publish(
-                self.settings.CJ_ASSESSMENT_FAILED_TOPIC, failure_data, key=key
+                self.settings.CJ_ASSESSMENT_FAILED_TOPIC, failure_data, key=key,
             )
         except Exception as e:
             raise Exception(f"Failed to publish CJ assessment failure event: {e!s}") from e

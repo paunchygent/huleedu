@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import Field
 
 from ..metadata_models import StorageReferenceMetadata
@@ -33,9 +31,9 @@ class SpellcheckResultDataV1(ProcessingUpdate):
     """
 
     original_text_storage_id: str = Field(
-        description="Storage ID of the original text that was spellchecked."
+        description="Storage ID of the original text that was spellchecked.",
     )
-    storage_metadata: Optional[StorageReferenceMetadata] = Field(
-        default=None, description="Ref to corrected text, logs."
+    storage_metadata: StorageReferenceMetadata | None = Field(
+        default=None, description="Ref to corrected text, logs.",
     )
-    corrections_made: Optional[int] = Field(default=None, description="Number of corrections made.")
+    corrections_made: int | None = Field(default=None, description="Number of corrections made.")

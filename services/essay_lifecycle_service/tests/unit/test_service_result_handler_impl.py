@@ -312,7 +312,8 @@ class TestDefaultServiceResultHandler:
         # Setup
         correlation_id = uuid4()
 
-        # Mock essay states - NOTE: implementation only processes essays in AWAITING_CJ_ASSESSMENT status
+        # Mock essay states - NOTE: implementation only processes essays in
+        # AWAITING_CJ_ASSESSMENT status
         essay1_state = MagicMock()
         essay1_state.essay_id = "essay-1"
         essay1_state.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT

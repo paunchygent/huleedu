@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import aiohttp
 
@@ -32,18 +31,18 @@ class DefaultSpellLogic(SpellLogicProtocol):
     async def perform_spell_check(
         self,
         text: str,
-        essay_id: Optional[str],
+        essay_id: str | None,
         original_text_storage_id: str,
         initial_system_metadata: SystemProcessingMetadata,
         language: str = "en",
     ) -> SpellcheckResultDataV1:
         """Perform spell check using the core logic implementation."""
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, essay_id, language=language
+            text, essay_id, language=language,
         )
 
-        new_storage_id: Optional[str] = None
-        storage_metadata_for_result: Optional[StorageReferenceMetadata] = None
+        new_storage_id: str | None = None
+        storage_metadata_for_result: StorageReferenceMetadata | None = None
         current_status = EssayStatus.SPELLCHECKED_SUCCESS
         error_detail = None
 
@@ -57,7 +56,7 @@ class DefaultSpellLogic(SpellLogicProtocol):
                 )
                 if new_storage_id:
                     storage_metadata_for_result = StorageReferenceMetadata(
-                        references={ContentType.CORRECTED_TEXT: {"default": new_storage_id}}
+                        references={ContentType.CORRECTED_TEXT: {"default": new_storage_id}},
                     )
                 else:
                     current_status = EssayStatus.SPELLCHECK_FAILED
@@ -67,7 +66,7 @@ class DefaultSpellLogic(SpellLogicProtocol):
 
                 logger = create_service_logger("spell_checker_service.spell_logic_impl")
                 logger.error(
-                    f"Essay {essay_id}: Failed to store corrected text: {e}", exc_info=True
+                    f"Essay {essay_id}: Failed to store corrected text: {e}", exc_info=True,
                 )
                 current_status = EssayStatus.SPELLCHECK_FAILED
                 error_detail = f"Exception storing corrected text: {str(e)[:100]}"
@@ -92,9 +91,9 @@ class DefaultSpellLogic(SpellLogicProtocol):
                     else ProcessingStage.FAILED
                 ),
                 "event": ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
-                "completed_at": datetime.now(timezone.utc),
+                "completed_at": datetime.now(UTC),
                 "error_info": updated_error_info,
-            }
+            },
         )
         # Ensure entity in system_metadata is the correct one for this essay
         final_system_metadata.entity = final_entity_ref
@@ -105,7 +104,7 @@ class DefaultSpellLogic(SpellLogicProtocol):
             corrections_made=corrections_count,
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
             entity_ref=final_entity_ref,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             status=current_status,
             system_metadata=final_system_metadata,
         )

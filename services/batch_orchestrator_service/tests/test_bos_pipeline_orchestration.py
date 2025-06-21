@@ -85,7 +85,7 @@ class TestBatchKafkaConsumerBusinessLogic:
 
         # Verify the correct handler was called
         mock_els_batch_phase_outcome_handler.handle_els_batch_phase_outcome.assert_called_once_with(
-            mock_message
+            mock_message,
         )
 
     async def test_batch_essays_ready_message_routing(
@@ -105,7 +105,7 @@ class TestBatchKafkaConsumerBusinessLogic:
 
         # Verify the correct handler was called
         mock_batch_essays_ready_handler.handle_batch_essays_ready.assert_called_once_with(
-            mock_message
+            mock_message,
         )
 
     async def test_client_pipeline_request_message_routing(
@@ -125,7 +125,7 @@ class TestBatchKafkaConsumerBusinessLogic:
 
         # Verify the correct handler was called
         mock_client_pipeline_request_handler.handle_client_pipeline_request.assert_called_once_with(
-            mock_message
+            mock_message,
         )
 
     async def test_unknown_topic_handling(

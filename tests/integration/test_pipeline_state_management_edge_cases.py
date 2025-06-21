@@ -48,7 +48,7 @@ class TestPipelineEdgeCases:
         )
 
     async def test_idempotency_handling_for_already_initiated_phase(
-        self, pipeline_coordinator, batch_repository, mock_cj_initiator
+        self, pipeline_coordinator, batch_repository, mock_cj_initiator,
     ):
         """Test idempotency - already initiated phases should not be re-initiated."""
         batch_id = str(uuid4())
@@ -91,7 +91,7 @@ class TestPipelineEdgeCases:
         mock_cj_initiator.initiate_phase.assert_not_called()
 
     async def test_missing_batch_context_error_handling(
-        self, pipeline_coordinator, batch_repository, mock_cj_initiator
+        self, pipeline_coordinator, batch_repository, mock_cj_initiator,
     ):
         """Test error handling when batch context is missing."""
         batch_id = str(uuid4())
@@ -122,7 +122,7 @@ class TestPipelineEdgeCases:
         mock_cj_initiator.initiate_phase.assert_not_called()
 
     async def test_missing_pipeline_state_error_handling(
-        self, pipeline_coordinator, batch_repository, mock_cj_initiator
+        self, pipeline_coordinator, batch_repository, mock_cj_initiator,
     ):
         """Test error handling when pipeline state is missing."""
         batch_id = str(uuid4())

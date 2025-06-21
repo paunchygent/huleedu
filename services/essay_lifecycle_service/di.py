@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.protocols import RedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import CollectorRegistry
 
@@ -88,13 +90,14 @@ class CoreInfrastructureProvider(Provider):
         return ClientSession()
 
     @provide(scope=Scope.APP)
-    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
-        """Provide Redis client for idempotency operations."""
+    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
+        """Provide Redis client for idempotency and pub/sub operations."""
         redis_client = RedisClient(
             client_id=f"{settings.SERVICE_NAME}-redis", redis_url=settings.REDIS_URL
         )
         await redis_client.start()
-        return redis_client
+        # RedisClient implements all AtomicRedisClientProtocol methods
+        return cast(AtomicRedisClientProtocol, redis_client)
 
     @provide(scope=Scope.APP)
     async def provide_essay_repository(self, settings: Settings) -> EssayRepositoryProtocol:

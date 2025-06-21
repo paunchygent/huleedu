@@ -68,7 +68,7 @@ class TestEventContractCompliance:
         )
 
         real_spell_logic = DefaultSpellLogic(
-            result_store=mock_result_store, http_session=mock_http_session
+            result_store=mock_result_store, http_session=mock_http_session,
         )
 
         # Act - Process message using real spell checking with NEW signature
@@ -137,7 +137,7 @@ class TestEventContractCompliance:
         )
 
         real_spell_logic = DefaultSpellLogic(
-            result_store=mock_result_store, http_session=mock_http_session
+            result_store=mock_result_store, http_session=mock_http_session,
         )
 
         # Act - Process message using real spell checking with NEW signature

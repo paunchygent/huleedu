@@ -40,7 +40,7 @@ class TestCoreLogicValidationErrors:
 
         # Configure text extractor to fail
         mock_text_extractor.extract_text.side_effect = RuntimeError(
-            "Unable to extract text from PDF"
+            "Unable to extract text from PDF",
         )
 
         # Act

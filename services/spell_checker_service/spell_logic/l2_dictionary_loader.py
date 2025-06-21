@@ -59,7 +59,7 @@ def load_l2_errors(filename: str, filter_entries: bool = True) -> dict[str, str]
             file_path = filename
 
         logger.debug(f"Loading L2 corrections from: {file_path}")
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line and ":" in line:
@@ -182,7 +182,7 @@ def apply_l2_corrections(text: str, l2_errors: dict[str, str]) -> tuple[str, lis
                     "rule": "L2 dictionary",
                     "start": pos,
                     "end": pos + len(original_case) - 1,
-                }
+                },
             )
             corrected_tokens.append(correction)
         else:
@@ -265,7 +265,7 @@ def apply_specific_corrections(text: str, corrections_to_apply: list[dict]) -> s
         if text_slice != original_word:
             logger.warning(
                 f"Text at position {start}-{end - 1} ('{text_slice}') "
-                f"doesn't match expected original word '{original_word}', skipping"
+                f"doesn't match expected original word '{original_word}', skipping",
             )
             continue
 

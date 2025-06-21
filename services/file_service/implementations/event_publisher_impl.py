@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -24,7 +23,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
         self.settings = settings
 
     async def publish_essay_content_provisioned(
-        self, event_data: EssayContentProvisionedV1, correlation_id: Optional[uuid.UUID]
+        self, event_data: EssayContentProvisionedV1, correlation_id: uuid.UUID | None,
     ) -> None:
         """Publish EssayContentProvisionedV1 event to Kafka."""
         try:
@@ -38,12 +37,12 @@ class DefaultEventPublisher(EventPublisherProtocol):
 
             # Publish to Kafka using KafkaBus
             await self.kafka_bus.publish(
-                topic=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC, envelope=envelope
+                topic=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC, envelope=envelope,
             )
 
             logger.info(
                 f"Published EssayContentProvisionedV1 event for file: "
-                f"{event_data.original_file_name}"
+                f"{event_data.original_file_name}",
             )
 
         except Exception as e:
@@ -51,7 +50,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
             raise
 
     async def publish_essay_validation_failed(
-        self, event_data: EssayValidationFailedV1, correlation_id: Optional[uuid.UUID]
+        self, event_data: EssayValidationFailedV1, correlation_id: uuid.UUID | None,
     ) -> None:
         """Publish EssayValidationFailedV1 event to Kafka."""
         try:
@@ -65,12 +64,12 @@ class DefaultEventPublisher(EventPublisherProtocol):
 
             # Publish to Kafka using KafkaBus
             await self.kafka_bus.publish(
-                topic=self.settings.ESSAY_VALIDATION_FAILED_TOPIC, envelope=envelope
+                topic=self.settings.ESSAY_VALIDATION_FAILED_TOPIC, envelope=envelope,
             )
 
             logger.info(
                 f"Published EssayValidationFailedV1 event for file: "
-                f"{event_data.original_file_name} (error: {event_data.validation_error_code})"
+                f"{event_data.original_file_name} (error: {event_data.validation_error_code})",
             )
 
         except Exception as e:

@@ -9,7 +9,7 @@ Uses modern utility patterns (ServiceTestManager + KafkaTestManager) throughout 
 
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -63,13 +63,13 @@ class TestE2EKafkaMonitoring:
                 pytest.fail(f"ServiceTestManager upload failed: {e}")
 
             # Collect events using KafkaTestManager utility
-            def event_filter(event_data: Dict[str, Any]) -> bool:
+            def event_filter(event_data: dict[str, Any]) -> bool:
                 """Filter for our specific batch (matching batch_id)."""
                 return "data" in event_data and event_data["data"].get("batch_id") == batch_id
 
             try:
                 events = await kafka_manager.collect_events(
-                    consumer, expected_count=1, timeout_seconds=30, event_filter=event_filter
+                    consumer, expected_count=1, timeout_seconds=30, event_filter=event_filter,
                 )
 
                 assert len(events) == 1, f"Expected 1 event, got {len(events)}"
@@ -111,9 +111,7 @@ class TestE2EKafkaMonitoring:
                 data_correlation_id = content_data.get("correlation_id")
 
                 correlation_match = False
-                if event_correlation_id and event_correlation_id == upload_correlation_id:
-                    correlation_match = True
-                elif data_correlation_id and data_correlation_id == upload_correlation_id:
+                if (event_correlation_id and event_correlation_id == upload_correlation_id) or (data_correlation_id and data_correlation_id == upload_correlation_id):
                     correlation_match = True
 
                 assert correlation_match, (
@@ -160,7 +158,7 @@ class TestE2EKafkaMonitoring:
         topics = ["huleedu.file.essay.content.provisioned.v1"]
         async with kafka_event_monitor("multi_file_events_test", topics) as consumer:
             # Upload multiple files using ServiceTestManager utility
-            files: List[Dict[str, Any]] = []
+            files: list[dict[str, Any]] = []
             for test_file in test_file_paths:
                 with open(test_file, "rb") as f:
                     files.append({"name": test_file.name, "content": f.read()})
@@ -176,7 +174,7 @@ class TestE2EKafkaMonitoring:
                 pytest.fail(f"ServiceTestManager multi-file upload failed: {e}")
 
             # Collect events for all uploaded files using KafkaTestManager
-            def event_filter(event_data: Dict[str, Any]) -> bool:
+            def event_filter(event_data: dict[str, Any]) -> bool:
                 """Filter for our specific batch (matching batch_id)."""
                 return "data" in event_data and event_data["data"].get("batch_id") == batch_id
 

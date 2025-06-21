@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from api_models import BatchRegistrationRequestV1
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -27,7 +27,7 @@ class BatchContextOperations:
         self.logger = create_service_logger("bos.repository.context")
 
     async def store_batch_context(
-        self, batch_id: str, registration_data: BatchRegistrationRequestV1
+        self, batch_id: str, registration_data: BatchRegistrationRequestV1,
     ) -> bool:
         """Store batch context information."""
         async with self.db.session() as session:
@@ -64,7 +64,7 @@ class BatchContextOperations:
                             description=registration_data.essay_instructions,
                             total_essays=registration_data.expected_essay_count,
                             processing_metadata=registration_data.model_dump(),
-                            updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                            updated_at=datetime.now(UTC).replace(tzinfo=None),
                         )
                     )
                     await session.execute(stmt)

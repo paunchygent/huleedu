@@ -7,7 +7,7 @@ with appropriate error codes (EMPTY_CONTENT, CONTENT_TOO_SHORT).
 Modernized to use ServiceTestManager and KafkaTestManager utilities.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -64,14 +64,14 @@ async def test_content_validation_failures_publish_events():
         # Upload files using utility
         try:
             upload_result = await service_manager.upload_files(
-                batch_id=batch_id, files=files, correlation_id=correlation_id
+                batch_id=batch_id, files=files, correlation_id=correlation_id,
             )
             print(f"✅ File upload successful: {upload_result}")
         except RuntimeError as e:
             pytest.fail(f"File upload failed: {e}")
 
         # Collect validation events using utility
-        def validation_event_filter(event_data: Dict[str, Any]) -> bool:
+        def validation_event_filter(event_data: dict[str, Any]) -> bool:
             """Filter for validation events from our specific test batch."""
             # Handle EventEnvelope format
             if "data" in event_data and isinstance(event_data["data"], dict):
@@ -83,7 +83,7 @@ async def test_content_validation_failures_publish_events():
         try:
             # Collect events - expect 1 content provision + 2 validation failures
             events = await kafka_manager.collect_events(
-                consumer, expected_count=3, timeout_seconds=30, event_filter=validation_event_filter
+                consumer, expected_count=3, timeout_seconds=30, event_filter=validation_event_filter,
             )
 
             print(f"📊 Collected {len(events)} validation events")
@@ -149,7 +149,7 @@ async def test_content_validation_failures_publish_events():
 
             print(
                 "✅ Test passed: Content validation failures correctly publish "
-                "appropriate validation failure events!"
+                "appropriate validation failure events!",
             )
 
         except Exception as e:

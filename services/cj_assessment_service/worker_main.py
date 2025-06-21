@@ -99,13 +99,13 @@ async def main() -> None:
                             else:
                                 logger.warning(
                                     f"Message processing failed, not committing: "
-                                    f"{msg.topic}:{msg.partition}:{msg.offset}"
+                                    f"{msg.topic}:{msg.partition}:{msg.offset}",
                                 )
                         else:
                             # Message was a duplicate and skipped
                             logger.info(
                                 f"Duplicate message skipped, not committing offset: "
-                                f"{msg.topic}:{msg.partition}:{msg.offset}"
+                                f"{msg.topic}:{msg.partition}:{msg.offset}",
                             )
 
                     except Exception as e:

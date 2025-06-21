@@ -140,7 +140,7 @@ class SpellCheckerKafkaConsumer:
                 for tp, messages in result.items():
                     logger.debug(
                         f"Received {len(messages)} messages from {tp.topic} "
-                        f"partition {tp.partition}"
+                        f"partition {tp.partition}",
                     )
                     for msg_count, msg in enumerate(messages):
                         if self.should_stop:
@@ -159,7 +159,7 @@ class SpellCheckerKafkaConsumer:
                             await self.consumer.commit(offsets)
                             logger.debug(
                                 f"Committed offset {msg.offset + 1} for {tp_instance} "
-                                f"(processing_result: {processing_result})"
+                                f"(processing_result: {processing_result})",
                             )
                         elif processing_result is None:  # Duplicate - already processed
                             # Still commit to avoid reprocessing the duplicate
@@ -168,7 +168,7 @@ class SpellCheckerKafkaConsumer:
                             await self.consumer.commit(offsets)
                             logger.debug(
                                 f"Committed offset {msg.offset + 1} for {tp_instance} "
-                                f"(duplicate skipped)"
+                                f"(duplicate skipped)",
                             )
                     if self.should_stop:
                         break

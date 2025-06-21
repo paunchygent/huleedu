@@ -8,7 +8,6 @@ including Kafka connection settings, service URLs, and consumer/producer configu
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -51,7 +50,7 @@ class Settings(BaseSettings):
     CORRECTION_LOG_OUTPUT_DIR: str = "data/corrected_essays"
 
     # Environment-specific overrides (for containerized deployments)
-    L2_EXTERNAL_DATA_PATH: Optional[str] = None  # Override for mounted volumes
+    L2_EXTERNAL_DATA_PATH: str | None = None  # Override for mounted volumes
 
     @property
     def _service_dir(self) -> Path:
@@ -76,7 +75,7 @@ class Settings(BaseSettings):
         if self.L2_EXTERNAL_DATA_PATH:
             return f"{self.L2_EXTERNAL_DATA_PATH}/nortvig_master_SWE_L2_corrections.txt"
         return str(
-            self._service_dir / "data" / "l2_error_dict" / "nortvig_master_SWE_L2_corrections.txt"
+            self._service_dir / "data" / "l2_error_dict" / "nortvig_master_SWE_L2_corrections.txt",
         )
 
     @property

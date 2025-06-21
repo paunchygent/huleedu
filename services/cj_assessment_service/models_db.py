@@ -53,7 +53,7 @@ class CJBatchUpload(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()")
+        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -61,12 +61,12 @@ class CJBatchUpload(Base):
     processing_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Relationships
-    essays: Mapped[list["ProcessedEssay"]] = relationship(
+    essays: Mapped[list[ProcessedEssay]] = relationship(
         back_populates="cj_batch",
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    comparison_pairs: Mapped[list["ComparisonPair"]] = relationship(
+    comparison_pairs: Mapped[list[ComparisonPair]] = relationship(
         back_populates="cj_batch",
         cascade="all, delete-orphan",
     )
@@ -96,19 +96,19 @@ class ProcessedEssay(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()")
+        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
     )
 
     # Processing metadata
     processing_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Relationships
-    cj_batch: Mapped["CJBatchUpload"] = relationship(back_populates="essays")
-    comparison_pairs_a: Mapped[list["ComparisonPair"]] = relationship(
+    cj_batch: Mapped[CJBatchUpload] = relationship(back_populates="essays")
+    comparison_pairs_a: Mapped[list[ComparisonPair]] = relationship(
         back_populates="essay_a",
         foreign_keys="ComparisonPair.essay_a_els_id",
     )
-    comparison_pairs_b: Mapped[list["ComparisonPair"]] = relationship(
+    comparison_pairs_b: Mapped[list[ComparisonPair]] = relationship(
         back_populates="essay_b",
         foreign_keys="ComparisonPair.essay_b_els_id",
     )
@@ -144,7 +144,7 @@ class ComparisonPair(Base):
 
     # Comparison results
     winner: Mapped[str | None] = mapped_column(
-        String(20), nullable=True
+        String(20), nullable=True,
     )  # "essay_a", "essay_b", "error"
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     justification: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -159,12 +159,12 @@ class ComparisonPair(Base):
     processing_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Relationships
-    cj_batch: Mapped["CJBatchUpload"] = relationship(back_populates="comparison_pairs")
-    essay_a: Mapped["ProcessedEssay"] = relationship(
+    cj_batch: Mapped[CJBatchUpload] = relationship(back_populates="comparison_pairs")
+    essay_a: Mapped[ProcessedEssay] = relationship(
         back_populates="comparison_pairs_a",
         foreign_keys=[essay_a_els_id],
     )
-    essay_b: Mapped["ProcessedEssay"] = relationship(
+    essay_b: Mapped[ProcessedEssay] = relationship(
         back_populates="comparison_pairs_b",
         foreign_keys=[essay_b_els_id],
     )

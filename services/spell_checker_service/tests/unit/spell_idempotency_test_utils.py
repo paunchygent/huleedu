@@ -1,12 +1,12 @@
 """
 Shared utilities, fixtures, and mock objects for spell checker idempotency tests.
 """
+
 from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
-from typing import Dict, Tuple
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -24,8 +24,8 @@ class MockRedisClient:
     """Mock Redis client for testing idempotency behavior."""
 
     def __init__(self) -> None:
-        self.keys: Dict[str, str] = {}
-        self.set_calls: list[Tuple[str, str, int]] = []
+        self.keys: dict[str, str] = {}
+        self.set_calls: list[tuple[str, str, int]] = []
         self.delete_calls: list[str] = []
         self.should_fail_set = False
 
@@ -86,7 +86,7 @@ def sample_spellcheck_request_event() -> dict:
     return {
         "event_id": str(uuid.uuid4()),
         "event_type": "huleedu.essay.spellcheck.requested.v1",
-        "event_timestamp": datetime.now(timezone.utc).isoformat(),
+        "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "essay_lifecycle_service",
         "correlation_id": correlation_id,
         "data": {
@@ -95,7 +95,7 @@ def sample_spellcheck_request_event() -> dict:
             "status": "awaiting_spellcheck",
             "system_metadata": {
                 "entity": {"entity_id": essay_id, "entity_type": "essay"},
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "processing_stage": "pending",
                 "event": "essay.spellcheck.requested",
             },
@@ -130,6 +130,7 @@ def real_spell_logic(
     from services.spell_checker_service.protocol_implementations.spell_logic_impl import (
         DefaultSpellLogic,
     )
+
     return DefaultSpellLogic(
         result_store=result_store,
         http_session=mock_boundary_services[0],

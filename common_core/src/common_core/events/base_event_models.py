@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Union
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
@@ -14,14 +14,14 @@ if TYPE_CHECKING:
 
 
 class BaseEventData(BaseModel):
-    event_name: "ProcessingEvent"  # Specific event name enum, Pydantic will coerce from string
+    event_name: ProcessingEvent  # Specific event name enum, Pydantic will coerce from string
     entity_ref: EntityReference
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     # SystemProcessingMetadata is now part of the concrete event data models below
 
 
 class ProcessingUpdate(BaseEventData):
-    status: Union["EssayStatus", "BatchStatus"]  # New status of the entity using proper enum types
+    status: EssayStatus | BatchStatus  # New status of the entity using proper enum types
     system_metadata: SystemProcessingMetadata  # Context of THIS event's creation
 
 

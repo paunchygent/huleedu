@@ -6,8 +6,6 @@ enabling the CJ service to fetch spellchecked essay content from the Content Ser
 
 from __future__ import annotations
 
-import asyncio
-
 import aiohttp
 from config import Settings
 
@@ -58,11 +56,11 @@ class ContentClientImpl(ContentClientProtocol):
                         message=f"Content Service error: {error_text}",
                     )
 
-        except (asyncio.TimeoutError, aiohttp.ServerTimeoutError) as e:
+        except (TimeoutError, aiohttp.ServerTimeoutError) as e:
             raise ValueError(f"Timeout fetching content for storage_id: {storage_id}") from e
         except aiohttp.ClientError:
             raise  # Re-raise aiohttp errors
         except Exception as e:
             raise ValueError(
-                f"Unexpected error fetching content for storage_id {storage_id}: {e!s}"
+                f"Unexpected error fetching content for storage_id {storage_id}: {e!s}",
             ) from e

@@ -6,290 +6,47 @@ This document provides a step-by-step implementation plan for the foundational c
 
 This part covers the critical prerequisite of creating a new internal API endpoint in the Batch Orchestrator Service (BOS), fixing event parsing compliance, and building the `result_aggregator_service` to use these new components. This sequence is mandatory to ensure that the services built in Part 2 and 3 have the necessary infrastructure to function correctly.
 
-### Checkpoint 1.1: Extend Shared Redis Client for Pub/Sub (Complete Implementation)
+### Checkpoint 1.1: Extend Shared Redis Client for Pub/Sub ✅ COMPLETED
 
-**Objective**: Enhance our existing `RedisClient` in `huleedu-service-libs` to support the WebSocket backplane. This extension is foundational for the real-time communication required by the frontend, enabling a responsive user experience.
+**Implementation Summary**: Extended `AtomicRedisClientProtocol` with `publish()`, `subscribe()`, `get_user_channel()`, and `publish_user_notification()` methods. Updated BOS and ELS DI containers to provide `AtomicRedisClientProtocol` instead of basic `RedisClientProtocol`. Established standardized user channel format `ws:{user_id}` for WebSocket backplane communication.
 
-**Context and Rationale**:
-Our real-time architecture depends on a "backplane"—a messaging system that allows multiple, independent instances of our API Gateway to communicate with backend services without knowing about each other. Redis Pub/Sub is the industry-standard solution for this. It provides a lightweight, high-speed channel where backend services can "publish" UI update events. The API Gateway instances will "subscribe" to these channels and forward the messages to the specific WebSocket clients they are connected to. This decouples the stateful WebSocket connections from our stateless backend, which is essential for horizontal scaling.
+**Core Implementation**:
 
-**Affected Files**:
+- **Protocol Extension**: Added pub/sub methods to `AtomicRedisClientProtocol` in `services/libs/huleedu_service_libs/protocols.py`
+- **Redis Client**: Implemented async context manager `subscribe()` with proper cleanup using `aclose()`, `publish()` with receiver count logging
+- **Service Integration**: Updated `services/batch_orchestrator_service/di.py` and `services/essay_lifecycle_service/di.py` to inject `AtomicRedisClientProtocol`
+- **Test Coverage**: 18 service library tests + 5 BOS tests + 5 ELS tests all passing
 
-- `services/libs/huleedu_service_libs/redis_client.py`
-- `services/libs/huleedu_service_libs/protocols.py`
+**Usage Pattern**:
 
-**Implementation Steps**:
+```python
+# Backend services publish user-specific updates
+await redis_client.publish_user_notification(
+    user_id, "batch_status_update", {"batch_id": "123", "status": "completed"}
+)
 
-1. **Update `AtomicRedisClientProtocol`**: Add `publish` and `subscribe` methods to the protocol definition. This ensures any service depending on this protocol can be type-checked correctly, maintaining our commitment to type safety.
+# API Gateway subscribes to user channels
+async with redis_client.subscribe("ws:user_123") as pubsub:
+    async for message in pubsub.listen():
+        # Forward to WebSocket client
+```
 
-    **File**: `services/libs/huleedu_service_libs/protocols.py`
+**Ready for**: API Gateway implementation can now subscribe to user-specific channels while backend services publish real-time updates.
 
-    ```python
-    // ... existing protocol code ...
-    
-    from contextlib import asynccontextmanager
-    from typing import AsyncGenerator
-    import redis.client
+### Checkpoint 1.2: Implement New Internal API in Batch Orchestrator Service ✅ COMPLETED
 
-    class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
-        // ... existing methods: watch, multi, exec, etc. ...
+**Implementation Summary**: Added internal API endpoint `GET /internal/v1/batches/{batch_id}/pipeline-state` to BOS for Result Aggregator Service queries. Endpoint uses existing `get_processing_pipeline_state()` repository method, returns complete ProcessingPipelineState JSON with user_id for ownership checks, and provides proper 404/500 error handling.
 
-        async def publish(self, channel: str, message: str) -> int:
-            """
-            Publish a message to a Redis channel. This is a "fire-and-forget"
-            operation that sends the message to all active subscribers of the channel.
+**Core Implementation**:
 
-            Args:
-                channel: The channel to publish to (e.g., "ws:user_123").
-                message: The message payload to publish, typically a JSON string.
+- **Internal Blueprint**: Added `internal_bp` to `services/batch_orchestrator_service/api/batch_routes.py` with `/internal/v1/batches` prefix
+- **Pipeline State Query**: Direct repository method call for efficient primary key lookup on batches table  
+- **Response Format**: Returns `{batch_id, pipeline_state, user_id}` structure for Result Aggregator consumption
+- **Error Handling**: 404 for non-existent batches, 500 with logging for repository failures
 
-            Returns:
-                The integer number of clients that received the message.
-            """
-            ...
+**Verification**: Live endpoint testing confirmed proper JSON response with complete pipeline state data and correct HTTP status codes (200/404).
 
-        @asynccontextmanager
-        async def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
-            """
-            Subscribe to a Redis channel within an async context manager, ensuring
-            proper connection and disconnection.
-
-            Args:
-                channel: The channel to subscribe to.
-
-            Yields:
-                A PubSub object that can be iterated over to listen for messages.
-            """
-            ...
-    ```
-
-2. **Implement `publish` and `subscribe` in `RedisClient`**: Add the concrete implementations to the main client class. It is critical to use `aclose()` instead of the deprecated `close()` to ensure the underlying connection pool is managed correctly by the `redis-py` async library, preventing resource leaks.
-
-    **File**: `services/libs/huleedu_service_libs/redis_client.py`
-
-    ```python
-    import json
-    from contextlib import asynccontextmanager
-    from typing import AsyncGenerator
-    import redis.client
-
-    // ... existing RedisClient class code ...
-
-    class RedisClient:
-        // ... existing methods ...
-
-        async def publish(self, channel: str, message: str) -> int:
-            """
-            Publish a message to a Redis channel with proper error handling and logging.
-            
-            CRITICAL: This method enables the WebSocket backplane by allowing backend
-            services to publish real-time updates to user-specific channels.
-            """
-            if not self._started:
-                raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-            
-            try:
-                # Publish message and get subscriber count
-                receiver_count = await self.client.publish(channel, message)
-                receiver_count = int(receiver_count)  # Ensure it's an integer
-                
-                logger.debug(
-                    f"Redis PUBLISH by '{self.client_id}': channel='{channel}', "
-                    f"message='{message[:75]}...', receivers={receiver_count}"
-                )
-                return receiver_count
-                
-            except Exception as e:
-                logger.error(
-                    f"Error in Redis PUBLISH operation by '{self.client_id}' for channel '{channel}': {e}",
-                    exc_info=True,
-                )
-                raise
-
-        @asynccontextmanager
-        async def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
-            """
-            Subscribe to a Redis channel with proper lifecycle management.
-            
-            CRITICAL: This method enables API Gateway instances to listen for 
-            user-specific real-time updates from backend services.
-            """
-            if not self._started:
-                raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-
-            pubsub = self.client.pubsub()
-            try:
-                await pubsub.subscribe(channel)
-                logger.info(f"Redis SUBSCRIBE by '{self.client_id}': channel='{channel}'")
-                yield pubsub
-                
-            except Exception as e:
-                logger.error(
-                    f"Error in Redis SUBSCRIBE operation by '{self.client_id}' for channel '{channel}': {e}",
-                    exc_info=True
-                )
-                raise
-                
-            finally:
-                # CRITICAL: Proper cleanup to prevent resource leaks
-                try:
-                    await pubsub.unsubscribe(channel)
-                    await pubsub.aclose()  # Use aclose() instead of deprecated close()
-                    logger.info(f"Redis UNSUBSCRIBE by '{self.client_id}': channel='{channel}'")
-                except Exception as e:
-                    logger.error(
-                        f"Error during Redis UNSUBSCRIBE cleanup by '{self.client_id}': {e}",
-                        exc_info=True
-                    )
-
-        # CRITICAL: Helper method for user-specific channel management
-        def get_user_channel(self, user_id: str) -> str:
-            """
-            Generate standardized user-specific channel name.
-            
-            Args:
-                user_id: The authenticated user's ID
-                
-            Returns:
-                Standardized channel name for the user (e.g., "ws:user_123")
-            """
-            return f"ws:{user_id}"
-
-        async def publish_user_notification(self, user_id: str, notification: dict) -> int:
-            """
-            Convenience method to publish JSON notifications to user-specific channels.
-            
-            Args:
-                user_id: The target user's ID
-                notification: Dictionary to be serialized as JSON
-                
-            Returns:
-                Number of subscribers that received the notification
-            """
-            channel = self.get_user_channel(user_id)
-            message = json.dumps(notification)
-            return await self.publish(channel, message)
-    ```
-
-3. **Add Tests for Pub/Sub Functionality**: Ensure the new functionality is properly tested.
-
-    **File**: `services/libs/huleedu_service_libs/tests/test_redis_pubsub.py`
-
-    ```python
-    import asyncio
-    import json
-    import pytest
-    from unittest.mock import AsyncMock, patch
-    from ..redis_client import RedisClient
-
-    @pytest.mark.asyncio
-    async def test_publish_message():
-        """Test publishing messages to Redis channels."""
-        redis_client = RedisClient("test-client", "redis://localhost:6379")
-        
-        with patch.object(redis_client, 'client') as mock_client:
-            mock_client.publish.return_value = 2  # 2 subscribers received message
-            
-            result = await redis_client.publish("test:channel", "test message")
-            
-            assert result == 2
-            mock_client.publish.assert_called_once_with("test:channel", "test message")
-
-    @pytest.mark.asyncio
-    async def test_user_notification_helper():
-        """Test the convenience method for user notifications."""
-        redis_client = RedisClient("test-client", "redis://localhost:6379")
-        
-        with patch.object(redis_client, 'publish') as mock_publish:
-            mock_publish.return_value = 1
-            
-            notification = {"event": "batch_updated", "batch_id": "123"}
-            result = await redis_client.publish_user_notification("user_456", notification)
-            
-            expected_channel = "ws:user_456"
-            expected_message = json.dumps(notification)
-            
-            assert result == 1
-            mock_publish.assert_called_once_with(expected_channel, expected_message)
-
-    @pytest.mark.asyncio
-    async def test_subscribe_context_manager():
-        """Test subscription context manager proper cleanup."""
-        redis_client = RedisClient("test-client", "redis://localhost:6379")
-        mock_pubsub = AsyncMock()
-        
-        with patch.object(redis_client, 'client') as mock_client:
-            mock_client.pubsub.return_value = mock_pubsub
-            
-            async with redis_client.subscribe("test:channel") as pubsub:
-                assert pubsub == mock_pubsub
-                mock_pubsub.subscribe.assert_called_once_with("test:channel")
-            
-            # Verify cleanup was called
-            mock_pubsub.unsubscribe.assert_called_once_with("test:channel")
-            mock_pubsub.aclose.assert_called_once()
-    ```
-
-**Done When**:
-
-- ✅ The `AtomicRedisClientProtocol` includes fully functional and type-hinted `publish` and `subscribe` methods.
-- ✅ The `RedisClient` class implements both methods with proper error handling and resource cleanup.
-- ✅ Helper methods for user-specific channels are available (`get_user_channel`, `publish_user_notification`).
-- ✅ All existing service library tests pass without regression, confirming backward compatibility.
-- ✅ New Pub/Sub functionality is covered by unit tests.
-- ✅ The implementation uses `aclose()` instead of deprecated `close()` for proper async resource management.
-
-This implementation provides the foundation for real-time user notifications while maintaining the established patterns and reliability standards of the service library.
-
-### Checkpoint 1.2: Implement New Internal API in Batch Orchestrator Service
-
-**Objective**: Create a new, internal-only HTTP endpoint in BOS to serve the detailed `ProcessingPipelineState` for a given batch. This establishes BOS as the single source of truth for pipeline state and enables the query pattern for other services.
-
-**Affected Files**:
-
-- `services/batch_orchestrator_service/api/batch_routes.py`
-- `services/batch_orchestrator_service/protocols.py`
-- `services/batch_orchestrator_service/implementations/batch_repository_postgres_impl.py`
-
-**Implementation Steps**:
-
-1. **Add New Route to `batch_routes.py`**: Create a new Quart route for internal queries. This pattern mirrors the existing `/status` endpoint but is prefixed with `/internal` to signify it is not for public consumption and should not be exposed outside our Docker network. The implementation should be lean, delegating the data retrieval logic directly to the repository layer to maintain our clean architecture.
-
-    **File**: `services/batch_orchestrator_service/api/batch_routes.py`
-
-    ```python
-    // ... existing imports ...
-
-    # Add this new route to the existing batch_bp Blueprint
-    @batch_bp.route("/internal/<batch_id>/pipeline-state", methods=["GET"])
-    @inject
-    async def get_internal_pipeline_state(
-        batch_id: str,
-        batch_repo: FromDishka[BatchRepositoryProtocol],
-    ) -> Union[Response, tuple[Response, int]]:
-        """Internal endpoint to retrieve the full pipeline processing state.
-        This endpoint is consumed by the Result Aggregator Service and other
-        internal systems, providing a single source of truth for batch state."""
-        try:
-            # Directly use the existing, tested repository method. This call is highly
-            # efficient as it's a primary key lookup on the 'batches' table.
-            pipeline_state = await batch_repo.get_processing_pipeline_state(batch_id)
-            if pipeline_state is None:
-                # Return a clear 404 if the batch or its state doesn't exist.
-                return jsonify({"error": "Pipeline state not found for batch"}), 404
-
-            # The state is stored as a JSON-compatible dict, so it can be returned directly.
-            return jsonify(pipeline_state), 200
-        except Exception as e:
-            # Log with context for easier debugging if the repository fails.
-            current_app.logger.error(f"Error getting internal pipeline state for {batch_id}: {e}", exc_info=True)
-            return jsonify({"error": "Failed to get internal pipeline state"}), 500
-    ```
-
-**Done When**:
-
-- ✅ The `batch_orchestrator_service` exposes a new, functional, and tested endpoint at `GET /internal/v1/batches/{batch_id}/pipeline-state`.
-- ✅ The endpoint correctly retrieves and returns the complete `ProcessingPipelineState` JSON object from the database, leveraging the existing `get_processing_pipeline_state` repository method.
+**Ready for**: Result Aggregator Service implementation can now query BOS as single source of truth for batch pipeline state.
 
 ### Checkpoint 1.3: EventEnvelope Compliance and Internal API ✅ COMPLETED
 

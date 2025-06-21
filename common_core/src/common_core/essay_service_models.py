@@ -11,9 +11,9 @@ from .events.ai_feedback_events import AIFeedbackInputDataV1
 from .events.base_event_models import ProcessingUpdate
 
 __all__ = [
-    "EssayLifecycleSpellcheckRequestV1",
-    "EssayLifecycleNLPRequestV1",
     "EssayLifecycleAIFeedbackRequestV1",
+    "EssayLifecycleNLPRequestV1",
+    "EssayLifecycleSpellcheckRequestV1",
 ]
 
 

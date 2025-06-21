@@ -9,7 +9,6 @@ Following testing mandates:
 
 from __future__ import annotations
 
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -26,7 +25,7 @@ class TestLLMProviderPublicInterface:
 
     @pytest.fixture
     def openai_provider(
-        self, mock_http_session: AsyncMock, mock_settings: MagicMock
+        self, mock_http_session: AsyncMock, mock_settings: MagicMock,
     ) -> OpenAIProviderImpl:
         """Create OpenAI provider instance for testing."""
         # Configure retry settings for test
@@ -41,7 +40,7 @@ class TestLLMProviderPublicInterface:
 
     @pytest.fixture
     def anthropic_provider(
-        self, mock_http_session: AsyncMock, mock_settings: MagicMock
+        self, mock_http_session: AsyncMock, mock_settings: MagicMock,
     ) -> AnthropicProviderImpl:
         """Create Anthropic provider instance for testing."""
         # Configure retry settings for test
@@ -56,7 +55,7 @@ class TestLLMProviderPublicInterface:
 
     @pytest.mark.asyncio
     async def test_openai_generate_comparison_with_overrides(
-        self, openai_provider: OpenAIProviderImpl
+        self, openai_provider: OpenAIProviderImpl,
     ) -> None:
         """Test OpenAI provider handles overrides correctly through public interface."""
         # Arrange - Mock external HTTP boundary only
@@ -67,10 +66,10 @@ class TestLLMProviderPublicInterface:
                         "content": (
                             '{"winner": "Essay A", "justification": "Better structure", '
                             '"confidence": 4}'
-                        )
-                    }
-                }
-            ]
+                        ),
+                    },
+                },
+            ],
         }
 
         # Mock the HTTP response
@@ -106,7 +105,7 @@ class TestLLMProviderPublicInterface:
 
     @pytest.mark.asyncio
     async def test_anthropic_generate_comparison_with_overrides(
-        self, anthropic_provider: AnthropicProviderImpl
+        self, anthropic_provider: AnthropicProviderImpl,
     ) -> None:
         """Test Anthropic provider handles overrides correctly through public interface."""
         # Arrange - Mock external HTTP boundary only
@@ -118,8 +117,8 @@ class TestLLMProviderPublicInterface:
                         '{"winner": "Essay B", "justification": "More coherent argument", '
                         '"confidence": 5}'
                     ),
-                }
-            ]
+                },
+            ],
         }
 
         # Mock the HTTP response
@@ -155,7 +154,7 @@ class TestLLMProviderPublicInterface:
 
     @pytest.mark.asyncio
     async def test_provider_fallback_to_defaults_when_no_overrides(
-        self, openai_provider: OpenAIProviderImpl
+        self, openai_provider: OpenAIProviderImpl,
     ) -> None:
         """Test provider uses defaults when no overrides provided."""
         # Arrange - Mock external HTTP boundary only
@@ -166,10 +165,10 @@ class TestLLMProviderPublicInterface:
                         "content": (
                             '{"winner": "Essay A", "justification": "Default test", '
                             '"confidence": 3}'
-                        )
-                    }
-                }
-            ]
+                        ),
+                    },
+                },
+            ],
         }
 
         # Mock the HTTP response
@@ -202,7 +201,7 @@ class TestLLMProviderPublicInterface:
 
     @pytest.mark.asyncio
     async def test_provider_handles_http_errors_correctly(
-        self, openai_provider: OpenAIProviderImpl
+        self, openai_provider: OpenAIProviderImpl,
     ) -> None:
         """Test provider error handling through public interface."""
         # Mock the HTTP response for error case
@@ -245,8 +244,8 @@ class TestOverridePrecedenceLogic:
         # Test precedence: runtime override > provider default > global default
 
         # Case 1: Runtime override takes precedence
-        temp: Optional[float] = 0.8  # Runtime override
-        max_tokens: Optional[int] = None  # No runtime override
+        temp: float | None = 0.8  # Runtime override
+        max_tokens: int | None = None  # No runtime override
 
         final_temp = (
             temp

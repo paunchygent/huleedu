@@ -14,7 +14,6 @@ Key principles:
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
 
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
@@ -29,7 +28,7 @@ from services.spell_checker_service.startup_setup import initialize_services, sh
 logger = create_service_logger("spell_checker_service.app")
 
 
-def create_app(settings: Optional[Settings] = None) -> Quart:
+def create_app(settings: Settings | None = None) -> Quart:
     """Create and configure the Quart application.
 
     Args:
@@ -52,7 +51,7 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
         {
             "TESTING": False,
             "DEBUG": settings.LOG_LEVEL == "DEBUG",
-        }
+        },
     )
 
     # Initialize dependency injection container immediately (required for tests)
@@ -94,7 +93,7 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
     return app
 
 
-async def run_health_api(settings: Settings, port: Optional[int] = None) -> None:
+async def run_health_api(settings: Settings, port: int | None = None) -> None:
     """Run the health API server.
 
     Args:

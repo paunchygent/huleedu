@@ -7,7 +7,7 @@ successfully, which is critical for forward reference resolution.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from common_core.enums import ProcessingEvent
@@ -61,7 +61,7 @@ class TestModelRebuilding:
 
         # Create an instance to ensure forward references are resolved
         entity_ref = EntityReference(
-            entity_id="test-id", entity_type="essay", parent_id="parent-id"
+            entity_id="test-id", entity_type="essay", parent_id="parent-id",
         )
 
         system_meta = SystemProcessingMetadata(
@@ -100,7 +100,7 @@ class TestEventEnvelopeSchemaVersion:
 
         # 1. Test default value upon creation
         envelope_new = EventEnvelope[BaseEventData](
-            event_type="test.event.v1", source_service="test_service", data=dummy_data
+            event_type="test.event.v1", source_service="test_service", data=dummy_data,
         )
         assert envelope_new.schema_version == 1
 
@@ -118,7 +118,7 @@ class TestEventEnvelopeSchemaVersion:
         old_payload_dict = {
             "event_id": str(uuid4()),
             "event_type": "test.oldevent.v1",
-            "event_timestamp": datetime.now(timezone.utc).isoformat(),
+            "event_timestamp": datetime.now(UTC).isoformat(),
             "source_service": "old_service",
             "data": dummy_data.model_dump(),  # Pydantic will handle parsing this to BaseEventData
         }

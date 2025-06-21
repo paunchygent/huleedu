@@ -55,12 +55,12 @@ class LLMInteractionImpl(LLMInteractionProtocol):
             available_providers = list(self.providers.keys())
             logger.warning(
                 f"Default provider '{provider_key}' not available. Available providers: "
-                f"{available_providers}. Using first available provider."
+                f"{available_providers}. Using first available provider.",
             )
             provider_key = available_providers[0] if available_providers else "openai"
 
         logger.debug(
-            f"Using provider '{provider_key}' with model '{self.settings.DEFAULT_LLM_MODEL}'"
+            f"Using provider '{provider_key}' with model '{self.settings.DEFAULT_LLM_MODEL}'",
         )
         return self.providers[provider_key]
 
@@ -102,7 +102,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                 cache_key = self.cache_manager.generate_hash(
                     f"{task.prompt}|model:{model_override}|"
                     f"temp:{temperature_override}|"
-                    f"tokens:{max_tokens_override}"
+                    f"tokens:{max_tokens_override}",
                 )
 
                 # Check cache first
@@ -125,7 +125,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     except Exception as e:
                         logger.warning(
                             f"Failed to create ComparisonResult from cached data for task "
-                            f"{task.essay_a.id}-{task.essay_b.id}: {e}"
+                            f"{task.essay_a.id}-{task.essay_b.id}: {e}",
                         )
                         # Continue to make fresh request if cache data is invalid
 
@@ -165,7 +165,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     else:
                         logger.error(
                             f"Task with essays {task.essay_a.id}-{task.essay_b.id} "
-                            f"failed: {error_message}"
+                            f"failed: {error_message}",
                         )
                         return ComparisonResult(
                             task=task,
@@ -214,7 +214,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             from_cache=False,
                             error_message=f"Task execution failed: {result!s}",
                             raw_llm_response_content=None,
-                        )
+                        ),
                     )
                 else:
                     # Type guard: result is ComparisonResult at this point
@@ -225,7 +225,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
             successful_tasks = sum(1 for r in final_results if r.llm_assessment is not None)
             logger.info(
                 f"Completed {len(tasks)} comparison tasks. "
-                f"Successful: {successful_tasks}, Failed: {len(tasks) - successful_tasks}"
+                f"Successful: {successful_tasks}, Failed: {len(tasks) - successful_tasks}",
             )
 
             return final_results

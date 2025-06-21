@@ -19,7 +19,7 @@ _metrics: dict[str, Any] | None = None
 def get_http_metrics() -> dict[str, Any]:
     """
     Get HTTP-focused metrics for startup_setup.py integration.
-    
+
     Thread-safe singleton pattern ensures consistent metric instances
     across HTTP and worker components.
     """
@@ -29,7 +29,7 @@ def get_http_metrics() -> dict[str, Any]:
 def get_business_metrics() -> dict[str, Any]:
     """
     Get business intelligence metrics for worker components.
-    
+
     Returns subset of metrics focused on business intelligence
     and operational visibility for worker component usage.
     """
@@ -53,7 +53,7 @@ def get_metrics() -> dict[str, Any]:
 def _create_metrics() -> dict[str, Any]:
     """
     Create all metrics instances with shared registry.
-    
+
     Creates both HTTP service metrics and business intelligence metrics
     for Essay Lifecycle Service observability.
     """
@@ -79,7 +79,6 @@ def _create_metrics() -> dict[str, Any]:
             ["operation", "status"],
             registry=registry,
         ),
-
         # Business Intelligence Metrics (new for worker visibility)
         "essay_state_transitions": Counter(
             "huleedu_essay_state_transitions_total",

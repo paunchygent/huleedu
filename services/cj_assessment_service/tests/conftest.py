@@ -8,7 +8,7 @@ with dependency injection and mocked external dependencies.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -188,7 +188,7 @@ def kafka_message_with_overrides(
 ) -> ConsumerRecord:
     """Provide Kafka ConsumerRecord with LLM config overrides."""
     message_value = json.dumps(cj_request_envelope_with_overrides.model_dump(mode="json")).encode(
-        "utf-8"
+        "utf-8",
     )
 
     record = MagicMock(spec=ConsumerRecord)
@@ -208,7 +208,7 @@ def kafka_message_no_overrides(
 ) -> ConsumerRecord:
     """Provide Kafka ConsumerRecord without LLM config overrides."""
     message_value = json.dumps(cj_request_envelope_no_overrides.model_dump(mode="json")).encode(
-        "utf-8"
+        "utf-8",
     )
 
     record = MagicMock(spec=ConsumerRecord)
@@ -288,7 +288,7 @@ def mock_settings() -> MagicMock:
 
 
 @pytest.fixture
-def sample_comparison_results() -> list[Dict[str, Any]]:
+def sample_comparison_results() -> list[dict[str, Any]]:
     """Provide sample comparison results data."""
     return [
         {"els_essay_id": str(uuid4()), "rank": 1, "score": 0.85},
@@ -298,15 +298,18 @@ def sample_comparison_results() -> list[Dict[str, Any]]:
 
 # --- Mock Protocol Implementations (for Idempotency Tests) ---
 
+
 @pytest.fixture
-def mock_redis_client(): # -> MockRedisClient
+def mock_redis_client():  # -> MockRedisClient
     """Provide a mock Redis client for idempotency testing."""
     from services.cj_assessment_service.tests.unit.mocks import MockRedisClient
+
     return MockRedisClient()
 
 
 @pytest.fixture
-def mock_cj_repository(): # -> MockDatabase
+def mock_cj_repository():  # -> MockDatabase
     """Provide a mock CJ repository for idempotency testing."""
     from services.cj_assessment_service.tests.unit.mocks import MockDatabase
+
     return MockDatabase()

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from api_models import BatchRegistrationRequestV1
 from config import Settings
@@ -33,7 +33,7 @@ class BatchProcessingServiceImpl:
         self.logger = create_service_logger("bos.service.batch_processing")
 
     async def register_new_batch(
-        self, registration_data: BatchRegistrationRequestV1, correlation_id: uuid.UUID
+        self, registration_data: BatchRegistrationRequestV1, correlation_id: uuid.UUID,
     ) -> str:
         """Register a new batch for processing.
 
@@ -86,28 +86,28 @@ class BatchProcessingServiceImpl:
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
                 if "spellcheck" in requested_pipelines
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            )
+            ),
         )
         cj_assessment_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
                 if "cj_assessment" in requested_pipelines
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            )
+            ),
         )
         ai_feedback_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
                 if "ai_feedback" in requested_pipelines
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            )
+            ),
         )
         nlp_metrics_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
                 if "nlp_metrics" in requested_pipelines
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            )
+            ),
         )
 
         initial_pipeline_state = ProcessingPipelineState(
@@ -119,7 +119,7 @@ class BatchProcessingServiceImpl:
             nlp_metrics=nlp_metrics_detail,
         )
         await self.batch_repo.save_processing_pipeline_state(
-            batch_id, initial_pipeline_state.model_dump(mode="json")
+            batch_id, initial_pipeline_state.model_dump(mode="json"),
         )
 
         # 3. Construct lightweight BatchEssaysRegistered event with internal essay IDs
@@ -127,7 +127,7 @@ class BatchProcessingServiceImpl:
         event_metadata = SystemProcessingMetadata(
             entity=batch_entity_ref,
             event=ProcessingEvent.BATCH_ESSAYS_REGISTERED.value,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
         batch_registered_event_data = BatchEssaysRegistered(
             batch_id=batch_id,

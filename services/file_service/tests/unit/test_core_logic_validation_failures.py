@@ -81,7 +81,7 @@ class TestCoreLogicValidationFailures:
 
         # Verify content storage was called ONCE for raw storage (NEW BEHAVIOR)
         mock_content_client.store_content.assert_called_once_with(
-            file_content, ContentType.RAW_UPLOAD_BLOB
+            file_content, ContentType.RAW_UPLOAD_BLOB,
         )
 
         # Verify validation failure event was published
@@ -143,7 +143,7 @@ class TestCoreLogicValidationFailures:
 
         # Verify raw storage was called (NEW BEHAVIOR)
         mock_content_client.store_content.assert_called_once_with(
-            file_content, ContentType.RAW_UPLOAD_BLOB
+            file_content, ContentType.RAW_UPLOAD_BLOB,
         )
 
         # Verify validation failure event published with empty content details
@@ -199,7 +199,7 @@ class TestCoreLogicValidationFailures:
 
         # Verify raw storage was called (NEW BEHAVIOR)
         mock_content_client.store_content.assert_called_once_with(
-            file_content, ContentType.RAW_UPLOAD_BLOB
+            file_content, ContentType.RAW_UPLOAD_BLOB,
         )
 
         # Verify appropriate event published for long content
@@ -249,7 +249,7 @@ class TestCoreLogicValidationFailures:
 
         # Verify raw storage was called (NEW BEHAVIOR)
         mock_content_client.store_content.assert_called_once_with(
-            file_content, ContentType.RAW_UPLOAD_BLOB
+            file_content, ContentType.RAW_UPLOAD_BLOB,
         )
 
         # Assert correlation ID propagation for failure event
@@ -320,7 +320,7 @@ class TestCoreLogicValidationFailures:
 
         # Verify raw storage was called (NEW BEHAVIOR)
         mock_content_client.store_content.assert_called_once_with(
-            file_content, ContentType.RAW_UPLOAD_BLOB
+            file_content, ContentType.RAW_UPLOAD_BLOB,
         )
 
         # Verify content validation failure event was published with correct error code

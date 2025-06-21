@@ -8,7 +8,7 @@ for Phase 6 of the File Service validation improvements.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -30,7 +30,7 @@ class TestEnhancedBatchEssaysReady:
         """Fixture providing sample processing metadata."""
         return SystemProcessingMetadata(
             entity=EntityReference(entity_id="test_entity", entity_type="batch"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
     @pytest.fixture
@@ -150,7 +150,7 @@ class TestEnhancedBatchEssaysReady:
         assert len(reconstructed.validation_failures) == len(event.validation_failures)
 
     def test_real_world_24_of_25_scenario(
-        self, sample_batch_entity: EntityReference, sample_metadata: SystemProcessingMetadata
+        self, sample_batch_entity: EntityReference, sample_metadata: SystemProcessingMetadata,
     ) -> None:
         """Test the real-world scenario: 24 successful essays, 1 validation failure."""
         # Create 24 successful essays
@@ -168,7 +168,7 @@ class TestEnhancedBatchEssaysReady:
                 validation_error_message="Essay content below minimum threshold",
                 file_size_bytes=15,
                 raw_file_storage_id="raw_failed_25",
-            )
+            ),
         ]
 
         event = BatchEssaysReady(
@@ -191,7 +191,7 @@ class TestEnhancedBatchEssaysReady:
         assert event.ready_essays[-1].essay_id == "essay_024"
 
     def test_all_essays_failed_validation_scenario(
-        self, sample_batch_entity: EntityReference, sample_metadata: SystemProcessingMetadata
+        self, sample_batch_entity: EntityReference, sample_metadata: SystemProcessingMetadata,
     ) -> None:
         """Test scenario where all essays failed validation."""
         validation_failures = [
@@ -221,7 +221,7 @@ class TestEnhancedBatchEssaysReady:
         assert event.total_files_processed == 5
 
     def test_batch_ready_metrics_calculation(
-        self, sample_batch_entity: EntityReference, sample_metadata: SystemProcessingMetadata
+        self, sample_batch_entity: EntityReference, sample_metadata: SystemProcessingMetadata,
     ) -> None:
         """Test that total_files_processed accurately reflects successful + failed counts."""
         ready_essays = [

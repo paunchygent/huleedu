@@ -6,7 +6,7 @@ regarding Comparative Judgment (CJ) assessment processing.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -15,10 +15,10 @@ from ..metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadat
 from .base_event_models import BaseEventData, ProcessingUpdate
 
 __all__ = [
-    "LLMConfigOverrides",
-    "ELS_CJAssessmentRequestV1",
     "CJAssessmentCompletedV1",
     "CJAssessmentFailedV1",
+    "ELS_CJAssessmentRequestV1",
+    "LLMConfigOverrides",
 ]
 
 
@@ -29,17 +29,17 @@ class LLMConfigOverrides(BaseModel):
     overriding service defaults for specific assessment batches.
     """
 
-    model_override: Optional[str] = Field(
-        default=None, description="LLM model to use (e.g., 'gpt-4o-mini')"
+    model_override: str | None = Field(
+        default=None, description="LLM model to use (e.g., 'gpt-4o-mini')",
     )
-    temperature_override: Optional[float] = Field(
-        default=None, ge=0.0, le=2.0, description="Temperature for LLM generation"
+    temperature_override: float | None = Field(
+        default=None, ge=0.0, le=2.0, description="Temperature for LLM generation",
     )
-    max_tokens_override: Optional[int] = Field(
-        default=None, gt=0, description="Maximum tokens for LLM response"
+    max_tokens_override: int | None = Field(
+        default=None, gt=0, description="Maximum tokens for LLM response",
     )
-    provider_override: Optional[str] = Field(
-        default=None, description="LLM provider to use (e.g., 'openai', 'anthropic')"
+    provider_override: str | None = Field(
+        default=None, description="LLM provider to use (e.g., 'openai', 'anthropic')",
     )
 
 
@@ -48,12 +48,12 @@ class ELS_CJAssessmentRequestV1(BaseEventData):
 
     event_name: ProcessingEvent = Field(default=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
     system_metadata: SystemProcessingMetadata  # Populated by ELS
-    essays_for_cj: List[EssayProcessingInputRefV1]
+    essays_for_cj: list[EssayProcessingInputRefV1]
     language: str
     course_code: str
     essay_instructions: str
-    llm_config_overrides: Optional[LLMConfigOverrides] = Field(
-        default=None, description="Optional LLM configuration overrides for this assessment batch"
+    llm_config_overrides: LLMConfigOverrides | None = Field(
+        default=None, description="Optional LLM configuration overrides for this assessment batch",
     )
     # class_designation: str  # Deferred (YAGNI)
 
@@ -67,7 +67,7 @@ class CJAssessmentCompletedV1(ProcessingUpdate):
     # system_metadata (from ProcessingUpdate) populated by CJ Assessment Service
 
     cj_assessment_job_id: str  # The internal ID from CJ_BatchUpload, for detailed log/result lookup
-    rankings: List[Dict[str, Any]]  # The consumer-friendly ranking data
+    rankings: list[dict[str, Any]]  # The consumer-friendly ranking data
     # Example: [{"els_essay_id": "uuid1", "rank": 1, "score": 0.75}, ...]
 
 

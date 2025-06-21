@@ -12,7 +12,7 @@ Based on modern testing practices:
 """
 
 import asyncio
-from typing import Any, Dict, List, NamedTuple, Optional
+from typing import Any, NamedTuple
 
 import aiohttp
 import httpx
@@ -49,10 +49,10 @@ class ServiceTestManager:
     ]
 
     def __init__(self):
-        self._validated_endpoints: Optional[Dict[str, Any]] = None
+        self._validated_endpoints: dict[str, Any] | None = None
         self._validation_lock = asyncio.Lock()
 
-    async def get_validated_endpoints(self, force_revalidation: bool = False) -> Dict[str, Any]:
+    async def get_validated_endpoints(self, force_revalidation: bool = False) -> dict[str, Any]:
         """
         Get validated service endpoints with caching.
 
@@ -65,7 +65,7 @@ class ServiceTestManager:
 
             return self._validated_endpoints.copy()
 
-    async def _validate_all_services(self) -> Dict[str, Any]:
+    async def _validate_all_services(self) -> dict[str, Any]:
         """Validate all services and return their configuration."""
         validated_endpoints = {}
 
@@ -78,7 +78,7 @@ class ServiceTestManager:
                         response = await client.get(health_url)
                         if response.status_code != 200:
                             logger.warning(
-                                f"{service.name} health check failed: {response.status_code}"
+                                f"{service.name} health check failed: {response.status_code}",
                             )
                             continue
 
@@ -137,7 +137,7 @@ class ServiceTestManager:
         expected_essay_count: int,
         course_code: str = "TEST",
         class_designation: str = "UtilityTest",
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
     ) -> tuple[str, str]:
         """
         Create a test batch via BOS API.
@@ -183,8 +183,8 @@ class ServiceTestManager:
                 return batch_id, returned_correlation_id
 
     async def upload_files(
-        self, batch_id: str, files: List[Dict[str, Any]], correlation_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, batch_id: str, files: list[dict[str, Any]], correlation_id: str | None = None,
+    ) -> dict[str, Any]:
         """
                 Upload files to File Service batch endpoint.
         '
@@ -220,14 +220,14 @@ class ServiceTestManager:
                 timeout=aiohttp.ClientTimeout(total=60),
             ) as response:
                 if response.status == 202:
-                    result: Dict[str, Any] = await response.json()
+                    result: dict[str, Any] = await response.json()
                     logger.info(f"File upload successful: {len(files)} files")
                     return result
                 else:
                     error_text = await response.text()
                     raise RuntimeError(f"File upload failed: {response.status} - {error_text}")
 
-    async def get_service_metrics(self, service_name: str, port: int) -> Optional[str]:
+    async def get_service_metrics(self, service_name: str, port: int) -> str | None:
         """
         Get metrics data from a specific service.
 
@@ -283,7 +283,7 @@ class ServiceTestManager:
                 else:
                     error_text = await response.text()
                     raise RuntimeError(
-                        f"Content Service upload failed: {response.status} - {error_text}"
+                        f"Content Service upload failed: {response.status} - {error_text}",
                     )
 
     async def fetch_content_directly(self, storage_id: str) -> str:
@@ -321,7 +321,7 @@ class ServiceTestManager:
                 else:
                     error_text = await response.text()
                     raise RuntimeError(
-                        f"Content Service fetch failed: {response.status} - {error_text}"
+                        f"Content Service fetch failed: {response.status} - {error_text}",
                     )
 
 
@@ -330,7 +330,7 @@ service_manager = ServiceTestManager()
 
 
 # Convenience functions that mirror the old fixture interface
-async def get_validated_service_endpoints(force_revalidation: bool = False) -> Dict[str, Any]:
+async def get_validated_service_endpoints(force_revalidation: bool = False) -> dict[str, Any]:
     """Convenience function that uses global service manager."""
     return await service_manager.get_validated_endpoints(force_revalidation)
 
@@ -339,16 +339,16 @@ async def create_test_batch(
     expected_essay_count: int,
     course_code: str = "TEST",
     class_designation: str = "UtilityTest",
-    correlation_id: Optional[str] = None,
+    correlation_id: str | None = None,
 ) -> tuple[str, str]:
     """Convenience function that uses global service manager."""
     return await service_manager.create_batch(
-        expected_essay_count, course_code, class_designation, correlation_id
+        expected_essay_count, course_code, class_designation, correlation_id,
     )
 
 
 async def upload_test_files(
-    batch_id: str, files: List[Dict[str, Any]], correlation_id: Optional[str] = None
-) -> Dict[str, Any]:
+    batch_id: str, files: list[dict[str, Any]], correlation_id: str | None = None,
+) -> dict[str, Any]:
     """Convenience function that uses global service manager."""
     return await service_manager.upload_files(batch_id, files, correlation_id)

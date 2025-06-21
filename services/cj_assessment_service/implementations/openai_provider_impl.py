@@ -208,7 +208,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                         logger.error(
                             f"{self.provider_name} API success status (200) but "
                             f"failed to parse JSON: {e}. Response text: "
-                            f"{error_text[:200]}"
+                            f"{error_text[:200]}",
                         )
                         return (
                             None,
@@ -221,7 +221,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                 if response.status in retryable_status_codes:
                     logger.warning(
                         f"{self.provider_name} API error ({response.status}) - raising for retry: "
-                        f"{error_text[:200]}"
+                        f"{error_text[:200]}",
                     )
                     response.raise_for_status()
                     return None, "Error: Should have been retried"
@@ -229,7 +229,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                 # Non-retryable error
                 logger.error(
                     f"{self.provider_name} API error ({response.status}) - not retryable: "
-                    f"{error_text[:200]}"
+                    f"{error_text[:200]}",
                 )
                 return (
                     None,

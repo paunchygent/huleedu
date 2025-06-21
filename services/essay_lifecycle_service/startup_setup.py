@@ -70,6 +70,3 @@ async def shutdown_services() -> None:
         logger.info("Essay Lifecycle Service shutdown completed")
     except Exception as e:
         logger.error(f"Error during shutdown: {e}", exc_info=True)
-
-
-

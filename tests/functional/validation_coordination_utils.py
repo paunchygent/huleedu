@@ -14,7 +14,7 @@ The utilities support testing validation failure coordination workflow:
 Modernized to use ServiceTestManager and KafkaTestManager patterns.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -25,7 +25,7 @@ from tests.utils.service_test_manager import ServiceTestManager
 logger = create_service_logger("test.validation_coordination_e2e")
 
 # Event Topics for Validation Coordination
-TOPICS: Dict[str, str] = {
+TOPICS: dict[str, str] = {
     "batch_registered": "huleedu.batch.essays.registered.v1",
     "content_provisioned": "huleedu.file.essay.content.provisioned.v1",
     "validation_failed": "huleedu.file.essay.validation.failed.v1",
@@ -63,7 +63,7 @@ async def create_validation_batch(
     return batch_id, correlation_id
 
 
-def create_validation_test_files(success_count: int, failure_count: int) -> List[Dict[str, Any]]:
+def create_validation_test_files(success_count: int, failure_count: int) -> list[dict[str, Any]]:
     """Create test files with specific success/failure patterns for validation testing."""
     files = []
 
@@ -80,7 +80,7 @@ def create_validation_test_files(success_count: int, failure_count: int) -> List
                     + "structure for testing validation coordination."
                 ),
                 "expected_outcome": "success",
-            }
+            },
         )
 
     # Create failure files (various validation failure types)
@@ -98,13 +98,13 @@ def create_validation_test_files(success_count: int, failure_count: int) -> List
                 "content": failure_type["content"],
                 "expected_outcome": "validation_failure",
                 "expected_error_code": failure_type["error_code"],
-            }
+            },
         )
 
     return files
 
 
-async def upload_validation_files(batch_id: str, files: List[Dict[str, Any]]) -> Dict[str, Any]:
+async def upload_validation_files(batch_id: str, files: list[dict[str, Any]]) -> dict[str, Any]:
     """
     Upload validation test files using modern ServiceTestManager.
 
@@ -126,7 +126,7 @@ def create_validation_kafka_manager() -> KafkaTestManager:
     """
     # Create Kafka configuration with validation coordination topics
     kafka_config = create_kafka_test_config(
-        bootstrap_servers="localhost:9093", topics=TOPICS, assignment_timeout=15
+        bootstrap_servers="localhost:9093", topics=TOPICS, assignment_timeout=15,
     )
 
     return KafkaTestManager(kafka_config)

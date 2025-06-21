@@ -16,7 +16,7 @@ from common_core.enums import ProcessingEvent, topic_name
 from dishka import make_async_container
 from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
-from huleedu_service_libs.protocols import RedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
 from services.essay_lifecycle_service.batch_command_handlers import process_single_message
 from services.essay_lifecycle_service.config import settings
@@ -89,7 +89,7 @@ async def run_consumer_loop(
     batch_coordination_handler: BatchCoordinationHandler,
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
-    redis_client: RedisClientProtocol,
+    redis_client: AtomicRedisClientProtocol,
 ) -> None:
     """Main message processing loop with idempotency support."""
     global should_stop
@@ -192,7 +192,7 @@ async def main() -> None:
             batch_coordination_handler = await request_container.get(BatchCoordinationHandler)
             batch_command_handler = await request_container.get(BatchCommandHandler)
             service_result_handler = await request_container.get(ServiceResultHandler)
-            redis_client = await request_container.get(RedisClientProtocol)
+            redis_client = await request_container.get(AtomicRedisClientProtocol)
 
             logger.info("Dependencies injected successfully")
 

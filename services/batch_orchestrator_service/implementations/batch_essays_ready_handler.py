@@ -64,12 +64,16 @@ class BatchEssaysReadyHandler:
             ready_essays = batch_essays_ready_data.ready_essays
             if not ready_essays:
                 raise DataValidationError(
-                    f"BatchEssaysReady for batch {batch_id} contains no ready_essays"
+                    f"BatchEssaysReady for batch {batch_id} contains no ready_essays",
                 )
 
             # Store essays for later pipeline processing
             essays_data = ready_essays
-            self.logger.info(f"Batch {batch_id} ready for processing with {len(essays_data)} essays - awaiting client trigger", extra={"correlation_id": str(envelope.correlation_id)})
+            self.logger.info(
+                f"Batch {batch_id} ready for processing with "
+                f"{len(essays_data)} essays - awaiting client trigger",
+                extra={"correlation_id": str(envelope.correlation_id)},
+            )
 
             # Debug logging for essay storage
             self.logger.debug(f"About to store {len(essays_data)} essays for batch {batch_id}")
@@ -78,11 +82,15 @@ class BatchEssaysReadyHandler:
             storage_success = await self.batch_repo.store_batch_essays(batch_id, essays_data)
 
             if storage_success:
-                self.logger.info(f"Successfully stored {len(essays_data)} essays for batch {batch_id}")
+                self.logger.info(
+                    f"Successfully stored {len(essays_data)} essays for batch {batch_id}",
+                )
             else:
                 self.logger.error(f"Failed to store essays for batch {batch_id}")
 
-            self.logger.debug(f"Essay storage completed for batch {batch_id}, success: {storage_success}")
+            self.logger.debug(
+                f"Essay storage completed for batch {batch_id}, success: {storage_success}",
+            )
 
         except Exception as e:
             self.logger.error(f"Error handling BatchEssaysReady message: {e}", exc_info=True)

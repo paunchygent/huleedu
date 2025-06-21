@@ -10,7 +10,8 @@ correction counting, content verification.
 """
 
 import uuid
-from typing import Any, Dict
+from datetime import UTC
+from typing import Any
 
 import pytest
 
@@ -109,7 +110,7 @@ class TestE2ESpellcheckWorkflows:
                 pytest.fail(f"Event publishing failed: {e}")
 
             # Step 4: Monitor for SpellcheckResultDataV1 response using utility
-            def spellcheck_result_filter(event_data: Dict[str, Any]) -> bool:
+            def spellcheck_result_filter(event_data: dict[str, Any]) -> bool:
                 """Filter for spellcheck results from our specific essay."""
                 return (
                     "data" in event_data
@@ -135,7 +136,7 @@ class TestE2ESpellcheckWorkflows:
                 assert spellcheck_result["corrections_made"] > 0  # Should have found errors
                 print(
                     f"✅ Spellcheck completed with "
-                    f"{spellcheck_result['corrections_made']} corrections"
+                    f"{spellcheck_result['corrections_made']} corrections",
                 )
 
                 # Step 5: Validate corrected content stored in Content Service using utility
@@ -151,7 +152,7 @@ class TestE2ESpellcheckWorkflows:
 
                 try:
                     corrected_content = await service_manager.fetch_content_directly(
-                        corrected_storage_id
+                        corrected_storage_id,
                     )
 
                     assert corrected_content is not None
@@ -161,7 +162,7 @@ class TestE2ESpellcheckWorkflows:
                     print("✅ Corrected content retrieved and validated")
                     print(
                         f"📝 Original length: {len(test_essay_content)}, "
-                        f"Corrected length: {len(corrected_content)}"
+                        f"Corrected length: {len(corrected_content)}",
                     )
                 except RuntimeError as e:
                     pytest.fail(f"Content fetch failed: {e}")
@@ -193,7 +194,7 @@ class TestE2ESpellcheckWorkflows:
         # Upload using utility
         try:
             original_storage_id = await service_manager.upload_content_directly(
-                perfect_essay_content
+                perfect_essay_content,
             )
         except RuntimeError as e:
             pytest.fail(f"Content upload failed: {e}")
@@ -218,7 +219,7 @@ class TestE2ESpellcheckWorkflows:
                 pytest.fail(f"Event publishing failed: {e}")
 
             # Monitor for results using utility
-            def spellcheck_result_filter(event_data: Dict[str, Any]) -> bool:
+            def spellcheck_result_filter(event_data: dict[str, Any]) -> bool:
                 """Filter for spellcheck results from our specific essay."""
                 return (
                     "data" in event_data
@@ -247,14 +248,14 @@ class TestE2ESpellcheckWorkflows:
                 pytest.fail(f"Event collection or validation failed: {e}")
 
     def _create_spellcheck_request_event(
-        self, essay_id: str, text_storage_id: str, correlation_id: str, language: str = "en"
-    ) -> Dict[str, Any]:
+        self, essay_id: str, text_storage_id: str, correlation_id: str, language: str = "en",
+    ) -> dict[str, Any]:
         """
         Create SpellcheckRequestedV1 event structure.
 
         Helper method that creates the proper EventEnvelope structure for spellcheck requests.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         # Create entity reference for the essay
         essay_entity_ref = EntityReference(entity_id=essay_id, entity_type="essay")
@@ -262,8 +263,8 @@ class TestE2ESpellcheckWorkflows:
         # Create system metadata (match original working implementation)
         system_metadata = SystemProcessingMetadata(
             entity=essay_entity_ref,
-            timestamp=datetime.now(timezone.utc),
-            started_at=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
+            started_at=datetime.now(UTC),
             processing_stage=ProcessingStage.PROCESSING,
             event=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED.value,
         )
@@ -272,7 +273,7 @@ class TestE2ESpellcheckWorkflows:
         spellcheck_request_data = EssayLifecycleSpellcheckRequestV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
             entity_ref=essay_entity_ref,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             status=EssayStatus.AWAITING_SPELLCHECK,
             text_storage_id=text_storage_id,
             language=language,
@@ -283,7 +284,7 @@ class TestE2ESpellcheckWorkflows:
         event_envelope = EventEnvelope(
             event_id=uuid.uuid4(),
             event_type="huleedu.essay.spellcheck.requested.v1",
-            event_timestamp=datetime.now(timezone.utc),
+            event_timestamp=datetime.now(UTC),
             source_service="test_spellcheck_workflows",
             correlation_id=uuid.UUID(correlation_id) if correlation_id else None,
             data=spellcheck_request_data,

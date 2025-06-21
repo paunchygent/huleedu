@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from aiohttp import ClientSession
 from config import Settings, settings
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.protocols import RedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from implementations.ai_feedback_initiator_impl import AIFeedbackInitiatorImpl
 from implementations.batch_conductor_client_impl import BatchConductorClientImpl
@@ -70,13 +72,14 @@ class CoreInfrastructureProvider(Provider):
         return ClientSession()
 
     @provide(scope=Scope.APP)
-    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
-        """Provide Redis client for idempotency operations."""
+    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
+        """Provide Redis client for idempotency and pub/sub operations."""
         redis_client = RedisClient(
-            client_id=f"{settings.SERVICE_NAME}-redis", redis_url=settings.REDIS_URL
+            client_id=f"{settings.SERVICE_NAME}-redis", redis_url=settings.REDIS_URL,
         )
         await redis_client.start()
-        return redis_client
+        # RedisClient implements all AtomicRedisClientProtocol methods
+        return cast(AtomicRedisClientProtocol, redis_client)
 
 
 class RepositoryAndPublishingProvider(Provider):
@@ -101,14 +104,14 @@ class ExternalClientsProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_essay_lifecycle_client(
-        self, http_session: ClientSession, settings: Settings
+        self, http_session: ClientSession, settings: Settings,
     ) -> EssayLifecycleClientProtocol:
         """Provide essay lifecycle service client implementation."""
         return DefaultEssayLifecycleClientImpl(http_session, settings)
 
     @provide(scope=Scope.APP)
     def provide_batch_conductor_client(
-        self, http_session: ClientSession, settings: Settings
+        self, http_session: ClientSession, settings: Settings,
     ) -> BatchConductorClientProtocol:
         """Provide Batch Conductor Service HTTP client implementation."""
         return BatchConductorClientImpl(http_session, settings)
@@ -219,7 +222,7 @@ class EventHandlingProvider(Provider):
         batch_essays_ready_handler: BatchEssaysReadyHandler,
         els_batch_phase_outcome_handler: ELSBatchPhaseOutcomeHandler,
         client_pipeline_request_handler: ClientPipelineRequestHandler,
-        redis_client: RedisClientProtocol,
+        redis_client: AtomicRedisClientProtocol,
     ) -> BatchKafkaConsumer:
         """Provide Kafka consumer with idempotency support."""
         return BatchKafkaConsumer(

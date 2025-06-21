@@ -8,10 +8,10 @@ in E2E integration tests.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any
 
 
-def is_related_to_batch(event_data: Dict[str, Any], batch_id: str, correlation_id: str) -> bool:
+def is_related_to_batch(event_data: dict[str, Any], batch_id: str, correlation_id: str) -> bool:
     """Check if event is related to our test batch or correlation ID."""
     # Check data field for batch_id
     data = event_data.get("data", {})
@@ -32,8 +32,8 @@ def is_related_to_batch(event_data: Dict[str, Any], batch_id: str, correlation_i
 
 
 async def monitor_pipeline_resolution_workflow(
-    consumer: Any, batch_id: str, correlation_id: str, timeout_seconds: int = 120
-) -> Dict[str, Any]:
+    consumer: Any, batch_id: str, correlation_id: str, timeout_seconds: int = 120,
+) -> dict[str, Any]:
     """
     Monitor the complete pipeline resolution workflow.
 
@@ -42,10 +42,10 @@ async def monitor_pipeline_resolution_workflow(
     start_time = asyncio.get_event_loop().time()
     end_time = start_time + timeout_seconds
 
-    specialized_services_triggered: List[str] = []
-    completion_events: List[Dict[str, Any]] = []
+    specialized_services_triggered: list[str] = []
+    completion_events: list[dict[str, Any]] = []
 
-    workflow_events: Dict[str, Any] = {
+    workflow_events: dict[str, Any] = {
         "client_request_processed": False,
         "bcs_resolution_completed": False,
         "pipeline_initiated": False,
@@ -59,9 +59,8 @@ async def monitor_pipeline_resolution_workflow(
         try:
             # Wait up to 1s for the next message; continue if none arrives.
             message = await asyncio.wait_for(consumer.getone(), timeout=1.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             continue  # No message within 1s; loop until deadline
-
 
         try:
             # Parse message for event analysis

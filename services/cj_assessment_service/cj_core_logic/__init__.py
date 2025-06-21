@@ -14,9 +14,9 @@ from .scoring_ranking import (
 from .workflow_orchestrator import run_cj_assessment_workflow
 
 __all__ = [
-    "run_cj_assessment_workflow",
-    "generate_comparison_tasks",
-    "record_comparisons_and_update_scores",
     "check_score_stability",
+    "generate_comparison_tasks",
     "get_essay_rankings",
+    "record_comparisons_and_update_scores",
+    "run_cj_assessment_workflow",
 ]

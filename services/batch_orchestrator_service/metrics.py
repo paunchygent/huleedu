@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import REGISTRY, Counter, Histogram
 
 logger = create_service_logger("bos.metrics")
 
-_metrics: Optional[Dict[str, Any]] = None
+_metrics: dict[str, Any] | None = None
 
-def get_metrics() -> Dict[str, Any]:
+
+def get_metrics() -> dict[str, Any]:
     """Get or create shared metrics instances (Singleton Pattern)."""
     global _metrics
     if _metrics is None:
@@ -19,7 +20,8 @@ def get_metrics() -> Dict[str, Any]:
         _metrics = _create_metrics()
     return _metrics
 
-def _create_metrics() -> Dict[str, Any]:
+
+def _create_metrics() -> dict[str, Any]:
     """Create all Prometheus metrics for BOS."""
     try:
         metrics = {
@@ -47,7 +49,7 @@ def _create_metrics() -> Dict[str, Any]:
                 "huleedu_phase_transition_duration_seconds",
                 "Duration of phase transitions orchestrated by BOS.",
                 ["from_phase", "to_phase", "batch_id"],
-                buckets=(0.1, 0.5, 1, 2.5, 5, 10, 30, 60), # Meaningful buckets
+                buckets=(0.1, 0.5, 1, 2.5, 5, 10, 30, 60),  # Meaningful buckets
                 registry=REGISTRY,
             ),
             "orchestration_commands_total": Counter(
@@ -61,21 +63,25 @@ def _create_metrics() -> Dict[str, Any]:
     except ValueError as e:
         if "Duplicated timeseries" in str(e):
             logger.warning(
-                f"Metrics already registered: {e} – reusing existing collectors from REGISTRY."
+                f"Metrics already registered: {e} – reusing existing collectors from REGISTRY.",
             )
             return _get_existing_metrics()
         raise
 
-def get_http_metrics() -> Dict[str, Any]:
+
+def get_http_metrics() -> dict[str, Any]:
     """Get metrics required by the HTTP API component."""
     all_metrics = get_metrics()
     return {
         "http_requests_total": all_metrics.get("http_requests_total"),
         "http_request_duration_seconds": all_metrics.get("http_request_duration_seconds"),
-        "pipeline_execution_total": all_metrics.get("pipeline_execution_total"), # For tracking requests that start pipelines
+        "pipeline_execution_total": all_metrics.get(
+            "pipeline_execution_total",
+        ),  # For tracking requests that start pipelines
     }
 
-def _get_existing_metrics() -> Dict[str, Any]:
+
+def _get_existing_metrics() -> dict[str, Any]:
     """Return already-registered collectors from the global REGISTRY.
 
     Falling back to an empty dict disables metrics entirely. This helper looks up the
@@ -93,7 +99,7 @@ def _get_existing_metrics() -> Dict[str, Any]:
         "orchestration_commands_total": "huleedu_orchestration_commands_total",
     }
 
-    existing: Dict[str, Any] = {}
+    existing: dict[str, Any] = {}
     registry_collectors = getattr(REGISTRY, "_names_to_collectors", None)
     for logical_key, metric_name in name_map.items():
         try:
@@ -110,7 +116,7 @@ def _get_existing_metrics() -> Dict[str, Any]:
     return existing
 
 
-def get_kafka_consumer_metrics() -> Dict[str, Any]:
+def get_kafka_consumer_metrics() -> dict[str, Any]:
     """Get metrics required by the Kafka consumer component."""
     all_metrics = get_metrics()
     return {

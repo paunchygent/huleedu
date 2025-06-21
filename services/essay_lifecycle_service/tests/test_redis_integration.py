@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 from dishka import make_async_container
-from huleedu_service_libs.protocols import RedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 
 from services.essay_lifecycle_service.config import Settings
@@ -41,8 +41,8 @@ async def di_container(settings_override: Settings) -> AsyncGenerator[Any, None]
 @pytest.mark.asyncio
 async def test_redis_client_injection_and_lifecycle(di_container: Any) -> None:
     """Test that RedisClient can be injected from DI container and manages lifecycle properly."""
-    # Test DI injection
-    redis_client = await di_container.get(RedisClientProtocol)
+    # Test DI injection of AtomicRedisClientProtocol
+    redis_client = await di_container.get(AtomicRedisClientProtocol)
     assert redis_client is not None
     assert isinstance(redis_client, RedisClient)
 
@@ -56,21 +56,41 @@ async def test_redis_client_injection_and_lifecycle(di_container: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_redis_protocol_compliance(di_container: Any) -> None:
-    """Test that injected client satisfies RedisClientProtocol interface."""
-    redis_client = await di_container.get(RedisClientProtocol)
+async def test_atomic_redis_protocol_compliance(di_container: Any) -> None:
+    """Test that injected client satisfies AtomicRedisClientProtocol interface."""
+    redis_client = await di_container.get(AtomicRedisClientProtocol)
 
-    # Verify protocol methods exist and are callable
+    # Verify basic protocol methods exist
     assert hasattr(redis_client, "set_if_not_exists")
     assert hasattr(redis_client, "delete_key")
     assert callable(redis_client.set_if_not_exists)
     assert callable(redis_client.delete_key)
 
+    # Verify atomic protocol methods exist
+    assert hasattr(redis_client, "watch")
+    assert hasattr(redis_client, "multi")
+    assert hasattr(redis_client, "exec")
+    assert hasattr(redis_client, "scan_pattern")
+    assert callable(redis_client.watch)
+    assert callable(redis_client.multi)
+    assert callable(redis_client.exec)
+    assert callable(redis_client.scan_pattern)
+
+    # Verify pub/sub protocol methods exist
+    assert hasattr(redis_client, "publish")
+    assert hasattr(redis_client, "subscribe")
+    assert hasattr(redis_client, "get_user_channel")
+    assert hasattr(redis_client, "publish_user_notification")
+    assert callable(redis_client.publish)
+    assert callable(redis_client.subscribe)
+    assert callable(redis_client.get_user_channel)
+    assert callable(redis_client.publish_user_notification)
+
 
 @pytest.mark.asyncio
 async def test_redis_idempotency_pattern(di_container: Any) -> None:
     """Test Redis SETNX idempotency pattern for event processing."""
-    redis_client = await di_container.get(RedisClientProtocol)
+    redis_client = await di_container.get(AtomicRedisClientProtocol)
 
     test_key = "idempotency:test_event_id"
     test_value = "processed"
@@ -90,9 +110,35 @@ async def test_redis_idempotency_pattern(di_container: Any) -> None:
 
 
 @pytest.mark.asyncio
+async def test_redis_pubsub_functionality(di_container: Any) -> None:
+    """Test Redis pub/sub functionality for real-time updates."""
+    redis_client = await di_container.get(AtomicRedisClientProtocol)
+
+    # Test publish operation
+    test_channel = "test:channel"
+    test_message = "test message"
+
+    receiver_count = await redis_client.publish(test_channel, test_message)
+    assert isinstance(receiver_count, int)
+    assert receiver_count >= 0  # No subscribers, but should work
+
+    # Test user channel helper
+    user_id = "test_user_123"
+    expected_channel = "ws:test_user_123"
+    actual_channel = redis_client.get_user_channel(user_id)
+    assert actual_channel == expected_channel
+
+    # Test user notification publishing
+    receiver_count = await redis_client.publish_user_notification(
+        user_id, "essay_status_update", {"essay_id": "123", "status": "completed"}
+    )
+    assert isinstance(receiver_count, int)
+
+
+@pytest.mark.asyncio
 async def test_redis_connection_management(di_container: Any) -> None:
     """Test Redis connection management and error handling."""
-    redis_client = await di_container.get(RedisClientProtocol)
+    redis_client = await di_container.get(AtomicRedisClientProtocol)
 
     # Test key operations work (indicating successful connection)
     test_key = "connection_test"

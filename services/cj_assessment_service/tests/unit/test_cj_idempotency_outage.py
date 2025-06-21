@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Tuple
+from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -28,7 +28,7 @@ def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
         topic="cj-assessment",
         partition=0,
         offset=0,
-        timestamp=int(datetime.now(timezone.utc).timestamp() * 1000),
+        timestamp=int(datetime.now(UTC).timestamp() * 1000),
         timestamp_type=0,
         key=None,
         value=json.dumps(event_data).encode(),
@@ -37,9 +37,6 @@ def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
         serialized_value_size=len(json.dumps(event_data)),
         headers=[],
     )
-
-
-
 
 
 @pytest.fixture
@@ -79,7 +76,7 @@ def sample_cj_request_event() -> dict:
 @pytest.fixture
 def mock_boundary_services(
     mock_cj_repository: MockDatabase,
-) -> Tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Any]:
+) -> tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Any]:
     """Create mock boundary services (external dependencies only)."""
     mock_content_client = AsyncMock()
     mock_content_client.fetch_content = AsyncMock(return_value={})
@@ -138,9 +135,7 @@ async def test_exception_failure_releases_lock(
 @pytest.mark.asyncio
 async def test_redis_failure_fallback(
     sample_cj_request_event: dict,
-    mock_boundary_services: Tuple[
-        MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock
-    ],
+    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock],
     mock_redis_client: MockRedisClient,
 ) -> None:
     """Test that Redis failures result in fail-open behavior."""
@@ -149,9 +144,7 @@ async def test_redis_failure_fallback(
     # Set the mock redis client to fail on set operation
     mock_redis_client.should_fail_set = True
 
-    database, content_client, event_publisher, llm_interaction, settings = (
-        mock_boundary_services
-    )
+    database, content_client, event_publisher, llm_interaction, settings = mock_boundary_services
 
     kafka_msg = create_mock_kafka_message(sample_cj_request_event)
 

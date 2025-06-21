@@ -69,7 +69,7 @@ class Batch(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()")
+        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -78,17 +78,17 @@ class Batch(Base):
     error_details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Relationships
-    phase_logs: Mapped[list["PhaseStatusLog"]] = relationship(
+    phase_logs: Mapped[list[PhaseStatusLog]] = relationship(
         back_populates="batch",
         cascade="all, delete-orphan",
         order_by="PhaseStatusLog.created_at",
     )
-    configuration_snapshots: Mapped[list["ConfigurationSnapshot"]] = relationship(
+    configuration_snapshots: Mapped[list[ConfigurationSnapshot]] = relationship(
         back_populates="batch",
         cascade="all, delete-orphan",
         order_by="ConfigurationSnapshot.created_at",
     )
-    essays: Mapped[list["BatchEssay"]] = relationship(
+    essays: Mapped[list[BatchEssay]] = relationship(
         back_populates="batch",
         cascade="all, delete-orphan",
         order_by="BatchEssay.created_at",
@@ -150,11 +150,11 @@ class PhaseStatusLog(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()")
+        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
     )
 
     # Relationships
-    batch: Mapped["Batch"] = relationship(back_populates="phase_logs")
+    batch: Mapped[Batch] = relationship(back_populates="phase_logs")
 
 
 class ConfigurationSnapshot(Base):
@@ -189,14 +189,14 @@ class ConfigurationSnapshot(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()")
+        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
     )
 
     # Additional metadata
     additional_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Relationships
-    batch: Mapped["Batch"] = relationship(back_populates="configuration_snapshots")
+    batch: Mapped[Batch] = relationship(back_populates="configuration_snapshots")
 
 
 class BatchEssay(Base):
@@ -226,8 +226,8 @@ class BatchEssay(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()")
+        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
     )
 
     # Relationships
-    batch: Mapped["Batch"] = relationship(back_populates="essays")
+    batch: Mapped[Batch] = relationship(back_populates="essays")

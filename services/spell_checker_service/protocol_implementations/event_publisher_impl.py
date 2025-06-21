@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 from huleedu_service_libs.kafka_client import KafkaBus
@@ -24,7 +23,7 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
         self,
         kafka_bus: KafkaBus,
         event_data: SpellcheckResultDataV1,
-        correlation_id: Optional[UUID],
+        correlation_id: UUID | None,
     ) -> None:
         """Publish spellcheck result event to Kafka."""
         result_envelope = EventEnvelope[SpellcheckResultDataV1](
@@ -45,5 +44,5 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
 
         logger = create_service_logger("spell_checker_service.event_publisher_impl")
         logger.info(
-            f"Published spellcheck completion event for essay {event_data.entity_ref.entity_id}"
+            f"Published spellcheck completion event for essay {event_data.entity_ref.entity_id}",
         )

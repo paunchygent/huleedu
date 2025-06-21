@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock
 
 import aiohttp
@@ -103,7 +103,7 @@ class TestPipelineResolutionIntegration:
     @pytest.fixture
     async def pipeline_request_handler(
         self,
-        validated_services: Dict[str, Any],
+        validated_services: dict[str, Any],
         mock_batch_repository: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_phase_coordinator: AsyncMock,
@@ -124,7 +124,7 @@ class TestPipelineResolutionIntegration:
         return handler
 
     @pytest.fixture
-    async def validated_services(self, service_manager: ServiceTestManager) -> Dict[str, Any]:
+    async def validated_services(self, service_manager: ServiceTestManager) -> dict[str, Any]:
         """
         Ensure all required services are available and validated.
 
@@ -184,7 +184,7 @@ class TestPipelineResolutionIntegration:
             source_service="api_gateway",
             correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
-                batch_id="test-batch-integration-001", requested_pipeline="ai_feedback"
+                batch_id="test-batch-integration-001", requested_pipeline="ai_feedback",
             ),
         )
 
@@ -196,10 +196,10 @@ class TestPipelineResolutionIntegration:
 
         # Verify batch repository was called correctly
         mock_batch_repository.get_batch_context.assert_called_once_with(
-            "test-batch-integration-001"
+            "test-batch-integration-001",
         )
         mock_batch_repository.get_processing_pipeline_state.assert_called_once_with(
-            "test-batch-integration-001"
+            "test-batch-integration-001",
         )
         mock_batch_repository.save_processing_pipeline_state.assert_called_once()
 
@@ -234,7 +234,7 @@ class TestPipelineResolutionIntegration:
             source_service="api_gateway",
             correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
-                batch_id="non-existent-batch", requested_pipeline="ai_feedback"
+                batch_id="non-existent-batch", requested_pipeline="ai_feedback",
             ),
         )
 
@@ -248,7 +248,7 @@ class TestPipelineResolutionIntegration:
         assert not hasattr(pipeline_request_handler.bcs_client, "resolve_pipeline") or not any(
             call
             for call in getattr(
-                pipeline_request_handler.bcs_client, "resolve_pipeline", lambda: None
+                pipeline_request_handler.bcs_client, "resolve_pipeline", lambda: None,
             ).__dict__.get("call_args_list", [])
         )
 
@@ -288,7 +288,7 @@ class TestPipelineResolutionIntegration:
             source_service="api_gateway",
             correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
-                batch_id="test-batch-bcs-error-001", requested_pipeline="invalid_pipeline_name"
+                batch_id="test-batch-bcs-error-001", requested_pipeline="invalid_pipeline_name",
             ),
         )
 
@@ -330,7 +330,7 @@ class TestPipelineResolutionIntegration:
         from common_core.pipeline_models import PipelineExecutionStatus
 
         mock_batch_repository.get_processing_pipeline_state.return_value = {
-            "status": PipelineExecutionStatus.IN_PROGRESS
+            "status": PipelineExecutionStatus.IN_PROGRESS,
         }
 
         test_event = EventEnvelope(
@@ -340,7 +340,7 @@ class TestPipelineResolutionIntegration:
             source_service="api_gateway",
             correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
-                batch_id="test-batch-idempotent-001", requested_pipeline="ai_feedback"
+                batch_id="test-batch-idempotent-001", requested_pipeline="ai_feedback",
             ),
         )
 
@@ -393,12 +393,12 @@ class TestPipelineResolutionIntegration:
                 event_id=uuid.uuid4(),
                 event_type="huleedu.commands.batch.pipeline.v1",
                 event_timestamp=datetime.fromisoformat(
-                    "2025-01-01T00:00:00Z".replace("Z", "+00:00")
+                    "2025-01-01T00:00:00Z".replace("Z", "+00:00"),
                 ),
                 source_service="api_gateway",
                 correlation_id=uuid.uuid4(),
                 data=ClientBatchPipelineRequestV1(
-                    batch_id=f"test-batch-concurrent-{i:03d}", requested_pipeline="ai_feedback"
+                    batch_id=f"test-batch-concurrent-{i:03d}", requested_pipeline="ai_feedback",
                 ),
             )
             concurrent_events.append(event)

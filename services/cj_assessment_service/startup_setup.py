@@ -33,7 +33,7 @@ async def initialize_services(app: Quart, settings: Settings, container) -> None
 
         logger.info(
             "CJ Assessment Service DI container and quart-dishka integration "
-            "initialized successfully."
+            "initialized successfully.",
         )
     except Exception as e:
         logger.critical(f"Failed to initialize CJ Assessment Service: {e}", exc_info=True)

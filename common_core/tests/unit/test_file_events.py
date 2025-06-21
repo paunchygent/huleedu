@@ -8,7 +8,7 @@ and validation failure notifications.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -81,7 +81,7 @@ class TestEssayValidationFailedV1:
     def test_model_with_all_fields(self) -> None:
         """Test validation failure event with all optional fields."""
         correlation_id = uuid4()
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
 
         event = EssayValidationFailedV1(
             batch_id="batch_789",
@@ -149,7 +149,7 @@ class TestEssayValidationFailedV1:
         assert event.correlation_id is None
 
         # Default timestamp (should be recent)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         time_diff = abs((now - event.timestamp).total_seconds())
         assert time_diff < 1.0  # Should be within 1 second
 
@@ -210,10 +210,10 @@ class TestEssayValidationFailedV1:
 
         # Should have timezone info
         assert event_default.timestamp.tzinfo is not None
-        assert event_default.timestamp.tzinfo == timezone.utc
+        assert event_default.timestamp.tzinfo == UTC
 
         # Event with explicit timestamp
-        explicit_time = datetime(2025, 1, 16, 12, 0, 0, tzinfo=timezone.utc)
+        explicit_time = datetime(2025, 1, 16, 12, 0, 0, tzinfo=UTC)
         event_explicit = EssayValidationFailedV1(
             batch_id="batch_explicit",
             original_file_name="test2.txt",

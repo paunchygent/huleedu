@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from implementations.batch_database_infrastructure import BatchDatabaseInfrastructure
@@ -100,7 +100,7 @@ class BatchCrudOperations:
                     .where(Batch.id == batch_id)
                     .values(
                         status=status_enum,
-                        updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                        updated_at=datetime.now(UTC).replace(tzinfo=None),
                     )
                 )
                 result = await session.execute(stmt)

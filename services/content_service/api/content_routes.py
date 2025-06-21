@@ -1,6 +1,5 @@
 """Content management routes for Content Service."""
 
-from typing import Union
 
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -18,7 +17,7 @@ content_bp = Blueprint("content_routes", __name__, url_prefix="/v1/content")
 async def upload_content(
     store: FromDishka[ContentStoreProtocol],
     metrics: FromDishka[ContentMetricsProtocol],
-) -> Union[Response, tuple[Response, int]]:
+) -> Response | tuple[Response, int]:
     """Upload content endpoint."""
     try:
         raw_data = await request.data
@@ -42,7 +41,7 @@ async def download_content(
     content_id: str,
     store: FromDishka[ContentStoreProtocol],
     metrics: FromDishka[ContentMetricsProtocol],
-) -> Union[Response, tuple[Response, int]]:
+) -> Response | tuple[Response, int]:
     """Download content endpoint."""
     try:
         if not all(c in "0123456789abcdefABCDEF" for c in content_id) or len(content_id) != 32:

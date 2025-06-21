@@ -24,7 +24,7 @@ class DefaultContentServiceClient(ContentServiceClientProtocol):
         try:
             # Content Service expects raw bytes data in request body
             async with self.http_session.post(
-                self.settings.CONTENT_SERVICE_URL, data=content_bytes
+                self.settings.CONTENT_SERVICE_URL, data=content_bytes,
             ) as response:
                 if response.status == 201:
                     result = await response.json()
@@ -32,7 +32,7 @@ class DefaultContentServiceClient(ContentServiceClientProtocol):
                     if isinstance(storage_id, str) and storage_id:
                         logger.info(
                             f"Successfully stored content (type: {content_type.value}), "
-                            f"storage_id: {storage_id}"
+                            f"storage_id: {storage_id}",
                         )
                         return storage_id
                     else:
@@ -40,7 +40,7 @@ class DefaultContentServiceClient(ContentServiceClientProtocol):
                 else:
                     error_text = await response.text()
                     raise RuntimeError(
-                        f"Content Service returned status {response.status}: {error_text}"
+                        f"Content Service returned status {response.status}: {error_text}",
                     )
         except Exception as e:
             logger.error(f"Error storing content in Content Service: {e}")

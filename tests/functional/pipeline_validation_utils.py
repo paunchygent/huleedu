@@ -7,13 +7,14 @@ in E2E integration tests.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
+
 from tests.utils.service_test_manager import ServiceTestManager
 
 
 async def validate_batch_pipeline_state(
-    service_manager: ServiceTestManager, batch_id: str
-) -> Dict[str, Any]:
+    service_manager: ServiceTestManager, batch_id: str,
+) -> dict[str, Any]:
     """Validate that batch has been updated with resolved pipeline."""
     # Get batch state from BOS
     endpoints = await service_manager.get_validated_endpoints()
@@ -24,7 +25,7 @@ async def validate_batch_pipeline_state(
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{bos_base_url}/v1/batches/{batch_id}/status") as response:
             if response.status == 200:
-                batch_data: Dict[str, Any] = await response.json()
+                batch_data: dict[str, Any] = await response.json()
                 print(f"📊 Batch state retrieved: {batch_data}")
                 return batch_data
             else:
@@ -33,8 +34,8 @@ async def validate_batch_pipeline_state(
 
 
 async def validate_bcs_integration_occurred(
-    service_manager: ServiceTestManager, batch_id: str, requested_pipeline: str
-) -> Dict[str, Any]:
+    service_manager: ServiceTestManager, batch_id: str, requested_pipeline: str,
+) -> dict[str, Any]:
     """
     Validate that BCS ↔ BOS integration actually occurred.
 
@@ -110,7 +111,7 @@ async def validate_bcs_integration_occurred(
     return integration_evidence
 
 
-async def validate_bcs_dependency_resolution(integration_evidence: Dict[str, Any]) -> bool:
+async def validate_bcs_dependency_resolution(integration_evidence: dict[str, Any]) -> bool:
     """
     Validate that BCS performed intelligent dependency resolution.
 

@@ -7,7 +7,6 @@ and the Batch Orchestrator Service (BOS) for dynamic pipeline orchestration.
 
 from __future__ import annotations
 
-from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -30,7 +29,7 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
     """
 
     batch_id: str = Field(
-        ..., description="Unique identifier of the batch that completed the phase"
+        ..., description="Unique identifier of the batch that completed the phase",
     )
 
     phase_name: str = Field(
@@ -49,7 +48,7 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
         ),
     )
 
-    processed_essays: List[EssayProcessingInputRefV1] = Field(
+    processed_essays: list[EssayProcessingInputRefV1] = Field(
         ...,
         description=(
             "List of essays that successfully completed this phase, with updated "
@@ -57,7 +56,7 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
         ),
     )
 
-    failed_essay_ids: List[str] = Field(
+    failed_essay_ids: list[str] = Field(
         ...,
         description=(
             "List of essay IDs that failed during this phase and should not be "
@@ -65,8 +64,8 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
         ),
     )
 
-    correlation_id: Optional[UUID] = Field(
-        None, description="Optional correlation ID for tracking related events across services"
+    correlation_id: UUID | None = Field(
+        None, description="Optional correlation ID for tracking related events across services",
     )
 
     class Config:
@@ -84,5 +83,5 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
                 ],
                 "failed_essay_ids": ["essay-3", "essay-4"],
                 "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
-            }
+            },
         }

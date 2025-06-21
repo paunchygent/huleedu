@@ -78,30 +78,32 @@ async def test_comprehensive_real_batch_pipeline():
         # Step 5: Register batch with BOS using modern utility
         print("📝 Registering batch with BOS to create essay slots...")
         batch_id = await register_comprehensive_batch(
-            service_manager, len(test_essays), test_correlation_id
+            service_manager, len(test_essays), test_correlation_id,
         )
         print(f"✅ Batch registered with BOS: {batch_id}")
 
         # Step 6: Upload files to trigger the pipeline using modern utility
         print("🚀 Uploading real student essays to trigger pipeline...")
         upload_response = await upload_real_essays(
-            service_manager, batch_id, test_essays, test_correlation_id
+            service_manager, batch_id, test_essays, test_correlation_id,
         )
         print(f"✅ File upload successful: {upload_response}")
 
-        # TIMING FIX: Wait for essays to be processed and stored in BOS before requesting pipeline
-        # The workflow is: Upload → File Processing → ELS BatchEssaysReady → Essay Storage in BOS
-        # We need to wait for this to complete before the client can request pipeline execution
-        print("⏳ Waiting for essays to be processed and stored in BOS...")
+        # TIMING FIX: Wait for essays to be processed by ELS before requesting pipeline
+        # The workflow is: Upload → File Processing → ELS processes and stores essays → ELS BatchEssaysReady → BOS ready to orchestrate
+        # We need to wait for ELS processing to complete before the client can request pipeline execution
+        print("⏳ Waiting for essays to be processed by ELS...")
 
         import asyncio
+
         batch_ready_received = False
 
         # Monitor for BatchEssaysReady event to ensure essays are stored before client request
         async for message in consumer:
             try:
-                if hasattr(message, 'value'):
+                if hasattr(message, "value"):
                     import json
+
                     if isinstance(message.value, bytes):
                         raw_message = message.value.decode("utf-8")
                     else:
@@ -112,11 +114,16 @@ async def test_comprehensive_real_batch_pipeline():
                     event_correlation_id = envelope_data.get("correlation_id")
 
                     # Check for BatchEssaysReady with our correlation ID
-                    if (message.topic == "huleedu.els.batch.essays.ready.v1" and
-                        event_correlation_id == test_correlation_id and
-                        event_data.get("batch_id") == batch_id):
+                    if (
+                        message.topic == "huleedu.els.batch.essays.ready.v1"
+                        and event_correlation_id == test_correlation_id
+                        and event_data.get("batch_id") == batch_id
+                    ):
                         ready_count = len(event_data.get("ready_essays", []))
-                        print(f"📨 BatchEssaysReady received: {ready_count} essays ready for processing")
+                        print(
+                            f"📨 BatchEssaysReady received: {ready_count} essays "
+                            "ready for processing",
+                        )
                         batch_ready_received = True
                         break
 
@@ -125,11 +132,13 @@ async def test_comprehensive_real_batch_pipeline():
                 continue
 
         if not batch_ready_received:
-            raise Exception("BatchEssaysReady event was not received - essays may not be stored in BOS")
+            raise Exception(
+                "BatchEssaysReady event was not received - essays may not be processed by ELS",
+            )
 
-        # Give BOS a moment to store the essays after receiving BatchEssaysReady
+        # Give BOS a moment to process the BatchEssaysReady event
         await asyncio.sleep(2)
-        print("✅ Essays confirmed stored in BOS, ready for client pipeline request")
+        print("✅ Essays confirmed processed by ELS, BOS ready for client pipeline request")
 
         # ARCHITECTURAL FIX: Explicitly trigger pipeline execution via client request
         # Essays are now stored persistently and BOS is ready to process client requests
@@ -138,14 +147,20 @@ async def test_comprehensive_real_batch_pipeline():
             kafka_manager,
             batch_id,
             "cj_assessment",  # Use cj_assessment pipeline for comprehensive testing
-            test_correlation_id
+            test_correlation_id,
         )
-        print(f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}")
+        print(
+            f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}",
+        )
 
         # Step 7: Watch pipeline progression with pre-positioned consumer
         print("⏳ Watching pipeline progression...")
         result = await watch_pipeline_progression_with_consumer(
-            consumer, batch_id, request_correlation_id, len(test_essays), 50  # Use request correlation ID
+            consumer,
+            batch_id,
+            request_correlation_id,
+            len(test_essays),
+            50,  # Use request correlation ID
         )
 
         assert result is not None, "Pipeline did not complete"

@@ -13,14 +13,14 @@ from .envelope import EventEnvelope
 from .spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 
 __all__ = [
-    "EventEnvelope",
     "BaseEventData",
-    "ProcessingUpdate",
-    "EventTracker",
-    "SpellcheckRequestedDataV1",
-    "SpellcheckResultDataV1",
-    "ELS_CJAssessmentRequestV1",
     "CJAssessmentCompletedV1",
     "CJAssessmentFailedV1",
     "ClientBatchPipelineRequestV1",
+    "ELS_CJAssessmentRequestV1",
+    "EventEnvelope",
+    "EventTracker",
+    "ProcessingUpdate",
+    "SpellcheckRequestedDataV1",
+    "SpellcheckResultDataV1",
 ]

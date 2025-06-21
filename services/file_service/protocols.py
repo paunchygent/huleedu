@@ -8,7 +8,7 @@ File Service dependencies to enable clean architecture and testability.
 from __future__ import annotations
 
 import uuid
-from typing import Optional, Protocol
+from typing import Protocol
 
 from common_core.enums import ContentType
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
@@ -40,7 +40,7 @@ class EventPublisherProtocol(Protocol):
     """Protocol for publishing Kafka events."""
 
     async def publish_essay_content_provisioned(
-        self, event_data: EssayContentProvisionedV1, correlation_id: Optional[uuid.UUID]
+        self, event_data: EssayContentProvisionedV1, correlation_id: uuid.UUID | None,
     ) -> None:
         """
         Publish EssayContentProvisionedV1 event to Kafka.
@@ -52,7 +52,7 @@ class EventPublisherProtocol(Protocol):
         ...
 
     async def publish_essay_validation_failed(
-        self, event_data: EssayValidationFailedV1, correlation_id: Optional[uuid.UUID]
+        self, event_data: EssayValidationFailedV1, correlation_id: uuid.UUID | None,
     ) -> None:
         """
         Publish EssayValidationFailedV1 event to Kafka.

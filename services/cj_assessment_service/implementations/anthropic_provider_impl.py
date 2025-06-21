@@ -151,7 +151,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
 
         try:
             async with self.session.post(
-                endpoint, headers=headers, json=payload, timeout=timeout_config
+                endpoint, headers=headers, json=payload, timeout=timeout_config,
             ) as response:
                 if response.status == 200:
                     response_data = await response.json()
@@ -165,7 +165,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                                     try:
                                         parsed_content = json.loads(text_content)
                                         validated_data = LLMAssessmentResponseSchema(
-                                            **parsed_content
+                                            **parsed_content,
                                         )
                                         # Type cast to satisfy mypy - model_dump()
                                         # returns dict[str, Any]

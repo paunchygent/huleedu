@@ -8,7 +8,7 @@ avoiding expensive API calls.
 from __future__ import annotations
 
 import random
-from typing import List, Literal, Optional
+from typing import Literal
 
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
@@ -24,7 +24,7 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
     Generates random but realistic comparative judgments without API calls.
     """
 
-    def __init__(self, seed: Optional[int] = None):
+    def __init__(self, seed: int | None = None):
         """Initialize mock with optional random seed for reproducible tests.
 
         Args:
@@ -35,11 +35,11 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
 
     async def perform_comparisons(
         self,
-        tasks: List[ComparisonTask],
-        model_override: Optional[str] = None,
-        temperature_override: Optional[float] = None,
-        max_tokens_override: Optional[int] = None,
-    ) -> List[ComparisonResult]:
+        tasks: list[ComparisonTask],
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
+    ) -> list[ComparisonResult]:
         """Generate mock comparison results for all tasks.
 
         Args:
@@ -95,7 +95,7 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
 
             # Create mock LLM assessment response
             llm_assessment = LLMAssessmentResponseSchema(
-                winner=winner, justification=justification, confidence=confidence
+                winner=winner, justification=justification, confidence=confidence,
             )
 
             # Create comparison result with short hash to fit database schema (64 chars max)

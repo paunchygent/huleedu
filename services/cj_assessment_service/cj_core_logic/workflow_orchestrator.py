@@ -58,12 +58,12 @@ async def run_cj_assessment_workflow(
     try:
         # Phase 1: Create CJ batch and setup
         cj_batch_id = await batch_preparation.create_cj_batch(
-            request_data, correlation_id, database, log_extra
+            request_data, correlation_id, database, log_extra,
         )
 
         # Phase 2: Fetch content and prepare essays
         essays_for_api_model = await batch_preparation.prepare_essays_for_assessment(
-            request_data, cj_batch_id, database, content_client, log_extra
+            request_data, cj_batch_id, database, content_client, log_extra,
         )
 
         # Phase 3: Iterative Comparison Loop
@@ -121,14 +121,14 @@ async def _finalize_batch_results(
         final_status = CJBatchStatusEnum.COMPLETE_STABLE
 
         await database.update_cj_batch_status(
-            session=session, cj_batch_id=cj_batch_id, status=final_status
+            session=session, cj_batch_id=cj_batch_id, status=final_status,
         )
 
         # Get final rankings
         rankings = await scoring_ranking.get_essay_rankings(session, cj_batch_id)
 
         logger.info(
-            f"Finalized batch {cj_batch_id} with {len(rankings)} ranked essays", extra=log_extra
+            f"Finalized batch {cj_batch_id} with {len(rankings)} ranked essays", extra=log_extra,
         )
 
         return rankings

@@ -191,9 +191,10 @@ class BatchKafkaConsumer:
                 if phase_transition_metric:
                     # The handler will use the metric for phase transition timing
                     # Pass metrics to handler for instrumentation
-                    setattr(
-                        self.els_batch_phase_outcome_handler, '_phase_transition_metric', phase_transition_metric)
-                    setattr(self.els_batch_phase_outcome_handler, '_commands_metric', commands_metric)
+                    self.els_batch_phase_outcome_handler._phase_transition_metric = (
+                        phase_transition_metric
+                    )
+                    self.els_batch_phase_outcome_handler._commands_metric = commands_metric
                 await self.els_batch_phase_outcome_handler.handle_els_batch_phase_outcome(msg)
 
             elif msg.topic == "huleedu.commands.batch.pipeline.v1":

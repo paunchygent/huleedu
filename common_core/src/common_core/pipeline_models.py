@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -47,25 +47,25 @@ class EssayProcessingCounts(BaseModel):
 class PipelineStateDetail(BaseModel):
     status: PipelineExecutionStatus = PipelineExecutionStatus.REQUESTED_BY_USER
     essay_counts: EssayProcessingCounts = Field(default_factory=EssayProcessingCounts)
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error_info: Optional[Dict[str, Any]] = None
-    progress_percentage: Optional[float] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_info: dict[str, Any] | None = None
+    progress_percentage: float | None = None
 
 
 class ProcessingPipelineState(BaseModel):
     """Whole-batch perspective of every requested pipeline."""
 
     batch_id: str
-    requested_pipelines: List[str]
-    spellcheck: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
-    nlp_metrics: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
-    ai_feedback: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
-    ai_editor_revision: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
-    grammar_check: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
-    cj_assessment: Optional[PipelineStateDetail] = Field(default_factory=PipelineStateDetail)
-    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    requested_pipelines: list[str]
+    spellcheck: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
+    nlp_metrics: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
+    ai_feedback: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
+    ai_editor_revision: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
+    grammar_check: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
+    cj_assessment: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    def get_pipeline(self, name: str) -> Optional[PipelineStateDetail]:
+    def get_pipeline(self, name: str) -> PipelineStateDetail | None:
         pipeline_name_attr = name.lower().replace("-", "_")
         return getattr(self, pipeline_name_attr, None)

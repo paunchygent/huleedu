@@ -53,7 +53,8 @@ class ELSBatchPhaseOutcomeHandler:
             processed_essays_for_next_phase = event_data.processed_essays
             failed_essay_ids = event_data.failed_essay_ids
 
-            # Note: No manual validation needed - Pydantic EventEnvelope parsing ensures required fields exist
+            # Note: No manual validation needed -
+            # Pydantic EventEnvelope parsing ensures required fields exist
 
             logger.info(
                 f"Received ELS batch phase outcome: batch={batch_id}, "

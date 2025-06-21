@@ -58,7 +58,7 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
     async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
         """Save pipeline processing state for a batch."""
         result: bool = await self.pipeline_manager.save_processing_pipeline_state(
-            batch_id, pipeline_state
+            batch_id, pipeline_state,
         )
         return result
 
@@ -77,13 +77,13 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
     ) -> bool:
         """Atomically update phase status if current status matches expected."""
         result: bool = await self.pipeline_manager.update_phase_status_atomically(
-            batch_id, phase_name, expected_status, new_status, completion_timestamp
+            batch_id, phase_name, expected_status, new_status, completion_timestamp,
         )
         return result
 
     # Context operations - delegated to context_ops
     async def store_batch_context(
-        self, batch_id: str, registration_data: BatchRegistrationRequestV1
+        self, batch_id: str, registration_data: BatchRegistrationRequestV1,
     ) -> bool:
         """Store batch context information."""
         result: bool = await self.context_ops.store_batch_context(batch_id, registration_data)
@@ -92,7 +92,7 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
     async def get_batch_context(self, batch_id: str) -> BatchRegistrationRequestV1 | None:
         """Retrieve batch context information."""
         result: BatchRegistrationRequestV1 | None = await self.context_ops.get_batch_context(
-            batch_id
+            batch_id,
         )
         return result
 
@@ -107,7 +107,7 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
     ) -> bool:
         """Create a configuration snapshot for a batch."""
         result: bool = await self.config_manager.create_configuration_snapshot(
-            batch_id, snapshot_name, pipeline_definition, configuration_version, description
+            batch_id, snapshot_name, pipeline_definition, configuration_version, description,
         )
         return result
 
@@ -124,16 +124,14 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
         try:
             async with self.db_infrastructure.session() as session:
                 # First, remove any existing essays for this batch (idempotency)
-                await session.execute(
-                    delete(BatchEssay).where(BatchEssay.batch_id == batch_id)
-                )
+                await session.execute(delete(BatchEssay).where(BatchEssay.batch_id == batch_id))
 
                 # Insert new essays - essays are EssayProcessingInputRefV1 objects
                 for essay_obj in essays:
                     # Create content reference from the essay object
                     content_reference = {
                         "text_storage_id": essay_obj.text_storage_id,
-                        "type": "text_content"
+                        "type": "text_content",
                     }
 
                     essay_record = BatchEssay(
@@ -141,7 +139,7 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
                         essay_id=essay_obj.essay_id,
                         content_reference=content_reference,
                         student_metadata={},  # Not available in EssayProcessingInputRefV1
-                        processing_metadata={}  # Not available in EssayProcessingInputRefV1
+                        processing_metadata={},  # Not available in EssayProcessingInputRefV1
                     )
                     session.add(essay_record)
 
@@ -160,7 +158,7 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
         try:
             async with self.db_infrastructure.session() as session:
                 result = await session.execute(
-                    select(BatchEssay).where(BatchEssay.batch_id == batch_id)
+                    select(BatchEssay).where(BatchEssay.batch_id == batch_id),
                 )
                 essay_records = result.scalars().all()
 
@@ -175,7 +173,7 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
                     # Reconstruct EssayProcessingInputRefV1 object from stored data
                     essay_obj = EssayProcessingInputRefV1(
                         essay_id=record.essay_id,
-                        text_storage_id=record.content_reference.get("text_storage_id", "")
+                        text_storage_id=record.content_reference.get("text_storage_id", ""),
                     )
                     essays.append(essay_obj)
 

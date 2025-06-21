@@ -10,7 +10,8 @@ real student essays, ranking validation, multi-essay coordination.
 """
 
 import uuid
-from typing import Any, Dict, List
+from datetime import UTC
+from typing import Any
 
 import pytest
 
@@ -91,7 +92,7 @@ class TestE2ECJAssessmentWorkflows:
         essay_storage_refs = []
 
         for i, essay_file in enumerate(essay_files):
-            with open(essay_file, "r", encoding="utf-8") as f:
+            with open(essay_file, encoding="utf-8") as f:
                 essay_content = f.read()
 
             try:
@@ -103,7 +104,7 @@ class TestE2ECJAssessmentWorkflows:
                         "essay_id": essay_id,
                         "storage_id": storage_id,
                         "file_name": essay_file.split("/")[-1],
-                    }
+                    },
                 )
 
                 print(f"✅ Essay {i + 1} uploaded: {storage_id}")
@@ -115,7 +116,7 @@ class TestE2ECJAssessmentWorkflows:
         failed_topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED)
 
         async with kafka_event_monitor(
-            "cj_assessment_pipeline_test", [completed_topic, failed_topic]
+            "cj_assessment_pipeline_test", [completed_topic, failed_topic],
         ) as consumer:
             # Step 3: Publish ELS_CJAssessmentRequestV1 event using utility
             cj_request = self._create_cj_assessment_request_event(
@@ -136,7 +137,7 @@ class TestE2ECJAssessmentWorkflows:
                 pytest.fail(f"CJ Assessment event publishing failed: {e}")
 
             # Step 4: Monitor for CJAssessmentCompletedV1 response using utility
-            def cj_result_filter(event_data: Dict[str, Any]) -> bool:
+            def cj_result_filter(event_data: dict[str, Any]) -> bool:
                 """Filter for CJ assessment results from our specific test by correlation ID."""
                 return "data" in event_data and event_data.get("correlation_id") == correlation_id
 
@@ -163,7 +164,7 @@ class TestE2ECJAssessmentWorkflows:
 
                 print(
                     f"✅ CJ Assessment completed with job ID: "
-                    f"{cj_completed_data['cj_assessment_job_id']}"
+                    f"{cj_completed_data['cj_assessment_job_id']}",
                 )
                 print(f"📊 Generated {len(cj_completed_data['rankings'])} essay rankings")
 
@@ -202,7 +203,7 @@ class TestE2ECJAssessmentWorkflows:
         # Upload essays using utility
         essay_storage_refs = []
         for i, essay_file in enumerate(essay_files):
-            with open(essay_file, "r", encoding="utf-8") as f:
+            with open(essay_file, encoding="utf-8") as f:
                 essay_content = f.read()
 
             try:
@@ -235,7 +236,7 @@ class TestE2ECJAssessmentWorkflows:
                 pytest.fail(f"Minimal CJ Assessment event publishing failed: {e}")
 
             # Monitor for results using utility
-            def cj_result_filter(event_data: Dict[str, Any]) -> bool:
+            def cj_result_filter(event_data: dict[str, Any]) -> bool:
                 """Filter for CJ assessment results from our specific test by correlation ID."""
                 return "data" in event_data and event_data.get("correlation_id") == correlation_id
 
@@ -264,24 +265,24 @@ class TestE2ECJAssessmentWorkflows:
     def _create_cj_assessment_request_event(
         self,
         batch_id: str,
-        essay_storage_refs: List[Dict[str, str]],
+        essay_storage_refs: list[dict[str, str]],
         correlation_id: str,
         language: str = "en",
         course_code: str = "TEST_COURSE",
         essay_instructions: str = "Write an essay.",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create ELS_CJAssessmentRequestV1 event structure.
 
         Helper method that creates the proper EventEnvelope structure for CJ assessment requests.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         # Create the essay input references
         essay_inputs = []
         for ref in essay_storage_refs:
             essay_input = EssayProcessingInputRefV1(
-                essay_id=ref["essay_id"], text_storage_id=ref["storage_id"]
+                essay_id=ref["essay_id"], text_storage_id=ref["storage_id"],
             )
             essay_inputs.append(essay_input)
 
@@ -291,7 +292,7 @@ class TestE2ECJAssessmentWorkflows:
         # Create SystemProcessingMetadata (match original working implementation)
         system_metadata = SystemProcessingMetadata(
             entity=batch_entity_ref,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             processing_stage=ProcessingStage.INITIALIZED,
             event=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED.value,
         )
@@ -311,7 +312,7 @@ class TestE2ECJAssessmentWorkflows:
         event_envelope = EventEnvelope(
             event_id=uuid.uuid4(),
             event_type=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
-            event_timestamp=datetime.now(timezone.utc),
+            event_timestamp=datetime.now(UTC),
             source_service="test_cj_assessment_workflows",
             correlation_id=uuid.UUID(correlation_id),
             data=cj_request_data,

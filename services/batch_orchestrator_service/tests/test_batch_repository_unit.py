@@ -101,7 +101,7 @@ class TestBatchRepositoryUnitTests:
 
         # Set initial state
         await in_memory_batch_repository.save_processing_pipeline_state(
-            batch_id, {f"{phase_name}_status": "pending"}
+            batch_id, {f"{phase_name}_status": "pending"},
         )
 
         # Act - Test atomic compare-and-set
@@ -132,7 +132,7 @@ class TestBatchRepositoryUnitTests:
 
         # Set initial state
         await in_memory_batch_repository.save_processing_pipeline_state(
-            batch_id, {f"{phase_name}_status": "pending"}
+            batch_id, {f"{phase_name}_status": "pending"},
         )
 
         # Act - First update (should succeed)
@@ -174,7 +174,7 @@ class TestRepositoryImplementationComparison:
         return settings
 
     def test_both_repositories_implement_same_protocol(
-        self, mock_settings_for_postgres: MagicMock
+        self, mock_settings_for_postgres: MagicMock,
     ) -> None:
         """Verify both repository implementations follow the same protocol."""
         # Arrange & Act

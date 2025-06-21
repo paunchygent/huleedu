@@ -6,8 +6,7 @@ injected protocol implementations for all external interactions.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import aiohttp
 from aiokafka import ConsumerRecord
@@ -58,21 +57,21 @@ async def process_single_message(
     Returns:
         bool: True if processing succeeded, False otherwise
     """
-    processing_started_at = datetime.now(timezone.utc)
+    processing_started_at = datetime.now(UTC)
 
     # Get business metrics from shared module
     business_metrics = get_business_metrics()
     corrections_metric = business_metrics.get("spellcheck_corrections_made")
     kafka_queue_latency_metric = business_metrics.get("kafka_queue_latency_seconds")
 
-    request_envelope: Optional[EventEnvelope[EssayLifecycleSpellcheckRequestV1]] = None
+    request_envelope: EventEnvelope[EssayLifecycleSpellcheckRequestV1] | None = None
     # Default if ID not parsed
     essay_id_for_logging: str = f"offset-{msg.offset}-partition-{msg.partition}"
 
     try:
         raw_message = msg.value.decode("utf-8")
         request_envelope = EventEnvelope[EssayLifecycleSpellcheckRequestV1].model_validate_json(
-            raw_message
+            raw_message,
         )
         request_data = request_envelope.data
 
@@ -88,7 +87,7 @@ async def process_single_message(
             if queue_latency_seconds >= 0:  # Avoid negative values from clock skew
                 kafka_queue_latency_metric.observe(queue_latency_seconds)
                 logger.debug(
-                    f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}"
+                    f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}",
                 )
 
         # Set a more meaningful ID for logging if available
@@ -115,7 +114,7 @@ async def process_single_message(
         )
 
         # Fetch original text content - content_client now manages its own http_session
-        original_text: Optional[str] = None
+        original_text: str | None = None
         try:
             original_text = await content_client.fetch_content(
                 storage_id=request_data.text_storage_id,
@@ -135,11 +134,11 @@ async def process_single_message(
                 update={
                     "processing_stage": ProcessingStage.FAILED,
                     "event": ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
-                    "completed_at": datetime.now(timezone.utc),
+                    "completed_at": datetime.now(UTC),
                     "error_info": {
-                        "fetch_error": f"Failed to fetch original content: {str(fetch_exc)[:150]}"
+                        "fetch_error": f"Failed to fetch original content: {str(fetch_exc)[:150]}",
                     },
-                }
+                },
             )
             failure_event_data = SpellcheckResultDataV1(
                 original_text_storage_id=request_data.text_storage_id,
@@ -147,27 +146,27 @@ async def process_single_message(
                 corrections_made=None,
                 event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
                 entity_ref=request_data.entity_ref,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 status=EssayStatus.SPELLCHECK_FAILED,
                 system_metadata=error_sys_meta,
             )
             await event_publisher.publish_spellcheck_result(
-                kafka_bus, failure_event_data, request_envelope.correlation_id
+                kafka_bus, failure_event_data, request_envelope.correlation_id,
             )
             return True
 
         if not original_text:  # Should be caught by error handler above in most cases
             logger.error(
                 f"Essay {essay_id_for_logging}: Fetched original content is None/empty. "
-                f"Cannot proceed."
+                f"Cannot proceed.",
             )
             empty_content_sys_meta = request_data.system_metadata.model_copy(
                 update={
                     "processing_stage": ProcessingStage.FAILED,
                     "event": ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
-                    "completed_at": datetime.now(timezone.utc),
+                    "completed_at": datetime.now(UTC),
                     "error_info": {"content_error": "Fetched content is None or empty"},
-                }
+                },
             )
             empty_content_failure_data = SpellcheckResultDataV1(
                 original_text_storage_id=request_data.text_storage_id,
@@ -175,12 +174,12 @@ async def process_single_message(
                 corrections_made=None,
                 event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
                 entity_ref=request_data.entity_ref,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 status=EssayStatus.SPELLCHECK_FAILED,
                 system_metadata=empty_content_sys_meta,
             )
             await event_publisher.publish_spellcheck_result(
-                kafka_bus, empty_content_failure_data, request_envelope.correlation_id
+                kafka_bus, empty_content_failure_data, request_envelope.correlation_id,
             )
             return True
 
@@ -205,7 +204,8 @@ async def process_single_message(
         if corrections_metric and result_data.corrections_made is not None:
             corrections_metric.observe(result_data.corrections_made)
             logger.debug(
-                f"Recorded {result_data.corrections_made} corrections for essay {essay_id_for_logging}",
+                f"Recorded {result_data.corrections_made} corrections "
+                f"for essay {essay_id_for_logging}",
                 extra={"correlation_id": str(request_envelope.correlation_id)},
             )
 
@@ -216,20 +216,20 @@ async def process_single_message(
 
         # Publish the result
         await event_publisher.publish_spellcheck_result(
-            kafka_bus, result_data, request_envelope.correlation_id
+            kafka_bus, result_data, request_envelope.correlation_id,
         )
 
         # Log processing times for latency analysis
-        processing_ended_at = datetime.now(timezone.utc)
+        processing_ended_at = datetime.now(UTC)
         processing_seconds = (processing_ended_at - processing_started_at).total_seconds()
         logger.info(
             f"Essay {essay_id_for_logging}: Completed processing in "
-            f"{processing_seconds:.2f} seconds"
+            f"{processing_seconds:.2f} seconds",
         )
         return True
     except ValidationError as e:
         logger.error(
-            f"Essay {essay_id_for_logging}: Invalid message format: {e.errors()}", exc_info=True
+            f"Essay {essay_id_for_logging}: Invalid message format: {e.errors()}", exc_info=True,
         )
         return True
     except Exception as e:
@@ -240,7 +240,7 @@ async def process_single_message(
         if request_envelope and event_publisher:  # Check event_publisher also
             try:
                 error_entity_ref = EntityReference(
-                    entity_id=essay_id_for_logging, entity_type="essay"
+                    entity_id=essay_id_for_logging, entity_type="essay",
                 )
                 if request_envelope.data and request_envelope.data.entity_ref:
                     error_entity_ref = request_envelope.data.entity_ref
@@ -248,12 +248,12 @@ async def process_single_message(
                 error_sys_meta_update = {
                     "processing_stage": ProcessingStage.FAILED,
                     "event": ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
-                    "completed_at": datetime.now(timezone.utc),
+                    "completed_at": datetime.now(UTC),
                     "error_info": {"unhandled_error": f"Unhandled error: {str(e)[:200]}"},
                 }
                 if request_envelope.data and request_envelope.data.system_metadata:
                     final_error_sys_meta = request_envelope.data.system_metadata.model_copy(
-                        update=error_sys_meta_update
+                        update=error_sys_meta_update,
                     )
                 else:  # Create minimal if no incoming
                     final_error_sys_meta = SystemProcessingMetadata(
@@ -262,7 +262,7 @@ async def process_single_message(
                         started_at=processing_started_at,
                         processing_stage=ProcessingStage.FAILED,
                         event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
-                        completed_at=datetime.now(timezone.utc),
+                        completed_at=datetime.now(UTC),
                         error_info={"unhandled_error": f"Unhandled error: {str(e)[:200]}"},
                     )
 
@@ -276,13 +276,13 @@ async def process_single_message(
                     corrections_made=None,
                     event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
                     entity_ref=error_entity_ref,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     status=EssayStatus.SPELLCHECK_FAILED,
                     system_metadata=final_error_sys_meta,
                 )
                 # Publish the error event
                 await event_publisher.publish_spellcheck_result(
-                    kafka_bus, unhandled_failure_data, request_envelope.correlation_id
+                    kafka_bus, unhandled_failure_data, request_envelope.correlation_id,
                 )
             except Exception as pub_e:
                 logger.error(

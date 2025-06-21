@@ -6,7 +6,7 @@ using string-based essay IDs and protocol-based database access.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 import choix
 import numpy as np
@@ -110,7 +110,7 @@ async def record_comparisons_and_update_scores(
 
         if winner_id_str in els_id_to_idx_map and loser_id_str in els_id_to_idx_map:
             choix_comparison_data.append(
-                (els_id_to_idx_map[winner_id_str], els_id_to_idx_map[loser_id_str])
+                (els_id_to_idx_map[winner_id_str], els_id_to_idx_map[loser_id_str]),
             )
         else:
             logger.warning(
@@ -135,7 +135,7 @@ async def record_comparisons_and_update_scores(
         params -= np.mean(params)
 
         # Map integer-indexed scores back to string ELS Essay IDs
-        updated_bt_scores: Dict[str, float] = {
+        updated_bt_scores: dict[str, float] = {
             unique_els_essay_ids[i]: float(params[i]) for i in range(n_items)
         }
         logger.info(
@@ -220,7 +220,7 @@ async def get_essay_rankings(
                 "els_essay_id": db_row.els_essay_id,
                 "score": db_row.current_bt_score,
                 # "comparison_count": db_row.comparison_count, # If you add this field
-            }
+            },
         )
 
     logger.info(

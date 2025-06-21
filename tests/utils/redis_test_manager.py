@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -28,11 +29,11 @@ class RedisKeyTracker:
     """Tracks Redis keys across multiple services for E2E validation."""
 
     def __init__(self) -> None:
-        self.keys: Dict[str, str] = {}
-        self.set_calls: List[Tuple[str, str, str, int]] = []  # (service, key, value, ttl)
-        self.delete_calls: List[Tuple[str, str]] = []  # (service, key)
-        self.get_calls: List[Tuple[str, str]] = []  # (service, key)
-        self.service_connections: Set[str] = set()
+        self.keys: dict[str, str] = {}
+        self.set_calls: list[tuple[str, str, str, int]] = []  # (service, key, value, ttl)
+        self.delete_calls: list[tuple[str, str]] = []  # (service, key)
+        self.get_calls: list[tuple[str, str]] = []  # (service, key)
+        self.service_connections: set[str] = set()
 
     def add_service_connection(self, service_name: str) -> None:
         """Track that a service has connected to Redis."""
@@ -44,7 +45,7 @@ class RedisKeyTracker:
         self.service_connections.discard(service_name)
         logger.info(f"Service {service_name} disconnected from Redis mock")
 
-    def get_keys_by_service(self, service_name: str) -> List[str]:
+    def get_keys_by_service(self, service_name: str) -> list[str]:
         """Get all keys accessed by a specific service."""
         keys = []
         # Extract keys from set_calls (service, key, value, ttl)
@@ -55,9 +56,9 @@ class RedisKeyTracker:
         keys.extend([key for service, key in self.get_calls if service == service_name])
         return keys
 
-    def get_cross_service_keys(self) -> Dict[str, List[str]]:
+    def get_cross_service_keys(self) -> dict[str, list[str]]:
         """Get keys that were accessed by multiple services."""
-        key_services: Dict[str, List[str]] = {}
+        key_services: dict[str, list[str]] = {}
 
         # Process set_calls (service, key, value, ttl)
         for service, key, _, _ in self.set_calls:
@@ -87,7 +88,7 @@ class MockRedisClient:
     """Mock Redis client for individual service connections."""
 
     def __init__(
-        self, service_name: str, key_tracker: RedisKeyTracker, fail_mode: Optional[str] = None
+        self, service_name: str, key_tracker: RedisKeyTracker, fail_mode: str | None = None,
     ) -> None:
         self.service_name = service_name
         self.key_tracker = key_tracker
@@ -134,7 +135,7 @@ class MockRedisClient:
             logger.info(f"[{self.service_name}] Key {key} not found for deletion")
             return 0
 
-    async def get_key(self, key: str) -> Optional[str]:
+    async def get_key(self, key: str) -> str | None:
         """Mock GET operation with failure simulation."""
         # Always track the call
         self.key_tracker.get_calls.append((self.service_name, key))
@@ -179,11 +180,11 @@ class RedisTestManager:
 
     def __init__(self) -> None:
         self.key_tracker = RedisKeyTracker()
-        self.service_clients: Dict[str, MockRedisClient] = {}
-        self._cleanup_tasks: List[asyncio.Task] = []
+        self.service_clients: dict[str, MockRedisClient] = {}
+        self._cleanup_tasks: list[asyncio.Task] = []
 
     def create_service_client(
-        self, service_name: str, fail_mode: Optional[str] = None
+        self, service_name: str, fail_mode: str | None = None,
     ) -> MockRedisClient:
         """
         Create a Redis client for a specific service.
@@ -199,7 +200,7 @@ class RedisTestManager:
         self.service_clients[service_name] = client
         return client
 
-    def get_service_client(self, service_name: str) -> Optional[MockRedisClient]:
+    def get_service_client(self, service_name: str) -> MockRedisClient | None:
         """Get existing Redis client for a service."""
         return self.service_clients.get(service_name)
 
@@ -215,7 +216,7 @@ class RedisTestManager:
         for client in self.service_clients.values():
             client.reconnect()
 
-    def get_idempotency_stats(self) -> Dict[str, Any]:
+    def get_idempotency_stats(self) -> dict[str, Any]:
         """Get comprehensive idempotency statistics."""
         return {
             "total_keys": len(self.key_tracker.keys),
@@ -244,7 +245,7 @@ class RedisTestManager:
         logger.info("Cleared all Redis keys and call history")
 
     @asynccontextmanager
-    async def redis_context(self, services: List[str]) -> AsyncIterator[Dict[str, MockRedisClient]]:
+    async def redis_context(self, services: list[str]) -> AsyncIterator[dict[str, MockRedisClient]]:
         """
         Context manager for Redis clients across multiple services.
 
@@ -275,14 +276,14 @@ class RedisTestManager:
 
 
 # Convenience functions for test usage
-async def create_cross_service_redis_test(services: List[str]) -> RedisTestManager:
+async def create_cross_service_redis_test(services: list[str]) -> RedisTestManager:
     """Create a Redis test manager for cross-service testing."""
     manager = RedisTestManager()
     logger.info(f"Created cross-service Redis test manager for: {services}")
     return manager
 
 
-def create_deterministic_event_test_data() -> List[Dict[str, Any]]:
+def create_deterministic_event_test_data() -> list[dict[str, Any]]:
     """Create test events with identical data payloads for deterministic ID testing."""
     base_data = {
         "batch_id": "test-batch-123",

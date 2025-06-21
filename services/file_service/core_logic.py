@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from quart import current_app, has_app_context
 
 from common_core.enums import ContentType, FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
@@ -27,18 +26,6 @@ from services.file_service.protocols import (
 logger = create_service_logger("file_service.core_logic")
 
 
-# Helper to safely access metrics within or outside Quart app context
-
-def _get_metrics() -> Dict[str, Any]:
-    """Return metrics dict if a Quart app context is active, else empty dict."""
-    if has_app_context():
-        try:
-            return current_app.extensions.get("metrics", {})  # type: ignore[attr-defined]
-        except Exception:  # pragma: no cover – guard against unexpected edge cases
-            return {}
-    return {}
-
-
 async def process_single_file_upload(
     batch_id: str,
     file_content: bytes,
@@ -48,7 +35,8 @@ async def process_single_file_upload(
     content_validator: ContentValidatorProtocol,
     content_client: ContentServiceClientProtocol,
     event_publisher: EventPublisherProtocol,
-) -> Dict[str, Any]:
+    metrics: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Process a single file upload within a batch using pre-emptive raw storage.
 
@@ -84,230 +72,223 @@ async def process_single_file_upload(
         extra={"correlation_id": str(main_correlation_id)},
     )
 
+    # Ensure metrics is a usable dictionary even when not provided (e.g., unit tests)
+    if metrics is None:
+        metrics = {}
+
+    # Step 1: Store raw file blob immediately (pre-emptive storage)
+    # This establishes an immutable source of truth before any processing occurs
     try:
-        # Step 1: Store raw file blob immediately (pre-emptive storage)
-        # This establishes an immutable source of truth before any processing occurs
-        try:
-            raw_file_storage_id = await content_client.store_content(
-                file_content, ContentType.RAW_UPLOAD_BLOB
-            )
-            logger.info(
-                f"Stored raw file blob for {file_name}, raw_file_storage_id: {raw_file_storage_id}",
-                extra={"correlation_id": str(main_correlation_id)},
-            )
-        except Exception as storage_error:
-            logger.error(
-                f"Failed to store raw file blob for {file_name}: {storage_error}",
-                extra={"correlation_id": str(main_correlation_id)},
-                exc_info=True,
-            )
-
-            # Publish storage failure event WITHOUT raw_file_storage_id (since storage failed)
-            validation_failure_event = EssayValidationFailedV1(
-                batch_id=batch_id,
-                original_file_name=file_name,
-                raw_file_storage_id="STORAGE_FAILED",  # Indicate storage failure
-                validation_error_code=FileValidationErrorCode.RAW_STORAGE_FAILED,
-                validation_error_message=f"Failed to store raw file: {storage_error}",
-                file_size_bytes=len(file_content),
-                correlation_id=main_correlation_id,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-            await event_publisher.publish_essay_validation_failed(
-                validation_failure_event, main_correlation_id
-            )
-
-            logger.info(
-                f"Published EssayValidationFailedV1 for raw storage failure: {file_name}",
-                extra={"correlation_id": str(main_correlation_id)},
-            )
-
-            # Record metric for raw storage failure
-            file_ext = file_name.split('.')[-1].lower() if '.' in file_name else 'unknown'
-            metrics = _get_metrics()
-            files_uploaded_counter = metrics.get("files_uploaded_total")
-            if files_uploaded_counter:
-                files_uploaded_counter.labels(
-                    file_type=file_ext,
-                    validation_status='raw_storage_failed',
-                    batch_id=str(batch_id)
-                ).inc()
-
-            return {
-                "file_name": file_name,
-                "status": "raw_storage_failed",
-                "error_detail": str(storage_error),
-            }
-
-        # Step 2: Extract text content from file
-        # Note: This should only fail for technical issues (unsupported format, corruption, etc.)
-        # Empty files should successfully extract to empty string and be handled by validation
-        try:
-            text = await text_extractor.extract_text(file_content, file_name)
-            logger.debug(
-                f"Text extraction completed for {file_name}: {len(text) if text else 0} characters",
-                extra={"correlation_id": str(main_correlation_id)},
-            )
-        except Exception as extraction_error:
-            logger.error(
-                f"Text extraction failed for {file_name}: {extraction_error}",
-                extra={"correlation_id": str(main_correlation_id)},
-                exc_info=True,
-            )
-
-            # Publish technical extraction failure event WITH raw_file_storage_id
-            validation_failure_event = EssayValidationFailedV1(
-                batch_id=batch_id,
-                original_file_name=file_name,
-                raw_file_storage_id=raw_file_storage_id,
-                validation_error_code=FileValidationErrorCode.TEXT_EXTRACTION_FAILED,
-                validation_error_message=f"Technical text extraction failure: {extraction_error}",
-                file_size_bytes=len(file_content),
-                correlation_id=main_correlation_id,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-            await event_publisher.publish_essay_validation_failed(
-                validation_failure_event, main_correlation_id
-            )
-
-            logger.info(
-                f"Published EssayValidationFailedV1 for technical extraction failure: {file_name}",
-                extra={"correlation_id": str(main_correlation_id)},
-            )
-
-            # Record metric for text extraction failure
-            file_ext = file_name.split('.')[-1].lower() if '.' in file_name else 'unknown'
-            metrics = _get_metrics()
-            files_uploaded_counter = metrics.get("files_uploaded_total")
-            if files_uploaded_counter:
-                files_uploaded_counter.labels(
-                    file_type=file_ext,
-                    validation_status='extraction_failed',
-                    batch_id=str(batch_id)
-                ).inc()
-
-            return {
-                "file_name": file_name,
-                "raw_file_storage_id": raw_file_storage_id,
-                "status": "extraction_failed",
-            }
-
-        # Step 3: Validate extracted content against business rules
-        # This handles all content-related issues including empty content, length limits, etc.
-        validation_result = await content_validator.validate_content(text, file_name)
-        if not validation_result.is_valid:
-            logger.warning(
-                f"Content validation failed for {file_name}: {validation_result.error_message}",
-                extra={
-                    "correlation_id": str(main_correlation_id),
-                    "error_code": validation_result.error_code,
-                    "error_message": validation_result.error_message,
-                    "content_length": len(text) if text else 0,
-                },
-            )
-
-            # Publish business rule validation failure event WITH raw_file_storage_id
-            validation_failure_event = EssayValidationFailedV1(
-                batch_id=batch_id,
-                original_file_name=file_name,
-                raw_file_storage_id=raw_file_storage_id,
-                validation_error_code=(
-                    validation_result.error_code or FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR
-                ),
-                validation_error_message=(
-                    validation_result.error_message or "Content validation failed"
-                ),
-                file_size_bytes=len(file_content),
-                correlation_id=main_correlation_id,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-            await event_publisher.publish_essay_validation_failed(
-                validation_failure_event, main_correlation_id
-            )
-
-            logger.info(
-                f"Published EssayValidationFailedV1 for content validation failure: {file_name}",
-                extra={"correlation_id": str(main_correlation_id)},
-            )
-
-            # Record metric for content validation failure
-            file_ext = file_name.split('.')[-1].lower() if '.' in file_name else 'unknown'
-            metrics = _get_metrics()
-            files_uploaded_counter = metrics.get("files_uploaded_total")
-            if files_uploaded_counter:
-                files_uploaded_counter.labels(
-                    file_type=file_ext,
-                    validation_status='content_validation_failed',
-                    batch_id=str(batch_id)
-                ).inc()
-
-            return {
-                "file_name": file_name,
-                "raw_file_storage_id": raw_file_storage_id,
-                "status": "content_validation_failed",
-                "error_code": validation_result.error_code,
-                "error_message": validation_result.error_message,
-            }
-
-        # Step 4: Store validated extracted plaintext and publish success event
-        text_storage_id = await content_client.store_content(
-            text.encode("utf-8"), ContentType.EXTRACTED_PLAINTEXT
+        raw_file_storage_id = await content_client.store_content(
+            file_content, ContentType.RAW_UPLOAD_BLOB,
         )
         logger.info(
-            f"Stored extracted plaintext for file {file_name}, text_storage_id: {text_storage_id}",
+            f"Stored raw file blob for {file_name}, raw_file_storage_id: {raw_file_storage_id}",
             extra={"correlation_id": str(main_correlation_id)},
         )
+    except Exception as storage_error:
+        logger.error(
+            f"Failed to store raw file blob for {file_name}: {storage_error}",
+            extra={"correlation_id": str(main_correlation_id)},
+            exc_info=True,
+        )
 
-        # Calculate metadata for event
-        content_md5_hash = hashlib.md5(file_content).hexdigest()
-        file_size_bytes = len(file_content)
-
-        # Construct success event WITH both storage IDs
-        content_provisioned_event_data = EssayContentProvisionedV1(
+        # Publish storage failure event WITHOUT raw_file_storage_id (since storage failed)
+        validation_failure_event = EssayValidationFailedV1(
             batch_id=batch_id,
             original_file_name=file_name,
-            raw_file_storage_id=raw_file_storage_id,
-            text_storage_id=text_storage_id,
-            file_size_bytes=file_size_bytes,
-            content_md5_hash=content_md5_hash,
+            raw_file_storage_id="STORAGE_FAILED",  # Indicate storage failure
+            validation_error_code=FileValidationErrorCode.RAW_STORAGE_FAILED,
+            validation_error_message=f"Failed to store raw file: {storage_error}",
+            file_size_bytes=len(file_content),
             correlation_id=main_correlation_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
-        # Publish success event
-        await event_publisher.publish_essay_content_provisioned(
-            content_provisioned_event_data, main_correlation_id
+        await event_publisher.publish_essay_validation_failed(
+            validation_failure_event, main_correlation_id,
         )
+
         logger.info(
-            f"Published EssayContentProvisionedV1 for file {file_name}",
+            f"Published EssayValidationFailedV1 for raw storage failure: {file_name}",
             extra={"correlation_id": str(main_correlation_id)},
         )
 
-        # Record metric for successful file processing
-        file_ext = file_name.split('.')[-1].lower() if '.' in file_name else 'unknown'
-        metrics = _get_metrics()
+        # Record metric for raw storage failure
+        file_ext = file_name.split(".")[-1].lower() if "." in file_name else "unknown"
+
         files_uploaded_counter = metrics.get("files_uploaded_total")
         if files_uploaded_counter:
             files_uploaded_counter.labels(
                 file_type=file_ext,
-                validation_status='success',
-                batch_id=str(batch_id)
+                validation_status="raw_storage_failed",
+                batch_id=str(batch_id),
+            ).inc()
+
+        return {
+            "file_name": file_name,
+            "status": "raw_storage_failed",
+            "error_detail": str(storage_error),
+        }
+
+    # Step 2: Extract text content from file
+    # Note: This should only fail for technical issues (unsupported format, corruption, etc.)
+    # Empty files should successfully extract to empty string and be handled by validation
+    try:
+        text = await text_extractor.extract_text(file_content, file_name)
+        logger.debug(
+            f"Text extraction completed for {file_name}: {len(text) if text else 0} characters",
+            extra={"correlation_id": str(main_correlation_id)},
+        )
+    except Exception as extraction_error:
+        logger.error(
+            f"Text extraction failed for {file_name}: {extraction_error}",
+            extra={"correlation_id": str(main_correlation_id)},
+            exc_info=True,
+        )
+
+        # Publish technical extraction failure event WITH raw_file_storage_id
+        validation_failure_event = EssayValidationFailedV1(
+            batch_id=batch_id,
+            original_file_name=file_name,
+            raw_file_storage_id=raw_file_storage_id,
+            validation_error_code=FileValidationErrorCode.TEXT_EXTRACTION_FAILED,
+            validation_error_message=f"Technical text extraction failure: {extraction_error}",
+            file_size_bytes=len(file_content),
+            correlation_id=main_correlation_id,
+            timestamp=datetime.now(UTC),
+        )
+
+        await event_publisher.publish_essay_validation_failed(
+            validation_failure_event, main_correlation_id,
+        )
+
+        logger.info(
+            f"Published EssayValidationFailedV1 for technical extraction failure: {file_name}",
+            extra={"correlation_id": str(main_correlation_id)},
+        )
+
+        # Record metric for text extraction failure
+        file_ext = file_name.split(".")[-1].lower() if "." in file_name else "unknown"
+
+        files_uploaded_counter = metrics.get("files_uploaded_total")
+        if files_uploaded_counter:
+            files_uploaded_counter.labels(
+                file_type=file_ext,
+                validation_status="extraction_failed",
+                batch_id=str(batch_id),
             ).inc()
 
         return {
             "file_name": file_name,
             "raw_file_storage_id": raw_file_storage_id,
-            "text_storage_id": text_storage_id,
-            "status": "processing_success",
+            "status": "extraction_failed",
         }
 
-    except Exception as e:
-        logger.error(
-            f"Unexpected error processing file {file_name}: {e}",
-            extra={"correlation_id": str(main_correlation_id)},
-            exc_info=True,
+    # Step 3: Validate extracted content against business rules
+    # This handles all content-related issues including empty content, length limits, etc.
+    validation_result = await content_validator.validate_content(text, file_name)
+    if not validation_result.is_valid:
+        logger.warning(
+            f"Content validation failed for {file_name}: {validation_result.error_message}",
+            extra={
+                "correlation_id": str(main_correlation_id),
+                "error_code": validation_result.error_code,
+                "error_message": validation_result.error_message,
+                "content_length": len(text) if text else 0,
+            },
         )
-        return {"file_name": file_name, "status": "processing_error", "detail": str(e)}
+
+        # Publish business rule validation failure event WITH raw_file_storage_id
+        validation_failure_event = EssayValidationFailedV1(
+            batch_id=batch_id,
+            original_file_name=file_name,
+            raw_file_storage_id=raw_file_storage_id,
+            validation_error_code=(
+                validation_result.error_code or FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR
+            ),
+            validation_error_message=(
+                validation_result.error_message or "Content validation failed"
+            ),
+            file_size_bytes=len(file_content),
+            correlation_id=main_correlation_id,
+            timestamp=datetime.now(UTC),
+        )
+
+        await event_publisher.publish_essay_validation_failed(
+            validation_failure_event, main_correlation_id,
+        )
+
+        logger.info(
+            f"Published EssayValidationFailedV1 for content validation failure: {file_name}",
+            extra={"correlation_id": str(main_correlation_id)},
+        )
+
+        # Record metric for content validation failure
+        file_ext = file_name.split(".")[-1].lower() if "." in file_name else "unknown"
+
+        files_uploaded_counter = metrics.get("files_uploaded_total")
+        if files_uploaded_counter:
+            files_uploaded_counter.labels(
+                file_type=file_ext,
+                validation_status="content_validation_failed",
+                batch_id=str(batch_id),
+            ).inc()
+
+        return {
+            "file_name": file_name,
+            "raw_file_storage_id": raw_file_storage_id,
+            "status": "content_validation_failed",
+            "error_code": validation_result.error_code,
+            "error_message": validation_result.error_message,
+        }
+
+    # Step 4: Store validated extracted plaintext and publish success event
+    text_storage_id = await content_client.store_content(
+        text.encode("utf-8"), ContentType.EXTRACTED_PLAINTEXT,
+    )
+    logger.info(
+        f"Stored extracted plaintext for file {file_name}, text_storage_id: {text_storage_id}",
+        extra={"correlation_id": str(main_correlation_id)},
+    )
+
+    # Calculate metadata for event
+    content_md5_hash = hashlib.md5(file_content).hexdigest()
+    file_size_bytes = len(file_content)
+
+    # Construct success event WITH both storage IDs
+    content_provisioned_event_data = EssayContentProvisionedV1(
+        batch_id=batch_id,
+        original_file_name=file_name,
+        raw_file_storage_id=raw_file_storage_id,
+        text_storage_id=text_storage_id,
+        file_size_bytes=file_size_bytes,
+        content_md5_hash=content_md5_hash,
+        correlation_id=main_correlation_id,
+        timestamp=datetime.now(UTC),
+    )
+
+    # Publish success event
+    await event_publisher.publish_essay_content_provisioned(
+        content_provisioned_event_data, main_correlation_id,
+    )
+    logger.info(
+        f"Published EssayContentProvisionedV1 for file {file_name}",
+        extra={"correlation_id": str(main_correlation_id)},
+    )
+
+    # Record metric for successful file processing
+    file_ext = file_name.split(".")[-1].lower() if "." in file_name else "unknown"
+
+    files_uploaded_counter = metrics.get("files_uploaded_total")
+    if files_uploaded_counter:
+        files_uploaded_counter.labels(
+            file_type=file_ext, validation_status="success", batch_id=str(batch_id),
+        ).inc()
+
+    return {
+        "file_name": file_name,
+        "raw_file_storage_id": raw_file_storage_id,
+        "text_storage_id": text_storage_id,
+        "status": "processing_success",
+    }

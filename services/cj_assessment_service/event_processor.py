@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from aiokafka import ConsumerRecord
@@ -50,7 +50,7 @@ async def process_single_message(
     Returns:
         True if message processed successfully, False otherwise
     """
-    processing_started_at = datetime.now(timezone.utc)
+    processing_started_at = datetime.now(UTC)
 
     # Get business metrics from shared module
     business_metrics = get_business_metrics()
@@ -64,7 +64,7 @@ async def process_single_message(
         # Deserialize to specific EventEnvelope with typed data
         try:
             envelope = EventEnvelope[ELS_CJAssessmentRequestV1].model_validate_json(
-                msg.value.decode("utf-8")
+                msg.value.decode("utf-8"),
             )
             request_event_data: ELS_CJAssessmentRequestV1 = envelope.data
 
@@ -80,7 +80,7 @@ async def process_single_message(
                 if queue_latency_seconds >= 0:  # Avoid negative values from clock skew
                     kafka_queue_latency_metric.observe(queue_latency_seconds)
                     logger.debug(
-                        f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}"
+                        f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}",
                     )
 
             # Use correlation_id from envelope, fall back to system metadata entity reference
@@ -119,7 +119,7 @@ async def process_single_message(
                 {
                     "els_essay_id": essay_ref.essay_id,
                     "text_storage_id": essay_ref.text_storage_id,
-                }
+                },
             )
 
         converted_request_data = {
@@ -158,13 +158,14 @@ async def process_single_message(
         )
 
         # Record business metrics for completed assessment
-        processing_ended_at = datetime.now(timezone.utc)
+        processing_ended_at = datetime.now(UTC)
         processing_duration = (processing_ended_at - processing_started_at).total_seconds()
 
         if duration_metric:
             duration_metric.observe(processing_duration)
             logger.debug(
-                f"Recorded assessment duration: {processing_duration:.2f}s for batch {converted_request_data['bos_batch_id']}",
+                f"Recorded assessment duration: {processing_duration:.2f}s for batch "
+                f"{converted_request_data['bos_batch_id']}",
                 extra=log_extra,
             )
 
@@ -174,7 +175,8 @@ async def process_single_message(
             estimated_comparisons = len(rankings) * (len(rankings) - 1) // 2
             comparisons_metric.observe(estimated_comparisons)
             logger.debug(
-                f"Recorded estimated comparisons: {estimated_comparisons} for batch {converted_request_data['bos_batch_id']}",
+                f"Recorded estimated comparisons: {estimated_comparisons} for batch "
+                f"{converted_request_data['bos_batch_id']}",
                 extra=log_extra,
             )
 
@@ -185,7 +187,7 @@ async def process_single_message(
             status=BatchStatus.COMPLETED_SUCCESSFULLY,
             system_metadata=SystemProcessingMetadata(  # New metadata for *this* completion event
                 entity=request_event_data.entity_ref,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 processing_stage=ProcessingStage.COMPLETED,
                 event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
             ),
@@ -218,7 +220,7 @@ async def process_single_message(
         )
 
         await event_publisher.publish_assessment_completed(
-            completion_data=completed_envelope, correlation_id=completed_envelope.correlation_id
+            completion_data=completed_envelope, correlation_id=completed_envelope.correlation_id,
         )
 
         logger.info(
@@ -234,7 +236,7 @@ async def process_single_message(
         try:
             # Re-deserialize for failure handling if needed
             envelope = EventEnvelope[ELS_CJAssessmentRequestV1].model_validate_json(
-                msg.value.decode("utf-8")
+                msg.value.decode("utf-8"),
             )
             request_event_data = envelope.data
             correlation_id = (
@@ -259,7 +261,7 @@ async def process_single_message(
                 status=BatchStatus.FAILED_CRITICALLY,
                 system_metadata=SystemProcessingMetadata(
                     entity=request_event_data.entity_ref,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     processing_stage=ProcessingStage.FAILED,
                     event=ProcessingEvent.CJ_ASSESSMENT_FAILED.value,
                     error_info=error_details,
@@ -278,7 +280,7 @@ async def process_single_message(
             )
 
             await event_publisher.publish_assessment_failed(
-                failure_data=failed_envelope, correlation_id=failed_envelope.correlation_id
+                failure_data=failed_envelope, correlation_id=failed_envelope.correlation_id,
             )
         except Exception as publish_error:
             logger.error(f"Failed to publish failure event: {publish_error}")

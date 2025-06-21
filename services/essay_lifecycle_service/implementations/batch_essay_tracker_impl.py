@@ -63,7 +63,8 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         expectation = BatchExpectation(
             batch_id=batch_id,
-            expected_essay_ids=batch_essays_registered.essay_ids,  # Internal essay ID slots from BOS
+            # Internal essay ID slots from BOS
+            expected_essay_ids=batch_essays_registered.essay_ids,
         )
 
         self.batch_expectations[batch_id] = expectation
@@ -72,7 +73,8 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         await self._start_timeout_monitoring(expectation)
 
         self._logger.info(
-            f"Registered batch {batch_id} with {len(batch_essays_registered.essay_ids)} slots: {batch_essays_registered.essay_ids}"
+            f"Registered batch {batch_id} with {len(batch_essays_registered.essay_ids)} "
+            f"slots: {batch_essays_registered.essay_ids}"
         )
 
     def assign_slot_to_content(
@@ -169,8 +171,9 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         self.validation_failures[batch_id].append(validation_failed)
 
         self._logger.info(
-            f"Tracked validation failure for batch {batch_id}: {validation_failed.validation_error_code} "
-            f"({validation_failed.original_file_name}). Total failures: {len(self.validation_failures[batch_id])}"
+            f"Tracked validation failure for batch {batch_id}: "
+            f"{validation_failed.validation_error_code} ({validation_failed.original_file_name}). "
+            f"Total failures: {len(self.validation_failures[batch_id])}"
         )
 
         # Check if we should trigger early batch completion

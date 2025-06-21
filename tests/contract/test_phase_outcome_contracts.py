@@ -96,7 +96,7 @@ class TestBatchServiceCommandContracts:
 
         # Test deserialization
         deserialized_command = BatchServiceCJAssessmentInitiateCommandDataV1.model_validate_json(
-            json_data
+            json_data,
         )
 
         # Verify all fields match
@@ -105,5 +105,5 @@ class TestBatchServiceCommandContracts:
         assert deserialized_command.class_designation == original_command.class_designation
         assert deserialized_command.essay_instructions == original_command.essay_instructions
         assert len(deserialized_command.essays_to_process) == len(
-            original_command.essays_to_process
+            original_command.essays_to_process,
         )

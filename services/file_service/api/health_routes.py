@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Union
-
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
@@ -15,14 +13,14 @@ health_bp = Blueprint("health_routes", __name__)
 
 
 @health_bp.route("/healthz")
-async def health_check() -> Union[Response, tuple[Response, int]]:
+async def health_check() -> Response | tuple[Response, int]:
     """Health check endpoint."""
     return (
         jsonify(
             {
                 "status": "ok",
                 "message": "File Service is healthy",
-            }
+            },
         ),
         200,
     )

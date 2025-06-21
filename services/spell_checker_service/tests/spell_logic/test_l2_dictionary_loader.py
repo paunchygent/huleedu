@@ -6,7 +6,7 @@ only the specified corrections to text, handles edge cases, and preserves text o
 of correction boundaries.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 from ...spell_logic.l2_dictionary_loader import apply_l2_corrections, apply_specific_corrections
 
@@ -25,7 +25,7 @@ class TestApplySpecificCorrections:
         misstakes_pos = text.find("misstakes")
         misstakes_end = misstakes_pos + len("misstakes") - 1
 
-        corrections: List[Dict[str, Any]] = [
+        corrections: list[dict[str, Any]] = [
             {
                 "original_word": "errros",
                 "corrected_word": "errors",
@@ -53,7 +53,7 @@ class TestApplySpecificCorrections:
         """Test with empty corrections list - should return original text unchanged."""
         # Arrange
         text = "This text stays unchanged."
-        corrections: List[Dict[str, Any]] = []
+        corrections: list[dict[str, Any]] = []
 
         # Act
         result = apply_specific_corrections(text, corrections)
@@ -65,7 +65,7 @@ class TestApplySpecificCorrections:
         """Test that corrections are applied in order regardless of input order."""
         # Arrange
         text = "First second third."
-        corrections: List[Dict[str, Any]] = [
+        corrections: list[dict[str, Any]] = [
             {
                 "original_word": "third",
                 "corrected_word": "THREE",
@@ -109,7 +109,7 @@ class TestApplySpecificCorrections:
         has_overlapping_pos = text.find("has overlapping")
         has_overlapping_end = has_overlapping_pos + len("has overlapping") - 1
 
-        corrections: List[Dict[str, Any]] = [
+        corrections: list[dict[str, Any]] = [
             {
                 "original_word": "overlapping",
                 "corrected_word": "OVERLAPPED",
@@ -143,7 +143,7 @@ class TestApplySpecificCorrections:
         """Test with corrections that have indices beyond text boundaries."""
         # Arrange
         text = "Short text."
-        corrections: List[Dict[str, Any]] = [
+        corrections: list[dict[str, Any]] = [
             {
                 "original_word": "text",
                 "corrected_word": "TEXT",
@@ -234,7 +234,7 @@ class TestApplyL2Corrections:
         text = "This text is perfectly fine."
         l2_errors = {"mispelled": "misspelled"}
         expected_text = "This text is perfectly fine."
-        expected_corrections: List[Dict[str, Any]] = []
+        expected_corrections: list[dict[str, Any]] = []
 
         # Act
         corrected_text, applied_details = apply_l2_corrections(text, l2_errors)
@@ -249,7 +249,7 @@ class TestApplyL2Corrections:
         text = ""
         l2_errors = {"errror": "error"}
         expected_text = ""
-        expected_corrections: List[Dict[str, Any]] = []
+        expected_corrections: list[dict[str, Any]] = []
 
         # Act
         corrected_text, applied_details = apply_l2_corrections(text, l2_errors)
@@ -262,9 +262,9 @@ class TestApplyL2Corrections:
         """Test with an empty l2_errors dictionary."""
         # Arrange
         text = "Some text with potential errrors."
-        l2_errors: Dict[str, str] = {}
+        l2_errors: dict[str, str] = {}
         expected_text = "Some text with potential errrors."
-        expected_corrections: List[Dict[str, Any]] = []
+        expected_corrections: list[dict[str, Any]] = []
 
         # Act
         corrected_text, applied_details = apply_l2_corrections(text, l2_errors)

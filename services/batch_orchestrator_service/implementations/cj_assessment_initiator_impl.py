@@ -58,13 +58,13 @@ class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):
             # Validate that this is the correct phase
             if phase_to_initiate != PhaseName.CJ_ASSESSMENT:
                 raise DataValidationError(
-                    f"DefaultCJAssessmentInitiator received incorrect phase: {phase_to_initiate}"
+                    f"DefaultCJAssessmentInitiator received incorrect phase: {phase_to_initiate}",
                 )
 
             # Validate required data
             if not essays_for_processing:
                 raise DataValidationError(
-                    f"No essays provided for CJ assessment initiation in batch {batch_id}"
+                    f"No essays provided for CJ assessment initiation in batch {batch_id}",
                 )
 
             # Get language from course code

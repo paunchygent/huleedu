@@ -66,13 +66,13 @@ class AIFeedbackInitiatorImpl(AIFeedbackInitiatorProtocol):
             # Validate that this is the correct phase
             if phase_to_initiate != PhaseName.AI_FEEDBACK:
                 raise DataValidationError(
-                    f"AIFeedbackInitiatorImpl received incorrect phase: {phase_to_initiate}"
+                    f"AIFeedbackInitiatorImpl received incorrect phase: {phase_to_initiate}",
                 )
 
             # Validate required data
             if not essays_for_processing:
                 raise DataValidationError(
-                    f"No essays provided for AI feedback initiation in batch {batch_id}"
+                    f"No essays provided for AI feedback initiation in batch {batch_id}",
                 )
 
             # Get language from course code

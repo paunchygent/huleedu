@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from typing import Dict, List, Optional
 
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 from aiokafka.errors import KafkaConnectionError, TopicAlreadyExistsError
@@ -49,9 +48,9 @@ class KafkaTopicBootstrap:
         self.retry_delay = retry_delay
         self.default_partitions = default_partitions
         self.default_replication_factor = default_replication_factor
-        self.admin_client: Optional[AIOKafkaAdminClient] = None
+        self.admin_client: AIOKafkaAdminClient | None = None
 
-    async def __aenter__(self) -> "KafkaTopicBootstrap":
+    async def __aenter__(self) -> KafkaTopicBootstrap:
         """Async context manager entry - establish Kafka admin client connection."""
         await self._connect_with_retry()
         return self
@@ -67,7 +66,7 @@ class KafkaTopicBootstrap:
             try:
                 print(f"Attempting to connect to Kafka (attempt {attempt}/{self.max_retries})...")
                 self.admin_client = AIOKafkaAdminClient(
-                    bootstrap_servers=self.bootstrap_servers, client_id="huleedu-topic-bootstrap"
+                    bootstrap_servers=self.bootstrap_servers, client_id="huleedu-topic-bootstrap",
                 )
                 await self.admin_client.start()
                 print("✅ Successfully connected to Kafka")
@@ -77,14 +76,14 @@ class KafkaTopicBootstrap:
                     print(f"❌ Failed to connect to Kafka after {self.max_retries} attempts")
                     raise ConnectionError(
                         f"Could not connect to Kafka at {self.bootstrap_servers} "
-                        f"after {self.max_retries} attempts. Last error: {e}"
+                        f"after {self.max_retries} attempts. Last error: {e}",
                     ) from e
 
                 delay = self.retry_delay * (2 ** (attempt - 1))  # Exponential backoff
                 print(f"⚠️  Connection failed: {e}. Retrying in {delay:.1f}s...")
                 await asyncio.sleep(delay)
 
-    def _discover_required_topics(self) -> List[str]:
+    def _discover_required_topics(self) -> list[str]:
         """Discover all required topics from the common_core topic mapping.
 
         Returns:
@@ -104,7 +103,7 @@ class KafkaTopicBootstrap:
 
         return topics
 
-    async def _get_existing_topics(self) -> List[str]:
+    async def _get_existing_topics(self) -> list[str]:
         """Get list of existing topics from Kafka cluster.
 
         Returns:
@@ -151,7 +150,7 @@ class KafkaTopicBootstrap:
             print(f"❌ Failed to create topic {topic_name}: {e}")
             raise
 
-    async def bootstrap_topics(self) -> Dict[str, bool]:
+    async def bootstrap_topics(self) -> dict[str, bool]:
         """Bootstrap all required Kafka topics.
 
         Returns:
@@ -201,7 +200,7 @@ async def main() -> None:
     print(f"📡 Connecting to: {bootstrap_servers}")
     print(
         f"⚙️  Config: {max_retries} retries, {retry_delay}s delay, "
-        f"{default_partitions} partitions, {default_replication_factor} replicas"
+        f"{default_partitions} partitions, {default_replication_factor} replicas",
     )
 
     try:

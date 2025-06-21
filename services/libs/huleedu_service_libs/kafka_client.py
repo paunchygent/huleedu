@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Optional, TypeVar  # Added Optional
+from typing import TypeVar  # Added Optional
 
 from aiokafka import AIOKafkaProducer
 from aiokafka.errors import KafkaConnectionError, KafkaTimeoutError
@@ -63,7 +63,7 @@ class KafkaBus:
         self,
         topic: str,
         envelope: EventEnvelope[T_EventPayload],
-        key: Optional[str] = None,
+        key: str | None = None,
     ) -> None:
         if not self._started:
             logger.warning(f"KafkaProducer '{self.client_id}' not started. Attempting to start.")
@@ -71,19 +71,19 @@ class KafkaBus:
             if not self._started:
                 logger.error(
                     f"Cannot publish on topic '{topic}', "
-                    f"producer '{self.client_id}' is not running."
+                    f"producer '{self.client_id}' is not running.",
                 )
                 raise RuntimeError(f"KafkaProducer '{self.client_id}' is not running.")
         try:
             key_bytes = key.encode("utf-8") if key else None
             future = await self.producer.send_and_wait(
-                topic, value=envelope.model_dump(mode="json"), key=key_bytes
+                topic, value=envelope.model_dump(mode="json"), key=key_bytes,
             )
             record_metadata = future
             logger.debug(
                 f"Message published by '{self.client_id}' to {topic} "
                 f"[partition:{record_metadata.partition}, offset:{record_metadata.offset}] "
-                f"key='{key}' event_id='{envelope.event_id}'"
+                f"key='{key}' event_id='{envelope.event_id}'",
             )
         except KafkaTimeoutError:
             logger.error(f"Timeout publishing message by '{self.client_id}' to topic '{topic}'.")

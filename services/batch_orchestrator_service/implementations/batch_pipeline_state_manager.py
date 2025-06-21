@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from implementations.batch_database_infrastructure import BatchDatabaseInfrastructure
@@ -43,7 +43,7 @@ class BatchPipelineStateManager:
                     .values(
                         pipeline_configuration=pipeline_state,
                         version=Batch.version + 1,
-                        updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                        updated_at=datetime.now(UTC).replace(tzinfo=None),
                     )
                 )
                 result = await session.execute(stmt)
@@ -101,7 +101,7 @@ class BatchPipelineStateManager:
                 if current_phase_status != expected_status:
                     self.logger.warning(
                         f"Phase {phase_name} status mismatch for batch {batch_id}: "
-                        f"expected {expected_status}, got {current_phase_status}"
+                        f"expected {expected_status}, got {current_phase_status}",
                     )
                     return False
 
@@ -119,14 +119,14 @@ class BatchPipelineStateManager:
                     .values(
                         pipeline_configuration=updated_pipeline_state,
                         version=Batch.version + 1,
-                        updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                        updated_at=datetime.now(UTC).replace(tzinfo=None),
                     )
                 )
                 result = await session.execute(stmt)
 
                 if result.rowcount == 0:
                     self.logger.warning(
-                        f"Optimistic lock failed for batch {batch_id} phase {phase_name} update"
+                        f"Optimistic lock failed for batch {batch_id} phase {phase_name} update",
                     )
                     return False
 
@@ -136,7 +136,7 @@ class BatchPipelineStateManager:
                     phase=phase_name,
                     status=new_status,
                     phase_completed_at=datetime.fromisoformat(completion_timestamp).replace(
-                        tzinfo=None
+                        tzinfo=None,
                     )
                     if completion_timestamp
                     else None,
@@ -146,12 +146,12 @@ class BatchPipelineStateManager:
 
                 self.logger.info(
                     f"Atomically updated batch {batch_id} phase {phase_name}: "
-                    f"{expected_status} -> {new_status}"
+                    f"{expected_status} -> {new_status}",
                 )
                 return True
 
             except Exception as e:
                 self.logger.error(
-                    f"Failed atomic phase update for batch {batch_id} phase {phase_name}: {e}"
+                    f"Failed atomic phase update for batch {batch_id} phase {phase_name}: {e}",
                 )
                 return False

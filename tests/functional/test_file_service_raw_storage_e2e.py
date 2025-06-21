@@ -55,7 +55,7 @@ async def test_file_service_events_contain_raw_storage_id():
         files = [{"name": "test_essay.txt", "content": test_file_content.encode()}]
 
         response = await service_manager.upload_files(
-            batch_id=batch_id, files=files, correlation_id=correlation_id
+            batch_id=batch_id, files=files, correlation_id=correlation_id,
         )
 
         print(f"✅ File uploaded successfully for batch: {batch_id}")
@@ -99,7 +99,7 @@ async def test_file_service_events_contain_raw_storage_id():
                         )
                         print(
                             f"⚠️ Unexpected validation failure: "
-                            f"{event_data.get('validation_error_message')}"
+                            f"{event_data.get('validation_error_message')}",
                         )
                         print(f"   - raw_file_storage_id: {event_data['raw_file_storage_id']}")
 
@@ -149,7 +149,7 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
         files = [{"name": "empty_essay.txt", "content": empty_file_content.encode()}]
 
         response = await service_manager.upload_files(
-            batch_id=batch_id, files=files, correlation_id=correlation_id
+            batch_id=batch_id, files=files, correlation_id=correlation_id,
         )
 
         print(f"✅ Empty file uploaded for batch: {batch_id}")
@@ -185,7 +185,7 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
                     print(f"   - raw_file_storage_id: {event_data['raw_file_storage_id']}")
                     print(f"   - validation_error_code: {event_data['validation_error_code']}")
                     print(
-                        f"   - validation_error_message: {event_data['validation_error_message']}"
+                        f"   - validation_error_message: {event_data['validation_error_message']}",
                     )
 
                     event_received = True
@@ -200,5 +200,5 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
         )
         print(
             "✅ E2E test passed: Validation failure events contain required "
-            "raw_file_storage_id field"
+            "raw_file_storage_id field",
         )

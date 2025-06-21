@@ -6,6 +6,7 @@ Basic idempotency tests for the Spell Checker Service.
 - Tests graceful handling of business logic failures.
 - Tests deterministic key generation.
 """
+
 import uuid
 from unittest.mock import AsyncMock
 

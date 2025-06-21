@@ -9,7 +9,7 @@ import asyncio
 import json
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -30,7 +30,7 @@ PIPELINE_TOPICS = {
     "els_batch_phase_outcome": topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
     "essay_spellcheck_completed": topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
     "batch_cj_assessment_initiate": topic_name(
-        ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND
+        ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
     ),
     "cj_assessment_completed": topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
 }
@@ -41,7 +41,7 @@ def create_comprehensive_kafka_manager() -> KafkaTestManager:
     return KafkaTestManager()
 
 
-async def load_real_test_essays(max_essays: int = 25) -> List[Path]:
+async def load_real_test_essays(max_essays: int = 25) -> list[Path]:
     """
     Load real student essays from test directory.
 
@@ -71,7 +71,7 @@ async def load_real_test_essays(max_essays: int = 25) -> List[Path]:
 async def register_comprehensive_batch(
     service_manager: ServiceTestManager,
     expected_essay_count: int,
-    correlation_id: Optional[str] = None,
+    correlation_id: str | None = None,
 ) -> str:
     """
     Register a batch specifically for comprehensive pipeline testing.
@@ -126,9 +126,9 @@ async def register_comprehensive_batch(
 async def upload_real_essays(
     service_manager: ServiceTestManager,
     batch_id: str,
-    essay_files: List[Path],
-    correlation_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    essay_files: list[Path],
+    correlation_id: str | None = None,
+) -> dict[str, Any]:
     """
     Upload real student essays for comprehensive testing.
 
@@ -146,7 +146,7 @@ async def upload_real_essays(
     for essay_file in essay_files:
         essay_content = essay_file.read_text(encoding="utf-8")
         files_data.append(
-            {"name": essay_file.name, "content": essay_content, "content_type": "text/plain"}
+            {"name": essay_file.name, "content": essay_content, "content_type": "text/plain"},
         )
 
     result = await service_manager.upload_files(batch_id, files_data, correlation_id)
@@ -180,7 +180,7 @@ async def watch_pipeline_progression_with_consumer(
     correlation_id: str,
     expected_essay_count: int,
     timeout_seconds: int = 180,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """
     Watch complete pipeline progression with dynamic essay count.
 
@@ -239,16 +239,14 @@ async def watch_pipeline_progression_with_consumer(
 
                         if message.topic in batch_level_topics:
                             entity_id_from_event = None
-                            if message.topic == PIPELINE_TOPICS["batch_essays_registered"]:
-                                entity_id_from_event = event_data.get("batch_id")
-                            elif message.topic == PIPELINE_TOPICS["batch_ready"]:
+                            if message.topic == PIPELINE_TOPICS["batch_essays_registered"] or message.topic == PIPELINE_TOPICS["batch_ready"]:
                                 entity_id_from_event = event_data.get("batch_id")
                             elif message.topic == PIPELINE_TOPICS["els_batch_phase_outcome"]:
                                 # For correlation-matched events, we trust the correlation_id match
                                 entity_match = True
                             else:
                                 entity_id_from_event = event_data.get("entity_ref", {}).get(
-                                    "entity_id"
+                                    "entity_id",
                                 )
 
                             if not entity_match and entity_id_from_event == batch_id:
@@ -272,12 +270,12 @@ async def watch_pipeline_progression_with_consumer(
                                 content_provisioned_count += 1
                                 if content_provisioned_count == 1:
                                     print(
-                                        "📨 0️⃣ File Service publishing content provisioned events..."
+                                        "📨 0️⃣ File Service publishing content provisioned events...",
                                     )
                                 elif content_provisioned_count == expected_essay_count:
                                     print(
                                         f"📨 0️⃣ All {content_provisioned_count} essays content "
-                                        "provisioned - ELS will aggregate"
+                                        "provisioned - ELS will aggregate",
                                     )
                             elif message.topic == PIPELINE_TOPICS["essay_validation_failed"]:
                                 validation_failure_count += 1
@@ -296,14 +294,14 @@ async def watch_pipeline_progression_with_consumer(
                                 total_processed = ready_count + failed_count
                                 print(
                                     f"📨 1️⃣ ELS published BatchEssaysReady: {ready_count} ready, "
-                                    f"{failed_count} failed ({total_processed} total)"
+                                    f"{failed_count} failed ({total_processed} total)",
                                 )
                             elif message.topic == PIPELINE_TOPICS["batch_spellcheck_initiate"]:
                                 essays_to_process = event_data.get("essays_to_process", [])
                                 essay_count = len(essays_to_process) if essays_to_process else 0
                                 print(
                                     f"📨 2️⃣ BOS published spellcheck initiate command: "
-                                    f"{essay_count} essays"
+                                    f"{essay_count} essays",
                                 )
                             elif message.topic == PIPELINE_TOPICS["essay_spellcheck_completed"]:
                                 spellcheck_completions += 1
@@ -315,7 +313,7 @@ async def watch_pipeline_progression_with_consumer(
                                 if phase_name == "spellcheck":
                                     print(
                                         f"📨 3️⃣ ELS published phase outcome: "
-                                        f"{phase_name} -> {phase_status}"
+                                        f"{phase_name} -> {phase_status}",
                                     )
                                     completion_statuses = [
                                         "COMPLETED_SUCCESSFULLY",
@@ -324,12 +322,12 @@ async def watch_pipeline_progression_with_consumer(
                                     if phase_status in completion_statuses:
                                         print(
                                             "✅ Spellcheck phase completed! "
-                                            "BOS will initiate CJ assessment..."
+                                            "BOS will initiate CJ assessment...",
                                         )
                                 elif phase_name == "cj_assessment":
                                     print(
                                         f"📨 6️⃣ ELS published phase outcome: "
-                                        f"{phase_name} -> {phase_status}"
+                                        f"{phase_name} -> {phase_status}",
                                     )
                                     completion_statuses = [
                                         "COMPLETED_SUCCESSFULLY",
@@ -338,13 +336,13 @@ async def watch_pipeline_progression_with_consumer(
                                     if phase_status in completion_statuses:
                                         print(
                                             "🎯 Pipeline SUCCESS! "
-                                            "Complete end-to-end processing finished."
+                                            "Complete end-to-end processing finished.",
                                         )
                                         return dict(envelope_data)
                                 else:
                                     print(
                                         f"📨 🔧 ELS published phase outcome: "
-                                        f"{phase_name} -> {phase_status}"
+                                        f"{phase_name} -> {phase_status}",
                                     )
                             elif message.topic == PIPELINE_TOPICS["batch_cj_assessment_initiate"]:
                                 essays_to_assess_list = event_data.get("essays_to_process", [])
@@ -353,13 +351,13 @@ async def watch_pipeline_progression_with_consumer(
                                 )
                                 print(
                                     f"📨 4️⃣ BOS published CJ assessment initiate command: "
-                                    f"{essays_to_assess} essays"
+                                    f"{essays_to_assess} essays",
                                 )
                             elif message.topic == PIPELINE_TOPICS["cj_assessment_completed"]:
                                 rankings = event_data.get("rankings", [])
                                 ranking_count = len(rankings) if rankings else 0
                                 print(
-                                    f"📨 5️⃣ CJ assessment completed: {ranking_count} essays ranked"
+                                    f"📨 5️⃣ CJ assessment completed: {ranking_count} essays ranked",
                                 )
                                 # Pipeline continues - ELS will publish final phase outcome
 

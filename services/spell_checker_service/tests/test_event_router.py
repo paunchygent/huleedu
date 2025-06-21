@@ -70,7 +70,7 @@ class TestProcessSingleMessage:
         )
 
         real_spell_logic = DefaultSpellLogic(
-            result_store=mock_result_store, http_session=mock_http_session
+            result_store=mock_result_store, http_session=mock_http_session,
         )
 
         # Act - The real algorithm will run, which is the correct behavior
@@ -354,7 +354,7 @@ class TestProcessSingleMessage:
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
         # Make the publisher fail every time
         mock_event_publisher.publish_spellcheck_result.side_effect = Exception(
-            "Kafka producer error"
+            "Kafka producer error",
         )
 
         # Use REAL spell logic implementation
@@ -363,7 +363,7 @@ class TestProcessSingleMessage:
         )
 
         real_spell_logic = DefaultSpellLogic(
-            result_store=mock_result_store, http_session=mock_http_session
+            result_store=mock_result_store, http_session=mock_http_session,
         )
 
         # Act - Process message, expecting publisher to fail

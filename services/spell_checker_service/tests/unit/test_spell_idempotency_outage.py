@@ -4,6 +4,7 @@ Idempotency tests for outage and failure scenarios in the Spell Checker Service.
 - Tests lock release on unhandled exceptions.
 - Tests fail-open behavior when Redis is unavailable.
 """
+
 from unittest.mock import AsyncMock
 
 import pytest

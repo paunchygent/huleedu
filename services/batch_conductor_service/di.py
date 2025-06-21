@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from aiohttp import ClientSession, ClientTimeout
 from dishka import Provider, Scope, provide
@@ -43,14 +43,17 @@ class CoreInfrastructureProvider(Provider):
         return ClientSession(timeout=timeout)
 
     @provide(scope=Scope.APP)
-    def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
-        """Provide Redis client with atomic operations support."""
+    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
+        """Provide Redis client with atomic operations and pub/sub support."""
         from huleedu_service_libs.redis_client import RedisClient
 
-        return RedisClient(
+        redis_client = RedisClient(
             client_id=f"bcs-{settings.SERVICE_NAME}",
             redis_url=settings.REDIS_URL,
         )
+        await redis_client.start()
+        # RedisClient implements all AtomicRedisClientProtocol methods
+        return cast(AtomicRedisClientProtocol, redis_client)
 
 
 class EventDrivenServicesProvider(Provider):

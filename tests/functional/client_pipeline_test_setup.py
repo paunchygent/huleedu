@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import List
 
 from tests.functional.comprehensive_pipeline_utils import (
     load_real_test_essays,
@@ -19,9 +18,7 @@ from tests.utils.service_test_manager import ServiceTestManager
 
 
 async def create_test_batch_with_essays(
-    service_manager: ServiceTestManager,
-    essay_count: int = 3,
-    correlation_id: str | None = None
+    service_manager: ServiceTestManager, essay_count: int = 3, correlation_id: str | None = None,
 ) -> tuple[str, str]:
     """
     Create a test batch with real essays for pipeline testing.
@@ -36,34 +33,78 @@ async def create_test_batch_with_essays(
     essay_files = await load_real_test_essays(max_essays=essay_count)
     expected_essay_count = len(essay_files)
 
-    # Register batch for comprehensive testing
-    batch_id = await register_comprehensive_batch(
-        service_manager,
-        expected_essay_count,
-        correlation_id
-    )
-    print(f"📦 Created test batch: {batch_id}")
+    # CRITICAL: Create consumer FIRST before any batch operations
+    # This ensures the consumer is positioned and ready to receive BatchEssaysReady
+    from tests.functional.comprehensive_pipeline_utils import create_comprehensive_kafka_manager
 
-    # Upload essays to batch
-    await upload_real_essays(
-        service_manager,
-        batch_id,
-        essay_files,
-        correlation_id
-    )
-    print(f"📚 Uploaded {expected_essay_count} essays")
+    kafka_manager = create_comprehensive_kafka_manager()
+    batch_ready_received = False
+    batch_id = None
 
-    # Wait for batch to be ready
-    await asyncio.sleep(5)
+    async with kafka_manager.consumer(
+        "batch_ready_wait", ["huleedu.els.batch.essays.ready.v1"],
+    ) as consumer:
+        print("⏳ Consumer positioned and ready to receive BatchEssaysReady events...")
+
+        # Register batch for comprehensive testing
+        batch_id = await register_comprehensive_batch(
+            service_manager, expected_essay_count, correlation_id,
+        )
+        print(f"📦 Created test batch: {batch_id}")
+
+        # Upload essays to batch
+        await upload_real_essays(service_manager, batch_id, essay_files, correlation_id)
+        print(f"📚 Uploaded {expected_essay_count} essays")
+
+        print("⏳ Waiting for ELS to process essays (BatchEssaysReady event)...")
+
+        async for message in consumer:
+            try:
+                if hasattr(message, "value"):
+                    import json
+
+                    if isinstance(message.value, bytes):
+                        raw_message = message.value.decode("utf-8")
+                    else:
+                        raw_message = message.value
+
+                    envelope_data = json.loads(raw_message)
+                    event_data = envelope_data.get("data", {})
+                    event_correlation_id = envelope_data.get("correlation_id")
+
+                    # Check for BatchEssaysReady with our correlation ID
+                    if (
+                        message.topic == "huleedu.els.batch.essays.ready.v1"
+                        and event_correlation_id == correlation_id
+                        and event_data.get("batch_id") == batch_id
+                    ):
+                        ready_count = len(event_data.get("ready_essays", []))
+                        print(
+                            f"📨 BatchEssaysReady received: {ready_count} essays "
+                            "ready for processing",
+                        )
+                        batch_ready_received = True
+                        break
+
+            except Exception as e:
+                print(f"⚠️ Error waiting for batch ready: {e}")
+                continue
+
+    if not batch_ready_received:
+        raise Exception(
+            "BatchEssaysReady event was not received - essays may not be processed by ELS",
+        )
+
+    # Give BOS a moment to process the BatchEssaysReady event
+    await asyncio.sleep(2)
+    print("✅ Essays confirmed processed by ELS and ready for pipeline requests")
 
     return batch_id, correlation_id
 
 
 async def create_multiple_test_batches(
-    service_manager: ServiceTestManager,
-    batch_count: int = 2,
-    essays_per_batch: int = 2
-) -> tuple[List[str], List[str]]:
+    service_manager: ServiceTestManager, batch_count: int = 2, essays_per_batch: int = 2,
+) -> tuple[list[str], list[str]]:
     """
     Create multiple test batches for concurrent testing.
 
@@ -81,20 +122,13 @@ async def create_multiple_test_batches(
         expected_essay_count = len(essay_files)
 
         batch_id = await register_comprehensive_batch(
-            service_manager,
-            expected_essay_count,
-            correlation_id
+            service_manager, expected_essay_count, correlation_id,
         )
         batch_ids.append(batch_id)
 
-        await upload_real_essays(
-            service_manager,
-            batch_id,
-            essay_files,
-            correlation_id
-        )
+        await upload_real_essays(service_manager, batch_id, essay_files, correlation_id)
 
-        print(f"📦 Created test batch {i+1}: {batch_id}")
+        print(f"📦 Created test batch {i + 1}: {batch_id}")
 
     # Wait for batches to be ready
     await asyncio.sleep(5)
@@ -102,7 +136,7 @@ async def create_multiple_test_batches(
     return batch_ids, correlation_ids
 
 
-def get_pipeline_monitoring_topics() -> List[str]:
+def get_pipeline_monitoring_topics() -> list[str]:
     """Get the standard list of topics for monitoring pipeline resolution."""
     return [
         "huleedu.commands.batch.pipeline.v1",
@@ -111,11 +145,11 @@ def get_pipeline_monitoring_topics() -> List[str]:
         "huleedu.batch.nlp.initiate.command.v1",
         "huleedu.batch.cj_assessment.initiate.command.v1",
         "huleedu.els.batch_phase.outcome.v1",
-        "huleedu.events.batch.initiate_command.v1"
+        "huleedu.events.batch.initiate_command.v1",
     ]
 
 
-def get_state_aware_monitoring_topics() -> List[str]:
+def get_state_aware_monitoring_topics() -> list[str]:
     """Get topics for state-aware pipeline monitoring."""
     return [
         "huleedu.commands.batch.pipeline.v1",
@@ -124,11 +158,11 @@ def get_state_aware_monitoring_topics() -> List[str]:
         "huleedu.batch.nlp.initiate.command.v1",
         "huleedu.batch.cj_assessment.initiate.command.v1",
         "huleedu.els.batch_phase.outcome.v1",
-        "huleedu.events.batch.initiate_command.v1"
+        "huleedu.events.batch.initiate_command.v1",
     ]
 
 
-def get_concurrent_monitoring_topics() -> List[str]:
+def get_concurrent_monitoring_topics() -> list[str]:
     """Get topics for concurrent pipeline monitoring."""
     return [
         "huleedu.commands.batch.pipeline.v1",
@@ -138,5 +172,5 @@ def get_concurrent_monitoring_topics() -> List[str]:
         "huleedu.batch.ai_feedback.initiate.command.v1",
         "huleedu.batch.nlp.initiate.command.v1",
         "huleedu.batch.cj_assessment.initiate.command.v1",
-        "huleedu.els.batch_phase.outcome.v1"
+        "huleedu.els.batch_phase.outcome.v1",
     ]

@@ -156,7 +156,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
                     (ComparisonPair.essay_a_els_id == essay_b_els_id)
                     & (ComparisonPair.essay_b_els_id == essay_a_els_id)
                 )
-            )
+            ),
         )
         result = await session.execute(stmt)
         return result.scalars().first()
@@ -214,7 +214,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
                 update(ProcessedEssay)
                 .where(
                     (ProcessedEssay.els_essay_id == els_essay_id)
-                    & (ProcessedEssay.cj_batch_id == cj_batch_id)
+                    & (ProcessedEssay.cj_batch_id == cj_batch_id),
                 )
                 .values(current_bt_score=score)
             )
@@ -257,7 +257,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
                     "els_essay_id": essay.els_essay_id,
                     "score": essay.current_bt_score,
                     "comparison_count": essay.comparison_count,
-                }
+                },
             )
 
         return rankings

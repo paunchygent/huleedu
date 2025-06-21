@@ -17,6 +17,6 @@ class DefaultContentClient(ContentClientProtocol):
     async def fetch_content(self, storage_id: str, http_session: aiohttp.ClientSession) -> str:
         """Fetch content using the core logic implementation."""
         result = await default_fetch_content_impl(
-            http_session, storage_id, self.content_service_url
+            http_session, storage_id, self.content_service_url,
         )
         return str(result)

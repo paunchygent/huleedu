@@ -7,8 +7,6 @@ functionality for the walking skeleton implementation.
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
-
 from huleedu_service_libs.logging_utils import create_service_logger
 
 logger = create_service_logger("file_service.text_processing")
@@ -30,7 +28,7 @@ async def extract_text_from_file(file_content: bytes, file_name: str) -> str:
     """
     if not file_name.lower().endswith(".txt"):
         logger.warning(
-            f"Non-txt file received: {file_name}. Walking skeleton only supports .txt files."
+            f"Non-txt file received: {file_name}. Walking skeleton only supports .txt files.",
         )
         return ""
 
@@ -44,7 +42,7 @@ async def extract_text_from_file(file_content: bytes, file_name: str) -> str:
         return ""
 
 
-async def parse_student_info(text_content: str) -> Tuple[Optional[str], Optional[str]]:
+async def parse_student_info(text_content: str) -> tuple[str | None, str | None]:
     """
     Parse student name and email from text content.
 

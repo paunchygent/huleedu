@@ -10,7 +10,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 logger = create_service_logger("bos.language_utils")
 
 
-def _infer_language_from_course_code(course_code: str) -> str:  # noqa: D401
+def _infer_language_from_course_code(course_code: str) -> str:
     """Infer ISO language code from a course code string.
 
     Args:

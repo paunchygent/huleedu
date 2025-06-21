@@ -7,7 +7,6 @@ be import-time lightweight for every service.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Set
 
 # ---------------------------------------------------------------------------
 # System-level lifecycle stages
@@ -23,11 +22,11 @@ class ProcessingStage(str, Enum):
     CANCELLED = "cancelled"
 
     @classmethod
-    def terminal(cls) -> Set["ProcessingStage"]:
+    def terminal(cls) -> set[ProcessingStage]:
         return {cls.COMPLETED, cls.FAILED, cls.CANCELLED}
 
     @classmethod
-    def active(cls) -> Set["ProcessingStage"]:
+    def active(cls) -> set[ProcessingStage]:
         return {cls.COMPLETED, cls.INITIALIZED, cls.PROCESSING}
 
 
@@ -134,12 +133,12 @@ def topic_name(event: ProcessingEvent) -> str:
     """
     if event not in _TOPIC_MAPPING:
         mapped_events_summary = "\n".join(
-            [f"- {e.name} ({e.value}) ➜ '{t}'" for e, t in _TOPIC_MAPPING.items()]
+            [f"- {e.name} ({e.value}) ➜ '{t}'" for e, t in _TOPIC_MAPPING.items()],
         )
         raise ValueError(
             f"Event '{event.name} ({event.value})' does not have an explicit topic mapping. "
             f"All events intended for Kafka must have deliberate topic contracts defined. "
-            f"Currently mapped events:\n{mapped_events_summary}"
+            f"Currently mapped events:\n{mapped_events_summary}",
         )
     return _TOPIC_MAPPING[event]
 

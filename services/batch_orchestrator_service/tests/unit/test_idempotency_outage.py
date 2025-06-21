@@ -7,8 +7,7 @@ Follows boundary mocking pattern - mocks Redis client but uses real handlers.
 
 import json
 import uuid
-from datetime import datetime, timezone
-from typing import Dict, Tuple
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -23,8 +22,8 @@ class MockRedisClient:
     """Mock Redis client that tracks calls for testing idempotency behavior."""
 
     def __init__(self) -> None:
-        self.keys: Dict[str, str] = {}
-        self.set_calls: list[Tuple[str, str, int]] = []
+        self.keys: dict[str, str] = {}
+        self.set_calls: list[tuple[str, str, int]] = []
         self.delete_calls: list[str] = []
         self.should_fail_set = False
 
@@ -89,7 +88,7 @@ def sample_batch_essays_ready_event() -> dict:
     return {
         "event_id": str(uuid.uuid4()),
         "event_type": "huleedu.batch.essays.ready.v1",
-        "event_timestamp": datetime.now(timezone.utc).isoformat(),
+        "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "essay_lifecycle_service",
         "correlation_id": correlation_id,
         "data": {
@@ -103,14 +102,14 @@ def sample_batch_essays_ready_event() -> dict:
             "validation_failures": [],
             "metadata": {
                 "entity": {"entity_type": "batch", "entity_id": batch_id},
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         },
     }
 
 
 @pytest.fixture
-def mock_handlers() -> Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler]:
+def mock_handlers() -> tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler]:
     """Create real handler instances with mocked dependencies (boundary mocking)."""
     mock_event_publisher = AsyncMock()
     mock_batch_repo = AsyncMock()
@@ -122,7 +121,7 @@ def mock_handlers() -> Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandle
         batch_repo=mock_batch_repo,
     )
     els_phase_outcome_handler = ELSBatchPhaseOutcomeHandler(
-        phase_coordinator=mock_phase_coordinator
+        phase_coordinator=mock_phase_coordinator,
     )
     return batch_essays_ready_handler, els_phase_outcome_handler
 
@@ -144,15 +143,16 @@ class TestBOSIdempotencyOutage:
     async def test_business_logic_failure_releases_redis_lock(
         self,
         sample_batch_essays_ready_event: dict,
-        mock_handlers: Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
+        mock_handlers: tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that business logic failures release the lock for retry."""
         from huleedu_service_libs.idempotency import idempotent_consumer
+
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
         batch_essays_ready_handler.batch_repo.store_batch_essays.side_effect = Exception(
-            "Business logic failure"
+            "Business logic failure",
         )
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
@@ -177,10 +177,11 @@ class TestBOSIdempotencyOutage:
 
     @pytest.mark.asyncio
     async def test_unhandled_exception_releases_redis_lock(
-        self, sample_batch_essays_ready_event: dict
+        self, sample_batch_essays_ready_event: dict,
     ) -> None:
         """Test that unhandled exceptions release the idempotency lock for retry."""
         from huleedu_service_libs.idempotency import idempotent_consumer
+
         redis_client = MockRedisClient()
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
@@ -200,11 +201,12 @@ class TestBOSIdempotencyOutage:
     async def test_redis_failure_fallback_continues_processing(
         self,
         sample_batch_essays_ready_event: dict,
-        mock_handlers: Tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
+        mock_handlers: tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that Redis failures fall back to processing without idempotency."""
         from huleedu_service_libs.idempotency import idempotent_consumer
+
         redis_client = MockRedisClient()
         redis_client.should_fail_set = True
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers

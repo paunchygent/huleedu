@@ -182,7 +182,7 @@ def test_create_filtered_l2_dictionary_empty_input(tmp_path: Path) -> None:
     assert not create_filtered_l2_dictionary({}, output_file, logger=mock_logger)
     assert not output_file.exists()
     mock_logger.warning.assert_called_once_with(
-        "No corrections provided to create_filtered_l2_dictionary"
+        "No corrections provided to create_filtered_l2_dictionary",
     )
 
 

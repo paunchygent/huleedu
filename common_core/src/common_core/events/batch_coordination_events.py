@@ -9,8 +9,8 @@ These events enable count-based aggregation pattern for batch readiness coordina
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from common_core.events.file_events import EssayValidationFailedV1
@@ -50,16 +50,16 @@ class BatchEssaysReady(BaseModel):
     event: str = Field(default="batch.essays.ready", description="Event type identifier")
     batch_id: str = Field(description="Batch identifier")
     ready_essays: list[EssayProcessingInputRefV1] = Field(
-        description="List of essays ready for processing with their content references"
+        description="List of essays ready for processing with their content references",
     )
     batch_entity: EntityReference = Field(description="Batch entity reference")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
-    validation_failures: Optional[list["EssayValidationFailedV1"]] = Field(
+    validation_failures: list[EssayValidationFailedV1] | None = Field(
         default=None,
         description="List of essays that failed validation (EssayValidationFailedV1 events)",
     )
-    total_files_processed: Optional[int] = Field(
-        default=None, description="Total number of files processed (successful + failed)"
+    total_files_processed: int | None = Field(
+        default=None, description="Total number of files processed (successful + failed)",
     )
 
 
@@ -92,15 +92,15 @@ class ExcessContentProvisionedV1(BaseModel):
     original_file_name: str = Field(description="Original uploaded file name")
     text_storage_id: str = Field(description="Content Service storage ID")
     reason: str = Field(description="Reason for excess content (e.g., 'NO_AVAILABLE_SLOT')")
-    correlation_id: Optional[UUID] = Field(default=None, description="Request correlation ID")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    correlation_id: UUID | None = Field(default=None, description="Request correlation ID")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # Event envelope integration for batch coordination events
 class BatchCoordinationEventData(BaseModel):
     """Union type for all batch coordination event data types."""
 
-    batch_essays_registered: Optional[BatchEssaysRegistered] = None
-    batch_essays_ready: Optional[BatchEssaysReady] = None
-    batch_readiness_timeout: Optional[BatchReadinessTimeout] = None
-    excess_content_provisioned: Optional[ExcessContentProvisionedV1] = None
+    batch_essays_registered: BatchEssaysRegistered | None = None
+    batch_essays_ready: BatchEssaysReady | None = None
+    batch_readiness_timeout: BatchReadinessTimeout | None = None
+    excess_content_provisioned: ExcessContentProvisionedV1 | None = None

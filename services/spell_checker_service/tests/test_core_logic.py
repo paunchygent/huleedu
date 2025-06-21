@@ -37,7 +37,7 @@ class TestDefaultImplementations:
 
         # Act
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text_with_errors, sample_essay_id
+            text_with_errors, sample_essay_id,
         )
 
         # Assert - The real L2 + pyspellchecker implementation corrects multiple errors
@@ -53,7 +53,7 @@ class TestDefaultImplementations:
 
     @pytest.mark.asyncio
     async def test_default_fetch_content_success(
-        self, sample_essay_id: str, sample_storage_id: str
+        self, sample_essay_id: str, sample_storage_id: str,
     ) -> None:
         """Test successful content fetching."""
         # Arrange - Mock the actual HTTP response properly using custom async context manager
@@ -67,7 +67,7 @@ class TestDefaultImplementations:
 
         # Act
         result = await default_fetch_content_impl(
-            mock_session, sample_storage_id, "http://test-service", sample_essay_id
+            mock_session, sample_storage_id, "http://test-service", sample_essay_id,
         )
 
         # Assert
@@ -76,7 +76,7 @@ class TestDefaultImplementations:
 
     @pytest.mark.asyncio
     async def test_default_fetch_content_http_error(
-        self, sample_essay_id: str, sample_storage_id: str
+        self, sample_essay_id: str, sample_storage_id: str,
     ) -> None:
         """Test content fetching with HTTP error."""
         # Arrange
@@ -90,7 +90,7 @@ class TestDefaultImplementations:
         # Act
         with pytest.raises(Exception, match="HTTP 404"):
             await default_fetch_content_impl(
-                mock_session, sample_storage_id, "http://test-service", sample_essay_id
+                mock_session, sample_storage_id, "http://test-service", sample_essay_id,
             )
 
         # Assert
@@ -112,7 +112,7 @@ class TestDefaultImplementations:
 
         # Act
         result = await default_store_content_impl(
-            mock_session, content_to_store, "http://test-service", sample_essay_id
+            mock_session, content_to_store, "http://test-service", sample_essay_id,
         )
 
         # Assert
@@ -135,7 +135,7 @@ class TestDefaultImplementations:
         # Act
         with pytest.raises(Exception, match="HTTP 500"):
             await default_store_content_impl(
-                mock_session, content_to_store, "http://test-service", sample_essay_id
+                mock_session, content_to_store, "http://test-service", sample_essay_id,
             )
 
         # Assert

@@ -13,8 +13,8 @@ This approach ensures both real-world validation and controlled testing scenario
 import asyncio
 import json
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List
+from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from aiokafka import ConsumerRecord
@@ -49,12 +49,12 @@ class RealRedisTestHelper:
         except Exception as e:
             print(f"Warning: Could not cleanup Redis test keys: {e}")
 
-    def create_test_event(self, event_type: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_test_event(self, event_type: str, data: dict[str, Any]) -> dict[str, Any]:
         """Create a test event with proper structure."""
         return {
             "event_id": str(uuid.uuid4()),
             "event_type": event_type,
-            "event_timestamp": datetime.now(timezone.utc).isoformat(),
+            "event_timestamp": datetime.now(UTC).isoformat(),
             "source_service": "test_service",
             "correlation_id": str(uuid.uuid4()),
             "data": data,
@@ -168,7 +168,7 @@ class MockRedisClient:
         self.set_calls: list[tuple[str, str, int | None]] = []
         self.delete_calls: list[str] = []
         self.should_fail_operations = False
-        self.connected_services: List[str] = []
+        self.connected_services: list[str] = []
 
     async def set_if_not_exists(self, key: str, value: str, ttl_seconds: int | None = None) -> bool:
         """Mock Redis SETNX operation."""
@@ -225,7 +225,7 @@ class MockRedisClient:
         """Restore Redis connectivity."""
         self.should_fail_operations = False
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get Redis operation statistics."""
         return {
             "total_keys": len(self.keys),
@@ -236,7 +236,7 @@ class MockRedisClient:
         }
 
 
-def create_mock_kafka_message(event_data: Dict[str, Any]) -> ConsumerRecord:
+def create_mock_kafka_message(event_data: dict[str, Any]) -> ConsumerRecord:
     """Create a mock Kafka message from event data."""
     message_value = json.dumps(event_data).encode("utf-8")
 
@@ -262,14 +262,14 @@ def mock_redis_client() -> MockRedisClient:
 
 
 @pytest.fixture
-def sample_batch_event() -> Dict[str, Any]:
+def sample_batch_event() -> dict[str, Any]:
     """Create sample batch event for testing."""
     batch_id = str(uuid.uuid4())
 
     return {
         "event_id": str(uuid.uuid4()),
         "event_type": "huleedu.batch.essays.ready.v1",
-        "event_timestamp": datetime.now(timezone.utc).isoformat(),
+        "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "essay_lifecycle_service",
         "correlation_id": str(uuid.uuid4()),
         "data": {
@@ -280,7 +280,7 @@ def sample_batch_event() -> Dict[str, Any]:
             ],
             "metadata": {
                 "entity": {"entity_type": "batch", "entity_id": batch_id},
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         },
     }
@@ -292,7 +292,7 @@ class TestControlledIdempotencyScenarios:
     """E2E tests using controlled mock scenarios for specific edge cases."""
 
     async def test_cross_service_duplicate_detection(
-        self, mock_redis_client: MockRedisClient, sample_batch_event: Dict[str, Any]
+        self, mock_redis_client: MockRedisClient, sample_batch_event: dict[str, Any],
     ) -> None:
         """
         Test that the same event processed by
@@ -332,7 +332,7 @@ class TestControlledIdempotencyScenarios:
         print(f"✅ Cross-service duplicate detection validated: {stats}")
 
     async def test_redis_outage_fail_open_behavior(
-        self, mock_redis_client: MockRedisClient, sample_batch_event: Dict[str, Any]
+        self, mock_redis_client: MockRedisClient, sample_batch_event: dict[str, Any],
     ) -> None:
         """
         Test that services continue processing when Redis is unavailable (fail-open behavior).
@@ -361,7 +361,7 @@ class TestControlledIdempotencyScenarios:
         print("✅ Fail-open behavior validated during Redis outage")
 
     async def test_processing_failure_key_cleanup(
-        self, mock_redis_client: MockRedisClient, sample_batch_event: Dict[str, Any]
+        self, mock_redis_client: MockRedisClient, sample_batch_event: dict[str, Any],
     ) -> None:
         """
         Test that Redis keys are properly cleaned up when processing fails.
@@ -388,7 +388,7 @@ class TestControlledIdempotencyScenarios:
         print("✅ Processing failure key cleanup validated")
 
     async def test_deterministic_id_generation_consistency(
-        self, sample_batch_event: Dict[str, Any]
+        self, sample_batch_event: dict[str, Any],
     ) -> None:
         """
         Test that deterministic ID generation is consistent across multiple calls.
@@ -452,7 +452,7 @@ class TestE2EPipelineIdempotency:
 
             try:
                 batch_id, _ = await service_manager.create_batch(
-                    expected_essay_count=2, correlation_id=correlation_id
+                    expected_essay_count=2, correlation_id=correlation_id,
                 )
 
                 # Upload test files to trigger pipeline
@@ -465,7 +465,7 @@ class TestE2EPipelineIdempotency:
 
                 # Collect initial events
                 initial_events = await kafka_manager.collect_events(
-                    consumer, expected_count=3, timeout_seconds=30
+                    consumer, expected_count=3, timeout_seconds=30,
                 )
 
                 assert len(initial_events) >= 1, "Should receive at least one pipeline event"
@@ -487,7 +487,7 @@ class TestE2EPipelineIdempotency:
 # =============================================================================
 
 
-def create_event_with_same_data(base_data: Dict[str, Any], count: int = 3) -> List[Dict[str, Any]]:
+def create_event_with_same_data(base_data: dict[str, Any], count: int = 3) -> list[dict[str, Any]]:
     """Create multiple events with identical data but different envelope metadata."""
     events = []
     for i in range(count):
@@ -503,7 +503,7 @@ def create_event_with_same_data(base_data: Dict[str, Any], count: int = 3) -> Li
     return events
 
 
-async def validate_redis_key_pattern(event_data: Dict[str, Any]) -> str:
+async def validate_redis_key_pattern(event_data: dict[str, Any]) -> str:
     """Validate Redis key pattern generation for an event."""
     event_bytes = json.dumps(event_data).encode("utf-8")
     deterministic_id = generate_deterministic_event_id(event_bytes)

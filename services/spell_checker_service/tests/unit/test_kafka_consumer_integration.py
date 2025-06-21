@@ -8,8 +8,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
-from typing import Dict
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -28,7 +27,7 @@ class MockRedisClient:
     """Mock Redis client for integration testing."""
 
     def __init__(self) -> None:
-        self.keys: Dict[str, str] = {}
+        self.keys: dict[str, str] = {}
         self.set_calls: list[tuple[str, str, int | None]] = []
 
     async def set_if_not_exists(self, key: str, value: str, ttl_seconds: int | None = None) -> bool:
@@ -64,7 +63,7 @@ def create_sample_spellcheck_event() -> dict:
     return {
         "event_id": str(uuid.uuid4()),
         "event_type": "huleedu.essay.spellcheck.requested.v1",
-        "event_timestamp": datetime.now(timezone.utc).isoformat(),
+        "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "essay_lifecycle_service",
         "correlation_id": correlation_id,
         "data": {
@@ -75,7 +74,7 @@ def create_sample_spellcheck_event() -> dict:
             "language": "en",
             "system_metadata": {
                 "entity": {"entity_id": essay_id, "entity_type": "essay"},
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "processing_stage": "pending",
                 "event": "essay.spellcheck.requested",
             },

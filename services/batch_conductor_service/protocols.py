@@ -210,8 +210,6 @@ class PipelineResolutionServiceProtocol(Protocol):
         """Resolve optimal pipeline configuration for a batch."""
         ...
 
-    async def resolve_pipeline_request(
-        self, request: Any
-    ) -> Any:
+    async def resolve_pipeline_request(self, request: Any) -> Any:
         """Resolve a complete pipeline request from BOS."""
         ...

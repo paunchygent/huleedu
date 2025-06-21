@@ -349,7 +349,8 @@ class TestSpellcheckCommandHandler:
                 command_data=spellcheck_command_data, correlation_id=correlation_id
             )
 
-            # Verify metadata includes both existing and new phases (called twice: transition + started event)
+            # Verify metadata includes both existing and new phases
+            # (called twice: transition + started event)
             assert mock_repository.update_essay_status_via_machine.call_count == 2
 
             # Check the first call (initial transition) has the correct metadata

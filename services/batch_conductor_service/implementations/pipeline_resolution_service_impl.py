@@ -232,9 +232,7 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
             counter = self._metrics["pipeline_resolutions_total"]
             # Safely handle the counter metric
             if hasattr(counter, "labels") and hasattr(counter, "inc"):
-                counter.labels(
-                    requested_pipeline=requested_pipeline, outcome="success"
-                ).inc()
+                counter.labels(requested_pipeline=requested_pipeline, outcome="success").inc()
 
     async def _track_failure_metrics(self, requested_pipeline: str, failure_reason: str) -> None:
         """Track failed pipeline resolution in Prometheus metrics."""
@@ -242,9 +240,7 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
             counter = self._metrics["pipeline_resolutions_total"]
             # Safely handle the counter metric
             if hasattr(counter, "labels") and hasattr(counter, "inc"):
-                counter.labels(
-                    requested_pipeline=requested_pipeline, outcome=failure_reason
-                ).inc()
+                counter.labels(requested_pipeline=requested_pipeline, outcome=failure_reason).inc()
 
     async def _track_duration_metrics(self, requested_pipeline: str, duration: float) -> None:
         """Track pipeline resolution duration in Prometheus metrics."""
@@ -252,9 +248,7 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
             histogram = self._metrics["pipeline_resolution_duration_seconds"]
             # Safely handle the histogram metric
             if hasattr(histogram, "labels") and hasattr(histogram, "observe"):
-                histogram.labels(
-                    requested_pipeline=requested_pipeline
-                ).observe(duration)
+                histogram.labels(requested_pipeline=requested_pipeline).observe(duration)
 
     async def resolve_optimal_pipeline(
         self,

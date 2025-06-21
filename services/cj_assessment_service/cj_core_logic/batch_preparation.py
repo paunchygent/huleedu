@@ -89,7 +89,7 @@ async def prepare_essays_for_assessment(
     """
     async with database.session() as session:
         await database.update_cj_batch_status(
-            session=session, cj_batch_id=cj_batch_id, status=CJBatchStatusEnum.FETCHING_CONTENT
+            session=session, cj_batch_id=cj_batch_id, status=CJBatchStatusEnum.FETCHING_CONTENT,
         )
 
         essays_for_api_model: list[EssayForComparison] = []
@@ -131,7 +131,7 @@ async def prepare_essays_for_assessment(
                 # Continue with other essays rather than failing entire batch
 
         logger.info(
-            f"Prepared {len(essays_for_api_model)} essays for CJ assessment", extra=log_extra
+            f"Prepared {len(essays_for_api_model)} essays for CJ assessment", extra=log_extra,
         )
 
         return essays_for_api_model

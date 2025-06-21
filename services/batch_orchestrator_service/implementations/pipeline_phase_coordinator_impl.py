@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -71,7 +71,7 @@ class DefaultPipelinePhaseCoordinator:
             batch_id,
             completed_phase,
             updated_status,
-            datetime.now(timezone.utc).isoformat(),
+            datetime.now(UTC).isoformat(),
         )
 
         # Allow progression for both COMPLETED_SUCCESSFULLY and COMPLETED_WITH_FAILURES
@@ -80,7 +80,7 @@ class DefaultPipelinePhaseCoordinator:
         if phase_status not in ["COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"]:
             logger.info(
                 f"Phase {completed_phase} for batch {batch_id} did not complete successfully "
-                f"(status: {phase_status}), skipping next phase initiation"
+                f"(status: {phase_status}), skipping next phase initiation",
             )
             return
 
@@ -97,7 +97,7 @@ class DefaultPipelinePhaseCoordinator:
 
         # Determine and initiate next phase with data propagation
         await self._initiate_next_phase(
-            batch_id, completed_phase, correlation_id, processed_essays_for_next_phase
+            batch_id, completed_phase, correlation_id, processed_essays_for_next_phase,
         )
 
     async def update_phase_status(
@@ -177,7 +177,7 @@ class DefaultPipelinePhaseCoordinator:
             except ValueError:
                 logger.error(
                     f"Completed phase '{completed_phase}' not found in requested_pipelines "
-                    f"for batch {batch_id}"
+                    f"for batch {batch_id}",
                 )
                 return
 
@@ -185,7 +185,7 @@ class DefaultPipelinePhaseCoordinator:
             if current_index + 1 >= len(requested_pipelines):
                 logger.info(
                     f"Pipeline completed for batch {batch_id} - no more phases after "
-                    f"'{completed_phase}'"
+                    f"'{completed_phase}'",
                 )
                 # TODO: Mark batch as COMPLETED when batch completion events are available
                 return
@@ -196,7 +196,7 @@ class DefaultPipelinePhaseCoordinator:
                 next_phase_name = PhaseName(next_phase_str)
             except ValueError as e:
                 logger.error(
-                    f"Invalid next phase name '{next_phase_str}' for batch {batch_id}: {e}"
+                    f"Invalid next phase name '{next_phase_str}' for batch {batch_id}: {e}",
                 )
                 return
 
@@ -247,7 +247,7 @@ class DefaultPipelinePhaseCoordinator:
             if not essays_to_process:
                 logger.warning(
                     f"No processed essays provided for next phase {next_phase_name.value}, "
-                    "this may indicate a data flow issue"
+                    "this may indicate a data flow issue",
                 )
                 # Continue anyway as some phases might not require previous phase results
                 essays_to_process = []
@@ -265,7 +265,7 @@ class DefaultPipelinePhaseCoordinator:
                 )
             except InitiationError as e:
                 logger.error(
-                    f"Failed to initiate phase {next_phase_name} for batch {batch_id}: {e}"
+                    f"Failed to initiate phase {next_phase_name} for batch {batch_id}: {e}",
                 )
 
                 # Mark phase as FAILED and save state
@@ -275,10 +275,10 @@ class DefaultPipelinePhaseCoordinator:
                         pipeline_detail.status = PipelineExecutionStatus.FAILED
                         pipeline_detail.error_info = {
                             "error": str(e),
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "timestamp": datetime.now(UTC).isoformat(),
                         }
                         await self.batch_repo.save_processing_pipeline_state(
-                            batch_id, current_pipeline_state
+                            batch_id, current_pipeline_state,
                         )
                 else:  # Dictionary - backwards compatibility
                     updated_pipeline_state = current_pipeline_state.copy()
@@ -287,12 +287,12 @@ class DefaultPipelinePhaseCoordinator:
                             f"{next_phase_name.value}_status": "FAILED",
                             f"{next_phase_name.value}_error": str(e),
                             f"{next_phase_name.value}_failed_at": (
-                                datetime.now(timezone.utc).isoformat()
+                                datetime.now(UTC).isoformat()
                             ),
-                        }
+                        },
                     )
                     await self.batch_repo.save_processing_pipeline_state(
-                        batch_id, updated_pipeline_state
+                        batch_id, updated_pipeline_state,
                     )
 
                 # TODO: Publish diagnostic event when error event models are available
@@ -303,9 +303,9 @@ class DefaultPipelinePhaseCoordinator:
                 pipeline_detail = current_pipeline_state.get_pipeline(next_phase_name.value)
                 if pipeline_detail:
                     pipeline_detail.status = PipelineExecutionStatus.DISPATCH_INITIATED
-                    pipeline_detail.started_at = datetime.now(timezone.utc)
+                    pipeline_detail.started_at = datetime.now(UTC)
                     await self.batch_repo.save_processing_pipeline_state(
-                        batch_id, current_pipeline_state
+                        batch_id, current_pipeline_state,
                     )
             else:  # Dictionary - backwards compatibility
                 updated_pipeline_state = current_pipeline_state.copy()
@@ -313,21 +313,21 @@ class DefaultPipelinePhaseCoordinator:
                     {
                         f"{next_phase_name.value}_status": "DISPATCH_INITIATED",
                         f"{next_phase_name.value}_initiated_at": (
-                            datetime.now(timezone.utc).isoformat()
+                            datetime.now(UTC).isoformat()
                         ),
-                    }
+                    },
                 )
                 await self.batch_repo.save_processing_pipeline_state(
-                    batch_id, updated_pipeline_state
+                    batch_id, updated_pipeline_state,
                 )
 
             logger.info(
-                f"Successfully initiated {next_phase_name.value} pipeline for batch {batch_id}"
+                f"Successfully initiated {next_phase_name.value} pipeline for batch {batch_id}",
             )
 
         except Exception as e:
             logger.error(
-                f"Error determining/initiating next phase for batch {batch_id}: {e}", exc_info=True
+                f"Error determining/initiating next phase for batch {batch_id}: {e}", exc_info=True,
             )
             raise
 
@@ -357,7 +357,10 @@ class DefaultPipelinePhaseCoordinator:
             first_phase_name = PhaseName(first_phase_str)
         except ValueError as e:
             raise DataValidationError(
-                f"Invalid first phase '{first_phase_str}' in resolved pipeline for batch {batch_id}: {e}"
+
+                    f"Invalid first phase '{first_phase_str}' in resolved pipeline "
+                    f"for batch {batch_id}: {e}",
+
             )
 
         # Check idempotency - don't re-initiate if already started
@@ -371,7 +374,8 @@ class DefaultPipelinePhaseCoordinator:
                     PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
                 ]:
                     logger.info(
-                        f"First phase {first_phase_name.value} already initiated for batch {batch_id}, skipping",
+                        f"First phase {first_phase_name.value} already initiated for "
+                        f"batch {batch_id}, skipping",
                         extra={"current_status": pipeline_detail.status.value},
                     )
                     return
@@ -384,8 +388,8 @@ class DefaultPipelinePhaseCoordinator:
                     "COMPLETED_SUCCESSFULLY",
                 ]:
                     logger.info(
-                        f"First phase {first_phase_name.value} already initiated for batch {batch_id}, skipping",
-                        extra={"current_status": phase_status},
+                        f"First phase {first_phase_name.value} already initiated, skipping",
+                        extra={"batch_id": batch_id, "current_status": phase_status},
                     )
                     return
 
@@ -399,7 +403,7 @@ class DefaultPipelinePhaseCoordinator:
 
         if not essays_for_processing:
             raise DataValidationError(
-                f"No essays found for batch {batch_id}. Batch may not be ready for processing."
+                f"No essays found for batch {batch_id}. Batch may not be ready for processing.",
             )
 
         logger.info(f"Retrieved {len(essays_for_processing)} essays for pipeline initiation")
@@ -415,7 +419,9 @@ class DefaultPipelinePhaseCoordinator:
                 batch_context=batch_context,
             )
         except InitiationError as e:
-            logger.error(f"Failed to initiate first phase {first_phase_name} for batch {batch_id}: {e}")
+            logger.error(
+                f"Failed to initiate first phase {first_phase_name} for batch {batch_id}: {e}",
+            )
             raise
 
         # Update pipeline state - mark first phase as DISPATCH_INITIATED
@@ -423,7 +429,7 @@ class DefaultPipelinePhaseCoordinator:
             batch_id=batch_id,
             phase=first_phase_name.value,
             status="DISPATCH_INITIATED",
-            completion_timestamp=datetime.now(timezone.utc).isoformat(),
+            completion_timestamp=datetime.now(UTC).isoformat(),
         )
 
         logger.info(

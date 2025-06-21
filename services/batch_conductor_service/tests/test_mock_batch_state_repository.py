@@ -44,9 +44,7 @@ class TestMockBatchStateRepository:
         assert len(completed_steps) == 1
 
     @pytest.mark.asyncio
-    async def test_protocol_compliance(
-        self, mock_repository: MockBatchStateRepositoryImpl
-    ) -> None:
+    async def test_protocol_compliance(self, mock_repository: MockBatchStateRepositoryImpl) -> None:
         """Ensure mock implements same interface as Redis repository."""
         batch_id = "test-batch-002"
         essay_id = "essay-002"
@@ -82,9 +80,7 @@ class TestMockBatchStateRepository:
         assert is_complete is False
 
     @pytest.mark.asyncio
-    async def test_ttl_simulation(
-        self, mock_repository: MockBatchStateRepositoryImpl
-    ) -> None:
+    async def test_ttl_simulation(self, mock_repository: MockBatchStateRepositoryImpl) -> None:
         """Test TTL expiration simulation."""
         batch_id = "test-batch-003"
         essay_id = "essay-003"

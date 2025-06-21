@@ -66,13 +66,13 @@ class NLPInitiatorImpl(NLPInitiatorProtocol):
             # Validate that this is the correct phase
             if phase_to_initiate != PhaseName.NLP:
                 raise DataValidationError(
-                    f"NLPInitiatorImpl received incorrect phase: {phase_to_initiate}"
+                    f"NLPInitiatorImpl received incorrect phase: {phase_to_initiate}",
                 )
 
             # Validate required data
             if not essays_for_processing:
                 raise DataValidationError(
-                    f"No essays provided for NLP initiation in batch {batch_id}"
+                    f"No essays provided for NLP initiation in batch {batch_id}",
                 )
 
             # Get language from course code

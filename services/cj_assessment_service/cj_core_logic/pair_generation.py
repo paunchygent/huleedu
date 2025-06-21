@@ -65,7 +65,7 @@ async def generate_comparison_tasks(
             if new_pairs_count >= existing_pairs_threshold:
                 logger.info(
                     f"Reached new pairs threshold ({existing_pairs_threshold}), "
-                    f"stopping pair generation"
+                    f"stopping pair generation",
                 )
                 break
 
@@ -85,7 +85,7 @@ async def generate_comparison_tasks(
 
 
 async def _fetch_existing_comparison_ids(
-    db_session: AsyncSession, cj_batch_id: int
+    db_session: AsyncSession, cj_batch_id: int,
 ) -> set[tuple[str, str]]:
     """Fetch existing comparison pair ELS essay IDs from the database for a given CJ batch.
 
@@ -105,7 +105,7 @@ async def _fetch_existing_comparison_ids(
     )
 
     stmt = select(CJ_ComparisonPair.essay_a_els_id, CJ_ComparisonPair.essay_b_els_id).where(
-        CJ_ComparisonPair.cj_batch_id == cj_batch_id
+        CJ_ComparisonPair.cj_batch_id == cj_batch_id,
     )
 
     result = await db_session.execute(stmt)

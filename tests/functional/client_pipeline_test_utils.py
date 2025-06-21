@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
@@ -17,7 +16,7 @@ from tests.utils.kafka_test_manager import KafkaTestManager
 
 
 async def create_client_pipeline_request_event(
-    batch_id: str, requested_pipeline: str, correlation_id: Optional[str] = None
+    batch_id: str, requested_pipeline: str, correlation_id: str | None = None,
 ) -> EventEnvelope[ClientBatchPipelineRequestV1]:
     """Create a ClientBatchPipelineRequestV1 event for testing."""
     if correlation_id is None:
@@ -41,18 +40,16 @@ async def publish_client_pipeline_request(
     kafka_manager: KafkaTestManager,
     batch_id: str,
     requested_pipeline: str,
-    correlation_id: Optional[str] = None,
+    correlation_id: str | None = None,
 ) -> str:
     """Publish ClientBatchPipelineRequestV1 event and return correlation ID."""
     if correlation_id is None:
         correlation_id = str(uuid.uuid4())
 
-    event = await create_client_pipeline_request_event(
-        batch_id, requested_pipeline, correlation_id
-    )
+    event = await create_client_pipeline_request_event(batch_id, requested_pipeline, correlation_id)
 
     # Convert to JSON-serializable format using Pydantic's JSON mode
-    event_dict = event.model_dump(mode='json')
+    event_dict = event.model_dump(mode="json")
 
     await kafka_manager.publish_event("huleedu.commands.batch.pipeline.v1", event_dict)
 

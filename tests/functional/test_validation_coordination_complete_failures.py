@@ -46,7 +46,7 @@ async def test_complete_validation_failures_0_of_25():
     async with kafka_manager.consumer("complete_failures") as consumer:
         # NOW trigger operations - consumer is guaranteed ready
         batch_id, correlation_id = await create_validation_batch(
-            course_code, class_designation, essay_count
+            course_code, class_designation, essay_count,
         )
 
         # Create all failing files (0 successful + 25 failing files)
@@ -85,11 +85,11 @@ async def test_complete_validation_failures_0_of_25():
                         # Log events for debugging
                         if topic == TOPICS["validation_failed"]:
                             logger.info(
-                                f"🔴 VALIDATION FAILURE: {json.dumps(event_data, indent=2)}"
+                                f"🔴 VALIDATION FAILURE: {json.dumps(event_data, indent=2)}",
                             )
                         elif topic == TOPICS["content_provisioned"]:
                             logger.info(
-                                f"✅ CONTENT PROVISIONED: {json.dumps(event_data, indent=2)}"
+                                f"✅ CONTENT PROVISIONED: {json.dumps(event_data, indent=2)}",
                             )
                         elif topic == TOPICS["batch_ready"]:
                             logger.info(f"🎯 BATCH READY: {json.dumps(event_data, indent=2)}")
@@ -101,7 +101,7 @@ async def test_complete_validation_failures_0_of_25():
                                 failure_data = event_data["data"]
                                 if failure_data.get("batch_id") == batch_id:
                                     validation_failures.append(
-                                        EssayValidationFailedV1(**failure_data)
+                                        EssayValidationFailedV1(**failure_data),
                                     )
                             # Handle direct event format
                             elif event_data.get("batch_id") == batch_id:
@@ -179,5 +179,5 @@ async def test_complete_validation_failures_0_of_25():
 
         logger.info(
             "✅ COMPLETE FAILURE TEST (0/25): "
-            "Success - Complete validation failure coordination validated"
+            "Success - Complete validation failure coordination validated",
         )

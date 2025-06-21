@@ -122,7 +122,9 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         """Get status count breakdown for a batch."""
         async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
             async with db.execute(
-                "SELECT current_status, COUNT(*) as count FROM essay_states WHERE batch_id = ? GROUP BY current_status",
+                "SELECT current_status, COUNT(*) as count "
+                "FROM essay_states WHERE batch_id = ? "
+                "GROUP BY current_status",
                 (batch_id,),
             ) as cursor:
                 rows = await cursor.fetchall()
@@ -273,11 +275,13 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
                     processing_metadata = json.loads(row["processing_metadata"])
 
                     # Check if this essay belongs to the specified phase
-                    # Phase information is stored in processing_metadata when BOS commands are processed
+                    # Phase information is stored in processing_metadata when BOS
+                    # commands are processed
                     current_phase = processing_metadata.get("current_phase")
                     commanded_phases = processing_metadata.get("commanded_phases", [])
 
-                    # Essay belongs to this phase if it's currently in this phase or was commanded for this phase
+                    # Essay belongs to this phase if it's currently in this phase
+                    # or was commanded for this phase
                     if current_phase == phase_name or phase_name in commanded_phases:
                         essay_state = EssayState(
                             essay_id=row["essay_id"],

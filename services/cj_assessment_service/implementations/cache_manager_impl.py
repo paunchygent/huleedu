@@ -28,13 +28,13 @@ class CacheManagerImpl(CacheProtocol):
         # Initialize diskcache instance
         cache_dir = getattr(settings, "cache_directory", "cache")
         cache_size_limit = getattr(
-            settings, "cache_size_limit_bytes", 100 * 1024 * 1024
+            settings, "cache_size_limit_bytes", 100 * 1024 * 1024,
         )  # 100MB default
 
         try:
             self.cache = Cache(cache_dir, size_limit=cache_size_limit)
             logger.info(
-                f"Initialized disk cache at '{cache_dir}' with size limit {cache_size_limit} bytes"
+                f"Initialized disk cache at '{cache_dir}' with size limit {cache_size_limit} bytes",
             )
         except Exception as e:
             logger.error(f"Failed to initialize cache: {e}")

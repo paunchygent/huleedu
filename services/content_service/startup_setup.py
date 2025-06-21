@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from config import Settings
 from dishka import AsyncContainer, make_async_container
@@ -16,7 +15,7 @@ from services.content_service.di import ContentServiceProvider
 logger = create_service_logger("content.startup")
 
 # Global reference for DI container, managed by app.py now
-_app_container_ref: Optional[AsyncContainer] = None
+_app_container_ref: AsyncContainer | None = None
 
 
 def create_di_container() -> AsyncContainer:

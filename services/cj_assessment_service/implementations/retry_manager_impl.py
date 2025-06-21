@@ -10,7 +10,7 @@ import asyncio
 import importlib
 from collections.abc import Awaitable, Callable
 from functools import lru_cache
-from typing import Any, Optional, Tuple
+from typing import Any
 
 import aiohttp
 from config import Settings
@@ -119,7 +119,7 @@ class RetryManagerImpl(RetryManagerProtocol):
         operation: Any,  # Callable coroutine
         *args: Any,
         **kwargs: Any,
-    ) -> Tuple[Any, Optional[str]]:
+    ) -> tuple[Any, str | None]:
         """Execute operation with retry logic.
 
         Args:
@@ -198,7 +198,7 @@ class RetryManagerImpl(RetryManagerProtocol):
                 )
 
         retry_exceptions_tuple: tuple[type[BaseException], ...] = _get_retry_exceptions_tuple(
-            self.settings
+            self.settings,
         )
 
         if not retry_exceptions_tuple:
@@ -227,7 +227,7 @@ class RetryManagerImpl(RetryManagerProtocol):
             reraise=True,
             before_sleep=lambda rs: logger.warning(
                 f"Retrying {provider_name} API call (attempt {rs.attempt_number + 1}) after error: "
-                f"{rs.outcome.exception() if rs.outcome else 'Unknown error'}"
+                f"{rs.outcome.exception() if rs.outcome else 'Unknown error'}",
             ),
         )
 

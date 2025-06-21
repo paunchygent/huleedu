@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -14,16 +14,16 @@ from .enums import (  # Assuming enums.py is in the same directory
 
 __all__ = [
     "EntityReference",
-    "SystemProcessingMetadata",
-    "StorageReferenceMetadata",
     "EssayProcessingInputRefV1",
+    "StorageReferenceMetadata",
+    "SystemProcessingMetadata",
 ]
 
 
 class EntityReference(BaseModel):
     entity_id: str
     entity_type: str
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     model_config = {
         "frozen": True,
         "json_schema_extra": {"examples": [{"entity_id": "123", "entity_type": "essay"}]},
@@ -32,20 +32,20 @@ class EntityReference(BaseModel):
 
 class SystemProcessingMetadata(BaseModel):
     entity: EntityReference
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    processing_stage: Optional[ProcessingStage] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    event: Optional[str] = None  # Actual event name string, e.g., from ProcessingEvent enum
-    error_info: Dict[str, Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    processing_stage: ProcessingStage | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    event: str | None = None  # Actual event name string, e.g., from ProcessingEvent enum
+    error_info: dict[str, Any] = Field(default_factory=dict)
     model_config = {"populate_by_name": True}
 
 
 class StorageReferenceMetadata(BaseModel):
-    references: Dict[ContentType, Dict[str, str]] = Field(default_factory=dict)
+    references: dict[ContentType, dict[str, str]] = Field(default_factory=dict)
 
     def add_reference(
-        self, ctype: ContentType, storage_id: str, path_hint: Optional[str] = None
+        self, ctype: ContentType, storage_id: str, path_hint: str | None = None,
     ) -> None:
         self.references[ctype] = {"storage_id": storage_id, "path": path_hint or ""}
 

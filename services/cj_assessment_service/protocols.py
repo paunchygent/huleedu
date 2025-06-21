@@ -6,7 +6,7 @@ enabling clean architecture and testability.
 
 from __future__ import annotations
 
-from typing import Any, AsyncContextManager, Dict, List, Optional, Protocol, Tuple
+from typing import Any, AsyncContextManager, Protocol
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,11 +37,11 @@ class CacheProtocol(Protocol):
         """Generate a hash key for a given prompt."""
         ...
 
-    def get_from_cache(self, cache_key: str) -> Dict[str, Any] | None:
+    def get_from_cache(self, cache_key: str) -> dict[str, Any] | None:
         """Retrieve data from cache using the provided key."""
         ...
 
-    def add_to_cache(self, cache_key: str, data: Dict[str, Any]) -> None:
+    def add_to_cache(self, cache_key: str, data: dict[str, Any]) -> None:
         """Add data to cache with the provided key."""
         ...
 
@@ -49,7 +49,7 @@ class CacheProtocol(Protocol):
         """Clear all cached data."""
         ...
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         ...
 
@@ -62,7 +62,7 @@ class RetryManagerProtocol(Protocol):
         operation: Any,  # Callable coroutine
         *args: Any,
         **kwargs: Any,
-    ) -> Tuple[Any, Optional[str]]:
+    ) -> tuple[Any, str | None]:
         """Execute operation with retry logic.
 
         Returns:
@@ -77,11 +77,11 @@ class LLMProviderProtocol(Protocol):
     async def generate_comparison(
         self,
         user_prompt: str,
-        system_prompt_override: Optional[str] = None,
-        model_override: Optional[str] = None,
-        temperature_override: Optional[float] = None,
-        max_tokens_override: Optional[int] = None,
-    ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+        system_prompt_override: str | None = None,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
+    ) -> tuple[dict[str, Any] | None, str | None]:
         """Generate a comparison assessment using the LLM.
 
         Args:
@@ -108,7 +108,7 @@ class CJRepositoryProtocol(Protocol):
         self,
         session: AsyncSession,
         bos_batch_id: str,
-        event_correlation_id: Optional[str],
+        event_correlation_id: str | None,
         language: str,
         course_code: str,
         essay_instructions: str,
@@ -130,8 +130,8 @@ class CJRepositoryProtocol(Protocol):
         ...
 
     async def get_essays_for_cj_batch(
-        self, session: AsyncSession, cj_batch_id: int
-    ) -> List[Any]:  # List[CJ_ProcessedEssay]
+        self, session: AsyncSession, cj_batch_id: int,
+    ) -> list[Any]:  # List[CJ_ProcessedEssay]
         """Get all essays for a CJ batch."""
         ...
 
@@ -141,31 +141,31 @@ class CJRepositoryProtocol(Protocol):
         cj_batch_id: int,
         essay_a_els_id: str,
         essay_b_els_id: str,
-    ) -> Optional[Any]:  # Optional[CJ_ComparisonPair]
+    ) -> Any | None:  # Optional[CJ_ComparisonPair]
         """Check if comparison pair already exists."""
         ...
 
     async def store_comparison_results(
-        self, session: AsyncSession, results: List[Any], cj_batch_id: int
+        self, session: AsyncSession, results: list[Any], cj_batch_id: int,
     ) -> None:
         """Store comparison results to database."""
         ...
 
     async def update_essay_scores_in_batch(
-        self, session: AsyncSession, cj_batch_id: int, scores: Dict[str, float]
+        self, session: AsyncSession, cj_batch_id: int, scores: dict[str, float],
     ) -> None:
         """Update essay Bradley-Terry scores."""
         ...
 
     async def update_cj_batch_status(
-        self, session: AsyncSession, cj_batch_id: int, status: Any
+        self, session: AsyncSession, cj_batch_id: int, status: Any,
     ) -> None:
         """Update CJ batch status."""
         ...
 
     async def get_final_cj_rankings(
-        self, session: AsyncSession, cj_batch_id: int
-    ) -> List[Dict[str, Any]]:
+        self, session: AsyncSession, cj_batch_id: int,
+    ) -> list[dict[str, Any]]:
         """Get final rankings for a CJ batch."""
         ...
 
@@ -178,13 +178,13 @@ class CJEventPublisherProtocol(Protocol):
     """Protocol for publishing CJ assessment results."""
 
     async def publish_assessment_completed(
-        self, completion_data: Any, correlation_id: Optional[UUID]
+        self, completion_data: Any, correlation_id: UUID | None,
     ) -> None:
         """Publish CJ assessment completion event."""
         ...
 
     async def publish_assessment_failed(
-        self, failure_data: Any, correlation_id: Optional[UUID]
+        self, failure_data: Any, correlation_id: UUID | None,
     ) -> None:
         """Publish CJ assessment failure event."""
         ...
@@ -195,11 +195,11 @@ class LLMInteractionProtocol(Protocol):
 
     async def perform_comparisons(
         self,
-        tasks: List[Any],
-        model_override: Optional[str] = None,
-        temperature_override: Optional[float] = None,
-        max_tokens_override: Optional[int] = None,
-    ) -> List[Any]:
+        tasks: list[Any],
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
+    ) -> list[Any]:
         """Perform comparative judgment on a list of comparison tasks.
 
         Args:

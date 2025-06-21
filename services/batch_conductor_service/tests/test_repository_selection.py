@@ -37,8 +37,7 @@ class TestRepositorySelection:
                 "services.batch_conductor_service.di.AtomicRedisClientProtocol"
             ) as mock_redis:
                 repository = provider.provide_batch_state_repository(
-                    redis_client=mock_redis,
-                    settings=mock_settings_instance
+                    redis_client=mock_redis, settings=mock_settings_instance
                 )
 
                 # Should return MockBatchStateRepositoryImpl
@@ -60,8 +59,7 @@ class TestRepositorySelection:
                 "services.batch_conductor_service.di.AtomicRedisClientProtocol"
             ) as mock_redis:
                 repository = provider.provide_batch_state_repository(
-                    redis_client=mock_redis,
-                    settings=mock_settings_instance
+                    redis_client=mock_redis, settings=mock_settings_instance
                 )
 
                 # Should return RedisCachedBatchStateRepositoryImpl
@@ -83,8 +81,7 @@ class TestRepositorySelection:
                 "services.batch_conductor_service.di.AtomicRedisClientProtocol"
             ) as mock_redis:
                 repository = provider.provide_batch_state_repository(
-                    redis_client=mock_redis,
-                    settings=mock_settings_instance
+                    redis_client=mock_redis, settings=mock_settings_instance
                 )
 
                 # Should return MockBatchStateRepositoryImpl even with USE_MOCK_REPOSITORY=False
@@ -116,8 +113,7 @@ class TestRepositorySelection:
                 "services.batch_conductor_service.di.AtomicRedisClientProtocol"
             ) as mock_redis:
                 repository = provider.provide_batch_state_repository(
-                    redis_client=mock_redis,
-                    settings=mock_settings_instance
+                    redis_client=mock_redis, settings=mock_settings_instance
                 )
 
                 # Should return MockBatchStateRepositoryImpl due to USE_MOCK_REPOSITORY=True

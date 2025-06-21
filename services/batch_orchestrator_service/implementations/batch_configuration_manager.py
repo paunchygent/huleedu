@@ -46,7 +46,7 @@ class BatchConfigurationManager:
 
                 session.add(snapshot)
                 self.logger.info(
-                    f"Created configuration snapshot {snapshot_name} for batch {batch_id}"
+                    f"Created configuration snapshot {snapshot_name} for batch {batch_id}",
                 )
                 return True
 

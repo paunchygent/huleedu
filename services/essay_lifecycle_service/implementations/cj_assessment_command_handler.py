@@ -210,7 +210,8 @@ class CJAssessmentCommandHandler:
                                 )
                             else:
                                 logger.warning(
-                                    f"Failed to trigger EVT_CJ_ASSESSMENT_STARTED for essay {essay_ref.essay_id}",
+                                    f"Failed to trigger EVT_CJ_ASSESSMENT_STARTED "
+                                    f"for essay {essay_ref.essay_id}",
                                     extra={
                                         "current_status": essay_state_model.current_status.value,
                                         "correlation_id": str(correlation_id),
@@ -218,7 +219,8 @@ class CJAssessmentCommandHandler:
                                 )
                     except Exception as e:
                         logger.error(
-                            f"Failed to trigger EVT_CJ_ASSESSMENT_STARTED for essay {essay_ref.essay_id}",
+                            f"Failed to trigger EVT_CJ_ASSESSMENT_STARTED "
+                            f"for essay {essay_ref.essay_id}",
                             extra={
                                 "error": str(e),
                                 "correlation_id": str(correlation_id),

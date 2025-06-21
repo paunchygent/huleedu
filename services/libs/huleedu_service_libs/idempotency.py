@@ -8,7 +8,8 @@ Follows the same architectural patterns as other service library components.
 from __future__ import annotations
 
 import functools
-from typing import Any, Awaitable, Callable, Optional, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
 
 from aiokafka import ConsumerRecord
 
@@ -27,7 +28,7 @@ T = TypeVar("T")
 def idempotent_consumer(
     redis_client: RedisClientProtocol,
     ttl_seconds: int = 86400,  # 24 hours default
-) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Optional[Any]]]]:
+) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any | None]]]:
     """
     Decorator to make a Kafka message handler idempotent using Redis.
 
@@ -50,9 +51,9 @@ def idempotent_consumer(
         ```
     """
 
-    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Optional[Any]]]:
+    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any | None]]:
         @functools.wraps(func)
-        async def wrapper(msg: ConsumerRecord, *args: Any, **kwargs: Any) -> Optional[Any]:
+        async def wrapper(msg: ConsumerRecord, *args: Any, **kwargs: Any) -> Any | None:
             # Generate deterministic ID from message content
             deterministic_id = generate_deterministic_event_id(msg.value)
             key = f"huleedu:events:seen:{deterministic_id}"
@@ -63,12 +64,12 @@ def idempotent_consumer(
             # If set_if_not_exists returns False, the key already existed (duplicate)
             try:
                 is_first_time = await redis_client.set_if_not_exists(
-                    key, "1", ttl_seconds=ttl_seconds
+                    key, "1", ttl_seconds=ttl_seconds,
                 )
 
                 if not is_first_time:
                     logger.warning(
-                        f"Duplicate event skipped: {deterministic_id} (Redis key: {key})"
+                        f"Duplicate event skipped: {deterministic_id} (Redis key: {key})",
                     )
                     return None  # Signal to caller that this was a duplicate
 
@@ -111,7 +112,7 @@ def idempotent_consumer(
                 # (fail-open approach to avoid blocking the pipeline)
                 logger.warning(
                     f"Processing event {deterministic_id} without idempotency "
-                    f"protection due to Redis error"
+                    f"protection due to Redis error",
                 )
                 return await func(msg, *args, **kwargs)
 

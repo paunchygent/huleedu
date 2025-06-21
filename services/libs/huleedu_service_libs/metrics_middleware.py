@@ -7,7 +7,6 @@ configured for different service-specific metric naming conventions.
 from __future__ import annotations
 
 import time
-from typing import Optional
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Quart, Response, current_app, g, request
@@ -20,7 +19,7 @@ def setup_metrics_middleware(
     request_count_metric_name: str = "request_count",
     request_duration_metric_name: str = "request_duration",
     status_label_name: str = "status_code",
-    logger_name: Optional[str] = None,
+    logger_name: str | None = None,
 ) -> None:
     """Setup Prometheus metrics middleware for a Quart application.
 
@@ -74,7 +73,7 @@ def setup_metrics_middleware(
 
                 if request_count:
                     request_count.labels(
-                        method=method, endpoint=endpoint, **{status_label_name: status_code}
+                        method=method, endpoint=endpoint, **{status_label_name: status_code},
                     ).inc()
                 if request_duration:
                     request_duration.labels(method=method, endpoint=endpoint).observe(duration)
