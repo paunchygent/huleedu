@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # Environment type
     ENV_TYPE: str = Field(default="development", description="Environment type")
 
+    # Repository Configuration (standardized with BOS/ELS)
+    USE_MOCK_REPOSITORY: bool = Field(
+        default=False, description="Use mock repository for development/testing"
+    )
+    ENVIRONMENT: str = Field(default="development", description="Environment type")
+
     # Event-driven architecture configuration
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
         default="localhost:9092", description="Kafka bootstrap servers for event consumption"

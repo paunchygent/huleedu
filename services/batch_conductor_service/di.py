@@ -60,14 +60,21 @@ class EventDrivenServicesProvider(Provider):
     def provide_batch_state_repository(
         self, redis_client: AtomicRedisClientProtocol, settings: Settings
     ) -> BatchStateRepositoryProtocol:
-        """Provide batch state repository implementation."""
-        from services.batch_conductor_service.implementations.batch_state_repository_impl import (
-            RedisCachedBatchStateRepositoryImpl,
-        )
+        """Provide batch state repository implementation based on environment configuration."""
+        if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
+            from services.batch_conductor_service.implementations import (
+                mock_batch_state_repository,
+            )
 
-        return RedisCachedBatchStateRepositoryImpl(
-            redis_client=redis_client,
-        )
+            return mock_batch_state_repository.MockBatchStateRepositoryImpl()
+        else:
+            from services.batch_conductor_service.implementations import (
+                batch_state_repository_impl,
+            )
+
+            return batch_state_repository_impl.RedisCachedBatchStateRepositoryImpl(
+                redis_client=redis_client,
+            )
 
     @provide(scope=Scope.APP)
     def provide_dlq_producer(self, settings: Settings) -> DlqProducerProtocol:

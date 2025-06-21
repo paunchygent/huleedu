@@ -78,7 +78,21 @@ Services with multiple entry points (e.g., HTTP + Worker) **MUST** use a shared 
 - **Pattern**: Use `RedisClient` class with protocol-based DI injection
 - **Lifecycle**: Managed through DI container with `start()`/`stop()` methods
 
-### 4.8. Production Patterns (Sprint 1 Hardened)
+### 4.8. Repository Selection Standards
+- **MUST** use environment-based repository selection for services with persistence
+- **Pattern**: `USE_MOCK_REPOSITORY` flag for development/testing environments
+- **Implementation**:
+  ```python
+  if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
+      return MockRepositoryImpl()
+  else:
+      return ProductionRepositoryImpl()
+  ```
+- **Configuration**: `<SERVICE>_USE_MOCK_REPOSITORY` and `<SERVICE>_ENVIRONMENT` variables
+- **Development**: Mock repositories simulate production behavior (atomic operations, TTL)
+- **Testing**: Always use mock repositories regardless of USE_MOCK_REPOSITORY flag
+
+### 4.9. Production Patterns (Sprint 1 Hardened)
 - **MUST** implement graceful shutdown with proper async resource cleanup
 - **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
 - **MUST** use manual Kafka commits with error boundaries (no auto-commit)

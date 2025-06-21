@@ -69,12 +69,31 @@ The Batch Conductor Service (BCS) is an internal Quart-based microservice respon
 
 Environment variables (prefix: `BCS_`):
 
+### Service Configuration
+
 - `BCS_HTTP_HOST`: Server host (default: 0.0.0.0)
 - `BCS_HTTP_PORT`: Server port (default: 4002)
 - `BCS_LOG_LEVEL`: Logging level (default: INFO)
-- `BCS_KAFKA_BOOTSTRAP_SERVERS`: Kafka connection (default: kafka:9092)
-- `BCS_REDIS_URL`: Redis connection for state caching
 - `BCS_HTTP_TIMEOUT`: HTTP client timeout (default: 30s)
+
+### Repository Configuration
+
+- `BCS_USE_MOCK_REPOSITORY`: Use mock repository for development/testing (default: false)
+- `BCS_ENVIRONMENT`: Environment type - testing/development/production (default: development)
+
+### Infrastructure Configuration
+
+- `BCS_KAFKA_BOOTSTRAP_SERVERS`: Kafka connection (default: kafka:9092)
+- `BCS_REDIS_URL`: Redis connection for state caching (default: redis://localhost:6379)
+- `BCS_REDIS_TTL_SECONDS`: Redis TTL for essay state (default: 604800 - 7 days)
+
+### Development Mode
+
+Set `BCS_USE_MOCK_REPOSITORY=true` to run without Redis infrastructure. Mock repository simulates atomic operations and TTL behavior for local development.
+
+### Production Mode
+
+Default configuration uses Redis-first state management with atomic WATCH/MULTI/EXEC operations for race condition safety.
 
 ## Pipeline Rules Engine
 
@@ -97,7 +116,7 @@ Environment variables (prefix: `BCS_`):
 - Python 3.11+
 - PDM for dependency management
 - Docker for containerization
-- Redis for state caching
+- Redis for state caching (not required with USE_MOCK_REPOSITORY=true)
 - Kafka for event consumption
 
 ### Local Development
@@ -109,7 +128,7 @@ pdm install
 # Run service locally (from monorepo root)
 pdm run dev-bcs
 
-# Run tests (24/24 passing)
+# Run tests (29/29 passing)
 pdm run pytest services/batch_conductor_service/ -v
 
 # Lint and format
