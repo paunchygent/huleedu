@@ -248,9 +248,9 @@ This part completes the `api_gateway_service` by adding the read-path and real-t
 
 This secured implementation closes the major security gap identified by the architect while providing a robust query mechanism for the frontend.
 
-### Checkpoint 3.2: Implement WebSocket Endpoint and Redis Backplane
+### Checkpoint 3.2: Implement WebSocket Endpoint and Redis Backplane (Enhanced)
 
-**Objective**: Implement the real-time "Update" mechanism by creating the WebSocket endpoint and its Redis Pub/Sub listener.
+**Objective**: Implement the real-time "Update" mechanism by creating the WebSocket endpoint and its Redis Pub/Sub listener, with enhanced support for class management, file operations, and student associations.
 
 **Affected Files**:
 
@@ -278,7 +278,7 @@ This secured implementation closes the major security gap identified by the arch
             return client
     ```
 
-2. **Implement the WebSocket Endpoint Router**: This handler manages the connection lifecycle, authentication, and message forwarding.
+2. **Implement the Enhanced WebSocket Endpoint Router**: This handler manages the connection lifecycle, authentication, and message forwarding with support for enhanced event types.
 
     **File**: `services/api_gateway_service/routers/websocket_routes.py`
 
@@ -288,9 +288,11 @@ This secured implementation closes the major security gap identified by the arch
     from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query
     from dishka.integrations.fastapi import FromDishka
     from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+    from huleedu_service_libs.logging_utils import create_service_logger
     from .. import auth
 
     router = APIRouter()
+    logger = create_service_logger("api_gateway.websocket")
 
     # Define a separate auth function for WebSockets to handle token from query param
     async def get_user_id_from_ws(token: str | None = Query(None)) -> str:
@@ -306,17 +308,46 @@ This secured implementation closes the major security gap identified by the arch
     ):
         await websocket.accept()
         user_channel = f"ws:{user_id}"
+        
+        logger.info(f"WebSocket connection established for user: {user_id}")
 
         async def redis_listener(ws: WebSocket, ps_client):
             async for message in ps_client.listen():
                 if message and message["type"] == "message":
-                    await ws.send_text(message["data"])
+                    try:
+                        # Parse message to validate structure and add client-side filtering
+                        event_data = json.loads(message["data"])
+                        event_type = event_data.get("event")
+                        
+                        # Enhanced event routing and validation
+                        if event_type in [
+                            "batch_phase_concluded", 
+                            "essay_status_updated",
+                            "batch_file_added",
+                            "batch_file_removed", 
+                            "batch_locked_for_processing",
+                            "student_parsing_completed",
+                            "essay_student_association_updated",
+                            "class_created",
+                            "class_updated", 
+                            "student_created",
+                            "student_updated"
+                        ]:
+                            await ws.send_text(message["data"])
+                            logger.debug(f"Sent {event_type} event to user {user_id}")
+                        else:
+                            logger.warning(f"Unknown event type received: {event_type}")
+                            
+                    except json.JSONDecodeError:
+                        logger.error(f"Invalid JSON in Redis message: {message['data']}")
+                    except Exception as e:
+                        logger.error(f"Error processing Redis message: {e}")
 
         async def pinger(ws: WebSocket):
             while True:
                 try:
                     await asyncio.sleep(15)
-                    await ws.send_json({"event": "ping"})
+                    await ws.send_json({"event": "ping", "timestamp": datetime.now(timezone.utc).isoformat()})
                 except (WebSocketDisconnect, asyncio.CancelledError):
                     break
 
@@ -335,15 +366,15 @@ This secured implementation closes the major security gap identified by the arch
                     task.cancel()
 
         except WebSocketDisconnect:
-            pass # Client disconnected gracefully
+            logger.info(f"WebSocket disconnected for user: {user_id}")
         except Exception as e:
-            # Log error
-            pass
+            logger.error(f"WebSocket error for user {user_id}: {e}")
         finally:
             if listener_task and not listener_task.done():
                 listener_task.cancel()
             if pinger_task and not pinger_task.done():
                 pinger_task.cancel()
+            logger.info(f"WebSocket cleanup completed for user: {user_id}")
     ```
 
 3. **Update `main.py` to Register the WebSocket Router**:
@@ -362,16 +393,38 @@ This secured implementation closes the major security gap identified by the arch
     app.include_router(websocket_routes.router, tags=["Real-time"]) // Add this line
     ```
 
+**Enhanced Event Types Supported**:
+
+The WebSocket implementation now supports these additional event types for the enhanced features:
+
+- **File Management Events**:
+  - `batch_file_added`: When files are added to a batch (before spellcheck)
+  - `batch_file_removed`: When files are removed from a batch (before spellcheck)
+  - `batch_locked_for_processing`: When spellcheck starts and batch becomes locked
+
+- **Student Association Events**:
+  - `student_parsing_completed`: When automatic student parsing finishes
+  - `essay_student_association_updated`: When manual student-essay associations are made
+
+- **Class Management Events**:
+  - `class_created`: When new classes are created
+  - `class_updated`: When class information is modified
+  - `student_created`: When new students are added
+  - `student_updated`: When student information is modified
+
 **Done When**:
 
 - ✅ A client can establish an authenticated WebSocket connection via `/ws?token=<jwt>`.
 - ✅ The gateway correctly subscribes to the user-specific Redis channel (e.g., `ws:user_123`).
 - ✅ The connection is kept alive via a server-side heartbeat and gracefully closed on disconnect.
 - ✅ Heartbeat messages use `{ "event": "ping" }` so all WebSocket payloads share the same `event` field.
+- ✅ Enhanced event types for file management, student associations, and class management are properly routed.
+- ✅ Event validation prevents malformed messages from reaching clients.
+- ✅ Comprehensive logging tracks WebSocket lifecycle and event routing.
 
-### Checkpoint 3.3: Modify Backend Services to Publish Updates
+### Checkpoint 3.3: Modify Backend Services to Publish Enhanced Updates
 
-**Objective**: Complete the real-time feedback loop by making BOS and ELS publish state changes to the Redis backplane.
+**Objective**: Complete the real-time feedback loop by making BOS, ELS, File Service, and the new Class Management Service publish state changes to the Redis backplane.
 
 **Affected Files**:
 
@@ -379,6 +432,8 @@ This secured implementation closes the major security gap identified by the arch
 - `services/batch_orchestrator_service/di.py`
 - `services/essay_lifecycle_service/implementations/service_result_handler_impl.py`
 - `services/essay_lifecycle_service/di.py`
+- `services/file_service/implementations/event_publisher_impl.py` (enhanced)
+- `services/class_management_service/implementations/event_publisher_impl.py` (new)
 
 **Implementation Steps**:
 
@@ -405,7 +460,7 @@ This secured implementation closes the major security gap identified by the arch
 
     Ensure the `redis_client` is added to the provider signature in `services/batch_orchestrator_service/di.py`.
 
-2. **Add Redis Publish Logic to BOS**: In the `handle_phase_concluded` method, after updating the database, publish the status change.
+2. **Add Enhanced Redis Publish Logic to BOS**: In the `handle_phase_concluded` method, after updating the database, publish the status change with enhanced event types.
 
     **File**: `services/batch_orchestrator_service/implementations/pipeline_phase_coordinator_impl.py`
 
@@ -418,14 +473,14 @@ This secured implementation closes the major security gap identified by the arch
             datetime.now(timezone.utc).isoformat(),
         )
 
-        # NEW LOGIC
-        # Note: Retrieve the user_id from the batch's processing_metadata.
+        # Enhanced Redis publishing with batch lock detection
         batch_context = await self.batch_repo.get_batch_context(batch_id)
         user_id = None
         if batch_context and batch_context.processing_metadata:
             user_id = batch_context.processing_metadata.get("user_id")
 
         if user_id:
+            # Standard phase conclusion event
             redis_message = {
                 "event": "batch_phase_concluded",
                 "batch_id": batch_id,
@@ -434,18 +489,152 @@ This secured implementation closes the major security gap identified by the arch
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
             await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
+            
+            # Special handling for spellcheck phase - marks batch as locked
+            if completed_phase == "SPELLCHECK" and updated_status == "COMPLETED":
+                lock_message = {
+                    "event": "batch_locked_for_processing",
+                    "batch_id": batch_id,
+                    "locked_at": datetime.now(timezone.utc).isoformat(),
+                    "reason": "Spellcheck completed - no further file modifications allowed"
+                }
+                await self.redis_client.publish(f"ws:{user_id}", json.dumps(lock_message))
+                
         else:
-            # Log a warning if user_id is not found, as real-time updates cannot be sent.
             self.logger.warning(f"User ID not found in batch context for batch '{batch_id}'. Skipping real-time update.")
     // ...
     ```
 
-3. **Repeat for ELS**: Perform the same dependency injection and logic addition for the `DefaultServiceResultHandler` in the `essay_lifecycle_service`. The logic will be added within `handle_spellcheck_result` and `handle_cj_assessment_completed` after the essay's state is successfully updated in its database.
+3. **Enhanced File Service Event Publishing**: Update File Service to publish file management events.
+
+    **File**: `services/file_service/implementations/event_publisher_impl.py`
+
+    ```python
+    async def publish_file_added_event(
+        self, 
+        batch_id: str, 
+        essay_id: str, 
+        filename: str, 
+        user_id: str
+    ) -> None:
+        """Publish real-time update when file is added to batch."""
+        redis_message = {
+            "event": "batch_file_added",
+            "batch_id": batch_id,
+            "essay_id": essay_id,
+            "filename": filename,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
+
+    async def publish_file_removed_event(
+        self, 
+        batch_id: str, 
+        essay_id: str, 
+        filename: str, 
+        user_id: str
+    ) -> None:
+        """Publish real-time update when file is removed from batch."""
+        redis_message = {
+            "event": "batch_file_removed",
+            "batch_id": batch_id,
+            "essay_id": essay_id,
+            "filename": filename,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
+
+    async def publish_student_parsing_completed_event(
+        self,
+        batch_id: str,
+        parsing_results: list[StudentParsingResult],
+        user_id: str
+    ) -> None:
+        """Publish real-time update when student parsing completes."""
+        redis_message = {
+            "event": "student_parsing_completed",
+            "batch_id": batch_id,
+            "parsed_count": len([r for r in parsing_results if r.student_name]),
+            "total_count": len(parsing_results),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
+    ```
+
+4. **Class Management Service Event Publishing**: Create event publisher for class and student management.
+
+    **File**: `services/class_management_service/implementations/event_publisher_impl.py`
+
+    ```python
+    from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+    import json
+    from datetime import datetime, timezone
+
+    class ClassManagementEventPublisher:
+        def __init__(self, redis_client: AtomicRedisClientProtocol):
+            self.redis_client = redis_client
+
+        async def publish_class_created_event(
+            self, 
+            class_id: str, 
+            class_designation: str, 
+            user_id: str
+        ) -> None:
+            """Publish real-time update when class is created."""
+            redis_message = {
+                "event": "class_created",
+                "class_id": class_id,
+                "class_designation": class_designation,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
+
+        async def publish_student_created_event(
+            self, 
+            student_id: str, 
+            student_name: str, 
+            student_email: str, 
+            user_id: str
+        ) -> None:
+            """Publish real-time update when student is created."""
+            redis_message = {
+                "event": "student_created",
+                "student_id": student_id,
+                "student_name": student_name,
+                "student_email": student_email,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
+
+        async def publish_essay_student_association_event(
+            self,
+            batch_id: str,
+            essay_id: str,
+            student_id: str,
+            association_method: str,
+            user_id: str
+        ) -> None:
+            """Publish real-time update when essay-student association is made."""
+            redis_message = {
+                "event": "essay_student_association_updated",
+                "batch_id": batch_id,
+                "essay_id": essay_id,
+                "student_id": student_id,
+                "association_method": association_method,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
+    ```
+
+5. **Repeat Enhanced Logic for ELS**: Perform the same dependency injection and logic addition for the `DefaultServiceResultHandler` in the `essay_lifecycle_service`, adding essay status update events.
 
 **Done When**:
 
 - ✅ When BOS or ELS processes an event that changes the state of a batch or essay, a corresponding JSON message is published to the correct user-specific Redis channel.
-- ✅ End-to-end tests (see below) confirm that a client action triggers a backend workflow which results in a WebSocket message being received.
+- ✅ File Service publishes real-time updates for file additions, removals, and student parsing completion.
+- ✅ Class Management Service publishes updates for class/student creation and essay-student associations.
+- ✅ Batch locking events are published when spellcheck begins.
+- ✅ End-to-end tests (see below) confirm that enhanced client actions trigger appropriate WebSocket messages.
 
 ### Checkpoint 3.4: Final Testing and Contract Generation
 

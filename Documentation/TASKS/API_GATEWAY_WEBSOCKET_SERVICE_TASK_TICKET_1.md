@@ -140,6 +140,26 @@ pipeline_state = await batch_repo.get_processing_pipeline_state(batch_id)
 - ✅ The API Gateway is capable of populating this field.
 - ✅ The Batch Orchestrator Service correctly persists the `user_id` as part of the batch context.
 
+---
+
+## 🔗 **Connected Implementation: Enhanced Features**
+
+**NEXT IMPLEMENTATION PHASE**: After completing Checkpoint 1.4 (User ID Propagation), the enhanced file and class management capabilities should be implemented following the comprehensive plan outlined in:
+
+📋 **[ENHANCED_CLASS_AND_FILE_MANAGEMENT_IMPLEMENTATION.md](ENHANCED_CLASS_AND_FILE_MANAGEMENT_IMPLEMENTATION.md)**
+
+This connected implementation provides:
+
+- Enhanced batch registration with course validation
+- File management with batch state validation
+- Class Management Service for student/class relationships
+- Student parsing integration with confidence scoring
+- Real-time WebSocket updates for all operations
+
+The enhanced features build directly on the User ID Propagation foundation to provide comprehensive educational management capabilities while maintaining architectural integrity.
+
+---
+
 ### Checkpoint 1.5: Create and Implement the `result_aggregator_service` (Revised + Hardened)
 
 **Objective**: Build the aggregator service to use the query pattern with critical production hardening based on architect feedback. This service acts as a performance-enhancing cache and materialized view, shielding our frontend-facing gateway from the complexities of the internal event bus.

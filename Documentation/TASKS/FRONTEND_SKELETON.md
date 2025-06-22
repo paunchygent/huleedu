@@ -933,3 +933,521 @@ This enhanced frontend plan provides:
 6. **Production Ready**: Error boundaries, proper JWT handling, and graceful degradation
 
 The plan maintains backwards compatibility while adding the sophisticated features required by the HuleEdu platform's advanced backend architecture.
+
+---
+
+## 📋 **Enhanced Features Implementation Plan**
+
+### **Connection to API Gateway User ID Propagation (Checkpoint 1.4)**
+
+The following enhanced features should be implemented as connected tasks to the User ID Propagation checkpoint, providing a comprehensive file and batch management system.
+
+### **Phase 1: Enhanced Batch & File Management (Connected to Checkpoint 1.4)**
+
+#### **Task 1.4.1: Enhanced Batch Registration**
+
+**Objective**: Extend batch registration to support class/course validation and student management.
+
+**Frontend Changes**:
+
+```typescript
+// Enhanced batch registration form
+interface EnhancedBatchRegistrationRequest {
+  expected_essay_count: number;
+  course_code: 'ENG5' | 'ENG6' | 'ENG7' | 'SV1' | 'SV2' | 'SV3';
+  class_id?: string; // Optional existing class
+  class_designation: string;
+  teacher_name: string;
+  essay_instructions: string;
+  enable_student_parsing: boolean;
+}
+
+// Course selection with language inference
+const CourseSelector = () => {
+  const courses = [
+    { code: 'ENG5', name: 'English 5', language: 'en', level: 5 },
+    { code: 'ENG6', name: 'English 6', language: 'en', level: 6 },
+    { code: 'ENG7', name: 'English 7', language: 'en', level: 7 },
+    { code: 'SV1', name: 'Svenska 1', language: 'sv', level: 1 },
+    { code: 'SV2', name: 'Svenska 2', language: 'sv', level: 2 },
+    { code: 'SV3', name: 'Svenska 3', language: 'sv', level: 3 },
+  ];
+  
+  return (
+    <select name="course_code" required>
+      {courses.map(course => (
+        <option key={course.code} value={course.code}>
+          {course.name} ({course.language.toUpperCase()})
+        </option>
+      ))}
+    </select>
+  );
+};
+```
+
+#### **Task 1.4.2: File Management Post-Upload**
+
+**Objective**: Allow teachers to add/remove files before spellcheck begins.
+
+**Frontend Components**:
+
+```typescript
+// File management component with batch state validation
+const FileManagementPanel = ({ batchId, batchState }: {
+  batchId: string;
+  batchState: BatchStatus;
+}) => {
+  const isLocked = batchState.pipeline_state?.SPELLCHECK?.status === 'COMPLETED' ||
+                   batchState.pipeline_state?.SPELLCHECK?.status === 'IN_PROGRESS';
+
+  const addFilesMutation = useMutation({
+    mutationFn: (files: File[]) => apiClient.addFilesToBatch(batchId, files),
+    enabled: !isLocked,
+  });
+
+  const removeFileMutation = useMutation({
+    mutationFn: (essayId: string) => apiClient.removeFileFromBatch(batchId, essayId),
+    enabled: !isLocked,
+  });
+
+  if (isLocked) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+        <p className="text-yellow-800">
+          <LockIcon className="inline w-4 h-4 mr-2" />
+          Batch is locked for modifications. Spellcheck has started.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <FileDropzone 
+        onFilesAdded={(files) => addFilesMutation.mutate(files)}
+        disabled={addFilesMutation.isPending}
+      />
+      <FileList 
+        files={batchState.essays}
+        onFileRemove={(essayId) => removeFileMutation.mutate(essayId)}
+        removeDisabled={removeFileMutation.isPending}
+      />
+    </div>
+  );
+};
+```
+
+**Real-time Updates**:
+
+```typescript
+// Enhanced WebSocket integration for file management
+const useFileManagementUpdates = (batchId: string) => {
+  const queryClient = useQueryClient();
+
+  useWebSocketUpdates(batchId, {
+    onMessage: (event) => {
+      switch (event.event) {
+        case 'batch_file_added':
+          queryClient.setQueryData(['batch', batchId], (old: BatchStatus) => ({
+            ...old,
+            essays: [...(old?.essays || []), {
+              essay_id: event.essay_id,
+              filename: event.filename,
+              status: 'UPLOADED',
+            }],
+          }));
+          break;
+          
+        case 'batch_file_removed':
+          queryClient.setQueryData(['batch', batchId], (old: BatchStatus) => ({
+            ...old,
+            essays: old?.essays?.filter(essay => essay.essay_id !== event.essay_id) || [],
+          }));
+          break;
+          
+        case 'batch_locked_for_processing':
+          queryClient.setQueryData(['batch', batchId], (old: BatchStatus) => ({
+            ...old,
+            is_locked: true,
+            locked_at: event.locked_at,
+          }));
+          break;
+      }
+    }
+  });
+};
+```
+
+### **Phase 2: Class Management Service Integration**
+
+#### **Task 2.1: Class & Student Management UI**
+
+**Objective**: Provide comprehensive class and student management capabilities.
+
+**Frontend Implementation**:
+
+```typescript
+// Class management page with student associations
+const ClassManagementPage = () => {
+  const { data: classes } = useQuery({
+    queryKey: ['user-classes'],
+    queryFn: () => apiClient.getUserClasses(),
+  });
+
+  const { data: students } = useQuery({
+    queryKey: ['user-students'],
+    queryFn: () => apiClient.getUserStudents(),
+  });
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <ClassPanel 
+        classes={classes}
+        onClassCreate={handleClassCreate}
+        onClassUpdate={handleClassUpdate}
+      />
+      <StudentPanel 
+        students={students}
+        classes={classes}
+        onStudentCreate={handleStudentCreate}
+        onStudentAssign={handleStudentAssign}
+      />
+    </div>
+  );
+};
+
+// Student-essay association interface
+const StudentEssayAssociationPanel = ({ 
+  batchId, 
+  essays, 
+  students 
+}: {
+  batchId: string;
+  essays: Essay[];
+  students: Student[];
+}) => {
+  const associationMutation = useMutation({
+    mutationFn: ({ essayId, studentId }: { essayId: string; studentId: string }) =>
+      apiClient.associateEssayWithStudent(batchId, essayId, studentId),
+  });
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold">Student-Essay Associations</h3>
+      {essays.map(essay => (
+        <div key={essay.essay_id} className="flex items-center space-x-4 p-3 border rounded">
+          <span className="flex-1">{essay.filename}</span>
+          {essay.parsed_student_name && (
+            <span className="text-sm text-green-600">
+              Parsed: {essay.parsed_student_name}
+            </span>
+          )}
+          <select
+            value={essay.associated_student_id || ''}
+            onChange={(e) => associationMutation.mutate({
+              essayId: essay.essay_id,
+              studentId: e.target.value,
+            })}
+            className="border rounded px-2 py-1"
+          >
+            <option value="">Select Student</option>
+            {students.map(student => (
+              <option key={student.id} value={student.id}>
+                {student.name} ({student.email})
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+#### **Task 2.2: Enhanced Student Parsing Integration**
+
+**Objective**: Integrate automatic student parsing with manual override capabilities following thin event patterns.
+
+**Frontend Components**:
+
+```typescript
+// Student parsing results display - aligned with thin event structure
+const StudentParsingResults = ({ 
+  batchId, 
+  parsingResults 
+}: {
+  batchId: string;
+  parsingResults: StudentParsingResult[];
+}) => {
+  const [selectedResults, setSelectedResults] = useState<Set<string>>(new Set());
+
+  const confirmParsingMutation = useMutation({
+    mutationFn: (confirmedResults: StudentParsingResult[]) =>
+      apiClient.confirmStudentParsing(batchId, confirmedResults),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+        <h4 className="font-semibold text-blue-800">Automatic Student Parsing Results</h4>
+        <p className="text-blue-600 text-sm">
+          {parsingResults.filter(r => r.confidence_score > 0.8).length} high-confidence matches found
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {parsingResults.map(result => (
+          <ParsingResultCard
+            key={result.essay_id}
+            result={result}
+            selected={selectedResults.has(result.essay_id)}
+            onToggle={(essayId) => {
+              const newSelected = new Set(selectedResults);
+              if (newSelected.has(essayId)) {
+                newSelected.delete(essayId);
+              } else {
+                newSelected.add(essayId);
+              }
+              setSelectedResults(newSelected);
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="flex space-x-2">
+        <button
+          onClick={() => confirmParsingMutation.mutate(
+            parsingResults.filter(r => selectedResults.has(r.essay_id))
+          )}
+          disabled={selectedResults.size === 0 || confirmParsingMutation.isPending}
+          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+        >
+          Confirm Selected ({selectedResults.size})
+        </button>
+        <button
+          onClick={() => setSelectedResults(new Set())}
+          className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+        >
+          Clear Selection
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ParsingResultCard = ({ 
+  result, 
+  selected, 
+  onToggle 
+}: {
+  result: StudentParsingResult;
+  selected: boolean;
+  onToggle: (essayId: string) => void;
+}) => {
+  const confidenceColor = result.confidence_score > 0.8 ? 'green' : 
+                         result.confidence_score > 0.5 ? 'yellow' : 'red';
+
+  return (
+    <div className={`border rounded-md p-3 ${selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+      <div className="flex items-center space-x-3">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggle(result.essay_id)}
+          className="w-4 h-4"
+        />
+        <div className="flex-1">
+          <div className="font-medium">{result.filename}</div>
+          <div className="text-sm text-gray-600">
+            {result.student_name && (
+              <span>Name: <strong>{result.student_name}</strong></span>
+            )}
+            {result.student_email && (
+              <span className="ml-4">Email: <strong>{result.student_email}</strong></span>
+            )}
+          </div>
+        </div>
+        <div className={`px-2 py-1 rounded text-xs font-medium text-${confidenceColor}-800 bg-${confidenceColor}-100`}>
+          {Math.round(result.confidence_score * 100)}% confidence
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Enhanced WebSocket integration aligned with thin events
+const useStudentParsingUpdates = (batchId: string) => {
+  const queryClient = useQueryClient();
+
+  useWebSocketUpdates(batchId, {
+    onMessage: (event) => {
+      switch (event.event) {
+        case 'student.parsing.completed':
+          // Handle StudentParsingCompletedV1 event
+          queryClient.setQueryData(['batch', batchId, 'parsing-results'], event.parsing_results);
+          
+          // Show notification
+          showNotification({
+            type: 'success',
+            title: 'Student Parsing Complete',
+            message: `Found ${event.parsed_count} of ${event.total_count} student names`,
+          });
+          break;
+          
+        case 'essay.student.association.updated':
+          // Handle EssayStudentAssociationUpdatedV1 event
+          queryClient.setQueryData(['batch', batchId], (old: BatchStatus) => ({
+            ...old,
+            essays: old?.essays?.map(essay => 
+              essay.essay_id === event.essay_id 
+                ? { 
+                    ...essay, 
+                    associated_student_id: event.student_id,
+                    associated_student_name: event.student_name,
+                    association_method: event.association_method,
+                    confidence_score: event.confidence_score
+                  }
+                : essay
+            ) || [],
+          }));
+          break;
+          
+        case 'class.created':
+          // Handle ClassCreatedV1 event
+          queryClient.invalidateQueries(['user-classes']);
+          showNotification({
+            type: 'success',
+            title: 'Class Created',
+            message: `Class "${event.class_designation}" created successfully`,
+          });
+          break;
+          
+        case 'student.created':
+          // Handle StudentCreatedV1 event
+          queryClient.invalidateQueries(['user-students']);
+          showNotification({
+            type: 'success',
+            title: 'Student Added',
+            message: `Student "${event.student_name}" added successfully`,
+          });
+          break;
+      }
+    }
+  });
+};
+```
+
+### **Phase 3: Enhanced Results & Analytics**
+
+#### **Task 3.1: Student-Centric Results Views**
+
+**Objective**: Provide results organized by student and class for better insights.
+
+**Frontend Implementation**:
+
+```typescript
+// Student progress dashboard
+const StudentProgressDashboard = ({ classId }: { classId: string }) => {
+  const { data: classData } = useQuery({
+    queryKey: ['class', classId],
+    queryFn: () => apiClient.getClassDetails(classId),
+  });
+
+  const { data: studentResults } = useQuery({
+    queryKey: ['class', classId, 'student-results'],
+    queryFn: () => apiClient.getClassStudentResults(classId),
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white border rounded-lg p-6">
+        <h2 className="text-xl font-semibold">{classData?.class_designation}</h2>
+        <p className="text-gray-600">
+          {classData?.courses?.map(c => c.name).join(', ')} • 
+          {studentResults?.length || 0} students
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {studentResults?.map(student => (
+          <StudentResultCard 
+            key={student.student_id}
+            student={student}
+            onViewDetails={() => navigateToStudentDetails(student.student_id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const StudentResultCard = ({ 
+  student, 
+  onViewDetails 
+}: {
+  student: StudentResult;
+  onViewDetails: () => void;
+}) => {
+  const completedEssays = student.essays.filter(e => e.status === 'COMPLETED').length;
+  const totalEssays = student.essays.length;
+
+  return (
+    <div className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold">{student.name}</h3>
+        <span className="text-sm text-gray-500">{student.email}</span>
+      </div>
+
+      <div className="space-y-2 mb-4">
+        <div className="flex justify-between text-sm">
+          <span>Essays Completed:</span>
+          <span className="font-medium">{completedEssays}/{totalEssays}</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div 
+            className="bg-blue-500 h-2 rounded-full transition-all"
+            style={{ width: `${(completedEssays / totalEssays) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      <button
+        onClick={onViewDetails}
+        className="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+      >
+        View Details
+      </button>
+    </div>
+  );
+};
+```
+
+### **Implementation Timeline & Dependencies**
+
+**Phase 1 (Immediate - with User ID Propagation):**
+
+* ✅ Enhanced batch registration with course validation
+* ✅ File management with batch state validation  
+* ✅ Real-time file operation updates
+
+**Phase 2 (Post API Gateway completion):**
+
+* ✅ Class Management Service implementation
+* ✅ Student parsing integration
+* ✅ Student-essay association UI
+
+**Phase 3 (Enhanced analytics):**
+
+* ✅ Student-centric results views
+* ✅ Class progress dashboards
+* ✅ Multi-batch student tracking
+
+**Key Benefits:**
+
+1. **Seamless User Experience**: Teachers can manage files, classes, and students in one interface
+2. **Intelligent Automation**: Automatic student parsing with manual override capabilities
+3. **Real-time Feedback**: WebSocket updates for all file and class management operations
+4. **Flexible Associations**: Support for complex class/student relationships
+5. **Comprehensive Analytics**: Student progress tracking across multiple batches and courses
+
+This enhanced implementation provides a complete educational management platform while maintaining the architectural integrity and event-driven patterns of the HuleEdu system.
