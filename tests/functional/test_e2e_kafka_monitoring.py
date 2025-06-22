@@ -111,7 +111,8 @@ class TestE2EKafkaMonitoring:
                 data_correlation_id = content_data.get("correlation_id")
 
                 correlation_match = False
-                if (event_correlation_id and event_correlation_id == upload_correlation_id) or (data_correlation_id and data_correlation_id == upload_correlation_id):
+                if ((event_correlation_id and event_correlation_id == upload_correlation_id) or 
+                    (data_correlation_id and data_correlation_id == upload_correlation_id)):
                     correlation_match = True
 
                 assert correlation_match, (

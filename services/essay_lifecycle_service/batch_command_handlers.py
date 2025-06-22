@@ -46,7 +46,7 @@ async def process_single_message(
     Returns:
         True if message was processed successfully, False otherwise
     """
-    message_start_time = time.time()
+    time.time()
 
     try:
         # Deserialize message

@@ -1,7 +1,8 @@
 """
 Specialized service request dispatcher implementation for Essay Lifecycle Service.
 
-Implements SpecializedServiceRequestDispatcher protocol for dispatching requests to specialized services.
+Implements SpecializedServiceRequestDispatcher protocol for dispatching requests
+    to specialized services.
 """
 
 from __future__ import annotations

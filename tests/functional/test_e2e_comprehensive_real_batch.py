@@ -90,8 +90,10 @@ async def test_comprehensive_real_batch_pipeline():
         print(f"✅ File upload successful: {upload_response}")
 
         # TIMING FIX: Wait for essays to be processed by ELS before requesting pipeline
-        # The workflow is: Upload → File Processing → ELS processes and stores essays → ELS BatchEssaysReady → BOS ready to orchestrate
-        # We need to wait for ELS processing to complete before the client can request pipeline execution
+        # The workflow is: Upload → File Processing → ELS processes and stores
+        # essays → ELS BatchEssaysReady → BOS ready to orchestrate
+        # We need to wait for ELS processing to complete before the client can
+        # request pipeline execution
         print("⏳ Waiting for essays to be processed by ELS...")
 
         import asyncio
@@ -150,7 +152,8 @@ async def test_comprehensive_real_batch_pipeline():
             test_correlation_id,
         )
         print(
-            f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}",
+            "📡 Published cj_assessment pipeline request with "
+            f"correlation: {request_correlation_id}"
         )
 
         # Step 7: Watch pipeline progression with pre-positioned consumer

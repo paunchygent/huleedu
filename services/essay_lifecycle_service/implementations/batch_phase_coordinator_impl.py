@@ -43,10 +43,12 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
         """
         Check if all essays in a batch phase are complete and publish ELSBatchPhaseOutcomeV1 if so.
 
-        This implements the core logic for Task 2.3: ELSBatchPhaseOutcomeV1 Event Aggregation and Publishing.
+        This implements the core logic for Task 2.3: ELSBatchPhaseOutcomeV1 Event
+        Aggregation and Publishing.
         """
         try:
-            # Only check for batch completion if this essay belongs to a batch and has phase metadata
+            # Only check for batch completion if this essay belongs to a batch
+            # and has phase metadata
             if not essay_state.batch_id:
                 logger.debug(
                     "Essay not part of a batch, skipping batch outcome check",

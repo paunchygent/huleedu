@@ -128,8 +128,10 @@ class TestClientPipelineResolutionWorkflow:
                     correlation_id,
                 )
 
+
                 print(
-                    f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}",
+                    "📡 Published cj_assessment pipeline request with "
+                    f"correlation: {request_correlation_id}",
                 )
 
                 # 5. Monitor complete pipeline resolution workflow
@@ -220,22 +222,28 @@ class TestClientPipelineResolutionWorkflow:
             async with kafka_manager.consumer(
                 "state_aware_pipeline_e2e", pipeline_topics,
             ) as consumer:
-                # Create batch with minimal essays - essays are now stored but don't auto-trigger pipeline
+                # Create batch with minimal essays - essays are now stored but
+                # don't auto-trigger pipeline
                 batch_id, correlation_id = await create_test_batch_with_essays(service_manager, 2)
 
                 print(f"📦 Created batch {batch_id} for state-aware testing")
 
                 # ARCHITECTURAL FIX: Explicitly trigger pipeline execution via client request
-                # This follows the new client-controlled architecture where pipelines require explicit triggers
+                # This follows the new client-controlled architecture where
+                # pipelines require explicit triggers
                 request_correlation_id = await publish_client_pipeline_request(
                     kafka_manager,
                     batch_id,
-                    "cj_assessment",  # Use cj_assessment pipeline which enables dependency resolution
+                    # Use cj_assessment pipeline which enables
+                    # dependency resolution
+                    "cj_assessment",
                     correlation_id,
                 )
 
+
                 print(
-                    f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}",
+                    "📡 Published cj_assessment pipeline request with "
+                    f"correlation: {request_correlation_id}",
                 )
 
                 # Monitor for the client-triggered pipeline execution

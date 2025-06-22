@@ -83,7 +83,10 @@ async def test_content_validation_failures_publish_events():
         try:
             # Collect events - expect 1 content provision + 2 validation failures
             events = await kafka_manager.collect_events(
-                consumer, expected_count=3, timeout_seconds=30, event_filter=validation_event_filter,
+                consumer, 
+                expected_count=3, 
+                timeout_seconds=30, 
+                event_filter=validation_event_filter,
             )
 
             print(f"📊 Collected {len(events)} validation events")
