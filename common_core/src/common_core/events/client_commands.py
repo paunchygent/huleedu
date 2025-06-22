@@ -33,7 +33,18 @@ class ClientBatchPipelineRequestV1(BaseModel):
     client_correlation_id: UUID | None = Field(
         default=None, description="Optional client-provided correlation ID for request tracking.",
     )
-    # user_id: str - To be added once authentication is in place
+    user_id: str = Field(
+        description="The ID of the authenticated user who owns this batch.",
+        min_length=1,
+        max_length=255,
+    )
+    is_retry: bool = Field(
+        default=False, description="Flag indicating this is a user-initiated retry request.",
+    )
+    retry_reason: str | None = Field(
+        default=None, description="Optional user-provided reason for the retry.",
+        max_length=500,
+    )
 
     model_config = {
         "str_strip_whitespace": True,
@@ -44,11 +55,17 @@ class ClientBatchPipelineRequestV1(BaseModel):
                     "batch_id": "batch_12345",
                     "requested_pipeline": "ai_feedback",
                     "client_correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "user_id": "user_789",
+                    "is_retry": False,
+                    "retry_reason": None,
                 },
                 {
                     "batch_id": "batch_67890",
-                    "requested_pipeline": "cj_assessment",
+                    "requested_pipeline": "spellcheck",
                     "client_correlation_id": None,
+                    "user_id": "user_456",
+                    "is_retry": True,
+                    "retry_reason": "Spellcheck failed due to network error, retrying",
                 },
             ],
         },

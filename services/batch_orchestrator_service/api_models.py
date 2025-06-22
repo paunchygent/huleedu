@@ -42,6 +42,9 @@ class BatchRegistrationRequestV1(BaseModel):
     cj_default_temperature: float | None = Field(
         default=None, ge=0.0, le=2.0, description="Default temperature for CJ assessment LLM.",
     )
+    user_id: str | None = Field(
+        default=None, description="The ID of the user who owns this batch.",
+    )
 
     @model_validator(mode="after")
     def validate_essay_count_consistency(self) -> BatchRegistrationRequestV1:

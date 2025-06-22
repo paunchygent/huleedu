@@ -184,7 +184,9 @@ class TestPipelineResolutionIntegration:
             source_service="api_gateway",
             correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
-                batch_id="test-batch-integration-001", requested_pipeline="ai_feedback",
+                batch_id="test-batch-integration-001",
+                requested_pipeline="ai_feedback",
+                user_id="test_user_123",
             ),
         )
 
@@ -234,7 +236,9 @@ class TestPipelineResolutionIntegration:
             source_service="api_gateway",
             correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
-                batch_id="non-existent-batch", requested_pipeline="ai_feedback",
+                batch_id="non-existent-batch",
+                requested_pipeline="ai_feedback",
+                user_id="test_user_123",
             ),
         )
 
@@ -288,7 +292,9 @@ class TestPipelineResolutionIntegration:
             source_service="api_gateway",
             correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
-                batch_id="test-batch-bcs-error-001", requested_pipeline="invalid_pipeline_name",
+                batch_id="test-batch-bcs-error-001",
+                requested_pipeline="invalid_pipeline_name",
+                user_id="test_user_123",
             ),
         )
 
@@ -340,7 +346,9 @@ class TestPipelineResolutionIntegration:
             source_service="api_gateway",
             correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
-                batch_id="test-batch-idempotent-001", requested_pipeline="ai_feedback",
+                batch_id="test-batch-idempotent-001",
+                requested_pipeline="ai_feedback",
+                user_id="test_user_123",
             ),
         )
 
@@ -398,7 +406,9 @@ class TestPipelineResolutionIntegration:
                 source_service="api_gateway",
                 correlation_id=uuid.uuid4(),
                 data=ClientBatchPipelineRequestV1(
-                    batch_id=f"test-batch-concurrent-{i:03d}", requested_pipeline="ai_feedback",
+                    batch_id=f"test-batch-concurrent-{i:03d}",
+                    requested_pipeline="ai_feedback",
+                    user_id="test_user_123",
                 ),
             )
             concurrent_events.append(event)

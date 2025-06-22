@@ -590,7 +590,9 @@ export function useWebSocketUpdates(batchId: string) {
 
 ##### 3. Enhanced Retry Logic Components
 
-Create sophisticated retry handling components:
+Create sophisticated retry handling components aligned with **simplified retry approach** (see `045-retry-logic.mdc`):
+
+**Note**: HuleEdu implements **natural retry** through the idempotency system. User-initiated retries leverage existing `ClientBatchPipelineRequestV1` with `is_retry` flag rather than complex retry command infrastructure.
 
 File: `src/components/RetryButton.tsx`
 
@@ -598,7 +600,6 @@ File: `src/components/RetryButton.tsx`
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
-import { Essay, RetryableErrorCategory } from '../types/retry';
 
 interface RetryButtonProps {
   essay: Essay;
@@ -611,8 +612,8 @@ export function RetryButton({ essay, batchId, pipeline, onRetrySuccess }: RetryB
   const [showConfirmation, setShowConfirmation] = useState(false);
   const queryClient = useQueryClient();
 
-  // Check if essay is retryable
-  const isRetryable = essay.status === 'FAILED' && essay.metadata?.is_retryable;
+  // Check if essay is retryable based on failure status
+  const isRetryable = essay.status.includes('FAILED');
   
   // Special handling for CJ Assessment - no individual essay retries
   const isCJAssessment = pipeline === 'CJ_ASSESSMENT';
@@ -621,9 +622,13 @@ export function RetryButton({ essay, batchId, pipeline, onRetrySuccess }: RetryB
     return null;
   }
 
+  // Use existing pipeline request pattern with is_retry flag
   const retryMutation = useMutation({
-    mutationFn: (retryData: { phase?: string; reason: string; essay_ids?: string[] }) =>
-      apiClient.retryBatch(batchId, retryData),
+    mutationFn: (retryData: { 
+      requested_pipeline: string; 
+      is_retry: boolean; 
+      retry_reason: string;
+    }) => apiClient.requestPipelineExecution(batchId, retryData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
       setShowConfirmation(false);
@@ -631,22 +636,20 @@ export function RetryButton({ essay, batchId, pipeline, onRetrySuccess }: RetryB
     },
   });
 
+  const handleRetry = () => {
+    retryMutation.mutate({
+      requested_pipeline: pipeline.toLowerCase(),
+      is_retry: true,
+      retry_reason: "User initiated retry from UI",
+    });
+  };
+
   const getConfirmationMessage = () => {
-    const failureReason = essay.metadata?.failure_reason;
-    const errorCategory = essay.metadata?.error_category;
-    
-    if (failureReason === 'PROCESSING_FAILURE' || errorCategory === RetryableErrorCategory.TRANSIENT_NETWORK) {
-      return "An unexpected processing error occurred. Would you like to retry? (No additional cost)";
+    if (essay.metadata?.error_category === 'TRANSIENT_NETWORK') {
+      return "A network error occurred. Would you like to retry? (No additional cost)";
     }
     
     return "Retrying this pipeline may incur additional processing costs. Are you sure you want to proceed?";
-  };
-
-  const handleRetry = () => {
-    retryMutation.mutate({
-      reason: "User initiated retry from UI",
-      essay_ids: [essay.essay_id],
-    });
   };
 
   if (showConfirmation) {

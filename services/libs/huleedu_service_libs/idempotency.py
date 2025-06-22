@@ -3,6 +3,10 @@ Idempotency decorator for Kafka message handlers.
 
 Provides DRY implementation of event idempotency using Redis SETNX operations.
 Follows the same architectural patterns as other service library components.
+
+TODO: Future retry enhancement integration - see 045-retry-logic.mdc for details
+on how this decorator may be extended to support explicit retry categorization
+and retry count tracking while maintaining the current natural retry behavior.
 """
 
 from __future__ import annotations

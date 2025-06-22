@@ -31,7 +31,7 @@ async def create_client_pipeline_request_event(
         data=ClientBatchPipelineRequestV1(
             batch_id=batch_id,
             requested_pipeline=requested_pipeline,
-            client_correlation_id=uuid.UUID(correlation_id),
+            user_id="test_user_123",
         ),
     )
 

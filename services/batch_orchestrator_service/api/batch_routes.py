@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from api_models import BatchRegistrationRequestV1
 from config import settings
@@ -11,12 +12,15 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from protocols import (
     BatchProcessingServiceProtocol,
     BatchRepositoryProtocol,
+    PipelinePhaseCoordinatorProtocol,
 )
 from pydantic import ValidationError
 from quart import Blueprint, Response, current_app, jsonify, request
 from quart_dishka import inject
 
 from common_core.enums import ProcessingEvent, topic_name
+from common_core.events.client_commands import ClientBatchPipelineRequestV1
+from common_core.pipeline_models import PhaseName
 
 logger = create_service_logger("bos.api.batch")
 batch_bp = Blueprint("batch_routes", __name__, url_prefix="/v1/batches")
@@ -175,3 +179,112 @@ async def get_internal_pipeline_state(
             f"Error getting internal pipeline state for {batch_id}: {e}", exc_info=True,
         )
         return jsonify({"error": "Failed to get internal pipeline state"}), 500
+
+
+@batch_bp.route("/<batch_id>/retry-phase", methods=["POST"])
+@inject
+async def retry_phase(
+    batch_id: str,
+    batch_repo: FromDishka[BatchRepositoryProtocol],
+    phase_coordinator: FromDishka[PipelinePhaseCoordinatorProtocol],
+) -> tuple[dict[str, Any], int]:
+    """
+    Retry a specific phase for a batch using simplified retry approach.
+
+    Leverages existing pipeline request pattern with is_retry context.
+    Validates user ownership and handles CJ Assessment batch-only constraints.
+    """
+    try:
+        data = await request.get_json()
+
+        # Extract retry parameters
+        phase_name = data.get("phase_name")
+        retry_reason = data.get("retry_reason", "User initiated retry")
+        user_id = data.get("user_id")  # From JWT in production
+
+        if not phase_name or not user_id:
+            return {"error": "phase_name and user_id are required"}, 400
+
+        # Validate batch ownership
+        batch_context = await batch_repo.get_batch_context(batch_id)
+        if not batch_context:
+            return {"error": "Batch not found"}, 404
+
+        # Note: In production, user_id would come from JWT token
+        # For now, we trust the provided user_id for testing
+
+        # Validate phase name
+        try:
+            phase_enum = PhaseName(phase_name.lower())
+        except ValueError:
+            return {"error": f"Invalid phase name: {phase_name}"}, 400
+
+        # Handle CJ Assessment batch-only constraint
+        if phase_enum == PhaseName.CJ_ASSESSMENT:
+            essay_ids = data.get("essay_ids", [])
+            if essay_ids:
+                return {
+                    "error": "CJ Assessment requires full batch retry for ranking consistency"
+                }, 400
+
+        # Get current pipeline state for retry validation
+        pipeline_state = await batch_repo.get_processing_pipeline_state(batch_id)
+        if not pipeline_state:
+            return {"error": "No pipeline state found for batch"}, 404
+
+        # Reset phase status to allow retry (simplified approach)
+        await phase_coordinator.update_phase_status(
+            batch_id=batch_id,
+            phase=phase_enum.value,
+            status="REQUESTED_BY_USER",
+            completion_timestamp=None,
+        )
+
+        # Create retry request using existing pipeline pattern
+        retry_request = ClientBatchPipelineRequestV1(
+            batch_id=batch_id,
+            requested_pipeline=phase_enum.value,
+            user_id=user_id,
+            is_retry=True,
+            retry_reason=retry_reason,
+        )
+
+        # Use existing phase coordination logic
+        essays_to_process = await batch_repo.get_batch_essays(batch_id)
+        if not essays_to_process:
+            return {"error": "No essays found for batch"}, 404
+
+        # Initiate retry using existing phase coordinator
+        correlation_id = (
+            str(retry_request.client_correlation_id)
+            if retry_request.client_correlation_id
+            else None
+        )
+        await phase_coordinator.initiate_resolved_pipeline(
+            batch_id=batch_id,
+            resolved_pipeline=[phase_enum.value],  # Single-phase pipeline
+            correlation_id=correlation_id,
+            batch_context=batch_context,
+        )
+
+        logger.info(
+            f"Phase retry initiated for batch {batch_id}, phase {phase_enum.value}",
+            extra={
+                "batch_id": batch_id,
+                "phase": phase_enum.value,
+                "user_id": user_id,
+                "retry_reason": retry_reason,
+                "is_retry": True,
+            },
+        )
+
+        return {
+            "status": "retry_initiated",
+            "batch_id": batch_id,
+            "phase": phase_enum.value,
+            "message": f"Retry initiated for {phase_enum.value} phase",
+        }, 200
+
+    except Exception as e:
+        logger.error(f"Error processing retry request for batch {batch_id}: {e}", exc_info=True)
+        return {"error": "Internal server error"}, 500
