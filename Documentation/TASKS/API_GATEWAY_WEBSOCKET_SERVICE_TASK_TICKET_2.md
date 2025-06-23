@@ -2,6 +2,14 @@
 
 This document provides a step-by-step implementation plan for the API Gateway component of the client interface layer.
 
+## 🚫 **BLOCKING DEPENDENCY - REFACTORING REQUIRED**
+
+**⚠️ CRITICAL: This task is BLOCKED until completion of:**
+
+📋 **[LEAN_BATCH_REGISTRATION_REFACTORING.md](LEAN_BATCH_REGISTRATION_REFACTORING.md)**
+
+**Reason**: API Gateway endpoints reference batch registration models that need to be refactored for lean registration and proper service boundaries.
+
 ## Part 2: API Gateway Service Implementation
 
 This part covers the creation of the new FastAPI-based `api_gateway_service`, which will serve as the primary entry point for the React frontend. It builds upon the foundational work completed in Part 1 (documentation/TASKS/API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_1.md) and which will be completed in Part 3 (documentation/TASKS/API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_3.md).
@@ -503,5 +511,359 @@ class Settings(BaseSettings):
 - ✅ The endpoint returns `202 Accepted` with proper correlation tracking.
 - ✅ Requests without valid JWT or with expired tokens are rejected with appropriate HTTP status codes.
 - ✅ Rate limiting triggers `429 Too Many Requests` responses when limits are exceeded.
+
+### Checkpoint 2.3: Student Validation Flow Endpoints
+
+**Objective**: Implement API endpoints to support the enhanced student validation workflow, including validation status checking, student association confirmation, and timeout handling.
+
+**Affected Files**:
+
+- `services/api_gateway_service/routers/validation_routes.py` (new)
+- `services/api_gateway_service/routers/batch_routes.py` (new)
+- `services/api_gateway_service/main.py` (updated)
+
+**Implementation Steps**:
+
+1. **Student Validation Router**: Create endpoints for validation workflow management.
+
+    **File**: `services/api_gateway_service/routers/validation_routes.py`
+
+    ```python
+    from typing import List, Dict, Any
+    from uuid import uuid4
+    from fastapi import APIRouter, Depends, status, HTTPException, Request
+    from dishka.integrations.fastapi import FromDishka
+    from pydantic import BaseModel, Field
+    from huleedu_service_libs.kafka_client import KafkaBus
+    from huleedu_service_libs.logging_utils import create_service_logger
+    from common_core.events.class_events import StudentAssociationsConfirmedV1
+    from common_core.events.envelope import EventEnvelope
+    from ..middleware.rate_limit_middleware import limiter
+    from .. import auth
+
+    router = APIRouter()
+    logger = create_service_logger("api_gateway.validation_routes")
+
+    class StudentAssociationRequest(BaseModel):
+        """Request model for student association."""
+        essay_id: str = Field(..., description="Essay identifier")
+        student_id: str = Field(..., description="Student identifier")
+
+    class BatchValidationRequest(BaseModel):
+        """Request model for batch validation confirmation."""
+        class_id: str = Field(..., description="Class identifier for validation")
+        associations: List[StudentAssociationRequest] = Field(..., description="List of student associations")
+
+    class ValidationStatusResponse(BaseModel):
+        """Response model for validation status."""
+        batch_id: str
+        validation_required: bool
+        essays_pending_validation: int
+        total_essays: int
+        timeout_hours_remaining: float | None = None
+        class_type: str
+        can_modify_files: bool
+
+    @router.get("/batches/{batch_id}/validation-status", response_model=ValidationStatusResponse)
+    @limiter.limit("30/minute")
+    async def get_batch_validation_status(
+        request: Request,
+        batch_id: str,
+        user_id: str = Depends(auth.get_current_user_id),
+        http_session: FromDishka[aiohttp.ClientSession],
+    ):
+        """Get current validation status for a batch."""
+        try:
+            # Query File Service for validation status
+            file_service_url = f"{settings.FILE_SERVICE_URL}/batch/{batch_id}/validation-status"
+            
+            async with http_session.get(file_service_url, headers={"X-User-ID": user_id}) as response:
+                if response.status == 404:
+                    raise HTTPException(status_code=404, detail="Batch not found")
+                elif response.status == 403:
+                    raise HTTPException(status_code=403, detail="Access denied")
+                elif response.status != 200:
+                    raise HTTPException(status_code=503, detail="Service unavailable")
+                
+                status_data = await response.json()
+                
+                return ValidationStatusResponse(
+                    batch_id=batch_id,
+                    validation_required=status_data.get("requires_validation", False),
+                    essays_pending_validation=status_data.get("essays_pending", 0),
+                    total_essays=status_data.get("total_essays", 0),
+                    timeout_hours_remaining=status_data.get("hours_remaining"),
+                    class_type=status_data.get("class_type", "REGULAR"),
+                    can_modify_files=status_data.get("can_modify", False)
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting validation status for batch {batch_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    @router.post("/batches/{batch_id}/confirm-associations", status_code=status.HTTP_202_ACCEPTED)
+    @limiter.limit("5/minute")  # Lower limit for critical operations
+    async def confirm_student_associations(
+        request: Request,
+        batch_id: str,
+        validation_request: BatchValidationRequest,
+        user_id: str = Depends(auth.get_current_user_id),
+        kafka_bus: FromDishka[KafkaBus],
+    ):
+        """Confirm student associations for a batch."""
+        correlation_id = uuid4()
+        
+        try:
+            # Create confirmation event
+            associations_data = [
+                {"essay_id": assoc.essay_id, "student_id": assoc.student_id}
+                for assoc in validation_request.associations
+            ]
+            
+            confirmation_event = StudentAssociationsConfirmedV1(
+                batch_id=batch_id,
+                user_id=user_id,
+                class_id=validation_request.class_id,
+                associations=associations_data,
+                validation_metadata={
+                    "confirmed_at": datetime.now(timezone.utc).isoformat(),
+                    "total_associations": len(associations_data),
+                    "confirmation_method": "manual"
+                }
+            )
+
+            envelope = EventEnvelope[StudentAssociationsConfirmedV1](
+                event_type="huleedu.class.student.associations.confirmed.v1",
+                source_service="api_gateway_service",
+                correlation_id=correlation_id,
+                data=confirmation_event,
+            )
+
+            await kafka_bus.publish(
+                topic="huleedu.class.student.associations.confirmed.v1",
+                envelope=envelope,
+                key=batch_id
+            )
+
+            logger.info(
+                f"Student associations confirmed: batch_id='{batch_id}', "
+                f"associations={len(associations_data)}, user_id='{user_id}', "
+                f"correlation_id='{correlation_id}'"
+            )
+
+            return {
+                "status": "accepted",
+                "message": "Student associations confirmation received",
+                "batch_id": batch_id,
+                "associations_count": len(associations_data),
+                "correlation_id": str(correlation_id)
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error confirming associations for batch {batch_id}: {e}",
+                exc_info=True
+            )
+            raise HTTPException(status_code=500, detail="Failed to confirm associations")
+
+    @router.post("/batches/{batch_id}/skip-validation", status_code=status.HTTP_202_ACCEPTED)
+    @limiter.limit("3/minute")  # Very low limit for skip operations
+    async def skip_batch_validation(
+        request: Request,
+        batch_id: str,
+        user_id: str = Depends(auth.get_current_user_id),
+        kafka_bus: FromDishka[KafkaBus],
+    ):
+        """Skip validation for a batch (use high-confidence matches, unknown for others)."""
+        correlation_id = uuid4()
+        
+        try:
+            # Create skip validation event (reuse timeout processing logic)
+            skip_event = ValidationTimeoutProcessedV1(
+                batch_id=batch_id,
+                timeout_hours=0,  # Immediate processing
+                auto_assigned_count=0,  # Will be calculated by ELS
+                unknown_assigned_count=0  # Will be calculated by ELS
+            )
+
+            envelope = EventEnvelope[ValidationTimeoutProcessedV1](
+                event_type="huleedu.validation.timeout.processed.v1",
+                source_service="api_gateway_service",
+                correlation_id=correlation_id,
+                data=skip_event,
+            )
+
+            await kafka_bus.publish(
+                topic="huleedu.validation.timeout.processed.v1",
+                envelope=envelope,
+                key=batch_id
+            )
+
+            logger.info(
+                f"Validation skipped: batch_id='{batch_id}', user_id='{user_id}', "
+                f"correlation_id='{correlation_id}'"
+            )
+
+            return {
+                "status": "accepted",
+                "message": "Validation skip request received",
+                "batch_id": batch_id,
+                "correlation_id": str(correlation_id)
+            }
+
+        except Exception as e:
+            logger.error(f"Error skipping validation for batch {batch_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to skip validation")
+    ```
+
+2. **Batch Management Router**: Create endpoints for enhanced batch operations.
+
+    **File**: `services/api_gateway_service/routers/batch_routes.py`
+
+    ```python
+    from typing import List, Optional
+    from uuid import uuid4
+    from fastapi import APIRouter, Depends, status, HTTPException, Request, UploadFile, File
+    from dishka.integrations.fastapi import FromDishka
+    from pydantic import BaseModel, Field
+    from huleedu_service_libs.kafka_client import KafkaBus
+    from huleedu_service_libs.logging_utils import create_service_logger
+    from common_core.enums import CourseCode
+    from ..middleware.rate_limit_middleware import limiter
+    from .. import auth
+
+    router = APIRouter()
+    logger = create_service_logger("api_gateway.batch_routes")
+
+    class EnhancedBatchRegistrationRequest(BaseModel):
+        """Enhanced batch registration request with course and class support."""
+        expected_essay_count: int = Field(..., gt=0)
+        course_code: CourseCode | None = Field(None, description="Course code (None for GUEST class)")
+        class_id: str | None = Field(None, description="Existing class ID")
+        class_designation: str = Field(..., description="Class designation or 'GUEST'")
+        essay_instructions: str = Field(...)
+        enable_student_parsing: bool = Field(default=True)
+        validation_timeout_hours: int = Field(default=72, ge=1, le=168)  # 1 hour to 1 week
+
+    class BatchStatusResponse(BaseModel):
+        """Response model for batch status."""
+        batch_id: str
+        status: str
+        class_type: str
+        validation_required: bool
+        can_modify_files: bool
+        essays_count: int
+        course_info: dict | None = None
+
+    @router.post("/batches/register", status_code=status.HTTP_201_CREATED)
+    @limiter.limit("10/minute")
+    async def register_enhanced_batch(
+        request: Request,
+        registration_request: EnhancedBatchRegistrationRequest,
+        user_id: str = Depends(auth.get_current_user_id),
+        http_session: FromDishka[aiohttp.ClientSession],
+    ):
+        """Register a new batch with enhanced course and validation support."""
+        try:
+            # Forward to BOS enhanced registration endpoint
+            bos_url = f"{settings.BOS_URL}/v2/register"
+            
+            registration_data = registration_request.model_dump()
+            registration_data["user_id"] = user_id
+            
+            async with http_session.post(
+                bos_url, 
+                json=registration_data,
+                headers={"X-User-ID": user_id}
+            ) as response:
+                if response.status == 201:
+                    batch_data = await response.json()
+                    logger.info(f"Enhanced batch registered: {batch_data.get('batch_id')}, user: {user_id}")
+                    return batch_data
+                elif response.status == 400:
+                    error_data = await response.json()
+                    raise HTTPException(status_code=400, detail=error_data.get("error", "Validation error"))
+                else:
+                    raise HTTPException(status_code=503, detail="Batch registration service unavailable")
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error registering enhanced batch: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to register batch")
+
+    @router.get("/batches/{batch_id}", response_model=BatchStatusResponse)
+    @limiter.limit("30/minute")
+    async def get_batch_status(
+        request: Request,
+        batch_id: str,
+        user_id: str = Depends(auth.get_current_user_id),
+        http_session: FromDishka[aiohttp.ClientSession],
+    ):
+        """Get enhanced batch status information."""
+        try:
+            # Query BOS for batch status
+            bos_url = f"{settings.BOS_URL}/internal/v1/batches/{batch_id}/status"
+            
+            async with http_session.get(bos_url, headers={"X-User-ID": user_id}) as response:
+                if response.status == 404:
+                    raise HTTPException(status_code=404, detail="Batch not found")
+                elif response.status == 403:
+                    raise HTTPException(status_code=403, detail="Access denied")
+                elif response.status != 200:
+                    raise HTTPException(status_code=503, detail="Service unavailable")
+                
+                batch_data = await response.json()
+                metadata = batch_data.get("processing_metadata", {})
+                
+                return BatchStatusResponse(
+                    batch_id=batch_id,
+                    status=batch_data.get("status", "unknown"),
+                    class_type=metadata.get("class_type", "REGULAR"),
+                    validation_required=metadata.get("validation_required", False),
+                    can_modify_files=batch_data.get("can_modify_files", False),
+                    essays_count=batch_data.get("essays_count", 0),
+                    course_info={
+                        "course_code": metadata.get("course_code"),
+                        "language": metadata.get("language"),
+                        "course_name": metadata.get("course_name")
+                    } if metadata.get("class_type") == "REGULAR" else None
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting batch status {batch_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Internal server error")
+    ```
+
+3. **Update Main Application**: Register the new routers.
+
+    **File**: `services/api_gateway_service/main.py`
+
+    ```python
+    # ... existing imports ...
+    from .routers import pipeline_routes, validation_routes, batch_routes
+
+    # ... existing code ...
+
+    # Register Routers
+    app.include_router(pipeline_routes.router, prefix="/v1", tags=["Pipelines"])
+    app.include_router(validation_routes.router, prefix="/v1", tags=["Validation"])
+    app.include_router(batch_routes.router, prefix="/v1", tags=["Batches"])
+
+    # ... rest of existing code ...
+    ```
+
+**Done When**:
+
+- ✅ Validation status endpoint provides comprehensive batch validation information
+- ✅ Student association confirmation endpoint publishes validation events
+- ✅ Validation skip endpoint allows teachers to bypass validation when needed
+- ✅ Enhanced batch registration supports GUEST class and validation timeout configuration
+- ✅ Batch status endpoint provides enhanced information including validation state
+- ✅ All endpoints include proper authentication, rate limiting, and error handling
 
 This completes Part 2 of the implementation guide. The API Gateway is now capable of receiving and processing commands. Part 3 will focus on implementing the query and real-time WebSocket components.

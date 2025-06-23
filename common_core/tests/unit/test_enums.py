@@ -11,13 +11,19 @@ import pytest
 
 from common_core.enums import (
     _TOPIC_MAPPING,
+    COURSE_METADATA,
     BatchStatus,
     ContentType,
+    CourseCode,
     ErrorCode,
     EssayStatus,
     FileValidationErrorCode,
+    Language,
     ProcessingEvent,
     ProcessingStage,
+    get_course_language,
+    get_course_level,
+    get_course_name,
     topic_name,
 )
 
@@ -303,3 +309,184 @@ class TestTopicMappingPrivateDict:
         topic_names = list(_TOPIC_MAPPING.values())
         unique_topic_names = set(topic_names)
         assert len(topic_names) == len(unique_topic_names), "Duplicate topic names found"
+
+
+class TestCourseCode:
+    """Test CourseCode enum functionality for enhanced class management."""
+
+    def test_course_code_values(self) -> None:
+        """Test that all CourseCode values are correct."""
+        assert CourseCode.ENG5.value == "ENG5"
+        assert CourseCode.ENG6.value == "ENG6"
+        assert CourseCode.ENG7.value == "ENG7"
+        assert CourseCode.SV1.value == "SV1"
+        assert CourseCode.SV2.value == "SV2"
+        assert CourseCode.SV3.value == "SV3"
+
+    def test_course_code_completeness(self) -> None:
+        """Test that all expected course codes exist."""
+        expected_codes = ["ENG5", "ENG6", "ENG7", "SV1", "SV2", "SV3"]
+        actual_codes = [code.value for code in CourseCode]
+
+        assert len(actual_codes) == len(expected_codes)
+        for code in expected_codes:
+            assert code in actual_codes
+
+    def test_course_code_string_inheritance(self) -> None:
+        """Test that CourseCode inherits from str."""
+        for code in CourseCode:
+            assert isinstance(code, str)
+            assert isinstance(code.value, str)
+
+
+class TestLanguage:
+    """Test Language enum functionality."""
+
+    def test_language_values(self) -> None:
+        """Test that Language enum has correct values."""
+        assert Language.ENGLISH.value == "en"
+        assert Language.SWEDISH.value == "sv"
+
+    def test_language_completeness(self) -> None:
+        """Test that all expected languages exist."""
+        expected_languages = ["en", "sv"]
+        actual_languages = [lang.value for lang in Language]
+
+        assert len(actual_languages) == len(expected_languages)
+        for lang in expected_languages:
+            assert lang in actual_languages
+
+    def test_language_string_inheritance(self) -> None:
+        """Test that Language inherits from str."""
+        for lang in Language:
+            assert isinstance(lang, str)
+            assert isinstance(lang.value, str)
+
+
+class TestCourseMetadata:
+    """Test COURSE_METADATA mapping and helper functions."""
+
+    def test_course_metadata_structure(self) -> None:
+        """Test that COURSE_METADATA has correct structure."""
+        assert isinstance(COURSE_METADATA, dict)
+        assert len(COURSE_METADATA) == 6  # Should have 6 courses
+
+        # Test each entry has correct structure
+        for course_code, metadata in COURSE_METADATA.items():
+            assert isinstance(course_code, CourseCode)
+            assert isinstance(metadata, tuple)
+            assert len(metadata) == 3
+
+            name, language, level = metadata
+            assert isinstance(name, str)
+            assert isinstance(language, Language)
+            assert isinstance(level, int)
+
+    def test_course_metadata_completeness(self) -> None:
+        """Test that all CourseCode values are in COURSE_METADATA."""
+        for course_code in CourseCode:
+            assert course_code in COURSE_METADATA
+
+    def test_get_course_language(self) -> None:
+        """Test get_course_language helper function."""
+        assert get_course_language(CourseCode.ENG5) == Language.ENGLISH
+        assert get_course_language(CourseCode.ENG6) == Language.ENGLISH
+        assert get_course_language(CourseCode.ENG7) == Language.ENGLISH
+        assert get_course_language(CourseCode.SV1) == Language.SWEDISH
+        assert get_course_language(CourseCode.SV2) == Language.SWEDISH
+        assert get_course_language(CourseCode.SV3) == Language.SWEDISH
+
+    def test_get_course_name(self) -> None:
+        """Test get_course_name helper function."""
+        assert get_course_name(CourseCode.ENG5) == "English 5"
+        assert get_course_name(CourseCode.ENG6) == "English 6"
+        assert get_course_name(CourseCode.ENG7) == "English 7"
+        assert get_course_name(CourseCode.SV1) == "Svenska 1"
+        assert get_course_name(CourseCode.SV2) == "Svenska 2"
+        assert get_course_name(CourseCode.SV3) == "Svenska 3"
+
+    def test_get_course_level(self) -> None:
+        """Test get_course_level helper function."""
+        assert get_course_level(CourseCode.ENG5) == 5
+        assert get_course_level(CourseCode.ENG6) == 6
+        assert get_course_level(CourseCode.ENG7) == 7
+        assert get_course_level(CourseCode.SV1) == 1
+        assert get_course_level(CourseCode.SV2) == 2
+        assert get_course_level(CourseCode.SV3) == 3
+
+    def test_course_helper_functions_consistency(self) -> None:
+        """Test that helper functions return consistent data with COURSE_METADATA."""
+        for course_code in CourseCode:
+            name, language, level = COURSE_METADATA[course_code]
+
+            assert get_course_name(course_code) == name
+            assert get_course_language(course_code) == language
+            assert get_course_level(course_code) == level
+
+
+class TestEnhancedProcessingEvents:
+    """Test new ProcessingEvent entries for enhanced file and class management."""
+
+    def test_enhanced_events_exist(self) -> None:
+        """Test that all enhanced file and class management events exist."""
+        enhanced_events = [
+            "STUDENT_PARSING_COMPLETED",
+            "ESSAY_STUDENT_ASSOCIATION_UPDATED",
+            "BATCH_FILE_ADDED",
+            "BATCH_FILE_REMOVED",
+            "CLASS_CREATED",
+            "STUDENT_CREATED"
+        ]
+
+        for event_name in enhanced_events:
+            assert hasattr(ProcessingEvent, event_name), f"Missing {event_name} in ProcessingEvent"
+
+    def test_enhanced_events_values(self) -> None:
+        """Test that enhanced events have correct string values."""
+        assert ProcessingEvent.STUDENT_PARSING_COMPLETED.value == "student.parsing.completed"
+        assert ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED.value == "essay.student.association.updated"
+        assert ProcessingEvent.BATCH_FILE_ADDED.value == "batch.file.added"
+        assert ProcessingEvent.BATCH_FILE_REMOVED.value == "batch.file.removed"
+        assert ProcessingEvent.CLASS_CREATED.value == "class.created"
+        assert ProcessingEvent.STUDENT_CREATED.value == "student.created"
+
+    def test_enhanced_events_topic_mappings(self) -> None:
+        """Test topic mappings for enhanced events."""
+        assert (
+            topic_name(ProcessingEvent.STUDENT_PARSING_COMPLETED)
+            == "huleedu.file.student.parsing.completed.v1"
+        )
+        assert (
+            topic_name(ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED)
+            == "huleedu.class.essay.association.updated.v1"
+        )
+        assert (
+            topic_name(ProcessingEvent.BATCH_FILE_ADDED)
+            == "huleedu.file.batch.file.added.v1"
+        )
+        assert (
+            topic_name(ProcessingEvent.BATCH_FILE_REMOVED)
+            == "huleedu.file.batch.file.removed.v1"
+        )
+        assert (
+            topic_name(ProcessingEvent.CLASS_CREATED)
+            == "huleedu.class.created.v1"
+        )
+        assert (
+            topic_name(ProcessingEvent.STUDENT_CREATED)
+            == "huleedu.class.student.created.v1"
+        )
+
+    def test_enhanced_events_are_mapped(self) -> None:
+        """Test that all enhanced events are included in _TOPIC_MAPPING."""
+        enhanced_events = [
+            ProcessingEvent.STUDENT_PARSING_COMPLETED,
+            ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED,
+            ProcessingEvent.BATCH_FILE_ADDED,
+            ProcessingEvent.BATCH_FILE_REMOVED,
+            ProcessingEvent.CLASS_CREATED,
+            ProcessingEvent.STUDENT_CREATED,
+        ]
+
+        for event in enhanced_events:
+            assert event in _TOPIC_MAPPING, f"Event {event} should be mapped but is missing"

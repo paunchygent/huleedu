@@ -2,11 +2,20 @@
 
 This document outlines the implementation of enhanced file and batch management capabilities, class management service, and student association features for the HuleEdu platform.
 
+## 🚫 **BLOCKING DEPENDENCY - REFACTORING REQUIRED**
+
+**⚠️ CRITICAL: Phase 2 onwards of this task is BLOCKED until completion of:**
+
+📋 **[LEAN_BATCH_REGISTRATION_REFACTORING.md](LEAN_BATCH_REGISTRATION_REFACTORING.md)**
+
+**Reason**: The current batch registration model captures too much processing data upfront. The refactoring establishes lean registration and proper service boundaries required for this implementation.
+
 **CRITICAL DEPENDENCIES:**
 
 - ✅ **Checkpoint 1.4: User ID Propagation** (API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_1.md) - MUST be completed first
 - ✅ **Checkpoint 3.2: Enhanced WebSocket Implementation** (API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_3.md) - For real-time updates
 - ✅ **User authentication and ownership validation** - Foundation for all enhanced features
+- 🚫 **Lean Batch Registration Refactoring** - BLOCKING Phase 2 onwards
 
 **Architecture Alignment:**
 This implementation follows established HuleEdu microservice patterns:
@@ -34,409 +43,240 @@ Future enhancements are documented in `documentation/SERVICE_FUTURE_ENHANCEMENTS
 - **Phase 4**: Multi-language course extensions
 - **Phase 5**: Analytics and reporting
 
+## 🏛️ **Architectural Decision Log (ADL)**
+
+This section documents key architectural decisions made during the planning phase. Each decision includes its rationale and consequences to provide full context for the development team.
+
+### **ADL-01: Standardized PersonNameV1 Model**
+
+**Decision**: A standardized, structured `PersonNameV1` Pydantic model will be created in `common_core` for handling all personal names (teachers and students). This model will contain separate `first_name` and `last_name` fields.
+
+**Rationale**:
+- **Flexibility & Future-Proofing**: Provides downstream services with granular data. AI Feedback Service can construct formal references while maintaining informal options
+- **Consistency & Reusability (DRY)**: Single definition for both teachers and students, reducing code duplication
+- **Centralized Logic**: Single source of truth for name-related formatting logic with properties like `.full_name`
+
+**Consequences**: All services producing/consuming person name events must use this structured model. Existing teacher/student events will be updated to use `PersonNameV1`.
+
+### **ADL-02: Domain Responsibility for User and Student Data**
+
+**Decision**: Service responsibilities will be strictly enforced to maintain clear bounded contexts:
+- **BOS**: Owns batch lifecycle and orchestration context only
+- **Class Management Service**: Single authoritative source for class rosters and student data  
+- **File Service**: Responsible for initial discovery of potential student names from raw file content
+- **ELS**: Owns essay lifecycle state, including final essay-student associations
+
+**Rationale**: Enforces Single Responsibility Principle and maintains clean boundaries. Prevents "context bleeding" where services become dependent on others' internal data models.
+
+**Consequences**: Requires new Class Management Service and HTTP clients for inter-service queries. Clear service boundaries enhance security and maintainability.
+
+### **ADL-03: enable_student_parsing Flag Handling**
+
+**Decision**: The `enable_student_parsing` flag will be passed directly to File Service as a form field in the `POST /v1/files/batch` request, removed from batch registration model.
+
+**Rationale**: The service performing an action should receive the configuration for that action. File Service is responsible for parsing, so it should receive parsing instructions directly.
+
+**Consequences**: Frontend must send this flag as part of multipart form data during file upload. File Service API endpoint updated to handle this parameter.
+
+### **ADL-04: Two-Stage Student Association Workflow**
+
+**Decision**: Associating essays with students will be a two-stage process:
+1. **Discovery Stage (File Service)**: Parses temporary `parsed_name_metadata` and includes in `StudentParsingCompletedV1` event
+2. **Association Stage (ELS)**: After user validation, `StudentAssociationsConfirmedV1` command persists authoritative essay-student links
+
+**Rationale**: Correctly decouples fast automated discovery (machine speed) from slow manual validation (human speed). Prevents File Service from becoming stateful while waiting for user input.
+
+**Consequences**: Requires new API endpoint and Kafka event. Frontend needs dedicated validation UI. ELS publishes `BatchEssaysReady` only after association confirmation.
+
+### **ADL-05: Inter-Service Data Retrieval Pattern**  
+
+**Decision**: For synchronous, request-response data needs between services, internal HTTP calls will be used. File Service will make HTTP GET requests to Class Management Service's `/v1/classes/{class_id}/students` endpoint for roster data.
+
+**Rationale**: Direct query for data required to continue processing. HTTP is correct pattern for synchronous internal data retrieval versus event-based complexity.
+
+**Consequences**: File Service requires dedicated internal HTTP client for Class Management Service. Introduces direct runtime dependency requiring proper error handling and timeouts.
+
 ## Part 1: Common Core Extensions
 
-**CRITICAL DEPENDENCIES:**
+### Checkpoint 2.0: Extend Common Core with Course and Event Definitions ✅ COMPLETED
 
-- ✅ **Checkpoint 1.4: User ID Propagation** (API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_1.md) - MUST be completed first
-- ✅ **Checkpoint 3.2: Enhanced WebSocket Implementation** (API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_3.md) - For real-time updates
-- ✅ **User authentication and ownership validation** - Foundation for all enhanced features
+**Implementation Summary:**
 
-**Architecture Alignment:**
-This implementation follows the established HuleEdu microservice patterns:
+Extended `common_core/src/common_core/enums.py` with course definitions:
 
-- Event-driven communication via Kafka with thin, focused events
-- Protocol-based dependency injection with Dishka
-- Pydantic contracts for all inter-service communication in `common_core`
-- User ownership validation for all operations
-- Real-time updates via Redis pub/sub and WebSocket
-- Pragmatic HTTP calls for simple request/response patterns
+- `CourseCode(str, Enum)`: ENG5/6/7, SV1/2/3 predefined courses
+- `Language(str, Enum)`: ENGLISH="en", SWEDISH="sv"
+- `COURSE_METADATA: Dict[CourseCode, Tuple[str, Language, int]]` mapping course codes to (name, language, level)
+- Helper functions: `get_course_language()`, `get_course_name()`, `get_course_level()`
+- Added ProcessingEvent entries: STUDENT_PARSING_COMPLETED, ESSAY_STUDENT_ASSOCIATION_UPDATED, BATCH_FILE_ADDED, BATCH_FILE_REMOVED, CLASS_CREATED, STUDENT_CREATED
+- Updated `_TOPIC_MAPPING` with new event topics following `huleedu.{domain}.{entity}.{action}.v1` pattern
 
-## Part 1: Common Core Extensions
+**NEW - PersonNameV1 Model (ADL-01):**
 
-### Checkpoint 2.0: Extend Common Core with Course and Event Definitions
+Created standardized person name model:
 
-**Objective**: Add course definitions and new event contracts to `common_core` following established patterns for cross-service compliance.
+**File**: `common_core/src/common_core/person_models.py`
 
-**Affected Files**:
+```python
+from pydantic import BaseModel, Field
 
-- `common_core/src/common_core/enums.py`
-- `common_core/src/common_core/events/class_events.py` (new)
-- `common_core/src/common_core/events/file_management_events.py` (new)
-
-**Implementation Steps**:
-
-1. **Add Course Definitions to Common Core**: Extend existing enum structure with course codes.
-
-    **File**: `common_core/src/common_core/enums.py`
-
-    ```python
-    from enum import Enum
-    from typing import Dict, Tuple
-
-    class CourseCode(str, Enum):
-        """Predefined course codes for HuleEdu platform."""
-        ENG5 = "ENG5"
-        ENG6 = "ENG6" 
-        ENG7 = "ENG7"
-        SV1 = "SV1"
-        SV2 = "SV2"
-        SV3 = "SV3"
-
-    class Language(str, Enum):
-        """Supported languages inferred from course codes."""
-        ENGLISH = "en"
-        SWEDISH = "sv"
-
-    # Course metadata mapping for language inference
-    COURSE_METADATA: Dict[CourseCode, Tuple[str, Language, int]] = {
-        CourseCode.ENG5: ("English 5", Language.ENGLISH, 5),
-        CourseCode.ENG6: ("English 6", Language.ENGLISH, 6),
-        CourseCode.ENG7: ("English 7", Language.ENGLISH, 7),
-        CourseCode.SV1: ("Svenska 1", Language.SWEDISH, 1),
-        CourseCode.SV2: ("Svenska 2", Language.SWEDISH, 2),
-        CourseCode.SV3: ("Svenska 3", Language.SWEDISH, 3),
-    }
-
-    def get_course_language(course_code: CourseCode) -> Language:
-        """Get language for a course code."""
-        return COURSE_METADATA[course_code][1]
-
-    def get_course_name(course_code: CourseCode) -> str:
-        """Get display name for a course code."""
-        return COURSE_METADATA[course_code][0]
-
-    def get_course_level(course_code: CourseCode) -> int:
-        """Get skill level for a course code."""
-        return COURSE_METADATA[course_code][2]
-
-    # Additional ProcessingEvent entries
-    class ProcessingEvent(str, Enum):
-        # ... existing events ...
-        
-        # Enhanced file and class management events
-        STUDENT_PARSING_COMPLETED = "STUDENT_PARSING_COMPLETED"
-        ESSAY_STUDENT_ASSOCIATION_UPDATED = "ESSAY_STUDENT_ASSOCIATION_UPDATED"
-        BATCH_FILE_ADDED = "BATCH_FILE_ADDED"
-        BATCH_FILE_REMOVED = "BATCH_FILE_REMOVED"
-        CLASS_CREATED = "CLASS_CREATED"
-        STUDENT_CREATED = "STUDENT_CREATED"
-
-    # Topic mapping additions (implement in future checkpoint)
-    _TOPIC_MAPPING.update({
-        ProcessingEvent.STUDENT_PARSING_COMPLETED: "huleedu.file.student.parsing.completed.v1",
-        ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED: "huleedu.class.essay.association.updated.v1",
-        ProcessingEvent.BATCH_FILE_ADDED: "huleedu.file.batch.file.added.v1",
-        ProcessingEvent.BATCH_FILE_REMOVED: "huleedu.file.batch.file.removed.v1",
-        ProcessingEvent.CLASS_CREATED: "huleedu.class.created.v1",
-        ProcessingEvent.STUDENT_CREATED: "huleedu.class.student.created.v1",
-    })
-    ```
-
-2. **Create Thin Event Contracts Following Established Patterns**: Add new event models that follow the thin event principle.
-
-    **File**: `common_core/src/common_core/events/file_management_events.py`
-
-    ```python
-    """
-    File management event models for enhanced file operations.
+class PersonNameV1(BaseModel):
+    """A structured representation of a person's name."""
+    first_name: str = Field(..., min_length=1, description="The person's first or given name(s).")
+    last_name: str = Field(..., min_length=1, description="The person's last or family name.")
     
-    These events support file addition/removal operations and student parsing
-    following the thin event principle with focused, essential data.
-    """
-
-    from __future__ import annotations
-
-    from datetime import UTC, datetime
-    from uuid import UUID
-
-    from pydantic import BaseModel, Field
-
-    class StudentParsingCompletedV1(BaseModel):
-        """Event published when File Service completes student parsing for a batch."""
-        event: str = Field(default="student.parsing.completed")
-        batch_id: str = Field(description="Batch identifier")
-        # Direct data - parsing results populate Class Management Service DB
-        parsing_results: list[dict] = Field(
-            description="List of parsing results: [{essay_id, filename, first_name, last_name, student_email, confidence}]"
-        )
-        parsed_count: int = Field(description="Number of essays with parsed student info")
-        total_count: int = Field(description="Total number of essays processed")
-        correlation_id: UUID | None = Field(default=None)
-        timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-    class BatchFileAddedV1(BaseModel):
-        """Event published when file is added to existing batch."""
-        event: str = Field(default="batch.file.added")
-        batch_id: str = Field(description="Batch identifier")
-        essay_id: str = Field(description="New essay identifier")
-        filename: str = Field(description="Original filename")
-        user_id: str = Field(description="User who added the file")
-        correlation_id: UUID | None = Field(default=None)
-        timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-    class BatchFileRemovedV1(BaseModel):
-        """Event published when file is removed from batch."""
-        event: str = Field(default="batch.file.removed")
-        batch_id: str = Field(description="Batch identifier")
-        essay_id: str = Field(description="Removed essay identifier")
-        filename: str = Field(description="Original filename")
-        user_id: str = Field(description="User who removed the file")
-        correlation_id: UUID | None = Field(default=None)
-        timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    ```
-
-    **File**: `common_core/src/common_core/events/class_events.py`
-
-    ```python
-    """
-    Class management event models for student and class operations.
+    @property
+    def full_name(self) -> str:
+        """Combined name for display purposes."""
+        return f"{self.first_name} {self.last_name}"
     
-    These events support class creation, student management, and essay-student
-    associations following the thin event principle.
-    """
+    @property
+    def last_first_name(self) -> str:
+        """Last, First format for sorting."""
+        return f"{self.last_name}, {self.first_name}"
+```
 
-    from __future__ import annotations
+Created thin event contracts:
 
-    from datetime import UTC, datetime
-    from uuid import UUID
+- `common_core/src/common_core/events/file_management_events.py`:
+  - `StudentParsingCompletedV1`: Contains parsing_results list with student metadata, confidence scores
+  - `BatchFileAddedV1`: File addition notifications with batch_id, essay_id, filename, user_id
+  - `BatchFileRemovedV1`: File removal notifications with same structure
+- `common_core/src/common_core/events/class_events.py`:
+  - `ClassCreatedV1`: Class creation with course_codes list, class_designation
+  - `StudentCreatedV1`: Student creation with separated first_name/last_name fields, class_ids list  
+  - `EssayStudentAssociationUpdatedV1`: Student-essay linking with confidence_score, association_method
 
-    from pydantic import BaseModel, Field
+**NEW - ParsedNameMetadata Model (ADL-04):**
 
-    class ClassCreatedV1(BaseModel):
-        """Event published when new class is created."""
-        event: str = Field(default="class.created")
-        class_id: str = Field(description="New class identifier")
-        class_designation: str = Field(description="Class designation name")
-        course_codes: list[str] = Field(description="Associated course codes")
-        user_id: str = Field(description="Teacher who created the class")
-        correlation_id: UUID | None = Field(default=None)
-        timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+Added model for temporary parsing results:
 
-    class StudentCreatedV1(BaseModel):
-    """Event published when new student is created."""
-    event: str = Field(default="student.created")
-    student_id: str = Field(description="New student identifier")
-    first_name: str = Field(description="Student first name")
-    last_name: str = Field(description="Student last name")
-    student_email: str = Field(description="Student email address")
-    class_ids: list[str] = Field(description="Associated class identifiers")
-    created_by_user_id: str = Field(description="User who created the student")
-    correlation_id: UUID | None = Field(default=None)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+**File**: `common_core/src/common_core/events/file_events.py`
 
-    class EssayStudentAssociationUpdatedV1(BaseModel):
-    """Event published when student-essay association is created/updated."""
-    event: str = Field(default="essay.student.association.updated")
-    batch_id: str = Field(description="Batch identifier")
-    essay_id: str = Field(description="Essay identifier")
-    student_id: str | None = Field(description="Student identifier (None if association removed)")
-    first_name: str | None = Field(description="Student first name for display")
-    last_name: str | None = Field(description="Student last name for display")
-    student_email: str | None = Field(description="Student email for display")
-    association_method: str = Field(description="Association method: 'parsed' or 'manual'")
-    confidence_score: float | None = Field(description="Confidence score for parsed associations")
-    created_by_user_id: str = Field(description="User who created the association")
-    correlation_id: UUID | None = Field(default=None)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    ```
+```python
+class ParsedNameMetadata(BaseModel):
+    """Unverified student name metadata parsed from file content for user review."""
+    first_name: str | None = Field(default=None, description="Parsed first name")
+    last_name: str | None = Field(default=None, description="Parsed last name")  
+    full_name_from_file: str = Field(..., description="The exact string parsed from the file")
+    confidence_score: float = Field(ge=0.0, le=1.0, description="Parsing confidence (0.0-1.0)")
+    parsing_method: str = Field(..., description="Method used for parsing")
 
-**Done When**:
+# Update existing EssayContentProvisionedV1 event
+class EssayContentProvisionedV1(BaseModel):
+    # ... existing fields ...
+    parsed_name_metadata: ParsedNameMetadata | None = Field(
+        default=None, 
+        description="Unverified student name metadata parsed from file content for user review."
+    )
+```
 
-- ✅ Course codes are defined in `common_core/enums.py`
-- ✅ New ProcessingEvent entries are added
-- ✅ Topic mappings are documented (implementation in future checkpoint)
-- ✅ Thin event contracts follow established patterns
-- ✅ All event models use focused, essential data only
+**NEW - StudentAssociationsConfirmedV1 Command (ADL-04):**
+
+Added command for user validation:
+
+**File**: `common_core/src/common_core/events/client_commands.py`
+
+```python
+class EssayStudentAssociationV1(BaseModel):
+    """Individual essay-student association."""
+    essay_id: str
+    student_id: str
+
+class StudentAssociationsConfirmedV1(BaseModel):
+    """Command event published when a user confirms student-essay associations for a batch."""
+    event: str = Field(default="student.associations.confirmed")
+    batch_id: str
+    user_id: str = Field(..., description="The authenticated user who confirmed associations")
+    associations: List[EssayStudentAssociationV1] = Field(..., description="Confirmed essay-student pairings")
+    validation_metadata: dict = Field(default_factory=dict, description="Additional validation context")
+```
+
+Updated `common_core/src/common_core/events/__init__.py` to export all new event models.
+
+**Additional Required Updates:**
+
+Extended `BatchStatus` enum for validation flow:
+
+```python
+class BatchStatus(str, Enum):
+    # ... existing statuses ...
+    AWAITING_STUDENT_VALIDATION = "awaiting_student_validation"
+    VALIDATION_TIMEOUT_PROCESSED = "validation_timeout_processed"
+    GUEST_CLASS_READY = "guest_class_ready"
+```
+
+Enhanced existing events to use `PersonNameV1`:
+
+```python
+# Update existing events to use PersonNameV1 model  
+class StudentCreatedV1(BaseModel):
+    """Student creation event using PersonNameV1 for consistency."""
+    student_name: PersonNameV1 = Field(..., description="Student name using standardized model")
+    email: str
+    created_by_user_id: str
+    class_ids: list[str] = Field(default_factory=list)
+
+class ClassCreatedV1(BaseModel):
+    """Class creation event."""
+    class_designation: str
+    course_codes: list[CourseCode]  
+    user_id: str
+    teacher_name: PersonNameV1 = Field(..., description="Teacher name using standardized model")
+```
+
+Extended `EssayStatus` enum for association workflow:
+
+```python
+class EssayStatus(str, Enum):
+    # ... existing statuses ...
+    AWAITING_STUDENT_ASSOCIATION = "awaiting_student_association"
+    STUDENT_ASSOCIATION_CONFIRMED = "student_association_confirmed"
+```
+
+**Testing Results:**
+
+- 📊 All new enums: 6 tests passing (CourseCode, Language completeness/values/inheritance)
+- 📊 Class events: 18 tests passing (creation, serialization, validation, real-world scenarios)
+- 📊 File management events: 15 tests passing (parsing results, file operations, timestamps)
+- 📊 MyPy validation: 320 source files, no type errors
+- 📊 Import validation: All enums and events importable, helper functions working
+
+**Ready for:** Part 2 implementation - Enhanced File and Batch Management with course validation, class associations, and user validation flow.
 
 ## Part 2: Enhanced File and Batch Management
 
-### Checkpoint 2.1: Enhanced Batch Registration with Course Validation
+**⚠️ NOTE**: This part implements lean registration where educational context (teacher names, class designation) is obtained from Class Management Service when processing starts, not during upload.
 
-**Objective**: Extend batch registration to support predefined courses, class associations, and enhanced metadata management while maintaining backward compatibility.
+### **Educational Context Flow - WHEN and WHERE**
 
-**Key Features**:
+**When Educational Context is Provided:**
 
-- Course validation enforces only ENG5/6/7 and SV1/2/3 codes
-- Language is automatically inferred from course code
-- Enhanced metadata is stored in batch context
-- Backward compatibility is maintained with V1 endpoint
-- All validation errors provide clear feedback
+1. **File Upload & Parsing**: File Service parses student info and publishes `StudentParsingCompletedV1` event
+2. **Student Validation**: Class Management Service processes parsing results and validates/stores student associations
+3. **Processing Initiation**: When ELS publishes `BatchEssaysReadyV1`, enhanced with educational context from Class Management Service
+4. **Processing Services**: AI Feedback and CJ Assessment services receive complete teacher context (`teacher_first_name`, `teacher_last_name`, `class_designation`) in processing commands
 
-**Affected Files**:
+**Where Educational Context is Handled:**
 
-- `services/batch_orchestrator_service/api_models.py`
-- `services/batch_orchestrator_service/implementations/batch_context_operations.py`
-- `services/batch_orchestrator_service/api/batch_routes.py`
-- `common_core/src/common_core/enums.py`
+- **Class Management Service**: `GET /internal/v1/users/{user_id}/teacher-context` endpoint provides teacher names based on user_id
+- **ELS Batch Command Handler**: Queries Class Management Service when enhancing `BatchEssaysReadyV1` event
+- **BOS Processing Initiators**: Receive enhanced commands with educational context from Class Management Service (not batch registration)
 
-**Implementation Steps**:
+**Event Handlers Involved:**
 
-1. **Enhanced Batch Registration Model**: Extend the existing model with course validation and class association.
+```python
+# File Service -> Class Management Service
+StudentParsingCompletedV1 → ClassManagementService.student_parsing_handler()
 
-    **File**: `services/batch_orchestrator_service/api_models.py`
+# Class Management Service -> ELS  
+StudentAssociationsValidatedV1 → ELS.batch_command_handler()
 
-    ```python
-    from common_core.enums import CourseCode, get_course_language
-    from pydantic import BaseModel, Field, model_validator
-    from typing import Optional
+# ELS -> Processing Services (enhanced with educational context)
+BatchEssaysReadyV1 (with teacher_first_name, teacher_last_name, class_designation) → BOS.processing_initiators()
+```
 
-    class BatchRegistrationRequestV2(BaseModel):
-        """Enhanced batch registration with course validation and class support."""
-        expected_essay_count: int = Field(..., gt=0)
-        essay_ids: list[str] | None = None
-        
-        # Enhanced course and class fields
-        course_code: CourseCode = Field(..., description="Must be one of: ENG5,ENG6,ENG7,SV1,SV2,SV3")
-        class_id: str | None = Field(None, description="Optional existing class ID")
-        class_designation: str = Field(..., description="Class designation name")
-        
-        # Existing fields
-        teacher_name: str = Field(...)
-        essay_instructions: str = Field(...)
-        user_id: str = Field(..., description="Authenticated user ID from API Gateway")
-        
-        # New fields for enhanced functionality
-        enable_student_parsing: bool = Field(default=True, description="Enable automatic student parsing")
-        expected_student_names: list[str] | None = Field(None, description="Optional list of expected student names")
-
-        @model_validator(mode="after")
-        def validate_and_enrich(self) -> "BatchRegistrationRequestV2":
-            """Validate course code and enrich with language information."""
-            # Course validation is handled by CourseCode enum
-            # Add derived language to the model for downstream services
-            self._language = get_course_language(self.course_code)
-            return self
-
-        @property
-        def language(self) -> str:
-            """Get the language code for this batch."""
-            return self._language.value if hasattr(self, '_language') else get_course_language(self.course_code).value
-
-    # Maintain backward compatibility
-    BatchRegistrationRequestV1 = BatchRegistrationRequestV2  # Alias for existing code
-    ```
-
-2. **Enhanced Batch Context Storage**: Update context operations to store course and class information.
-
-    **File**: `services/batch_orchestrator_service/implementations/batch_context_operations.py`
-
-    ```python
-    async def store_enhanced_batch_context(
-        self,
-        batch_id: str,
-        registration_data: BatchRegistrationRequestV2,
-        session: AsyncSession,
-    ) -> None:
-        """Store enhanced batch context with course and class information."""
-        try:
-            # Check if batch already exists
-            stmt = select(Batch).where(Batch.id == batch_id)
-            result = await session.execute(stmt)
-            batch = result.scalar_one_or_none()
-
-            # Prepare enhanced metadata
-            enhanced_metadata = registration_data.model_dump()
-            enhanced_metadata.update({
-                "language": registration_data.language,
-                "course_name": get_course_name(registration_data.course_code),
-                "course_level": get_course_level(registration_data.course_code),
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "version": "v2"  # Version tracking for migrations
-            })
-
-            if batch is None:
-                # Create new batch record with enhanced metadata
-                batch = Batch(
-                    id=batch_id,
-                    expected_essay_count=registration_data.expected_essay_count,
-                    essay_ids=registration_data.essay_ids,
-                    processing_metadata=enhanced_metadata,
-                    created_at=datetime.now(timezone.utc).replace(tzinfo=None),
-                    updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
-                )
-                session.add(batch)
-                self.logger.info(f"Created enhanced batch context: batch_id='{batch_id}', course='{registration_data.course_code}', class='{registration_data.class_designation}'")
-            else:
-                # Update existing batch with enhanced context
-                stmt = (
-                    update(Batch)
-                    .where(Batch.id == batch_id)
-                    .values(
-                        expected_essay_count=registration_data.expected_essay_count,
-                        essay_ids=registration_data.essay_ids,
-                        processing_metadata=enhanced_metadata,
-                        updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
-                    )
-                )
-                await session.execute(stmt)
-                self.logger.info(f"Updated enhanced batch context: batch_id='{batch_id}', course='{registration_data.course_code}'")
-
-        except Exception as e:
-            self.logger.error(f"Failed to store enhanced batch context: batch_id='{batch_id}', error='{e}'", exc_info=True)
-            raise
-    ```
-
-3. **Enhanced Batch Registration Endpoint**: Add new endpoint with backward compatibility.
-
-    **File**: `services/batch_orchestrator_service/api/batch_routes.py`
-
-    ```python
-    @batch_bp.route("/v2/register", methods=["POST"])
-    @inject
-    async def register_enhanced_batch(
-        registration_data: BatchRegistrationRequestV2,
-        batch_ops: FromDishka[BatchContextOperationsProtocol],
-        event_publisher: FromDishka[BatchEventPublisherProtocol],
-    ) -> tuple[dict, int]:
-        """Enhanced batch registration with course validation and class support."""
-        try:
-            batch_id = str(uuid4())
-            correlation_id = uuid4()
-
-            # Store enhanced context
-            await batch_ops.store_enhanced_batch_context(batch_id, registration_data)
-
-            # Publish enhanced registration event
-            await event_publisher.publish_batch_registered_event(
-                batch_id=batch_id,
-                registration_data=registration_data,
-                correlation_id=correlation_id,
-            )
-
-            logger.info(
-                f"Enhanced batch registered: batch_id='{batch_id}', "
-                f"course='{registration_data.course_code}', "
-                f"class='{registration_data.class_designation}', "
-                f"user_id='{registration_data.user_id}'"
-            )
-
-            return {
-                "batch_id": batch_id,
-                "status": "registered",
-                "course_code": registration_data.course_code,
-                "language": registration_data.language,
-                "class_designation": registration_data.class_designation,
-                "enable_student_parsing": registration_data.enable_student_parsing,
-            }, 201
-
-        except ValueError as e:
-            logger.warning(f"Enhanced batch registration validation error: {e}")
-            return {"error": f"Validation error: {str(e)}"}, 400
-        except Exception as e:
-            logger.error(f"Enhanced batch registration failed: {e}", exc_info=True)
-            return {"error": "Internal server error"}, 500
-    ```
-
-**Done When**:
-
-- ✅ Course validation enforces only ENG5/6/7 and SV1/2/3 codes
-- ✅ Language is automatically inferred from course code
-- ✅ Enhanced metadata is stored in batch context
-- ✅ Backward compatibility is maintained with V1 endpoint
-- ✅ All validation errors provide clear feedback
-
-### Checkpoint 2.2: File Management with Batch State Validation
+### Checkpoint 2.1: File Management with Batch State Validation
 
 **Objective**: Implement file add/remove operations with proper batch state validation, ensuring files cannot be modified after spellcheck begins.
 
@@ -459,299 +299,299 @@ This implementation follows the established HuleEdu microservice patterns:
 
 1. **Batch State Validation Protocol**: Define protocol for validating batch modification permissions.
 
-    **File**: `services/file_service/protocols.py`
+**File**: `services/file_service/protocols.py`
 
-    ```python
-    from typing import Protocol
-    from datetime import datetime
+```python
+from typing import Protocol
+from datetime import datetime
 
-    class BatchStateValidatorProtocol(Protocol):
-        """Protocol for validating batch state and modification permissions."""
-        
-        async def can_modify_batch_files(self, batch_id: str, user_id: str) -> tuple[bool, str]:
-            """
-            Check if batch files can be modified.
-            
-            Returns:
-                tuple[bool, str]: (can_modify, reason_if_not)
-            """
-            ...
+class BatchStateValidatorProtocol(Protocol):
+    """Protocol for validating batch state and modification permissions."""
 
-        async def get_batch_lock_status(self, batch_id: str) -> dict:
-            """Get detailed batch lock status information."""
-            ...
+    async def can_modify_batch_files(self, batch_id: str, user_id: str) -> tuple[bool, str]:
+        """
+        Check if batch files can be modified.
 
-    class FileEventPublisherProtocol(Protocol):
-        """Enhanced protocol for publishing file management events."""
-        
-        async def publish_file_added_event(
-            self, 
-            batch_id: str, 
-            essay_id: str, 
-            filename: str, 
-            user_id: str
-        ) -> None:
-            """Publish real-time update when file is added to batch."""
-            ...
+        Returns:
+            tuple[bool, str]: (can_modify, reason_if_not)
+        """
+        ...
 
-        async def publish_file_removed_event(
-            self, 
-            batch_id: str, 
-            essay_id: str, 
-            filename: str, 
-            user_id: str
-        ) -> None:
-            """Publish real-time update when file is removed from batch."""
-            ...
+    async def get_batch_lock_status(self, batch_id: str) -> dict:
+        """Get detailed batch lock status information."""
+        ...
 
-        async def publish_batch_locked_event(
-            self,
-            batch_id: str,
-            locked_at: datetime,
-            reason: str,
-            user_id: str
-        ) -> None:
-            """Publish real-time update when batch becomes locked."""
-            ...
-    ```
+class FileEventPublisherProtocol(Protocol):
+    """Enhanced protocol for publishing file management events."""
+
+    async def publish_file_added_event(
+        self,
+        batch_id: str,
+        essay_id: str,
+        filename: str,
+        user_id: str
+    ) -> None:
+        """Publish real-time update when file is added to batch."""
+        ...
+
+    async def publish_file_removed_event(
+        self,
+        batch_id: str,
+        essay_id: str,
+        filename: str,
+        user_id: str
+    ) -> None:
+        """Publish real-time update when file is removed from batch."""
+        ...
+
+    async def publish_batch_locked_event(
+        self,
+        batch_id: str,
+        locked_at: datetime,
+        reason: str,
+        user_id: str
+    ) -> None:
+        """Publish real-time update when batch becomes locked."""
+        ...
+```
 
 2. **Batch State Validator Implementation**: Create validator that queries BOS for batch state.
 
-    **File**: `services/file_service/implementations/batch_state_validator.py`
+**File**: `services/file_service/implementations/batch_state_validator.py`
 
-    ```python
-    import aiohttp
-    from datetime import datetime
-    from huleedu_service_libs.logging_utils import create_service_logger
-    from ..protocols import BatchStateValidatorProtocol
-    from ..config import Settings
+```python
+import aiohttp
+from datetime import datetime
+from huleedu_service_libs.logging_utils import create_service_logger
+from ..protocols import BatchStateValidatorProtocol
+from ..config import Settings
 
-    logger = create_service_logger("file_service.batch_state_validator")
+logger = create_service_logger("file_service.batch_state_validator")
 
-    class BOSBatchStateValidator:
-        """Validates batch state by querying BOS for pipeline status."""
-        
-        def __init__(self, http_session: aiohttp.ClientSession, settings: Settings):
-            self.http_session = http_session
-            self.settings = settings
+class BOSBatchStateValidator:
+    """Validates batch state by querying BOS for pipeline status."""
 
-        async def can_modify_batch_files(self, batch_id: str, user_id: str) -> tuple[bool, str]:
-            """
-            Check if batch files can be modified by querying BOS pipeline state.
-            
-            Files cannot be modified if:
-            - Spellcheck phase has started (IN_PROGRESS or COMPLETED)
-            - Batch is in any processing state beyond READY_FOR_PIPELINE_EXECUTION
-            """
-            try:
-                # Query BOS for current pipeline state
-                bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
-                
-                async with self.http_session.get(bos_url, timeout=aiohttp.ClientTimeout(total=5)) as response:
-                    if response.status == 404:
-                        return False, "Batch not found"
-                    elif response.status != 200:
-                        logger.error(f"BOS query failed for batch {batch_id}: status {response.status}")
-                        return False, "Unable to verify batch state"
-                    
-                    pipeline_data = await response.json()
-                    pipeline_state = pipeline_data.get("pipeline_state", {})
-                    
-                    # Verify user ownership
-                    batch_user_id = pipeline_data.get("user_id")
-                    if batch_user_id != user_id:
-                        return False, "Access denied: You don't own this batch"
-                    
-                    # Check if spellcheck has started
-                    spellcheck_status = pipeline_state.get("SPELLCHECK", {}).get("status")
-                    if spellcheck_status in ["IN_PROGRESS", "COMPLETED"]:
-                        return False, "Batch is locked: Spellcheck has started"
-                    
-                    # Check if any processing has started
-                    for phase, phase_data in pipeline_state.items():
-                        if isinstance(phase_data, dict) and phase_data.get("status") in ["IN_PROGRESS", "COMPLETED"]:
-                            return False, f"Batch is locked: {phase} processing has started"
-                    
-                    return True, "Batch can be modified"
-                    
-            except Exception as e:
-                logger.error(f"Error validating batch state for {batch_id}: {e}", exc_info=True)
-                return False, "Unable to verify batch state"
+    def __init__(self, http_session: aiohttp.ClientSession, settings: Settings):
+        self.http_session = http_session
+        self.settings = settings
 
-        async def get_batch_lock_status(self, batch_id: str) -> dict:
-            """Get detailed batch lock status for client information."""
-            try:
-                bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
-                
-                async with self.http_session.get(bos_url, timeout=aiohttp.ClientTimeout(total=5)) as response:
-                    if response.status != 200:
-                        return {"locked": True, "reason": "Unable to verify batch state"}
-                    
-                    pipeline_data = await response.json()
-                    pipeline_state = pipeline_data.get("pipeline_state", {})
-                    
-                    # Determine lock status and reason
-                    for phase, phase_data in pipeline_state.items():
-                        if isinstance(phase_data, dict) and phase_data.get("status") in ["IN_PROGRESS", "COMPLETED"]:
-                            return {
-                                "locked": True,
-                                "reason": f"{phase} processing has started",
-                                "locked_at": phase_data.get("started_at"),
-                                "current_phase": phase,
-                                "phase_status": phase_data.get("status")
-                            }
-                    
-                    return {
-                        "locked": False,
-                        "reason": "Batch is open for modifications",
-                        "current_state": "READY_FOR_MODIFICATIONS"
-                    }
-                    
-            except Exception as e:
-                logger.error(f"Error getting batch lock status for {batch_id}: {e}", exc_info=True)
-                return {"locked": True, "reason": "Unable to verify batch state"}
-    ```
+    async def can_modify_batch_files(self, batch_id: str, user_id: str) -> tuple[bool, str]:
+        """
+        Check if batch files can be modified by querying BOS pipeline state.
+
+        Files cannot be modified if:
+        - Spellcheck phase has started (IN_PROGRESS or COMPLETED)
+        - Batch is in any processing state beyond READY_FOR_PIPELINE_EXECUTION
+        """
+        try:
+            # Query BOS for current pipeline state
+            bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
+
+            async with self.http_session.get(bos_url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                if response.status == 404:
+                    return False, "Batch not found"
+                elif response.status != 200:
+                    logger.error(f"BOS query failed for batch {batch_id}: status {response.status}")
+                    return False, "Unable to verify batch state"
+
+                pipeline_data = await response.json()
+                pipeline_state = pipeline_data.get("pipeline_state", {})
+
+                # Verify user ownership
+                batch_user_id = pipeline_data.get("user_id")
+                if batch_user_id != user_id:
+                    return False, "Access denied: You don't own this batch"
+
+                # Check if spellcheck has started
+                spellcheck_status = pipeline_state.get("SPELLCHECK", {}).get("status")
+                if spellcheck_status in ["IN_PROGRESS", "COMPLETED"]:
+                    return False, "Batch is locked: Spellcheck has started"
+
+                # Check if any processing has started
+                for phase, phase_data in pipeline_state.items():
+                    if isinstance(phase_data, dict) and phase_data.get("status") in ["IN_PROGRESS", "COMPLETED"]:
+                        return False, f"Batch is locked: {phase} processing has started"
+
+                return True, "Batch can be modified"
+
+        except Exception as e:
+            logger.error(f"Error validating batch state for {batch_id}: {e}", exc_info=True)
+            return False, "Unable to verify batch state"
+
+    async def get_batch_lock_status(self, batch_id: str) -> dict:
+        """Get detailed batch lock status for client information."""
+        try:
+            bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
+
+            async with self.http_session.get(bos_url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                if response.status != 200:
+                    return {"locked": True, "reason": "Unable to verify batch state"}
+
+                pipeline_data = await response.json()
+                pipeline_state = pipeline_data.get("pipeline_state", {})
+
+                # Determine lock status and reason
+                for phase, phase_data in pipeline_state.items():
+                    if isinstance(phase_data, dict) and phase_data.get("status") in ["IN_PROGRESS", "COMPLETED"]:
+                        return {
+                            "locked": True,
+                            "reason": f"{phase} processing has started",
+                            "locked_at": phase_data.get("started_at"),
+                            "current_phase": phase,
+                            "phase_status": phase_data.get("status")
+                        }
+
+                return {
+                    "locked": False,
+                    "reason": "Batch is open for modifications",
+                    "current_state": "READY_FOR_MODIFICATIONS"
+                }
+
+        except Exception as e:
+            logger.error(f"Error getting batch lock status for {batch_id}: {e}", exc_info=True)
+            return {"locked": True, "reason": "Unable to verify batch state"}
+```
 
 3. **Enhanced File Management Endpoints**: Add new endpoints for file operations with state validation.
 
-    **File**: `services/file_service/api/file_routes.py`
+**File**: `services/file_service/api/file_routes.py`
 
-    ```python
-    from quart import Blueprint, request, jsonify
-    from quart_dishka import inject
-    from dishka import FromDishka
-    from ..protocols import BatchStateValidatorProtocol, FileEventPublisherProtocol
-    from ..core_logic import FileProcessingLogic
-    from huleedu_service_libs.logging_utils import create_service_logger
+```python
+from quart import Blueprint, request, jsonify
+from quart_dishka import inject
+from dishka import FromDishka
+from ..protocols import BatchStateValidatorProtocol, FileEventPublisherProtocol
+from ..core_logic import FileProcessingLogic
+from huleedu_service_libs.logging_utils import create_service_logger
 
-    file_bp = Blueprint("file_routes", __name__)
-    logger = create_service_logger("file_service.file_routes")
+file_bp = Blueprint("file_routes", __name__)
+logger = create_service_logger("file_service.file_routes")
 
-    @file_bp.route("/batch/<batch_id>/state", methods=["GET"])
-    @inject
-    async def get_batch_processing_state(
-        batch_id: str,
-        batch_validator: FromDishka[BatchStateValidatorProtocol],
-    ):
-        """Get current batch processing state and lock status."""
-        try:
-            lock_status = await batch_validator.get_batch_lock_status(batch_id)
+@file_bp.route("/batch/<batch_id>/state", methods=["GET"])
+@inject
+async def get_batch_processing_state(
+    batch_id: str,
+    batch_validator: FromDishka[BatchStateValidatorProtocol],
+):
+    """Get current batch processing state and lock status."""
+    try:
+        lock_status = await batch_validator.get_batch_lock_status(batch_id)
+        return jsonify({
+            "batch_id": batch_id,
+            "lock_status": lock_status,
+            "can_modify_files": not lock_status.get("locked", True)
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error getting batch state for {batch_id}: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+
+@file_bp.route("/batch/<batch_id>/files", methods=["POST"])
+@inject
+async def add_files_to_batch(
+    batch_id: str,
+    batch_validator: FromDishka[BatchStateValidatorProtocol],
+    file_processor: FromDishka[FileProcessingLogic],
+    event_publisher: FromDishka[FileEventPublisherProtocol],
+):
+    """Add files to an existing batch with state validation."""
+    try:
+        # Get user_id from authenticated request (provided by API Gateway)
+        user_id = request.headers.get("X-User-ID")
+        if not user_id:
+            return jsonify({"error": "User authentication required"}), 401
+
+        # Validate batch can be modified
+        can_modify, reason = await batch_validator.can_modify_batch_files(batch_id, user_id)
+        if not can_modify:
             return jsonify({
-                "batch_id": batch_id,
-                "lock_status": lock_status,
-                "can_modify_files": not lock_status.get("locked", True)
-            }), 200
-            
-        except Exception as e:
-            logger.error(f"Error getting batch state for {batch_id}: {e}", exc_info=True)
-            return jsonify({"error": "Internal server error"}), 500
+                "error": "Cannot add files to batch",
+                "reason": reason
+            }), 409
 
-    @file_bp.route("/batch/<batch_id>/files", methods=["POST"])
-    @inject
-    async def add_files_to_batch(
-        batch_id: str,
-        batch_validator: FromDishka[BatchStateValidatorProtocol],
-        file_processor: FromDishka[FileProcessingLogic],
-        event_publisher: FromDishka[FileEventPublisherProtocol],
-    ):
-        """Add files to an existing batch with state validation."""
-        try:
-            # Get user_id from authenticated request (provided by API Gateway)
-            user_id = request.headers.get("X-User-ID")
-            if not user_id:
-                return jsonify({"error": "User authentication required"}), 401
+        # Process uploaded files
+        files = await request.files
+        if not files:
+            return jsonify({"error": "No files provided"}), 400
 
-            # Validate batch can be modified
-            can_modify, reason = await batch_validator.can_modify_batch_files(batch_id, user_id)
-            if not can_modify:
-                return jsonify({
-                    "error": "Cannot add files to batch",
-                    "reason": reason
-                }), 409
+        uploaded_files = []
+        for file_key, file_obj in files.items():
+            if file_obj.filename:
+                # Process file with existing logic
+                essay_id, processed_content = await file_processor.process_uploaded_file(
+                    file_obj, batch_id, user_id
+                )
 
-            # Process uploaded files
-            files = await request.files
-            if not files:
-                return jsonify({"error": "No files provided"}), 400
+                uploaded_files.append({
+                    "essay_id": essay_id,
+                    "filename": file_obj.filename,
+                    "status": "uploaded"
+                })
 
-            uploaded_files = []
-            for file_key, file_obj in files.items():
-                if file_obj.filename:
-                    # Process file with existing logic
-                    essay_id, processed_content = await file_processor.process_uploaded_file(
-                        file_obj, batch_id, user_id
-                    )
-                    
-                    uploaded_files.append({
-                        "essay_id": essay_id,
-                        "filename": file_obj.filename,
-                        "status": "uploaded"
-                    })
+                # Publish real-time update
+                await event_publisher.publish_file_added_event(
+                    batch_id, essay_id, file_obj.filename, user_id
+                )
 
-                    # Publish real-time update
-                    await event_publisher.publish_file_added_event(
-                        batch_id, essay_id, file_obj.filename, user_id
-                    )
+        logger.info(f"Added {len(uploaded_files)} files to batch {batch_id} for user {user_id}")
 
-            logger.info(f"Added {len(uploaded_files)} files to batch {batch_id} for user {user_id}")
-            
+        return jsonify({
+            "batch_id": batch_id,
+            "files_added": uploaded_files,
+            "total_files": len(uploaded_files)
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Error adding files to batch {batch_id}: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+
+@file_bp.route("/batch/<batch_id>/files/<essay_id>", methods=["DELETE"])
+@inject
+async def remove_file_from_batch(
+    batch_id: str,
+    essay_id: str,
+    batch_validator: FromDishka[BatchStateValidatorProtocol],
+    file_processor: FromDishka[FileProcessingLogic],
+    event_publisher: FromDishka[FileEventPublisherProtocol],
+):
+    """Remove a file from a batch with state validation."""
+    try:
+        # Get user_id from authenticated request
+        user_id = request.headers.get("X-User-ID")
+        if not user_id:
+            return jsonify({"error": "User authentication required"}), 401
+
+        # Validate batch can be modified
+        can_modify, reason = await batch_validator.can_modify_batch_files(batch_id, user_id)
+        if not can_modify:
             return jsonify({
-                "batch_id": batch_id,
-                "files_added": uploaded_files,
-                "total_files": len(uploaded_files)
-            }), 201
+                "error": "Cannot remove files from batch",
+                "reason": reason
+            }), 409
 
-        except Exception as e:
-            logger.error(f"Error adding files to batch {batch_id}: {e}", exc_info=True)
-            return jsonify({"error": "Internal server error"}), 500
+        # Remove file with existing logic
+        filename = await file_processor.remove_file_from_batch(batch_id, essay_id, user_id)
 
-    @file_bp.route("/batch/<batch_id>/files/<essay_id>", methods=["DELETE"])
-    @inject
-    async def remove_file_from_batch(
-        batch_id: str,
-        essay_id: str,
-        batch_validator: FromDishka[BatchStateValidatorProtocol],
-        file_processor: FromDishka[FileProcessingLogic],
-        event_publisher: FromDishka[FileEventPublisherProtocol],
-    ):
-        """Remove a file from a batch with state validation."""
-        try:
-            # Get user_id from authenticated request
-            user_id = request.headers.get("X-User-ID")
-            if not user_id:
-                return jsonify({"error": "User authentication required"}), 401
+        # Publish real-time update
+        await event_publisher.publish_file_removed_event(
+            batch_id, essay_id, filename, user_id
+        )
 
-            # Validate batch can be modified
-            can_modify, reason = await batch_validator.can_modify_batch_files(batch_id, user_id)
-            if not can_modify:
-                return jsonify({
-                    "error": "Cannot remove files from batch",
-                    "reason": reason
-                }), 409
+        logger.info(f"Removed file {essay_id} from batch {batch_id} for user {user_id}")
 
-            # Remove file with existing logic
-            filename = await file_processor.remove_file_from_batch(batch_id, essay_id, user_id)
-            
-            # Publish real-time update
-            await event_publisher.publish_file_removed_event(
-                batch_id, essay_id, filename, user_id
-            )
+        return jsonify({
+            "batch_id": batch_id,
+            "essay_id": essay_id,
+            "filename": filename,
+            "status": "removed"
+        }), 200
 
-            logger.info(f"Removed file {essay_id} from batch {batch_id} for user {user_id}")
-            
-            return jsonify({
-                "batch_id": batch_id,
-                "essay_id": essay_id,
-                "filename": filename,
-                "status": "removed"
-            }), 200
-
-        except FileNotFoundError:
-            return jsonify({"error": "File not found"}), 404
-        except Exception as e:
-            logger.error(f"Error removing file {essay_id} from batch {batch_id}: {e}", exc_info=True)
-            return jsonify({"error": "Internal server error"}), 500
-    ```
+    except FileNotFoundError:
+        return jsonify({"error": "File not found"}), 404
+    except Exception as e:
+        logger.error(f"Error removing file {essay_id} from batch {batch_id}: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+```
 
 **Done When**:
 
@@ -761,7 +601,7 @@ This implementation follows the established HuleEdu microservice patterns:
 - ✅ Batch state information is available to clients
 - ✅ Error messages provide clear reasons for operation failures
 
-### Checkpoint 2.3: Class Management Service Foundation
+### Checkpoint 2.2: Class Management Service Foundation
 
 **Objective**: Implement a new microservice for managing user classes, students, and their relationships with courses and essays.
 
@@ -782,202 +622,214 @@ This implementation follows the established HuleEdu microservice patterns:
 
 1. **Service Structure and Database Models**: Create the complete service structure following HuleEdu patterns.
 
-    **File**: `services/class_management_service/models_db.py`
+**File**: `services/class_management_service/models_db.py`
 
-    ```python
-    from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, Float, ForeignKey, Table
-    from sqlalchemy.ext.declarative import declarative_base
-    from sqlalchemy.orm import relationship, Mapped, mapped_column
-    from datetime import datetime
-    from typing import Optional
+```python
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, Float, ForeignKey, Table
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+from datetime import datetime
+from typing import Optional
 
-    Base = declarative_base()
+Base = declarative_base()
 
-    # Association table for many-to-many relationship between classes and students
-    class_student_association = Table(
-        'class_student_associations',
-        Base.metadata,
-        Column('class_id', String(36), ForeignKey('user_classes.id', ondelete='CASCADE'), primary_key=True),
-        Column('student_id', String(36), ForeignKey('students.id', ondelete='CASCADE'), primary_key=True),
-        Column('created_at', DateTime, default=datetime.utcnow)
-    )
+# Association table for many-to-many relationship between classes and students
+class_student_association = Table(
+    'class_student_associations',
+    Base.metadata,
+    Column('class_id', String(36), ForeignKey('user_classes.id', ondelete='CASCADE'), primary_key=True),
+    Column('student_id', String(36), ForeignKey('students.id', ondelete='CASCADE'), primary_key=True),
+    Column('created_at', DateTime, default=datetime.utcnow)
+)
 
-    # Note: Simplified one-to-one class-course relationship (each class belongs to exactly one course)
+# Note: Simplified one-to-one class-course relationship (each class belongs to exactly one course)
 
-    class Course(Base):
-        """Predefined courses with language and skill level information."""
-        __tablename__ = "courses"
-        
-        code: Mapped[str] = mapped_column(String(10), primary_key=True)  # ENG5, SV1, etc.
-        name: Mapped[str] = mapped_column(String(100), nullable=False)
-        language: Mapped[str] = mapped_column(String(10), nullable=False)  # "en", "sv"
-        skill_level: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-7
-        description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-        is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-        created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+class Course(Base):
+    """Predefined courses with language and skill level information."""
+    __tablename__ = "courses"
 
-        # Relationships (one-to-many: one course can have multiple classes)
-        classes = relationship("UserClass", back_populates="course")
+    code: Mapped[str] = mapped_column(String(10), primary_key=True)  # ENG5, SV1, etc.
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    language: Mapped[str] = mapped_column(String(10), nullable=False)  # "en", "sv"
+    skill_level: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-7
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    class UserClass(Base):
-        """Teacher-owned class designations with one-to-one course relationship."""
-        __tablename__ = "user_classes"
-        
-        id: Mapped[str] = mapped_column(String(36), primary_key=True)
-        user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-        class_designation: Mapped[str] = mapped_column(String(255), nullable=False)
-        course_code: Mapped[str] = mapped_column(String(10), ForeignKey("courses.code"), nullable=False)
-        description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-        created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-        updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-        
-        # Relationships
-        students = relationship("Student", secondary=class_student_association, back_populates="classes")
-        course = relationship("Course", back_populates="classes")
+    # Relationships (one-to-many: one course can have multiple classes)
+    classes = relationship("UserClass", back_populates="course")
 
-    class Student(Base):
-        """Student entities with separated name fields for better data management and CSV export."""
-        __tablename__ = "students"
-        
-        id: Mapped[str] = mapped_column(String(36), primary_key=True)
-        first_name: Mapped[str] = mapped_column(String(255), nullable=False)
-        last_name: Mapped[str] = mapped_column(String(255), nullable=False)
-        legal_full_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Full parsed name for reference
-        email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-        created_by_user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-        created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-        updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-        
-        @property
-        def full_name(self) -> str:
-            """Combined name for display purposes."""
-            return f"{self.first_name} {self.last_name}"
-        
-        @property
-        def last_first_name(self) -> str:
-            """Last, First format for sorting."""
-            return f"{self.last_name}, {self.first_name}"
-        
-        # Relationships - students can belong to multiple classes
-        classes = relationship("UserClass", secondary=class_student_association, back_populates="students")
-        essay_associations = relationship("EssayStudentAssociation", back_populates="student")
+class UserClass(Base):
+    """Teacher-owned class designations with one-to-one course relationship."""
+    __tablename__ = "user_classes"
 
-    class EssayStudentAssociation(Base):
-        """Associates essays with students (manual or parsed)."""
-        __tablename__ = "essay_student_associations"
-        
-        id: Mapped[str] = mapped_column(String(36), primary_key=True)
-        batch_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
-        essay_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
-        student_id: Mapped[str] = mapped_column(String(36), ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
-        association_method: Mapped[str] = mapped_column(String(20), nullable=False)  # "parsed" or "manual"
-        confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-        created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-        created_by_user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-        
-        # Relationships
-        student = relationship("Student", back_populates="essay_associations")
-    ```
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    class_designation: Mapped[str] = mapped_column(String(255), nullable=False)
+    course_code: Mapped[str] = mapped_column(String(10), ForeignKey("courses.code"), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    students = relationship("Student", secondary=class_student_association, back_populates="classes")
+    course = relationship("Course", back_populates="classes")
+
+class Student(Base):
+    """Student entities using PersonNameV1 pattern for consistency (ADL-01)."""
+    __tablename__ = "students"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    first_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    legal_full_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Full parsed name from file
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    created_by_user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def full_name(self) -> str:
+        """Combined name for display purposes (matches PersonNameV1.full_name)."""
+        return f"{self.first_name} {self.last_name}"
+
+    @property
+    def last_first_name(self) -> str:
+        """Last, First format for sorting (matches PersonNameV1.last_first_name)."""
+        return f"{self.last_name}, {self.first_name}"
+    
+    def to_person_name_v1(self) -> "PersonNameV1":
+        """Convert to PersonNameV1 for event publishing."""
+        from common_core.person_models import PersonNameV1
+        return PersonNameV1(first_name=self.first_name, last_name=self.last_name)
+
+    # Relationships - students can belong to multiple classes
+    classes = relationship("UserClass", secondary=class_student_association, back_populates="students")
+    essay_associations = relationship("EssayStudentAssociation", back_populates="student")
+
+class EssayStudentAssociation(Base):
+    """Associates essays with students (manual or parsed)."""
+    __tablename__ = "essay_student_associations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    batch_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    essay_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    student_id: Mapped[str] = mapped_column(String(36), ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    association_method: Mapped[str] = mapped_column(String(20), nullable=False)  # "parsed" or "manual"
+    confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_by_user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+
+    # Relationships
+    student = relationship("Student", back_populates="essay_associations")
+```
 
 2. **Service API Models**: Define request/response models for the class management API.
 
-    **File**: `services/class_management_service/api_models.py`
+**File**: `services/class_management_service/api_models.py`
 
-    ```python
-    from pydantic import BaseModel, Field, EmailStr
-    from typing import Optional, List
-    from datetime import datetime
-    from common_core.enums import CourseCode
+```python
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List
+from datetime import datetime
+from common_core.enums import CourseCode
 
-    class CreateClassRequest(BaseModel):
-        """Request to create a new class."""
-        class_designation: str = Field(..., min_length=1, max_length=255)
-        description: Optional[str] = Field(None, max_length=1000)
-        course_codes: List[CourseCode] = Field(..., min_items=1, description="Courses this class is associated with")
+class CreateClassRequest(BaseModel):
+    """Request to create a new class."""
+    class_designation: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=1000)
+    course_codes: List[CourseCode] = Field(..., min_items=1, description="Courses this class is associated with")
 
-    class UpdateClassRequest(BaseModel):
-        """Request to update an existing class."""
-        class_designation: Optional[str] = Field(None, min_length=1, max_length=255)
-        description: Optional[str] = Field(None, max_length=1000)
-        course_codes: Optional[List[CourseCode]] = Field(None, min_items=1)
+class UpdateClassRequest(BaseModel):
+    """Request to update an existing class."""
+    class_designation: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=1000)
+    course_codes: Optional[List[CourseCode]] = Field(None, min_items=1)
 
-    class CreateStudentRequest(BaseModel):
-        """Request to create a new student with separated name fields."""
-        first_name: str = Field(..., min_length=1, max_length=255)
-        last_name: str = Field(..., min_length=1, max_length=255)
-        email: EmailStr = Field(...)
-        class_ids: Optional[List[str]] = Field(None, description="Classes to associate student with")
+class CreateStudentRequest(BaseModel):
+    """Request to create a new student with separated name fields."""
+    first_name: str = Field(..., min_length=1, max_length=255)
+    last_name: str = Field(..., min_length=1, max_length=255)
+    email: EmailStr = Field(...)
+    class_ids: Optional[List[str]] = Field(None, description="Classes to associate student with")
 
-    class UpdateStudentRequest(BaseModel):
-        """Request to update an existing student."""
-        first_name: Optional[str] = Field(None, min_length=1, max_length=255)
-        last_name: Optional[str] = Field(None, min_length=1, max_length=255)
-        email: Optional[EmailStr] = Field(None)
+class UpdateStudentRequest(BaseModel):
+    """Request to update an existing student."""
+    first_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    last_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    email: Optional[EmailStr] = Field(None)
 
-    class EssayStudentAssociationRequest(BaseModel):
-        """Request to associate an essay with a student."""
-        student_id: str = Field(...)
-        association_method: str = Field(default="manual", pattern="^(manual|parsed)$")
-        confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
+class EssayStudentAssociationRequest(BaseModel):
+    """Request to associate an essay with a student."""
+    student_id: str = Field(...)
+    association_method: str = Field(default="manual", pattern="^(manual|parsed)$")
+    confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
 
-    class StudentParsingResult(BaseModel):
-        """Result of automatic student parsing with separated name components."""
-        essay_id: str
-        filename: str
-        first_name: Optional[str] = None
-        last_name: Optional[str] = None
-        legal_full_name: Optional[str] = None  # Original parsed full name
-        student_email: Optional[str] = None
-        confidence_score: float = Field(ge=0.0, le=1.0)
-        parsing_method: str
-        raw_text_snippet: Optional[str] = None
-        
-        @property
-        def full_name(self) -> Optional[str]:
-            """Combined name if both parts are available."""
-            if self.first_name and self.last_name:
-                return f"{self.first_name} {self.last_name}"
-            return self.first_name or self.last_name or self.legal_full_name
+class StudentParsingResult(BaseModel):
+    """Result of automatic student parsing following PersonNameV1 pattern (ADL-01)."""
+    essay_id: str
+    filename: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    legal_full_name: Optional[str] = None  # Original parsed full name from file
+    student_email: Optional[str] = None
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    parsing_method: str
+    raw_text_snippet: Optional[str] = None
 
-    # Response models
-    class ClassResponse(BaseModel):
-        """Response model for class information."""
-        id: str
-        class_designation: str
-        description: Optional[str]
-        user_id: str
-        courses: List[dict]  # Course information
-        student_count: int
-        created_at: datetime
-        updated_at: datetime
-
-    class StudentResponse(BaseModel):
-        """Response model for student information with separated name fields."""
-        id: str
-        first_name: str
-        last_name: str
-        email: str
-        created_by_user_id: str
-        classes: List[dict]  # Class information
-        essay_count: int
-        created_at: datetime
-        updated_at: datetime
-        
-        @property
-        def full_name(self) -> str:
-            """Combined name for display purposes."""
+    @property
+    def full_name(self) -> Optional[str]:
+        """Combined name if both parts are available (matches PersonNameV1.full_name)."""
+        if self.first_name and self.last_name:
             return f"{self.first_name} {self.last_name}"
+        return self.first_name or self.last_name or self.legal_full_name
+    
+    def to_person_name_v1(self) -> Optional["PersonNameV1"]:
+        """Convert to PersonNameV1 if both name parts are available."""
+        if self.first_name and self.last_name:
+            from common_core.person_models import PersonNameV1
+            return PersonNameV1(first_name=self.first_name, last_name=self.last_name)
+        return None
 
-    class EssayStudentAssociationResponse(BaseModel):
-        """Response model for essay-student associations."""
-        id: str
-        batch_id: str
-        essay_id: str
-        student: StudentResponse
-        association_method: str
-        confidence_score: Optional[float]
-        created_at: datetime
-    ```
+# Response models
+class ClassResponse(BaseModel):
+    """Response model for class information."""
+    id: str
+    class_designation: str
+    description: Optional[str]
+    user_id: str
+    courses: List[dict]  # Course information
+    student_count: int
+    created_at: datetime
+    updated_at: datetime
+
+class StudentResponse(BaseModel):
+    """Response model for student information with separated name fields."""
+    id: str
+    first_name: str
+    last_name: str
+    email: str
+    created_by_user_id: str
+    classes: List[dict]  # Class information
+    essay_count: int
+    created_at: datetime
+    updated_at: datetime
+
+    @property
+    def full_name(self) -> str:
+        """Combined name for display purposes."""
+        return f"{self.first_name} {self.last_name}"
+
+class EssayStudentAssociationResponse(BaseModel):
+    """Response model for essay-student associations."""
+    id: str
+    batch_id: str
+    essay_id: str
+    student: StudentResponse
+    association_method: str
+    confidence_score: Optional[float]
+    created_at: datetime
+```
 
 **Done When**:
 
@@ -993,40 +845,58 @@ This implementation follows the established HuleEdu microservice patterns:
 **Objective**: Enhance existing File Service parsing capabilities with confidence scoring, class roster matching, and separated name field support.
 
 **Enhancement Strategy**:
+
 - Extend existing `parse_student_info()` stub in File Service
 - Add fuzzy matching against teacher's known students for specific course
 - Implement confidence scoring (0.0-1.0) based on match quality
 - Teacher-scoped parsing (only match against teacher's students)
 - Parse names into separate first/last components for better data management
 
-**Name Parsing Logic**:
+**Name Parsing Logic (ADL-01 & ADL-04)**:
 
 ```python
-def parse_student_name(full_name: str) -> tuple[str, str, str]:
+def parse_student_name(full_name: str) -> ParsedNameMetadata:
     """
-    Parse full name into first, last, and original full name components.
+    Parse full name into PersonNameV1-compatible components with confidence scoring.
     
     Handles Swedish/English naming patterns:
-    - "Anna Andersson" → ("Anna", "Andersson", "Anna Andersson")
-    - "Erik Johan Svensson" → ("Erik Johan", "Svensson", "Erik Johan Svensson") 
-    - "Anna Margareta Svensson-Andersson" → ("Anna", "Svensson-Andersson", "Anna Margareta Svensson-Andersson")
+    - "Anna Andersson" → ParsedNameMetadata(first_name="Anna", last_name="Andersson", confidence=0.9)
+    - "Erik Johan Svensson" → ParsedNameMetadata(first_name="Erik Johan", last_name="Svensson", confidence=0.8) 
+    - "Anna Margareta Svensson-Andersson" → ParsedNameMetadata(first_name="Anna", last_name="Svensson-Andersson", confidence=0.7)
+    
+    Returns ParsedNameMetadata for two-stage workflow (ADL-04).
     """
     if not full_name or not full_name.strip():
-        return "", "", ""
+        return ParsedNameMetadata(
+            first_name=None, last_name=None, 
+            full_name_from_file="", confidence_score=0.0,
+            parsing_method="empty_input"
+        )
     
     original_name = full_name.strip()
     name_parts = original_name.split()
     
     if len(name_parts) == 1:
-        # Single name - treat as last name
-        return "", name_parts[0], original_name
+        # Single name - treat as last name, lower confidence
+        return ParsedNameMetadata(
+            first_name=None, last_name=name_parts[0],
+            full_name_from_file=original_name, confidence_score=0.4,
+            parsing_method="single_name"
+        )
     elif len(name_parts) == 2:
-        # First Last
-        return name_parts[0], name_parts[1], original_name
+        # First Last - highest confidence
+        return ParsedNameMetadata(
+            first_name=name_parts[0], last_name=name_parts[1],
+            full_name_from_file=original_name, confidence_score=0.9,
+            parsing_method="two_part_name"
+        )
     else:
-        # Multiple parts - use first name and last surname, preserve full name
-        # This handles Swedish double surnames and multiple given names
-        return name_parts[0], name_parts[-1], original_name
+        # Multiple parts - use first and last, preserve full name
+        return ParsedNameMetadata(
+            first_name=name_parts[0], last_name=name_parts[-1],
+            full_name_from_file=original_name, confidence_score=0.8,
+            parsing_method="multi_part_name"
+        )
 ```
 
 **CSV Export Benefits**:
@@ -1041,6 +911,7 @@ Maria,Johansson,maria.johansson@school.se,9B,SV2
 ```
 
 This enables:
+
 - **Better Sorting**: Sort by last name primarily
 - **External System Integration**: Many LMS systems expect separated name fields
 - **Data Analysis**: Easier to analyze name patterns and demographics

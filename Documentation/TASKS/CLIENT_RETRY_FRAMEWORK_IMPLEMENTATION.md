@@ -7,6 +7,7 @@
 After comprehensive codebase analysis, the proposed retry framework may be **over-engineered** given existing system capabilities:
 
 **Existing Natural Retry Capabilities:**
+
 - `@idempotent_consumer` decorator already handles retries by deleting Redis keys on failure
 - Kafka message reprocessing provides natural retry mechanism  
 - `PipelinePhaseCoordinatorProtocol` handles phase transition failures
@@ -58,7 +59,8 @@ class ClientBatchPipelineRequestV1(BaseModel):
     )
 ```
 
-**Benefits**: 
+**Benefits**:
+
 - ✅ Reuses existing pipeline request infrastructure
 - ✅ Maintains backward compatibility (optional fields with defaults)
 - ✅ Supports both normal requests and retry requests
@@ -86,6 +88,7 @@ async def retry_phase(
 ```
 
 **Key Features**:
+
 - ✅ **User Ownership Validation**: Checks batch context for user authorization
 - ✅ **CJ Assessment Constraint**: Enforces batch-only retry for CJ Assessment
 - ✅ **Existing Phase Coordination**: Uses `phase_coordinator.initiate_resolved_pipeline()`
@@ -97,6 +100,7 @@ async def retry_phase(
 **File**: `services/batch_orchestrator_service/tests/test_simplified_retry_logic.py`
 
 **Test Coverage**:
+
 - ✅ **Retry Context Validation**: Tests `is_retry` and `retry_reason` fields
 - ✅ **Serialization**: Validates Kafka message serialization/deserialization
 - ✅ **Phase Name Validation**: Tests valid/invalid phase names for retries
@@ -123,6 +127,7 @@ and retry count tracking while maintaining the current natural retry behavior.
 **File**: `.cursor/rules/045-retry-logic.mdc`
 
 Comprehensive rule documenting:
+
 - ✅ **Current Natural Retry Approach**: Via idempotency + Kafka reprocessing
 - ✅ **User-Initiated Retry Pattern**: Using existing `ClientBatchPipelineRequestV1`
 - ✅ **Implementation Guidelines**: Phase = single-phase pipeline approach
@@ -151,18 +156,21 @@ const retryMutation = useMutation({
 ### **Architecture Validation**
 
 #### **✅ Leverages Existing Infrastructure**
-- **Pipeline Request Pattern**: Reuses `ClientBatchPipelineRequestV1` 
+
+- **Pipeline Request Pattern**: Reuses `ClientBatchPipelineRequestV1`
 - **Phase Coordination**: Uses existing `PipelinePhaseCoordinatorProtocol`
 - **User Authorization**: Leverages established user_id propagation
 - **State Management**: Uses existing `ProcessingPipelineState.error_info`
 
 #### **✅ Natural Retry via Idempotency**
+
 - **Automatic Retry**: `@idempotent_consumer` deletes Redis keys on failure
 - **Kafka Reprocessing**: Failed messages can be naturally reprocessed
 - **TTL-Based Cleanup**: Prevents indefinite retry loops
 - **Fail-Open Approach**: Maintains system resilience
 
 #### **✅ Simplified API Design**
+
 - **Single Endpoint**: `/v1/batches/{batch_id}/retry-phase`
 - **Ownership Validation**: User can only retry their own batches
 - **CJ Assessment Constraint**: API-level validation for batch-only retries
@@ -173,6 +181,7 @@ const retryMutation = useMutation({
 **If explicit retry tracking becomes necessary:**
 
 1. **Idempotency Enhancement**:
+
    ```python
    # Extend decorator to distinguish permanent vs. retryable failures
    if error_category == "PERMANENT_FAILURE":
@@ -182,6 +191,7 @@ const retryMutation = useMutation({
    ```
 
 2. **Retry Metadata in Pipeline State**:
+
    ```python
    # Extend PipelineStateDetail.error_info with retry context
    error_info = {
@@ -192,6 +202,7 @@ const retryMutation = useMutation({
    ```
 
 3. **Error Categorization**:
+
    ```python
    # Extend existing ErrorCode enum if needed
    class ErrorCode(str, Enum):
@@ -202,16 +213,19 @@ const retryMutation = useMutation({
 ### **Testing and Validation**
 
 #### **✅ Unit Tests Pass**
+
 - **Common Core**: All 64 tests pass with new retry fields
 - **BOS Tests**: All 52 tests pass (5 Redis integration tests require running Redis)
 - **Retry Logic Tests**: All 11 new tests pass
 
 #### **✅ Backward Compatibility**
+
 - **Existing Events**: Work without retry fields (optional with defaults)
 - **API Endpoints**: Existing functionality unchanged
 - **Phase Coordination**: No changes to existing orchestration logic
 
 #### **✅ Integration Ready**
+
 - **Container Build**: BOS service rebuilds successfully with changes
 - **Event Serialization**: Retry context properly serializes for Kafka
 - **API Gateway**: Ready for frontend integration with retry endpoints
@@ -221,7 +235,7 @@ const retryMutation = useMutation({
 1. **Architectural Consistency**: Extends proven patterns vs. creating new infrastructure
 2. **Reduced Complexity**: ~200 lines of code vs. thousands in original proposal
 3. **Natural Retry**: Leverages existing idempotency system for automatic retries
-4. **User Experience**: Simple retry button that "just works" 
+4. **User Experience**: Simple retry button that "just works"
 5. **Maintainability**: No complex retry state machines or DLQ infrastructure
 6. **Performance**: No additional Kafka topics or event overhead
 7. **Testing**: Comprehensive test coverage with minimal test infrastructure

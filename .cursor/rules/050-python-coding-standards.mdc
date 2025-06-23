@@ -25,7 +25,7 @@ alwaysApply: true
 - **MUST** type-annotate all public functions, methods, class attributes
 - **MUST** use `from __future__ import annotations`
 - **MUST** prefer precise types over `typing.Any`
-- **MUST** pass `pdm run typecheck-all` (run from repository root)
+- **MUST** pass `pdm run mypy` (run from repository root to catch complex multi-level issues)
 - **FORBIDDEN**: `typing.Any` where precise type possible
 
 ### 3.2. Execution Patterns
@@ -33,7 +33,7 @@ alwaysApply: true
 
 ```bash
 # ✅ CORRECT
-pdm run typecheck-all        # Standard command
+pdm run mypy        # Standard command
 pdm run mypy services/       # Check services
 
 ### 3.3. Missing Type Stubs

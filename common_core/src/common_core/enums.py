@@ -7,6 +7,7 @@ be import-time lightweight for every service.
 from __future__ import annotations
 
 from enum import Enum
+from typing import Dict, Tuple
 
 # ---------------------------------------------------------------------------
 # System-level lifecycle stages
@@ -28,6 +29,53 @@ class ProcessingStage(str, Enum):
     @classmethod
     def active(cls) -> set[ProcessingStage]:
         return {cls.COMPLETED, cls.INITIALIZED, cls.PROCESSING}
+
+
+# ---------------------------------------------------------------------------
+# Course and Language definitions for HuleEdu platform
+# ---------------------------------------------------------------------------
+
+
+class CourseCode(str, Enum):
+    """Predefined course codes for HuleEdu platform."""
+    ENG5 = "ENG5"
+    ENG6 = "ENG6"
+    ENG7 = "ENG7"
+    SV1 = "SV1"
+    SV2 = "SV2"
+    SV3 = "SV3"
+
+
+class Language(str, Enum):
+    """Supported languages inferred from course codes."""
+    ENGLISH = "en"
+    SWEDISH = "sv"
+
+
+# Course metadata mapping for language inference
+COURSE_METADATA: Dict[CourseCode, Tuple[str, Language, int]] = {
+    CourseCode.ENG5: ("English 5", Language.ENGLISH, 5),
+    CourseCode.ENG6: ("English 6", Language.ENGLISH, 6),
+    CourseCode.ENG7: ("English 7", Language.ENGLISH, 7),
+    CourseCode.SV1: ("Svenska 1", Language.SWEDISH, 1),
+    CourseCode.SV2: ("Svenska 2", Language.SWEDISH, 2),
+    CourseCode.SV3: ("Svenska 3", Language.SWEDISH, 3),
+}
+
+
+def get_course_language(course_code: CourseCode) -> Language:
+    """Get language for a course code."""
+    return COURSE_METADATA[course_code][1]
+
+
+def get_course_name(course_code: CourseCode) -> str:
+    """Get display name for a course code."""
+    return COURSE_METADATA[course_code][0]
+
+
+def get_course_level(course_code: CourseCode) -> int:
+    """Get skill level for a course code."""
+    return COURSE_METADATA[course_code][2]
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +121,14 @@ class ProcessingEvent(str, Enum):
     ESSAY_EDITOR_REVISION_COMPLETED = "essay.editor_revision.completed"  # Producer perspective
     ESSAY_GRAMMAR_COMPLETED = "essay.grammar.completed"  # Producer perspective
 
+    # -------------  Enhanced file and class management events  -------------#
+    STUDENT_PARSING_COMPLETED = "student.parsing.completed"
+    ESSAY_STUDENT_ASSOCIATION_UPDATED = "essay.student.association.updated"
+    BATCH_FILE_ADDED = "batch.file.added"
+    BATCH_FILE_REMOVED = "batch.file.removed"
+    CLASS_CREATED = "class.created"
+    STUDENT_CREATED = "student.created"
+
     # -------------  Generic -------------#
     PROCESSING_STARTED = "processing.started"
     PROCESSING_CONCLUDED = "processing.concluded"
@@ -100,6 +156,13 @@ _TOPIC_MAPPING = {
     ProcessingEvent.CJ_ASSESSMENT_COMPLETED: "huleedu.cj_assessment.completed.v1",
     ProcessingEvent.CJ_ASSESSMENT_FAILED: "huleedu.cj_assessment.failed.v1",
     ProcessingEvent.ELS_BATCH_PHASE_OUTCOME: "huleedu.els.batch_phase.outcome.v1",
+    # Enhanced file and class management event mappings
+    ProcessingEvent.STUDENT_PARSING_COMPLETED: "huleedu.file.student.parsing.completed.v1",
+    ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED: "huleedu.class.essay.association.updated.v1",
+    ProcessingEvent.BATCH_FILE_ADDED: "huleedu.file.batch.file.added.v1",
+    ProcessingEvent.BATCH_FILE_REMOVED: "huleedu.file.batch.file.removed.v1",
+    ProcessingEvent.CLASS_CREATED: "huleedu.class.created.v1",
+    ProcessingEvent.STUDENT_CREATED: "huleedu.class.student.created.v1",
     # Add more mappings as needed for other events - EACH MUST BE EXPLICIT
 }
 

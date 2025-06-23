@@ -2,6 +2,14 @@
 
 This document provides the final implementation steps for the client interface layer, focusing on read queries, real-time updates, and modifications to existing services to support the new frontend architecture.
 
+## 🚫 **BLOCKING DEPENDENCY - REFACTORING REQUIRED**
+
+**⚠️ CRITICAL: This task is BLOCKED until completion of:**
+
+📋 **[LEAN_BATCH_REGISTRATION_REFACTORING.md](LEAN_BATCH_REGISTRATION_REFACTORING.md)**
+
+**Reason**: WebSocket events and backend modifications reference batch/student data models that need to be refactored for lean registration and proper service boundaries.
+
 ## Part 3: Query Endpoints, WebSocket Layer & Backend Modifications
 
 This part completes the `api_gateway_service` by adding the read-path and real-time components. It also details the required changes in our existing backend services to publish data to the new WebSocket backplane.

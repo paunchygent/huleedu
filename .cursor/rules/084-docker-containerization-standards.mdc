@@ -1,5 +1,5 @@
 ---
-description: 
+description: rules for correct docker containerization patterns
 globs: 
 alwaysApply: false
 ---
