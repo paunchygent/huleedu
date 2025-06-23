@@ -1,8 +1,40 @@
 # Enhanced Class and File Management Implementation Plan
 
-This document outlines the implementation of enhanced file and batch management capabilities, class management service, and student association features for the HuleEdu platform. This implementation builds directly upon the API Gateway foundation and should begin after **Checkpoint 1.4: User ID Propagation** from `API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_1.md`.
+This document outlines the implementation of enhanced file and batch management capabilities, class management service, and student association features for the HuleEdu platform.
 
-## Prerequisites & Dependencies
+**CRITICAL DEPENDENCIES:**
+
+- ✅ **Checkpoint 1.4: User ID Propagation** (API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_1.md) - MUST be completed first
+- ✅ **Checkpoint 3.2: Enhanced WebSocket Implementation** (API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_3.md) - For real-time updates
+- ✅ **User authentication and ownership validation** - Foundation for all enhanced features
+
+**Architecture Alignment:**
+This implementation follows established HuleEdu microservice patterns:
+
+- Event-driven communication via Kafka with thin, focused events
+- Protocol-based dependency injection with Dishka
+- Pydantic contracts for all inter-service communication in `common_core`
+- User ownership validation for all operations
+- Real-time updates via Redis pub/sub and WebSocket
+
+## Implementation Strategy
+
+**Database Design**: Simplified one-to-one class-course relationship where each class belongs to exactly one course. This aligns with the "class + course = unique ID" concept while maintaining simplicity.
+
+**User Scope**: In this system, "user" = teacher. All student data is scoped to the teacher who created it.
+
+**File Operations**: Files can only be modified before spellcheck processing begins. Operations are blocked once pipeline processing starts.
+
+## Future Enhancements
+
+Future enhancements are documented in `documentation/SERVICE_FUTURE_ENHANCEMENTS/class_management_service_roadmap.md`:
+
+- **Phase 2**: Organization-level class sharing
+- **Phase 3**: Advanced student matching and tracking  
+- **Phase 4**: Multi-language course extensions
+- **Phase 5**: Analytics and reporting
+
+## Part 1: Common Core Extensions
 
 **CRITICAL DEPENDENCIES:**
 
@@ -126,7 +158,7 @@ This implementation follows the established HuleEdu microservice patterns:
         batch_id: str = Field(description="Batch identifier")
         # Direct data - parsing results populate Class Management Service DB
         parsing_results: list[dict] = Field(
-            description="List of parsing results: [{essay_id, filename, student_name, student_email, confidence}]"
+            description="List of parsing results: [{essay_id, filename, first_name, last_name, student_email, confidence}]"
         )
         parsed_count: int = Field(description="Number of essays with parsed student info")
         total_count: int = Field(description="Total number of essays processed")
@@ -182,29 +214,31 @@ This implementation follows the established HuleEdu microservice patterns:
         timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class StudentCreatedV1(BaseModel):
-        """Event published when new student is created."""
-        event: str = Field(default="student.created")
-        student_id: str = Field(description="New student identifier")
-        student_name: str = Field(description="Student name")
-        student_email: str = Field(description="Student email address")
-        class_ids: list[str] = Field(description="Associated class identifiers")
-        created_by_user_id: str = Field(description="User who created the student")
-        correlation_id: UUID | None = Field(default=None)
-        timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    """Event published when new student is created."""
+    event: str = Field(default="student.created")
+    student_id: str = Field(description="New student identifier")
+    first_name: str = Field(description="Student first name")
+    last_name: str = Field(description="Student last name")
+    student_email: str = Field(description="Student email address")
+    class_ids: list[str] = Field(description="Associated class identifiers")
+    created_by_user_id: str = Field(description="User who created the student")
+    correlation_id: UUID | None = Field(default=None)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class EssayStudentAssociationUpdatedV1(BaseModel):
-        """Event published when student-essay association is created/updated."""
-        event: str = Field(default="essay.student.association.updated")
-        batch_id: str = Field(description="Batch identifier")
-        essay_id: str = Field(description="Essay identifier")
-        student_id: str | None = Field(description="Student identifier (None if association removed)")
-        student_name: str | None = Field(description="Student name for display")
-        student_email: str | None = Field(description="Student email for display")
-        association_method: str = Field(description="Association method: 'parsed' or 'manual'")
-        confidence_score: float | None = Field(description="Confidence score for parsed associations")
-        created_by_user_id: str = Field(description="User who created the association")
-        correlation_id: UUID | None = Field(default=None)
-        timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    """Event published when student-essay association is created/updated."""
+    event: str = Field(default="essay.student.association.updated")
+    batch_id: str = Field(description="Batch identifier")
+    essay_id: str = Field(description="Essay identifier")
+    student_id: str | None = Field(description="Student identifier (None if association removed)")
+    first_name: str | None = Field(description="Student first name for display")
+    last_name: str | None = Field(description="Student last name for display")
+    student_email: str | None = Field(description="Student email for display")
+    association_method: str = Field(description="Association method: 'parsed' or 'manual'")
+    confidence_score: float | None = Field(description="Confidence score for parsed associations")
+    created_by_user_id: str = Field(description="User who created the association")
+    correlation_id: UUID | None = Field(default=None)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     ```
 
 **Done When**:
@@ -768,14 +802,7 @@ This implementation follows the established HuleEdu microservice patterns:
         Column('created_at', DateTime, default=datetime.utcnow)
     )
 
-    # Association table for many-to-many relationship between classes and courses
-    class_course_association = Table(
-        'class_course_associations',
-        Base.metadata,
-        Column('class_id', String(36), ForeignKey('user_classes.id', ondelete='CASCADE'), primary_key=True),
-        Column('course_code', String(10), ForeignKey('courses.code', ondelete='CASCADE'), primary_key=True),
-        Column('created_at', DateTime, default=datetime.utcnow)
-    )
+    # Note: Simplified one-to-one class-course relationship (each class belongs to exactly one course)
 
     class Course(Base):
         """Predefined courses with language and skill level information."""
@@ -789,34 +816,47 @@ This implementation follows the established HuleEdu microservice patterns:
         is_active: Mapped[bool] = mapped_column(Boolean, default=True)
         created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-        # Relationships
-        classes = relationship("UserClass", secondary=class_course_association, back_populates="courses")
+        # Relationships (one-to-many: one course can have multiple classes)
+        classes = relationship("UserClass", back_populates="course")
 
     class UserClass(Base):
-        """Teacher-owned class designations."""
+        """Teacher-owned class designations with one-to-one course relationship."""
         __tablename__ = "user_classes"
         
         id: Mapped[str] = mapped_column(String(36), primary_key=True)
         user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
         class_designation: Mapped[str] = mapped_column(String(255), nullable=False)
+        course_code: Mapped[str] = mapped_column(String(10), ForeignKey("courses.code"), nullable=False)
         description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
         created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
         updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
         
         # Relationships
         students = relationship("Student", secondary=class_student_association, back_populates="classes")
-        courses = relationship("Course", secondary=class_course_association, back_populates="classes")
+        course = relationship("Course", back_populates="classes")
 
     class Student(Base):
-        """Student entities with email addresses."""
+        """Student entities with separated name fields for better data management and CSV export."""
         __tablename__ = "students"
         
         id: Mapped[str] = mapped_column(String(36), primary_key=True)
-        name: Mapped[str] = mapped_column(String(255), nullable=False)
+        first_name: Mapped[str] = mapped_column(String(255), nullable=False)
+        last_name: Mapped[str] = mapped_column(String(255), nullable=False)
+        legal_full_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Full parsed name for reference
         email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
         created_by_user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
         created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
         updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+        
+        @property
+        def full_name(self) -> str:
+            """Combined name for display purposes."""
+            return f"{self.first_name} {self.last_name}"
+        
+        @property
+        def last_first_name(self) -> str:
+            """Last, First format for sorting."""
+            return f"{self.last_name}, {self.first_name}"
         
         # Relationships - students can belong to multiple classes
         classes = relationship("UserClass", secondary=class_student_association, back_populates="students")
@@ -862,14 +902,16 @@ This implementation follows the established HuleEdu microservice patterns:
         course_codes: Optional[List[CourseCode]] = Field(None, min_items=1)
 
     class CreateStudentRequest(BaseModel):
-        """Request to create a new student."""
-        name: str = Field(..., min_length=1, max_length=255)
+        """Request to create a new student with separated name fields."""
+        first_name: str = Field(..., min_length=1, max_length=255)
+        last_name: str = Field(..., min_length=1, max_length=255)
         email: EmailStr = Field(...)
         class_ids: Optional[List[str]] = Field(None, description="Classes to associate student with")
 
     class UpdateStudentRequest(BaseModel):
         """Request to update an existing student."""
-        name: Optional[str] = Field(None, min_length=1, max_length=255)
+        first_name: Optional[str] = Field(None, min_length=1, max_length=255)
+        last_name: Optional[str] = Field(None, min_length=1, max_length=255)
         email: Optional[EmailStr] = Field(None)
 
     class EssayStudentAssociationRequest(BaseModel):
@@ -879,14 +921,23 @@ This implementation follows the established HuleEdu microservice patterns:
         confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
 
     class StudentParsingResult(BaseModel):
-        """Result of automatic student parsing from essay content."""
+        """Result of automatic student parsing with separated name components."""
         essay_id: str
         filename: str
-        student_name: Optional[str] = None
+        first_name: Optional[str] = None
+        last_name: Optional[str] = None
+        legal_full_name: Optional[str] = None  # Original parsed full name
         student_email: Optional[str] = None
         confidence_score: float = Field(ge=0.0, le=1.0)
         parsing_method: str
         raw_text_snippet: Optional[str] = None
+        
+        @property
+        def full_name(self) -> Optional[str]:
+            """Combined name if both parts are available."""
+            if self.first_name and self.last_name:
+                return f"{self.first_name} {self.last_name}"
+            return self.first_name or self.last_name or self.legal_full_name
 
     # Response models
     class ClassResponse(BaseModel):
@@ -901,15 +952,21 @@ This implementation follows the established HuleEdu microservice patterns:
         updated_at: datetime
 
     class StudentResponse(BaseModel):
-        """Response model for student information."""
+        """Response model for student information with separated name fields."""
         id: str
-        name: str
+        first_name: str
+        last_name: str
         email: str
         created_by_user_id: str
         classes: List[dict]  # Class information
         essay_count: int
         created_at: datetime
         updated_at: datetime
+        
+        @property
+        def full_name(self) -> str:
+            """Combined name for display purposes."""
+            return f"{self.first_name} {self.last_name}"
 
     class EssayStudentAssociationResponse(BaseModel):
         """Response model for essay-student associations."""
@@ -933,7 +990,63 @@ This implementation follows the established HuleEdu microservice patterns:
 
 ### Checkpoint 2.4: Enhanced Student Parsing Integration
 
-**Objective**: Leverage existing File Service parsing capabilities with enhanced confidence scoring and manual override support.
+**Objective**: Enhance existing File Service parsing capabilities with confidence scoring, class roster matching, and separated name field support.
+
+**Enhancement Strategy**:
+- Extend existing `parse_student_info()` stub in File Service
+- Add fuzzy matching against teacher's known students for specific course
+- Implement confidence scoring (0.0-1.0) based on match quality
+- Teacher-scoped parsing (only match against teacher's students)
+- Parse names into separate first/last components for better data management
+
+**Name Parsing Logic**:
+
+```python
+def parse_student_name(full_name: str) -> tuple[str, str, str]:
+    """
+    Parse full name into first, last, and original full name components.
+    
+    Handles Swedish/English naming patterns:
+    - "Anna Andersson" → ("Anna", "Andersson", "Anna Andersson")
+    - "Erik Johan Svensson" → ("Erik Johan", "Svensson", "Erik Johan Svensson") 
+    - "Anna Margareta Svensson-Andersson" → ("Anna", "Svensson-Andersson", "Anna Margareta Svensson-Andersson")
+    """
+    if not full_name or not full_name.strip():
+        return "", "", ""
+    
+    original_name = full_name.strip()
+    name_parts = original_name.split()
+    
+    if len(name_parts) == 1:
+        # Single name - treat as last name
+        return "", name_parts[0], original_name
+    elif len(name_parts) == 2:
+        # First Last
+        return name_parts[0], name_parts[1], original_name
+    else:
+        # Multiple parts - use first name and last surname, preserve full name
+        # This handles Swedish double surnames and multiple given names
+        return name_parts[0], name_parts[-1], original_name
+```
+
+**CSV Export Benefits**:
+
+With separated name fields, CSV exports become much cleaner and more useful:
+
+```csv
+first_name,last_name,email,class_designation,course_code
+Anna,Andersson,anna.andersson@school.se,9A,ENG6
+Erik,Svensson,erik.svensson@school.se,9A,ENG6
+Maria,Johansson,maria.johansson@school.se,9B,SV2
+```
+
+This enables:
+- **Better Sorting**: Sort by last name primarily
+- **External System Integration**: Many LMS systems expect separated name fields
+- **Data Analysis**: Easier to analyze name patterns and demographics
+- **Mail Merge**: Direct use in communication templates
+- **Name Preservation**: `legal_full_name` preserves complex Swedish names like "Anna Margareta Svensson-Andersson"
+- **Fuzzy Matching**: Full name available for matching against student submissions with name variations
 
 ### Checkpoint 2.5: Student-Essay Association Management
 
