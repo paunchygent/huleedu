@@ -18,7 +18,7 @@ from implementations.ai_feedback_initiator_impl import AIFeedbackInitiatorImpl
 from protocols import BatchEventPublisherProtocol, DataValidationError
 
 from common_core.batch_service_models import BatchServiceAIFeedbackInitiateCommandDataV1
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.enums import CourseCode, ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
@@ -41,7 +41,7 @@ def sample_batch_context() -> BatchRegistrationRequestV1:
     """Sample batch registration context for testing - lean registration model."""
     return BatchRegistrationRequestV1(
         expected_essay_count=2,
-        course_code="ENG101",
+        course_code=CourseCode.ENG5,
         essay_instructions="Write a 500-word essay analyzing the themes in Shakespeare's Hamlet.",
         user_id="user_123",
         essay_ids=["essay1", "essay2"],
@@ -111,7 +111,7 @@ class TestAIFeedbackInitiatorImpl:
         assert command_data.entity_ref.entity_id == batch_id
         assert command_data.entity_ref.entity_type == "batch"
         assert command_data.essays_to_process == sample_essay_refs
-        assert command_data.language == "en"  # Inferred from ENG101
+        assert command_data.language == "en"  # Inferred from ENG5
         assert command_data.event_name == ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND
 
         # Verify AI feedback specific context fields
@@ -173,7 +173,7 @@ class TestAIFeedbackInitiatorImpl:
         until Class Management Service integration."""
         custom_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
-            course_code="LIT201",
+            course_code=CourseCode.ENG6,
             essay_instructions="Analyze the use of symbolism in modern poetry.",
             user_id="user_123",
             essay_ids=["essay1"],
@@ -203,7 +203,7 @@ class TestAIFeedbackInitiatorImpl:
         """Test language inference for Swedish course code."""
         swedish_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
-            course_code="SV2",  # Swedish course
+            course_code=CourseCode.SV2,  # Swedish course
             essay_instructions="Analysera användningen av metaforer i Strindbergs verk.",
             user_id="user_123",
             essay_ids=["essay1"],
@@ -228,10 +228,10 @@ class TestAIFeedbackInitiatorImpl:
         sample_essay_refs: list[EssayProcessingInputRefV1],
         sample_correlation_id: uuid.UUID,
     ) -> None:
-        """Test that unknown course codes default to English."""
-        unknown_context = BatchRegistrationRequestV1(
+        """Test language inference for English course codes."""
+        english_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
-            course_code="ABC123",  # Unknown course code
+            course_code=CourseCode.ENG7,  # Valid English course code
             essay_instructions="Write an essay.",
             user_id="user_123",
             essay_ids=["essay1"],
@@ -242,10 +242,10 @@ class TestAIFeedbackInitiatorImpl:
             phase_to_initiate=PhaseName.AI_FEEDBACK,
             correlation_id=sample_correlation_id,
             essays_for_processing=sample_essay_refs,
-            batch_context=unknown_context,
+            batch_context=english_context,
         )
 
-        # Verify defaulted to English
+        # Verify English language (ENG7 maps to English via get_course_language)
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
         assert published_envelope.data.language == "en"
 
@@ -259,7 +259,7 @@ class TestAIFeedbackInitiatorImpl:
         """Test that all required context fields are included in the command."""
         comprehensive_context = BatchRegistrationRequestV1(
             expected_essay_count=2,
-            course_code="PHIL301",
+            course_code=CourseCode.SV1,
             essay_instructions=(
                 "Examine the ethical implications of artificial intelligence in 1000 words."
             ),
@@ -279,7 +279,7 @@ class TestAIFeedbackInitiatorImpl:
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
         command_data = published_envelope.data
 
-        assert command_data.course_code == "PHIL301"
+        assert command_data.course_code == CourseCode.SV1
         assert command_data.essay_instructions == (
             "Examine the ethical implications of artificial intelligence in 1000 words."
         )

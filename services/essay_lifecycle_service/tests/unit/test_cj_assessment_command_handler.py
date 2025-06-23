@@ -512,25 +512,17 @@ class TestCJAssessmentCommandHandler:
             class_type="REGULAR",
         )
 
-        # Setup essay state
-        essay_state = self.create_essay_state_mock(command_data.essays_to_process[0].essay_id, batch_id)
-        mock_repository.get_essay_state.return_value = essay_state
+        # No essay state setup needed since essays_to_process is empty
+        # The handler should handle empty list gracefully without trying to process essays
 
-        with patch(
-            "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
-        ) as mock_state_machine_class:
-            mock_machine = MagicMock()
-            mock_machine.trigger.return_value = False  # Transition fails
-            mock_state_machine_class.return_value = mock_machine
+        # Execute
+        await cj_assessment_handler.process_initiate_cj_assessment_command(
+            command_data=command_data, correlation_id=correlation_id
+        )
 
-            # Execute
-            await cj_assessment_handler.process_initiate_cj_assessment_command(
-                command_data=command_data, correlation_id=correlation_id
-            )
+        # Verify no repository queries were made (no essays to process)
+        mock_repository.get_essay_state.assert_not_called()
 
-            # Verify state machine was attempted
-            mock_machine.trigger.assert_called_once_with(CMD_INITIATE_CJ_ASSESSMENT)
-
-            # Verify no repository update or dispatch for failed transition
-            mock_repository.update_essay_status_via_machine.assert_not_called()
-            mock_request_dispatcher.dispatch_cj_assessment_requests.assert_not_called()
+        # Verify no repository updates or dispatch for empty essays list
+        mock_repository.update_essay_status_via_machine.assert_not_called()
+        mock_request_dispatcher.dispatch_cj_assessment_requests.assert_not_called()

@@ -18,7 +18,7 @@ from implementations.nlp_initiator_impl import NLPInitiatorImpl
 from protocols import BatchEventPublisherProtocol, DataValidationError
 
 from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.enums import CourseCode, ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
@@ -41,7 +41,7 @@ def sample_batch_context() -> BatchRegistrationRequestV1:
     """Sample batch registration context for testing - lean registration model."""
     return BatchRegistrationRequestV1(
         expected_essay_count=2,
-        course_code="ENG101",
+        course_code=CourseCode.ENG5,
         essay_instructions="Write a 500-word essay on climate change.",
         user_id="test_user_nlp",
         essay_ids=["essay1", "essay2"],
@@ -111,7 +111,7 @@ class TestNLPInitiatorImpl:
         assert command_data.entity_ref.entity_id == batch_id
         assert command_data.entity_ref.entity_type == "batch"
         assert command_data.essays_to_process == sample_essay_refs
-        assert command_data.language == "en"  # Inferred from ENG101
+        assert command_data.language == "en"  # Inferred from ENG5
         assert command_data.event_name == ProcessingEvent.BATCH_NLP_INITIATE_COMMAND
 
     async def test_initiate_phase_wrong_phase_validation(
@@ -157,7 +157,7 @@ class TestNLPInitiatorImpl:
         """Test language inference for Swedish course code."""
         swedish_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
-            course_code="SV1",  # Swedish course
+            course_code=CourseCode.SV1,  # Swedish course
             essay_instructions="Skriv en uppsats om miljöfrågor.",
             user_id="test_user_swedish_nlp",
             essay_ids=["essay1"],
@@ -182,12 +182,12 @@ class TestNLPInitiatorImpl:
         sample_essay_refs: list[EssayProcessingInputRefV1],
         sample_correlation_id: uuid.UUID,
     ) -> None:
-        """Test that unknown course codes default to English."""
-        unknown_context = BatchRegistrationRequestV1(
+        """Test language inference for English course codes."""
+        english_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
-            course_code="XYZ999",  # Unknown course code
+            course_code=CourseCode.ENG6,  # Valid English course code
             essay_instructions="Write something.",
-            user_id="test_user_unknown_nlp",
+            user_id="test_user_english_nlp",
             essay_ids=["essay1"],
         )
 
@@ -196,10 +196,10 @@ class TestNLPInitiatorImpl:
             phase_to_initiate=PhaseName.NLP,
             correlation_id=sample_correlation_id,
             essays_for_processing=sample_essay_refs,
-            batch_context=unknown_context,
+            batch_context=english_context,
         )
 
-        # Verify defaulted to English
+        # Verify English language (ENG6 maps to English via get_course_language)
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
         assert published_envelope.data.language == "en"
 

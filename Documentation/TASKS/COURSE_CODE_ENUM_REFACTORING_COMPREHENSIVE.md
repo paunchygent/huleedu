@@ -59,22 +59,66 @@ Comprehensive refactoring to enforce `common_core.enums.CourseCode` usage across
 
 ---
 
-## 🔄 **IN PROGRESS: Phase 4 - Test Infrastructure Modernization**
+### PHASE 4: Resolve Post-Enum Refactoring Test Failures 
 
-**Objective**: Replace all magic strings in tests with enum members for consistency.
+#### 🎯 ** Task Purpose and Scope
 
-#### **✅ Completed Test Updates**
-- **✅ `common_core/tests/unit/test_class_events.py`**: All 17 magic string instances → `CourseCode` enum members
-- **✅ `common_core/tests/unit/test_batch_coordination_events_enhanced.py`**: Updated course_code fields → `CourseCode` enum
-- **✅ `services/essay_lifecycle_service/tests/unit/test_batch_tracker_validation_enhanced.py`**: Added missing course context fields
+##### **Problem Statement** 
 
-#### **🔄 Remaining Test Updates (In Progress)**
-- **📝 Need Update**: `tests/contract/test_phase_outcome_contracts.py` - Invalid course codes
-- **📝 Need Update**: `services/cj_assessment_service/tests/conftest.py` - Invalid course codes  
-- **📝 Need Update**: Multiple integration and functional tests using invalid course codes
-- **📝 Need Update**: Service test managers and utilities
+The CourseCode enum refactoring has successfully updated our core contracts and business logic. However, it has exposed outdated test data and minor inconsistencies in our test suite and implementation, resulting in 22 test failures. These failures must be resolved to ensure the stability and correctness of the new architecture before proceeding.
 
----
+#### Analysis of Failures
+
+The 22 failures can be grouped into three primary categories:
+
+**Pydantic ValidationError (Root Cause for ~90% of failures):**
+ Most errors occur because test fixtures and functional test helpers are still creating Pydantic models using invalid string literals for course_code (e.g., "ENG101", "TEST101") instead of the required CourseCode enum members (e.g., CourseCode.ENG5). This affects unit, integration, and functional tests.
+
+**AttributeError in AIFeedbackInitiatorImpl:** 
+The initiator's logging logic attempts to access batch_context.teacher_name, a field that was correctly removed from BatchRegistrationRequestV1 during the lean registration refactoring.
+
+**Flawed Test Logic (IndexError):**
+ One test in test_cj_assessment_command_handler.py is logically incorrect. It tries to access the first element of an intentionally empty list, causing an IndexError instead of testing the intended validation failure.
+
+##### 📋 Implementation Plan
+
+###### Phase 1: Fix Invalid Test Data (ValidationError)
+
+**Objective:**
+Systematically update all test fixtures, helpers, and data to use the CourseCode enum, resolving the most common failure.
+
+**Update ServiceTestManager:** Modify the create_batch helper in tests/utils/service_test_manager.py to use a valid CourseCode enum member by default and for all test calls.
+
+**Change:** In create_batch, replace course_code: str = "TEST" with course_code: CourseCode = CourseCode.ENG5.Action: Update all calls in functional tests (e.g., test_simple_validation_e2e.py) that pass invalid strings like "E2E" or "VAL101" to use a valid enum member like CourseCode.ENG6.
+
+**Update Unit Test Fixtures:File:** 
+services/batch_orchestrator_service/tests/test_ai_feedback_initiator_impl.pyFile: services/batch_orchestrator_service/tests/test_nlp_initiator_impl.py
+
+**Action:** In the sample_batch_context fixtures, change course_code="ENG101" to a valid enum member, like course_code=CourseCode.ENG6.Update Idempotency and Event Test 
+
+**Data:** File: services/batch_orchestrator_service/tests/unit/test_idempotency_*.pyFile: services/essay_lifecycle_service/tests/unit/test_els_idempotency_integration.pyFile: services/cj_assessment_service/tests/unit/test_cj_idempotency_*.py
+
+**Action:** In all fixtures and helper functions that create sample Kafka messages (e.g., sample_batch_essays_ready_event), find the course_code field and change its value from a string like "TEST101" to a valid enum member like CourseCode.ENG7.
+
+###### Phase 2: Fix Outdated Business Logic (AttributeError)
+
+**Objective:** Align the AIFeedbackInitiatorImpl with the lean registration contract.
+
+**Remove Invalid Log Attribute:** File: services/batch_orchestrator_service/implementations/ai_feedback_initiator_impl.py
+
+**Action:** Locate the logger.info call inside the initiate_phase method and remove the reference to batch_context.teacher_name, as this attribute no longer exists.
+
+###### Phase 3: Fix Flawed Test Logic (IndexError)
+
+**Objective:** Correct the test case to properly validate the intended behavior.Rewrite Validation Failure Test:
+
+**File:** services/essay_lifecycle_service/tests/unit/test_cj_assessment_command_handler.pyTest: test_process_cj_assessment_command_validation_failure
+
+**Action:** The test should not attempt to access an element of the empty essays_to_process list. Instead, it should assert that calling process_initiate_cj_assessment_command with an empty list raises a DataValidationError. This correctly tests the handler's input validation logic.
+
+#### ✅ Success Criteria
+
+All 22 test failures are resolved.Running pdm run pytest from the root directory results in all tests passing.The codebase consistently uses the CourseCode enum in all relevant data models and test fixtures.
 
 ## 📊 **CURRENT SUCCESS RATE**
 

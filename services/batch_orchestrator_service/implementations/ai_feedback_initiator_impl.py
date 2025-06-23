@@ -111,7 +111,7 @@ class AIFeedbackInitiatorImpl(AIFeedbackInitiatorProtocol):
 
             logger.info(
                 f"Published AI feedback initiate command for batch {batch_id}, "
-                f"event_id {command_envelope.event_id}, teacher: {batch_context.teacher_name} "
+                f"event_id {command_envelope.event_id} "
                 f"(TODO: AI Feedback Service not yet implemented to consume this)",
                 extra={"correlation_id": str(correlation_id)},
             )

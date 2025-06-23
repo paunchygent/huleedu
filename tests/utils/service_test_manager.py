@@ -18,6 +18,8 @@ import aiohttp
 import httpx
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from common_core.enums import CourseCode
+
 logger = create_service_logger("test.service_manager")
 
 
@@ -135,7 +137,7 @@ class ServiceTestManager:
     async def create_batch(
         self,
         expected_essay_count: int,
-        course_code: str = "TEST",
+        course_code: CourseCode | str = CourseCode.ENG5,
         user_id: str = "test_user_123",
         correlation_id: str | None = None,
     ) -> tuple[str, str]:
@@ -157,8 +159,19 @@ class ServiceTestManager:
 
         bos_base_url = endpoints["batch_orchestrator_service"]["base_url"]
 
+        # Convert string course codes to CourseCode enum if possible, fallback to ENG5
+        if isinstance(course_code, str):
+            try:
+                course_code_enum = CourseCode(course_code)
+            except ValueError:
+                # Invalid course code string, use default
+                course_code_enum = CourseCode.ENG5
+                logger.warning(f"Invalid course code '{course_code}', using default {CourseCode.ENG5.value}")
+        else:
+            course_code_enum = course_code
+
         batch_request = {
-            "course_code": course_code,
+            "course_code": course_code_enum.value,
             "expected_essay_count": expected_essay_count,
             "essay_instructions": "Test batch created by ServiceTestManager",
             "user_id": user_id,
@@ -339,7 +352,7 @@ async def get_validated_service_endpoints(force_revalidation: bool = False) -> d
 
 async def create_test_batch(
     expected_essay_count: int,
-    course_code: str = "TEST",
+    course_code: CourseCode | str = CourseCode.ENG5,
     user_id: str = "test_user_123",
     correlation_id: str | None = None,
 ) -> tuple[str, str]:

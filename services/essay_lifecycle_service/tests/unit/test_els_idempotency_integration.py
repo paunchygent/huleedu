@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.enums import CourseCode
 
 from services.essay_lifecycle_service.batch_command_handlers import process_single_message
 from services.essay_lifecycle_service.protocols import (
@@ -94,6 +95,9 @@ def sample_batch_registered_event() -> dict:
             "batch_id": "test-batch-001",
             "expected_essay_count": 3,
             "essay_ids": ["essay-1", "essay-2", "essay-3"],
+            "course_code": CourseCode.ENG5.value,
+            "essay_instructions": "Write a test essay for idempotency testing.",
+            "user_id": "test_user_idempotency",
             "metadata": {
                 "entity": {"entity_id": "test-batch-001", "entity_type": "batch"},
                 "timestamp": datetime.now(UTC).isoformat(),
@@ -325,6 +329,9 @@ async def test_deterministic_event_id_generation(
             "batch_id": "same-batch-123",  # Same data content
             "expected_essay_count": 2,
             "essay_ids": ["essay-1", "essay-2"],
+            "course_code": CourseCode.ENG5.value,
+            "essay_instructions": "Test essay for deterministic ID generation.",
+            "user_id": "test_user_deterministic",
             "metadata": {
                 "entity": {"entity_id": "same-batch-123", "entity_type": "batch"},
                 "timestamp": datetime.now(UTC).isoformat(),

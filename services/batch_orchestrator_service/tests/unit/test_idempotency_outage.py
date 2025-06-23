@@ -17,6 +17,8 @@ from implementations.client_pipeline_request_handler import ClientPipelineReques
 from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
 from kafka_consumer import BatchKafkaConsumer
 
+from common_core.enums import CourseCode
+
 
 class MockRedisClient:
     """Mock Redis client that tracks calls for testing idempotency behavior."""
@@ -105,7 +107,7 @@ def sample_batch_essays_ready_event() -> dict:
                 "timestamp": datetime.now(UTC).isoformat(),
             },
             # Enhanced lean registration fields (required by updated BatchEssaysReady model)
-            "course_code": "TEST101",
+            "course_code": CourseCode.ENG5.value,
             "course_language": "en",
             "essay_instructions": "Test instructions for lean flow idempotency testing.",
             "class_type": "GUEST",

@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiokafka import ConsumerRecord
 
+from common_core.enums import CourseCode
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.tests.unit.mocks import MockDatabase, MockRedisClient
 
@@ -67,7 +68,7 @@ def sample_cj_request_event() -> dict:
                 {"essay_id": essay2_id, "text_storage_id": storage2_id},
             ],
             "language": "en",
-            "course_code": "ENG101",
+            "course_code": CourseCode.ENG5.value,
             "essay_instructions": "Compare and rank the essays.",
             "llm_config_overrides": None,
         },
@@ -234,7 +235,7 @@ async def test_deterministic_event_id_generation(
         },
         "essays_for_cj": [{"essay_id": "essay-1", "text_storage_id": "storage-1"}],
         "language": "en",
-        "course_code": "TEST",
+        "course_code": CourseCode.ENG6.value,
         "essay_instructions": "Test instructions",
         "llm_config_overrides": None,
     }
