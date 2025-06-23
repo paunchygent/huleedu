@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, model_validator
 class BatchRegistrationRequestV1(BaseModel):
     """Lean batch registration model - captures only orchestration essentials.
 
-    Educational context (teacher_name, class_designation, student data) is deferred to
+    Educational context (teacher_name, user_id, student data) is deferred to
     Class Management Service and provided later via enhanced BatchEssaysReady events.
     This maintains proper service boundaries and single source of truth principles.
     """

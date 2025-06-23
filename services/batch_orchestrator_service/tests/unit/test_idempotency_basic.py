@@ -82,7 +82,7 @@ def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
 
 @pytest.fixture
 def sample_batch_essays_ready_event() -> dict:
-    """Create sample BatchEssaysReady event for testing."""
+    """Create sample BatchEssaysReady event for testing with lean registration fields."""
     batch_id = str(uuid.uuid4())
     correlation_id = str(uuid.uuid4())
     return {
@@ -104,6 +104,13 @@ def sample_batch_essays_ready_event() -> dict:
                 "entity": {"entity_type": "batch", "entity_id": batch_id},
                 "timestamp": datetime.now(UTC).isoformat(),
             },
+            # Enhanced lean registration fields (required by updated BatchEssaysReady model)
+            "course_code": "TEST101",
+            "course_language": "en",
+            "essay_instructions": "Test instructions for lean flow idempotency testing.",
+            "class_type": "GUEST",
+            "teacher_first_name": None,
+            "teacher_last_name": None,
         },
     }
 

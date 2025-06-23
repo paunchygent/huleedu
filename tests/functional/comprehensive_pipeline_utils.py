@@ -97,10 +97,10 @@ async def register_comprehensive_batch(
 
     batch_request = {
         "course_code": "ENG5",
-        "class_designation": "E2E-Comprehensive-Test",
         "expected_essay_count": expected_essay_count,
         "essay_instructions": "Comprehensive pipeline test with CJ assessment enabled",
-        "teacher_name": "Test Teacher - Comprehensive Pipeline",
+        "user_id": "e2e-test-user-123",
+        "teacher_name": {"first_name": "Test", "last_name": "Teacher"},
         "enable_cj_assessment": True,  # CRITICAL: Enable CJ assessment for full pipeline
     }
 

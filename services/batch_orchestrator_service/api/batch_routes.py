@@ -123,9 +123,9 @@ async def get_batch_status(
             "batch_id": batch_id,
             "batch_context": {
                 "course_code": batch_context.course_code,
-                "class_designation": batch_context.class_designation,
                 "expected_essay_count": batch_context.expected_essay_count,
                 "enable_cj_assessment": batch_context.enable_cj_assessment,
+                "user_id": batch_context.user_id,
             },
             "pipeline_state": pipeline_state or {},
         }

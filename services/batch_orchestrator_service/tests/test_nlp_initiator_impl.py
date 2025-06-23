@@ -38,13 +38,12 @@ def nlp_initiator(mock_event_publisher: AsyncMock) -> NLPInitiatorImpl:
 
 @pytest.fixture
 def sample_batch_context() -> BatchRegistrationRequestV1:
-    """Sample batch registration context for testing."""
+    """Sample batch registration context for testing - lean registration model."""
     return BatchRegistrationRequestV1(
         expected_essay_count=2,
         course_code="ENG101",
-        class_designation="Advanced Writing",
-        teacher_name="Dr. Smith",
         essay_instructions="Write a 500-word essay on climate change.",
+        user_id="test_user_nlp",
         essay_ids=["essay1", "essay2"],
     )
 
@@ -159,9 +158,8 @@ class TestNLPInitiatorImpl:
         swedish_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
             course_code="SV1",  # Swedish course
-            class_designation="Svenska språket",
-            teacher_name="Professor Andersson",
             essay_instructions="Skriv en uppsats om miljöfrågor.",
+            user_id="test_user_swedish_nlp",
             essay_ids=["essay1"],
         )
 
@@ -188,9 +186,8 @@ class TestNLPInitiatorImpl:
         unknown_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
             course_code="XYZ999",  # Unknown course code
-            class_designation="Mystery Subject",
-            teacher_name="Professor Unknown",
             essay_instructions="Write something.",
+            user_id="test_user_unknown_nlp",
             essay_ids=["essay1"],
         )
 

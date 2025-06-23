@@ -37,7 +37,6 @@ async def test_complete_validation_failures_0_of_25():
 
     # Test setup
     course_code = "VAL104"
-    class_designation = "CompleteFail_ValidationCoordination"
     essay_count = 25
 
     # Set up Kafka consumer using modern utility pattern
@@ -47,8 +46,8 @@ async def test_complete_validation_failures_0_of_25():
         # NOW trigger operations - consumer is guaranteed ready
         batch_id, correlation_id = await create_validation_batch(
             course_code,
-            class_designation,
             essay_count,
+            user_id="validation_test_user_complete_failures",
         )
 
         # Create all failing files (0 successful + 25 failing files)

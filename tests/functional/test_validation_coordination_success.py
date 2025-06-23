@@ -36,7 +36,6 @@ async def test_all_essays_pass_validation():
 
     # Test setup
     course_code = "VAL101"
-    class_designation = "AllPass_ValidationCoordination"
     essay_count = 25
 
     # Set up Kafka consumer using modern utility pattern
@@ -46,8 +45,8 @@ async def test_all_essays_pass_validation():
         # NOW trigger operations - consumer is guaranteed ready
         batch_id, correlation_id = await create_validation_batch(
             course_code,
-            class_designation,
             essay_count,
+            user_id="validation_test_user_success_all_pass",
         )
 
         # Create all successful files

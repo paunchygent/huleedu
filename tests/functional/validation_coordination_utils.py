@@ -42,12 +42,12 @@ VALIDATION_TIMEOUTS = {
 
 async def create_validation_batch(
     course_code: str,
-    class_designation: str,
     essay_count: int,
+    user_id: str = "validation_test_user",
     essay_instructions: str = "Test validation coordination",
 ) -> tuple[str, str]:
     """
-    Create a validation test batch using modern ServiceTestManager.
+    Create a validation test batch using modern ServiceTestManager with lean registration.
 
     Returns (batch_id, correlation_id).
     """
@@ -56,7 +56,7 @@ async def create_validation_batch(
     batch_id, correlation_id = await service_manager.create_batch(
         expected_essay_count=essay_count,
         course_code=course_code,
-        class_designation=class_designation,
+        user_id=user_id,
     )
 
     logger.info(f"Created validation test batch {batch_id} with {essay_count} expected essays")

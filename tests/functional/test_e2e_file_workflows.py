@@ -190,7 +190,7 @@ class TestE2EFileWorkflows:
             batch_id, correlation_id = await service_manager.create_batch(
                 expected_essay_count=1,
                 course_code="E2E",
-                class_designation="CompleteWorkflow",
+                user_id="e2e_complete_workflow_user",
             )
 
             print(f"✅ Batch created: {batch_id}")

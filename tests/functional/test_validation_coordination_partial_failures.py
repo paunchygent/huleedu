@@ -38,7 +38,6 @@ async def test_partial_validation_failures_24_of_25():
 
     # Test setup
     course_code = "VAL102"
-    class_designation = "PartialFail_ValidationCoordination"
     essay_count = 25
 
     # Set up Kafka consumer using modern utility pattern
@@ -48,8 +47,8 @@ async def test_partial_validation_failures_24_of_25():
         # NOW trigger operations - consumer is guaranteed ready
         batch_id, correlation_id = await create_validation_batch(
             course_code,
-            class_designation,
             essay_count,
+            user_id="validation_test_user_partial_24_25",
         )
 
         # Create 24 successful + 1 failing file
@@ -188,7 +187,6 @@ async def test_multiple_validation_failures_20_of_25():
 
     # Test setup
     course_code = "VAL103"
-    class_designation = "MultiFail_ValidationCoordination"
     essay_count = 25
 
     # Set up Kafka consumer using modern utility pattern
@@ -198,8 +196,8 @@ async def test_multiple_validation_failures_20_of_25():
         # NOW trigger operations - consumer is guaranteed ready
         batch_id, correlation_id = await create_validation_batch(
             course_code,
-            class_designation,
             essay_count,
+            user_id="validation_test_user_multiple_20_25",
         )
 
         # Create 20 successful + 5 failing files

@@ -32,7 +32,7 @@ async def test_content_validation_failures_publish_events():
         batch_id, correlation_id = await service_manager.create_batch(
             expected_essay_count=3,
             course_code="SIMPLE",
-            class_designation="E2E",
+            user_id="simple_validation_test_user",
         )
         print(f"✅ Created batch {batch_id}")
     except RuntimeError as e:

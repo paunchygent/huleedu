@@ -137,7 +137,12 @@ Implement lean batch registration that captures only essential upload data and d
 
 **Update Pattern**: All test fixtures must use lean `BatchRegistrationRequestV1` model and mock Class Management Service responses for educational context.
 
-**Files Successfully Updated:**
+**Core Infrastructure Updates:**
+
+- ✅ `tests/utils/service_test_manager.py` - Updated core `create_batch` method to use lean registration model
+- ✅ `tests/functional/validation_coordination_utils.py` - Updated `create_validation_batch` wrapper function
+
+**Test Fixture Updates (Unit & Integration Tests):**
 
 - ✅ `services/batch_orchestrator_service/tests/test_simplified_retry_logic.py` - Updated BatchRegistrationRequestV1 fixture
 - ✅ `tests/integration/test_pipeline_state_management_scenarios.py` - Updated batch context fixture
@@ -148,6 +153,14 @@ Implement lean batch registration that captures only essential upload data and d
 - ✅ `services/batch_orchestrator_service/tests/test_ai_feedback_initiator_impl.py` - Updated 4 fixtures and assertions
 - ✅ `services/batch_orchestrator_service/tests/test_batch_repository_integration.py` - Updated fixture and retrieval assertions
 - ✅ `services/essay_lifecycle_service/tests/unit/test_cj_assessment_command_handler.py` - Updated 3 command data instances
+
+**Functional Test Updates:**
+
+- ✅ `tests/functional/test_validation_coordination_partial_failures.py` - Updated lean registration calls
+- ✅ `tests/functional/test_validation_coordination_success.py` - Updated lean registration calls
+- ✅ `tests/functional/test_validation_coordination_complete_failures.py` - Updated lean registration calls
+- ✅ `tests/functional/test_simple_validation_e2e.py` - Updated batch creation call
+- ✅ `tests/functional/test_e2e_file_workflows.py` - Updated complete workflow test
 
 **Update Patterns Applied:**
 

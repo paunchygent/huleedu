@@ -17,7 +17,7 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
 
     def __init__(self) -> None:
         """Initialize the mock repository with internal storage."""
-        # Storage for batch contexts (course_code, class_designation, etc.)
+        # Storage for batch contexts (course_code, user_id, etc.)
         self.batch_contexts: dict[str, BatchRegistrationRequestV1] = {}
         # Storage for pipeline states
         self.pipeline_states: dict[str, dict] = {}

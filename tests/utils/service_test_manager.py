@@ -136,11 +136,11 @@ class ServiceTestManager:
         self,
         expected_essay_count: int,
         course_code: str = "TEST",
-        class_designation: str = "UtilityTest",
+        user_id: str = "test_user_123",
         correlation_id: str | None = None,
     ) -> tuple[str, str]:
         """
-        Create a test batch via BOS API.
+        Create a test batch via BOS API using lean registration model.
 
         Returns (batch_id, correlation_id).
         Replaces the batch_creation_helper fixture.
@@ -159,10 +159,9 @@ class ServiceTestManager:
 
         batch_request = {
             "course_code": course_code,
-            "class_designation": class_designation,
             "expected_essay_count": expected_essay_count,
             "essay_instructions": "Test batch created by ServiceTestManager",
-            "teacher_name": "Test Teacher - ServiceTestManager",
+            "user_id": user_id,
         }
 
         async with aiohttp.ClientSession() as session:
@@ -341,14 +340,14 @@ async def get_validated_service_endpoints(force_revalidation: bool = False) -> d
 async def create_test_batch(
     expected_essay_count: int,
     course_code: str = "TEST",
-    class_designation: str = "UtilityTest",
+    user_id: str = "test_user_123",
     correlation_id: str | None = None,
 ) -> tuple[str, str]:
     """Convenience function that uses global service manager."""
     return await service_manager.create_batch(
         expected_essay_count,
         course_code,
-        class_designation,
+        user_id,
         correlation_id,
     )
 
