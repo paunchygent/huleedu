@@ -38,13 +38,12 @@ def ai_feedback_initiator(mock_event_publisher: AsyncMock) -> AIFeedbackInitiato
 
 @pytest.fixture
 def sample_batch_context() -> BatchRegistrationRequestV1:
-    """Sample batch registration context for testing."""
+    """Sample batch registration context for testing - lean registration model."""
     return BatchRegistrationRequestV1(
         expected_essay_count=2,
         course_code="ENG101",
-        class_designation="Advanced Writing",
-        teacher_name="Dr. Sarah Johnson",  # This is the key field for AI feedback
         essay_instructions="Write a 500-word essay analyzing the themes in Shakespeare's Hamlet.",
+        user_id="user_123",
         essay_ids=["essay1", "essay2"],
     )
 
@@ -117,9 +116,11 @@ class TestAIFeedbackInitiatorImpl:
 
         # Verify AI feedback specific context fields
         assert command_data.course_code == sample_batch_context.course_code
-        assert command_data.teacher_name == sample_batch_context.teacher_name  # Direct access!
-        assert command_data.class_designation == sample_batch_context.class_designation
         assert command_data.essay_instructions == sample_batch_context.essay_instructions
+        # Educational context fields use placeholder values until Class Management Service integration
+        assert command_data.class_type == "GUEST"
+        assert command_data.teacher_first_name is None
+        assert command_data.teacher_last_name is None
 
     async def test_initiate_phase_wrong_phase_validation(
         self,
@@ -160,20 +161,19 @@ class TestAIFeedbackInitiatorImpl:
                 batch_context=sample_batch_context,
             )
 
-    async def test_teacher_name_direct_access(
+    async def test_educational_context_placeholder_values(
         self,
         ai_feedback_initiator: AIFeedbackInitiatorImpl,
         mock_event_publisher: AsyncMock,
         sample_essay_refs: list[EssayProcessingInputRefV1],
         sample_correlation_id: uuid.UUID,
     ) -> None:
-        """Test that teacher name is accessed directly from batch context."""
+        """Test that educational context uses placeholder values until Class Management Service integration."""
         custom_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
             course_code="LIT201",
-            class_designation="Literary Analysis",
-            teacher_name="Professor Margaret Anderson",  # Custom teacher name
             essay_instructions="Analyze the use of symbolism in modern poetry.",
+            user_id="user_123",
             essay_ids=["essay1"],
         )
 
@@ -185,9 +185,11 @@ class TestAIFeedbackInitiatorImpl:
             batch_context=custom_context,
         )
 
-        # Verify teacher name was used directly
+        # Verify educational context uses placeholder values
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
-        assert published_envelope.data.teacher_name == "Professor Margaret Anderson"
+        assert published_envelope.data.class_type == "GUEST"
+        assert published_envelope.data.teacher_first_name is None
+        assert published_envelope.data.teacher_last_name is None
 
     async def test_language_inference_swedish(
         self,
@@ -200,9 +202,8 @@ class TestAIFeedbackInitiatorImpl:
         swedish_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
             course_code="SV2",  # Swedish course
-            class_designation="Avancerad svenska",
-            teacher_name="Professor Lars Eriksson",
             essay_instructions="Analysera användningen av metaforer i Strindbergs verk.",
+            user_id="user_123",
             essay_ids=["essay1"],
         )
 
@@ -229,9 +230,8 @@ class TestAIFeedbackInitiatorImpl:
         unknown_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
             course_code="ABC123",  # Unknown course code
-            class_designation="Generic Course",
-            teacher_name="Professor Smith",
             essay_instructions="Write an essay.",
+            user_id="user_123",
             essay_ids=["essay1"],
         )
 
@@ -258,11 +258,10 @@ class TestAIFeedbackInitiatorImpl:
         comprehensive_context = BatchRegistrationRequestV1(
             expected_essay_count=2,
             course_code="PHIL301",
-            class_designation="Advanced Philosophy",
-            teacher_name="Dr. Elizabeth Hartwell",
             essay_instructions=(
                 "Examine the ethical implications of artificial intelligence in 1000 words."
             ),
+            user_id="user_123",
             essay_ids=["essay1", "essay2"],
         )
 
@@ -279,11 +278,13 @@ class TestAIFeedbackInitiatorImpl:
         command_data = published_envelope.data
 
         assert command_data.course_code == "PHIL301"
-        assert command_data.class_designation == "Advanced Philosophy"
-        assert command_data.teacher_name == "Dr. Elizabeth Hartwell"
         assert command_data.essay_instructions == (
             "Examine the ethical implications of artificial intelligence in 1000 words."
         )
+        # Educational context uses placeholder values until Class Management Service integration
+        assert command_data.class_type == "GUEST"
+        assert command_data.teacher_first_name is None
+        assert command_data.teacher_last_name is None
 
     async def test_event_publisher_exception_propagation(
         self,

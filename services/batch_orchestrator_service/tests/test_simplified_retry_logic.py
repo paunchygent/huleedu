@@ -31,12 +31,10 @@ class TestSimplifiedRetryLogic:
 
     @pytest.fixture
     def sample_batch_context(self) -> BatchRegistrationRequestV1:
-        """Sample batch context for testing."""
+        """Sample batch context for testing - lean registration model."""
         return BatchRegistrationRequestV1(
             expected_essay_count=3,
             course_code="ENG5",
-            class_designation="Class 9A",
-            teacher_name="Test Teacher",
             essay_instructions="Test instructions",
             user_id="user_123",
         )

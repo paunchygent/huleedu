@@ -84,7 +84,7 @@ class TestBatchServiceCommandContracts:
             essays_to_process=essays,
             language="sv",
             course_code="SV101",
-            class_designation="Class 9A",
+            class_type="REGULAR",
             essay_instructions="Write about your summer vacation",
         )
 
@@ -102,7 +102,7 @@ class TestBatchServiceCommandContracts:
         # Verify all fields match
         assert deserialized_command.entity_ref.entity_id == original_command.entity_ref.entity_id
         assert deserialized_command.course_code == original_command.course_code
-        assert deserialized_command.class_designation == original_command.class_designation
+        assert deserialized_command.class_type == original_command.class_type
         assert deserialized_command.essay_instructions == original_command.essay_instructions
         assert len(deserialized_command.essays_to_process) == len(
             original_command.essays_to_process,

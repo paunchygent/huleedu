@@ -64,9 +64,8 @@ class TestPipelineProgressionScenarios:
         batch_context = BatchRegistrationRequestV1(
             expected_essay_count=3,
             course_code="SV101",
-            class_designation="Test Class",
-            teacher_name="Test Teacher",
             essay_instructions="Test essay instructions",
+            user_id="user_123",
             enable_cj_assessment=True,  # Critical: CJ assessment enabled
         )
         batch_repository.batch_contexts[batch_id] = batch_context
@@ -121,9 +120,8 @@ class TestPipelineProgressionScenarios:
         batch_context = BatchRegistrationRequestV1(
             expected_essay_count=2,
             course_code="ENG201",
-            class_designation="Test Class",
-            teacher_name="Test Teacher",
             essay_instructions="Test essay instructions",
+            user_id="user_123",
             enable_cj_assessment=False,  # Critical: CJ assessment disabled
         )
         batch_repository.batch_contexts[batch_id] = batch_context

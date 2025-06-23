@@ -67,9 +67,8 @@ class TestPipelineRealWorldScenarios:
         batch_context = BatchRegistrationRequestV1(
             expected_essay_count=25,
             course_code="ENG101",
-            class_designation="Real World Test",
-            teacher_name="Test Teacher",
             essay_instructions="Write about the given topic",
+            user_id="user_123",
             enable_cj_assessment=True,
         )
         batch_repository.batch_contexts[batch_id] = batch_context

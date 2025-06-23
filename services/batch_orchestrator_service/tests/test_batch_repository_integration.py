@@ -55,12 +55,11 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
     @pytest.fixture
     def sample_batch_registration(self) -> BatchRegistrationRequestV1:
-        """Sample batch registration for testing."""
+        """Sample batch registration for testing - lean registration model."""
         return BatchRegistrationRequestV1(
             course_code="CS101",
-            class_designation="Fall 2025",
-            teacher_name="Dr. Smith",
             essay_instructions="Write a 500-word essay about software engineering.",
+            user_id="user_123",
             expected_essay_count=25,
             enable_cj_assessment=True,
         )
@@ -138,7 +137,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         assert store_success is True
         assert retrieved_context is not None
         assert retrieved_context.course_code == "CS101"
-        assert retrieved_context.class_designation == "Fall 2025"
+        assert retrieved_context.user_id == "user_123"
         assert retrieved_context.expected_essay_count == 25
         assert retrieved_context.enable_cj_assessment is True
 

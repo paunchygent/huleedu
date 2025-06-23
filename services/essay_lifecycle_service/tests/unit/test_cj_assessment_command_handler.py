@@ -114,7 +114,7 @@ class TestCJAssessmentCommandHandler:
             essays_to_process=[essay_processing_ref],
             language="en",
             course_code="ENG101",
-            class_designation="Class 9A",
+            class_type="REGULAR",
             essay_instructions="Write about your summer vacation",
         )
 
@@ -278,7 +278,7 @@ class TestCJAssessmentCommandHandler:
             essays_to_process=essay_refs,
             language="en",
             course_code="ENG101",
-            class_designation="Class 9A",
+            class_type="REGULAR",
             essay_instructions="Write about your summer vacation",
         )
 
@@ -343,7 +343,7 @@ class TestCJAssessmentCommandHandler:
             essays_to_process=[essay_ref],
             language="sv",
             course_code="SV201",
-            class_designation="Gymnasiet 2A",
+            class_type="REGULAR",
             essay_instructions="Skriv om din semester",
         )
 
