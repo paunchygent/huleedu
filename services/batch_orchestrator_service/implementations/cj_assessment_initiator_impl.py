@@ -68,7 +68,7 @@ class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):
                 )
 
             # Get language from course code
-            language = _infer_language_from_course_code(batch_context.course_code)
+            language = _infer_language_from_course_code(batch_context.course_code).value
 
             # Construct CJ assessment command
             batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")

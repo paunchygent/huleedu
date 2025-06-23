@@ -13,6 +13,7 @@ from uuid import uuid4
 
 import pytest
 
+from common_core.enums import CourseCode
 from common_core.events.class_events import (
     ClassCreatedV1,
     EssayStudentAssociationUpdatedV1,
@@ -28,13 +29,13 @@ class TestClassCreatedV1:
         model = ClassCreatedV1(
             class_id="class_123",
             class_designation="9A English",
-            course_codes=["ENG5", "ENG6"],
+            course_codes=[CourseCode.ENG5, CourseCode.ENG6],
             user_id="teacher_456",
         )
 
         assert model.class_id == "class_123"
         assert model.class_designation == "9A English"
-        assert model.course_codes == ["ENG5", "ENG6"]
+        assert model.course_codes == [CourseCode.ENG5, CourseCode.ENG6]
         assert model.user_id == "teacher_456"
         assert model.event == "class.created"
         assert model.correlation_id is None
@@ -48,7 +49,7 @@ class TestClassCreatedV1:
         model = ClassCreatedV1(
             class_id="class_456",
             class_designation="8B Svenska",
-            course_codes=["SV1", "SV2"],
+            course_codes=[CourseCode.SV1, CourseCode.SV2],
             user_id="teacher_789",
             correlation_id=correlation_id,
             timestamp=timestamp,
@@ -56,7 +57,7 @@ class TestClassCreatedV1:
 
         assert model.class_id == "class_456"
         assert model.class_designation == "8B Svenska"
-        assert model.course_codes == ["SV1", "SV2"]
+        assert model.course_codes == [CourseCode.SV1, CourseCode.SV2]
         assert model.user_id == "teacher_789"
         assert model.correlation_id == correlation_id
         assert model.timestamp == timestamp
@@ -67,7 +68,7 @@ class TestClassCreatedV1:
         original_event = ClassCreatedV1(
             class_id="class_serialize",
             class_designation="Test Class Serialization",
-            course_codes=["ENG7"],
+            course_codes=[CourseCode.ENG7],
             user_id="teacher_serialize",
             correlation_id=correlation_id,
         )
@@ -92,26 +93,26 @@ class TestClassCreatedV1:
         model = ClassCreatedV1(
             class_id="class_multi",
             class_designation="Advanced English Writing",
-            course_codes=["ENG5", "ENG6", "ENG7"],
+            course_codes=[CourseCode.ENG5, CourseCode.ENG6, CourseCode.ENG7],
             user_id="teacher_multi",
         )
 
         assert len(model.course_codes) == 3
-        assert "ENG5" in model.course_codes
-        assert "ENG6" in model.course_codes
-        assert "ENG7" in model.course_codes
+        assert CourseCode.ENG5 in model.course_codes
+        assert CourseCode.ENG6 in model.course_codes
+        assert CourseCode.ENG7 in model.course_codes
 
     def test_single_course_code(self) -> None:
         """Test class creation with single course code."""
         model = ClassCreatedV1(
             class_id="class_single",
             class_designation="Beginner Swedish",
-            course_codes=["SV1"],
+            course_codes=[CourseCode.SV1],
             user_id="teacher_single",
         )
 
         assert len(model.course_codes) == 1
-        assert model.course_codes[0] == "SV1"
+        assert model.course_codes[0] == CourseCode.SV1
 
 
 class TestStudentCreatedV1:
@@ -387,7 +388,7 @@ class TestEssayStudentAssociationUpdatedV1:
             # Missing required batch_id for class created
             ClassCreatedV1(  # type: ignore[call-arg]
                 class_designation="Test Class",
-                course_codes=["ENG5"],
+                course_codes=[CourseCode.ENG5],
                 user_id="teacher_test",
             )
 
@@ -420,7 +421,7 @@ class TestEssayStudentAssociationUpdatedV1:
         class_event = ClassCreatedV1(
             class_id="class_workflow_2025",
             class_designation="9A English Writing 2025",
-            course_codes=["ENG5", "ENG6"],
+            course_codes=[CourseCode.ENG5, CourseCode.ENG6],
             user_id="teacher_workflow",
         )
 
@@ -464,7 +465,7 @@ class TestEssayStudentAssociationUpdatedV1:
         class_event = ClassCreatedV1(
             class_id="class_time_test",
             class_designation="Time Test Class",
-            course_codes=["ENG5"],
+            course_codes=[CourseCode.ENG5],
             user_id="teacher_time",
         )
         student_event = StudentCreatedV1(

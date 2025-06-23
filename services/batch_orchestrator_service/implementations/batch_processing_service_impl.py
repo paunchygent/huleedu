@@ -137,6 +137,10 @@ class BatchProcessingServiceImpl:
             expected_essay_count=registration_data.expected_essay_count,
             essay_ids=internal_essay_ids,  # Use generated internal IDs instead of user-provided
             metadata=event_metadata,
+            # Course context for ELS to use in BatchEssaysReady events
+            course_code=registration_data.course_code,
+            essay_instructions=registration_data.essay_instructions,
+            user_id=registration_data.user_id,
         )
 
         # 4. Create EventEnvelope

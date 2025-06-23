@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field, model_validator
 
+from common_core.enums import CourseCode
+
 
 class BatchRegistrationRequestV1(BaseModel):
     """Lean batch registration model - captures only orchestration essentials.
@@ -27,7 +29,7 @@ class BatchRegistrationRequestV1(BaseModel):
     )
 
     # Orchestration essentials (BOS responsibility)
-    course_code: str = Field(
+    course_code: CourseCode = Field(
         ...,
         description="Course code associated with this batch (e.g., SV1, ENG5).",
     )

@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
+from common_core.enums import get_course_language
 from common_core.events.batch_coordination_events import (
     BatchEssaysReady,
     BatchEssaysRegistered,
@@ -53,7 +54,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         Register batch slot expectations from BOS.
 
         Args:
-            event: BatchEssaysRegistered event from BOS containing internal essay ID slots
+            event: BatchEssaysRegistered event from BOS containing internal essay ID slots and course context
         """
         batch_essays_registered = BatchEssaysRegistered.model_validate(event)
         batch_id = batch_essays_registered.batch_id
@@ -65,6 +66,10 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             batch_id=batch_id,
             # Internal essay ID slots from BOS
             expected_essay_ids=batch_essays_registered.essay_ids,
+            # Course context from BOS
+            course_code=batch_essays_registered.course_code,
+            essay_instructions=batch_essays_registered.essay_instructions,
+            user_id=batch_essays_registered.user_id,
         )
 
         self.batch_expectations[batch_id] = expectation
@@ -74,7 +79,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         self._logger.info(
             f"Registered batch {batch_id} with {len(batch_essays_registered.essay_ids)} "
-            f"slots: {batch_essays_registered.essay_ids}"
+            f"slots: {batch_essays_registered.essay_ids}, course: {batch_essays_registered.course_code.value}"
         )
 
     def assign_slot_to_content(
@@ -230,6 +235,9 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         if expectation._timeout_task:
             expectation._timeout_task.cancel()
 
+        # Infer language from course code using helper function
+        course_language = get_course_language(expectation.course_code).value
+
         # Create enhanced BatchEssaysReady event
         ready_event = BatchEssaysReady(
             batch_id=batch_id,
@@ -240,11 +248,10 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 timestamp=datetime.now(UTC),
                 event="batch.essays.ready",
             ),
-            # Enhanced lean registration fields
-            # TODO: Get actual values from Class Management Service after integration
-            course_code="ENG5",  # Placeholder - should come from batch context
-            course_language="en",  # Placeholder - inferred from course code
-            essay_instructions="Essay instructions placeholder",  # Placeholder
+            # Enhanced lean registration fields from batch context
+            course_code=expectation.course_code,
+            course_language=course_language,
+            essay_instructions=expectation.essay_instructions,
             class_type="GUEST",  # Placeholder - until Class Management Service integration
             teacher_first_name=None,  # No teacher info for GUEST classes
             teacher_last_name=None,   # No teacher info for GUEST classes
@@ -256,7 +263,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         self._logger.info(
             f"Batch {batch_id} completed: "
             f"{len(expectation.slot_assignments)} successful, {len(failures)} failed, "
-            f"{ready_event.total_files_processed} total processed"
+            f"{ready_event.total_files_processed} total processed, course: {expectation.course_code.value}"
         )
 
         # Clean up completed batch

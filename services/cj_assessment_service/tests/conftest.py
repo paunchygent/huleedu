@@ -18,6 +18,7 @@ from aiokafka import AIOKafkaProducer, ConsumerRecord
 
 # CRITICAL: Import ALL enum types FIRST
 from common_core.enums import (
+    CourseCode,
     ProcessingEvent,
     ProcessingStage,
 )
@@ -130,7 +131,7 @@ def cj_assessment_request_data_with_overrides(
         system_metadata=system_metadata,
         essays_for_cj=[essay_processing_ref],
         language="en",
-        course_code="CS101",
+        course_code=CourseCode.ENG5,
         essay_instructions="Compare the quality of these essays.",
         llm_config_overrides=llm_config_overrides,
     )
@@ -149,7 +150,7 @@ def cj_assessment_request_data_no_overrides(
         system_metadata=system_metadata,
         essays_for_cj=[essay_processing_ref],
         language="en",
-        course_code="CS101",
+        course_code=CourseCode.SV1,
         essay_instructions="Compare the quality of these essays.",
         llm_config_overrides=None,
     )

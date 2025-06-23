@@ -16,7 +16,7 @@ from common_core.batch_service_models import (
     BatchServiceCJAssessmentInitiateCommandDataV1,
     EssayProcessingInputRefV1,
 )
-from common_core.enums import EssayStatus, ProcessingEvent
+from common_core.enums import CourseCode, EssayStatus, ProcessingEvent
 from common_core.metadata_models import EntityReference
 
 from services.essay_lifecycle_service.essay_state_machine import (
@@ -113,7 +113,7 @@ class TestCJAssessmentCommandHandler:
             entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
             essays_to_process=[essay_processing_ref],
             language="en",
-            course_code="ENG101",
+            course_code=CourseCode.ENG5,
             class_type="REGULAR",
             essay_instructions="Write about your summer vacation",
         )
@@ -277,7 +277,7 @@ class TestCJAssessmentCommandHandler:
             entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
             essays_to_process=essay_refs,
             language="en",
-            course_code="ENG101",
+            course_code=CourseCode.ENG6,
             class_type="REGULAR",
             essay_instructions="Write about your summer vacation",
         )
@@ -342,7 +342,7 @@ class TestCJAssessmentCommandHandler:
             entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
             essays_to_process=[essay_ref],
             language="sv",
-            course_code="SV201",
+            course_code=CourseCode.SV3,
             class_type="REGULAR",
             essay_instructions="Skriv om din semester",
         )
@@ -368,8 +368,169 @@ class TestCJAssessmentCommandHandler:
             mock_request_dispatcher.dispatch_cj_assessment_requests.assert_called_once_with(
                 essays_to_process=[essay_ref],
                 language="sv",
-                course_code="SV201",
+                course_code=CourseCode.SV3,
                 essay_instructions="Skriv om din semester",
                 batch_id=batch_id,
                 correlation_id=correlation_id,
             )
+
+    # Test: Create command with course code
+    @pytest.mark.asyncio
+    async def test_process_cj_assessment_command_course_code(
+        self,
+        cj_assessment_handler: CJAssessmentCommandHandler,
+        mock_repository: AsyncMock,
+        mock_request_dispatcher: AsyncMock,
+        batch_id: str,
+        correlation_id: UUID,
+    ) -> None:
+        """Test CJ assessment command with course code."""
+        # Create command with course code
+        command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
+            event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
+            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            essays_to_process=[
+                EssayProcessingInputRefV1(essay_id="essay1", text_storage_id="storage1"),
+                EssayProcessingInputRefV1(essay_id="essay2", text_storage_id="storage2"),
+            ],
+            language="en",
+            course_code=CourseCode.ENG5,
+            essay_instructions="Write about your experience",
+            class_type="REGULAR",
+        )
+
+        # Setup essay states - all found and can transition
+        essay_states = [self.create_essay_state_mock(ref.essay_id, batch_id) for ref in command_data.essays_to_process]
+        mock_repository.get_essay_state.side_effect = essay_states
+
+        with patch(
+            "services.essay_lifecycle_service.implementations.cj_assessment_command_handler."
+            "EssayStateMachine"
+        ) as mock_state_machine_class:
+            # Setup state machines - all succeed
+            # Need 4 total: 2 for initial processing + 2 for started events
+            mock_machines = []
+            for _ in range(4):
+                mock_machine = MagicMock()
+                mock_machine.trigger.return_value = True  # All succeed
+                mock_machine.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT
+                mock_machines.append(mock_machine)
+
+            mock_state_machine_class.side_effect = mock_machines
+
+            # Execute
+            await cj_assessment_handler.process_initiate_cj_assessment_command(
+                command_data=command_data, correlation_id=correlation_id
+            )
+
+            # Verify all essays were processed (started events fail due to mock exhaustion)
+            assert mock_repository.get_essay_state.call_count == 4  # 2 initial + 2 started attempts
+            assert mock_state_machine_class.call_count == 2  # Only initial processing
+
+            # Verify all successful transitions were persisted (started events fail)
+            assert mock_repository.update_essay_status_via_machine.call_count == 2
+
+            # Verify request dispatcher called with all successfully transitioned essays
+            mock_request_dispatcher.dispatch_cj_assessment_requests.assert_called_once()
+            args, kwargs = mock_request_dispatcher.dispatch_cj_assessment_requests.call_args
+
+            # Should contain both essays
+            assert len(kwargs["essays_to_process"]) == 2
+            assert kwargs["essays_to_process"][0].essay_id == "essay1"
+            assert kwargs["essays_to_process"][1].essay_id == "essay2"
+
+    # Test: Create command with minimal data
+    @pytest.mark.asyncio
+    async def test_process_cj_assessment_command_minimal_data(
+        self,
+        cj_assessment_handler: CJAssessmentCommandHandler,
+        mock_repository: AsyncMock,
+        mock_request_dispatcher: AsyncMock,
+        batch_id: str,
+        correlation_id: UUID,
+    ) -> None:
+        """Test CJ assessment command with minimal data."""
+        # Create command with minimal data
+        command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
+            event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
+            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            essays_to_process=[
+                EssayProcessingInputRefV1(essay_id="essay1", text_storage_id="storage1"),
+            ],
+            language="sv",
+            course_code=CourseCode.SV1,
+            essay_instructions="Minimal instructions",
+            class_type="GUEST",
+        )
+
+        # Setup essay state
+        essay_state = self.create_essay_state_mock(command_data.essays_to_process[0].essay_id, batch_id)
+        mock_repository.get_essay_state.return_value = essay_state
+
+        with patch(
+            "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
+        ) as mock_state_machine_class:
+            mock_machine = MagicMock()
+            mock_machine.trigger.return_value = True
+            mock_machine.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT
+            mock_state_machine_class.return_value = mock_machine
+
+            # Execute
+            await cj_assessment_handler.process_initiate_cj_assessment_command(
+                command_data=command_data, correlation_id=correlation_id
+            )
+
+            # Verify command data is passed correctly to dispatcher
+            mock_request_dispatcher.dispatch_cj_assessment_requests.assert_called_once_with(
+                essays_to_process=[command_data.essays_to_process[0]],
+                language="sv",
+                course_code=command_data.course_code,
+                essay_instructions=command_data.essay_instructions,
+                batch_id=batch_id,
+                correlation_id=correlation_id,
+            )
+
+    # Test: Create command that should fail validation
+    @pytest.mark.asyncio
+    async def test_process_cj_assessment_command_validation_failure(
+        self,
+        cj_assessment_handler: CJAssessmentCommandHandler,
+        mock_repository: AsyncMock,
+        mock_request_dispatcher: AsyncMock,
+        batch_id: str,
+        correlation_id: UUID,
+    ) -> None:
+        """Test CJ assessment command that should fail validation."""
+        # Create command that should fail validation
+        command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
+            event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
+            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            essays_to_process=[],  # Empty essays list should cause validation failure
+            language="en",
+            course_code=CourseCode.ENG7,
+            essay_instructions="Test validation",
+            class_type="REGULAR",
+        )
+
+        # Setup essay state
+        essay_state = self.create_essay_state_mock(command_data.essays_to_process[0].essay_id, batch_id)
+        mock_repository.get_essay_state.return_value = essay_state
+
+        with patch(
+            "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
+        ) as mock_state_machine_class:
+            mock_machine = MagicMock()
+            mock_machine.trigger.return_value = False  # Transition fails
+            mock_state_machine_class.return_value = mock_machine
+
+            # Execute
+            await cj_assessment_handler.process_initiate_cj_assessment_command(
+                command_data=command_data, correlation_id=correlation_id
+            )
+
+            # Verify state machine was attempted
+            mock_machine.trigger.assert_called_once_with(CMD_INITIATE_CJ_ASSESSMENT)
+
+            # Verify no repository update or dispatch for failed transition
+            mock_repository.update_essay_status_via_machine.assert_not_called()
+            mock_request_dispatcher.dispatch_cj_assessment_requests.assert_not_called()

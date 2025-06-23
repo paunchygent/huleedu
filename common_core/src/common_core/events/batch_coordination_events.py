@@ -18,6 +18,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from ..enums import CourseCode
 from ..metadata_models import (
     EntityReference,
     EssayProcessingInputRefV1,
@@ -30,6 +31,7 @@ class BatchEssaysRegistered(BaseModel):
     Event sent by BOS to ELS to register batch processing expectations.
 
     This establishes the count-based coordination contract between BOS and ELS.
+    Enhanced to include course context so ELS can create proper BatchEssaysReady events.
     """
 
     event: str = Field(default="batch.essays.registered", description="Event type identifier")
@@ -37,6 +39,11 @@ class BatchEssaysRegistered(BaseModel):
     expected_essay_count: int = Field(description="Number of essays expected in this batch")
     essay_ids: list[str] = Field(description="List of essay IDs that will be processed")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
+
+    # Course context from BOS lean registration (added for ELS to use in BatchEssaysReady)
+    course_code: CourseCode = Field(description="Course code from batch registration")
+    essay_instructions: str = Field(description="Essay instructions from batch registration")
+    user_id: str = Field(description="User who owns this batch")
 
 
 class BatchEssaysReady(BaseModel):
@@ -57,7 +64,7 @@ class BatchEssaysReady(BaseModel):
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
 
     # Enhanced context from Class Management Service (lean registration refactoring)
-    course_code: str = Field(description="Course code from BOS lean registration")
+    course_code: CourseCode = Field(description="Course code from BOS lean registration")
     course_language: str = Field(description="Language inferred from course_code")
     essay_instructions: str = Field(description="Essay instructions from BOS lean registration")
 

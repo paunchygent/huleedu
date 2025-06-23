@@ -117,7 +117,8 @@ class TestAIFeedbackInitiatorImpl:
         # Verify AI feedback specific context fields
         assert command_data.course_code == sample_batch_context.course_code
         assert command_data.essay_instructions == sample_batch_context.essay_instructions
-        # Educational context fields use placeholder values until Class Management Service integration
+        # Educational context fields use placeholder
+        # values until Class Management Service integration
         assert command_data.class_type == "GUEST"
         assert command_data.teacher_first_name is None
         assert command_data.teacher_last_name is None
@@ -168,7 +169,8 @@ class TestAIFeedbackInitiatorImpl:
         sample_essay_refs: list[EssayProcessingInputRefV1],
         sample_correlation_id: uuid.UUID,
     ) -> None:
-        """Test that educational context uses placeholder values until Class Management Service integration."""
+        """Test that educational context uses placeholder values
+        until Class Management Service integration."""
         custom_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
             course_code="LIT201",

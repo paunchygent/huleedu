@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from common_core.enums import BatchStatus, ProcessingEvent, ProcessingStage, topic_name
+from common_core.enums import BatchStatus, CourseCode, ProcessingEvent, ProcessingStage, topic_name
 from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
@@ -125,7 +125,7 @@ class TestE2ECJAssessmentWorkflows:
                 essay_storage_refs=essay_storage_refs,
                 correlation_id=correlation_id,
                 language="en",
-                course_code="SA24D ENG 5 WRITING 2025",
+                course_code=CourseCode.ENG5,
                 essay_instructions="Write a persuasive essay on your topic.",
             )
 
@@ -225,7 +225,7 @@ class TestE2ECJAssessmentWorkflows:
                 essay_storage_refs=essay_storage_refs,
                 correlation_id=correlation_id,
                 language="en",
-                course_code="TEST_COURSE_MINIMAL",
+                course_code=CourseCode.ENG6,
                 essay_instructions="Write a short essay.",
             )
 
@@ -269,7 +269,7 @@ class TestE2ECJAssessmentWorkflows:
         essay_storage_refs: list[dict[str, str]],
         correlation_id: str,
         language: str = "en",
-        course_code: str = "TEST_COURSE",
+        course_code: CourseCode = CourseCode.ENG5,
         essay_instructions: str = "Write an essay.",
     ) -> dict[str, Any]:
         """

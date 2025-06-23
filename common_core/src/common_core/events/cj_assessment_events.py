@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..enums import ProcessingEvent
+from ..enums import CourseCode, ProcessingEvent
 from ..metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
 from .base_event_models import BaseEventData, ProcessingUpdate
 
@@ -57,7 +57,7 @@ class ELS_CJAssessmentRequestV1(BaseEventData):
     system_metadata: SystemProcessingMetadata  # Populated by ELS
     essays_for_cj: list[EssayProcessingInputRefV1]
     language: str
-    course_code: str
+    course_code: CourseCode
     essay_instructions: str
     llm_config_overrides: LLMConfigOverrides | None = Field(
         default=None,

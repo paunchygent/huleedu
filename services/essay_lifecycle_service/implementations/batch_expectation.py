@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 
+from common_core.enums import CourseCode
 from common_core.metadata_models import EssayProcessingInputRefV1
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -20,12 +21,16 @@ class BatchExpectation:
     Tracks slot expectations for a specific batch.
 
     Maintains the slot-based coordination state between BOS and ELS.
+    Enhanced to include course context for proper BatchEssaysReady event creation.
     """
 
     def __init__(
         self,
         batch_id: str,
         expected_essay_ids: list[str],  # Internal essay ID slots from BOS
+        course_code: CourseCode,
+        essay_instructions: str,
+        user_id: str,
         timeout_seconds: int = 300,  # 5 minutes default
     ) -> None:
         self.batch_id = batch_id
@@ -33,6 +38,12 @@ class BatchExpectation:
         self.expected_count = len(expected_essay_ids)
         self.available_slots = set(expected_essay_ids)  # Unassigned slots
         self.slot_assignments: dict[str, SlotAssignment] = {}  # internal_essay_id -> SlotAssignment
+
+        # Course context from BOS
+        self.course_code = course_code
+        self.essay_instructions = essay_instructions
+        self.user_id = user_id
+
         self.created_at = datetime.now(UTC)
         self.timeout_seconds = timeout_seconds
         self._timeout_task: asyncio.Task[None] | None = None

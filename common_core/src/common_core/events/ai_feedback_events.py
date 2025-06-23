@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..enums import ProcessingEvent
+from ..enums import CourseCode, ProcessingEvent
 from .base_event_models import ProcessingUpdate
 
 __all__ = [
@@ -34,7 +34,7 @@ class AIFeedbackInputDataV1(BaseModel):
     """Input data structure needed for AI feedback processing requests."""
 
     text_storage_id: str
-    course_code: str
+    course_code: CourseCode
     essay_instructions: str
     language: str
     teacher_name: str | None = None

@@ -43,7 +43,7 @@ class BatchContextOperations:
                     # Create new batch record using lean registration model
                     batch = Batch(
                         id=batch_id,
-                        name=f"{registration_data.course_code} - {registration_data.user_id}",
+                        name=f"{registration_data.course_code.value} - {registration_data.user_id}",
                         description=registration_data.essay_instructions,
                         status=BatchStatus.AWAITING_CONTENT_VALIDATION,
                         total_essays=registration_data.expected_essay_count,
@@ -56,7 +56,7 @@ class BatchContextOperations:
                         update(Batch)
                         .where(Batch.id == batch_id)
                         .values(
-                            name=f"{registration_data.course_code} - {registration_data.user_id}",
+                            name=f"{registration_data.course_code.value} - {registration_data.user_id}",
                             description=registration_data.essay_instructions,
                             total_essays=registration_data.expected_essay_count,
                             processing_metadata=registration_data.model_dump(),

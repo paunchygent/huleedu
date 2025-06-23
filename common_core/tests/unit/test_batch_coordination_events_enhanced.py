@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from common_core.enums import CourseCode
 from common_core.events.batch_coordination_events import BatchEssaysReady
 from common_core.metadata_models import (
     EntityReference,
@@ -58,7 +59,7 @@ class TestEnhancedBatchEssaysReadyLean:
             batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             # Lean registration fields from BOS
-            course_code="ENG5",
+            course_code=CourseCode.ENG5,
             course_language="en",
             essay_instructions="Write about your role model",
             # Educational context from Class Management Service
@@ -68,7 +69,7 @@ class TestEnhancedBatchEssaysReadyLean:
         )
 
         assert event.batch_id == "batch_regular"
-        assert event.course_code == "ENG5"
+        assert event.course_code == CourseCode.ENG5
         assert event.course_language == "en"
         assert event.class_type == "REGULAR"
         assert event.teacher_first_name == "Emma"
@@ -88,7 +89,7 @@ class TestEnhancedBatchEssaysReadyLean:
             batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             # Lean registration fields from BOS
-            course_code="SV1",
+            course_code=CourseCode.SV1,
             course_language="sv",
             essay_instructions="Skriv om din förebild",
             # Educational context - GUEST class has no teacher names
@@ -98,44 +99,53 @@ class TestEnhancedBatchEssaysReadyLean:
         )
 
         assert event.batch_id == "batch_guest"
-        assert event.course_code == "SV1"
+        assert event.course_code == CourseCode.SV1
         assert event.course_language == "sv"
         assert event.class_type == "GUEST"
         assert event.teacher_first_name is None
         assert event.teacher_last_name is None
 
-    def test_serialization_lean_model(
+    def test_lean_batch_ready_serialization_roundtrip(
         self,
         sample_ready_essays: list[EssayProcessingInputRefV1],
         sample_batch_entity: EntityReference,
         sample_metadata: SystemProcessingMetadata,
     ) -> None:
-        """Test JSON serialization/deserialization of lean model."""
+        """Test BatchEssaysReady serialization and deserialization with lean registration fields."""
         event = BatchEssaysReady(
-            batch_id="batch_serialize_lean",
+            batch_id="batch_serialization",
             ready_essays=sample_ready_essays,
             batch_entity=sample_batch_entity,
             metadata=sample_metadata,
-            course_code="ENG6",
+            # Lean registration fields from BOS
+            course_code=CourseCode.ENG6,
             course_language="en",
-            essay_instructions="Describe a memorable experience",
+            essay_instructions="Analyze the character development in your chosen novel",
+            # Educational context from Class Management Service
             class_type="REGULAR",
-            teacher_first_name="Sarah",
-            teacher_last_name="Wilson",
+            teacher_first_name="Michael",
+            teacher_last_name="Thompson",
         )
 
-        # Serialize to JSON
+        # Test serialization
         json_data = event.model_dump_json()
         assert isinstance(json_data, str)
 
-        # Verify key fields in JSON
+        # Test deserialization
         data_dict = json.loads(json_data)
-        assert data_dict["course_code"] == "ENG6"
-        assert data_dict["class_type"] == "REGULAR"
-        assert data_dict["teacher_first_name"] == "Sarah"
+        reconstructed_event = BatchEssaysReady.model_validate(data_dict)
 
-        # Deserialize back
-        reconstructed = BatchEssaysReady.model_validate(data_dict)
-        assert reconstructed.batch_id == event.batch_id
-        assert reconstructed.course_code == event.course_code
-        assert reconstructed.class_type == event.class_type
+        # Verify lean registration fields
+        assert data_dict["course_code"] == CourseCode.ENG6.value
+        assert data_dict["course_language"] == "en"
+        assert data_dict["class_type"] == "REGULAR"
+        assert data_dict["teacher_first_name"] == "Michael"
+        assert data_dict["teacher_last_name"] == "Thompson"
+
+        # Verify all fields match after reconstruction
+        assert reconstructed_event.batch_id == event.batch_id
+        assert reconstructed_event.course_code == event.course_code
+        assert reconstructed_event.course_language == event.course_language
+        assert reconstructed_event.class_type == event.class_type
+        assert reconstructed_event.teacher_first_name == event.teacher_first_name
+        assert reconstructed_event.teacher_last_name == event.teacher_last_name

@@ -13,6 +13,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
+from common_core.enums import CourseCode
 from common_core.events.batch_coordination_events import BatchEssaysReady, BatchEssaysRegistered
 from common_core.events.file_events import EssayValidationFailedV1
 from common_core.metadata_models import (
@@ -44,6 +45,10 @@ class TestEnhancedBatchEssayTracker:
                 entity=EntityReference(entity_id="batch_test", entity_type="batch"),
                 timestamp=datetime.now(UTC),
             ),
+            # Course context fields
+            course_code=CourseCode.ENG5,
+            essay_instructions="Test essay instructions",
+            user_id="test_user",
         )
 
     @pytest.fixture
@@ -150,6 +155,10 @@ class TestEnhancedBatchEssayTracker:
                 entity=EntityReference(entity_id="batch_24_of_25", entity_type="batch"),
                 timestamp=datetime.now(UTC),
             ),
+            # Course context fields
+            course_code=CourseCode.ENG6,
+            essay_instructions="Write about your summer vacation",
+            user_id="test_user_25",
         )
         await tracker.register_batch(batch_registration)
 
@@ -274,6 +283,10 @@ class TestEnhancedBatchEssayTracker:
                 entity=EntityReference(entity_id="batch_all_failed", entity_type="batch"),
                 timestamp=datetime.now(UTC),
             ),
+            # Course context fields
+            course_code=CourseCode.SV1,
+            essay_instructions="Skriv om ditt favoritämne",
+            user_id="test_user_failed",
         )
         await tracker.register_batch(batch_registration)
 

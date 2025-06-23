@@ -7,25 +7,18 @@ individual initiators to avoid circular imports.
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from common_core.enums import CourseCode, Language, get_course_language
+
 logger = create_service_logger("bos.language_utils")
 
 
-def _infer_language_from_course_code(course_code: str) -> str:
-    """Infer ISO language code from a course code string.
+def _infer_language_from_course_code(course_code: CourseCode) -> Language:
+    """Infer ISO language code from a CourseCode enum member.
 
     Args:
-        course_code: Course code (e.g. "SV1", "ENG5").
+        course_code: Course code enum member (e.g. CourseCode.SV1, CourseCode.ENG5).
 
     Returns:
-        A two-letter language code (e.g. ``"sv"`` or ``"en"``).
+        A Language enum member (e.g. Language.SWEDISH or Language.ENGLISH).
     """
-    course_code_upper = course_code.upper()
-
-    if course_code_upper.startswith("SV"):
-        return "sv"  # Swedish
-    if course_code_upper.startswith("ENG"):
-        return "en"  # English
-
-    # Default to English if the course code is unrecognised
-    logger.warning("Unknown course code '%s', defaulting to English", course_code)
-    return "en"
+    return get_course_language(course_code)

@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from common_core.enums import CourseCode
 from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_repository_impl import (
@@ -66,7 +67,7 @@ class TestPipelineRealWorldScenarios:
         # Setup batch context for 25 essays with CJ assessment enabled
         batch_context = BatchRegistrationRequestV1(
             expected_essay_count=25,
-            course_code="ENG101",
+            course_code=CourseCode.ENG5,
             essay_instructions="Write about the given topic",
             user_id="user_123",
             enable_cj_assessment=True,

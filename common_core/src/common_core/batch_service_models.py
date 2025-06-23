@@ -7,6 +7,7 @@ the Batch Orchestrator Service sends to ELS to initiate various processing phase
 
 from __future__ import annotations
 
+from .enums import CourseCode
 from .events.base_event_models import BaseEventData
 from .metadata_models import EssayProcessingInputRefV1
 
@@ -39,7 +40,7 @@ class BatchServiceAIFeedbackInitiateCommandDataV1(BaseEventData):
     language: str  # inferred from course_code
 
     # Orchestration context (from BOS lean registration)
-    course_code: str  # from batch registration
+    course_code: CourseCode  # from batch registration
     essay_instructions: str  # from batch registration
 
     # Personalization context (from Class Management Service via enhanced BatchEssaysReady)
@@ -55,7 +56,7 @@ class BatchServiceCJAssessmentInitiateCommandDataV1(BaseEventData):
     language: str  # inferred from course_code
 
     # Orchestration context (from BOS lean registration)
-    course_code: str  # from batch registration
+    course_code: CourseCode  # from batch registration
     essay_instructions: str  # from batch registration
 
     # Educational context (from Class Management Service via enhanced BatchEssaysReady)

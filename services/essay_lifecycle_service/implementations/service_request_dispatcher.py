@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from config import Settings
 
+from common_core.enums import CourseCode
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.protocols import SpecializedServiceRequestDispatcher
@@ -149,7 +150,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: str,
-        course_code: str,
+        course_code: CourseCode,
         essay_instructions: str,
         batch_id: str,
         correlation_id: UUID | None = None,
@@ -171,7 +172,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 "essay_count": len(essays_to_process),
                 "essay_ids": [essay.essay_id for essay in essays_to_process],
                 "language": language,
-                "course_code": course_code,
+                "course_code": course_code.value,
                 "essay_instructions": essay_instructions[:100] + "..."
                 if len(essay_instructions) > 100
                 else essay_instructions,
@@ -223,7 +224,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                     "batch_id": batch_id,
                     "essay_count": len(essays_to_process),
                     "language": language,
-                    "course_code": course_code,
+                    "course_code": course_code.value,
                     "event_id": str(envelope.event_id),
                     "correlation_id": str(correlation_id),
                 },

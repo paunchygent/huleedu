@@ -11,7 +11,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 from uuid import UUID
 
-from common_core.enums import ContentType, EssayStatus
+from common_core.enums import ContentType, CourseCode, EssayStatus
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 
 
@@ -297,7 +297,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: str,
-        course_code: str,
+        course_code: CourseCode,
         essay_instructions: str,
         batch_id: str,
         correlation_id: UUID | None = None,

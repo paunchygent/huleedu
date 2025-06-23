@@ -9,7 +9,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from common_core.batch_service_models import BatchServiceCJAssessmentInitiateCommandDataV1
-from common_core.enums import ProcessingEvent
+from common_core.enums import CourseCode, ProcessingEvent
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 
@@ -83,7 +83,7 @@ class TestBatchServiceCommandContracts:
             ),
             essays_to_process=essays,
             language="sv",
-            course_code="SV101",
+            course_code=CourseCode.SV1,
             class_type="REGULAR",
             essay_instructions="Write about your summer vacation",
         )
@@ -92,7 +92,7 @@ class TestBatchServiceCommandContracts:
         json_data = original_command.model_dump_json()
         assert isinstance(json_data, str)
         assert batch_id in json_data
-        assert "SV101" in json_data
+        assert "SV1" in json_data
 
         # Test deserialization
         deserialized_command = BatchServiceCJAssessmentInitiateCommandDataV1.model_validate_json(

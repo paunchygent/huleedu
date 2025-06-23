@@ -12,6 +12,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from ..enums import CourseCode
+
 
 class ClassCreatedV1(BaseModel):
     """Event published when new class is created."""
@@ -19,7 +21,7 @@ class ClassCreatedV1(BaseModel):
     event: str = Field(default="class.created")
     class_id: str = Field(description="New class identifier")
     class_designation: str = Field(description="Class designation name")
-    course_codes: list[str] = Field(description="Associated course codes")
+    course_codes: list[CourseCode] = Field(description="Associated course codes")
     user_id: str = Field(description="Teacher who created the class")
     correlation_id: UUID | None = Field(default=None)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
