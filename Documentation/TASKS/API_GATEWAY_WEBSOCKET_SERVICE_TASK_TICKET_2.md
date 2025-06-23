@@ -2,13 +2,13 @@
 
 This document provides a step-by-step implementation plan for the API Gateway component of the client interface layer.
 
-## 🚫 **BLOCKING DEPENDENCY - REFACTORING REQUIRED**
+## ✅ **BLOCKING DEPENDENCY RESOLVED - REFACTORING COMPLETED**
 
-**⚠️ CRITICAL: This task is BLOCKED until completion of:**
+**✅ FOUNDATION READY: This task can now proceed with:**
 
-📋 **[LEAN_BATCH_REGISTRATION_REFACTORING.md](LEAN_BATCH_REGISTRATION_REFACTORING.md)**
+📋 **[LEAN_BATCH_REGISTRATION_REFACTORING.md](LEAN_BATCH_REGISTRATION_REFACTORING.md)** - **COMPLETED**
 
-**Reason**: API Gateway endpoints reference batch registration models that need to be refactored for lean registration and proper service boundaries.
+**Result**: API Gateway endpoints can now be implemented using lean registration models with proper service boundaries established.
 
 ## Part 2: API Gateway Service Implementation
 
@@ -737,14 +737,14 @@ class Settings(BaseSettings):
     router = APIRouter()
     logger = create_service_logger("api_gateway.batch_routes")
 
-    class EnhancedBatchRegistrationRequest(BaseModel):
-        """Enhanced batch registration request with course and class support."""
+    class LeanBatchRegistrationRequest(BaseModel):
+        """Lean batch registration request aligned with refactored architecture."""
+        user_id: str = Field(..., description="Authenticated user ID (populated by gateway)")
+        course_code: CourseCode = Field(..., description="Course code for processing")
+        essay_instructions: str = Field(..., description="Instructions for essay processing")
         expected_essay_count: int = Field(..., gt=0)
-        course_code: CourseCode | None = Field(None, description="Course code (None for GUEST class)")
-        class_id: str | None = Field(None, description="Existing class ID")
-        class_designation: str = Field(..., description="Class designation or 'GUEST'")
-        essay_instructions: str = Field(...)
-        enable_student_parsing: bool = Field(default=True)
+        # Note: Educational context (teacher names, class designation) handled by Class Management Service
+        enable_student_parsing: bool = Field(default=True, description="Enable automatic student parsing")
         validation_timeout_hours: int = Field(default=72, ge=1, le=168)  # 1 hour to 1 week
 
     class BatchStatusResponse(BaseModel):
@@ -759,19 +759,19 @@ class Settings(BaseSettings):
 
     @router.post("/batches/register", status_code=status.HTTP_201_CREATED)
     @limiter.limit("10/minute")
-    async def register_enhanced_batch(
+    async def register_lean_batch(
         request: Request,
-        registration_request: EnhancedBatchRegistrationRequest,
+        registration_request: LeanBatchRegistrationRequest,
         user_id: str = Depends(auth.get_current_user_id),
         http_session: FromDishka[aiohttp.ClientSession],
     ):
-        """Register a new batch with enhanced course and validation support."""
+        """Register a new batch using lean registration pattern."""
         try:
-            # Forward to BOS enhanced registration endpoint
-            bos_url = f"{settings.BOS_URL}/v2/register"
+            # Populate user_id from authentication and forward to BOS lean registration
+            registration_request.user_id = user_id
+            bos_url = f"{settings.BOS_URL}/v1/register"  # Use standard lean registration endpoint
             
             registration_data = registration_request.model_dump()
-            registration_data["user_id"] = user_id
             
             async with http_session.post(
                 bos_url, 

@@ -2,20 +2,20 @@
 
 This document outlines the implementation of enhanced file and batch management capabilities, class management service, and student association features for the HuleEdu platform.
 
-## 🚫 **BLOCKING DEPENDENCY - REFACTORING REQUIRED**
+## ✅ **BLOCKING DEPENDENCY RESOLVED - REFACTORING COMPLETED**
 
-**⚠️ CRITICAL: Phase 2 onwards of this task is BLOCKED until completion of:**
+**✅ FOUNDATION READY: All phases of this task can now proceed with:**
 
-📋 **[LEAN_BATCH_REGISTRATION_REFACTORING.md](LEAN_BATCH_REGISTRATION_REFACTORING.md)**
+📋 **[LEAN_BATCH_REGISTRATION_REFACTORING.md](LEAN_BATCH_REGISTRATION_REFACTORING.md)** - **COMPLETED**
 
-**Reason**: The current batch registration model captures too much processing data upfront. The refactoring establishes lean registration and proper service boundaries required for this implementation.
+**Result**: Lean registration architecture is established with proper service boundaries. Enhanced features can now be implemented on top of the lean foundation where BOS handles orchestration and Class Management Service owns educational context.
 
 **CRITICAL DEPENDENCIES:**
 
-- ✅ **Checkpoint 1.4: User ID Propagation** (API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_1.md) - MUST be completed first
+- ✅ **Checkpoint 1.4: User ID Propagation** (API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_1.md) - COMPLETED
 - ✅ **Checkpoint 3.2: Enhanced WebSocket Implementation** (API_GATEWAY_WEBSOCKET_SERVICE_TASK_TICKET_3.md) - For real-time updates
 - ✅ **User authentication and ownership validation** - Foundation for all enhanced features
-- 🚫 **Lean Batch Registration Refactoring** - BLOCKING Phase 2 onwards
+- ✅ **Lean Batch Registration Refactoring** - COMPLETED - All phases unblocked
 
 **Architecture Alignment:**
 This implementation follows established HuleEdu microservice patterns:
@@ -52,6 +52,7 @@ This section documents key architectural decisions made during the planning phas
 **Decision**: A standardized, structured `PersonNameV1` Pydantic model will be created in `common_core` for handling all personal names (teachers and students). This model will contain separate `first_name` and `last_name` fields.
 
 **Rationale**:
+
 - **Flexibility & Future-Proofing**: Provides downstream services with granular data. AI Feedback Service can construct formal references while maintaining informal options
 - **Consistency & Reusability (DRY)**: Single definition for both teachers and students, reducing code duplication
 - **Centralized Logic**: Single source of truth for name-related formatting logic with properties like `.full_name`
@@ -61,6 +62,7 @@ This section documents key architectural decisions made during the planning phas
 ### **ADL-02: Domain Responsibility for User and Student Data**
 
 **Decision**: Service responsibilities will be strictly enforced to maintain clear bounded contexts:
+
 - **BOS**: Owns batch lifecycle and orchestration context only
 - **Class Management Service**: Single authoritative source for class rosters and student data  
 - **File Service**: Responsible for initial discovery of potential student names from raw file content
@@ -81,6 +83,7 @@ This section documents key architectural decisions made during the planning phas
 ### **ADL-04: Two-Stage Student Association Workflow**
 
 **Decision**: Associating essays with students will be a two-stage process:
+
 1. **Discovery Stage (File Service)**: Parses temporary `parsed_name_metadata` and includes in `StudentParsingCompletedV1` event
 2. **Association Stage (ELS)**: After user validation, `StudentAssociationsConfirmedV1` command persists authoritative essay-student links
 
@@ -246,47 +249,53 @@ class EssayStatus(str, Enum):
 
 ## Part 2: Enhanced File and Batch Management
 
-**⚠️ NOTE**: This part implements lean registration where educational context (teacher names, class designation) is obtained from Class Management Service when processing starts, not during upload.
+**✅ ALIGNED WITH LEAN REGISTRATION**: This part implements the enhanced features on top of the completed lean registration architecture, where batch registration captures only orchestration essentials (`user_id`, `course_code`, `essay_instructions`) and educational context is provided by Class Management Service during processing.
 
 ### **Educational Context Flow - WHEN and WHERE**
 
 **When Educational Context is Provided:**
 
-1. **File Upload & Parsing**: File Service parses student info and publishes `StudentParsingCompletedV1` event
-2. **Student Validation**: Class Management Service processes parsing results and validates/stores student associations
-3. **Processing Initiation**: When ELS publishes `BatchEssaysReadyV1`, enhanced with educational context from Class Management Service
-4. **Processing Services**: AI Feedback and CJ Assessment services receive complete teacher context (`teacher_first_name`, `teacher_last_name`, `class_designation`) in processing commands
+1. **Batch Registration (Lean)**: BOS captures only orchestration essentials - `user_id`, `course_code`, `essay_instructions`
+2. **File Upload & Parsing**: File Service parses student info and publishes `StudentParsingCompletedV1` event
+3. **Student Validation**: Class Management Service processes parsing results and validates/stores student associations
+4. **Processing Initiation**: When ELS publishes enhanced `BatchEssaysReadyV1`, it includes educational context queried from Class Management Service
+5. **Processing Services**: AI Feedback and CJ Assessment services receive complete context (`teacher_first_name`, `teacher_last_name`, `class_designation`) via enhanced processing commands
 
 **Where Educational Context is Handled:**
 
-- **Class Management Service**: `GET /internal/v1/users/{user_id}/teacher-context` endpoint provides teacher names based on user_id
-- **ELS Batch Command Handler**: Queries Class Management Service when enhancing `BatchEssaysReadyV1` event
-- **BOS Processing Initiators**: Receive enhanced commands with educational context from Class Management Service (not batch registration)
+- **BOS**: Stores lean registration data only (`user_id`, `course_code`, `essay_instructions`) - NO educational context
+- **Class Management Service**: Single source of truth for all educational context (`teacher_names`, `class_designation`, student data)
+- **ELS Batch Command Handler**: Queries Class Management Service when enhancing `BatchEssaysReadyV1` event with educational context
+- **Processing Services**: Receive complete context via enhanced events, not from batch registration
 
 **Event Handlers Involved:**
 
 ```python
+# Lean Registration (Completed)
+BatchRegistrationRequestV1 (user_id, course_code, essay_instructions) → BOS.register_batch()
+
 # File Service -> Class Management Service
 StudentParsingCompletedV1 → ClassManagementService.student_parsing_handler()
 
 # Class Management Service -> ELS  
 StudentAssociationsValidatedV1 → ELS.batch_command_handler()
 
-# ELS -> Processing Services (enhanced with educational context)
-BatchEssaysReadyV1 (with teacher_first_name, teacher_last_name, class_designation) → BOS.processing_initiators()
+# ELS queries Class Management Service for educational context, then publishes enhanced event
+BatchEssaysReadyV1 (with teacher_first_name, teacher_last_name, class_designation from CMS) → BOS.processing_initiators()
 ```
 
 ### Checkpoint 2.1: File Management with Batch State Validation
 
-**Objective**: Implement file add/remove operations with proper batch state validation, ensuring files cannot be modified after spellcheck begins.
+**Objective**: Implement file add/remove operations with proper batch state validation, ensuring files cannot be modified after spellcheck begins. This builds on the lean registration architecture where educational context is handled separately.
 
 **Key Features**:
 
 - File operations blocked when spellcheck has started
-- User ownership validation for all file operations
-- Real-time events published for file additions/removals
+- User ownership validation via `user_id` from lean registration
+- Real-time events published for file additions/removals  
 - Batch state information available to clients
 - Clear error messages for operation failures
+- **Integration with lean registration**: File operations validate against lean batch context (no educational data required)
 
 **Affected Files**:
 

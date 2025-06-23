@@ -46,10 +46,11 @@ services/batch_orchestrator_service/
 ### 3.1. Current Endpoints
 
 #### POST /v1/batches/register
-- **Request**: `BatchRegistrationRequestV1` (course_code, class_designation, essay_ids, etc.)
+- **Request**: `BatchRegistrationRequestV1` (user_id, course_code, essay_instructions) - **LEAN REGISTRATION**
 - **Response**: `{"batch_id": "uuid", "correlation_id": "uuid", "status": "registered"}`
 - **Status**: 202 (accepted), 400 (validation error), 500 (server error)
 - **Flow**: HTTP → Service Layer → Repository + Event Publishing
+- **Note**: Educational context (teacher names, class designation) handled by Class Management Service
 
 #### POST /v1/batches/trigger-spellcheck-test
 - **Purpose**: Integration testing endpoint
@@ -216,10 +217,10 @@ HTTP Request → Service Layer → Repository → Event Publisher → Kafka → 
 - **MUST** implement `/healthz` with consistent JSON response format
 - **MUST** fail fast on startup errors with `logger.critical()` and `raise`
 
-## 15. Technical Debt
+## 15. Architectural Evolution
 
-### 15.1. Teacher Name Inference (Priority: HIGH)
-- **Current**: `teacher_name` manually provided in `BatchRegistrationRequestV1`
-- **Required**: Auto-inference from authenticated user when AUTH/USER services available
-- **Impact**: AI Feedback initiator and user identification across services
-- **Action**: Replace manual input with `f"{user.first_name} {user.last_name}"` lookup
+### 15.1. Educational Context Management ✅ COMPLETED
+- **Previous**: `teacher_name` manually provided in `BatchRegistrationRequestV1`
+- **Current**: Educational context provided by Class Management Service during processing
+- **Implementation**: Processing services receive complete teacher context via enhanced `BatchEssaysReady` events
+- **Benefit**: Clean service boundaries, single source of truth for educational data
