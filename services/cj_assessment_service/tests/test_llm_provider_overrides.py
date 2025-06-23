@@ -25,7 +25,9 @@ class TestLLMProviderPublicInterface:
 
     @pytest.fixture
     def openai_provider(
-        self, mock_http_session: AsyncMock, mock_settings: MagicMock,
+        self,
+        mock_http_session: AsyncMock,
+        mock_settings: MagicMock,
     ) -> OpenAIProviderImpl:
         """Create OpenAI provider instance for testing."""
         # Configure retry settings for test
@@ -40,7 +42,9 @@ class TestLLMProviderPublicInterface:
 
     @pytest.fixture
     def anthropic_provider(
-        self, mock_http_session: AsyncMock, mock_settings: MagicMock,
+        self,
+        mock_http_session: AsyncMock,
+        mock_settings: MagicMock,
     ) -> AnthropicProviderImpl:
         """Create Anthropic provider instance for testing."""
         # Configure retry settings for test
@@ -55,7 +59,8 @@ class TestLLMProviderPublicInterface:
 
     @pytest.mark.asyncio
     async def test_openai_generate_comparison_with_overrides(
-        self, openai_provider: OpenAIProviderImpl,
+        self,
+        openai_provider: OpenAIProviderImpl,
     ) -> None:
         """Test OpenAI provider handles overrides correctly through public interface."""
         # Arrange - Mock external HTTP boundary only
@@ -105,7 +110,8 @@ class TestLLMProviderPublicInterface:
 
     @pytest.mark.asyncio
     async def test_anthropic_generate_comparison_with_overrides(
-        self, anthropic_provider: AnthropicProviderImpl,
+        self,
+        anthropic_provider: AnthropicProviderImpl,
     ) -> None:
         """Test Anthropic provider handles overrides correctly through public interface."""
         # Arrange - Mock external HTTP boundary only
@@ -154,7 +160,8 @@ class TestLLMProviderPublicInterface:
 
     @pytest.mark.asyncio
     async def test_provider_fallback_to_defaults_when_no_overrides(
-        self, openai_provider: OpenAIProviderImpl,
+        self,
+        openai_provider: OpenAIProviderImpl,
     ) -> None:
         """Test provider uses defaults when no overrides provided."""
         # Arrange - Mock external HTTP boundary only
@@ -201,7 +208,8 @@ class TestLLMProviderPublicInterface:
 
     @pytest.mark.asyncio
     async def test_provider_handles_http_errors_correctly(
-        self, openai_provider: OpenAIProviderImpl,
+        self,
+        openai_provider: OpenAIProviderImpl,
     ) -> None:
         """Test provider error handling through public interface."""
         # Mock the HTTP response for error case

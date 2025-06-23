@@ -128,7 +128,8 @@ class TestFileContentValidator:
         assert result.error_code == "CONTENT_TOO_LONG"
 
     async def test_validate_content_with_whitespace_trimming(
-        self, validator: FileContentValidator,
+        self,
+        validator: FileContentValidator,
     ) -> None:
         """Test that content length is calculated after trimming whitespace."""
         # 50 characters plus surrounding whitespace
@@ -190,7 +191,8 @@ class TestFileContentValidator:
         assert result.is_valid is True
 
     async def test_filename_inclusion_in_error_messages(
-        self, validator: FileContentValidator,
+        self,
+        validator: FileContentValidator,
     ) -> None:
         """Test that filenames are properly included in error messages for debugging."""
         test_cases = [

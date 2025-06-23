@@ -177,7 +177,8 @@ class TestBOSIdempotencyOutage:
 
     @pytest.mark.asyncio
     async def test_unhandled_exception_releases_redis_lock(
-        self, sample_batch_essays_ready_event: dict,
+        self,
+        sample_batch_essays_ready_event: dict,
     ) -> None:
         """Test that unhandled exceptions release the idempotency lock for retry."""
         from huleedu_service_libs.idempotency import idempotent_consumer

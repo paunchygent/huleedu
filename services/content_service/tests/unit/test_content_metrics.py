@@ -111,7 +111,9 @@ class TestPrometheusContentMetrics:
         assert download_success_sample.value == 1.0
 
     def test_record_multiple_operations(
-        self, metrics: ContentMetricsProtocol, registry: CollectorRegistry,
+        self,
+        metrics: ContentMetricsProtocol,
+        registry: CollectorRegistry,
     ) -> None:
         """Test recording multiple operations with different statuses."""
         # Record various operations

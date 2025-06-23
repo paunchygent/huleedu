@@ -54,7 +54,9 @@ async def test_redis_client_lifecycle() -> None:
         # Test basic operation (will fail if Redis not available, which is expected)
         try:
             result = await redis_client.set_if_not_exists(
-                "spell_test_key", "test_value", ttl_seconds=60,
+                "spell_test_key",
+                "test_value",
+                ttl_seconds=60,
             )
             # If Redis is available, verify operation works
             assert isinstance(result, bool)

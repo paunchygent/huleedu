@@ -88,7 +88,10 @@ class MockRedisClient:
     """Mock Redis client for individual service connections."""
 
     def __init__(
-        self, service_name: str, key_tracker: RedisKeyTracker, fail_mode: str | None = None,
+        self,
+        service_name: str,
+        key_tracker: RedisKeyTracker,
+        fail_mode: str | None = None,
     ) -> None:
         self.service_name = service_name
         self.key_tracker = key_tracker
@@ -184,7 +187,9 @@ class RedisTestManager:
         self._cleanup_tasks: list[asyncio.Task] = []
 
     def create_service_client(
-        self, service_name: str, fail_mode: str | None = None,
+        self,
+        service_name: str,
+        fail_mode: str | None = None,
     ) -> MockRedisClient:
         """
         Create a Redis client for a specific service.

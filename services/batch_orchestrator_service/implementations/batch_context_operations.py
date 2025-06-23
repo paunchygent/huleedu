@@ -27,7 +27,9 @@ class BatchContextOperations:
         self.logger = create_service_logger("bos.repository.context")
 
     async def store_batch_context(
-        self, batch_id: str, registration_data: BatchRegistrationRequestV1,
+        self,
+        batch_id: str,
+        registration_data: BatchRegistrationRequestV1,
     ) -> bool:
         """Store batch context information."""
         async with self.db.session() as session:

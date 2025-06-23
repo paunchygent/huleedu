@@ -55,7 +55,9 @@ async def test_file_service_events_contain_raw_storage_id():
         files = [{"name": "test_essay.txt", "content": test_file_content.encode()}]
 
         response = await service_manager.upload_files(
-            batch_id=batch_id, files=files, correlation_id=correlation_id,
+            batch_id=batch_id,
+            files=files,
+            correlation_id=correlation_id,
         )
 
         print(f"✅ File uploaded successfully for batch: {batch_id}")
@@ -149,7 +151,9 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
         files = [{"name": "empty_essay.txt", "content": empty_file_content.encode()}]
 
         response = await service_manager.upload_files(
-            batch_id=batch_id, files=files, correlation_id=correlation_id,
+            batch_id=batch_id,
+            files=files,
+            correlation_id=correlation_id,
         )
 
         print(f"✅ Empty file uploaded for batch: {batch_id}")

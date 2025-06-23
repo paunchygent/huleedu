@@ -64,7 +64,9 @@ async def test_content_validation_failures_publish_events():
         # Upload files using utility
         try:
             upload_result = await service_manager.upload_files(
-                batch_id=batch_id, files=files, correlation_id=correlation_id,
+                batch_id=batch_id,
+                files=files,
+                correlation_id=correlation_id,
             )
             print(f"✅ File upload successful: {upload_result}")
         except RuntimeError as e:

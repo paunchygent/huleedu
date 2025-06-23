@@ -109,7 +109,9 @@ class BatchRepositoryProtocol(Protocol):
         ...
 
     async def store_batch_context(
-        self, batch_id: str, registration_data: BatchRegistrationRequestV1,
+        self,
+        batch_id: str,
+        registration_data: BatchRegistrationRequestV1,
     ) -> bool:
         """Store batch context information."""
         ...
@@ -169,7 +171,9 @@ class BatchProcessingServiceProtocol(Protocol):
     """Protocol for batch processing service operations."""
 
     async def register_new_batch(
-        self, registration_data: BatchRegistrationRequestV1, correlation_id: uuid.UUID,
+        self,
+        registration_data: BatchRegistrationRequestV1,
+        correlation_id: uuid.UUID,
     ) -> str:
         """Register a new batch for processing and return the batch ID."""
         ...

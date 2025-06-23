@@ -1,6 +1,5 @@
 """Content management routes for Content Service."""
 
-
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Blueprint, Response, jsonify, request, send_file

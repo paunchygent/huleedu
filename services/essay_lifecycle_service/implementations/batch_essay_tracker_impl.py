@@ -240,6 +240,15 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 timestamp=datetime.now(UTC),
                 event="batch.essays.ready",
             ),
+            # Enhanced lean registration fields
+            # TODO: Get actual values from Class Management Service after integration
+            course_code="ENG5",  # Placeholder - should come from batch context
+            course_language="en",  # Placeholder - inferred from course code
+            essay_instructions="Essay instructions placeholder",  # Placeholder
+            class_type="GUEST",  # Placeholder - until Class Management Service integration
+            teacher_first_name=None,  # No teacher info for GUEST classes
+            teacher_last_name=None,   # No teacher info for GUEST classes
+
             validation_failures=failures if failures else None,
             total_files_processed=len(expectation.slot_assignments) + len(failures),
         )

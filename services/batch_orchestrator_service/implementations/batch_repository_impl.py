@@ -57,7 +57,9 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         return self.pipeline_states.get(batch_id)
 
     async def store_batch_context(
-        self, batch_id: str, registration_data: BatchRegistrationRequestV1,
+        self,
+        batch_id: str,
+        registration_data: BatchRegistrationRequestV1,
     ) -> bool:
         """Store the full batch context including course info and essay instructions."""
         self.batch_contexts[batch_id] = registration_data

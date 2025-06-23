@@ -38,7 +38,8 @@ class TestHealthAPI:
         assert data["checks"]["service_responsive"] is True
 
     async def test_metrics_endpoint_responds_with_prometheus_format(
-        self, app_client: QuartClient,
+        self,
+        app_client: QuartClient,
     ) -> None:
         """Test /metrics endpoint returns Prometheus formatted metrics."""
         response = await app_client.get("/metrics")
@@ -85,7 +86,8 @@ class TestHealthAPI:
         # Empty content is acceptable in test environment
 
     async def test_nonexistent_endpoint_triggers_error_handler(
-        self, app_client: QuartClient,
+        self,
+        app_client: QuartClient,
     ) -> None:
         """Test that non-existent endpoints trigger error handler."""
         response = await app_client.get("/nonexistent")

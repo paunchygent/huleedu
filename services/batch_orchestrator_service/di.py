@@ -75,7 +75,8 @@ class CoreInfrastructureProvider(Provider):
     async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
         """Provide Redis client for idempotency and pub/sub operations."""
         redis_client = RedisClient(
-            client_id=f"{settings.SERVICE_NAME}-redis", redis_url=settings.REDIS_URL,
+            client_id=f"{settings.SERVICE_NAME}-redis",
+            redis_url=settings.REDIS_URL,
         )
         await redis_client.start()
         # RedisClient implements all AtomicRedisClientProtocol methods
@@ -104,14 +105,18 @@ class ExternalClientsProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_essay_lifecycle_client(
-        self, http_session: ClientSession, settings: Settings,
+        self,
+        http_session: ClientSession,
+        settings: Settings,
     ) -> EssayLifecycleClientProtocol:
         """Provide essay lifecycle service client implementation."""
         return DefaultEssayLifecycleClientImpl(http_session, settings)
 
     @provide(scope=Scope.APP)
     def provide_batch_conductor_client(
-        self, http_session: ClientSession, settings: Settings,
+        self,
+        http_session: ClientSession,
+        settings: Settings,
     ) -> BatchConductorClientProtocol:
         """Provide Batch Conductor Service HTTP client implementation."""
         return BatchConductorClientImpl(http_session, settings)

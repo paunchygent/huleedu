@@ -126,7 +126,9 @@ def create_validation_kafka_manager() -> KafkaTestManager:
     """
     # Create Kafka configuration with validation coordination topics
     kafka_config = create_kafka_test_config(
-        bootstrap_servers="localhost:9093", topics=TOPICS, assignment_timeout=15,
+        bootstrap_servers="localhost:9093",
+        topics=TOPICS,
+        assignment_timeout=15,
     )
 
     return KafkaTestManager(kafka_config)

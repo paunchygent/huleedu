@@ -70,7 +70,10 @@ class KafkaTestManager:
 
     @asynccontextmanager
     async def consumer(
-        self, test_name: str, topics: list[str] | None = None, auto_offset_reset: str = "latest",
+        self,
+        test_name: str,
+        topics: list[str] | None = None,
+        auto_offset_reset: str = "latest",
     ) -> AsyncIterator[AIOKafkaConsumer]:
         """
         Context manager for Kafka consumer with automatic cleanup.
@@ -120,7 +123,9 @@ class KafkaTestManager:
                 logger.warning(f"Error stopping consumer for {test_name}: {e}")
 
     async def _wait_for_partition_assignment(
-        self, consumer: AIOKafkaConsumer, test_name: str,
+        self,
+        consumer: AIOKafkaConsumer,
+        test_name: str,
     ) -> None:
         """Wait for consumer to get partition assignment."""
         partitions_assigned = False
@@ -280,5 +285,8 @@ async def collect_kafka_events(
     """
     async with kafka_event_monitor(test_name, topics) as consumer:
         return await kafka_manager.collect_events(
-            consumer, expected_count, timeout_seconds, event_filter,
+            consumer,
+            expected_count,
+            timeout_seconds,
+            event_filter,
         )

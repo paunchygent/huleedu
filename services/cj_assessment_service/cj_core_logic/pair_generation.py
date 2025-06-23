@@ -85,7 +85,8 @@ async def generate_comparison_tasks(
 
 
 async def _fetch_existing_comparison_ids(
-    db_session: AsyncSession, cj_batch_id: int,
+    db_session: AsyncSession,
+    cj_batch_id: int,
 ) -> set[tuple[str, str]]:
     """Fetch existing comparison pair ELS essay IDs from the database for a given CJ batch.
 

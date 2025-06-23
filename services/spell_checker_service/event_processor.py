@@ -151,7 +151,9 @@ async def process_single_message(
                 system_metadata=error_sys_meta,
             )
             await event_publisher.publish_spellcheck_result(
-                kafka_bus, failure_event_data, request_envelope.correlation_id,
+                kafka_bus,
+                failure_event_data,
+                request_envelope.correlation_id,
             )
             return True
 
@@ -179,7 +181,9 @@ async def process_single_message(
                 system_metadata=empty_content_sys_meta,
             )
             await event_publisher.publish_spellcheck_result(
-                kafka_bus, empty_content_failure_data, request_envelope.correlation_id,
+                kafka_bus,
+                empty_content_failure_data,
+                request_envelope.correlation_id,
             )
             return True
 
@@ -216,7 +220,9 @@ async def process_single_message(
 
         # Publish the result
         await event_publisher.publish_spellcheck_result(
-            kafka_bus, result_data, request_envelope.correlation_id,
+            kafka_bus,
+            result_data,
+            request_envelope.correlation_id,
         )
 
         # Log processing times for latency analysis
@@ -229,7 +235,8 @@ async def process_single_message(
         return True
     except ValidationError as e:
         logger.error(
-            f"Essay {essay_id_for_logging}: Invalid message format: {e.errors()}", exc_info=True,
+            f"Essay {essay_id_for_logging}: Invalid message format: {e.errors()}",
+            exc_info=True,
         )
         return True
     except Exception as e:
@@ -240,7 +247,8 @@ async def process_single_message(
         if request_envelope and event_publisher:  # Check event_publisher also
             try:
                 error_entity_ref = EntityReference(
-                    entity_id=essay_id_for_logging, entity_type="essay",
+                    entity_id=essay_id_for_logging,
+                    entity_type="essay",
                 )
                 if request_envelope.data and request_envelope.data.entity_ref:
                     error_entity_ref = request_envelope.data.entity_ref
@@ -282,7 +290,9 @@ async def process_single_message(
                 )
                 # Publish the error event
                 await event_publisher.publish_spellcheck_result(
-                    kafka_bus, unhandled_failure_data, request_envelope.correlation_id,
+                    kafka_bus,
+                    unhandled_failure_data,
+                    request_envelope.correlation_id,
                 )
             except Exception as pub_e:
                 logger.error(

@@ -23,7 +23,9 @@ class DefaultEventPublisher(EventPublisherProtocol):
         self.settings = settings
 
     async def publish_essay_content_provisioned(
-        self, event_data: EssayContentProvisionedV1, correlation_id: uuid.UUID | None,
+        self,
+        event_data: EssayContentProvisionedV1,
+        correlation_id: uuid.UUID | None,
     ) -> None:
         """Publish EssayContentProvisionedV1 event to Kafka."""
         try:
@@ -37,7 +39,8 @@ class DefaultEventPublisher(EventPublisherProtocol):
 
             # Publish to Kafka using KafkaBus
             await self.kafka_bus.publish(
-                topic=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC, envelope=envelope,
+                topic=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
+                envelope=envelope,
             )
 
             logger.info(
@@ -50,7 +53,9 @@ class DefaultEventPublisher(EventPublisherProtocol):
             raise
 
     async def publish_essay_validation_failed(
-        self, event_data: EssayValidationFailedV1, correlation_id: uuid.UUID | None,
+        self,
+        event_data: EssayValidationFailedV1,
+        correlation_id: uuid.UUID | None,
     ) -> None:
         """Publish EssayValidationFailedV1 event to Kafka."""
         try:
@@ -64,7 +69,8 @@ class DefaultEventPublisher(EventPublisherProtocol):
 
             # Publish to Kafka using KafkaBus
             await self.kafka_bus.publish(
-                topic=self.settings.ESSAY_VALIDATION_FAILED_TOPIC, envelope=envelope,
+                topic=self.settings.ESSAY_VALIDATION_FAILED_TOPIC,
+                envelope=envelope,
             )
 
             logger.info(

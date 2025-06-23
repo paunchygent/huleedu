@@ -58,7 +58,8 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
     async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
         """Save pipeline processing state for a batch."""
         result: bool = await self.pipeline_manager.save_processing_pipeline_state(
-            batch_id, pipeline_state,
+            batch_id,
+            pipeline_state,
         )
         return result
 
@@ -77,13 +78,19 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
     ) -> bool:
         """Atomically update phase status if current status matches expected."""
         result: bool = await self.pipeline_manager.update_phase_status_atomically(
-            batch_id, phase_name, expected_status, new_status, completion_timestamp,
+            batch_id,
+            phase_name,
+            expected_status,
+            new_status,
+            completion_timestamp,
         )
         return result
 
     # Context operations - delegated to context_ops
     async def store_batch_context(
-        self, batch_id: str, registration_data: BatchRegistrationRequestV1,
+        self,
+        batch_id: str,
+        registration_data: BatchRegistrationRequestV1,
     ) -> bool:
         """Store batch context information."""
         result: bool = await self.context_ops.store_batch_context(batch_id, registration_data)
@@ -107,7 +114,11 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
     ) -> bool:
         """Create a configuration snapshot for a batch."""
         result: bool = await self.config_manager.create_configuration_snapshot(
-            batch_id, snapshot_name, pipeline_definition, configuration_version, description,
+            batch_id,
+            snapshot_name,
+            pipeline_definition,
+            configuration_version,
+            description,
         )
         return result
 

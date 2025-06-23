@@ -30,16 +30,23 @@ class LLMConfigOverrides(BaseModel):
     """
 
     model_override: str | None = Field(
-        default=None, description="LLM model to use (e.g., 'gpt-4o-mini')",
+        default=None,
+        description="LLM model to use (e.g., 'gpt-4o-mini')",
     )
     temperature_override: float | None = Field(
-        default=None, ge=0.0, le=2.0, description="Temperature for LLM generation",
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Temperature for LLM generation",
     )
     max_tokens_override: int | None = Field(
-        default=None, gt=0, description="Maximum tokens for LLM response",
+        default=None,
+        gt=0,
+        description="Maximum tokens for LLM response",
     )
     provider_override: str | None = Field(
-        default=None, description="LLM provider to use (e.g., 'openai', 'anthropic')",
+        default=None,
+        description="LLM provider to use (e.g., 'openai', 'anthropic')",
     )
 
 
@@ -53,7 +60,8 @@ class ELS_CJAssessmentRequestV1(BaseEventData):
     course_code: str
     essay_instructions: str
     llm_config_overrides: LLMConfigOverrides | None = Field(
-        default=None, description="Optional LLM configuration overrides for this assessment batch",
+        default=None,
+        description="Optional LLM configuration overrides for this assessment batch",
     )
     # class_designation: str  # Deferred (YAGNI)
 

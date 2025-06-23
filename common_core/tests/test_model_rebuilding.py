@@ -61,7 +61,9 @@ class TestModelRebuilding:
 
         # Create an instance to ensure forward references are resolved
         entity_ref = EntityReference(
-            entity_id="test-id", entity_type="essay", parent_id="parent-id",
+            entity_id="test-id",
+            entity_type="essay",
+            parent_id="parent-id",
         )
 
         system_meta = SystemProcessingMetadata(
@@ -100,7 +102,9 @@ class TestEventEnvelopeSchemaVersion:
 
         # 1. Test default value upon creation
         envelope_new = EventEnvelope[BaseEventData](
-            event_type="test.event.v1", source_service="test_service", data=dummy_data,
+            event_type="test.event.v1",
+            source_service="test_service",
+            data=dummy_data,
         )
         assert envelope_new.schema_version == 1
 

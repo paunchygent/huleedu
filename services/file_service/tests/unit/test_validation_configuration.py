@@ -65,9 +65,12 @@ class TestValidationSettings:
         settings = ValidationSettings()
 
         # Test existing topic is preserved
-        assert topic_name(
-            ProcessingEvent.ESSAY_CONTENT_PROVISIONED,
-        ) == settings.ESSAY_CONTENT_PROVISIONED_TOPIC
+        assert (
+            topic_name(
+                ProcessingEvent.ESSAY_CONTENT_PROVISIONED,
+            )
+            == settings.ESSAY_CONTENT_PROVISIONED_TOPIC
+        )
 
         # Test new validation failure topic is configured
         assert settings.ESSAY_VALIDATION_FAILED_TOPIC == "huleedu.file.essay.validation.failed.v1"
@@ -180,12 +183,18 @@ class TestValidationSettings:
                 assert (
                     env_vars.get("FILE_SERVICE_CONTENT_VALIDATION_ENABLED") == "true"
                 ) == settings.CONTENT_VALIDATION_ENABLED
-                assert int(
-                    env_vars["FILE_SERVICE_MIN_CONTENT_LENGTH"],
-                ) == settings.MIN_CONTENT_LENGTH
-                assert int(
-                    env_vars["FILE_SERVICE_MAX_CONTENT_LENGTH"],
-                ) == settings.MAX_CONTENT_LENGTH
+                assert (
+                    int(
+                        env_vars["FILE_SERVICE_MIN_CONTENT_LENGTH"],
+                    )
+                    == settings.MIN_CONTENT_LENGTH
+                )
+                assert (
+                    int(
+                        env_vars["FILE_SERVICE_MAX_CONTENT_LENGTH"],
+                    )
+                    == settings.MAX_CONTENT_LENGTH
+                )
 
                 if "FILE_SERVICE_VALIDATION_LOG_LEVEL" in env_vars:
                     assert (

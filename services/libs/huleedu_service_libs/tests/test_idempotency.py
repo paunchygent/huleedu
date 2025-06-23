@@ -134,7 +134,8 @@ def sample_event_data() -> dict:
 
 @pytest.mark.asyncio
 async def test_first_time_event_processing(
-    mock_redis_client: MockRedisClient, sample_event_data: dict,
+    mock_redis_client: MockRedisClient,
+    sample_event_data: dict,
 ) -> None:
     """Test that first-time events are processed normally."""
     # Create Kafka message
@@ -171,7 +172,8 @@ async def test_first_time_event_processing(
 
 @pytest.mark.asyncio
 async def test_duplicate_event_skipped(
-    mock_redis_client: MockRedisClient, sample_event_data: dict,
+    mock_redis_client: MockRedisClient,
+    sample_event_data: dict,
 ) -> None:
     """Test that duplicate events are skipped without processing."""
     # Create Kafka message
@@ -205,7 +207,8 @@ async def test_duplicate_event_skipped(
 
 @pytest.mark.asyncio
 async def test_processing_failure_releases_lock(
-    mock_redis_client: MockRedisClient, sample_event_data: dict,
+    mock_redis_client: MockRedisClient,
+    sample_event_data: dict,
 ) -> None:
     """Test that processing failures release the idempotency lock for retry."""
     # Create Kafka message
@@ -231,7 +234,8 @@ async def test_processing_failure_releases_lock(
 
 @pytest.mark.asyncio
 async def test_redis_set_failure_fallback(
-    mock_redis_client: MockRedisClient, sample_event_data: dict,
+    mock_redis_client: MockRedisClient,
+    sample_event_data: dict,
 ) -> None:
     """Test that Redis SET failures fall back to processing without idempotency."""
     # Configure Redis client to fail on SET
@@ -256,7 +260,8 @@ async def test_redis_set_failure_fallback(
 
 @pytest.mark.asyncio
 async def test_redis_delete_failure_logged(
-    mock_redis_client: MockRedisClient, sample_event_data: dict,
+    mock_redis_client: MockRedisClient,
+    sample_event_data: dict,
 ) -> None:
     """Test that Redis DELETE failures are logged but don't prevent exception propagation."""
     # Configure Redis client to fail on DELETE
@@ -281,7 +286,8 @@ async def test_redis_delete_failure_logged(
 
 @pytest.mark.asyncio
 async def test_default_ttl_applied(
-    mock_redis_client: MockRedisClient, sample_event_data: dict,
+    mock_redis_client: MockRedisClient,
+    sample_event_data: dict,
 ) -> None:
     """Test that default TTL (24 hours) is applied when not specified."""
     # Create Kafka message

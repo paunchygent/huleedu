@@ -40,7 +40,9 @@ class EventPublisherProtocol(Protocol):
     """Protocol for publishing Kafka events."""
 
     async def publish_essay_content_provisioned(
-        self, event_data: EssayContentProvisionedV1, correlation_id: uuid.UUID | None,
+        self,
+        event_data: EssayContentProvisionedV1,
+        correlation_id: uuid.UUID | None,
     ) -> None:
         """
         Publish EssayContentProvisionedV1 event to Kafka.
@@ -52,7 +54,9 @@ class EventPublisherProtocol(Protocol):
         ...
 
     async def publish_essay_validation_failed(
-        self, event_data: EssayValidationFailedV1, correlation_id: uuid.UUID | None,
+        self,
+        event_data: EssayValidationFailedV1,
+        correlation_id: uuid.UUID | None,
     ) -> None:
         """
         Publish EssayValidationFailedV1 event to Kafka.

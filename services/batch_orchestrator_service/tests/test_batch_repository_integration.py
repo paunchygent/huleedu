@@ -67,7 +67,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
     @pytest.mark.asyncio
     async def test_database_schema_initialization(
-        self, postgres_repository: PostgreSQLBatchRepositoryImpl,
+        self,
+        postgres_repository: PostgreSQLBatchRepositoryImpl,
     ) -> None:
         """Test that database schema is created correctly."""
         # The schema should be initialized in the fixture
@@ -84,7 +85,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
     @pytest.mark.asyncio
     async def test_create_and_retrieve_batch(
-        self, postgres_repository: PostgreSQLBatchRepositoryImpl,
+        self,
+        postgres_repository: PostgreSQLBatchRepositoryImpl,
     ) -> None:
         """Test creating and retrieving a batch."""
         # Arrange
@@ -125,7 +127,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
         # Act - Store context
         store_success = await postgres_repository.store_batch_context(
-            batch_id, sample_batch_registration,
+            batch_id,
+            sample_batch_registration,
         )
 
         # Act - Retrieve context
@@ -141,7 +144,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
     @pytest.mark.asyncio
     async def test_pipeline_state_persistence(
-        self, postgres_repository: PostgreSQLBatchRepositoryImpl,
+        self,
+        postgres_repository: PostgreSQLBatchRepositoryImpl,
     ) -> None:
         """Test saving and retrieving pipeline state."""
         # Arrange
@@ -162,7 +166,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
         # Act - Save pipeline state
         save_success = await postgres_repository.save_processing_pipeline_state(
-            batch_id, pipeline_state,
+            batch_id,
+            pipeline_state,
         )
 
         # Act - Retrieve pipeline state
@@ -177,7 +182,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
     @pytest.mark.asyncio
     async def test_atomic_phase_status_update(
-        self, postgres_repository: PostgreSQLBatchRepositoryImpl,
+        self,
+        postgres_repository: PostgreSQLBatchRepositoryImpl,
     ) -> None:
         """Test atomic phase status updates prevent race conditions."""
         # Arrange
@@ -193,7 +199,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
         )
 
         await postgres_repository.save_processing_pipeline_state(
-            batch_id, {f"{phase_name}_status": "pending"},
+            batch_id,
+            {f"{phase_name}_status": "pending"},
         )
 
         # Act - First atomic update (should succeed)
@@ -235,7 +242,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
     @pytest.mark.asyncio
     async def test_concurrent_atomic_operations(
-        self, postgres_repository: PostgreSQLBatchRepositoryImpl,
+        self,
+        postgres_repository: PostgreSQLBatchRepositoryImpl,
     ) -> None:
         """Test that concurrent atomic operations are handled correctly."""
         # Arrange
@@ -251,7 +259,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
         )
 
         await postgres_repository.save_processing_pipeline_state(
-            batch_id, {f"{phase_name}_status": "pending"},
+            batch_id,
+            {f"{phase_name}_status": "pending"},
         )
 
         # Act - Run concurrent atomic updates
@@ -284,7 +293,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
     @pytest.mark.asyncio
     async def test_batch_status_update(
-        self, postgres_repository: PostgreSQLBatchRepositoryImpl,
+        self,
+        postgres_repository: PostgreSQLBatchRepositoryImpl,
     ) -> None:
         """Test updating batch status."""
         # Arrange
@@ -300,7 +310,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
         # Act - Update status
         update_success = await postgres_repository.update_batch_status(
-            batch_id, "ready_for_pipeline_execution",
+            batch_id,
+            "ready_for_pipeline_execution",
         )
 
         # Act - Retrieve updated batch
@@ -313,7 +324,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
     @pytest.mark.asyncio
     async def test_nonexistent_batch_operations(
-        self, postgres_repository: PostgreSQLBatchRepositoryImpl,
+        self,
+        postgres_repository: PostgreSQLBatchRepositoryImpl,
     ) -> None:
         """Test operations on nonexistent batches return appropriate results."""
         nonexistent_id = "nonexistent-batch-123"
@@ -332,12 +344,14 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
         # Test status update
         status_update = await postgres_repository.update_batch_status(
-            nonexistent_id, "completed_successfully",
+            nonexistent_id,
+            "completed_successfully",
         )
         assert status_update is False
 
         # Test pipeline state save (should fail)
         pipeline_save = await postgres_repository.save_processing_pipeline_state(
-            nonexistent_id, {"test": "data"},
+            nonexistent_id,
+            {"test": "data"},
         )
         assert pipeline_save is False

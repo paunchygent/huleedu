@@ -292,7 +292,9 @@ class TestControlledIdempotencyScenarios:
     """E2E tests using controlled mock scenarios for specific edge cases."""
 
     async def test_cross_service_duplicate_detection(
-        self, mock_redis_client: MockRedisClient, sample_batch_event: dict[str, Any],
+        self,
+        mock_redis_client: MockRedisClient,
+        sample_batch_event: dict[str, Any],
     ) -> None:
         """
         Test that the same event processed by
@@ -332,7 +334,9 @@ class TestControlledIdempotencyScenarios:
         print(f"✅ Cross-service duplicate detection validated: {stats}")
 
     async def test_redis_outage_fail_open_behavior(
-        self, mock_redis_client: MockRedisClient, sample_batch_event: dict[str, Any],
+        self,
+        mock_redis_client: MockRedisClient,
+        sample_batch_event: dict[str, Any],
     ) -> None:
         """
         Test that services continue processing when Redis is unavailable (fail-open behavior).
@@ -361,7 +365,9 @@ class TestControlledIdempotencyScenarios:
         print("✅ Fail-open behavior validated during Redis outage")
 
     async def test_processing_failure_key_cleanup(
-        self, mock_redis_client: MockRedisClient, sample_batch_event: dict[str, Any],
+        self,
+        mock_redis_client: MockRedisClient,
+        sample_batch_event: dict[str, Any],
     ) -> None:
         """
         Test that Redis keys are properly cleaned up when processing fails.
@@ -388,7 +394,8 @@ class TestControlledIdempotencyScenarios:
         print("✅ Processing failure key cleanup validated")
 
     async def test_deterministic_id_generation_consistency(
-        self, sample_batch_event: dict[str, Any],
+        self,
+        sample_batch_event: dict[str, Any],
     ) -> None:
         """
         Test that deterministic ID generation is consistent across multiple calls.
@@ -452,7 +459,8 @@ class TestE2EPipelineIdempotency:
 
             try:
                 batch_id, _ = await service_manager.create_batch(
-                    expected_essay_count=2, correlation_id=correlation_id,
+                    expected_essay_count=2,
+                    correlation_id=correlation_id,
                 )
 
                 # Upload test files to trigger pipeline
@@ -465,7 +473,9 @@ class TestE2EPipelineIdempotency:
 
                 # Collect initial events
                 initial_events = await kafka_manager.collect_events(
-                    consumer, expected_count=3, timeout_seconds=30,
+                    consumer,
+                    expected_count=3,
+                    timeout_seconds=30,
                 )
 
                 assert len(initial_events) >= 1, "Should receive at least one pipeline event"

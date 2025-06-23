@@ -186,7 +186,9 @@ def mock_fetch_content_success(sample_text: str) -> AsyncMock:
     """Provide a mock fetch_content function that succeeds."""
 
     async def fetch_content(
-        session: aiohttp.ClientSession, storage_id: str, essay_id: str,
+        session: aiohttp.ClientSession,
+        storage_id: str,
+        essay_id: str,
     ) -> str | None:
         return sample_text
 
@@ -198,7 +200,9 @@ def mock_fetch_content_failure() -> AsyncMock:
     """Provide a mock fetch_content function that fails."""
 
     async def fetch_content(
-        session: aiohttp.ClientSession, storage_id: str, essay_id: str,
+        session: aiohttp.ClientSession,
+        storage_id: str,
+        essay_id: str,
     ) -> str | None:
         return None
 
@@ -210,7 +214,9 @@ def mock_store_content_success(sample_storage_id: str) -> AsyncMock:
     """Provide a mock store_content function that succeeds."""
 
     async def store_content(
-        session: aiohttp.ClientSession, text_content: str, essay_id: str,
+        session: aiohttp.ClientSession,
+        text_content: str,
+        essay_id: str,
     ) -> str | None:
         return f"corrected_{sample_storage_id}"
 
@@ -222,7 +228,9 @@ def mock_store_content_failure() -> AsyncMock:
     """Provide a mock store_content function that fails."""
 
     async def store_content(
-        session: aiohttp.ClientSession, text_content: str, essay_id: str,
+        session: aiohttp.ClientSession,
+        text_content: str,
+        essay_id: str,
     ) -> str | None:
         return None
 

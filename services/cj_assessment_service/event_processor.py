@@ -220,7 +220,8 @@ async def process_single_message(
         )
 
         await event_publisher.publish_assessment_completed(
-            completion_data=completed_envelope, correlation_id=completed_envelope.correlation_id,
+            completion_data=completed_envelope,
+            correlation_id=completed_envelope.correlation_id,
         )
 
         logger.info(
@@ -280,7 +281,8 @@ async def process_single_message(
             )
 
             await event_publisher.publish_assessment_failed(
-                failure_data=failed_envelope, correlation_id=failed_envelope.correlation_id,
+                failure_data=failed_envelope,
+                correlation_id=failed_envelope.correlation_id,
             )
         except Exception as publish_error:
             logger.error(f"Failed to publish failure event: {publish_error}")

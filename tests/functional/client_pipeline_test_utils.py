@@ -16,7 +16,9 @@ from tests.utils.kafka_test_manager import KafkaTestManager
 
 
 async def create_client_pipeline_request_event(
-    batch_id: str, requested_pipeline: str, correlation_id: str | None = None,
+    batch_id: str,
+    requested_pipeline: str,
+    correlation_id: str | None = None,
 ) -> EventEnvelope[ClientBatchPipelineRequestV1]:
     """Create a ClientBatchPipelineRequestV1 event for testing."""
     if correlation_id is None:

@@ -69,7 +69,10 @@ class TestE2EKafkaMonitoring:
 
             try:
                 events = await kafka_manager.collect_events(
-                    consumer, expected_count=1, timeout_seconds=30, event_filter=event_filter,
+                    consumer,
+                    expected_count=1,
+                    timeout_seconds=30,
+                    event_filter=event_filter,
                 )
 
                 assert len(events) == 1, f"Expected 1 event, got {len(events)}"
@@ -111,8 +114,9 @@ class TestE2EKafkaMonitoring:
                 data_correlation_id = content_data.get("correlation_id")
 
                 correlation_match = False
-                if ((event_correlation_id and event_correlation_id == upload_correlation_id) or
-                    (data_correlation_id and data_correlation_id == upload_correlation_id)):
+                if (event_correlation_id and event_correlation_id == upload_correlation_id) or (
+                    data_correlation_id and data_correlation_id == upload_correlation_id
+                ):
                     correlation_match = True
 
                 assert correlation_match, (

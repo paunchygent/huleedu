@@ -435,7 +435,7 @@ class TestEnhancedProcessingEvents:
             "BATCH_FILE_ADDED",
             "BATCH_FILE_REMOVED",
             "CLASS_CREATED",
-            "STUDENT_CREATED"
+            "STUDENT_CREATED",
         ]
 
         for event_name in enhanced_events:
@@ -444,7 +444,10 @@ class TestEnhancedProcessingEvents:
     def test_enhanced_events_values(self) -> None:
         """Test that enhanced events have correct string values."""
         assert ProcessingEvent.STUDENT_PARSING_COMPLETED.value == "student.parsing.completed"
-        assert ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED.value == "essay.student.association.updated"
+        assert (
+            ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED.value
+            == "essay.student.association.updated"
+        )
         assert ProcessingEvent.BATCH_FILE_ADDED.value == "batch.file.added"
         assert ProcessingEvent.BATCH_FILE_REMOVED.value == "batch.file.removed"
         assert ProcessingEvent.CLASS_CREATED.value == "class.created"
@@ -460,22 +463,12 @@ class TestEnhancedProcessingEvents:
             topic_name(ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED)
             == "huleedu.class.essay.association.updated.v1"
         )
+        assert topic_name(ProcessingEvent.BATCH_FILE_ADDED) == "huleedu.file.batch.file.added.v1"
         assert (
-            topic_name(ProcessingEvent.BATCH_FILE_ADDED)
-            == "huleedu.file.batch.file.added.v1"
+            topic_name(ProcessingEvent.BATCH_FILE_REMOVED) == "huleedu.file.batch.file.removed.v1"
         )
-        assert (
-            topic_name(ProcessingEvent.BATCH_FILE_REMOVED)
-            == "huleedu.file.batch.file.removed.v1"
-        )
-        assert (
-            topic_name(ProcessingEvent.CLASS_CREATED)
-            == "huleedu.class.created.v1"
-        )
-        assert (
-            topic_name(ProcessingEvent.STUDENT_CREATED)
-            == "huleedu.class.student.created.v1"
-        )
+        assert topic_name(ProcessingEvent.CLASS_CREATED) == "huleedu.class.created.v1"
+        assert topic_name(ProcessingEvent.STUDENT_CREATED) == "huleedu.class.student.created.v1"
 
     def test_enhanced_events_are_mapped(self) -> None:
         """Test that all enhanced events are included in _TOPIC_MAPPING."""

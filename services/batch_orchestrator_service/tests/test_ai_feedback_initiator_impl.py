@@ -130,7 +130,8 @@ class TestAIFeedbackInitiatorImpl:
     ) -> None:
         """Test that initiator rejects incorrect phase."""
         with pytest.raises(
-            DataValidationError, match="AIFeedbackInitiatorImpl received incorrect phase",
+            DataValidationError,
+            match="AIFeedbackInitiatorImpl received incorrect phase",
         ):
             await ai_feedback_initiator.initiate_phase(
                 batch_id="test-batch-456",
@@ -148,7 +149,8 @@ class TestAIFeedbackInitiatorImpl:
     ) -> None:
         """Test that initiator rejects empty essay list."""
         with pytest.raises(
-            DataValidationError, match="No essays provided for AI feedback initiation",
+            DataValidationError,
+            match="No essays provided for AI feedback initiation",
         ):
             await ai_feedback_initiator.initiate_phase(
                 batch_id="test-batch-456",
@@ -326,7 +328,8 @@ class TestAIFeedbackInitiatorImpl:
         assert published_envelope.correlation_id is None
 
     async def test_protocol_compliance(
-        self, ai_feedback_initiator: AIFeedbackInitiatorImpl,
+        self,
+        ai_feedback_initiator: AIFeedbackInitiatorImpl,
     ) -> None:
         """Test that implementation properly implements the protocol."""
         # Verify that the implementation has the required methods

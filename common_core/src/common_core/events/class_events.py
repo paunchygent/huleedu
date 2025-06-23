@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 class ClassCreatedV1(BaseModel):
     """Event published when new class is created."""
+
     event: str = Field(default="class.created")
     class_id: str = Field(description="New class identifier")
     class_designation: str = Field(description="Class designation name")
@@ -26,6 +27,7 @@ class ClassCreatedV1(BaseModel):
 
 class StudentCreatedV1(BaseModel):
     """Event published when new student is created."""
+
     event: str = Field(default="student.created")
     student_id: str = Field(description="New student identifier")
     first_name: str = Field(description="Student first name")
@@ -39,6 +41,7 @@ class StudentCreatedV1(BaseModel):
 
 class EssayStudentAssociationUpdatedV1(BaseModel):
     """Event published when student-essay association is created/updated."""
+
     event: str = Field(default="essay.student.association.updated")
     batch_id: str = Field(description="Batch identifier")
     essay_id: str = Field(description="Essay identifier")

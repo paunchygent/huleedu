@@ -32,7 +32,10 @@ def is_related_to_batch(event_data: dict[str, Any], batch_id: str, correlation_i
 
 
 async def monitor_pipeline_resolution_workflow(
-    consumer: Any, batch_id: str, correlation_id: str, timeout_seconds: int = 120,
+    consumer: Any,
+    batch_id: str,
+    correlation_id: str,
+    timeout_seconds: int = 120,
 ) -> dict[str, Any]:
     """
     Monitor the complete pipeline resolution workflow.

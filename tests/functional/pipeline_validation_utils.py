@@ -13,7 +13,8 @@ from tests.utils.service_test_manager import ServiceTestManager
 
 
 async def validate_batch_pipeline_state(
-    service_manager: ServiceTestManager, batch_id: str,
+    service_manager: ServiceTestManager,
+    batch_id: str,
 ) -> dict[str, Any]:
     """Validate that batch has been updated with resolved pipeline."""
     # Get batch state from BOS
@@ -34,7 +35,9 @@ async def validate_batch_pipeline_state(
 
 
 async def validate_bcs_integration_occurred(
-    service_manager: ServiceTestManager, batch_id: str, requested_pipeline: str,
+    service_manager: ServiceTestManager,
+    batch_id: str,
+    requested_pipeline: str,
 ) -> dict[str, Any]:
     """
     Validate that BCS ↔ BOS integration actually occurred.

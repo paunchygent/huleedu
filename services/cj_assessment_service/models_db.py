@@ -53,7 +53,9 @@ class CJBatchUpload(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
+        DateTime,
+        server_default=text("NOW()"),
+        onupdate=text("NOW()"),
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -96,7 +98,9 @@ class ProcessedEssay(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
+        DateTime,
+        server_default=text("NOW()"),
+        onupdate=text("NOW()"),
     )
 
     # Processing metadata
@@ -144,7 +148,8 @@ class ComparisonPair(Base):
 
     # Comparison results
     winner: Mapped[str | None] = mapped_column(
-        String(20), nullable=True,
+        String(20),
+        nullable=True,
     )  # "essay_a", "essay_b", "error"
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     justification: Mapped[str | None] = mapped_column(Text, nullable=True)

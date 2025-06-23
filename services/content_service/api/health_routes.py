@@ -1,6 +1,5 @@
 """Health and metrics routes for Content Service."""
 
-
 from config import settings
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger

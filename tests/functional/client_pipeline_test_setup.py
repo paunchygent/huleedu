@@ -18,7 +18,9 @@ from tests.utils.service_test_manager import ServiceTestManager
 
 
 async def create_test_batch_with_essays(
-    service_manager: ServiceTestManager, essay_count: int = 3, correlation_id: str | None = None,
+    service_manager: ServiceTestManager,
+    essay_count: int = 3,
+    correlation_id: str | None = None,
 ) -> tuple[str, str]:
     """
     Create a test batch with real essays for pipeline testing.
@@ -42,13 +44,16 @@ async def create_test_batch_with_essays(
     batch_id = None
 
     async with kafka_manager.consumer(
-        "batch_ready_wait", ["huleedu.els.batch.essays.ready.v1"],
+        "batch_ready_wait",
+        ["huleedu.els.batch.essays.ready.v1"],
     ) as consumer:
         print("⏳ Consumer positioned and ready to receive BatchEssaysReady events...")
 
         # Register batch for comprehensive testing
         batch_id = await register_comprehensive_batch(
-            service_manager, expected_essay_count, correlation_id,
+            service_manager,
+            expected_essay_count,
+            correlation_id,
         )
         print(f"📦 Created test batch: {batch_id}")
 
@@ -103,7 +108,9 @@ async def create_test_batch_with_essays(
 
 
 async def create_multiple_test_batches(
-    service_manager: ServiceTestManager, batch_count: int = 2, essays_per_batch: int = 2,
+    service_manager: ServiceTestManager,
+    batch_count: int = 2,
+    essays_per_batch: int = 2,
 ) -> tuple[list[str], list[str]]:
     """
     Create multiple test batches for concurrent testing.
@@ -122,7 +129,9 @@ async def create_multiple_test_batches(
         expected_essay_count = len(essay_files)
 
         batch_id = await register_comprehensive_batch(
-            service_manager, expected_essay_count, correlation_id,
+            service_manager,
+            expected_essay_count,
+            correlation_id,
         )
         batch_ids.append(batch_id)
 

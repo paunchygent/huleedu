@@ -38,6 +38,7 @@ class ProcessingStage(str, Enum):
 
 class CourseCode(str, Enum):
     """Predefined course codes for HuleEdu platform."""
+
     ENG5 = "ENG5"
     ENG6 = "ENG6"
     ENG7 = "ENG7"
@@ -48,6 +49,7 @@ class CourseCode(str, Enum):
 
 class Language(str, Enum):
     """Supported languages inferred from course codes."""
+
     ENGLISH = "en"
     SWEDISH = "sv"
 
@@ -129,6 +131,10 @@ class ProcessingEvent(str, Enum):
     CLASS_CREATED = "class.created"
     STUDENT_CREATED = "student.created"
 
+    # -------------  Student validation workflow events  -------------#
+    STUDENT_ASSOCIATIONS_CONFIRMED = "student.associations.confirmed"
+    VALIDATION_TIMEOUT_PROCESSED = "validation.timeout.processed"
+
     # -------------  Generic -------------#
     PROCESSING_STARTED = "processing.started"
     PROCESSING_CONCLUDED = "processing.concluded"
@@ -163,6 +169,11 @@ _TOPIC_MAPPING = {
     ProcessingEvent.BATCH_FILE_REMOVED: "huleedu.file.batch.file.removed.v1",
     ProcessingEvent.CLASS_CREATED: "huleedu.class.created.v1",
     ProcessingEvent.STUDENT_CREATED: "huleedu.class.student.created.v1",
+    # Student validation workflow event mappings
+    ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED: (
+        "huleedu.class.student.associations.confirmed.v1"
+    ),
+    ProcessingEvent.VALIDATION_TIMEOUT_PROCESSED: "huleedu.class.validation.timeout.processed.v1",
     # Add more mappings as needed for other events - EACH MUST BE EXPLICIT
 }
 
@@ -283,6 +294,14 @@ class BatchStatus(str, Enum):
     # Active Processing Phase
     PROCESSING_PIPELINES = "processing_pipelines"
     # BOS is actively orchestrating one or more requested pipelines via ELS.
+
+    # Student Validation States (for lean registration workflow)
+    AWAITING_STUDENT_VALIDATION = "awaiting_student_validation"
+    # Teacher needs to confirm parsed student associations
+    VALIDATION_TIMEOUT_PROCESSED = "validation_timeout_processed"
+    # Timeout expired, auto-processed high-confidence matches
+    GUEST_CLASS_READY = "guest_class_ready"
+    # Either chosen as GUEST or timeout resulted in GUEST behavior
 
     # Terminal States for the Entire Batch Processing Lifecycle
     COMPLETED_SUCCESSFULLY = "completed_successfully"

@@ -64,14 +64,18 @@ class ServiceImplementationsProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_content_service_client(
-        self, http_session: ClientSession, settings: Settings,
+        self,
+        http_session: ClientSession,
+        settings: Settings,
     ) -> ContentServiceClientProtocol:
         """Provide Content Service client implementation."""
         return DefaultContentServiceClient(http_session, settings)
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(
-        self, kafka_bus: KafkaBus, settings: Settings,
+        self,
+        kafka_bus: KafkaBus,
+        settings: Settings,
     ) -> EventPublisherProtocol:
         """Provide event publisher implementation."""
         return DefaultEventPublisher(kafka_bus, settings)
@@ -85,5 +89,6 @@ class ServiceImplementationsProvider(Provider):
     def provide_content_validator(self, settings: Settings) -> ContentValidatorProtocol:
         """Provide content validator implementation."""
         return FileContentValidator(
-            min_length=settings.MIN_CONTENT_LENGTH, max_length=settings.MAX_CONTENT_LENGTH,
+            min_length=settings.MIN_CONTENT_LENGTH,
+            max_length=settings.MAX_CONTENT_LENGTH,
         )

@@ -85,7 +85,8 @@ class TestCoreLogicValidationSuccess:
             [
                 call(file_content, ContentType.RAW_UPLOAD_BLOB),  # First: raw blob
                 call(
-                    extracted_text.encode("utf-8"), ContentType.EXTRACTED_PLAINTEXT,
+                    extracted_text.encode("utf-8"),
+                    ContentType.EXTRACTED_PLAINTEXT,
                 ),  # Second: extracted text
             ],
         )

@@ -118,7 +118,9 @@ class TestClientPipelineResolutionWorkflow:
             pipeline_topics = get_pipeline_monitoring_topics()
 
             async with kafka_manager.consumer(
-                "client_pipeline_resolution_e2e", pipeline_topics, auto_offset_reset="latest",
+                "client_pipeline_resolution_e2e",
+                pipeline_topics,
+                auto_offset_reset="latest",
             ) as consumer:
                 # 4. Publish ClientBatchPipelineRequestV1 event to trigger cj_assessment
                 request_correlation_id = await publish_client_pipeline_request(
@@ -127,7 +129,6 @@ class TestClientPipelineResolutionWorkflow:
                     "cj_assessment",  # Use cj_assessment pipeline which is enabled
                     correlation_id,
                 )
-
 
                 print(
                     "📡 Published cj_assessment pipeline request with "
@@ -220,7 +221,8 @@ class TestClientPipelineResolutionWorkflow:
             pipeline_topics = get_state_aware_monitoring_topics()
 
             async with kafka_manager.consumer(
-                "state_aware_pipeline_e2e", pipeline_topics,
+                "state_aware_pipeline_e2e",
+                pipeline_topics,
             ) as consumer:
                 # Create batch with minimal essays - essays are now stored but
                 # don't auto-trigger pipeline
@@ -239,7 +241,6 @@ class TestClientPipelineResolutionWorkflow:
                     "cj_assessment",
                     correlation_id,
                 )
-
 
                 print(
                     "📡 Published cj_assessment pipeline request with "
@@ -298,13 +299,17 @@ class TestClientPipelineResolutionWorkflow:
             pipeline_topics = get_concurrent_monitoring_topics()
 
             async with kafka_manager.consumer(
-                "concurrent_pipeline_e2e", pipeline_topics,
+                "concurrent_pipeline_e2e",
+                pipeline_topics,
             ) as consumer:
                 # Publish concurrent pipeline requests
                 tasks = []
                 for batch_id, correlation_id in zip(batch_ids, correlation_ids, strict=False):
                     task = publish_client_pipeline_request(
-                        kafka_manager, batch_id, "cj_assessment", correlation_id,
+                        kafka_manager,
+                        batch_id,
+                        "cj_assessment",
+                        correlation_id,
                     )
                     tasks.append(task)
 

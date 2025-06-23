@@ -252,7 +252,9 @@ class TestPipelineResolutionIntegration:
         assert not hasattr(pipeline_request_handler.bcs_client, "resolve_pipeline") or not any(
             call
             for call in getattr(
-                pipeline_request_handler.bcs_client, "resolve_pipeline", lambda: None,
+                pipeline_request_handler.bcs_client,
+                "resolve_pipeline",
+                lambda: None,
             ).__dict__.get("call_args_list", [])
         )
 

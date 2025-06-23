@@ -67,7 +67,10 @@ class RedisClient:
                 )
 
     async def set_if_not_exists(
-        self, key: str, value: Any, ttl_seconds: int | None = None,
+        self,
+        key: str,
+        value: Any,
+        ttl_seconds: int | None = None,
     ) -> bool:
         """
         Atomic SET if NOT EXISTS operation for idempotency.

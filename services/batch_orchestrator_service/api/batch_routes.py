@@ -65,7 +65,9 @@ async def register_batch(
 
             for pipeline in pipelines:
                 pipeline_execution_metric.labels(
-                    pipeline_type=pipeline, outcome="requested", batch_id=str(batch_id),
+                    pipeline_type=pipeline,
+                    outcome="requested",
+                    batch_id=str(batch_id),
                 ).inc()
 
         return jsonify(
@@ -74,14 +76,17 @@ async def register_batch(
 
     except ValidationError as ve:
         logger.warning(
-            f"Batch registration validation error. Correlation ID: {correlation_id}", exc_info=True,
+            f"Batch registration validation error. Correlation ID: {correlation_id}",
+            exc_info=True,
         )
         # Record validation error metrics
         metrics = current_app.extensions.get("metrics", {})
         pipeline_execution_metric = metrics.get("pipeline_execution_total")
         if pipeline_execution_metric:
             pipeline_execution_metric.labels(
-                pipeline_type="unknown", outcome="validation_error", batch_id="unknown",
+                pipeline_type="unknown",
+                outcome="validation_error",
+                batch_id="unknown",
             ).inc()
         return jsonify({"error": "Validation Error", "details": ve.errors()}), 400
     except Exception:
@@ -91,7 +96,9 @@ async def register_batch(
         pipeline_execution_metric = metrics.get("pipeline_execution_total")
         if pipeline_execution_metric:
             pipeline_execution_metric.labels(
-                pipeline_type="unknown", outcome="error", batch_id="unknown",
+                pipeline_type="unknown",
+                outcome="error",
+                batch_id="unknown",
             ).inc()
         return jsonify({"error": "Failed to register batch."}), 500
 
@@ -176,7 +183,8 @@ async def get_internal_pipeline_state(
     except Exception as e:
         # Log with context for easier debugging if the repository fails.
         current_app.logger.error(
-            f"Error getting internal pipeline state for {batch_id}: {e}", exc_info=True,
+            f"Error getting internal pipeline state for {batch_id}: {e}",
+            exc_info=True,
         )
         return jsonify({"error": "Failed to get internal pipeline state"}), 500
 

@@ -138,7 +138,9 @@ async def test_validation_failure_includes_raw_storage_id() -> None:
     content_client.store_content.return_value = "raw_storage_id_123"
     text_extractor.extract_text.return_value = ""  # Empty content
     content_validator.validate_content.return_value = ValidationResult(
-        is_valid=False, error_code="CONTENT_TOO_SHORT", error_message="Content is too short",
+        is_valid=False,
+        error_code="CONTENT_TOO_SHORT",
+        error_message="Content is too short",
     )
 
     # Act

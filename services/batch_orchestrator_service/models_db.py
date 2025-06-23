@@ -69,7 +69,9 @@ class Batch(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
+        DateTime,
+        server_default=text("NOW()"),
+        onupdate=text("NOW()"),
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -150,7 +152,9 @@ class PhaseStatusLog(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
+        DateTime,
+        server_default=text("NOW()"),
+        onupdate=text("NOW()"),
     )
 
     # Relationships
@@ -189,7 +193,9 @@ class ConfigurationSnapshot(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
+        DateTime,
+        server_default=text("NOW()"),
+        onupdate=text("NOW()"),
     )
 
     # Additional metadata
@@ -226,7 +232,9 @@ class BatchEssay(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("NOW()"), onupdate=text("NOW()"),
+        DateTime,
+        server_default=text("NOW()"),
+        onupdate=text("NOW()"),
     )
 
     # Relationships

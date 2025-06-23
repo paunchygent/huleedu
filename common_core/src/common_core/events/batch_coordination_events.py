@@ -43,8 +43,9 @@ class BatchEssaysReady(BaseModel):
     """
     Event sent by ELS to BOS when all essays in a batch are ready for processing.
 
-    This triggers BOS to begin pipeline orchestration for the complete batch.
-    Enhanced to include validation failure information for Phase 6 coordination.
+    Enhanced for lean registration: includes educational context from Class Management Service
+    that was deferred from the initial batch registration. Processing services receive complete
+    context at the right time rather than prematurely during upload.
     """
 
     event: str = Field(default="batch.essays.ready", description="Event type identifier")
@@ -54,12 +55,29 @@ class BatchEssaysReady(BaseModel):
     )
     batch_entity: EntityReference = Field(description="Batch entity reference")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
+
+    # Enhanced context from Class Management Service (lean registration refactoring)
+    course_code: str = Field(description="Course code from BOS lean registration")
+    course_language: str = Field(description="Language inferred from course_code")
+    essay_instructions: str = Field(description="Essay instructions from BOS lean registration")
+
+    # Educational context from Class Management Service
+    class_type: str = Field(description="GUEST or REGULAR - determines processing behavior")
+    teacher_first_name: str | None = Field(
+        default=None, description="Teacher first name from Class Management Service (REGULAR only)"
+    )
+    teacher_last_name: str | None = Field(
+        default=None, description="Teacher last name from Class Management Service (REGULAR only)"
+    )
+
+    # Legacy validation failure support
     validation_failures: list[EssayValidationFailedV1] | None = Field(
         default=None,
         description="List of essays that failed validation (EssayValidationFailedV1 events)",
     )
     total_files_processed: int | None = Field(
-        default=None, description="Total number of files processed (successful + failed)",
+        default=None,
+        description="Total number of files processed (successful + failed)",
     )
 
 

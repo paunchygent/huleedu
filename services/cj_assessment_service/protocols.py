@@ -130,7 +130,9 @@ class CJRepositoryProtocol(Protocol):
         ...
 
     async def get_essays_for_cj_batch(
-        self, session: AsyncSession, cj_batch_id: int,
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
     ) -> list[Any]:  # List[CJ_ProcessedEssay]
         """Get all essays for a CJ batch."""
         ...
@@ -146,25 +148,36 @@ class CJRepositoryProtocol(Protocol):
         ...
 
     async def store_comparison_results(
-        self, session: AsyncSession, results: list[Any], cj_batch_id: int,
+        self,
+        session: AsyncSession,
+        results: list[Any],
+        cj_batch_id: int,
     ) -> None:
         """Store comparison results to database."""
         ...
 
     async def update_essay_scores_in_batch(
-        self, session: AsyncSession, cj_batch_id: int, scores: dict[str, float],
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+        scores: dict[str, float],
     ) -> None:
         """Update essay Bradley-Terry scores."""
         ...
 
     async def update_cj_batch_status(
-        self, session: AsyncSession, cj_batch_id: int, status: Any,
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+        status: Any,
     ) -> None:
         """Update CJ batch status."""
         ...
 
     async def get_final_cj_rankings(
-        self, session: AsyncSession, cj_batch_id: int,
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
     ) -> list[dict[str, Any]]:
         """Get final rankings for a CJ batch."""
         ...
@@ -178,13 +191,17 @@ class CJEventPublisherProtocol(Protocol):
     """Protocol for publishing CJ assessment results."""
 
     async def publish_assessment_completed(
-        self, completion_data: Any, correlation_id: UUID | None,
+        self,
+        completion_data: Any,
+        correlation_id: UUID | None,
     ) -> None:
         """Publish CJ assessment completion event."""
         ...
 
     async def publish_assessment_failed(
-        self, failure_data: Any, correlation_id: UUID | None,
+        self,
+        failure_data: Any,
+        correlation_id: UUID | None,
     ) -> None:
         """Publish CJ assessment failure event."""
         ...

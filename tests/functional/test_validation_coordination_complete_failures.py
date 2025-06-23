@@ -46,7 +46,9 @@ async def test_complete_validation_failures_0_of_25():
     async with kafka_manager.consumer("complete_failures") as consumer:
         # NOW trigger operations - consumer is guaranteed ready
         batch_id, correlation_id = await create_validation_batch(
-            course_code, class_designation, essay_count,
+            course_code,
+            class_designation,
+            essay_count,
         )
 
         # Create all failing files (0 successful + 25 failing files)

@@ -70,7 +70,8 @@ class CJAssessmentServiceProvider(Provider):
     async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
         """Provide Redis client for idempotency operations."""
         redis_client = RedisClient(
-            client_id=f"{settings.SERVICE_NAME}-redis", redis_url=settings.REDIS_URL,
+            client_id=f"{settings.SERVICE_NAME}-redis",
+            redis_url=settings.REDIS_URL,
         )
         await redis_client.start()
         return redis_client
@@ -160,7 +161,9 @@ class CJAssessmentServiceProvider(Provider):
             return MockLLMInteractionImpl(seed=42)  # Fixed seed for reproducible tests
 
         return LLMInteractionImpl(
-            cache_manager=cache_manager, providers=providers, settings=settings,
+            cache_manager=cache_manager,
+            providers=providers,
+            settings=settings,
         )
 
     @provide(scope=Scope.APP)
@@ -170,14 +173,18 @@ class CJAssessmentServiceProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_content_client(
-        self, session: aiohttp.ClientSession, settings: Settings,
+        self,
+        session: aiohttp.ClientSession,
+        settings: Settings,
     ) -> ContentClientProtocol:
         """Provide content client."""
         return ContentClientImpl(session, settings)
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(
-        self, kafka_bus: KafkaBus, settings: Settings,
+        self,
+        kafka_bus: KafkaBus,
+        settings: Settings,
     ) -> CJEventPublisherProtocol:
         """Provide event publisher."""
         return CJEventPublisherImpl(kafka_bus, settings)

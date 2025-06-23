@@ -151,7 +151,10 @@ class AnthropicProviderImpl(LLMProviderProtocol):
 
         try:
             async with self.session.post(
-                endpoint, headers=headers, json=payload, timeout=timeout_config,
+                endpoint,
+                headers=headers,
+                json=payload,
+                timeout=timeout_config,
             ) as response:
                 if response.status == 200:
                     response_data = await response.json()

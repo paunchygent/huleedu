@@ -78,14 +78,19 @@ async def test_comprehensive_real_batch_pipeline():
         # Step 5: Register batch with BOS using modern utility
         print("📝 Registering batch with BOS to create essay slots...")
         batch_id = await register_comprehensive_batch(
-            service_manager, len(test_essays), test_correlation_id,
+            service_manager,
+            len(test_essays),
+            test_correlation_id,
         )
         print(f"✅ Batch registered with BOS: {batch_id}")
 
         # Step 6: Upload files to trigger the pipeline using modern utility
         print("🚀 Uploading real student essays to trigger pipeline...")
         upload_response = await upload_real_essays(
-            service_manager, batch_id, test_essays, test_correlation_id,
+            service_manager,
+            batch_id,
+            test_essays,
+            test_correlation_id,
         )
         print(f"✅ File upload successful: {upload_response}")
 

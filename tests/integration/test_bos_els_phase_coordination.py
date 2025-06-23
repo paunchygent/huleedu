@@ -102,8 +102,7 @@ class TestBosElsPhaseCoordination:
     @pytest.fixture
     def mock_client_pipeline_request_handler(self):
         """Mock the ClientPipelineRequestHandler external boundary."""
-        from services.batch_orchestrator_service.implementations \
-            .client_pipeline_request_handler import (
+        from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
             ClientPipelineRequestHandler,
         )
 
@@ -128,7 +127,9 @@ class TestBosElsPhaseCoordination:
         )
 
     async def test_real_bos_els_kafka_integration_with_data_propagation(
-        self, kafka_consumer, mock_phase_coordinator,
+        self,
+        kafka_consumer,
+        mock_phase_coordinator,
     ):
         """Test actual Kafka message routing and ELS outcome handler processing
         with Phase 3 data propagation."""
@@ -181,7 +182,9 @@ class TestBosElsPhaseCoordination:
         )
 
     async def test_kafka_message_json_deserialization_error_handling(
-        self, kafka_consumer, mock_phase_coordinator,
+        self,
+        kafka_consumer,
+        mock_phase_coordinator,
     ):
         """Test error handling for malformed Kafka message JSON."""
         # Create malformed Kafka message
@@ -201,7 +204,9 @@ class TestBosElsPhaseCoordination:
         mock_phase_coordinator.handle_phase_concluded.assert_not_called()
 
     async def test_missing_required_fields_in_outcome_event(
-        self, kafka_consumer, mock_phase_coordinator,
+        self,
+        kafka_consumer,
+        mock_phase_coordinator,
     ):
         """Test handling of ELSBatchPhaseOutcomeV1 events with missing required fields."""
         correlation_id = uuid4()

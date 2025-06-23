@@ -45,7 +45,10 @@ class StorageReferenceMetadata(BaseModel):
     references: dict[ContentType, dict[str, str]] = Field(default_factory=dict)
 
     def add_reference(
-        self, ctype: ContentType, storage_id: str, path_hint: str | None = None,
+        self,
+        ctype: ContentType,
+        storage_id: str,
+        path_hint: str | None = None,
     ) -> None:
         self.references[ctype] = {"storage_id": storage_id, "path": path_hint or ""}
 

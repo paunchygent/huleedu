@@ -47,7 +47,9 @@ async def test_partial_validation_failures_24_of_25():
     async with kafka_manager.consumer("partial_24_of_25") as consumer:
         # NOW trigger operations - consumer is guaranteed ready
         batch_id, correlation_id = await create_validation_batch(
-            course_code, class_designation, essay_count,
+            course_code,
+            class_designation,
+            essay_count,
         )
 
         # Create 24 successful + 1 failing file
@@ -195,7 +197,9 @@ async def test_multiple_validation_failures_20_of_25():
     async with kafka_manager.consumer("multiple_20_of_25") as consumer:
         # NOW trigger operations - consumer is guaranteed ready
         batch_id, correlation_id = await create_validation_batch(
-            course_code, class_designation, essay_count,
+            course_code,
+            class_designation,
+            essay_count,
         )
 
         # Create 20 successful + 5 failing files

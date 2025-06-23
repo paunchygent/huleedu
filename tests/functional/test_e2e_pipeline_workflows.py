@@ -40,14 +40,16 @@ class TestE2EPipelineWorkflows:
 
         # Step 1: Upload content to Content Service using validated endpoint
         storage_id = await self._upload_content_via_utility(
-            endpoints["content_service"]["base_url"], test_content,
+            endpoints["content_service"]["base_url"],
+            test_content,
         )
         assert storage_id is not None
         print(f"✅ Content uploaded with storage_id: {storage_id}")
 
         # Step 2: Retrieve content from Content Service using validated endpoint
         retrieved_content = await self._fetch_content_via_utility(
-            endpoints["content_service"]["base_url"], storage_id,
+            endpoints["content_service"]["base_url"],
+            storage_id,
         )
 
         assert retrieved_content is not None

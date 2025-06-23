@@ -70,7 +70,8 @@ class TestProcessSingleMessage:
         )
 
         real_spell_logic = DefaultSpellLogic(
-            result_store=mock_result_store, http_session=mock_http_session,
+            result_store=mock_result_store,
+            http_session=mock_http_session,
         )
 
         # Act - The real algorithm will run, which is the correct behavior
@@ -363,7 +364,8 @@ class TestProcessSingleMessage:
         )
 
         real_spell_logic = DefaultSpellLogic(
-            result_store=mock_result_store, http_session=mock_http_session,
+            result_store=mock_result_store,
+            http_session=mock_http_session,
         )
 
         # Act - Process message, expecting publisher to fail

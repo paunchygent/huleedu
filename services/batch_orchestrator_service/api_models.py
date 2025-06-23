@@ -6,14 +6,17 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class BatchRegistrationRequestV1(BaseModel):
-    """Request model for batch registration endpoint.
+    """Lean batch registration model - captures only orchestration essentials.
 
-    This model captures all the context needed for batch processing,
-    including course information and essay details.
+    Educational context (teacher_name, class_designation, student data) is deferred to
+    Class Management Service and provided later via enhanced BatchEssaysReady events.
+    This maintains proper service boundaries and single source of truth principles.
     """
 
     expected_essay_count: int = Field(
-        ..., description="Number of essays expected in this batch.", gt=0,
+        ...,
+        description="Number of essays expected in this batch.",
+        gt=0,
     )
     essay_ids: list[str] | None = Field(
         default=None,
@@ -22,28 +25,35 @@ class BatchRegistrationRequestV1(BaseModel):
         ),
         min_length=1,
     )
+
+    # Orchestration essentials (BOS responsibility)
     course_code: str = Field(
-        ..., description="Course code associated with this batch (e.g., SV1, ENG5).",
+        ...,
+        description="Course code associated with this batch (e.g., SV1, ENG5).",
     )
-    class_designation: str = Field(
-        ..., description="Class or group designation (e.g., 'Class 9A', 'Group Blue').",
-    )
-    teacher_name: str = Field(..., description="Name of the teacher or instructor for this batch.")
     essay_instructions: str = Field(
-        ..., description="Instructions provided for the essay assignment.",
+        ...,
+        description="Instructions provided for the essay assignment.",
     )
-    # CJ Assessment optional parameters (Sub-task 2.1.1)
+    user_id: str = Field(
+        ...,
+        description="The ID of the user who owns this batch (from API Gateway JWT).",
+    )
+
+    # CJ Assessment pipeline parameters
     enable_cj_assessment: bool = Field(
-        default=False, description="Whether to include CJ assessment in the processing pipeline.",
+        default=False,
+        description="Whether to include CJ assessment in the processing pipeline.",
     )
     cj_default_llm_model: str | None = Field(
-        default=None, description="Default LLM model for CJ assessment (e.g., 'gpt-4o-mini').",
+        default=None,
+        description="Default LLM model for CJ assessment (e.g., 'gpt-4o-mini').",
     )
     cj_default_temperature: float | None = Field(
-        default=None, ge=0.0, le=2.0, description="Default temperature for CJ assessment LLM.",
-    )
-    user_id: str | None = Field(
-        default=None, description="The ID of the user who owns this batch.",
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Default temperature for CJ assessment LLM.",
     )
 
     @model_validator(mode="after")

@@ -27,7 +27,10 @@ class MockRedisClient(RedisClientProtocol):
         self.should_fail_delete = False
 
     async def set_if_not_exists(
-        self, key: str, value: Any, ttl_seconds: int | None = None,
+        self,
+        key: str,
+        value: Any,
+        ttl_seconds: int | None = None,
     ) -> bool:
         """Set a key only if it doesn't exist with optional TTL."""
         self.set_calls.append((key, str(value), ttl_seconds or 0))
@@ -185,28 +188,39 @@ class MockDatabase(CJRepositoryProtocol):
         return None
 
     async def store_comparison_results(
-        self, session: AsyncSession, results: list[Any], cj_batch_id: int,
+        self,
+        session: AsyncSession,
+        results: list[Any],
+        cj_batch_id: int,
     ) -> None:
         """Store comparison results to database."""
         # Mock implementation - no need for actual behavior in these tests
         pass
 
     async def update_essay_scores_in_batch(
-        self, session: AsyncSession, cj_batch_id: int, scores: dict[str, float],
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+        scores: dict[str, float],
     ) -> None:
         """Update essay Bradley-Terry scores."""
         # Mock implementation - no need for actual behavior in these tests
         pass
 
     async def update_cj_batch_status(
-        self, session: AsyncSession, cj_batch_id: int, status: Any,
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+        status: Any,
     ) -> None:
         """Update CJ batch status."""
         # Mock implementation - no need for actual behavior in these tests
         pass
 
     async def get_final_cj_rankings(
-        self, session: AsyncSession, cj_batch_id: int,
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
     ) -> list[dict[str, Any]]:
         """Get final rankings for a CJ batch."""
         return []  # Mock implementation for tests

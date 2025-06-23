@@ -149,7 +149,9 @@ def filter_l2_entries(l2_errors: dict[str, str], logger: Logger | None = None) -
 
 
 def create_filtered_l2_dictionary(
-    l2_errors: dict[str, str], output_path: str | Path, logger: Logger | None = None,
+    l2_errors: dict[str, str],
+    output_path: str | Path,
+    logger: Logger | None = None,
 ) -> bool:
     """Create a filtered L2 dictionary file with valid corrections.
 

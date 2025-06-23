@@ -68,7 +68,9 @@ def idempotent_consumer(
             # If set_if_not_exists returns False, the key already existed (duplicate)
             try:
                 is_first_time = await redis_client.set_if_not_exists(
-                    key, "1", ttl_seconds=ttl_seconds,
+                    key,
+                    "1",
+                    ttl_seconds=ttl_seconds,
                 )
 
                 if not is_first_time:

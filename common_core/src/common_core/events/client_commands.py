@@ -22,7 +22,9 @@ class ClientBatchPipelineRequestV1(BaseModel):
     """
 
     batch_id: str = Field(
-        description="The unique identifier of the target batch.", min_length=1, max_length=255,
+        description="The unique identifier of the target batch.",
+        min_length=1,
+        max_length=255,
     )
     requested_pipeline: str = Field(
         description="""The final pipeline the user wants to run (e.g., 'ai_feedback',
@@ -31,7 +33,8 @@ class ClientBatchPipelineRequestV1(BaseModel):
         max_length=100,
     )
     client_correlation_id: UUID | None = Field(
-        default=None, description="Optional client-provided correlation ID for request tracking.",
+        default=None,
+        description="Optional client-provided correlation ID for request tracking.",
     )
     user_id: str = Field(
         description="The ID of the authenticated user who owns this batch.",
@@ -39,10 +42,12 @@ class ClientBatchPipelineRequestV1(BaseModel):
         max_length=255,
     )
     is_retry: bool = Field(
-        default=False, description="Flag indicating this is a user-initiated retry request.",
+        default=False,
+        description="Flag indicating this is a user-initiated retry request.",
     )
     retry_reason: str | None = Field(
-        default=None, description="Optional user-provided reason for the retry.",
+        default=None,
+        description="Optional user-provided reason for the retry.",
         max_length=500,
     )
 

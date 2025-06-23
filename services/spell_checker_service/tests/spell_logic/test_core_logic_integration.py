@@ -24,7 +24,9 @@ class TestCoreLogicIntegration:
 
         # Act
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, essay_id, language="en",
+            text,
+            essay_id,
+            language="en",
         )
 
         # Assert
@@ -47,7 +49,9 @@ class TestCoreLogicIntegration:
 
         # Act
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, essay_id, language="en",
+            text,
+            essay_id,
+            language="en",
         )
 
         # Assert
@@ -70,7 +74,9 @@ class TestCoreLogicIntegration:
 
         # Act
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, essay_id, language="en",
+            text,
+            essay_id,
+            language="en",
         )
 
         # Assert
@@ -96,7 +102,9 @@ class TestCoreLogicIntegration:
 
         # Act
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, essay_id, language="en",
+            text,
+            essay_id,
+            language="en",
         )
 
         # Assert
@@ -123,7 +131,9 @@ class TestCoreLogicIntegration:
 
         # Act
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, essay_id, language="en",
+            text,
+            essay_id,
+            language="en",
         )
 
         # Assert
@@ -185,7 +195,9 @@ class TestCoreLogicIntegration:
 
         # Act
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, essay_id, language="en",
+            text,
+            essay_id,
+            language="en",
         )
 
         # Assert
@@ -212,7 +224,9 @@ class TestCoreLogicIntegration:
 
         # Act
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, essay_id, language="en",
+            text,
+            essay_id,
+            language="en",
         )
 
         # Assert
@@ -231,7 +245,9 @@ class TestCoreLogicIntegration:
 
         # Act
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, essay_id, language="en",
+            text,
+            essay_id,
+            language="en",
         )
 
         # Assert

@@ -86,11 +86,15 @@ class AIFeedbackInitiatorImpl(AIFeedbackInitiatorProtocol):
                 entity_ref=batch_entity_ref,
                 essays_to_process=essays_for_processing,
                 language=language,
-                # AI feedback specific context fields
+                # Orchestration context (from BOS lean registration)
                 course_code=batch_context.course_code,
-                teacher_name=batch_context.teacher_name,  # Direct access - no extraction needed!
-                class_designation=batch_context.class_designation,
                 essay_instructions=batch_context.essay_instructions,
+
+                # Educational context (TODO: Get from enhanced BatchEssaysReady event)
+                # For now, using GUEST class type until Class Management Service integration
+                class_type="GUEST",
+                teacher_first_name=None,
+                teacher_last_name=None,
             )
 
             # Create EventEnvelope for AI feedback command

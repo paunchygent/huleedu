@@ -188,7 +188,9 @@ class TestE2EFileWorkflows:
         # Step 1: Create batch using ServiceTestManager utility
         try:
             batch_id, correlation_id = await service_manager.create_batch(
-                expected_essay_count=1, course_code="E2E", class_designation="CompleteWorkflow",
+                expected_essay_count=1,
+                course_code="E2E",
+                class_designation="CompleteWorkflow",
             )
 
             print(f"✅ Batch created: {batch_id}")

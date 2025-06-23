@@ -39,11 +39,13 @@ class Settings(BaseSettings):
     DB_HOST: str = Field(default="localhost", validation_alias="BATCH_ORCHESTRATOR_DB_HOST")
     DB_PORT: int = Field(default=5432, validation_alias="BATCH_ORCHESTRATOR_DB_PORT")
     DB_NAME: str = Field(
-        default="batch_orchestrator", validation_alias="BATCH_ORCHESTRATOR_DB_NAME",
+        default="batch_orchestrator",
+        validation_alias="BATCH_ORCHESTRATOR_DB_NAME",
     )
     DB_USER: str = Field(default="huleedu_user", validation_alias="BATCH_ORCHESTRATOR_DB_USER")
     DB_PASSWORD: str = Field(
-        default="REDACTED_DEFAULT_PASSWORD", validation_alias="BATCH_ORCHESTRATOR_DB_PASSWORD",
+        default="REDACTED_DEFAULT_PASSWORD",
+        validation_alias="BATCH_ORCHESTRATOR_DB_PASSWORD",
     )
     DB_POOL_SIZE: int = 5
     DB_MAX_OVERFLOW: int = 10

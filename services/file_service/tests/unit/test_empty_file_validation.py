@@ -68,7 +68,8 @@ async def test_empty_file_uses_content_validation() -> None:
 
     # Assert - Raw storage was called (NEW BEHAVIOR)
     content_client.store_content.assert_called_once_with(
-        empty_file_content, ContentType.RAW_UPLOAD_BLOB,
+        empty_file_content,
+        ContentType.RAW_UPLOAD_BLOB,
     )
 
     # Assert - Validation failure event was published with correct error code
@@ -206,7 +207,8 @@ async def test_content_too_short_validation() -> None:
 
     # Assert - Raw storage was called (NEW BEHAVIOR)
     content_client.store_content.assert_called_once_with(
-        short_file_content, ContentType.RAW_UPLOAD_BLOB,
+        short_file_content,
+        ContentType.RAW_UPLOAD_BLOB,
     )
 
     # Assert - Correct validation failure event

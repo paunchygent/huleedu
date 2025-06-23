@@ -38,7 +38,9 @@ class DefaultSpellLogic(SpellLogicProtocol):
     ) -> SpellcheckResultDataV1:
         """Perform spell check using the core logic implementation."""
         corrected_text, corrections_count = await default_perform_spell_check_algorithm(
-            text, essay_id, language=language,
+            text,
+            essay_id,
+            language=language,
         )
 
         new_storage_id: str | None = None
@@ -66,7 +68,8 @@ class DefaultSpellLogic(SpellLogicProtocol):
 
                 logger = create_service_logger("spell_checker_service.spell_logic_impl")
                 logger.error(
-                    f"Essay {essay_id}: Failed to store corrected text: {e}", exc_info=True,
+                    f"Essay {essay_id}: Failed to store corrected text: {e}",
+                    exc_info=True,
                 )
                 current_status = EssayStatus.SPELLCHECK_FAILED
                 error_detail = f"Exception storing corrected text: {str(e)[:100]}"

@@ -141,7 +141,9 @@ class ClientPipelineRequestHandler:
 
             # Update batch with resolved pipeline
             await self._update_batch_with_resolved_pipeline(
-                batch_id, resolved_pipeline, batch_context,
+                batch_id,
+                resolved_pipeline,
+                batch_context,
             )
 
             # Initiate first phase of resolved pipeline
@@ -240,7 +242,10 @@ class ClientPipelineRequestHandler:
             return False
 
     async def _update_batch_with_resolved_pipeline(
-        self, batch_id: str, resolved_pipeline: list[str], batch_context: Any,
+        self,
+        batch_id: str,
+        resolved_pipeline: list[str],
+        batch_context: Any,
     ) -> None:
         """Update batch processing state with BCS-resolved pipeline."""
         from common_core.pipeline_models import (
@@ -291,7 +296,8 @@ class ClientPipelineRequestHandler:
 
         # Save updated state
         await self.batch_repo.save_processing_pipeline_state(
-            batch_id, updated_pipeline_state.model_dump(mode="json"),
+            batch_id,
+            updated_pipeline_state.model_dump(mode="json"),
         )
 
         logger.info(

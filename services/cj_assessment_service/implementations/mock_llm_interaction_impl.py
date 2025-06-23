@@ -95,7 +95,9 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
 
             # Create mock LLM assessment response
             llm_assessment = LLMAssessmentResponseSchema(
-                winner=winner, justification=justification, confidence=confidence,
+                winner=winner,
+                justification=justification,
+                confidence=confidence,
             )
 
             # Create comparison result with short hash to fit database schema (64 chars max)

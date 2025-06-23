@@ -45,7 +45,9 @@ async def test_all_essays_pass_validation():
     async with kafka_manager.consumer("all_pass") as consumer:
         # NOW trigger operations - consumer is guaranteed ready
         batch_id, correlation_id = await create_validation_batch(
-            course_code, class_designation, essay_count,
+            course_code,
+            class_designation,
+            essay_count,
         )
 
         # Create all successful files

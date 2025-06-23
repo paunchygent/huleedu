@@ -48,7 +48,10 @@ class TestPipelineRealWorldScenarios:
         )
 
     async def test_real_world_24_of_25_essays_scenario(
-        self, pipeline_coordinator, batch_repository, mock_cj_initiator,
+        self,
+        pipeline_coordinator,
+        batch_repository,
+        mock_cj_initiator,
     ):
         """
         Test the specific root cause scenario: 24/25 essays complete successfully,

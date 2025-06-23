@@ -33,7 +33,7 @@ class TestStudentParsingCompletedV1:
                 "first_name": "John",
                 "last_name": "Doe",
                 "student_email": "john.doe@student.edu",
-                "confidence": 0.95
+                "confidence": 0.95,
             }
         ]
 
@@ -63,7 +63,7 @@ class TestStudentParsingCompletedV1:
                 "first_name": "Anna",
                 "last_name": "Svensson",
                 "student_email": "anna.svensson@skola.se",
-                "confidence": 0.85
+                "confidence": 0.85,
             },
             {
                 "essay_id": "essay_2",
@@ -71,8 +71,8 @@ class TestStudentParsingCompletedV1:
                 "first_name": "Erik",
                 "last_name": "Johansson",
                 "student_email": "erik.johansson@skola.se",
-                "confidence": 0.92
-            }
+                "confidence": 0.92,
+            },
         ]
 
         model = StudentParsingCompletedV1(
@@ -101,7 +101,7 @@ class TestStudentParsingCompletedV1:
                 "first_name": "Test",
                 "last_name": "Student",
                 "student_email": "test@example.com",
-                "confidence": 0.88
+                "confidence": 0.88,
             }
         ]
 
@@ -150,7 +150,7 @@ class TestStudentParsingCompletedV1:
                 "first_name": "Maria",
                 "last_name": "Andersson",
                 "student_email": "maria.andersson@student.se",
-                "confidence": 0.95
+                "confidence": 0.95,
             },
             {
                 "essay_id": "essay_complex_2",
@@ -158,8 +158,8 @@ class TestStudentParsingCompletedV1:
                 "first_name": None,
                 "last_name": None,
                 "student_email": None,
-                "confidence": 0.0
-            }
+                "confidence": 0.0,
+            },
         ]
 
         model = StudentParsingCompletedV1(

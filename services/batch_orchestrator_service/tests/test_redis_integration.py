@@ -31,7 +31,8 @@ async def settings_override() -> Settings:
 async def di_container(settings_override: Settings) -> AsyncGenerator[Any, None]:
     """Create DI container with Redis provider for testing."""
     container = make_async_container(
-        CoreInfrastructureProvider(), context={Settings: settings_override},
+        CoreInfrastructureProvider(),
+        context={Settings: settings_override},
     )
     yield container
     await container.close()
@@ -129,7 +130,9 @@ async def test_redis_pubsub_functionality(di_container: Any) -> None:
 
     # Test user notification publishing
     receiver_count = await redis_client.publish_user_notification(
-        user_id, "test_event", {"data": "test"},
+        user_id,
+        "test_event",
+        {"data": "test"},
     )
     assert isinstance(receiver_count, int)
 

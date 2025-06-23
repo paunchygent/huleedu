@@ -51,7 +51,8 @@ class TestPatternAlignmentValidation:
 
             # Find service pattern type from ServiceTestManager configuration
             service_endpoint = next(
-                (ep for ep in service_manager.SERVICE_ENDPOINTS if ep.name == service_name), None,
+                (ep for ep in service_manager.SERVICE_ENDPOINTS if ep.name == service_name),
+                None,
             )
             pattern_type = (
                 "HTTP Service" if service_endpoint and service_endpoint.has_http_api else "Worker"
@@ -87,7 +88,8 @@ class TestPatternAlignmentValidation:
         for service_endpoint in service_manager.SERVICE_ENDPOINTS:
             if service_endpoint.has_metrics:
                 metrics_text = await service_manager.get_service_metrics(
-                    service_endpoint.name, service_endpoint.port,
+                    service_endpoint.name,
+                    service_endpoint.port,
                 )
 
                 if metrics_text is not None:
@@ -208,7 +210,8 @@ class TestPatternAlignmentValidation:
         for service_endpoint in service_manager.SERVICE_ENDPOINTS:
             if service_endpoint.has_metrics:
                 metrics_text = await service_manager.get_service_metrics(
-                    service_endpoint.name, service_endpoint.port,
+                    service_endpoint.name,
+                    service_endpoint.port,
                 )
                 if metrics_text is not None:
                     metrics_count += 1
@@ -261,7 +264,8 @@ class TestPatternAlignmentValidation:
         for service_endpoint in service_manager.SERVICE_ENDPOINTS:
             if service_endpoint.has_metrics:
                 metrics_text = await service_manager.get_service_metrics(
-                    service_endpoint.name, service_endpoint.port,
+                    service_endpoint.name,
+                    service_endpoint.port,
                 )
                 if metrics_text is not None:
                     success_metrics["metrics_endpoints_working"] += 1

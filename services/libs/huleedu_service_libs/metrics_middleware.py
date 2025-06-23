@@ -73,7 +73,9 @@ def setup_metrics_middleware(
 
                 if request_count:
                     request_count.labels(
-                        method=method, endpoint=endpoint, **{status_label_name: status_code},
+                        method=method,
+                        endpoint=endpoint,
+                        **{status_label_name: status_code},
                     ).inc()
                 if request_duration:
                     request_duration.labels(method=method, endpoint=endpoint).observe(duration)

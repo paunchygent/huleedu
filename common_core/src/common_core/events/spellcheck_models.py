@@ -34,6 +34,7 @@ class SpellcheckResultDataV1(ProcessingUpdate):
         description="Storage ID of the original text that was spellchecked.",
     )
     storage_metadata: StorageReferenceMetadata | None = Field(
-        default=None, description="Ref to corrected text, logs.",
+        default=None,
+        description="Ref to corrected text, logs.",
     )
     corrections_made: int | None = Field(default=None, description="Number of corrections made.")

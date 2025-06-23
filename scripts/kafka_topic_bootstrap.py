@@ -66,7 +66,8 @@ class KafkaTopicBootstrap:
             try:
                 print(f"Attempting to connect to Kafka (attempt {attempt}/{self.max_retries})...")
                 self.admin_client = AIOKafkaAdminClient(
-                    bootstrap_servers=self.bootstrap_servers, client_id="huleedu-topic-bootstrap",
+                    bootstrap_servers=self.bootstrap_servers,
+                    client_id="huleedu-topic-bootstrap",
                 )
                 await self.admin_client.start()
                 print("✅ Successfully connected to Kafka")

@@ -77,7 +77,9 @@ class KafkaBus:
         try:
             key_bytes = key.encode("utf-8") if key else None
             future = await self.producer.send_and_wait(
-                topic, value=envelope.model_dump(mode="json"), key=key_bytes,
+                topic,
+                value=envelope.model_dump(mode="json"),
+                key=key_bytes,
             )
             record_metadata = future
             logger.debug(

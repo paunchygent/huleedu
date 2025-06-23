@@ -69,7 +69,9 @@ async def default_store_content_impl(
     try:
         timeout = ClientTimeout(total=10)
         async with session.post(
-            content_service_url, data=text_content.encode("utf-8"), timeout=timeout,
+            content_service_url,
+            data=text_content.encode("utf-8"),
+            timeout=timeout,
         ) as response:
             response.raise_for_status()
             # Assuming Content Service returns JSON like {"storage_id": "..."}
@@ -85,7 +87,9 @@ async def default_store_content_impl(
 
 
 async def default_perform_spell_check_algorithm(
-    text: str, essay_id: str | None = None, language: str = "en",
+    text: str,
+    essay_id: str | None = None,
+    language: str = "en",
 ) -> tuple[str, int]:
     """
     Complete L2 + pyspellchecker pipeline implementation.

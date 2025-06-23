@@ -33,23 +33,31 @@ class BatchServiceNLPInitiateCommandDataV1(BaseEventData):
 
 
 class BatchServiceAIFeedbackInitiateCommandDataV1(BaseEventData):
-    """Command data for Batch Orchestrator Service to initiate AI feedback phase for a batch."""
+    """Command data for AI feedback with personalization context from Class Management Service."""
 
     essays_to_process: list[EssayProcessingInputRefV1]
-    language: str  # infered from course_code
-    # AI feedback specific fields
-    course_code: str  # form input at upload
-    teacher_name: str  # infered from user_id of batch_owner first_name and last_name
-    class_designation: str  # form input at upload
-    essay_instructions: str  # form input at upload
+    language: str  # inferred from course_code
+
+    # Orchestration context (from BOS lean registration)
+    course_code: str  # from batch registration
+    essay_instructions: str  # from batch registration
+
+    # Personalization context (from Class Management Service via enhanced BatchEssaysReady)
+    class_type: str  # GUEST or REGULAR - determines AI feedback template selection
+    teacher_first_name: str | None = None  # For personalized templates - REGULAR classes only
+    teacher_last_name: str | None = None  # For personalized templates - REGULAR classes only
 
 
 class BatchServiceCJAssessmentInitiateCommandDataV1(BaseEventData):
-    """Command data for Batch Orchestrator Service to initiate CJ assessment phase for a batch."""
+    """Command data for CJ assessment with educational context from Class Management Service."""
 
     essays_to_process: list[EssayProcessingInputRefV1]
-    language: str  # infered from course_code
-    # CJ assessment specific context
-    course_code: str  # form input at upload
-    class_designation: str  # form input at upload
-    essay_instructions: str  # form input at upload
+    language: str  # inferred from course_code
+
+    # Orchestration context (from BOS lean registration)
+    course_code: str  # from batch registration
+    essay_instructions: str  # from batch registration
+
+    # Educational context (from Class Management Service via enhanced BatchEssaysReady)
+    # Note: CJ assessment works identically for GUEST and REGULAR classes
+    class_type: str  # GUEST or REGULAR - for audit/reporting purposes only

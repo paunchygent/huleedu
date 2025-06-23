@@ -80,7 +80,8 @@ async def process_single_file_upload(
     # This establishes an immutable source of truth before any processing occurs
     try:
         raw_file_storage_id = await content_client.store_content(
-            file_content, ContentType.RAW_UPLOAD_BLOB,
+            file_content,
+            ContentType.RAW_UPLOAD_BLOB,
         )
         logger.info(
             f"Stored raw file blob for {file_name}, raw_file_storage_id: {raw_file_storage_id}",
@@ -106,7 +107,8 @@ async def process_single_file_upload(
         )
 
         await event_publisher.publish_essay_validation_failed(
-            validation_failure_event, main_correlation_id,
+            validation_failure_event,
+            main_correlation_id,
         )
 
         logger.info(
@@ -160,7 +162,8 @@ async def process_single_file_upload(
         )
 
         await event_publisher.publish_essay_validation_failed(
-            validation_failure_event, main_correlation_id,
+            validation_failure_event,
+            main_correlation_id,
         )
 
         logger.info(
@@ -216,7 +219,8 @@ async def process_single_file_upload(
         )
 
         await event_publisher.publish_essay_validation_failed(
-            validation_failure_event, main_correlation_id,
+            validation_failure_event,
+            main_correlation_id,
         )
 
         logger.info(
@@ -245,7 +249,8 @@ async def process_single_file_upload(
 
     # Step 4: Store validated extracted plaintext and publish success event
     text_storage_id = await content_client.store_content(
-        text.encode("utf-8"), ContentType.EXTRACTED_PLAINTEXT,
+        text.encode("utf-8"),
+        ContentType.EXTRACTED_PLAINTEXT,
     )
     logger.info(
         f"Stored extracted plaintext for file {file_name}, text_storage_id: {text_storage_id}",
@@ -270,7 +275,8 @@ async def process_single_file_upload(
 
     # Publish success event
     await event_publisher.publish_essay_content_provisioned(
-        content_provisioned_event_data, main_correlation_id,
+        content_provisioned_event_data,
+        main_correlation_id,
     )
     logger.info(
         f"Published EssayContentProvisionedV1 for file {file_name}",
@@ -283,7 +289,9 @@ async def process_single_file_upload(
     files_uploaded_counter = metrics.get("files_uploaded_total")
     if files_uploaded_counter:
         files_uploaded_counter.labels(
-            file_type=file_ext, validation_status="success", batch_id=str(batch_id),
+            file_type=file_ext,
+            validation_status="success",
+            batch_id=str(batch_id),
         ).inc()
 
     return {

@@ -248,7 +248,11 @@ class TestE2ESpellcheckWorkflows:
                 pytest.fail(f"Event collection or validation failed: {e}")
 
     def _create_spellcheck_request_event(
-        self, essay_id: str, text_storage_id: str, correlation_id: str, language: str = "en",
+        self,
+        essay_id: str,
+        text_storage_id: str,
+        correlation_id: str,
+        language: str = "en",
     ) -> dict[str, Any]:
         """
         Create SpellcheckRequestedV1 event structure.

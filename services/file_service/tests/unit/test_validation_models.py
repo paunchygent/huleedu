@@ -146,11 +146,15 @@ class TestValidationResult:
     def test_model_equality(self) -> None:
         """Test model equality comparison."""
         result1 = ValidationResult(
-            is_valid=False, error_code="TEST_ERROR", error_message="Test message",
+            is_valid=False,
+            error_code="TEST_ERROR",
+            error_message="Test message",
         )
 
         result2 = ValidationResult(
-            is_valid=False, error_code="TEST_ERROR", error_message="Test message",
+            is_valid=False,
+            error_code="TEST_ERROR",
+            error_message="Test message",
         )
 
         assert result1 == result2

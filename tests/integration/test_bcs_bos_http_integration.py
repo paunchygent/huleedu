@@ -49,7 +49,9 @@ class TestBCSBOSHttpIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_successful_pipeline_resolution(
-        self, validated_services: dict[str, Any], bcs_endpoint_url: str,
+        self,
+        validated_services: dict[str, Any],
+        bcs_endpoint_url: str,
     ):
         """
         Test successful HTTP communication and pipeline resolution.
@@ -96,7 +98,9 @@ class TestBCSBOSHttpIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_http_error_handling_400_bad_request(
-        self, validated_services: dict[str, Any], bcs_endpoint_url: str,
+        self,
+        validated_services: dict[str, Any],
+        bcs_endpoint_url: str,
     ):
         """
         Test BCS handles invalid requests with proper HTTP 400 responses.
@@ -144,7 +148,9 @@ class TestBCSBOSHttpIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_http_timeout_and_resilience(
-        self, validated_services: dict[str, Any], bcs_endpoint_url: str,
+        self,
+        validated_services: dict[str, Any],
+        bcs_endpoint_url: str,
     ):
         """
         Test HTTP timeout configuration and error handling.
@@ -199,7 +205,9 @@ class TestBCSBOSHttpIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_concurrent_http_requests(
-        self, validated_services: dict[str, Any], bcs_endpoint_url: str,
+        self,
+        validated_services: dict[str, Any],
+        bcs_endpoint_url: str,
     ):
         """
         Test BCS handles concurrent HTTP requests properly.
@@ -270,7 +278,9 @@ class TestBCSBOSHttpIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_request_response_contract_validation(
-        self, validated_services: dict[str, Any], bcs_endpoint_url: str,
+        self,
+        validated_services: dict[str, Any],
+        bcs_endpoint_url: str,
     ):
         """
         Test detailed request/response contract validation.

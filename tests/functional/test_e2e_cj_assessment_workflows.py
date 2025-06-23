@@ -116,7 +116,8 @@ class TestE2ECJAssessmentWorkflows:
         failed_topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED)
 
         async with kafka_event_monitor(
-            "cj_assessment_pipeline_test", [completed_topic, failed_topic],
+            "cj_assessment_pipeline_test",
+            [completed_topic, failed_topic],
         ) as consumer:
             # Step 3: Publish ELS_CJAssessmentRequestV1 event using utility
             cj_request = self._create_cj_assessment_request_event(
@@ -282,7 +283,8 @@ class TestE2ECJAssessmentWorkflows:
         essay_inputs = []
         for ref in essay_storage_refs:
             essay_input = EssayProcessingInputRefV1(
-                essay_id=ref["essay_id"], text_storage_id=ref["storage_id"],
+                essay_id=ref["essay_id"],
+                text_storage_id=ref["storage_id"],
             )
             essay_inputs.append(essay_input)
 

@@ -183,7 +183,10 @@ class ServiceTestManager:
                 return batch_id, returned_correlation_id
 
     async def upload_files(
-        self, batch_id: str, files: list[dict[str, Any]], correlation_id: str | None = None,
+        self,
+        batch_id: str,
+        files: list[dict[str, Any]],
+        correlation_id: str | None = None,
     ) -> dict[str, Any]:
         """
                 Upload files to File Service batch endpoint.
@@ -343,12 +346,17 @@ async def create_test_batch(
 ) -> tuple[str, str]:
     """Convenience function that uses global service manager."""
     return await service_manager.create_batch(
-        expected_essay_count, course_code, class_designation, correlation_id,
+        expected_essay_count,
+        course_code,
+        class_designation,
+        correlation_id,
     )
 
 
 async def upload_test_files(
-    batch_id: str, files: list[dict[str, Any]], correlation_id: str | None = None,
+    batch_id: str,
+    files: list[dict[str, Any]],
+    correlation_id: str | None = None,
 ) -> dict[str, Any]:
     """Convenience function that uses global service manager."""
     return await service_manager.upload_files(batch_id, files, correlation_id)

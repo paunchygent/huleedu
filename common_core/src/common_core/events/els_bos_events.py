@@ -29,7 +29,8 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
     """
 
     batch_id: str = Field(
-        ..., description="Unique identifier of the batch that completed the phase",
+        ...,
+        description="Unique identifier of the batch that completed the phase",
     )
 
     phase_name: str = Field(
@@ -65,7 +66,8 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
     )
 
     correlation_id: UUID | None = Field(
-        None, description="Optional correlation ID for tracking related events across services",
+        None,
+        description="Optional correlation ID for tracking related events across services",
     )
 
     class Config:

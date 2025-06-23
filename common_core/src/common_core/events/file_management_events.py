@@ -15,11 +15,15 @@ from pydantic import BaseModel, Field
 
 class StudentParsingCompletedV1(BaseModel):
     """Event published when File Service completes student parsing for a batch."""
+
     event: str = Field(default="student.parsing.completed")
     batch_id: str = Field(description="Batch identifier")
     # Direct data - parsing results populate Class Management Service DB
     parsing_results: list[dict] = Field(
-        description="List of parsing results: [{essay_id, filename, first_name, last_name, student_email, confidence}]"
+        description=(
+            "List of parsing results: [{essay_id, filename, first_name, last_name, "
+            "student_email, confidence}]"
+        )
     )
     parsed_count: int = Field(description="Number of essays with parsed student info")
     total_count: int = Field(description="Total number of essays processed")
@@ -29,6 +33,7 @@ class StudentParsingCompletedV1(BaseModel):
 
 class BatchFileAddedV1(BaseModel):
     """Event published when file is added to existing batch."""
+
     event: str = Field(default="batch.file.added")
     batch_id: str = Field(description="Batch identifier")
     essay_id: str = Field(description="New essay identifier")
@@ -40,6 +45,7 @@ class BatchFileAddedV1(BaseModel):
 
 class BatchFileRemovedV1(BaseModel):
     """Event published when file is removed from batch."""
+
     event: str = Field(default="batch.file.removed")
     batch_id: str = Field(description="Batch identifier")
     essay_id: str = Field(description="Removed essay identifier")

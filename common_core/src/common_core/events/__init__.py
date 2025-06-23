@@ -21,6 +21,11 @@ from .file_management_events import (
     StudentParsingCompletedV1,
 )
 from .spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
+from .validation_events import (
+    StudentAssociation,
+    StudentAssociationsConfirmedV1,
+    ValidationTimeoutProcessedV1,
+)
 
 __all__ = [
     "BaseEventData",
@@ -37,6 +42,9 @@ __all__ = [
     "ProcessingUpdate",
     "SpellcheckRequestedDataV1",
     "SpellcheckResultDataV1",
+    "StudentAssociation",
+    "StudentAssociationsConfirmedV1",
     "StudentCreatedV1",
     "StudentParsingCompletedV1",
+    "ValidationTimeoutProcessedV1",
 ]

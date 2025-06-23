@@ -33,7 +33,9 @@ class BatchProcessingServiceImpl:
         self.logger = create_service_logger("bos.service.batch_processing")
 
     async def register_new_batch(
-        self, registration_data: BatchRegistrationRequestV1, correlation_id: uuid.UUID,
+        self,
+        registration_data: BatchRegistrationRequestV1,
+        correlation_id: uuid.UUID,
     ) -> str:
         """Register a new batch for processing.
 
@@ -119,7 +121,8 @@ class BatchProcessingServiceImpl:
             nlp_metrics=nlp_metrics_detail,
         )
         await self.batch_repo.save_processing_pipeline_state(
-            batch_id, initial_pipeline_state.model_dump(mode="json"),
+            batch_id,
+            initial_pipeline_state.model_dump(mode="json"),
         )
 
         # 3. Construct lightweight BatchEssaysRegistered event with internal essay IDs

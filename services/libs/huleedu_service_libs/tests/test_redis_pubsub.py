@@ -285,7 +285,9 @@ class TestRedisPubSubFunctionality:
 
         # Use helper method to publish notification
         await redis_client_with_mock.publish_user_notification(
-            user_id, "test_integration", {"data": "success"},
+            user_id,
+            "test_integration",
+            {"data": "success"},
         )
 
         # Verify correct channel was used

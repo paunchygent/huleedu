@@ -97,7 +97,10 @@ class DefaultPipelinePhaseCoordinator:
 
         # Determine and initiate next phase with data propagation
         await self._initiate_next_phase(
-            batch_id, completed_phase, correlation_id, processed_essays_for_next_phase,
+            batch_id,
+            completed_phase,
+            correlation_id,
+            processed_essays_for_next_phase,
         )
 
     async def update_phase_status(
@@ -278,7 +281,8 @@ class DefaultPipelinePhaseCoordinator:
                             "timestamp": datetime.now(UTC).isoformat(),
                         }
                         await self.batch_repo.save_processing_pipeline_state(
-                            batch_id, current_pipeline_state,
+                            batch_id,
+                            current_pipeline_state,
                         )
                 else:  # Dictionary - backwards compatibility
                     updated_pipeline_state = current_pipeline_state.copy()
@@ -286,13 +290,12 @@ class DefaultPipelinePhaseCoordinator:
                         {
                             f"{next_phase_name.value}_status": "FAILED",
                             f"{next_phase_name.value}_error": str(e),
-                            f"{next_phase_name.value}_failed_at": (
-                                datetime.now(UTC).isoformat()
-                            ),
+                            f"{next_phase_name.value}_failed_at": (datetime.now(UTC).isoformat()),
                         },
                     )
                     await self.batch_repo.save_processing_pipeline_state(
-                        batch_id, updated_pipeline_state,
+                        batch_id,
+                        updated_pipeline_state,
                     )
 
                 # TODO: Publish diagnostic event when error event models are available
@@ -305,20 +308,20 @@ class DefaultPipelinePhaseCoordinator:
                     pipeline_detail.status = PipelineExecutionStatus.DISPATCH_INITIATED
                     pipeline_detail.started_at = datetime.now(UTC)
                     await self.batch_repo.save_processing_pipeline_state(
-                        batch_id, current_pipeline_state,
+                        batch_id,
+                        current_pipeline_state,
                     )
             else:  # Dictionary - backwards compatibility
                 updated_pipeline_state = current_pipeline_state.copy()
                 updated_pipeline_state.update(
                     {
                         f"{next_phase_name.value}_status": "DISPATCH_INITIATED",
-                        f"{next_phase_name.value}_initiated_at": (
-                            datetime.now(UTC).isoformat()
-                        ),
+                        f"{next_phase_name.value}_initiated_at": (datetime.now(UTC).isoformat()),
                     },
                 )
                 await self.batch_repo.save_processing_pipeline_state(
-                    batch_id, updated_pipeline_state,
+                    batch_id,
+                    updated_pipeline_state,
                 )
 
             logger.info(
@@ -327,7 +330,8 @@ class DefaultPipelinePhaseCoordinator:
 
         except Exception as e:
             logger.error(
-                f"Error determining/initiating next phase for batch {batch_id}: {e}", exc_info=True,
+                f"Error determining/initiating next phase for batch {batch_id}: {e}",
+                exc_info=True,
             )
             raise
 
@@ -357,10 +361,8 @@ class DefaultPipelinePhaseCoordinator:
             first_phase_name = PhaseName(first_phase_str)
         except ValueError as e:
             raise DataValidationError(
-
-                    f"Invalid first phase '{first_phase_str}' in resolved pipeline "
-                    f"for batch {batch_id}: {e}",
-
+                f"Invalid first phase '{first_phase_str}' in resolved pipeline "
+                f"for batch {batch_id}: {e}",
             )
 
         # Check idempotency - don't re-initiate if already started

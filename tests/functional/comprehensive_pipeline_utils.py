@@ -239,8 +239,10 @@ async def watch_pipeline_progression_with_consumer(
 
                         if message.topic in batch_level_topics:
                             entity_id_from_event = None
-                            if (message.topic == PIPELINE_TOPICS["batch_essays_registered"] or
-                                message.topic == PIPELINE_TOPICS["batch_ready"]):
+                            if (
+                                message.topic == PIPELINE_TOPICS["batch_essays_registered"]
+                                or message.topic == PIPELINE_TOPICS["batch_ready"]
+                            ):
                                 entity_id_from_event = event_data.get("batch_id")
                             elif message.topic == PIPELINE_TOPICS["els_batch_phase_outcome"]:
                                 # For correlation-matched events, we trust the correlation_id match
