@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiokafka import ConsumerRecord
-from common_core.enums import EssayStatus
 
+from common_core.enums import EssayStatus
 from services.spell_checker_service.kafka_consumer import SpellCheckerKafkaConsumer
 from services.spell_checker_service.protocols import (
     ContentClientProtocol,

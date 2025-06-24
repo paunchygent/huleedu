@@ -10,10 +10,9 @@ from __future__ import annotations
 import json
 from unittest.mock import AsyncMock, Mock
 
-from common_core.enums import EssayStatus
-
 import pytest
 
+from common_core.enums import EssayStatus
 from services.batch_conductor_service.kafka_consumer import BCSKafkaConsumer
 
 
