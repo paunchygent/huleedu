@@ -73,8 +73,8 @@ class TestPipelineEdgeCases:
         initial_pipeline_state = {
             "batch_id": batch_id,
             "requested_pipelines": ["spellcheck", "cj_assessment"],
-            "spellcheck_status": "COMPLETED",
-            "cj_assessment_status": "DISPATCH_INITIATED",  # Already initiated
+            "spellcheck_status": "completed",
+            "cj_assessment_status": "dispatch_initiated",  # Already initiated
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -89,7 +89,7 @@ class TestPipelineEdgeCases:
         # Verify pipeline state was updated (spellcheck marked as completed)
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
+        assert updated_state["spellcheck_status"] == "completed_successfully"
 
         # Verify CJ assessment was NOT re-initiated (idempotency)
         mock_cj_initiator.initiate_phase.assert_not_called()
@@ -108,7 +108,7 @@ class TestPipelineEdgeCases:
         initial_pipeline_state = {
             "batch_id": batch_id,
             "requested_pipelines": ["spellcheck"],
-            "spellcheck_status": "IN_PROGRESS",
+            "spellcheck_status": "in_progress",
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -123,7 +123,7 @@ class TestPipelineEdgeCases:
         # Verify pipeline state was still updated
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
+        assert updated_state["spellcheck_status"] == "completed_successfully"
 
         # Verify CJ assessment was not initiated (missing context)
         mock_cj_initiator.initiate_phase.assert_not_called()
@@ -183,7 +183,7 @@ class TestPipelineEdgeCases:
         initial_pipeline_state = {
             "batch_id": batch_id,
             "requested_pipelines": ["spellcheck"],
-            "spellcheck_status": "COMPLETED",
+            "spellcheck_status": "completed",
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -198,7 +198,7 @@ class TestPipelineEdgeCases:
         # Verify pipeline state was updated (spellcheck marked as completed)
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
+        assert updated_state["spellcheck_status"] == "completed_successfully"
 
         # Verify CJ assessment was not initiated (single essay batch)
         mock_cj_initiator.initiate_phase.assert_not_called()
@@ -227,7 +227,7 @@ class TestPipelineEdgeCases:
         initial_pipeline_state = {
             "batch_id": batch_id,
             "requested_pipelines": ["spellcheck"],
-            "spellcheck_status": "COMPLETED",
+            "spellcheck_status": "completed",
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -242,7 +242,7 @@ class TestPipelineEdgeCases:
         # Verify pipeline state was updated (spellcheck marked as completed)
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
+        assert updated_state["spellcheck_status"] == "completed_successfully"
 
         # Verify CJ assessment was not initiated (large batch)
         mock_cj_initiator.initiate_phase.assert_not_called()

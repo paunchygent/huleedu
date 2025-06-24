@@ -76,8 +76,8 @@ class TestPipelineProgressionScenarios:
         initial_pipeline_state = {
             "batch_id": batch_id,
             "requested_pipelines": ["spellcheck", "cj_assessment"],
-            "spellcheck_status": "IN_PROGRESS",
-            "cj_assessment_status": "PENDING",
+            "spellcheck_status": "in_progress",
+            "cj_assessment_status": "pending",
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -92,7 +92,7 @@ class TestPipelineProgressionScenarios:
         # Verify pipeline state was updated
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
+        assert updated_state["spellcheck_status"] == "completed_successfully"
 
         # Verify CJ assessment was initiated (with None processed_essays since
         # no data propagation from spellcheck)
@@ -132,8 +132,8 @@ class TestPipelineProgressionScenarios:
         initial_pipeline_state = {
             "batch_id": batch_id,
             "requested_pipelines": ["spellcheck"],  # CJ assessment disabled, only spellcheck
-            "spellcheck_status": "IN_PROGRESS",
-            "cj_assessment_status": "PENDING",
+            "spellcheck_status": "in_progress",
+            "cj_assessment_status": "pending",
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -148,7 +148,7 @@ class TestPipelineProgressionScenarios:
         # Verify pipeline state was updated
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"
+        assert updated_state["spellcheck_status"] == "completed_successfully"
 
         # Verify CJ assessment was NOT initiated (disabled)
         mock_cj_initiator.initiate_phase.assert_not_called()

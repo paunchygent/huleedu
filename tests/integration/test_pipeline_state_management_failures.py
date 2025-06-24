@@ -73,8 +73,8 @@ class TestPipelineFailureHandling:
         initial_pipeline_state = {
             "batch_id": batch_id,
             "requested_pipelines": ["spellcheck", "cj_assessment"],
-            "spellcheck_status": "IN_PROGRESS",
-            "cj_assessment_status": "PENDING",
+            "spellcheck_status": "in_progress",
+            "cj_assessment_status": "pending",
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -89,7 +89,7 @@ class TestPipelineFailureHandling:
         # Verify pipeline state was updated to reflect failure
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "FAILED"
+        assert updated_state["spellcheck_status"] == "failed"
 
         # Verify CJ assessment was NOT initiated (previous phase failed)
         mock_cj_initiator.initiate_phase.assert_not_called()
@@ -123,8 +123,8 @@ class TestPipelineFailureHandling:
         initial_pipeline_state = {
             "batch_id": batch_id,
             "requested_pipelines": ["spellcheck", "cj_assessment"],
-            "spellcheck_status": "IN_PROGRESS",
-            "cj_assessment_status": "PENDING",
+            "spellcheck_status": "in_progress",
+            "cj_assessment_status": "pending",
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -146,7 +146,7 @@ class TestPipelineFailureHandling:
         # Verify pipeline state was updated to reflect partial completion
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"  # Updated status
+        assert updated_state["spellcheck_status"] == "completed_successfully"  # Updated status
 
         # CRITICAL: Verify CJ assessment WAS initiated (should proceed with successful essays)
         # This is the behavior we want after the fix
@@ -187,8 +187,8 @@ class TestPipelineFailureHandling:
         initial_pipeline_state = {
             "batch_id": batch_id,
             "requested_pipelines": ["spellcheck", "cj_assessment"],
-            "spellcheck_status": "IN_PROGRESS",
-            "cj_assessment_status": "PENDING",
+            "spellcheck_status": "in_progress",
+            "cj_assessment_status": "pending",
         }
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -210,7 +210,7 @@ class TestPipelineFailureHandling:
         # Verify pipeline state was updated to reflect partial completion
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "COMPLETED_SUCCESSFULLY"  # Updated status
+        assert updated_state["spellcheck_status"] == "completed_successfully"  # Updated status
 
         # CRITICAL: Verify CJ assessment WAS initiated (should proceed with successful essays)
         # This is the behavior we want after the fix
