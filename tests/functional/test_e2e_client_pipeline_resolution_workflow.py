@@ -35,6 +35,7 @@ from tests.functional.workflow_monitoring_utils import (
 )
 from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
+from tests.utils.test_auth_manager import AuthTestManager
 
 
 class TestClientPipelineResolutionWorkflow:
@@ -42,8 +43,14 @@ class TestClientPipelineResolutionWorkflow:
 
     @pytest.fixture
     async def service_manager(self) -> ServiceTestManager:
-        """Initialize ServiceTestManager for service management."""
-        return ServiceTestManager()
+        """Initialize ServiceTestManager with authentication for service management."""
+        auth_manager = AuthTestManager()
+        return ServiceTestManager(auth_manager=auth_manager)
+
+    @pytest.fixture
+    async def test_teacher(self, service_manager: ServiceTestManager):
+        """Create authenticated test teacher for pipeline testing."""
+        return service_manager.auth_manager.create_teacher_user("Pipeline Test Teacher")
 
     @pytest.fixture
     async def kafka_manager(self) -> KafkaTestManager:
@@ -81,6 +88,7 @@ class TestClientPipelineResolutionWorkflow:
         service_manager: ServiceTestManager,
         kafka_manager: KafkaTestManager,
         validated_services: dict[str, Any],
+        test_teacher,
     ):
         """
         Test complete client pipeline resolution and execution workflow.
@@ -95,7 +103,9 @@ class TestClientPipelineResolutionWorkflow:
 
         try:
             # 1. Setup: Create batch with real essays
-            batch_id, correlation_id = await create_test_batch_with_essays(service_manager, 3)
+            batch_id, correlation_id = await create_test_batch_with_essays(
+                service_manager, 3, test_teacher=test_teacher
+            )
 
             # 2. Verify batch is ready for client-triggered processing
             print("📊 Verifying batch is ready for client-triggered processing...")
@@ -205,6 +215,7 @@ class TestClientPipelineResolutionWorkflow:
         service_manager: ServiceTestManager,
         kafka_manager: KafkaTestManager,
         validated_services: dict[str, Any],
+        test_teacher,
     ):
         """
         Test BCS intelligent pipeline resolution based on batch state.
@@ -226,7 +237,9 @@ class TestClientPipelineResolutionWorkflow:
             ) as consumer:
                 # Create batch with minimal essays - essays are now stored but
                 # don't auto-trigger pipeline
-                batch_id, correlation_id = await create_test_batch_with_essays(service_manager, 2)
+                batch_id, correlation_id = await create_test_batch_with_essays(
+                    service_manager, 2, test_teacher=test_teacher
+                )
 
                 print(f"📦 Created batch {batch_id} for state-aware testing")
 
@@ -280,6 +293,7 @@ class TestClientPipelineResolutionWorkflow:
         service_manager: ServiceTestManager,
         kafka_manager: KafkaTestManager,
         validated_services: dict[str, Any],
+        test_teacher,
     ):
         """
         Test multiple concurrent client pipeline resolution requests.
@@ -293,7 +307,9 @@ class TestClientPipelineResolutionWorkflow:
 
         try:
             # Create multiple batches for concurrent testing
-            batch_ids, correlation_ids = await create_multiple_test_batches(service_manager, 2, 2)
+            batch_ids, correlation_ids = await create_multiple_test_batches(
+                service_manager, 2, 2, test_teacher=test_teacher
+            )
 
             # Setup monitoring for concurrent requests
             pipeline_topics = get_concurrent_monitoring_topics()

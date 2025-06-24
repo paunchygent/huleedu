@@ -72,6 +72,7 @@ async def register_comprehensive_batch(
     service_manager: ServiceTestManager,
     expected_essay_count: int,
     correlation_id: str | None = None,
+    user = None,
 ) -> str:
     """
     Register a batch specifically for comprehensive pipeline testing.
@@ -83,6 +84,7 @@ async def register_comprehensive_batch(
         service_manager: ServiceTestManager instance
         expected_essay_count: Number of essays to expect
         correlation_id: Original correlation ID to use throughout pipeline
+        user: Authenticated test user
 
     Returns:
         batch_id only (original correlation_id continues to be used for events)
@@ -90,37 +92,17 @@ async def register_comprehensive_batch(
     if correlation_id is None:
         correlation_id = str(uuid.uuid4())
 
-    # For comprehensive pipeline testing, we need to enable CJ assessment
-    # Create the batch request manually to include enable_cj_assessment=True
-    endpoints = await service_manager.get_validated_endpoints()
-    bos_base_url = endpoints["batch_orchestrator_service"]["base_url"]
+    # Use ServiceTestManager's create_batch method for authentication
+    batch_id, _ = await service_manager.create_batch(
+        expected_essay_count=expected_essay_count,
+        course_code="ENG5",
+        user=user,
+        correlation_id=correlation_id,
+        enable_cj_assessment=True,  # Enable CJ assessment for full pipeline
+    )
 
-    batch_request = {
-        "course_code": "ENG5",
-        "expected_essay_count": expected_essay_count,
-        "essay_instructions": "Comprehensive pipeline test with CJ assessment enabled",
-        "user_id": "e2e-test-user-123",
-        "teacher_name": {"first_name": "Test", "last_name": "Teacher"},
-        "enable_cj_assessment": True,  # CRITICAL: Enable CJ assessment for full pipeline
-    }
-
-    import aiohttp
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"{bos_base_url}/v1/batches/register",
-            json=batch_request,
-            headers={"X-Correlation-ID": correlation_id},
-        ) as response:
-            if response.status != 202:
-                error_text = await response.text()
-                raise RuntimeError(f"Batch creation failed: {response.status} - {error_text}")
-
-            result = await response.json()
-            batch_id: str = result["batch_id"]
-
-            logger.info(f"✅ Comprehensive batch registered: {batch_id} (CJ assessment enabled)")
-            return batch_id
+    logger.info(f"✅ Comprehensive batch registered: {batch_id} (CJ assessment enabled)")
+    return batch_id
 
 
 async def upload_real_essays(
@@ -128,6 +110,7 @@ async def upload_real_essays(
     batch_id: str,
     essay_files: list[Path],
     correlation_id: str | None = None,
+    user = None,
 ) -> dict[str, Any]:
     """
     Upload real student essays for comprehensive testing.
@@ -137,6 +120,7 @@ async def upload_real_essays(
         batch_id: Target batch ID
         essay_files: List of essay file paths
         correlation_id: Optional correlation ID
+        user: Authenticated test user
 
     Returns:
         File upload response
@@ -144,12 +128,17 @@ async def upload_real_essays(
     # Convert Path objects to the format expected by ServiceTestManager
     files_data = []
     for essay_file in essay_files:
-        essay_content = essay_file.read_text(encoding="utf-8")
+        essay_content = essay_file.read_bytes()  # Use read_bytes for binary content
         files_data.append(
-            {"name": essay_file.name, "content": essay_content, "content_type": "text/plain"},
+            {"name": essay_file.name, "content": essay_content},
         )
 
-    result = await service_manager.upload_files(batch_id, files_data, correlation_id)
+    result = await service_manager.upload_files(
+        batch_id=batch_id,
+        files=files_data,
+        user=user,
+        correlation_id=correlation_id
+    )
     logger.info(f"🚀 Uploaded {len(files_data)} real essays")
     return result
 

@@ -11,6 +11,7 @@ from prometheus_client import REGISTRY, CollectorRegistry
 
 from services.file_service.config import Settings, settings
 from services.file_service.content_validator import FileContentValidator
+from services.file_service.implementations.batch_state_validator import BOSBatchStateValidator
 from services.file_service.implementations.content_service_client_impl import (
     DefaultContentServiceClient,
 )
@@ -18,6 +19,7 @@ from services.file_service.implementations.event_publisher_impl import DefaultEv
 from services.file_service.implementations.text_extractor_impl import DefaultTextExtractor
 from services.file_service.metrics import METRICS
 from services.file_service.protocols import (
+    BatchStateValidatorProtocol,
     ContentServiceClientProtocol,
     ContentValidatorProtocol,
     EventPublisherProtocol,
@@ -92,3 +94,12 @@ class ServiceImplementationsProvider(Provider):
             min_length=settings.MIN_CONTENT_LENGTH,
             max_length=settings.MAX_CONTENT_LENGTH,
         )
+
+    @provide(scope=Scope.APP)
+    def provide_batch_state_validator(
+        self,
+        http_session: ClientSession,
+        settings: Settings,
+    ) -> BatchStateValidatorProtocol:
+        """Provide batch state validator implementation."""
+        return BOSBatchStateValidator(http_session, settings)

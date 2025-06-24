@@ -7,13 +7,14 @@ The service handles file uploads, text extraction, and event publishing.
 
 from __future__ import annotations
 
-from api.file_routes import file_bp
-from api.health_routes import health_bp
-from config import settings
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.metrics_middleware import setup_file_service_metrics_middleware
 from quart import Quart
-from startup_setup import initialize_services, shutdown_services
+
+from services.file_service.api.file_routes import file_bp
+from services.file_service.api.health_routes import health_bp
+from services.file_service.config import settings
+from services.file_service.startup_setup import initialize_services, shutdown_services
 
 # Configure structured logging for the service
 configure_service_logging("file-service", log_level=settings.LOG_LEVEL)

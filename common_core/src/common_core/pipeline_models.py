@@ -61,8 +61,6 @@ class ProcessingPipelineState(BaseModel):
     spellcheck: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
     nlp_metrics: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
     ai_feedback: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
-    ai_editor_revision: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
-    grammar_check: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
     cj_assessment: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
     last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

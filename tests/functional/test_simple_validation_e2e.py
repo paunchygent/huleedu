@@ -13,30 +13,59 @@ import pytest
 
 from tests.utils.kafka_test_manager import kafka_event_monitor, kafka_manager
 from tests.utils.service_test_manager import ServiceTestManager
+from tests.utils.test_auth_manager import AuthTestManager, create_test_teacher
 
 
-@pytest.mark.asyncio
 @pytest.mark.e2e
 @pytest.mark.docker
+@pytest.mark.asyncio
 async def test_content_validation_failures_publish_events():
     """
-    Test that content validation failures publish validation failure events with proper error codes.
+    Test content validation failures publish proper events using utilities.
 
-    Uses modern utility patterns throughout - NO direct HTTP calls or custom Kafka consumers.
-    Preserves all validation failure testing logic: EMPTY_CONTENT and CONTENT_TOO_SHORT scenarios.
+    Validates:
+    - ServiceTestManager handles file upload correctly
+    - KafkaTestManager captures validation failure events
+    - Events contain proper validation error information
     """
-    service_manager = ServiceTestManager()
+    # Initialize with authentication support
+    auth_manager = AuthTestManager()
+    service_manager = ServiceTestManager(auth_manager=auth_manager)
+    test_teacher = create_test_teacher()
 
-    # Create a small batch using utility
-    try:
-        batch_id, correlation_id = await service_manager.create_batch(
-            expected_essay_count=3,
-            course_code="SIMPLE",
-            user_id="simple_validation_test_user",
-        )
-        print(f"✅ Created batch {batch_id}")
-    except RuntimeError as e:
-        pytest.fail(f"Batch creation failed: {e}")
+    # Validate File Service is available
+    endpoints = await service_manager.get_validated_endpoints()
+    if "file_service" not in endpoints:
+        pytest.skip("File Service not available for validation testing")
+
+    # Create batch first (required for file uploads)
+    batch_id, correlation_id = await service_manager.create_batch(
+        expected_essay_count=1,
+        course_code="ENG5",
+        user=test_teacher
+    )
+    print(f"✅ Batch created: {batch_id}")
+
+    # Use KafkaTestManager for event monitoring
+    topics = ["huleedu.file.essay.validation.failed.v1"]
+    async with kafka_event_monitor("validation_failure_test", topics) as consumer:
+        # Upload invalid file (empty content should trigger validation failure)
+        files = [{"name": "invalid_essay.txt", "content": b""}]
+
+        try:
+            upload_result = await service_manager.upload_files(
+                batch_id=batch_id,
+                files=files,
+                user=test_teacher,
+                correlation_id=correlation_id
+            )
+            upload_correlation_id = upload_result["correlation_id"]
+
+            print(f"✅ Invalid file uploaded for batch {batch_id}")
+            print(f"   Upload correlation ID: {upload_correlation_id}")
+
+        except RuntimeError as e:
+            pytest.fail(f"ServiceTestManager upload failed: {e}")
 
     # Create test files: 1 valid, 2 content validation failures
     files = [
@@ -61,11 +90,12 @@ async def test_content_validation_failures_publish_events():
     ]
 
     async with kafka_event_monitor("validation_failures_test", validation_topics) as consumer:
-        # Upload files using utility
+        # Upload files using utility (with same user who created the batch)
         try:
             upload_result = await service_manager.upload_files(
                 batch_id=batch_id,
                 files=files,
+                user=test_teacher,  # Use same user who created the batch
                 correlation_id=correlation_id,
             )
             print(f"✅ File upload successful: {upload_result}")

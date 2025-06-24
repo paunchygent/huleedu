@@ -20,6 +20,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from tests.utils.kafka_test_manager import KafkaTestManager, create_kafka_test_config
 from tests.utils.service_test_manager import ServiceTestManager
+from tests.utils.test_auth_manager import AuthTestManager
 
 # Configure logging for debugging
 logger = create_service_logger("test.validation_coordination_e2e")
@@ -39,6 +40,8 @@ VALIDATION_TIMEOUTS = {
     "event_wait_timeout": 45,  # 45 seconds for individual events
 }
 
+# Store the user globally for the validation tests
+_validation_test_user = None
 
 async def create_validation_batch(
     course_code: str,
@@ -47,19 +50,27 @@ async def create_validation_batch(
     essay_instructions: str = "Test validation coordination",
 ) -> tuple[str, str]:
     """
-    Create a validation test batch using modern ServiceTestManager with lean registration.
+    Create a validation test batch using modern ServiceTestManager with authentication.
 
     Returns (batch_id, correlation_id).
     """
-    service_manager = ServiceTestManager()
+    global _validation_test_user
+
+    # Initialize with authentication support
+    auth_manager = AuthTestManager()
+    service_manager = ServiceTestManager(auth_manager=auth_manager)
+    test_user = auth_manager.create_test_user(name=user_id, email=f"{user_id}@test.com")
+
+    # Store the user for later use in uploads
+    _validation_test_user = test_user
 
     batch_id, correlation_id = await service_manager.create_batch(
         expected_essay_count=essay_count,
         course_code=course_code,
-        user_id=user_id,
+        user=test_user,
     )
 
-    logger.info(f"Created validation test batch {batch_id} with {essay_count} expected essays")
+    logger.info(f"✅ Created validation batch {batch_id} for {essay_count} essays")
     return batch_id, correlation_id
 
 
@@ -106,15 +117,35 @@ def create_validation_test_files(success_count: int, failure_count: int) -> list
 
 async def upload_validation_files(batch_id: str, files: list[dict[str, Any]]) -> dict[str, Any]:
     """
-    Upload validation test files using modern ServiceTestManager.
+    Upload validation test files using ServiceTestManager with authentication.
 
-    Returns upload result.
+    Args:
+        batch_id: Target batch ID
+        files: List of file dictionaries with 'name' and 'content' keys
+
+    Returns:
+        Upload response
     """
-    service_manager = ServiceTestManager()
+    global _validation_test_user
 
-    result = await service_manager.upload_files(batch_id, files)
+    # Initialize with authentication support
+    auth_manager = AuthTestManager()
+    service_manager = ServiceTestManager(auth_manager=auth_manager)
 
-    logger.info(f"Validation file upload result: {len(files)} files uploaded")
+    # Use the same user that created the batch
+    if _validation_test_user is None:
+        # Fallback to default user if no user was stored
+        test_user = auth_manager.get_default_user()
+    else:
+        test_user = _validation_test_user
+
+    result = await service_manager.upload_files(
+        batch_id=batch_id,
+        files=files,
+        user=test_user,
+    )
+
+    logger.info(f"✅ Uploaded {len(files)} validation test files to batch {batch_id}")
     return result
 
 

@@ -13,6 +13,14 @@ license = {text = "MIT"}
 dependencies = [
     "python-dotenv",
     "pypandoc",
+    "aiohttp",
+    "httpx",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-timeout",
+    "pydantic",
+    "pydantic-settings",
+    "PyJWT",  # For test authentication
 ]
 
 [tool.pdm]

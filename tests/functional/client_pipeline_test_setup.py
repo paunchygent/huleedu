@@ -21,6 +21,7 @@ async def create_test_batch_with_essays(
     service_manager: ServiceTestManager,
     essay_count: int = 3,
     correlation_id: str | None = None,
+    test_teacher = None,
 ) -> tuple[str, str]:
     """
     Create a test batch with real essays for pipeline testing.
@@ -54,11 +55,18 @@ async def create_test_batch_with_essays(
             service_manager,
             expected_essay_count,
             correlation_id,
+            test_teacher,
         )
         print(f"📦 Created test batch: {batch_id}")
 
         # Upload essays to batch
-        await upload_real_essays(service_manager, batch_id, essay_files, correlation_id)
+        await upload_real_essays(
+            service_manager,
+            batch_id,
+            essay_files,
+            correlation_id,
+            test_teacher
+        )
         print(f"📚 Uploaded {expected_essay_count} essays")
 
         print("⏳ Waiting for ELS to process essays (BatchEssaysReady event)...")
@@ -111,6 +119,7 @@ async def create_multiple_test_batches(
     service_manager: ServiceTestManager,
     batch_count: int = 2,
     essays_per_batch: int = 2,
+    test_teacher = None,
 ) -> tuple[list[str], list[str]]:
     """
     Create multiple test batches for concurrent testing.
@@ -132,10 +141,17 @@ async def create_multiple_test_batches(
             service_manager,
             expected_essay_count,
             correlation_id,
+            test_teacher,
         )
         batch_ids.append(batch_id)
 
-        await upload_real_essays(service_manager, batch_id, essay_files, correlation_id)
+        await upload_real_essays(
+            service_manager,
+            batch_id,
+            essay_files,
+            correlation_id,
+            test_teacher
+        )
 
         print(f"📦 Created test batch {i + 1}: {batch_id}")
 

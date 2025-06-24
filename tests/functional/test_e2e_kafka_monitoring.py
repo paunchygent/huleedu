@@ -7,7 +7,6 @@ Tests event-driven architecture after file uploads and service processing.
 Uses modern utility patterns (ServiceTestManager + KafkaTestManager) throughout - NO direct calls.
 """
 
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +14,7 @@ import pytest
 
 from tests.utils.kafka_test_manager import kafka_event_monitor, kafka_manager
 from tests.utils.service_test_manager import ServiceTestManager
+from tests.utils.test_auth_manager import AuthTestManager, create_test_teacher
 
 
 class TestE2EKafkaMonitoring:
@@ -32,7 +32,10 @@ class TestE2EKafkaMonitoring:
         - KafkaTestManager captures EssayContentProvisionedV1 event
         - Event contains correct data structure and correlation ID
         """
-        service_manager = ServiceTestManager()
+        # Initialize with authentication support
+        auth_manager = AuthTestManager()
+        service_manager = ServiceTestManager(auth_manager=auth_manager)
+        test_teacher = create_test_teacher()
 
         # Validate File Service is available using utility
         endpoints = await service_manager.get_validated_endpoints()
@@ -43,7 +46,13 @@ class TestE2EKafkaMonitoring:
         if not test_file_path.exists():
             pytest.skip(f"Test file {test_file_path} not found")
 
-        batch_id = f"e2e-event-test-{uuid.uuid4().hex[:8]}"
+        # Create batch first (required for file uploads)
+        batch_id, correlation_id = await service_manager.create_batch(
+            expected_essay_count=1,
+            course_code="ENG5",
+            user=test_teacher
+        )
+        print(f"✅ Batch created: {batch_id}")
 
         # Use KafkaTestManager context manager for event monitoring
         topics = ["huleedu.file.essay.content.provisioned.v1"]
@@ -53,7 +62,12 @@ class TestE2EKafkaMonitoring:
                 files = [{"name": test_file_path.name, "content": f.read()}]
 
             try:
-                upload_result = await service_manager.upload_files(batch_id, files)
+                upload_result = await service_manager.upload_files(
+                    batch_id=batch_id,
+                    files=files,
+                    user=test_teacher,
+                    correlation_id=correlation_id
+                )
                 upload_correlation_id = upload_result["correlation_id"]
 
                 print(f"✅ File uploaded for batch {batch_id}")
@@ -146,7 +160,10 @@ class TestE2EKafkaMonitoring:
         - KafkaTestManager collects multiple events
         - Each file generates a separate event with correct data
         """
-        service_manager = ServiceTestManager()
+        # Initialize with authentication support
+        auth_manager = AuthTestManager()
+        service_manager = ServiceTestManager(auth_manager=auth_manager)
+        test_teacher = create_test_teacher()
 
         endpoints = await service_manager.get_validated_endpoints()
         if "file_service" not in endpoints:
@@ -157,7 +174,13 @@ class TestE2EKafkaMonitoring:
             if not test_file.exists():
                 pytest.skip(f"Test file {test_file} not found")
 
-        batch_id = f"e2e-multi-event-{uuid.uuid4().hex[:8]}"
+        # Create batch first (required for file uploads)
+        batch_id, correlation_id = await service_manager.create_batch(
+            expected_essay_count=len(test_file_paths),
+            course_code="ENG5",
+            user=test_teacher
+        )
+        print(f"✅ Batch created: {batch_id}")
 
         # Use KafkaTestManager for event monitoring
         topics = ["huleedu.file.essay.content.provisioned.v1"]
@@ -169,7 +192,12 @@ class TestE2EKafkaMonitoring:
                     files.append({"name": test_file.name, "content": f.read()})
 
             try:
-                upload_result = await service_manager.upload_files(batch_id, files)
+                upload_result = await service_manager.upload_files(
+                    batch_id=batch_id,
+                    files=files,
+                    user=test_teacher,
+                    correlation_id=correlation_id
+                )
                 upload_correlation_id = upload_result["correlation_id"]
 
                 print(f"✅ Multi-file upload for batch {batch_id}")

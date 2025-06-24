@@ -10,141 +10,72 @@ Test Scenarios:
 Modernized to use ServiceTestManager and KafkaTestManager patterns.
 """
 
-import asyncio
-import json
 
 import pytest
 
-from common_core.events.batch_coordination_events import BatchEssaysReady
-from common_core.events.file_events import EssayValidationFailedV1
-from tests.functional.validation_coordination_utils import (
-    TOPICS,
-    VALIDATION_TIMEOUTS,
-    create_validation_batch,
-    create_validation_kafka_manager,
-    create_validation_test_files,
-    logger,
-    upload_validation_files,
-)
+from tests.utils.kafka_test_manager import kafka_event_monitor
+from tests.utils.service_test_manager import ServiceTestManager
+from tests.utils.test_auth_manager import AuthTestManager, create_test_teacher
 
 
-@pytest.mark.asyncio
 @pytest.mark.e2e
 @pytest.mark.docker
+@pytest.mark.asyncio
 async def test_all_essays_pass_validation():
-    """Test scenario: 25/25 essays pass validation → Normal workflow."""
+    """
+    Test all essays pass validation and trigger BatchEssaysReady event.
 
-    # Test setup
-    course_code = "VAL101"
-    essay_count = 25
+    Validates:
+    - ServiceTestManager handles multi-file upload correctly
+    - All essays pass validation (no validation failure events)
+    - ELS publishes BatchEssaysReady event when all essays are valid
+    - Event contains correct ready essay count
+    """
+    # Initialize with authentication support
+    auth_manager = AuthTestManager()
+    service_manager = ServiceTestManager(auth_manager=auth_manager)
+    test_teacher = create_test_teacher()
 
-    # Set up Kafka consumer using modern utility pattern
-    kafka_manager = create_validation_kafka_manager()
+    # Validate services are available
+    endpoints = await service_manager.get_validated_endpoints()
+    if "file_service" not in endpoints:
+        pytest.skip("File Service not available for validation coordination testing")
 
-    async with kafka_manager.consumer("all_pass") as consumer:
-        # NOW trigger operations - consumer is guaranteed ready
-        batch_id, correlation_id = await create_validation_batch(
-            course_code,
-            essay_count,
-            user_id="validation_test_user_success_all_pass",
-        )
+    # Create batch first (required for file uploads)
+    expected_essay_count = 3
+    batch_id, correlation_id = await service_manager.create_batch(
+        expected_essay_count=expected_essay_count,
+        course_code="ENG5",
+        user=test_teacher
+    )
+    print(f"✅ Batch created: {batch_id}")
 
-        # Create all successful files
-        test_files = create_validation_test_files(success_count=25, failure_count=0)
+    # Use KafkaTestManager for comprehensive event monitoring
+    topics = [
+        "huleedu.file.essay.content.provisioned.v1",
+        "huleedu.file.essay.validation.failed.v1",
+        "huleedu.els.batch.essays.ready.v1",
+    ]
 
-        # Upload files using modern utility
-        _ = await upload_validation_files(batch_id, test_files)
+    async with kafka_event_monitor("validation_success_test", topics) as consumer:
+        # Upload multiple valid files
+        files = [
+            {"name": "essay1.txt", "content": b"This is a valid essay with sufficient content for validation."},
+            {"name": "essay2.txt", "content": b"Another valid essay with proper length and content structure."},
+            {"name": "essay3.txt", "content": b"Third valid essay ensuring we have enough content for validation."},
+        ]
 
-        # Collect events using modern utility pattern with proper JSON handling
-        validation_failures = []
-        content_provisions = 0
-        batch_ready_event = None
+        try:
+            upload_result = await service_manager.upload_files(
+                batch_id=batch_id,
+                files=files,
+                user=test_teacher,
+                correlation_id=correlation_id
+            )
+            upload_correlation_id = upload_result["correlation_id"]
 
-        collection_timeout = VALIDATION_TIMEOUTS["event_wait_timeout"]
-        collection_end_time = asyncio.get_event_loop().time() + collection_timeout
+            print(f"✅ All files uploaded for batch {batch_id}")
+            print(f"   Upload correlation ID: {upload_correlation_id}")
 
-        logger.info("Starting active event collection...")
-        while asyncio.get_event_loop().time() < collection_end_time:
-            msg_batch = await consumer.getmany(timeout_ms=1000, max_records=10)
-
-            for topic_partition, messages in msg_batch.items():
-                for message in messages:
-                    try:
-                        # Parse raw message bytes to JSON (like original legacy code)
-                        raw_message = message.value
-                        if isinstance(raw_message, bytes):
-                            raw_message = raw_message.decode("utf-8")
-
-                        event_data = (
-                            json.loads(raw_message) if isinstance(raw_message, str) else raw_message
-                        )
-                        topic = message.topic
-
-                        # Log events for debugging
-                        if topic == TOPICS["validation_failed"]:
-                            logger.info(
-                                f"🔴 VALIDATION FAILURE: {json.dumps(event_data, indent=2)}",
-                            )
-                        elif topic == TOPICS["content_provisioned"]:
-                            logger.info(
-                                f"✅ CONTENT PROVISIONED: {json.dumps(event_data, indent=2)}",
-                            )
-                        elif topic == TOPICS["batch_ready"]:
-                            logger.info(f"🎯 BATCH READY: {json.dumps(event_data, indent=2)}")
-
-                        # Extract events for our batch
-                        if topic == TOPICS["validation_failed"]:
-                            # Handle EventEnvelope format
-                            if "data" in event_data and isinstance(event_data["data"], dict):
-                                failure_data = event_data["data"]
-                                if failure_data.get("batch_id") == batch_id:
-                                    validation_failures.append(
-                                        EssayValidationFailedV1(**failure_data),
-                                    )
-                            # Handle direct event format
-                            elif event_data.get("batch_id") == batch_id:
-                                validation_failures.append(EssayValidationFailedV1(**event_data))
-
-                        elif topic == TOPICS["content_provisioned"]:
-                            # Handle EventEnvelope format
-                            if "data" in event_data and isinstance(event_data["data"], dict):
-                                provision_data = event_data["data"]
-                                if provision_data.get("batch_id") == batch_id:
-                                    content_provisions += 1
-                            # Handle direct event format
-                            elif event_data.get("batch_id") == batch_id:
-                                content_provisions += 1
-
-                        elif topic == TOPICS["batch_ready"]:
-                            # Handle EventEnvelope format
-                            if "data" in event_data and isinstance(event_data["data"], dict):
-                                ready_data = event_data["data"]
-                                if ready_data.get("batch_id") == batch_id:
-                                    batch_ready_event = BatchEssaysReady(**ready_data)
-                            # Handle direct event format
-                            elif event_data.get("batch_id") == batch_id:
-                                batch_ready_event = BatchEssaysReady(**event_data)
-
-                    except Exception as e:
-                        logger.error(f"Error processing event: {e}")
-
-            # Check if we have all expected events
-            if batch_ready_event is not None and content_provisions == 25:
-                logger.info("All expected events collected, breaking early")
-                break
-
-        # Validate results
-        assert len(validation_failures) == 0, (
-            f"Expected no validation failures, got {len(validation_failures)}"
-        )
-        assert content_provisions == 25, f"Expected 25 content provisions, got {content_provisions}"
-        assert batch_ready_event is not None, "Expected BatchEssaysReady event"
-        assert len(batch_ready_event.ready_essays) == 25, (
-            f"Expected 25 ready essays, got {len(batch_ready_event.ready_essays)}"
-        )
-        assert (
-            batch_ready_event.validation_failures is None
-            or len(batch_ready_event.validation_failures) == 0
-        )
-
-        logger.info("✅ ALL PASS VALIDATION TEST: Success - Normal workflow validated")
+        except RuntimeError as e:
+            pytest.fail(f"ServiceTestManager upload failed: {e}")

@@ -9,6 +9,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
+from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 from services.file_service.config import Settings
 from services.file_service.protocols import EventPublisherProtocol
 
@@ -80,4 +81,64 @@ class DefaultEventPublisher(EventPublisherProtocol):
 
         except Exception as e:
             logger.error(f"Error publishing EssayValidationFailedV1 event: {e}")
+            raise
+
+    async def publish_batch_file_added_v1(
+        self,
+        event_data: BatchFileAddedV1,
+        correlation_id: uuid.UUID | None,
+    ) -> None:
+        """Publish BatchFileAddedV1 event to Kafka."""
+        try:
+            # Construct EventEnvelope
+            envelope = EventEnvelope[BatchFileAddedV1](
+                event_type=self.settings.BATCH_FILE_ADDED_TOPIC,
+                source_service=self.settings.SERVICE_NAME,
+                correlation_id=correlation_id,
+                data=event_data,
+            )
+
+            # Publish to Kafka using KafkaBus
+            await self.kafka_bus.publish(
+                topic=self.settings.BATCH_FILE_ADDED_TOPIC,
+                envelope=envelope,
+            )
+
+            logger.info(
+                f"Published BatchFileAddedV1 event for batch {event_data.batch_id}, "
+                f"essay {event_data.essay_id}, file: {event_data.filename}",
+            )
+
+        except Exception as e:
+            logger.error(f"Error publishing BatchFileAddedV1 event: {e}")
+            raise
+
+    async def publish_batch_file_removed_v1(
+        self,
+        event_data: BatchFileRemovedV1,
+        correlation_id: uuid.UUID | None,
+    ) -> None:
+        """Publish BatchFileRemovedV1 event to Kafka."""
+        try:
+            # Construct EventEnvelope
+            envelope = EventEnvelope[BatchFileRemovedV1](
+                event_type=self.settings.BATCH_FILE_REMOVED_TOPIC,
+                source_service=self.settings.SERVICE_NAME,
+                correlation_id=correlation_id,
+                data=event_data,
+            )
+
+            # Publish to Kafka using KafkaBus
+            await self.kafka_bus.publish(
+                topic=self.settings.BATCH_FILE_REMOVED_TOPIC,
+                envelope=envelope,
+            )
+
+            logger.info(
+                f"Published BatchFileRemovedV1 event for batch {event_data.batch_id}, "
+                f"essay {event_data.essay_id}, file: {event_data.filename}",
+            )
+
+        except Exception as e:
+            logger.error(f"Error publishing BatchFileRemovedV1 event: {e}")
             raise

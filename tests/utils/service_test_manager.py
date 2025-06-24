@@ -9,16 +9,18 @@ Based on modern testing practices:
 - No hidden fixture magic
 - Clear ownership of test resources
 - Parallel test execution support
+- Integrated test authentication
 """
 
 import asyncio
-from typing import Any, NamedTuple
+from typing import Any, Dict, NamedTuple, Optional
 
 import aiohttp
 import httpx
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core.domain_enums import CourseCode
+from tests.utils.test_auth_manager import AuthTestManager, TestUser
 
 logger = create_service_logger("test.service_manager")
 
@@ -34,9 +36,10 @@ class ServiceEndpoint(NamedTuple):
 
 class ServiceTestManager:
     """
-    Explicit service testing utilities.
+    Explicit service testing utilities with integrated authentication.
 
     Replaces session-scoped fixtures with explicit validation and caching.
+    Includes proper test authentication for all service interactions.
     """
 
     # Service configuration - single source of truth
@@ -50,9 +53,16 @@ class ServiceTestManager:
         ServiceEndpoint("cj_assessment_service", 9095, has_http_api=True, has_metrics=True),
     ]
 
-    def __init__(self):
+    def __init__(self, auth_manager: Optional[AuthTestManager] = None):
+        """
+        Initialize ServiceTestManager with optional authentication.
+        
+        Args:
+            auth_manager: Authentication manager (creates default if None)
+        """
         self._validated_endpoints: dict[str, Any] | None = None
         self._validation_lock = asyncio.Lock()
+        self.auth_manager = auth_manager or AuthTestManager()
 
     async def get_validated_endpoints(self, force_revalidation: bool = False) -> dict[str, Any]:
         """
@@ -138,14 +148,21 @@ class ServiceTestManager:
         self,
         expected_essay_count: int,
         course_code: CourseCode | str = CourseCode.ENG5,
-        user_id: str = "test_user_123",
+        user: Optional[TestUser] = None,
         correlation_id: str | None = None,
+        enable_cj_assessment: bool = False,
     ) -> tuple[str, str]:
         """
         Create a test batch via BOS API using lean registration model.
 
-        Returns (batch_id, correlation_id).
-        Replaces the batch_creation_helper fixture.
+        Args:
+            expected_essay_count: Number of essays expected in batch
+            course_code: Course code for the batch
+            user: Test user (uses default if None)
+            correlation_id: Correlation ID for tracking
+
+        Returns:
+            tuple[str, str]: (batch_id, correlation_id)
         """
         endpoints = await self.get_validated_endpoints()
 
@@ -156,6 +173,9 @@ class ServiceTestManager:
 
         if correlation_id is None:
             correlation_id = str(uuid.uuid4())
+
+        if user is None:
+            user = self.auth_manager.get_default_user()
 
         bos_base_url = endpoints["batch_orchestrator_service"]["base_url"]
 
@@ -176,14 +196,22 @@ class ServiceTestManager:
             "course_code": course_code_enum.value,
             "expected_essay_count": expected_essay_count,
             "essay_instructions": "Test batch created by ServiceTestManager",
-            "user_id": user_id,
+            "user_id": user.user_id,
+            "enable_cj_assessment": enable_cj_assessment,
+        }
+
+        # Get authentication headers
+        auth_headers = self.auth_manager.get_auth_headers(user)
+        headers = {
+            **auth_headers,
+            "X-Correlation-ID": correlation_id,
         }
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{bos_base_url}/v1/batches/register",
                 json=batch_request,
-                headers={"X-Correlation-ID": correlation_id},
+                headers=headers,
             ) as response:
                 if response.status != 202:
                     error_text = await response.text()
@@ -200,17 +228,28 @@ class ServiceTestManager:
         self,
         batch_id: str,
         files: list[dict[str, Any]],
+        user: Optional[TestUser] = None,
         correlation_id: str | None = None,
     ) -> dict[str, Any]:
         """
-                Upload files to File Service batch endpoint.
-        '
-                Replaces the file_upload_helper fixture.
+        Upload files to File Service batch endpoint.
+
+        Args:
+            batch_id: Target batch ID
+            files: List of file dictionaries with 'name' and 'content' keys
+            user: Test user (uses default if None)
+            correlation_id: Correlation ID for tracking
+
+        Returns:
+            dict[str, Any]: Upload response
         """
         endpoints = await self.get_validated_endpoints()
 
         if "file_service" not in endpoints:
             raise RuntimeError("File Service not available for file upload")
+
+        if user is None:
+            user = self.auth_manager.get_default_user()
 
         file_service_base = endpoints["file_service"]["base_url"]
 
@@ -226,7 +265,10 @@ class ServiceTestManager:
                     content_type="text/plain",
                 )
 
-            headers = {}
+            # Get authentication headers
+            auth_headers = self.auth_manager.get_auth_headers(user)
+            headers = auth_headers.copy()
+
             if correlation_id:
                 headers["X-Correlation-ID"] = correlation_id
 
@@ -263,33 +305,37 @@ class ServiceTestManager:
             logger.warning(f"⚠️  {service_name} metrics not accessible: {e}")
             return None
 
-    async def upload_content_directly(self, content: str) -> str:
+    async def upload_content_directly(
+        self,
+        content: str,
+        user: Optional[TestUser] = None
+    ) -> str:
         """
         Upload content directly to Content Service.
 
-        Used for pipeline testing where content needs to be uploaded directly
-        to Content Service (not via File Service batch upload).
-
         Args:
             content: Text content to upload
+            user: Test user (uses default if None)
 
         Returns:
-            storage_id: Content Service storage identifier
-
-        Raises:
-            RuntimeError: If Content Service is not available or upload fails
+            str: Content Service storage identifier
         """
         endpoints = await self.get_validated_endpoints()
 
         if "content_service" not in endpoints:
             raise RuntimeError("Content Service not available for direct content upload")
 
+        if user is None:
+            user = self.auth_manager.get_default_user()
+
         content_service_base = endpoints["content_service"]["base_url"]
+        auth_headers = self.auth_manager.get_auth_headers(user)
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{content_service_base}/v1/content",
                 data=content.encode("utf-8"),
+                headers=auth_headers,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status == 201:
@@ -303,31 +349,36 @@ class ServiceTestManager:
                         f"Content Service upload failed: {response.status} - {error_text}",
                     )
 
-    async def fetch_content_directly(self, storage_id: str) -> str:
+    async def fetch_content_directly(
+        self,
+        storage_id: str,
+        user: Optional[TestUser] = None
+    ) -> str:
         """
         Fetch content directly from Content Service.
 
-        Used for pipeline testing to retrieve processed content from Content Service.
-
         Args:
             storage_id: Content Service storage identifier
+            user: Test user (uses default if None)
 
         Returns:
-            content: Retrieved text content
-
-        Raises:
-            RuntimeError: If Content Service is not available or fetch fails
+            str: Retrieved text content
         """
         endpoints = await self.get_validated_endpoints()
 
         if "content_service" not in endpoints:
             raise RuntimeError("Content Service not available for direct content fetch")
 
+        if user is None:
+            user = self.auth_manager.get_default_user()
+
         content_service_base = endpoints["content_service"]["base_url"]
+        auth_headers = self.auth_manager.get_auth_headers(user)
 
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"{content_service_base}/v1/content/{storage_id}",
+                headers=auth_headers,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status == 200:
@@ -340,6 +391,14 @@ class ServiceTestManager:
                     raise RuntimeError(
                         f"Content Service fetch failed: {response.status} - {error_text}",
                     )
+
+    def create_test_user(self, **kwargs) -> TestUser:
+        """Create a test user via the auth manager."""
+        return self.auth_manager.create_test_user(**kwargs)
+
+    def get_auth_headers(self, user: Optional[TestUser] = None) -> Dict[str, str]:
+        """Get authentication headers for a user."""
+        return self.auth_manager.get_auth_headers(user)
 
 
 # Global instance for convenience (but can be instantiated per test for isolation)
@@ -355,22 +414,25 @@ async def get_validated_service_endpoints(force_revalidation: bool = False) -> d
 async def create_test_batch(
     expected_essay_count: int,
     course_code: CourseCode | str = CourseCode.ENG5,
-    user_id: str = "test_user_123",
+    user: Optional[TestUser] = None,
     correlation_id: str | None = None,
+    enable_cj_assessment: bool = False,
 ) -> tuple[str, str]:
     """Convenience function that uses global service manager."""
     return await service_manager.create_batch(
         expected_essay_count,
         course_code,
-        user_id,
+        user,
         correlation_id,
+        enable_cj_assessment,
     )
 
 
 async def upload_test_files(
     batch_id: str,
     files: list[dict[str, Any]],
+    user: Optional[TestUser] = None,
     correlation_id: str | None = None,
 ) -> dict[str, Any]:
     """Convenience function that uses global service manager."""
-    return await service_manager.upload_files(batch_id, files, correlation_id)
+    return await service_manager.upload_files(batch_id, files, user, correlation_id)

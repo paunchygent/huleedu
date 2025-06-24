@@ -7,6 +7,7 @@ including Kafka settings, Content Service URL, and service ports.
 
 from __future__ import annotations
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from common_core.event_enums import ProcessingEvent, topic_name
@@ -24,6 +25,10 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "file-service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     CONTENT_SERVICE_URL: str = "http://content_service:8001/v1/content"
+    BOS_URL: str = Field(
+        default="http://batch_orchestrator_service:5000",
+        description="Batch Orchestrator Service URL for pipeline state queries"
+    )
     ESSAY_CONTENT_PROVISIONED_TOPIC: str = topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED)
     HTTP_PORT: int = 7001
     PROMETHEUS_PORT: int = 9092
@@ -37,6 +42,10 @@ class Settings(BaseSettings):
 
     # Kafka topic for validation failures (will be implemented with new enum)
     ESSAY_VALIDATION_FAILED_TOPIC: str = "huleedu.file.essay.validation.failed.v1"
+
+    # File management event topics
+    BATCH_FILE_ADDED_TOPIC: str = "huleedu.file.batch.file.added.v1"
+    BATCH_FILE_REMOVED_TOPIC: str = "huleedu.file.batch.file.removed.v1"
 
     model_config = SettingsConfigDict(
         env_file=".env",

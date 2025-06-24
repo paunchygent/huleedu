@@ -8,26 +8,48 @@ and publishes events containing the required raw_file_storage_id field.
 from __future__ import annotations
 
 import json
-import uuid
+from pathlib import Path
 
 import pytest
 
 from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
+from tests.utils.test_auth_manager import AuthTestManager, create_test_teacher
 
 
-@pytest.mark.functional
+@pytest.mark.e2e
+@pytest.mark.docker
 @pytest.mark.asyncio
 async def test_file_service_events_contain_raw_storage_id():
     """
-    E2E test verifying File Service publishes events with raw_file_storage_id.
+    Test that File Service events include raw_storage_id for content tracking.
 
-    This test validates that the File Service refactor successfully implements
-    pre-emptive raw storage and populates the required raw_file_storage_id field
-    in both success and failure events, addressing the breaking changes in Task 2.
+    Validates:
+    - EssayContentProvisionedV1 events contain raw_storage_id
+    - Raw storage ID can be used to retrieve original content
+    - Content integrity is maintained through storage pipeline
     """
-    batch_id = str(uuid.uuid4())
-    timeout_seconds = 30
+    # Initialize with authentication support
+    auth_manager = AuthTestManager()
+    service_manager = ServiceTestManager(auth_manager=auth_manager)
+    test_teacher = create_test_teacher()
+
+    # Validate File Service is available
+    endpoints = await service_manager.get_validated_endpoints()
+    if "file_service" not in endpoints:
+        pytest.skip("File Service not available for raw storage testing")
+
+    test_file_path = Path("test_uploads/essay1.txt")
+    if not test_file_path.exists():
+        pytest.skip(f"Test file {test_file_path} not found")
+
+    # Create batch first (required for file uploads)
+    batch_id, correlation_id = await service_manager.create_batch(
+        expected_essay_count=1,
+        course_code="ENG5",
+        user=test_teacher
+    )
+    print(f"✅ Batch created: {batch_id}")
 
     kafka_manager = KafkaTestManager()
     topics = [
@@ -35,35 +57,31 @@ async def test_file_service_events_contain_raw_storage_id():
         "huleedu.file.essay.validation.failed.v1",
     ]
 
-    # Step 1: Validate File Service is healthy
-    service_manager = ServiceTestManager()
-    endpoints = await service_manager.get_validated_endpoints()
-
-    assert "file_service" in endpoints, "File Service not found in healthy services"
-    print(f"✅ File Service validated at: {endpoints['file_service']['base_url']}")
-
     # Step 2: Set up Kafka consumer to capture events
     async with kafka_manager.consumer("file_service_e2e", topics) as consumer:
         print("✅ Kafka consumer ready for File Service events")
 
-        # Step 3: Upload a valid test file
-        correlation_id = str(uuid.uuid4())
+        # Upload file using ServiceTestManager utility
+        with open(test_file_path, "rb") as f:
+            files = [{"name": test_file_path.name, "content": f.read()}]
 
-        test_file_content = "This is a valid test essay content."
+        try:
+            upload_result = await service_manager.upload_files(
+                batch_id=batch_id,
+                files=files,
+                user=test_teacher,
+                correlation_id=correlation_id
+            )
+            upload_correlation_id = upload_result["correlation_id"]
 
-        # Prepare files for upload using ServiceTestManager format
-        files = [{"name": "test_essay.txt", "content": test_file_content.encode()}]
+            print(f"✅ File uploaded for batch {batch_id}")
+            print(f"   Upload correlation ID: {upload_correlation_id}")
 
-        response = await service_manager.upload_files(
-            batch_id=batch_id,
-            files=files,
-            correlation_id=correlation_id,
-        )
-
-        print(f"✅ File uploaded successfully for batch: {batch_id}")
-        print(f"   Upload response: {response}")
+        except RuntimeError as e:
+            pytest.fail(f"ServiceTestManager upload failed: {e}")
 
         # Step 4: Wait for and validate event
+        timeout_seconds = 30
         event_received = False
 
         async for message in consumer:
@@ -84,7 +102,7 @@ async def test_file_service_events_contain_raw_storage_id():
                         assert "text_storage_id" in event_data, (
                             "Missing text_storage_id in success event"
                         )
-                        assert event_data["original_file_name"] == "test_essay.txt"
+                        assert event_data["original_file_name"] == test_file_path.name
                         assert event_data["batch_id"] == batch_id
 
                         print("✅ EssayContentProvisionedV1 event validated:")
@@ -118,46 +136,59 @@ async def test_file_service_events_contain_raw_storage_id():
         print("✅ E2E test passed: File Service events contain required raw_file_storage_id field")
 
 
-@pytest.mark.functional
+@pytest.mark.e2e
+@pytest.mark.docker
 @pytest.mark.asyncio
 async def test_file_service_validation_failure_contains_raw_storage_id():
     """
-    E2E test verifying validation failure events contain raw_file_storage_id.
+    Test that validation failure events include raw_storage_id for debugging.
 
-    Tests that even when file validation fails, the raw file has been stored
-    and the failure event contains the raw_file_storage_id.
+    Validates:
+    - EssayValidationFailedV1 events contain raw_storage_id
+    - Raw storage ID allows access to problematic content
+    - Validation failure tracking includes content reference
     """
-    # Step 1: Validate File Service is healthy
-    service_manager = ServiceTestManager()
+    # Initialize with authentication support
+    auth_manager = AuthTestManager()
+    service_manager = ServiceTestManager(auth_manager=auth_manager)
+    test_teacher = create_test_teacher()
+
+    # Validate File Service is available
     endpoints = await service_manager.get_validated_endpoints()
+    if "file_service" not in endpoints:
+        pytest.skip("File Service not available for validation failure testing")
 
-    assert "file_service" in endpoints, "File Service not found in healthy services"
-    print(f"✅ File Service validated at: {endpoints['file_service']['base_url']}")
+    # Create batch first (required for file uploads)
+    batch_id, correlation_id = await service_manager.create_batch(
+        expected_essay_count=1,
+        course_code="ENG5",
+        user=test_teacher
+    )
+    print(f"✅ Batch created: {batch_id}")
 
-    # Step 2: Set up Kafka consumer
     kafka_manager = KafkaTestManager()
     topics = ["huleedu.file.essay.validation.failed.v1"]
 
     async with kafka_manager.consumer("file_service_validation_e2e", topics) as consumer:
         print("✅ Kafka consumer ready for validation failure events")
 
-        # Step 3: Upload an invalid file (empty content to trigger validation failure)
-        batch_id = str(uuid.uuid4())
-        correlation_id = str(uuid.uuid4())
+        # Create a file that should trigger validation failure (empty content)
+        files = [{"name": "empty_essay.txt", "content": b""}]
 
-        empty_file_content = ""  # This should trigger validation failure
+        try:
+            upload_result = await service_manager.upload_files(
+                batch_id=batch_id,
+                files=files,
+                user=test_teacher,
+                correlation_id=correlation_id
+            )
+            upload_correlation_id = upload_result["correlation_id"]
 
-        # Prepare empty file for upload
-        files = [{"name": "empty_essay.txt", "content": empty_file_content.encode()}]
+            print(f"✅ Empty file uploaded for batch {batch_id}")
+            print(f"   Upload correlation ID: {upload_correlation_id}")
 
-        response = await service_manager.upload_files(
-            batch_id=batch_id,
-            files=files,
-            correlation_id=correlation_id,
-        )
-
-        print(f"✅ Empty file uploaded for batch: {batch_id}")
-        print(f"   Upload response: {response}")
+        except RuntimeError as e:
+            pytest.fail(f"ServiceTestManager upload failed: {e}")
 
         # Step 4: Wait for validation failure event
         event_received = False

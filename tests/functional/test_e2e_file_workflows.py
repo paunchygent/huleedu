@@ -7,6 +7,7 @@ Consolidated test suite for file upload workflows, combining functionality from:
 - Complete workflow from batch registration to ELS integration
 
 Uses modern utility patterns (ServiceTestManager) throughout - NO direct HTTP calls.
+Updated with proper test authentication to resolve 401 errors.
 """
 
 import uuid
@@ -16,24 +17,28 @@ from typing import Any
 import pytest
 
 from tests.utils.service_test_manager import ServiceTestManager
+from tests.utils.test_auth_manager import AuthTestManager, create_test_teacher
 
 
 class TestE2EFileWorkflows:
-    """Test file upload workflows using modern utility patterns exclusively."""
+    """Test file upload workflows using modern utility patterns with authentication."""
 
     @pytest.mark.e2e
     @pytest.mark.docker
     @pytest.mark.asyncio
     async def test_single_file_upload_workflow(self):
         """
-        Test single file upload through ServiceTestManager utility.
+        Test single file upload through ServiceTestManager utility with authentication.
 
         Validates:
         - File Service is available and healthy
-        - ServiceTestManager.upload_files() works correctly
+        - ServiceTestManager.upload_files() works correctly with auth
         - Returns proper response structure with batch_id and correlation_id
         """
-        service_manager = ServiceTestManager()
+        # Initialize with authentication support
+        auth_manager = AuthTestManager()
+        service_manager = ServiceTestManager(auth_manager=auth_manager)
+        test_teacher = create_test_teacher()
 
         # Validate File Service is available using utility
         endpoints = await service_manager.get_validated_endpoints()
@@ -44,15 +49,27 @@ class TestE2EFileWorkflows:
         if not test_file_path.exists():
             pytest.skip(f"Test file {test_file_path} not found")
 
-        batch_id = f"e2e-test-{uuid.uuid4().hex[:8]}"
+        # Create batch first with authenticated user
+        try:
+            batch_id, correlation_id = await service_manager.create_batch(
+                expected_essay_count=1,
+                user=test_teacher
+            )
+        except RuntimeError as e:
+            pytest.skip(f"Batch creation failed: {e}")
 
         # Prepare file data for ServiceTestManager
         with open(test_file_path, "rb") as f:
             files = [{"name": test_file_path.name, "content": f.read()}]
 
-        # Upload using ServiceTestManager utility (not direct HTTP)
+        # Upload using ServiceTestManager utility with authentication
         try:
-            result = await service_manager.upload_files(batch_id, files)
+            result = await service_manager.upload_files(
+                batch_id=batch_id,
+                files=files,
+                user=test_teacher,  # Same user for ownership
+                correlation_id=correlation_id
+            )
 
             # Validate response structure
             required_fields = ["message", "batch_id", "correlation_id"]
@@ -68,6 +85,7 @@ class TestE2EFileWorkflows:
                 pytest.fail(f"Invalid correlation_id format: {result['correlation_id']}")
 
             print(f"✅ File upload successful for batch {batch_id}")
+            print(f"   User: {test_teacher.user_id}")
             print(f"   Correlation ID: {result['correlation_id']}")
 
         except RuntimeError as e:
@@ -78,13 +96,15 @@ class TestE2EFileWorkflows:
     @pytest.mark.asyncio
     async def test_multiple_files_batch_upload(self):
         """
-        Test uploading multiple files using ServiceTestManager utility.
+        Test uploading multiple files using ServiceTestManager utility with authentication.
 
         Validates:
-        - ServiceTestManager handles multiple files correctly
+        - ServiceTestManager handles multiple files correctly with auth
         - Response indicates correct number of files processed
         """
-        service_manager = ServiceTestManager()
+        auth_manager = AuthTestManager()
+        service_manager = ServiceTestManager(auth_manager=auth_manager)
+        test_teacher = create_test_teacher()
 
         endpoints = await service_manager.get_validated_endpoints()
         if "file_service" not in endpoints:
@@ -95,7 +115,14 @@ class TestE2EFileWorkflows:
             if not test_file.exists():
                 pytest.skip(f"Test file {test_file} not found")
 
-        batch_id = f"e2e-multi-test-{uuid.uuid4().hex[:8]}"
+        # Create batch first with authenticated user
+        try:
+            batch_id, correlation_id = await service_manager.create_batch(
+                expected_essay_count=len(test_file_paths),
+                user=test_teacher
+            )
+        except RuntimeError as e:
+            pytest.skip(f"Batch creation failed: {e}")
 
         # Prepare multiple files for ServiceTestManager
         files: list[dict[str, Any]] = []
@@ -103,14 +130,20 @@ class TestE2EFileWorkflows:
             with open(test_file, "rb") as f:
                 files.append({"name": test_file.name, "content": f.read()})
 
-        # Upload using ServiceTestManager utility
+        # Upload using ServiceTestManager utility with authentication
         try:
-            result = await service_manager.upload_files(batch_id, files)
+            result = await service_manager.upload_files(
+                batch_id=batch_id,
+                files=files,
+                user=test_teacher,
+                correlation_id=correlation_id
+            )
 
             assert result["batch_id"] == batch_id
             assert str(len(test_file_paths)) in result["message"]
 
             print(f"✅ Multi-file upload successful for batch {batch_id}")
+            print(f"   User: {test_teacher.user_id}")
             print(f"   Files uploaded: {len(test_file_paths)}")
 
         except RuntimeError as e:
@@ -121,13 +154,13 @@ class TestE2EFileWorkflows:
     @pytest.mark.asyncio
     async def test_file_upload_validation_errors(self):
         """
-        Test ServiceTestManager error handling for invalid requests.
+        Test ServiceTestManager error handling for invalid requests with authentication.
 
         Validates:
         - ServiceTestManager properly raises RuntimeError for service failures
         - Error messages are descriptive and can be caught appropriately
         """
-        service_manager = ServiceTestManager()
+        service_manager = ServiceTestManager()  # Uses default auth
 
         endpoints = await service_manager.get_validated_endpoints()
         if "file_service" not in endpoints:
@@ -139,7 +172,12 @@ class TestE2EFileWorkflows:
 
         # Test 1: Empty files list should be handled gracefully
         empty_files: list[dict[str, Any]] = []
-        batch_id = f"test-empty-{uuid.uuid4().hex[:8]}"
+
+        # Create a valid batch first
+        try:
+            batch_id, _ = await service_manager.create_batch(expected_essay_count=1)
+        except RuntimeError as e:
+            pytest.skip(f"Batch creation failed: {e}")
 
         try:
             await service_manager.upload_files(batch_id, empty_files)
@@ -165,14 +203,16 @@ class TestE2EFileWorkflows:
     @pytest.mark.asyncio
     async def test_complete_workflow_batch_to_els(self):
         """
-        Test complete workflow from batch creation through file upload using utilities.
+        Test complete workflow from batch creation through file upload using utilities with authentication.
 
         Validates:
-        - ServiceTestManager.create_batch() creates batch successfully
-        - ServiceTestManager.upload_files() uploads to created batch
+        - ServiceTestManager.create_batch() creates batch successfully with auth
+        - ServiceTestManager.upload_files() uploads to created batch with same user
         - Correlation IDs are properly maintained across operations
         """
-        service_manager = ServiceTestManager()
+        auth_manager = AuthTestManager()
+        service_manager = ServiceTestManager(auth_manager=auth_manager)
+        test_teacher = auth_manager.create_teacher_user("E2E Complete Workflow")
 
         # Validate required services using utility
         endpoints = await service_manager.get_validated_endpoints()
@@ -185,26 +225,32 @@ class TestE2EFileWorkflows:
         if not test_file_path.exists():
             pytest.skip(f"Test file {test_file_path} not found")
 
-        # Step 1: Create batch using ServiceTestManager utility
+        # Step 1: Create batch using ServiceTestManager utility with authentication
         try:
             batch_id, correlation_id = await service_manager.create_batch(
                 expected_essay_count=1,
-                course_code="E2E",
-                user_id="e2e_complete_workflow_user",
+                course_code="ENG5",
+                user=test_teacher,
             )
 
             print(f"✅ Batch created: {batch_id}")
+            print(f"   Teacher: {test_teacher.user_id}")
             print(f"   Correlation ID: {correlation_id}")
 
         except RuntimeError as e:
             pytest.fail(f"Batch creation failed: {e}")
 
-        # Step 2: Upload files to created batch using ServiceTestManager utility
+        # Step 2: Upload files to created batch using ServiceTestManager utility with same user
         with open(test_file_path, "rb") as f:
             files = [{"name": test_file_path.name, "content": f.read()}]
 
         try:
-            upload_result = await service_manager.upload_files(batch_id, files, correlation_id)
+            upload_result = await service_manager.upload_files(
+                batch_id=batch_id,
+                files=files,
+                user=test_teacher,  # Same user for ownership
+                correlation_id=correlation_id
+            )
 
             # Validate workflow integration
             assert upload_result["batch_id"] == batch_id
@@ -213,8 +259,9 @@ class TestE2EFileWorkflows:
             upload_correlation_id = upload_result["correlation_id"]
             assert upload_correlation_id  # Should have a correlation ID
 
-            print("✅ Complete workflow successful")
+            print("✅ Complete authenticated workflow successful")
             print(f"   Batch: {batch_id}")
+            print(f"   Teacher: {test_teacher.user_id}")
             print(f"   Upload correlation: {upload_correlation_id}")
 
         except RuntimeError as e:

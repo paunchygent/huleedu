@@ -27,6 +27,7 @@ from tests.functional.comprehensive_pipeline_utils import (
     watch_pipeline_progression_with_consumer,
 )
 from tests.utils.service_test_manager import ServiceTestManager
+from tests.utils.test_auth_manager import AuthTestManager
 
 
 @pytest.mark.e2e
@@ -49,8 +50,12 @@ async def test_comprehensive_real_batch_pipeline():
     # Validate real test essays are available
     test_essays = await load_real_test_essays(max_essays=25)
 
-    # Step 1: Validate all services are healthy using modern utility
-    service_manager = ServiceTestManager()
+    # Step 1: Initialize authentication and service manager
+    auth_manager = AuthTestManager()
+    service_manager = ServiceTestManager(auth_manager=auth_manager)
+    test_teacher = auth_manager.create_teacher_user("Comprehensive Test Teacher")
+
+    # Validate all services are healthy using modern utility
     endpoints = await service_manager.get_validated_endpoints()
     assert len(endpoints) >= 4, f"Expected at least 4 services, got {len(endpoints)}"
     print(f"✅ {len(endpoints)} services validated healthy")
@@ -81,6 +86,7 @@ async def test_comprehensive_real_batch_pipeline():
             service_manager,
             len(test_essays),
             test_correlation_id,
+            test_teacher,  # Pass authenticated user
         )
         print(f"✅ Batch registered with BOS: {batch_id}")
 
@@ -91,6 +97,7 @@ async def test_comprehensive_real_batch_pipeline():
             batch_id,
             test_essays,
             test_correlation_id,
+            test_teacher,  # Pass authenticated user
         )
         print(f"✅ File upload successful: {upload_response}")
 
