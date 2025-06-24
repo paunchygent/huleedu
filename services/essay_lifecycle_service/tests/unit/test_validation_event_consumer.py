@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
-from common_core.enums import FileValidationErrorCode
+from common_core.error_enums import FileValidationErrorCode
 from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayValidationFailedV1
 

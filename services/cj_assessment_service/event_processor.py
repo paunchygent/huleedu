@@ -8,7 +8,7 @@ from uuid import UUID
 from aiokafka import ConsumerRecord
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core.enums import BatchStatus, ProcessingEvent, ProcessingStage
+from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import (
     CJAssessmentCompletedV1,
     CJAssessmentFailedV1,
@@ -16,6 +16,7 @@ from common_core.events.cj_assessment_events import (
 )
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
+from common_core.status_enums import BatchStatus, ProcessingStage
 from services.cj_assessment_service.cj_core_logic import run_cj_assessment_workflow
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics

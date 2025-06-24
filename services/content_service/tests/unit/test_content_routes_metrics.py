@@ -5,15 +5,18 @@ from __future__ import annotations
 import pytest
 from quart import Quart
 
+from common_core.observability_enums import OperationType
+from common_core.status_enums import OperationStatus
+
 
 class MockContentMetrics:
     """Mock implementation of ContentMetricsProtocol for testing."""
 
     def __init__(self) -> None:
         """Initialize the mock metrics."""
-        self.operations: list[tuple[str, str]] = []
+        self.operations: list[tuple[OperationType, OperationStatus]] = []
 
-    def record_operation(self, operation: str, status: str) -> None:
+    def record_operation(self, operation: OperationType, status: OperationStatus) -> None:
         """Record an operation for testing verification."""
         self.operations.append((operation, status))
 
@@ -91,10 +94,10 @@ class TestContentRoutesMetricsIntegration:
 
         # Simulate successful upload
         await mock_store.save_content(content_data)
-        mock_metrics.record_operation("upload", "success")
+        mock_metrics.record_operation(OperationType.UPLOAD, OperationStatus.SUCCESS)
 
         # Verify metrics were recorded
-        assert ("upload", "success") in mock_metrics.operations
+        assert (OperationType.UPLOAD, OperationStatus.SUCCESS) in mock_metrics.operations
         assert len(mock_metrics.operations) == 1
 
     @pytest.mark.asyncio
@@ -108,10 +111,10 @@ class TestContentRoutesMetricsIntegration:
         try:
             await mock_store.save_content(b"")  # Empty content should fail
         except ValueError:
-            mock_metrics.record_operation("upload", "failed")
+            mock_metrics.record_operation(OperationType.UPLOAD, OperationStatus.FAILED)
 
         # Verify error metrics were recorded
-        assert ("upload", "failed") in mock_metrics.operations
+        assert (OperationType.UPLOAD, OperationStatus.FAILED) in mock_metrics.operations
 
     @pytest.mark.asyncio
     async def test_download_success_records_metric(
@@ -126,10 +129,10 @@ class TestContentRoutesMetricsIntegration:
         # Simulate successful download
         assert await mock_store.content_exists(content_id)
         await mock_store.get_content_path(content_id)
-        mock_metrics.record_operation("download", "success")
+        mock_metrics.record_operation(OperationType.DOWNLOAD, OperationStatus.SUCCESS)
 
         # Verify metrics were recorded
-        assert ("download", "success") in mock_metrics.operations
+        assert (OperationType.DOWNLOAD, OperationStatus.SUCCESS) in mock_metrics.operations
 
     @pytest.mark.asyncio
     async def test_download_not_found_records_metric(
@@ -142,10 +145,10 @@ class TestContentRoutesMetricsIntegration:
         content_id = "non-existent-id"
 
         if not await mock_store.content_exists(content_id):
-            mock_metrics.record_operation("download", "not_found")
+            mock_metrics.record_operation(OperationType.DOWNLOAD, OperationStatus.NOT_FOUND)
 
         # Verify metrics were recorded
-        assert ("download", "not_found") in mock_metrics.operations
+        assert (OperationType.DOWNLOAD, OperationStatus.NOT_FOUND) in mock_metrics.operations
 
     def test_metrics_protocol_integration(self) -> None:
         """Test that mock metrics follows the protocol interface."""
@@ -156,8 +159,8 @@ class TestContentRoutesMetricsIntegration:
         assert callable(mock_metrics.record_operation)
 
         # Test the interface
-        mock_metrics.record_operation("upload", "success")
-        assert mock_metrics.operations == [("upload", "success")]
+        mock_metrics.record_operation(OperationType.UPLOAD, OperationStatus.SUCCESS)
+        assert mock_metrics.operations == [(OperationType.UPLOAD, OperationStatus.SUCCESS)]
 
     def test_content_store_protocol_integration(self) -> None:
         """Test that mock store follows the protocol interface."""
@@ -185,7 +188,7 @@ class TestMetricsErrorHandling:
         class FailingMetrics:
             """Metrics implementation that raises exceptions."""
 
-            def record_operation(self, operation: str, status: str) -> None:
+            def record_operation(self, operation: OperationType, status: OperationStatus) -> None:
                 """Always raise an exception."""
                 raise RuntimeError("Metrics system failure")
 
@@ -194,7 +197,7 @@ class TestMetricsErrorHandling:
         # In the actual implementation, metrics errors should be caught
         # and logged but not propagate to break the route response
         try:
-            failing_metrics.record_operation("upload", "success")
+            failing_metrics.record_operation(OperationType.UPLOAD, OperationStatus.SUCCESS)
             assert False, "Should have raised an exception"
         except RuntimeError:
             # This demonstrates why the implementation needs error handling
@@ -206,12 +209,12 @@ class TestMetricsErrorHandling:
 
         # Test various edge cases that routes might encounter
         test_cases = [
-            ("upload", "success"),
-            ("download", "success"),
-            ("upload", "failed"),
-            ("download", "not_found"),
-            ("download", "error"),
-            ("upload", "error"),
+            (OperationType.UPLOAD, OperationStatus.SUCCESS),
+            (OperationType.DOWNLOAD, OperationStatus.SUCCESS),
+            (OperationType.UPLOAD, OperationStatus.FAILED),
+            (OperationType.DOWNLOAD, OperationStatus.NOT_FOUND),
+            (OperationType.DOWNLOAD, OperationStatus.ERROR),
+            (OperationType.UPLOAD, OperationStatus.ERROR),
         ]
 
         for operation, status in test_cases:

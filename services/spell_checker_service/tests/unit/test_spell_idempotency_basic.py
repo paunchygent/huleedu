@@ -14,7 +14,7 @@ import pytest
 from aiokafka import ConsumerRecord
 from huleedu_service_libs.idempotency import idempotent_consumer
 
-from common_core.enums import EssayStatus
+from common_core.status_enums import EssayStatus
 from services.spell_checker_service.event_processor import process_single_message
 from services.spell_checker_service.protocols import SpellLogicProtocol
 

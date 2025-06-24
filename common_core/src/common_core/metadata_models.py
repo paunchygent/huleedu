@@ -7,10 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .enums import (  # Assuming enums.py is in the same directory
-    ContentType,
-    ProcessingStage,
-)
+from .domain_enums import ContentType
+from .status_enums import ProcessingStage
 
 __all__ = [
     "EntityReference",

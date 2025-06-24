@@ -9,10 +9,12 @@ from __future__ import annotations
 from uuid import uuid4
 
 from common_core.batch_service_models import BatchServiceCJAssessmentInitiateCommandDataV1
-from common_core.enums import BatchStatus, CourseCode, ProcessingEvent
+from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
+from common_core.status_enums import BatchStatus
 
 
 class TestELSBatchPhaseOutcomeContract:

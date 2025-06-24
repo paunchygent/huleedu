@@ -18,7 +18,8 @@ from implementations.nlp_initiator_impl import NLPInitiatorImpl
 from protocols import BatchEventPublisherProtocol, DataValidationError
 
 from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
-from common_core.enums import CourseCode, ProcessingEvent, topic_name
+from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName

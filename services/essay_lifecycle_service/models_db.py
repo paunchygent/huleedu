@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from common_core.enums import EssayStatus
+from common_core.status_enums import EssayStatus
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, text
 from sqlalchemy.dialects.postgresql import ENUM as SQLAlchemyEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column

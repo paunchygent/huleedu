@@ -11,6 +11,8 @@ from typing import Any
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import REGISTRY, Counter, Histogram
 
+from common_core.observability_enums import MetricName
+
 logger = create_service_logger("cj_assessment_service.metrics")
 
 # Global metrics instances (created once, shared by HTTP and worker)
@@ -56,7 +58,7 @@ def _create_metrics() -> dict[str, Any]:
                 ["method", "endpoint"],
                 registry=REGISTRY,
             ),
-            # CJ Assessment business metrics
+            # CJ Assessment business metrics using standardized names
             "cj_assessment_operations": Counter(
                 "cj_assessment_operations_total",
                 "Total CJ assessment operations",
@@ -69,8 +71,8 @@ def _create_metrics() -> dict[str, Any]:
                 ["provider", "model", "status"],
                 registry=REGISTRY,
             ),
-            # Business intelligence metrics (for future worker usage)
-            "cj_comparisons_made": Histogram(
+            # Business intelligence metrics using MetricName enum
+            MetricName.PIPELINE_EXECUTION_TIME.value: Histogram(
                 "huleedu_cj_comparisons_made",
                 "Distribution of comparisons made per CJ assessment batch",
                 buckets=(0, 10, 25, 50, 100, 200, 500, 1000),
@@ -85,6 +87,13 @@ def _create_metrics() -> dict[str, Any]:
             "kafka_queue_latency_seconds": Histogram(
                 "kafka_message_queue_latency_seconds",
                 "Latency between event timestamp and processing start",
+                registry=REGISTRY,
+            ),
+            # Cache operation metrics using OperationType enum
+            "cache_operations": Counter(
+                "cache_operations_total",
+                "Total cache operations",
+                ["operation", "result"],
                 registry=REGISTRY,
             ),
         }
@@ -117,9 +126,10 @@ def _get_existing_metrics() -> dict[str, Any]:
         "request_duration": "http_request_duration_seconds",
         "cj_assessment_operations": "cj_assessment_operations_total",
         "llm_api_calls": "llm_api_calls_total",
-        "cj_comparisons_made": "huleedu_cj_comparisons_made",
+        MetricName.PIPELINE_EXECUTION_TIME.value: "huleedu_cj_comparisons_made",
         "cj_assessment_duration_seconds": "huleedu_cj_assessment_duration_seconds",
         "kafka_queue_latency_seconds": "kafka_message_queue_latency_seconds",
+        "cache_operations": "cache_operations_total",
     }
 
     existing: dict[str, Any] = {}
@@ -148,10 +158,13 @@ def get_business_metrics() -> dict[str, Any]:
     """
     all_metrics = get_metrics()
     return {
-        "cj_comparisons_made": all_metrics.get("cj_comparisons_made"),
+        MetricName.PIPELINE_EXECUTION_TIME.value: all_metrics.get(
+            MetricName.PIPELINE_EXECUTION_TIME.value
+        ),
         "cj_assessment_duration_seconds": all_metrics.get("cj_assessment_duration_seconds"),
         "kafka_queue_latency_seconds": all_metrics.get("kafka_queue_latency_seconds"),
         "llm_api_calls": all_metrics.get("llm_api_calls"),
+        "cache_operations": all_metrics.get("cache_operations"),
     }
 
 
@@ -167,4 +180,5 @@ def get_http_metrics() -> dict[str, Any]:
         "request_duration": all_metrics.get("request_duration"),
         "cj_assessment_operations": all_metrics.get("cj_assessment_operations"),
         "llm_api_calls": all_metrics.get("llm_api_calls"),
+        "cache_operations": all_metrics.get("cache_operations"),
     }

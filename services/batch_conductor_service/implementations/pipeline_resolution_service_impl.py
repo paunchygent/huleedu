@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from common_core.events.envelope import EventEnvelope
+from common_core.status_enums import OperationStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from services.batch_conductor_service.api_models import (
     BCSPipelineDefinitionRequestV1,
@@ -232,7 +233,9 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
             counter = self._metrics["pipeline_resolutions_total"]
             # Safely handle the counter metric
             if hasattr(counter, "labels") and hasattr(counter, "inc"):
-                counter.labels(requested_pipeline=requested_pipeline, outcome="success").inc()
+                counter.labels(
+                    requested_pipeline=requested_pipeline, outcome=OperationStatus.SUCCESS.value
+                ).inc()
 
     async def _track_failure_metrics(self, requested_pipeline: str, failure_reason: str) -> None:
         """Track failed pipeline resolution in Prometheus metrics."""

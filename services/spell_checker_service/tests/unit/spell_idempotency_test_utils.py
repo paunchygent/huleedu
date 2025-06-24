@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 import pytest
 from aiokafka import ConsumerRecord
 
-from common_core.enums import EssayStatus
+from common_core.status_enums import EssayStatus
 from services.spell_checker_service.protocols import (
     ContentClientProtocol,
     ResultStoreProtocol,

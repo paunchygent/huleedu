@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -184,7 +185,6 @@ class TestPipelineResolutionAPI:
         # Assert
         assert response.status_code == 500
         assert data == {"error": "Internal server error"}
-        
 
     async def test_pipeline_resolution_invalid_method(self, app_client: QuartTestClient) -> None:
         """Test that only POST method is allowed."""

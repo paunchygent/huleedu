@@ -7,7 +7,7 @@ test modules to avoid duplication and maintain consistency.
 
 from __future__ import annotations
 
-from common_core.enums import EssayStatus
+from common_core.status_enums import EssayStatus
 
 from essay_state_machine import (
     CMD_INITIATE_AI_FEEDBACK,

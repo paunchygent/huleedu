@@ -18,7 +18,7 @@ from implementations.client_pipeline_request_handler import ClientPipelineReques
 from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
 from metrics import get_kafka_consumer_metrics
 
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent, topic_name
 
 logger = create_service_logger("bos.kafka.consumer")
 

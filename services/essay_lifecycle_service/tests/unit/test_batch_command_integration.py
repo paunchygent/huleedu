@@ -14,7 +14,7 @@ from common_core.batch_service_models import (
     BatchServiceSpellcheckInitiateCommandDataV1,
     EssayProcessingInputRefV1,
 )
-from common_core.enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent
 from common_core.metadata_models import EntityReference
 
 from services.essay_lifecycle_service.implementations.batch_command_handler_impl import (

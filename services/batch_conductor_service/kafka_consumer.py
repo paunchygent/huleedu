@@ -14,10 +14,11 @@ import json
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
 
-from common_core.enums import EssayStatus, ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
+from common_core.status_enums import EssayStatus, OperationStatus
 from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
@@ -164,7 +165,7 @@ class BCSKafkaConsumer:
         """Track successful event processing in metrics."""
         if self._metrics and "events_processed_total" in self._metrics:
             self._metrics["events_processed_total"].labels(
-                event_type=event_type, outcome="success"
+                event_type=event_type, outcome=OperationStatus.SUCCESS.value
             ).inc()
 
     async def _track_event_failure(self, event_type: str, failure_reason: str) -> None:

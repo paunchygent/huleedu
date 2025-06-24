@@ -18,9 +18,10 @@ from pydantic import ValidationError
 from quart import Blueprint, Response, current_app, jsonify, request
 from quart_dishka import inject
 
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.pipeline_models import PhaseName
+from common_core.status_enums import OperationStatus, ProcessingStatus
 
 logger = create_service_logger("bos.api.batch")
 batch_bp = Blueprint("batch_routes", __name__, url_prefix="/v1/batches")
@@ -66,7 +67,7 @@ async def register_batch(
             for pipeline in pipelines:
                 pipeline_execution_metric.labels(
                     pipeline_type=pipeline,
-                    outcome="requested",
+                    outcome=ProcessingStatus.PENDING.value,
                     batch_id=str(batch_id),
                 ).inc()
 
@@ -85,7 +86,7 @@ async def register_batch(
         if pipeline_execution_metric:
             pipeline_execution_metric.labels(
                 pipeline_type="unknown",
-                outcome="validation_error",
+                outcome=OperationStatus.FAILED.value,
                 batch_id="unknown",
             ).inc()
         return jsonify({"error": "Validation Error", "details": ve.errors()}), 400
@@ -97,7 +98,7 @@ async def register_batch(
         if pipeline_execution_metric:
             pipeline_execution_metric.labels(
                 pipeline_type="unknown",
-                outcome="error",
+                outcome=OperationStatus.FAILED.value,
                 batch_id="unknown",
             ).inc()
         return jsonify({"error": "Failed to register batch."}), 500

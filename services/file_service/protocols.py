@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Protocol
 
-from common_core.enums import ContentType
+from common_core.domain_enums import ContentType
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from services.file_service.validation_models import ValidationResult
 

@@ -8,7 +8,7 @@ state transitions driven by triggers corresponding to BOS commands and service r
 
 from __future__ import annotations
 
-from common_core.enums import EssayStatus
+from common_core.status_enums import EssayStatus
 from transitions import Machine
 
 # Define all trigger constants for clear interface

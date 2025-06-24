@@ -8,6 +8,9 @@ from api_models import BatchRegistrationRequestV1
 from huleedu_service_libs.logging_utils import create_service_logger
 from protocols import BatchRepositoryProtocol
 
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from common_core.status_enums import BatchStatus
+
 
 class MockBatchRepositoryImpl(BatchRepositoryProtocol):
     """Mock implementation of BatchRepositoryProtocol for Phase 1.2.
@@ -42,7 +45,7 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         # Note: In production batch_data would be a BatchUpload model
         return {"id": "mock-batch-id", **batch_data}
 
-    async def update_batch_status(self, batch_id: str, new_status: str) -> bool:
+    async def update_batch_status(self, batch_id: str, new_status: BatchStatus) -> bool:
         """Mock implementation - always succeeds."""
         return True
 
@@ -72,9 +75,9 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
     async def update_phase_status_atomically(
         self,
         batch_id: str,
-        phase_name: str,
-        expected_status: str,
-        new_status: str,
+        phase_name: PhaseName,
+        expected_status: PipelineExecutionStatus,
+        new_status: PipelineExecutionStatus,
         completion_timestamp: str | None = None,
     ) -> bool:
         """
@@ -84,15 +87,15 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         """
         async with self._get_lock(batch_id):
             current_state = self.pipeline_states.get(batch_id, {})
-            current_status = current_state.get(f"{phase_name}_status")
+            current_status = current_state.get(f"{phase_name.value}_status")
 
             # Simulate atomic compare-and-set operation
-            if current_status == expected_status:
+            if current_status == expected_status.value:
                 # Update status atomically
                 updated_state = current_state.copy()
-                updated_state[f"{phase_name}_status"] = new_status
+                updated_state[f"{phase_name.value}_status"] = new_status.value
                 if completion_timestamp:
-                    updated_state[f"{phase_name}_completed_at"] = completion_timestamp
+                    updated_state[f"{phase_name.value}_completed_at"] = completion_timestamp
 
                 self.pipeline_states[batch_id] = updated_state
                 return True

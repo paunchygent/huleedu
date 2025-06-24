@@ -5,7 +5,7 @@ from __future__ import annotations
 from aiohttp import ClientSession
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core.enums import ContentType
+from common_core.domain_enums import ContentType
 from services.file_service.config import Settings
 from services.file_service.protocols import ContentServiceClientProtocol
 

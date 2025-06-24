@@ -12,8 +12,9 @@ from datetime import datetime
 from typing import Any
 
 import pytest
-from common_core.enums import ContentType, EssayStatus
+from common_core.domain_enums import ContentType
 from common_core.metadata_models import EntityReference
+from common_core.status_enums import EssayStatus
 from testcontainers.postgres import PostgresContainer
 
 from services.essay_lifecycle_service.config import Settings

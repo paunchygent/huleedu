@@ -6,13 +6,15 @@ from datetime import UTC, datetime
 
 import aiohttp
 
-from common_core.enums import ContentType, EssayStatus, ProcessingEvent, ProcessingStage
+from common_core.domain_enums import ContentType
+from common_core.event_enums import ProcessingEvent
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.metadata_models import (
     EntityReference,
     StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
+from common_core.status_enums import EssayStatus, ProcessingStage
 from services.spell_checker_service.core_logic import default_perform_spell_check_algorithm
 from services.spell_checker_service.protocols import ResultStoreProtocol, SpellLogicProtocol
 

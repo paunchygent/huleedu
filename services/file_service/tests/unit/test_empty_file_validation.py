@@ -10,10 +10,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from common_core.enums import ContentType, FileValidationErrorCode
+from common_core.domain_enums import ContentType
+from common_core.error_enums import FileValidationErrorCode
 from common_core.events.file_events import EssayValidationFailedV1
 from services.file_service.core_logic import process_single_file_upload
-from services.file_service.validation_models import ValidationResult
+from services.file_service.validation_models import FileProcessingStatus, ValidationResult
 
 
 @pytest.mark.asyncio
@@ -89,7 +90,7 @@ async def test_empty_file_uses_content_validation() -> None:
     event_publisher.publish_essay_content_provisioned.assert_not_called()
 
     # Assert - Correct return status
-    assert result["status"] == "content_validation_failed"
+    assert result["status"] == FileProcessingStatus.CONTENT_VALIDATION_FAILED.value
     assert result["error_code"] == FileValidationErrorCode.EMPTY_CONTENT
     assert result["file_name"] == file_name
     assert result["raw_file_storage_id"] == "raw_storage_empty_12345"
@@ -152,7 +153,7 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     assert published_event.raw_file_storage_id == "raw_storage_corrupted_67890"  # Raw ID
 
     # Assert - Correct return status
-    assert result["status"] == "extraction_failed"
+    assert result["status"] == FileProcessingStatus.EXTRACTION_FAILED.value
     assert result["file_name"] == file_name
     assert result["raw_file_storage_id"] == "raw_storage_corrupted_67890"
 
@@ -218,6 +219,6 @@ async def test_content_too_short_validation() -> None:
     assert published_event.raw_file_storage_id == "raw_storage_short_11111"
 
     # Assert - Correct return status
-    assert result["status"] == "content_validation_failed"
+    assert result["status"] == FileProcessingStatus.CONTENT_VALIDATION_FAILED.value
     assert result["error_code"] == FileValidationErrorCode.CONTENT_TOO_SHORT
     assert result["raw_file_storage_id"] == "raw_storage_short_11111"

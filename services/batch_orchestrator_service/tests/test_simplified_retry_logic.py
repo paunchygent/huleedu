@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from common_core.enums import CourseCode
+from common_core.domain_enums import CourseCode
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1

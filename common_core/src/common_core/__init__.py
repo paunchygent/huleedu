@@ -12,21 +12,22 @@ from .batch_service_models import (
     BatchServiceNLPInitiateCommandDataV1,
     BatchServiceSpellcheckInitiateCommandDataV1,
 )
-from .enums import (
-    BatchStatus,
+from .config_enums import Environment
+from .domain_enums import (
     ContentType,
-    ErrorCode,
-    EssayStatus,
-    FileValidationErrorCode,
-    ProcessingEvent,
-    ProcessingStage,
-    topic_name,
+    CourseCode,
+    Language,
+    get_course_language,
+    get_course_level,
+    get_course_name,
 )
+from .error_enums import ErrorCode, FileValidationErrorCode
 from .essay_service_models import (
     EssayLifecycleAIFeedbackRequestV1,
     EssayLifecycleNLPRequestV1,
     EssayLifecycleSpellcheckRequestV1,
 )
+from .event_enums import ProcessingEvent, topic_name
 from .events.ai_feedback_events import AIFeedbackInputDataV1
 from .events.base_event_models import (
     BaseEventData,
@@ -56,6 +57,7 @@ from .metadata_models import (
     StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
+from .observability_enums import CacheOperation, MetricName, OperationType
 from .pipeline_models import (
     EssayProcessingCounts,
     PhaseName,
@@ -63,17 +65,44 @@ from .pipeline_models import (
     PipelineStateDetail,
     ProcessingPipelineState,
 )
+from .status_enums import (
+    BatchStatus,
+    CacheStatus,
+    EssayStatus,
+    OperationStatus,
+    ProcessingStage,
+    ProcessingStatus,
+    ValidationStatus,
+)
 
 __all__ = [
-    # Enums
+    # Status Enums
     "ProcessingStage",
-    "ProcessingEvent",
     "EssayStatus",
     "BatchStatus",
+    "ProcessingStatus",
+    "ValidationStatus",
+    "OperationStatus",
+    "CacheStatus",
+    # Domain Enums
     "ContentType",
+    "CourseCode",
+    "Language",
+    "get_course_language",
+    "get_course_name",
+    "get_course_level",
+    # Event Enums
+    "ProcessingEvent",
+    "topic_name",
+    # Observability Enums
+    "MetricName",
+    "OperationType",
+    "CacheOperation",
+    # Error Enums
     "ErrorCode",
     "FileValidationErrorCode",
-    "topic_name",
+    # Config Enums
+    "Environment",
     # Metadata Models
     "EntityReference",
     "SystemProcessingMetadata",
@@ -117,7 +146,6 @@ __all__ = [
 ]
 
 # Rebuild models to resolve forward references after all imports
-# Now that all enums are imported above, forward references should resolve successfully
 BaseEventData.model_rebuild(raise_errors=True)
 ProcessingUpdate.model_rebuild(raise_errors=True)
 EventTracker.model_rebuild(raise_errors=True)
@@ -135,7 +163,6 @@ BatchEssaysRegistered.model_rebuild(raise_errors=True)
 BatchEssaysReady.model_rebuild(raise_errors=True)
 BatchReadinessTimeout.model_rebuild(raise_errors=True)
 ExcessContentProvisionedV1.model_rebuild(raise_errors=True)
-
 EssayContentProvisionedV1.model_rebuild(raise_errors=True)
 EssayValidationFailedV1.model_rebuild(raise_errors=True)
 ELS_CJAssessmentRequestV1.model_rebuild(raise_errors=True)

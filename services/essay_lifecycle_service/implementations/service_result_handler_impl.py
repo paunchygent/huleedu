@@ -10,13 +10,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from common_core.enums import EssayStatus
 from common_core.events.cj_assessment_events import (
     CJAssessmentCompletedV1,
     CJAssessmentFailedV1,
 )
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.pipeline_models import PhaseName
+from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
 # Import event constants from state machine to ensure consistency

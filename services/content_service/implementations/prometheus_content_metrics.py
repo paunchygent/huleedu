@@ -5,6 +5,8 @@ from __future__ import annotations
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import Counter
 
+from common_core.observability_enums import OperationType
+from common_core.status_enums import OperationStatus
 from services.content_service.protocols import ContentMetricsProtocol
 
 logger = create_service_logger("content.metrics.prometheus")
@@ -22,15 +24,15 @@ class PrometheusContentMetrics(ContentMetricsProtocol):
         """
         self.content_operations = content_operations_counter
 
-    def record_operation(self, operation: str, status: str) -> None:
+    def record_operation(self, operation: OperationType, status: OperationStatus) -> None:
         """
         Record a content operation metric.
 
         Args:
-            operation: Operation type ('upload', 'download')
-            status: Operation status ('success', 'failed', 'error', 'not_found')
+            operation: Operation type (OperationType enum)
+            status: Operation status (OperationStatus enum)
         """
         try:
-            self.content_operations.labels(operation=operation, status=status).inc()
+            self.content_operations.labels(operation=operation.value, status=status.value).inc()
         except Exception as e:
             logger.error(f"Error recording content operation metric: {e}")

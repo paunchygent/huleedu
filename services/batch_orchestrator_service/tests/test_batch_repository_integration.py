@@ -12,7 +12,8 @@ from unittest.mock import MagicMock
 import pytest
 from testcontainers.postgres import PostgresContainer
 
-from common_core.enums import BatchStatus, CourseCode
+from common_core.domain_enums import CourseCode
+from common_core.status_enums import BatchStatus
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_repository_postgres_impl import (
     PostgreSQLBatchRepositoryImpl,

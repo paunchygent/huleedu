@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 from prometheus_client import CollectorRegistry, Counter
 
+from common_core.observability_enums import OperationType
+from common_core.status_enums import OperationStatus
 from services.content_service.implementations.prometheus_content_metrics import (
     PrometheusContentMetrics,
 )
@@ -45,7 +47,7 @@ class TestPrometheusContentMetrics:
     ) -> None:
         """Test recording successful upload operation."""
         # Record upload success
-        metrics.record_operation("upload", "success")
+        metrics.record_operation(OperationType.UPLOAD, OperationStatus.SUCCESS)
 
         # Debug: print what's in the registry
         metric_families = list(registry.collect())
@@ -85,7 +87,7 @@ class TestPrometheusContentMetrics:
     ) -> None:
         """Test recording successful download operation."""
         # Record download success
-        metrics.record_operation("download", "success")
+        metrics.record_operation(OperationType.DOWNLOAD, OperationStatus.SUCCESS)
 
         # Verify metric was recorded
         metric_families = list(registry.collect())
@@ -117,12 +119,12 @@ class TestPrometheusContentMetrics:
     ) -> None:
         """Test recording multiple operations with different statuses."""
         # Record various operations
-        metrics.record_operation("upload", "success")
-        metrics.record_operation("upload", "success")
-        metrics.record_operation("upload", "failed")
-        metrics.record_operation("download", "success")
-        metrics.record_operation("download", "not_found")
-        metrics.record_operation("download", "error")
+        metrics.record_operation(OperationType.UPLOAD, OperationStatus.SUCCESS)
+        metrics.record_operation(OperationType.UPLOAD, OperationStatus.SUCCESS)
+        metrics.record_operation(OperationType.UPLOAD, OperationStatus.FAILED)
+        metrics.record_operation(OperationType.DOWNLOAD, OperationStatus.SUCCESS)
+        metrics.record_operation(OperationType.DOWNLOAD, OperationStatus.NOT_FOUND)
+        metrics.record_operation(OperationType.DOWNLOAD, OperationStatus.ERROR)
 
         # Verify all metrics were recorded correctly
         metric_families = list(registry.collect())
@@ -167,7 +169,7 @@ class TestPrometheusContentMetrics:
 
         # This should not raise an exception even if there are issues
         # (The actual implementation handles errors gracefully)
-        metrics.record_operation("upload", "success")
+        metrics.record_operation(OperationType.UPLOAD, OperationStatus.SUCCESS)
 
         # Verify it still recorded the metric
         metric_families = list(registry.collect())
@@ -180,8 +182,13 @@ class TestPrometheusContentMetrics:
 
     def test_valid_operation_and_status_combinations(self, metrics: ContentMetricsProtocol) -> None:
         """Test all valid operation and status combinations."""
-        valid_operations = ["upload", "download"]
-        valid_statuses = ["success", "failed", "error", "not_found"]
+        valid_operations = [OperationType.UPLOAD, OperationType.DOWNLOAD]
+        valid_statuses = [
+            OperationStatus.SUCCESS,
+            OperationStatus.FAILED,
+            OperationStatus.ERROR,
+            OperationStatus.NOT_FOUND,
+        ]
 
         # All combinations should work without error
         for operation in valid_operations:
@@ -195,6 +202,6 @@ class TestPrometheusContentMetrics:
         counter = Counter("test", "test", ["operation", "status"])
         metrics = PrometheusContentMetrics(counter)
 
-        # Should accept string parameters and return None
-        metrics.record_operation("upload", "success")
+        # Should accept enum parameters and return None
+        metrics.record_operation(OperationType.UPLOAD, OperationStatus.SUCCESS)
         # Method should complete without error (returns None)

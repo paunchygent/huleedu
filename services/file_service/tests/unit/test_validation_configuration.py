@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent, topic_name
 from services.file_service.config import Settings as ValidationSettings
 
 

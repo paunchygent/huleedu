@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 
-from common_core.enums import CourseCode
+from common_core.domain_enums import CourseCode
 from common_core.metadata_models import EssayProcessingInputRefV1
 from huleedu_service_libs.logging_utils import create_service_logger
 

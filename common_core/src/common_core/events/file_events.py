@@ -13,7 +13,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ..enums import FileValidationErrorCode
+from ..error_enums import FileValidationErrorCode
 
 
 class EssayContentProvisionedV1(BaseModel):

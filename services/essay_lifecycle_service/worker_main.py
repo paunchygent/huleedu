@@ -12,7 +12,7 @@ import signal
 import sys
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent, topic_name
 from dishka import make_async_container
 from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger

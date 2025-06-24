@@ -11,8 +11,9 @@ from uuid import uuid4
 
 import pytest
 
-from common_core.enums import BatchStatus, CourseCode
+from common_core.domain_enums import CourseCode
 from common_core.pipeline_models import PhaseName
+from common_core.status_enums import BatchStatus
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_repository_impl import (
     MockBatchRepositoryImpl,
@@ -80,7 +81,7 @@ class TestPipelineEdgeCases:
         # Test spellcheck completion handling (should be idempotent)
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
-            completed_phase="spellcheck",
+            completed_phase=PhaseName.SPELLCHECK,
             phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=correlation_id,
         )
@@ -114,7 +115,7 @@ class TestPipelineEdgeCases:
         # Test handling when batch context is missing
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
-            completed_phase="spellcheck",
+            completed_phase=PhaseName.SPELLCHECK,
             phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=correlation_id,
         )
@@ -150,7 +151,7 @@ class TestPipelineEdgeCases:
         # Test handling when pipeline state is missing (should not crash)
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
-            completed_phase="spellcheck",
+            completed_phase=PhaseName.SPELLCHECK,
             phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=correlation_id,
         )
@@ -189,7 +190,7 @@ class TestPipelineEdgeCases:
         # Test handling of single essay batch
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
-            completed_phase="spellcheck",
+            completed_phase=PhaseName.SPELLCHECK,
             phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=correlation_id,
         )
@@ -233,7 +234,7 @@ class TestPipelineEdgeCases:
         # Test handling of large batch
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
-            completed_phase="spellcheck",
+            completed_phase=PhaseName.SPELLCHECK,
             phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=correlation_id,
         )

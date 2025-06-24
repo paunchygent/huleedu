@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from common_core.enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent
 from common_core.events.base_event_models import (
     BaseEventData,
     EventTracker,
@@ -57,7 +57,7 @@ class TestModelRebuilding:
     def test_forward_references_resolved(self) -> None:
         """Test that forward references in models are properly resolved."""
         # This test validates that Union types and enum forward references work
-        from common_core.enums import EssayStatus, ProcessingStage
+        from common_core.status_enums import EssayStatus, ProcessingStage
 
         # Create an instance to ensure forward references are resolved
         entity_ref = EntityReference(

@@ -11,9 +11,10 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 from uuid import UUID
 
-from common_core.enums import ContentType, CourseCode, EssayStatus, Language
+from common_core.domain_enums import ContentType, CourseCode, Language
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
+from common_core.status_enums import EssayStatus
 
 
 class EssayState(Protocol):

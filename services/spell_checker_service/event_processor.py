@@ -14,13 +14,14 @@ from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
 from pydantic import ValidationError
 
-from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
+from common_core.event_enums import ProcessingEvent
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import (
     SpellcheckResultDataV1,
 )
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.status_enums import EssayStatus, ProcessingStage
 from services.spell_checker_service.metrics import get_business_metrics
 from services.spell_checker_service.protocols import (
     ContentClientProtocol,

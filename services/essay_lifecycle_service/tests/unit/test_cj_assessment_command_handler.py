@@ -16,8 +16,10 @@ from common_core.batch_service_models import (
     BatchServiceCJAssessmentInitiateCommandDataV1,
     EssayProcessingInputRefV1,
 )
-from common_core.enums import CourseCode, EssayStatus, ProcessingEvent
+from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent
 from common_core.metadata_models import EntityReference
+from common_core.status_enums import EssayStatus
 
 from services.essay_lifecycle_service.essay_state_machine import (
     CMD_INITIATE_CJ_ASSESSMENT,

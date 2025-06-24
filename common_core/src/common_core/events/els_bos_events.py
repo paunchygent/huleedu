@@ -9,9 +9,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ..enums import BatchStatus
 from ..metadata_models import EssayProcessingInputRefV1
 from ..pipeline_models import PhaseName
+from ..status_enums import BatchStatus
 
 
 class ELSBatchPhaseOutcomeV1(BaseModel):

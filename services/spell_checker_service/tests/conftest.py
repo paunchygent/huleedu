@@ -15,15 +15,8 @@ import aiohttp
 import pytest
 from aiokafka import ConsumerRecord
 
-# CRITICAL: Import ALL enum types FIRST to ensure they're available for forward reference resolution
-# Note: We need BatchStatus even though spell checker doesn't use it directly,
-# because ProcessingUpdate has Union["EssayStatus", "BatchStatus"] annotation
-from common_core.enums import (
-    EssayStatus,
-    ProcessingEvent,
-    ProcessingStage,
-)
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
+from common_core.event_enums import ProcessingEvent
 
 # Import base event models that also need rebuilding
 from common_core.events.base_event_models import (
@@ -41,6 +34,11 @@ from common_core.metadata_models import (
     EntityReference,
     SystemProcessingMetadata,
 )
+
+# CRITICAL: Import ALL enum types FIRST to ensure they're available for forward reference resolution
+# Note: We need BatchStatus even though spell checker doesn't use it directly,
+# because ProcessingUpdate has Union["EssayStatus", "BatchStatus"] annotation
+from common_core.status_enums import EssayStatus, ProcessingStage
 
 # Import idempotency test fixtures
 from .unit.spell_idempotency_test_utils import (

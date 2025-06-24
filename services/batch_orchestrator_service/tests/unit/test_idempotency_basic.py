@@ -17,7 +17,7 @@ from implementations.client_pipeline_request_handler import ClientPipelineReques
 from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
 from kafka_consumer import BatchKafkaConsumer
 
-from common_core.enums import CourseCode
+from common_core.domain_enums import CourseCode
 
 
 class MockRedisClient:
@@ -122,7 +122,7 @@ def sample_els_phase_outcome_event() -> dict:
     """Create sample ELSBatchPhaseOutcome event for testing."""
     batch_id = str(uuid.uuid4())
     correlation_id = str(uuid.uuid4())
-    from common_core.enums import BatchStatus
+    from common_core.status_enums import BatchStatus
 
     return {
         "event_id": str(uuid.uuid4()),

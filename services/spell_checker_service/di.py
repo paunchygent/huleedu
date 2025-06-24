@@ -9,7 +9,7 @@ from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import CollectorRegistry
 
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent, topic_name
 from services.spell_checker_service.config import Settings, settings
 from services.spell_checker_service.kafka_consumer import SpellCheckerKafkaConsumer
 from services.spell_checker_service.protocol_implementations.content_client_impl import (

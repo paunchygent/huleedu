@@ -12,7 +12,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ..enums import CourseCode
+from ..domain_enums import CourseCode
 
 
 class ClassCreatedV1(BaseModel):

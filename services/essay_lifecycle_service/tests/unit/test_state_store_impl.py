@@ -11,7 +11,8 @@ import tempfile
 from datetime import UTC, datetime
 
 import pytest
-from common_core.enums import ContentType, EssayStatus
+from common_core.domain_enums import ContentType
+from common_core.status_enums import EssayStatus
 
 from state_store import EssayState, SQLiteEssayStateStore
 

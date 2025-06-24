@@ -8,7 +8,7 @@ from huleedu_service_libs.kafka_client import KafkaBus
 
 # Import concrete types instead of placeholders if they are stable
 # Assuming common_core models might be used in signatures
-from common_core.enums import ContentType
+from common_core.domain_enums import ContentType
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.metadata_models import SystemProcessingMetadata
 

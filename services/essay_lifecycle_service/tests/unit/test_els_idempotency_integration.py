@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
-from common_core.enums import CourseCode
+from common_core.domain_enums import CourseCode
 
 from services.essay_lifecycle_service.batch_command_handlers import process_single_message
 from services.essay_lifecycle_service.protocols import (

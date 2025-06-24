@@ -9,7 +9,7 @@ from implementations.batch_database_infrastructure import BatchDatabaseInfrastru
 from models_db import Batch
 from sqlalchemy import select, update
 
-from common_core.enums import BatchStatus
+from common_core.status_enums import BatchStatus
 
 
 class BatchCrudOperations:

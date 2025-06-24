@@ -12,7 +12,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from common_core.enums import FileValidationErrorCode
+from common_core.error_enums import FileValidationErrorCode
 from services.file_service.validation_models import ValidationResult
 
 

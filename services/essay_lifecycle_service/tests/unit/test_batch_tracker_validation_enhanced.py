@@ -13,7 +13,8 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
-from common_core.enums import CourseCode, FileValidationErrorCode
+from common_core.domain_enums import CourseCode
+from common_core.error_enums import FileValidationErrorCode
 from common_core.events.batch_coordination_events import BatchEssaysReady, BatchEssaysRegistered
 from common_core.events.file_events import EssayValidationFailedV1
 from common_core.metadata_models import (

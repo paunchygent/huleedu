@@ -138,7 +138,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 return True
 
             # **Step 3: Persist Slot Assignment**
-            from common_core.enums import EssayStatus
+            from common_core.status_enums import EssayStatus
 
             await self.repository.create_or_update_essay_state_for_slot_assignment(
                 internal_essay_id=assigned_essay_id,

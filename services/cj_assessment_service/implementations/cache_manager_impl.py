@@ -9,6 +9,7 @@ from config import Settings
 from diskcache import Cache
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from common_core.observability_enums import CacheOperation
 from services.cj_assessment_service.protocols import CacheProtocol
 
 logger = create_service_logger("cj_assessment_service.cache_manager_impl")
@@ -65,15 +66,24 @@ class CacheManagerImpl(CacheProtocol):
         try:
             cached_data = self.cache.get(cache_key)
             if cached_data is not None:
-                logger.debug(f"Cache hit for key: {cache_key[:16]}...")
+                logger.debug(
+                    f"Cache {CacheOperation.GET.value} hit for key: {cache_key[:16]}...",
+                    extra={"cache_operation": CacheOperation.GET.value, "cache_result": "hit"},
+                )
                 # Type cast since we know this should be a dict[str, Any]
                 # based on our caching pattern
                 return dict(cached_data) if isinstance(cached_data, dict) else None
             else:
-                logger.debug(f"Cache miss for key: {cache_key[:16]}...")
+                logger.debug(
+                    f"Cache {CacheOperation.GET.value} miss for key: {cache_key[:16]}...",
+                    extra={"cache_operation": CacheOperation.GET.value, "cache_result": "miss"},
+                )
                 return None
         except Exception as e:
-            logger.warning(f"Error accessing cache for key {cache_key[:16]}...: {e}")
+            logger.warning(
+                f"Error during cache {CacheOperation.GET.value} for key {cache_key[:16]}...: {e}",
+                extra={"cache_operation": CacheOperation.GET.value, "cache_result": "error"},
+            )
             return None
 
     def add_to_cache(self, cache_key: str, data: dict[str, Any]) -> None:
@@ -85,17 +95,29 @@ class CacheManagerImpl(CacheProtocol):
         """
         try:
             self.cache.set(cache_key, data)
-            logger.debug(f"Cached data for key: {cache_key[:16]}...")
+            logger.debug(
+                f"Cache {CacheOperation.SET.value} successful for key: {cache_key[:16]}...",
+                extra={"cache_operation": CacheOperation.SET.value, "cache_result": "success"},
+            )
         except Exception as e:
-            logger.warning(f"Error adding to cache for key {cache_key[:16]}...: {e}")
+            logger.warning(
+                f"Error during cache {CacheOperation.SET.value} for key {cache_key[:16]}...: {e}",
+                extra={"cache_operation": CacheOperation.SET.value, "cache_result": "error"},
+            )
 
     def clear_cache(self) -> None:
         """Clear all cached data."""
         try:
             self.cache.clear()
-            logger.info("Cache cleared successfully")
+            logger.info(
+                f"Cache {CacheOperation.CLEAR.value} successful",
+                extra={"cache_operation": CacheOperation.CLEAR.value, "cache_result": "success"},
+            )
         except Exception as e:
-            logger.error(f"Error clearing cache: {e}")
+            logger.error(
+                f"Error during cache {CacheOperation.CLEAR.value}: {e}",
+                extra={"cache_operation": CacheOperation.CLEAR.value, "cache_result": "error"},
+            )
 
     def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics.

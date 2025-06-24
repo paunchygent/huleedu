@@ -9,10 +9,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from common_core.enums import BatchStatus, ContentType, EssayStatus
+from common_core.domain_enums import ContentType
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
+from common_core.status_enums import BatchStatus, EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.protocols import (

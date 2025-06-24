@@ -14,8 +14,8 @@ from protocols import (
     PipelinePhaseInitiatorProtocol,
 )
 
-from common_core.enums import BatchStatus
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from common_core.status_enums import BatchStatus
 
 logger = create_service_logger("bos.pipeline.coordinator")
 
@@ -34,7 +34,7 @@ class DefaultPipelinePhaseCoordinator:
     async def handle_phase_concluded(
         self,
         batch_id: str,
-        completed_phase: str,
+        completed_phase: PhaseName,
         phase_status: BatchStatus,
         correlation_id: str,
         processed_essays_for_next_phase: list[Any] | None = None,
@@ -55,7 +55,7 @@ class DefaultPipelinePhaseCoordinator:
         6. Handle errors with proper state updates and diagnostic logging
         """
         logger.info(
-            f"Handling phase conclusion: batch={batch_id}, phase={completed_phase}, "
+            f"Handling phase conclusion: batch={batch_id}, phase={completed_phase.value}, "
             f"status={phase_status.value}",
             extra={"correlation_id": correlation_id},
         )
@@ -65,9 +65,9 @@ class DefaultPipelinePhaseCoordinator:
         # (per common_core/enums.py - it's a terminal success state with partial failures)
         success_statuses = {BatchStatus.COMPLETED_SUCCESSFULLY, BatchStatus.COMPLETED_WITH_FAILURES}
         if phase_status in success_statuses:
-            updated_status = "COMPLETED_SUCCESSFULLY"
+            updated_status = PipelineExecutionStatus.COMPLETED_SUCCESSFULLY
         else:
-            updated_status = "FAILED"
+            updated_status = PipelineExecutionStatus.FAILED
 
         await self.update_phase_status(
             batch_id,
@@ -81,7 +81,7 @@ class DefaultPipelinePhaseCoordinator:
         # successful essays
         if phase_status not in success_statuses:
             logger.info(
-                f"Phase {completed_phase} for batch {batch_id} did not complete successfully "
+                f"Phase {completed_phase.value} for batch {batch_id} did not complete successfully "
                 f"(status: {phase_status.value}), skipping next phase initiation",
             )
             return
@@ -92,7 +92,7 @@ class DefaultPipelinePhaseCoordinator:
                 len(processed_essays_for_next_phase) if processed_essays_for_next_phase else 0
             )
             logger.info(
-                f"Phase {completed_phase} completed with partial failures for batch {batch_id}. "
+                f"Phase {completed_phase.value} completed with partial failures for batch {batch_id}. "
                 f"Proceeding to next phase with {successful_count} successful essays.",
                 extra={"correlation_id": correlation_id},
             )
@@ -108,8 +108,8 @@ class DefaultPipelinePhaseCoordinator:
     async def update_phase_status(
         self,
         batch_id: str,
-        phase: str,
-        status: str,
+        phase: PhaseName,
+        status: PipelineExecutionStatus,
         completion_timestamp: str | None = None,
     ) -> None:
         """Update the status of a specific pipeline phase."""
@@ -125,19 +125,19 @@ class DefaultPipelinePhaseCoordinator:
             updated_pipeline_state = current_pipeline_state.copy()
 
         # Update the specific phase status
-        phase_updates = {f"{phase}_status": status}
+        phase_updates = {f"{phase.value}_status": status.value}
         if completion_timestamp:
-            phase_updates[f"{phase}_completed_at"] = completion_timestamp
+            phase_updates[f"{phase.value}_completed_at"] = completion_timestamp
 
         updated_pipeline_state.update(phase_updates)
         await self.batch_repo.save_processing_pipeline_state(batch_id, updated_pipeline_state)
 
-        logger.info(f"Updated {phase} status to {status} for batch {batch_id}")
+        logger.info(f"Updated {phase.value} status to {status.value} for batch {batch_id}")
 
     async def _initiate_next_phase(
         self,
         batch_id: str,
-        completed_phase: str,
+        completed_phase: PhaseName,
         correlation_id: str,
         processed_essays_from_previous_phase: list[Any] | None = None,
     ) -> None:
@@ -178,10 +178,10 @@ class DefaultPipelinePhaseCoordinator:
 
             # Dynamic next phase determination
             try:
-                current_index = requested_pipelines.index(completed_phase)
+                current_index = requested_pipelines.index(completed_phase.value)
             except ValueError:
                 logger.error(
-                    f"Completed phase '{completed_phase}' not found in requested_pipelines "
+                    f"Completed phase '{completed_phase.value}' not found in requested_pipelines "
                     f"for batch {batch_id}",
                 )
                 return
@@ -190,7 +190,7 @@ class DefaultPipelinePhaseCoordinator:
             if current_index + 1 >= len(requested_pipelines):
                 logger.info(
                     f"Pipeline completed for batch {batch_id} - no more phases after "
-                    f"'{completed_phase}'",
+                    f"'{completed_phase.value}'",
                 )
                 # TODO: Mark batch as COMPLETED when batch completion events are available
                 return
@@ -207,7 +207,7 @@ class DefaultPipelinePhaseCoordinator:
 
             logger.info(
                 f"Initiating next phase '{next_phase_name.value}' for batch {batch_id} after "
-                f"'{completed_phase}'",
+                f"'{completed_phase.value}'",
                 extra={"correlation_id": correlation_id},
             )
 
@@ -230,10 +230,10 @@ class DefaultPipelinePhaseCoordinator:
                 phase_status_key = f"{next_phase_name.value}_status"
                 phase_status = current_pipeline_state.get(phase_status_key)
                 if phase_status in [
-                    "DISPATCH_INITIATED",
-                    "IN_PROGRESS",
-                    "COMPLETED_SUCCESSFULLY",
-                    "FAILED",
+                    PipelineExecutionStatus.DISPATCH_INITIATED.value,
+                    PipelineExecutionStatus.IN_PROGRESS.value,
+                    PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value,
+                    PipelineExecutionStatus.FAILED.value,
                 ]:
                     logger.info(
                         f"Phase {next_phase_name.value} already initiated for batch {batch_id}, "
@@ -290,7 +290,7 @@ class DefaultPipelinePhaseCoordinator:
                     updated_pipeline_state = current_pipeline_state.copy()
                     updated_pipeline_state.update(
                         {
-                            f"{next_phase_name.value}_status": "FAILED",
+                            f"{next_phase_name.value}_status": PipelineExecutionStatus.FAILED.value,
                             f"{next_phase_name.value}_error": str(e),
                             f"{next_phase_name.value}_failed_at": (datetime.now(UTC).isoformat()),
                         },
@@ -317,7 +317,9 @@ class DefaultPipelinePhaseCoordinator:
                 updated_pipeline_state = current_pipeline_state.copy()
                 updated_pipeline_state.update(
                     {
-                        f"{next_phase_name.value}_status": "DISPATCH_INITIATED",
+                        f"{next_phase_name.value}_status": (
+                            PipelineExecutionStatus.DISPATCH_INITIATED.value
+                        ),
                         f"{next_phase_name.value}_initiated_at": (datetime.now(UTC).isoformat()),
                     },
                 )
@@ -387,9 +389,9 @@ class DefaultPipelinePhaseCoordinator:
                 phase_status_key = f"{first_phase_name.value}_status"
                 phase_status = current_pipeline_state.get(phase_status_key)
                 if phase_status in [
-                    "DISPATCH_INITIATED",
-                    "IN_PROGRESS",
-                    "COMPLETED_SUCCESSFULLY",
+                    PipelineExecutionStatus.DISPATCH_INITIATED.value,
+                    PipelineExecutionStatus.IN_PROGRESS.value,
+                    PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value,
                 ]:
                     logger.info(
                         f"First phase {first_phase_name.value} already initiated, skipping",
@@ -431,8 +433,8 @@ class DefaultPipelinePhaseCoordinator:
         # Update pipeline state - mark first phase as DISPATCH_INITIATED
         await self.update_phase_status(
             batch_id=batch_id,
-            phase=first_phase_name.value,
-            status="DISPATCH_INITIATED",
+            phase=first_phase_name,
+            status=PipelineExecutionStatus.DISPATCH_INITIATED,
             completion_timestamp=datetime.now(UTC).isoformat(),
         )
 

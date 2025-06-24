@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, call
 
 import pytest
 
-from common_core.enums import ContentType
+from common_core.domain_enums import ContentType
 from common_core.events.file_events import EssayContentProvisionedV1
 from services.file_service.core_logic import process_single_file_upload
 from services.file_service.tests.unit.core_logic_validation_utils import (
@@ -20,6 +20,7 @@ from services.file_service.tests.unit.core_logic_validation_utils import (
     TEST_FILE_NAMES,
     VALID_FILE_CONTENT,
 )
+from services.file_service.validation_models import FileProcessingStatus
 
 
 class TestCoreLogicValidationSuccess:
@@ -65,7 +66,7 @@ class TestCoreLogicValidationSuccess:
 
         # Assert workflow completion
         assert result["file_name"] == file_name
-        assert result["status"] == "processing_success"
+        assert result["status"] == FileProcessingStatus.PROCESSING_SUCCESS.value
         assert result["raw_file_storage_id"] == "raw_storage_id_12345"
         assert result["text_storage_id"] == "text_storage_id_67890"
 

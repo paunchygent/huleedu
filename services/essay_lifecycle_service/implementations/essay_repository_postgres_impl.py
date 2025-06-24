@@ -12,8 +12,9 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from common_core.enums import ContentType, EssayStatus
+from common_core.domain_enums import ContentType
 from common_core.metadata_models import EntityReference
+from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

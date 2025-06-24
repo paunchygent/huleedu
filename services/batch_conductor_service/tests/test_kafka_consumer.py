@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from common_core.enums import EssayStatus
+from common_core.status_enums import EssayStatus
 from services.batch_conductor_service.kafka_consumer import BCSKafkaConsumer
 
 

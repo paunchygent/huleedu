@@ -13,7 +13,7 @@ from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent, topic_name
 from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
 

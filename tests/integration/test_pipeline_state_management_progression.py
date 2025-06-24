@@ -11,8 +11,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from common_core.enums import BatchStatus, CourseCode
+from common_core.domain_enums import CourseCode
 from common_core.pipeline_models import PhaseName
+from common_core.status_enums import BatchStatus
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_repository_impl import (
     MockBatchRepositoryImpl,
@@ -83,7 +84,7 @@ class TestPipelineProgressionScenarios:
         # Test spellcheck completion handling
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
-            completed_phase="spellcheck",
+            completed_phase=PhaseName.SPELLCHECK,
             phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,  # Successful completion
             correlation_id=correlation_id,
         )
@@ -139,7 +140,7 @@ class TestPipelineProgressionScenarios:
         # Test spellcheck completion handling
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
-            completed_phase="spellcheck",
+            completed_phase=PhaseName.SPELLCHECK,
             phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=correlation_id,
         )

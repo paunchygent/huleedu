@@ -17,7 +17,7 @@ from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent, topic_name
 from services.spell_checker_service.event_processor import process_single_message
 from services.spell_checker_service.protocols import (
     ContentClientProtocol,

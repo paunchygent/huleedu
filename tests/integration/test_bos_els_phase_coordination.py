@@ -24,11 +24,11 @@ from uuid import uuid4
 
 import pytest
 
-from common_core.enums import BatchStatus
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
+from common_core.status_enums import BatchStatus
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
@@ -104,10 +104,9 @@ class TestBosElsPhaseCoordination:
     @pytest.fixture
     def mock_client_pipeline_request_handler(self):
         """Mock the ClientPipelineRequestHandler external boundary."""
-        from services.batch_orchestrator_service.implementations \
-            .client_pipeline_request_handler import (
-                ClientPipelineRequestHandler,
-            )
+        from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
+            ClientPipelineRequestHandler,
+        )
 
         return AsyncMock(spec=ClientPipelineRequestHandler)
 

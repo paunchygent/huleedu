@@ -19,7 +19,7 @@ from common_core.batch_service_models import (
     BatchServiceSpellcheckInitiateCommandDataV1,
     EssayProcessingInputRefV1,
 )
-from common_core.enums import EssayStatus
+from common_core.status_enums import EssayStatus
 
 from services.essay_lifecycle_service.implementations.batch_command_handler_impl import (
     DefaultBatchCommandHandler,
@@ -108,7 +108,7 @@ class TestDefaultBatchCommandHandler:
         self, batch_id: str, essay_processing_ref: EssayProcessingInputRefV1
     ) -> BatchServiceSpellcheckInitiateCommandDataV1:
         """Sample spellcheck command data."""
-        from common_core.enums import ProcessingEvent
+        from common_core.event_enums import ProcessingEvent
         from common_core.metadata_models import EntityReference
 
         return BatchServiceSpellcheckInitiateCommandDataV1(

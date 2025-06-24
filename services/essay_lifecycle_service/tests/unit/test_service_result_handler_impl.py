@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from common_core.enums import EssayStatus
 from common_core.metadata_models import StorageReferenceMetadata
+from common_core.status_enums import EssayStatus
 
 from services.essay_lifecycle_service.implementations.service_result_handler_impl import (
     DefaultServiceResultHandler,

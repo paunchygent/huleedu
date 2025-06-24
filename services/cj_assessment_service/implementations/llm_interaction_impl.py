@@ -11,7 +11,9 @@ from typing import cast
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from common_core.observability_enums import CacheOperation
 from services.cj_assessment_service.config import Settings
+from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
     ComparisonTask,
@@ -91,6 +93,10 @@ class LLMInteractionImpl(LLMInteractionProtocol):
         # Get the provider for the current model configuration
         provider = self._get_provider_for_model()
 
+        # Get cache metrics for recording operations
+        business_metrics = get_business_metrics()
+        cache_operations_metric = business_metrics.get("cache_operations")
+
         # Create semaphore for concurrency control
         max_concurrent_requests = getattr(self.settings, "max_concurrent_llm_requests", 3)
         semaphore = asyncio.Semaphore(max_concurrent_requests)
@@ -108,9 +114,19 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                 # Check cache first
                 cached_response = self.cache_manager.get_from_cache(cache_key)
                 if cached_response:
+                    # Record cache hit metric
+                    if cache_operations_metric:
+                        cache_operations_metric.labels(
+                            operation=CacheOperation.GET.value, result="hit"
+                        ).inc()
+
                     logger.info(
-                        f"Cache HIT for essays {task.essay_a.id} vs {task.essay_b.id}",
-                        extra={"prompt_hash": cache_key},
+                        f"Cache {CacheOperation.GET.value} HIT for essays {task.essay_a.id} vs {task.essay_b.id}",
+                        extra={
+                            "prompt_hash": cache_key,
+                            "cache_operation": CacheOperation.GET.value,
+                            "cache_result": "hit",
+                        },
                     )
                     try:
                         llm_assessment = LLMAssessmentResponseSchema(**cached_response)
@@ -128,10 +144,20 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             f"{task.essay_a.id}-{task.essay_b.id}: {e}",
                         )
                         # Continue to make fresh request if cache data is invalid
+                else:
+                    # Record cache miss metric
+                    if cache_operations_metric:
+                        cache_operations_metric.labels(
+                            operation=CacheOperation.GET.value, result="miss"
+                        ).inc()
 
                 logger.info(
-                    f"Cache MISS for essays {task.essay_a.id} vs {task.essay_b.id}. Querying LLM.",
-                    extra={"prompt_hash": cache_key},
+                    f"Cache {CacheOperation.GET.value} MISS for essays {task.essay_a.id} vs {task.essay_b.id}. Querying LLM.",
+                    extra={
+                        "prompt_hash": cache_key,
+                        "cache_operation": CacheOperation.GET.value,
+                        "cache_result": "miss",
+                    },
                 )
                 # Make fresh API request
                 try:
@@ -151,6 +177,12 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         )
                         # Cache successful response
                         self.cache_manager.add_to_cache(cache_key, response_data)
+
+                        # Record cache set metric
+                        if cache_operations_metric:
+                            cache_operations_metric.labels(
+                                operation=CacheOperation.SET.value, result="success"
+                            ).inc()
 
                         llm_assessment = LLMAssessmentResponseSchema(**response_data)
                         return ComparisonResult(

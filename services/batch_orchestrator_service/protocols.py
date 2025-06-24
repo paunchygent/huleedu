@@ -8,10 +8,14 @@ from typing import Any, Protocol
 # Import the new API model for batch context storage
 from api_models import BatchRegistrationRequestV1
 
-# Import common_core models for standardized interfaces
-from common_core.enums import BatchStatus, EssayStatus
 from common_core.metadata_models import EssayProcessingInputRefV1
-from common_core.pipeline_models import PhaseName
+
+# Import observability enums for metrics collection
+from common_core.observability_enums import OperationType
+
+# Import common_core models for standardized interfaces
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from common_core.status_enums import BatchStatus, EssayStatus, OperationStatus, ValidationStatus
 
 # Assuming common_core models might be used in signatures
 
@@ -132,9 +136,9 @@ class BatchRepositoryProtocol(Protocol):
     async def update_phase_status_atomically(
         self,
         batch_id: str,
-        phase_name: str,
-        expected_status: str,
-        new_status: str,
+        phase_name: PhaseName,
+        expected_status: PipelineExecutionStatus,
+        new_status: PipelineExecutionStatus,
         completion_timestamp: str | None = None,
     ) -> bool:
         """
@@ -144,9 +148,8 @@ class BatchRepositoryProtocol(Protocol):
         (indicating another process already updated it).
 
         This method prevents race conditions in phase initiation.
-        
-        Note: Phase status uses string literals as it represents pipeline execution status,
-        not the canonical BatchStatus enum. This is correct for internal state management.
+
+        Note: Uses PipelineExecutionStatus enum for internal pipeline state management.
         """
         ...
 
@@ -189,7 +192,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
     async def handle_phase_concluded(
         self,
         batch_id: str,
-        completed_phase: str,
+        completed_phase: PhaseName,
         phase_status: BatchStatus,
         correlation_id: str,
         processed_essays_for_next_phase: list[Any] | None = None,
@@ -200,8 +203,8 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
     async def update_phase_status(
         self,
         batch_id: str,
-        phase: str,
-        status: str,
+        phase: PhaseName,
+        status: PipelineExecutionStatus,
         completion_timestamp: str | None = None,
     ) -> None:
         """Update the status of a specific pipeline phase."""
@@ -289,4 +292,27 @@ class BatchConductorClientProtocol(Protocol):
         Raises:
             Exception: If BCS communication fails or returns error
         """
+        ...
+
+
+class BatchMetricsProtocol(Protocol):
+    """Protocol for batch processing metrics collection."""
+
+    def record_pipeline_operation(
+        self,
+        operation: OperationType,
+        status: OperationStatus,
+        pipeline_type: str,
+        batch_id: str,
+    ) -> None:
+        """Record pipeline operation metrics with standardized enum types."""
+        ...
+
+    def record_validation_operation(
+        self,
+        validation_status: ValidationStatus,
+        batch_id: str,
+        error_details: str | None = None,
+    ) -> None:
+        """Record validation operation metrics."""
         ...

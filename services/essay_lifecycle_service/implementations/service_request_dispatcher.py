@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from config import Settings
 
-from common_core.enums import CourseCode, Language
+from common_core.domain_enums import CourseCode, Language
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.protocols import SpecializedServiceRequestDispatcher
@@ -39,10 +39,11 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         """Dispatch individual spellcheck requests to Spell Checker Service."""
         from datetime import UTC, datetime
 
-        from common_core.enums import EssayStatus, ProcessingEvent, ProcessingStage, topic_name
         from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
+        from common_core.event_enums import ProcessingEvent, topic_name
         from common_core.events.envelope import EventEnvelope
         from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+        from common_core.status_enums import EssayStatus, ProcessingStage
 
         logger = create_service_logger("specialized_service_dispatcher")
 
@@ -158,10 +159,11 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         """Dispatch CJ assessment request to CJ Assessment Service."""
         from datetime import UTC, datetime
 
-        from common_core.enums import ProcessingEvent, ProcessingStage, topic_name
+        from common_core.event_enums import ProcessingEvent, topic_name
         from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
         from common_core.events.envelope import EventEnvelope
         from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+        from common_core.status_enums import ProcessingStage
 
         logger = create_service_logger("specialized_service_dispatcher")
 

@@ -186,8 +186,8 @@ class TestELSBatchPhaseOutcomeHandler:
         ]
 
         # Create ELS outcome event
-        from common_core.enums import BatchStatus
         from common_core.pipeline_models import PhaseName
+        from common_core.status_enums import BatchStatus
 
         outcome_data = ELSBatchPhaseOutcomeV1(
             batch_id=batch_id,
@@ -219,7 +219,7 @@ class TestELSBatchPhaseOutcomeHandler:
         # Verify the external boundary was called with the new signature including processed essays
         mock_phase_coordinator.handle_phase_concluded.assert_called_once_with(
             batch_id=batch_id,
-            completed_phase="spellcheck",
+            completed_phase=PhaseName.SPELLCHECK,
             phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=str(correlation_id),
             processed_essays_for_next_phase=processed_essays,  # NEW: Phase 3 data propagation

@@ -12,7 +12,7 @@ import time
 from typing import Any
 
 from aiokafka import ConsumerRecord
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.logging_utils import create_service_logger
 

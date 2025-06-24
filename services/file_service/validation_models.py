@@ -7,7 +7,27 @@ results and error states in the File Service validation framework.
 
 from __future__ import annotations
 
+from enum import Enum
+
 from pydantic import BaseModel, ConfigDict
+
+
+class FileValidationStatus(str, Enum):
+    """File validation status values for metrics collection."""
+
+    SUCCESS = "success"
+    RAW_STORAGE_FAILED = "raw_storage_failed"
+    EXTRACTION_FAILED = "extraction_failed"
+    CONTENT_VALIDATION_FAILED = "content_validation_failed"
+
+
+class FileProcessingStatus(str, Enum):
+    """File processing status values for result reporting."""
+
+    PROCESSING_SUCCESS = "processing_success"
+    RAW_STORAGE_FAILED = "raw_storage_failed"
+    EXTRACTION_FAILED = "extraction_failed"
+    CONTENT_VALIDATION_FAILED = "content_validation_failed"
 
 
 class ValidationResult(BaseModel):

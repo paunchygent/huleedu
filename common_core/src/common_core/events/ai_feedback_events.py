@@ -12,7 +12,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..enums import CourseCode, ProcessingEvent
+from ..domain_enums import CourseCode
+from ..event_enums import ProcessingEvent
 from .base_event_models import ProcessingUpdate
 
 __all__ = [

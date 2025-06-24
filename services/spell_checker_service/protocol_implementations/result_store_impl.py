@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import aiohttp
 
-from common_core.enums import ContentType
+from common_core.domain_enums import ContentType
 from services.spell_checker_service.core_logic import default_store_content_impl
 from services.spell_checker_service.protocols import ResultStoreProtocol
 

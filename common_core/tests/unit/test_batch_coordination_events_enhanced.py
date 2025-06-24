@@ -1,9 +1,4 @@
-"""
-Unit tests for enhanced batch coordination event models with lean registration support.
-
-Tests the enhanced BatchEssaysReady event model with new required fields
-for the lean registration refactoring.
-"""
+"""Enhanced unit tests for batch coordination events with comprehensive validation."""
 
 from __future__ import annotations
 
@@ -12,8 +7,10 @@ from datetime import UTC, datetime
 
 import pytest
 
-from common_core.enums import CourseCode
-from common_core.events.batch_coordination_events import BatchEssaysReady
+from common_core.domain_enums import CourseCode
+from common_core.events.batch_coordination_events import (
+    BatchEssaysReady,
+)
 from common_core.metadata_models import (
     EntityReference,
     EssayProcessingInputRefV1,

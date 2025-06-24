@@ -13,12 +13,12 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from common_core.events.file_events import EssayValidationFailedV1
+    from .file_events import EssayValidationFailedV1
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ..enums import CourseCode
+from ..domain_enums import CourseCode
 from ..metadata_models import (
     EntityReference,
     EssayProcessingInputRefV1,

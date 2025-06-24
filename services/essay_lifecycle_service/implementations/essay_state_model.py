@@ -10,7 +10,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from common_core.enums import ContentType, EssayStatus
+from common_core.domain_enums import ContentType
+from common_core.status_enums import EssayStatus
 from pydantic import BaseModel, Field
 
 

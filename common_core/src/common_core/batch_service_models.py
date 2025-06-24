@@ -7,7 +7,7 @@ the Batch Orchestrator Service sends to ELS to initiate various processing phase
 
 from __future__ import annotations
 
-from .enums import CourseCode
+from .domain_enums import CourseCode
 from .events.base_event_models import BaseEventData
 from .metadata_models import EssayProcessingInputRefV1
 

@@ -17,11 +17,8 @@ import pytest
 from aiokafka import AIOKafkaProducer, ConsumerRecord
 
 # CRITICAL: Import ALL enum types FIRST
-from common_core.enums import (
-    CourseCode,
-    ProcessingEvent,
-    ProcessingStage,
-)
+from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent
 
 # Import models that need rebuilding
 from common_core.events.base_event_models import (
@@ -40,6 +37,7 @@ from common_core.metadata_models import (
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
+from common_core.status_enums import ProcessingStage
 
 # NOW rebuild models with all types available
 BaseEventData.model_rebuild(raise_errors=True)

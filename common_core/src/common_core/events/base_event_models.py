@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field
 from ..metadata_models import EntityReference, SystemProcessingMetadata
 
 if TYPE_CHECKING:
-    from ..enums import BatchStatus, EssayStatus, ProcessingEvent
+    from ..event_enums import ProcessingEvent
+    from ..status_enums import BatchStatus, EssayStatus
 
 
 class BaseEventData(BaseModel):

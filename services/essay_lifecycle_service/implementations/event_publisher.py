@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from common_core.enums import EssayStatus
     from common_core.metadata_models import EntityReference
+    from common_core.status_enums import EssayStatus
     from huleedu_service_libs.kafka_client import KafkaBus
 
     from config import Settings
@@ -158,7 +158,7 @@ class DefaultEventPublisher(EventPublisher):
         """Publish ExcessContentProvisionedV1 event when no slots are available."""
         from uuid import uuid4
 
-        from common_core.enums import ProcessingEvent, topic_name
+        from common_core.event_enums import ProcessingEvent, topic_name
         from common_core.events.envelope import EventEnvelope
 
         # Create event envelope
@@ -181,7 +181,7 @@ class DefaultEventPublisher(EventPublisher):
         """Publish BatchEssaysReady event when batch is complete."""
         from uuid import uuid4
 
-        from common_core.enums import ProcessingEvent, topic_name
+        from common_core.event_enums import ProcessingEvent, topic_name
         from common_core.events.envelope import EventEnvelope
 
         # Create event envelope
@@ -204,7 +204,7 @@ class DefaultEventPublisher(EventPublisher):
         """Publish ELSBatchPhaseOutcomeV1 event when phase is complete."""
         from uuid import uuid4
 
-        from common_core.enums import ProcessingEvent, topic_name
+        from common_core.event_enums import ProcessingEvent, topic_name
         from common_core.events.envelope import EventEnvelope
 
         # Create event envelope

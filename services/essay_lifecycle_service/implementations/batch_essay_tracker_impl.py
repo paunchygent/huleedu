@@ -11,7 +11,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from common_core.enums import get_course_language
+from common_core.domain_enums import get_course_language
 from common_core.events.batch_coordination_events import (
     BatchEssaysReady,
     BatchEssaysRegistered,

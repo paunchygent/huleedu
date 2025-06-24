@@ -10,6 +10,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
+from common_core.observability_enums import OperationType
+from common_core.status_enums import OperationStatus
+
 
 class ContentStoreProtocol(Protocol):
     """Protocol for content storage operations."""
@@ -58,12 +61,12 @@ class ContentStoreProtocol(Protocol):
 class ContentMetricsProtocol(Protocol):
     """Protocol for content service metrics collection."""
 
-    def record_operation(self, operation: str, status: str) -> None:
+    def record_operation(self, operation: OperationType, status: OperationStatus) -> None:
         """
         Record a content operation metric.
 
         Args:
-            operation: Operation type ('upload', 'download')
-            status: Operation status ('success', 'failed', 'error', 'not_found')
+            operation: Operation type (OperationType enum)
+            status: Operation status (OperationStatus enum)
         """
         ...

@@ -68,7 +68,7 @@ When creating new HTTP services:
 
 - **REQUIRED**: Use `BatchStatus` enum for batch status operations
 - **REQUIRED**: Use `EssayStatus` enum for essay status operations  
-- **REQUIRED**: Use appropriate enums from `common_core.enums` for all status fields
+- **REQUIRED**: Use appropriate enums from `common_core.config_enums.py, common_core/domain_enums.py, common_core/error_enums.py, common_core/essay_service_models.py, common_core/event_enums.py` for all status fields
 - **FORBIDDEN**: String literals for status values in protocol signatures
 
 **Examples:**

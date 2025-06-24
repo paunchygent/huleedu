@@ -11,7 +11,9 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from common_core.enums import BatchStatus, ContentType, EssayStatus
+from common_core.domain_enums import ContentType
+from common_core.pipeline_models import PhaseName
+from common_core.status_enums import BatchStatus, EssayStatus
 
 from services.essay_lifecycle_service.implementations.batch_phase_coordinator_impl import (
     DefaultBatchPhaseCoordinator,
@@ -101,7 +103,9 @@ class TestDefaultBatchPhaseCoordinator:
         mock_essay_repository.list_essays_by_batch_and_phase.return_value = [essay1, essay2]
 
         # Execute
-        await coordinator.check_batch_completion(test_essay_state, "spellcheck", correlation_id)
+        await coordinator.check_batch_completion(
+            test_essay_state, PhaseName.SPELLCHECK, correlation_id
+        )
 
         # Verify
         mock_essay_repository.list_essays_by_batch_and_phase.assert_called_once_with(
@@ -115,7 +119,7 @@ class TestDefaultBatchPhaseCoordinator:
         event_data = call_args.kwargs["event_data"]  # Keyword argument
 
         assert event_data.batch_id == "test-batch-1"
-        assert event_data.phase_name == "spellcheck"
+        assert event_data.phase_name == PhaseName.SPELLCHECK
         assert event_data.phase_status == BatchStatus.COMPLETED_SUCCESSFULLY
         assert len(event_data.processed_essays) == 2
         assert len(event_data.failed_essay_ids) == 0
@@ -166,7 +170,9 @@ class TestDefaultBatchPhaseCoordinator:
         ]
 
         # Execute
-        await coordinator.check_batch_completion(test_essay_state, "spellcheck", correlation_id)
+        await coordinator.check_batch_completion(
+            test_essay_state, PhaseName.SPELLCHECK, correlation_id
+        )
 
         # Verify
         mock_event_publisher.publish_els_batch_phase_outcome.assert_called_once()
@@ -176,9 +182,7 @@ class TestDefaultBatchPhaseCoordinator:
         event_data = call_args.kwargs["event_data"]
 
         assert event_data.batch_id == "test-batch-1"
-        assert event_data.phase_name == "spellcheck"
-        from common_core.enums import BatchStatus
-
+        assert event_data.phase_name == PhaseName.SPELLCHECK
         assert event_data.phase_status == BatchStatus.COMPLETED_WITH_FAILURES
         assert len(event_data.processed_essays) == 2  # Only successful ones
         assert len(event_data.failed_essay_ids) == 1
@@ -213,7 +217,9 @@ class TestDefaultBatchPhaseCoordinator:
         ]
 
         # Execute
-        await coordinator.check_batch_completion(test_essay_state, "spellcheck", correlation_id)
+        await coordinator.check_batch_completion(
+            test_essay_state, PhaseName.SPELLCHECK, correlation_id
+        )
 
         # Verify
         mock_event_publisher.publish_els_batch_phase_outcome.assert_called_once()
@@ -223,9 +229,7 @@ class TestDefaultBatchPhaseCoordinator:
         event_data = call_args.kwargs["event_data"]
 
         assert event_data.batch_id == "test-batch-1"
-        assert event_data.phase_name == "spellcheck"
-        from common_core.enums import BatchStatus
-
+        assert event_data.phase_name == PhaseName.SPELLCHECK
         assert event_data.phase_status == BatchStatus.FAILED_CRITICALLY
         assert len(event_data.processed_essays) == 0
         assert len(event_data.failed_essay_ids) == 2
@@ -265,7 +269,9 @@ class TestDefaultBatchPhaseCoordinator:
         ]
 
         # Execute
-        await coordinator.check_batch_completion(test_essay_state, "spellcheck", correlation_id)
+        await coordinator.check_batch_completion(
+            test_essay_state, PhaseName.SPELLCHECK, correlation_id
+        )
 
         # Verify - no outcome event should be published
         mock_event_publisher.publish_els_batch_phase_outcome.assert_not_called()

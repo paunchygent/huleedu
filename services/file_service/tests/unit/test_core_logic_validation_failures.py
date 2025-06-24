@@ -12,7 +12,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from common_core.enums import ContentType, FileValidationErrorCode
+from common_core.domain_enums import ContentType
+from common_core.error_enums import FileValidationErrorCode
 from common_core.events.file_events import EssayValidationFailedV1
 from services.file_service.core_logic import process_single_file_upload
 from services.file_service.tests.unit.core_logic_validation_utils import (
@@ -21,7 +22,7 @@ from services.file_service.tests.unit.core_logic_validation_utils import (
     TEST_FILE_NAMES,
     ZERO_BYTE_CONTENT,
 )
-from services.file_service.validation_models import ValidationResult
+from services.file_service.validation_models import FileProcessingStatus, ValidationResult
 
 
 class TestCoreLogicValidationFailures:
@@ -67,7 +68,7 @@ class TestCoreLogicValidationFailures:
 
         # Assert validation failure response
         assert result["file_name"] == file_name
-        assert result["status"] == "content_validation_failed"
+        assert result["status"] == FileProcessingStatus.CONTENT_VALIDATION_FAILED.value
         assert result["error_code"] == FileValidationErrorCode.CONTENT_TOO_SHORT
         assert "5 characters" in result["error_message"]
         assert result["raw_file_storage_id"] == "raw_storage_12345"
@@ -137,7 +138,7 @@ class TestCoreLogicValidationFailures:
         )
 
         # Assert validation failure
-        assert result["status"] == "content_validation_failed"
+        assert result["status"] == FileProcessingStatus.CONTENT_VALIDATION_FAILED.value
         assert result["error_code"] == FileValidationErrorCode.EMPTY_CONTENT
         assert "empty or contains only whitespace" in result["error_message"]
         assert result["raw_file_storage_id"] == "raw_storage_empty_123"
@@ -194,7 +195,7 @@ class TestCoreLogicValidationFailures:
         )
 
         # Assert validation failure
-        assert result["status"] == "content_validation_failed"
+        assert result["status"] == FileProcessingStatus.CONTENT_VALIDATION_FAILED.value
         assert result["error_code"] == FileValidationErrorCode.CONTENT_TOO_LONG
         assert "10000 characters" in result["error_message"]
         assert result["raw_file_storage_id"] == "raw_storage_long_456"
@@ -312,7 +313,7 @@ class TestCoreLogicValidationFailures:
         )
 
         # Assert - Text extraction succeeded, content validation failed
-        assert result["status"] == "content_validation_failed"
+        assert result["status"] == FileProcessingStatus.CONTENT_VALIDATION_FAILED.value
         assert result["error_code"] == FileValidationErrorCode.EMPTY_CONTENT
         assert result["raw_file_storage_id"] == "raw_storage_empty_extract_999"
 

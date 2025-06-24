@@ -10,7 +10,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..enums import CourseCode, ProcessingEvent
+from ..domain_enums import CourseCode
+from ..event_enums import ProcessingEvent
 from ..metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
 from .base_event_models import BaseEventData, ProcessingUpdate
 

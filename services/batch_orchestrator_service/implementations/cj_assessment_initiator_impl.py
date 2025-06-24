@@ -14,7 +14,7 @@ from protocols import (
 )
 
 from common_core.batch_service_models import BatchServiceCJAssessmentInitiateCommandDataV1
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName

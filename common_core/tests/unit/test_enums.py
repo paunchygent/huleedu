@@ -9,23 +9,18 @@ from __future__ import annotations
 
 import pytest
 
-from common_core.enums import (
-    _TOPIC_MAPPING,
+from common_core.domain_enums import (
     COURSE_METADATA,
-    BatchStatus,
     ContentType,
     CourseCode,
-    ErrorCode,
-    EssayStatus,
-    FileValidationErrorCode,
     Language,
-    ProcessingEvent,
-    ProcessingStage,
     get_course_language,
     get_course_level,
     get_course_name,
-    topic_name,
 )
+from common_core.error_enums import ErrorCode, FileValidationErrorCode
+from common_core.event_enums import _TOPIC_MAPPING, ProcessingEvent, topic_name
+from common_core.status_enums import BatchStatus, EssayStatus, ProcessingStage
 
 
 class TestProcessingStage:

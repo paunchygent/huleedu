@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field, model_validator
 
-from common_core.enums import CourseCode
+from common_core.domain_enums import CourseCode
 
 
 class BatchRegistrationRequestV1(BaseModel):

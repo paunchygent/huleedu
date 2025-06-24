@@ -17,7 +17,7 @@ from implementations.client_pipeline_request_handler import ClientPipelineReques
 from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
 from kafka_consumer import BatchKafkaConsumer
 
-from common_core.enums import CourseCode
+from common_core.domain_enums import CourseCode
 
 
 class MockRedisClient:

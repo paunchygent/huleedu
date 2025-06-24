@@ -13,7 +13,7 @@ from uuid import UUID
 if TYPE_CHECKING:
     from common_core.batch_service_models import BatchServiceCJAssessmentInitiateCommandDataV1
 
-from common_core.enums import Language
+from common_core.domain_enums import Language
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.essay_state_machine import (

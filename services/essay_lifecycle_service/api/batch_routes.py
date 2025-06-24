@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from common_core.enums import EssayStatus
+from common_core.observability_enums import OperationType
+from common_core.status_enums import EssayStatus, OperationStatus
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import Counter
@@ -56,7 +57,7 @@ async def get_batch_status(
     essays = await state_store.list_essays_by_batch(batch_id)
     if not essays:
         if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(operation="get_batch_status", status="not_found").inc()
+            ESSAY_OPERATIONS.labels(operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value).inc()
         response = ErrorResponse(
             error="Batch Not Found",
             detail=f"Batch with ID {batch_id} does not exist or has no essays",

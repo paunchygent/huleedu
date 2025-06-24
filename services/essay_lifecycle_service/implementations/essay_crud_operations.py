@@ -12,8 +12,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 import aiosqlite
-from common_core.enums import ContentType, EssayStatus
+from common_core.domain_enums import ContentType
 from common_core.metadata_models import EntityReference
+from common_core.status_enums import EssayStatus
 
 from services.essay_lifecycle_service.implementations.essay_state_model import EssayState
 

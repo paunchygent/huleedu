@@ -14,7 +14,8 @@ from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core.enums import ContentType, FileValidationErrorCode
+from common_core.domain_enums import ContentType
+from common_core.error_enums import FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from services.file_service.protocols import (
     ContentServiceClientProtocol,
@@ -22,6 +23,7 @@ from services.file_service.protocols import (
     EventPublisherProtocol,
     TextExtractorProtocol,
 )
+from services.file_service.validation_models import FileProcessingStatus, FileValidationStatus
 
 logger = create_service_logger("file_service.core_logic")
 
@@ -123,13 +125,13 @@ async def process_single_file_upload(
         if files_uploaded_counter:
             files_uploaded_counter.labels(
                 file_type=file_ext,
-                validation_status="raw_storage_failed",
+                validation_status=FileValidationStatus.RAW_STORAGE_FAILED.value,
                 batch_id=str(batch_id),
             ).inc()
 
         return {
             "file_name": file_name,
-            "status": "raw_storage_failed",
+            "status": FileProcessingStatus.RAW_STORAGE_FAILED.value,
             "error_detail": str(storage_error),
         }
 
@@ -178,14 +180,14 @@ async def process_single_file_upload(
         if files_uploaded_counter:
             files_uploaded_counter.labels(
                 file_type=file_ext,
-                validation_status="extraction_failed",
+                validation_status=FileValidationStatus.EXTRACTION_FAILED.value,
                 batch_id=str(batch_id),
             ).inc()
 
         return {
             "file_name": file_name,
             "raw_file_storage_id": raw_file_storage_id,
-            "status": "extraction_failed",
+            "status": FileProcessingStatus.EXTRACTION_FAILED.value,
         }
 
     # Step 3: Validate extracted content against business rules
@@ -235,14 +237,14 @@ async def process_single_file_upload(
         if files_uploaded_counter:
             files_uploaded_counter.labels(
                 file_type=file_ext,
-                validation_status="content_validation_failed",
+                validation_status=FileValidationStatus.CONTENT_VALIDATION_FAILED.value,
                 batch_id=str(batch_id),
             ).inc()
 
         return {
             "file_name": file_name,
             "raw_file_storage_id": raw_file_storage_id,
-            "status": "content_validation_failed",
+            "status": FileProcessingStatus.CONTENT_VALIDATION_FAILED.value,
             "error_code": validation_result.error_code,
             "error_message": validation_result.error_message,
         }
@@ -290,7 +292,7 @@ async def process_single_file_upload(
     if files_uploaded_counter:
         files_uploaded_counter.labels(
             file_type=file_ext,
-            validation_status="success",
+            validation_status=FileValidationStatus.SUCCESS.value,
             batch_id=str(batch_id),
         ).inc()
 
@@ -298,5 +300,5 @@ async def process_single_file_upload(
         "file_name": file_name,
         "raw_file_storage_id": raw_file_storage_id,
         "text_storage_id": text_storage_id,
-        "status": "processing_success",
+        "status": FileProcessingStatus.PROCESSING_SUCCESS.value,
     }
