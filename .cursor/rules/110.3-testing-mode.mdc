@@ -29,24 +29,70 @@ alwaysApply: false
 - Follow [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc) Sections 3.9-3.11
 - Follow [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc) Section 8.2
 
-## 6. Integration Testing Standards
+## 6. Enum Usage in Tests **MANDATORY**
 
-### 6.1. Database Integration Testing
+### 6.1. Test Data Requirements
+**ALL tests MUST use enum objects for status-related parameters:**
+
+- **REQUIRED**: Pass `BatchStatus` enums to batch-related methods
+- **REQUIRED**: Pass `EssayStatus` enums to essay-related methods
+- **FORBIDDEN**: String literals for status values in test method calls
+
+**Examples:**
+```python
+# ✅ CORRECT - Use enum objects in tests
+from common_core.enums import BatchStatus
+
+async def test_pipeline_completion():
+    await pipeline_coordinator.handle_phase_concluded(
+        batch_id="test-batch",
+        phase_status=BatchStatus.COMPLETED_SUCCESSFULLY
+    )
+
+# ❌ FORBIDDEN - String literals in tests
+async def test_pipeline_completion():
+    await pipeline_coordinator.handle_phase_concluded(
+        batch_id="test-batch", 
+        phase_status="completed_successfully"  # Wrong!
+    )
+```
+
+### 6.2. Boundary Testing Pattern
+**When testing serialization boundaries:**
+
+- Test string-to-enum conversion at API endpoints
+- Test enum-to-string conversion for event publishing
+- Internal business logic tests MUST use enum objects
+
+### 6.3. Mock Assertions
+**Mock verification MUST use enum objects:**
+
+```python
+# ✅ CORRECT
+mock_service.update_status.assert_called_with(
+    essay_id="test",
+    status=EssayStatus.SPELLCHECKED_SUCCESS
+)
+```
+
+## 7. Integration Testing Standards
+
+### 7.1. Database Integration Testing
 - **MUST** use testcontainers for database integration tests when testing repository implementations
 - **REQUIRED**: Real database instances over in-memory alternatives for production parity
 
-### 6.2. Test Isolation
+### 7.2. Test Isolation
 - **MUST** ensure test containers clean up automatically
 - **PATTERN**: Use pytest fixture scopes appropriately
 
-## 7. Debugging and Error Analysis
+## 8. Debugging and Error Analysis
 
-### 7.1. Test Failure Analysis
+### 8.1. Test Failure Analysis
 - **MUST** run tests with `-s` flag during debugging to see print output
 - **REQUIRED**: Read actual error messages completely before attempting fixes
 - **FORBIDDEN**: Simplifying tests to make them pass without fixing root cause
 
-### 7.2. Web Research Integration
+### 8.2. Web Research Integration
 - **SHOULD** research known issues for complex errors (SQLAlchemy, async, etc.)
 - **PATTERN**: Include reference links in comments for documented solutions
 - **EXAMPLE**: Document GitHub issues and Stack Overflow solutions

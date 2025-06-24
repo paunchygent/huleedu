@@ -11,7 +11,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 from uuid import UUID
 
-from common_core.enums import ContentType, CourseCode, EssayStatus
+from common_core.enums import ContentType, CourseCode, EssayStatus, Language
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 
@@ -270,7 +270,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
     async def dispatch_spellcheck_requests(
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
-        language: str,
+        language: Language,
         correlation_id: UUID | None = None,
     ) -> None:
         """Dispatch spellcheck requests to Spellcheck Service."""
@@ -279,7 +279,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
     async def dispatch_nlp_requests(
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
-        language: str,
+        language: Language,
         batch_correlation_id: UUID | None = None,
     ) -> None:
         """Dispatch NLP requests to NLP Service."""
@@ -297,7 +297,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
     async def dispatch_cj_assessment_requests(
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
-        language: str,
+        language: Language,
         course_code: CourseCode,
         essay_instructions: str,
         batch_id: str,
@@ -350,7 +350,7 @@ class BatchEssayTracker(Protocol):
 class MetricsCollector(Protocol):
     """Protocol for collecting service metrics."""
 
-    def record_state_transition(self, from_status: str, to_status: str) -> None:
+    def record_state_transition(self, from_status: EssayStatus, to_status: EssayStatus) -> None:
         """Record a state transition metric."""
         ...
 

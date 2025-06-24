@@ -14,6 +14,7 @@ from protocols import (
     PipelinePhaseInitiatorProtocol,
 )
 
+from common_core.enums import BatchStatus
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 
 logger = create_service_logger("bos.pipeline.coordinator")
@@ -34,7 +35,7 @@ class DefaultPipelinePhaseCoordinator:
         self,
         batch_id: str,
         completed_phase: str,
-        phase_status: str,
+        phase_status: BatchStatus,
         correlation_id: str,
         processed_essays_for_next_phase: list[Any] | None = None,
     ) -> None:
@@ -55,14 +56,15 @@ class DefaultPipelinePhaseCoordinator:
         """
         logger.info(
             f"Handling phase conclusion: batch={batch_id}, phase={completed_phase}, "
-            f"status={phase_status}",
+            f"status={phase_status.value}",
             extra={"correlation_id": correlation_id},
         )
 
         # Update the phase status in pipeline state
         # COMPLETED_WITH_FAILURES is treated as success for progression purposes
         # (per common_core/enums.py - it's a terminal success state with partial failures)
-        if phase_status in ["completed_successfully", "completed_with_failures"]:
+        success_statuses = {BatchStatus.COMPLETED_SUCCESSFULLY, BatchStatus.COMPLETED_WITH_FAILURES}
+        if phase_status in success_statuses:
             updated_status = "COMPLETED_SUCCESSFULLY"
         else:
             updated_status = "FAILED"
@@ -77,15 +79,15 @@ class DefaultPipelinePhaseCoordinator:
         # Allow progression for both COMPLETED_SUCCESSFULLY and COMPLETED_WITH_FAILURES
         # COMPLETED_WITH_FAILURES indicates partial success and should proceed with
         # successful essays
-        if phase_status not in ["completed_successfully", "completed_with_failures"]:
+        if phase_status not in success_statuses:
             logger.info(
                 f"Phase {completed_phase} for batch {batch_id} did not complete successfully "
-                f"(status: {phase_status}), skipping next phase initiation",
+                f"(status: {phase_status.value}), skipping next phase initiation",
             )
             return
 
         # Log progression decision for COMPLETED_WITH_FAILURES cases
-        if phase_status == "completed_with_failures":
+        if phase_status == BatchStatus.COMPLETED_WITH_FAILURES:
             successful_count = (
                 len(processed_essays_for_next_phase) if processed_essays_for_next_phase else 0
             )

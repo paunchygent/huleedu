@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from config import Settings
 
-from common_core.enums import CourseCode
+from common_core.enums import CourseCode, Language
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.protocols import SpecializedServiceRequestDispatcher
@@ -33,7 +33,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
     async def dispatch_spellcheck_requests(
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
-        language: str,
+        language: Language,
         correlation_id: UUID | None = None,
     ) -> None:
         """Dispatch individual spellcheck requests to Spell Checker Service."""
@@ -50,7 +50,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
             "Dispatching spellcheck requests to Spell Checker Service",
             extra={
                 "essay_count": len(essays_to_process),
-                "language": language,
+                "language": language.value,
                 "correlation_id": str(correlation_id),
             },
         )
@@ -80,7 +80,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                     status=EssayStatus.AWAITING_SPELLCHECK,
                     system_metadata=system_metadata,
                     text_storage_id=essay_ref.text_storage_id,
-                    language=language,
+                    language=language.value,  # Use enum value for serialization
                 )
 
                 # Create event envelope
@@ -100,7 +100,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                     extra={
                         "essay_id": essay_ref.essay_id,
                         "text_storage_id": essay_ref.text_storage_id,
-                        "language": language,
+                        "language": language.value,
                         "event_id": str(envelope.event_id),
                         "correlation_id": str(correlation_id),
                     },
@@ -127,7 +127,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
     async def dispatch_nlp_requests(
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
-        language: str,
+        language: Language,
         batch_correlation_id: UUID | None = None,
     ) -> None:
         """Dispatch individual NLP requests to NLP Service."""
@@ -149,7 +149,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
     async def dispatch_cj_assessment_requests(
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
-        language: str,
+        language: Language,
         course_code: CourseCode,
         essay_instructions: str,
         batch_id: str,
@@ -171,7 +171,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 "batch_id": batch_id,
                 "essay_count": len(essays_to_process),
                 "essay_ids": [essay.essay_id for essay in essays_to_process],
-                "language": language,
+                "language": language.value,
                 "course_code": course_code.value,
                 "essay_instructions": essay_instructions[:100] + "..."
                 if len(essay_instructions) > 100
@@ -200,7 +200,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 entity_ref=batch_entity_ref,
                 system_metadata=system_metadata,
                 essays_for_cj=essays_to_process,
-                language=language,
+                language=language.value,  # Use enum value for serialization
                 course_code=course_code,
                 essay_instructions=essay_instructions,
                 llm_config_overrides=None,  # Use service defaults
@@ -223,7 +223,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 extra={
                     "batch_id": batch_id,
                     "essay_count": len(essays_to_process),
-                    "language": language,
+                    "language": language.value,
                     "course_code": course_code.value,
                     "event_id": str(envelope.event_id),
                     "correlation_id": str(correlation_id),
