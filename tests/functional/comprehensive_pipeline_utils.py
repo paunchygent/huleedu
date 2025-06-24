@@ -320,8 +320,8 @@ async def watch_pipeline_progression_with_consumer(
                                         f"{phase_name} -> {phase_status}",
                                     )
                                     completion_statuses = [
-                                        "COMPLETED_SUCCESSFULLY",
-                                        "COMPLETED_WITH_FAILURES",
+                                        "completed_successfully",
+                                        "completed_with_failures",
                                     ]
                                     if phase_status in completion_statuses:
                                         print(
@@ -334,8 +334,8 @@ async def watch_pipeline_progression_with_consumer(
                                         f"{phase_name} -> {phase_status}",
                                     )
                                     completion_statuses = [
-                                        "COMPLETED_SUCCESSFULLY",
-                                        "COMPLETED_WITH_FAILURES",
+                                        "completed_successfully",
+                                        "completed_with_failures",
                                     ]
                                     if phase_status in completion_statuses:
                                         print(

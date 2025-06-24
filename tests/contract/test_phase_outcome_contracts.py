@@ -7,11 +7,11 @@ Following 070-testing-and-quality-assurance.mdc principles.
 from __future__ import annotations
 
 from uuid import uuid4
-
-from common_core.batch_service_models import BatchServiceCJAssessmentInitiateCommandDataV1
-from common_core.enums import CourseCode, ProcessingEvent
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
-from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
+from common_core.batch_service_models import BatchServiceCJAssessmentInitiateCommandDataV1
+from common_core.metadata_models import EssayProcessingInputRefV1, EntityReference
+from common_core.enums import BatchStatus, ProcessingEvent, CourseCode
+from common_core.pipeline_models import PhaseName
 
 
 class TestELSBatchPhaseOutcomeContract:
@@ -33,8 +33,8 @@ class TestELSBatchPhaseOutcomeContract:
         # Create outcome event
         original_event = ELSBatchPhaseOutcomeV1(
             batch_id=batch_id,
-            phase_name="spellcheck",
-            phase_status="COMPLETED_SUCCESSFULLY",
+            phase_name=PhaseName.SPELLCHECK,
+            phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             processed_essays=processed_essays,
             failed_essay_ids=["essay-2", "essay-3"],
             correlation_id=correlation_id,

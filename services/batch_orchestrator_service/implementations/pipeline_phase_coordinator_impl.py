@@ -62,7 +62,7 @@ class DefaultPipelinePhaseCoordinator:
         # Update the phase status in pipeline state
         # COMPLETED_WITH_FAILURES is treated as success for progression purposes
         # (per common_core/enums.py - it's a terminal success state with partial failures)
-        if phase_status in ["COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"]:
+        if phase_status in ["completed_successfully", "completed_with_failures"]:
             updated_status = "COMPLETED_SUCCESSFULLY"
         else:
             updated_status = "FAILED"
@@ -77,7 +77,7 @@ class DefaultPipelinePhaseCoordinator:
         # Allow progression for both COMPLETED_SUCCESSFULLY and COMPLETED_WITH_FAILURES
         # COMPLETED_WITH_FAILURES indicates partial success and should proceed with
         # successful essays
-        if phase_status not in ["COMPLETED_SUCCESSFULLY", "COMPLETED_WITH_FAILURES"]:
+        if phase_status not in ["completed_successfully", "completed_with_failures"]:
             logger.info(
                 f"Phase {completed_phase} for batch {batch_id} did not complete successfully "
                 f"(status: {phase_status}), skipping next phase initiation",
@@ -85,7 +85,7 @@ class DefaultPipelinePhaseCoordinator:
             return
 
         # Log progression decision for COMPLETED_WITH_FAILURES cases
-        if phase_status == "COMPLETED_WITH_FAILURES":
+        if phase_status == "completed_with_failures":
             successful_count = (
                 len(processed_essays_for_next_phase) if processed_essays_for_next_phase else 0
             )

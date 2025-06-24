@@ -122,6 +122,8 @@ def sample_els_phase_outcome_event() -> dict:
     """Create sample ELSBatchPhaseOutcome event for testing."""
     batch_id = str(uuid.uuid4())
     correlation_id = str(uuid.uuid4())
+    from common_core.enums import BatchStatus
+
     return {
         "event_id": str(uuid.uuid4()),
         "event_type": "huleedu.els.batch_phase.outcome.v1",
@@ -131,7 +133,7 @@ def sample_els_phase_outcome_event() -> dict:
         "data": {
             "batch_id": batch_id,
             "phase_name": "spellcheck",
-            "phase_status": "COMPLETED_SUCCESSFULLY",
+            "phase_status": BatchStatus.COMPLETED_SUCCESSFULLY,
             "processed_essays": [{"essay_id": "essay-1", "text_storage_id": "storage-1-processed"}],
             "failed_essay_ids": [],
         },

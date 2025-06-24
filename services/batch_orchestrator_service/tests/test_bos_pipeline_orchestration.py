@@ -186,10 +186,13 @@ class TestELSBatchPhaseOutcomeHandler:
         ]
 
         # Create ELS outcome event
+        from common_core.enums import BatchStatus
+        from common_core.pipeline_models import PhaseName
+
         outcome_data = ELSBatchPhaseOutcomeV1(
             batch_id=batch_id,
-            phase_name="spellcheck",
-            phase_status="COMPLETED_SUCCESSFULLY",
+            phase_name=PhaseName.SPELLCHECK,
+            phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             processed_essays=processed_essays,
             failed_essay_ids=["essay-3"],
             correlation_id=correlation_id,
@@ -217,7 +220,7 @@ class TestELSBatchPhaseOutcomeHandler:
         mock_phase_coordinator.handle_phase_concluded.assert_called_once_with(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="COMPLETED_SUCCESSFULLY",
+            phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=str(correlation_id),
             processed_essays_for_next_phase=processed_essays,  # NEW: Phase 3 data propagation
         )

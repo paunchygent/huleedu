@@ -63,7 +63,7 @@ class TestSQLiteEssayStateStore:
                 "storage_id": "corrected-456",
             },
             "current_phase": "spellcheck",
-            "phase_outcome_status": "spellchecked_success",
+            "phase_outcome_status": EssayStatus.SPELLCHECKED_SUCCESS.value,
         }
 
         # Execute

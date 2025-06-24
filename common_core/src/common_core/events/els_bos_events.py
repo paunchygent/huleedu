@@ -5,13 +5,13 @@ This module contains event models for communication between the Essay Lifecycle 
 and the Batch Orchestrator Service (BOS) for dynamic pipeline orchestration.
 """
 
-from __future__ import annotations
-
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from ..enums import BatchStatus
 from ..metadata_models import EssayProcessingInputRefV1
+from ..pipeline_models import PhaseName
 
 
 class ELSBatchPhaseOutcomeV1(BaseModel):
@@ -33,19 +33,20 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
         description="Unique identifier of the batch that completed the phase",
     )
 
-    phase_name: str = Field(
+    phase_name: PhaseName = Field(
         ...,
         description=(
-            "Name of the phase that was completed (e.g., 'spellcheck', "
-            "'ai_feedback', 'cj_assessment')"
+            "Name of the phase that was completed. Must be a PhaseName enum value "
+            "(e.g., PhaseName.SPELLCHECK, PhaseName.AI_FEEDBACK, PhaseName.CJ_ASSESSMENT)"
         ),
     )
 
-    phase_status: str = Field(
+    phase_status: BatchStatus = Field(
         ...,
         description=(
-            "Overall status of the phase completion (e.g., 'COMPLETED_SUCCESSFULLY', "
-            "'COMPLETED_WITH_FAILURES', 'FAILED_CRITICALLY')"
+            "Overall status of the phase completion. Must be a BatchStatus enum value "
+            "(e.g., BatchStatus.COMPLETED_SUCCESSFULLY, BatchStatus.COMPLETED_WITH_FAILURES, "
+            "BatchStatus.FAILED_CRITICALLY)"
         ),
     )
 
@@ -78,7 +79,7 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
             "example": {
                 "batch_id": "batch-123-456",
                 "phase_name": "spellcheck",
-                "phase_status": "COMPLETED_WITH_FAILURES",
+                "phase_status": "completed_with_failures",  # Enum value for BatchStatus
                 "processed_essays": [
                     {"essay_id": "essay-1", "text_storage_id": "storage-corrected-1"},
                     {"essay_id": "essay-2", "text_storage_id": "storage-corrected-2"},

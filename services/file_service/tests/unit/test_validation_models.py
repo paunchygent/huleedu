@@ -12,6 +12,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
+from common_core.enums import FileValidationErrorCode
 from services.file_service.validation_models import ValidationResult
 
 
@@ -31,13 +32,13 @@ class TestValidationResult:
         """Test creating a failed validation result with error information."""
         result = ValidationResult(
             is_valid=False,
-            error_code="EMPTY_CONTENT",
+            error_code=FileValidationErrorCode.EMPTY_CONTENT,
             error_message="File contains no readable text content.",
             warnings=["File size is unusually small"],
         )
 
         assert result.is_valid is False
-        assert result.error_code == "EMPTY_CONTENT"
+        assert result.error_code == FileValidationErrorCode.EMPTY_CONTENT
         assert result.error_message == "File contains no readable text content."
         assert result.warnings == ["File size is unusually small"]
 
@@ -45,11 +46,11 @@ class TestValidationResult:
         """Test that whitespace is automatically stripped from string fields."""
         result = ValidationResult(
             is_valid=False,
-            error_code="  CONTENT_TOO_SHORT  ",
+            error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
             error_message="  Content is too short.  ",
         )
 
-        assert result.error_code == "CONTENT_TOO_SHORT"
+        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
         assert result.error_message == "Content is too short."
 
     def test_validate_assignment_configuration(self) -> None:
@@ -86,7 +87,7 @@ class TestValidationResult:
         """Test serialization and deserialization maintains data integrity."""
         original = ValidationResult(
             is_valid=False,
-            error_code="CONTENT_TOO_SHORT",
+            error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
             error_message="Content must be at least 50 characters.",
             warnings=["Consider adding more detail"],
         )

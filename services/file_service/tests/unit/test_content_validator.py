@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+from common_core.enums import FileValidationErrorCode
 from services.file_service.content_validator import FileContentValidator
 
 
@@ -196,9 +197,9 @@ class TestFileContentValidator:
     ) -> None:
         """Test that filenames are properly included in error messages for debugging."""
         test_cases = [
-            ("", "empty_file.docx", "EMPTY_CONTENT"),
-            ("Short", "brief_essay.pdf", "CONTENT_TOO_SHORT"),
-            ("A" * 1001, "massive_essay.txt", "CONTENT_TOO_LONG"),
+            ("", "empty_file.docx", FileValidationErrorCode.EMPTY_CONTENT),
+            ("Short", "brief_essay.pdf", FileValidationErrorCode.CONTENT_TOO_SHORT),
+            ("A" * 1001, "massive_essay.txt", FileValidationErrorCode.CONTENT_TOO_LONG),
         ]
 
         for content, filename, expected_error in test_cases:

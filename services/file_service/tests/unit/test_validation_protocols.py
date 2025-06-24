@@ -7,6 +7,7 @@ and compatibility with dependency injection patterns.
 
 from __future__ import annotations
 
+from common_core.enums import FileValidationErrorCode
 from services.file_service.protocols import ContentValidatorProtocol
 from services.file_service.validation_models import ValidationResult
 
@@ -47,7 +48,7 @@ class TestContentValidatorProtocol:
                 """Implementation for testing method signature compliance."""
                 return ValidationResult(
                     is_valid=len(text) > 0,
-                    error_code="EMPTY_CONTENT" if not text else None,
+                    error_code=FileValidationErrorCode.EMPTY_CONTENT if not text else None,
                     error_message="Content is empty" if not text else None,
                 )
 
@@ -59,4 +60,4 @@ class TestContentValidatorProtocol:
 
         empty_result = await validator.validate_content("", "empty.txt")
         assert empty_result.is_valid is False
-        assert empty_result.error_code == "EMPTY_CONTENT"
+        assert empty_result.error_code == FileValidationErrorCode.EMPTY_CONTENT

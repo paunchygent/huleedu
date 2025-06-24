@@ -13,6 +13,7 @@ from uuid import uuid4
 
 import pytest
 
+from common_core.enums import FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 
 
@@ -64,14 +65,14 @@ class TestEssayValidationFailedV1:
             batch_id="batch_456",
             original_file_name="empty_essay.txt",
             raw_file_storage_id="raw_xyz789",
-            validation_error_code="EMPTY_CONTENT",
+            validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
             validation_error_message="File content is empty or contains only whitespace",
             file_size_bytes=0,
         )
 
         assert event.batch_id == "batch_456"
         assert event.original_file_name == "empty_essay.txt"
-        assert event.validation_error_code == "EMPTY_CONTENT"
+        assert event.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
         assert event.validation_error_message == "File content is empty or contains only whitespace"
         assert event.file_size_bytes == 0
         assert event.event == "essay.validation.failed"
@@ -87,7 +88,7 @@ class TestEssayValidationFailedV1:
             batch_id="batch_789",
             original_file_name="too_short_essay.docx",
             raw_file_storage_id="raw_abc456",
-            validation_error_code="CONTENT_TOO_SHORT",
+            validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
             validation_error_message="Content length (25 characters) below minimum threshold (50)",
             file_size_bytes=512,
             correlation_id=correlation_id,
@@ -95,7 +96,7 @@ class TestEssayValidationFailedV1:
         )
 
         assert event.batch_id == "batch_789"
-        assert event.validation_error_code == "CONTENT_TOO_SHORT"
+        assert event.validation_error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
         assert event.file_size_bytes == 512
         assert event.correlation_id == correlation_id
         assert event.timestamp == timestamp
@@ -107,9 +108,9 @@ class TestEssayValidationFailedV1:
             batch_id="batch_serialize",
             original_file_name="test_file.pdf",
             raw_file_storage_id="raw_serialize123",
-            validation_error_code="CONTENT_TOO_LONG",
-            validation_error_message="Content exceeds maximum length limit",
-            file_size_bytes=2048,
+            validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+            validation_error_message="Content is too short",
+            file_size_bytes=150,
             correlation_id=correlation_id,
         )
 
@@ -137,7 +138,7 @@ class TestEssayValidationFailedV1:
             batch_id="test_batch",
             original_file_name="test.txt",
             raw_file_storage_id="raw_default123",
-            validation_error_code="TEST_ERROR",
+            validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
             validation_error_message="Test error message",
             file_size_bytes=100,
         )
@@ -156,21 +157,21 @@ class TestEssayValidationFailedV1:
     def test_validation_error_code_values(self) -> None:
         """Test event creation with various validation error codes."""
         error_codes = [
-            "EMPTY_CONTENT",
-            "CONTENT_TOO_SHORT",
-            "CONTENT_TOO_LONG",
+            FileValidationErrorCode.EMPTY_CONTENT,
+            FileValidationErrorCode.CONTENT_TOO_SHORT,
+            FileValidationErrorCode.CONTENT_TOO_LONG,
         ]
 
-        for error_code in error_codes:
+        for code in error_codes:
             event = EssayValidationFailedV1(
-                batch_id="batch_test",
-                original_file_name="test.txt",
+                batch_id=f"batch_{code.value.lower()}",
+                original_file_name=f"test_{code.value.lower()}.txt",
                 raw_file_storage_id="raw_test123",
-                validation_error_code=error_code,
-                validation_error_message=f"Test error for {error_code}",
+                validation_error_code=code,
+                validation_error_message=f"Test {code.value}",
                 file_size_bytes=100,
             )
-            assert event.validation_error_code == error_code
+            assert event.validation_error_code == code
 
     def test_file_size_edge_cases(self) -> None:
         """Test validation failure event with edge case file sizes."""
@@ -179,7 +180,7 @@ class TestEssayValidationFailedV1:
             batch_id="batch_zero",
             original_file_name="empty.txt",
             raw_file_storage_id="raw_zero123",
-            validation_error_code="EMPTY_CONTENT",
+            validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
             validation_error_message="Empty file",
             file_size_bytes=0,
         )
@@ -190,7 +191,7 @@ class TestEssayValidationFailedV1:
             batch_id="batch_large",
             original_file_name="huge.txt",
             raw_file_storage_id="raw_large123",
-            validation_error_code="CONTENT_TOO_LONG",
+            validation_error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
             validation_error_message="File too large",
             file_size_bytes=10_000_000,
         )
@@ -203,7 +204,7 @@ class TestEssayValidationFailedV1:
             batch_id="batch_tz",
             original_file_name="test.txt",
             raw_file_storage_id="raw_tz123",
-            validation_error_code="TEST_ERROR",
+            validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
             validation_error_message="Test message",
             file_size_bytes=100,
         )
@@ -218,7 +219,7 @@ class TestEssayValidationFailedV1:
             batch_id="batch_explicit",
             original_file_name="test2.txt",
             raw_file_storage_id="raw_explicit123",
-            validation_error_code="TEST_ERROR",
+            validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
             validation_error_message="Test message",
             file_size_bytes=200,
             timestamp=explicit_time,
@@ -232,7 +233,7 @@ class TestEssayValidationFailedV1:
             # Missing required batch_id
             EssayValidationFailedV1(  # type: ignore[call-arg]
                 original_file_name="test.txt",
-                validation_error_code="TEST_ERROR",
+                validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
                 validation_error_message="Test message",
                 file_size_bytes=100,
             )
@@ -247,7 +248,7 @@ class TestEssayValidationFailedV1:
             batch_id=batch_id,
             original_file_name="student_essay_3.docx",
             raw_file_storage_id="raw_coordination123",
-            validation_error_code="CONTENT_TOO_SHORT",
+            validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
             validation_error_message=(
                 "Essay content (15 words) below minimum requirement (50 words)"
             ),

@@ -20,13 +20,15 @@ from __future__ import annotations
 
 import json
 from unittest.mock import AsyncMock, Mock
-from uuid import uuid4
-
 import pytest
+from uuid import UUID, uuid4
 
-from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
+from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
+from common_core.events.batch_coordination_events import BatchEssaysReady
 from common_core.metadata_models import EssayProcessingInputRefV1
+from common_core.enums import BatchStatus, CourseCode, ProcessingEvent
+from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
@@ -151,8 +153,8 @@ class TestBosElsPhaseCoordination:
         # Create ELS outcome event
         outcome_event = ELSBatchPhaseOutcomeV1(
             batch_id=batch_id,
-            phase_name="spellcheck",
-            phase_status="COMPLETED_SUCCESSFULLY",
+            phase_name=PhaseName.SPELLCHECK,
+            phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             processed_essays=processed_essays,
             failed_essay_ids=["essay-3"],  # One essay failed
             correlation_id=correlation_id,
@@ -176,7 +178,7 @@ class TestBosElsPhaseCoordination:
         mock_phase_coordinator.handle_phase_concluded.assert_called_once_with(
             batch_id=batch_id,  # batch_id string
             completed_phase="spellcheck",  # phase_name string
-            phase_status="COMPLETED_SUCCESSFULLY",  # phase_status string
+            phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,  # phase_status enum
             correlation_id=str(correlation_id),  # correlation_id as string
             processed_essays_for_next_phase=processed_essays,  # NEW: Phase 3 data propagation
         )
@@ -214,7 +216,7 @@ class TestBosElsPhaseCoordination:
         # Create event envelope with incomplete data (missing batch_id)
         incomplete_data = {
             "phase_name": "spellcheck",
-            "phase_status": "COMPLETED_SUCCESSFULLY",
+            "phase_status": BatchStatus.COMPLETED_SUCCESSFULLY.value,
             "processed_essays": [],
             "failed_essay_ids": [],
             "correlation_id": str(correlation_id),

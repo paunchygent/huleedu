@@ -8,11 +8,13 @@ proper dependency injection and testability.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar, Union, Optional
 from uuid import UUID
 
-from common_core.enums import ContentType, CourseCode, EssayStatus
+from common_core.enums import BatchStatus, ContentType, CourseCode, EssayStatus
+from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
+from common_core.pipeline_models import PhaseName
 
 
 class EssayState(Protocol):
@@ -246,7 +248,7 @@ class BatchPhaseCoordinator(Protocol):
     async def check_batch_completion(
         self,
         essay_state: EssayState,
-        phase_name: str,
+        phase_name: PhaseName,
         correlation_id: UUID | None = None,
     ) -> None:
         """

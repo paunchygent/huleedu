@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from common_core.enums import ContentType, EssayStatus
+from common_core.enums import BatchStatus, ContentType, EssayStatus
 
 from services.essay_lifecycle_service.implementations.batch_phase_coordinator_impl import (
     DefaultBatchPhaseCoordinator,
@@ -54,9 +54,17 @@ class TestDefaultBatchPhaseCoordinator:
         essay_state.batch_id = batch_id
         essay_state.current_status = status
         essay_state.processing_metadata = {"current_phase": phase, "commanded_phases": [phase]}
-        essay_state.storage_references = storage_refs or {
-            ContentType.ORIGINAL_ESSAY: f"original-{essay_id}"
-        }
+
+        # Set storage_references as a real dictionary to avoid MagicMock interference
+        final_storage_refs = storage_refs or {ContentType.ORIGINAL_ESSAY: f"original-{essay_id}"}
+        essay_state.storage_references = final_storage_refs
+
+        # Ensure MagicMock doesn't auto-create storage-related attributes
+        essay_state.spellchecked_text_storage_id = None
+        essay_state.ai_feedback_text_storage_id = None
+        essay_state.cj_assessment_text_storage_id = None
+        essay_state.nlp_processed_text_storage_id = None
+
         return essay_state
 
     async def test_check_batch_completion_all_succeed_triggers_outcome(
@@ -108,7 +116,7 @@ class TestDefaultBatchPhaseCoordinator:
 
         assert event_data.batch_id == "test-batch-1"
         assert event_data.phase_name == "spellcheck"
-        assert event_data.phase_status == "COMPLETED_SUCCESSFULLY"
+        assert event_data.phase_status == BatchStatus.COMPLETED_SUCCESSFULLY
         assert len(event_data.processed_essays) == 2
         assert len(event_data.failed_essay_ids) == 0
 
@@ -169,7 +177,9 @@ class TestDefaultBatchPhaseCoordinator:
 
         assert event_data.batch_id == "test-batch-1"
         assert event_data.phase_name == "spellcheck"
-        assert event_data.phase_status == "COMPLETED_WITH_FAILURES"
+        from common_core.enums import BatchStatus
+
+        assert event_data.phase_status == BatchStatus.COMPLETED_WITH_FAILURES
         assert len(event_data.processed_essays) == 2  # Only successful ones
         assert len(event_data.failed_essay_ids) == 1
         assert "essay-2" in event_data.failed_essay_ids
@@ -214,7 +224,9 @@ class TestDefaultBatchPhaseCoordinator:
 
         assert event_data.batch_id == "test-batch-1"
         assert event_data.phase_name == "spellcheck"
-        assert event_data.phase_status == "FAILED_CRITICALLY"
+        from common_core.enums import BatchStatus
+
+        assert event_data.phase_status == BatchStatus.FAILED_CRITICALLY
         assert len(event_data.processed_essays) == 0
         assert len(event_data.failed_essay_ids) == 2
         assert "essay-1" in event_data.failed_essay_ids
@@ -440,6 +452,6 @@ class TestDefaultBatchPhaseCoordinator:
 
         assert event_data.batch_id == "test-batch-1"
         assert event_data.phase_name == "cj_assessment"
-        assert event_data.phase_status == "COMPLETED_SUCCESSFULLY"
+        assert event_data.phase_status == BatchStatus.COMPLETED_SUCCESSFULLY
         assert len(event_data.processed_essays) == 2
         assert len(event_data.failed_essay_ids) == 0

@@ -81,7 +81,7 @@ class TestPipelineEdgeCases:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="COMPLETED_SUCCESSFULLY",
+            phase_status="completed_successfully",
             correlation_id=correlation_id,
         )
 
@@ -115,7 +115,7 @@ class TestPipelineEdgeCases:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="COMPLETED_SUCCESSFULLY",
+            phase_status="completed_successfully",
             correlation_id=correlation_id,
         )
 
@@ -151,7 +151,7 @@ class TestPipelineEdgeCases:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="COMPLETED_SUCCESSFULLY",
+            phase_status="completed_successfully",
             correlation_id=correlation_id,
         )
 
@@ -190,7 +190,7 @@ class TestPipelineEdgeCases:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="COMPLETED_SUCCESSFULLY",
+            phase_status="completed_successfully",
             correlation_id=correlation_id,
         )
 
@@ -234,7 +234,7 @@ class TestPipelineEdgeCases:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="COMPLETED_SUCCESSFULLY",
+            phase_status="completed_successfully",
             correlation_id=correlation_id,
         )
 

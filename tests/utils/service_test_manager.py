@@ -166,7 +166,9 @@ class ServiceTestManager:
             except ValueError:
                 # Invalid course code string, use default
                 course_code_enum = CourseCode.ENG5
-                logger.warning(f"Invalid course code '{course_code}', using default {CourseCode.ENG5.value}")
+                logger.warning(
+                    f"Invalid course code '{course_code}', using default {CourseCode.ENG5.value}"
+                )
         else:
             course_code_enum = course_code
 

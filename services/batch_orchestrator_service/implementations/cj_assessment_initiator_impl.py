@@ -81,7 +81,6 @@ class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):
                 # Orchestration context (from BOS lean registration)
                 course_code=batch_context.course_code,
                 essay_instructions=batch_context.essay_instructions,
-
                 # Educational context (TODO: Get from enhanced BatchEssaysReady event)
                 # For now, using GUEST class type until Class Management Service integration
                 class_type="GUEST",

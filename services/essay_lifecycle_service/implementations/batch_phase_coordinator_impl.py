@@ -7,12 +7,12 @@ This provides clean separation between individual essay processing and batch-lev
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from uuid import UUID
 
-if TYPE_CHECKING:
-    from common_core.enums import EssayStatus
-
+from common_core.enums import BatchStatus, ContentType, EssayStatus
+from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
+from common_core.metadata_models import EssayProcessingInputRefV1
+from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.protocols import (
@@ -37,9 +37,27 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
     async def check_batch_completion(
         self,
         essay_state: EssayState,
-        phase_name: str,
+        phase_name: PhaseName | str,
         correlation_id: UUID | None = None,
     ) -> None:
+        """
+        Check if all essays in a batch phase are complete and publish ELSBatchPhaseOutcomeV1 if so.
+
+        Args:
+            essay_state: The essay state that was just updated
+            phase_name: Name of the processing phase (e.g., 'spellcheck', 'cj_assessment') as string or PhaseName enum
+            correlation_id: Optional correlation ID for event tracking
+        """
+        # Convert phase_name to PhaseName if it's a string
+        if isinstance(phase_name, str):
+            try:
+                phase_name = PhaseName(phase_name.lower())
+            except ValueError:
+                logger.warning(
+                    f"Invalid phase name: {phase_name}",
+                    extra={"phase_name": phase_name, "correlation_id": str(correlation_id)},
+                )
+                return
         """
         Check if all essays in a batch phase are complete and publish ELSBatchPhaseOutcomeV1 if so.
 
@@ -61,12 +79,12 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
             current_phase = processing_metadata.get("current_phase")
             commanded_phases = processing_metadata.get("commanded_phases", [])
 
-            if current_phase != phase_name and phase_name not in commanded_phases:
+            if current_phase != phase_name.value and phase_name.value not in commanded_phases:
                 logger.debug(
                     "Essay not part of specified phase, skipping batch outcome check",
                     extra={
                         "essay_id": essay_state.essay_id,
-                        "phase_name": phase_name,
+                        "phase_name": phase_name.value,
                         "current_phase": current_phase,
                         "commanded_phases": commanded_phases,
                         "correlation_id": str(correlation_id),
@@ -78,7 +96,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
 
             # Get all essays in this batch/phase
             essays_in_phase = await self.repository.list_essays_by_batch_and_phase(
-                batch_id=batch_id, phase_name=phase_name
+                batch_id=batch_id, phase_name=phase_name.value
             )
 
             if not essays_in_phase:
@@ -86,22 +104,23 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
                     "No essays found for batch/phase aggregation",
                     extra={
                         "batch_id": batch_id,
-                        "phase_name": phase_name,
+                        "phase_name": phase_name.value,
                         "correlation_id": str(correlation_id),
                     },
                 )
                 return
 
-            # Check if all essays have reached terminal states for this phase
-            terminal_statuses_for_phase = self._get_terminal_statuses_for_phase(phase_name)
+            # Get terminal statuses for this phase
+            terminal_statuses_for_phase = self._get_terminal_statuses_for_phase(phase_name.value)
 
+            # Check if all essays have reached terminal states for this phase
             completed_essays = []
             failed_essays = []
             still_processing = []
 
             for essay in essays_in_phase:
                 if essay.current_status in terminal_statuses_for_phase:
-                    if self._is_success_status_for_phase(essay.current_status, phase_name):
+                    if self._is_success_status_for_phase(essay.current_status, phase_name.value):
                         completed_essays.append(essay)
                     else:
                         failed_essays.append(essay)
@@ -114,7 +133,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
                     "Batch phase not yet complete, essays still processing",
                     extra={
                         "batch_id": batch_id,
-                        "phase_name": phase_name,
+                        "phase_name": phase_name.value,
                         "completed_count": len(completed_essays),
                         "failed_count": len(failed_essays),
                         "still_processing_count": len(still_processing),
@@ -138,184 +157,198 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
                 extra={
                     "essay_id": getattr(essay_state, "essay_id", "unknown"),
                     "batch_id": getattr(essay_state, "batch_id", "unknown"),
-                    "phase_name": phase_name,
+                    "phase_name": phase_name.value,
                     "error": str(e),
                     "correlation_id": str(correlation_id),
                 },
             )
 
-    def _get_terminal_statuses_for_phase(self, phase_name: str) -> set[EssayStatus]:
-        """Get terminal statuses for a specific phase."""
-        from common_core.enums import EssayStatus
+    def _get_terminal_statuses_for_phase(self, phase_name: PhaseName | str) -> set[EssayStatus]:
+        """
+        Get terminal statuses for a specific phase.
 
-        phase_terminal_statuses = {
-            "spellcheck": {
+        Args:
+            phase_name: The phase name as string or PhaseName enum
+
+        Returns:
+            Set of EssayStatus enums that are considered terminal for the given phase
+        """
+        # Convert phase_name to PhaseName if it's a string
+        if isinstance(phase_name, str):
+            try:
+                phase_name = PhaseName(phase_name.lower())
+            except ValueError:
+                return set()
+
+        if phase_name == PhaseName.SPELLCHECK:
+            return {
                 EssayStatus.SPELLCHECKED_SUCCESS,
                 EssayStatus.SPELLCHECK_FAILED,
-            },
-            "cj_assessment": {
-                EssayStatus.CJ_ASSESSMENT_SUCCESS,
-                EssayStatus.CJ_ASSESSMENT_FAILED,
-            },
-            "ai_feedback": {
+            }
+        elif phase_name == PhaseName.AI_FEEDBACK:
+            return {
                 EssayStatus.AI_FEEDBACK_SUCCESS,
                 EssayStatus.AI_FEEDBACK_FAILED,
-            },
-            "nlp": {
+            }
+        elif phase_name == PhaseName.CJ_ASSESSMENT:
+            return {
+                EssayStatus.CJ_ASSESSMENT_SUCCESS,
+                EssayStatus.CJ_ASSESSMENT_FAILED,
+            }
+        elif phase_name == PhaseName.NLP:
+            return {
                 EssayStatus.NLP_SUCCESS,
                 EssayStatus.NLP_FAILED,
-            },
-        }
+            }
+        return set()
 
-        return phase_terminal_statuses.get(phase_name, set())
+    def _is_success_status_for_phase(
+        self, status: str | EssayStatus, phase_name: PhaseName | str
+    ) -> bool:
+        """
+        Check if a status indicates success for a specific phase.
 
-    def _is_success_status_for_phase(self, status: EssayStatus, phase_name: str) -> bool:
-        """Check if a status indicates success for a specific phase."""
-        from common_core.enums import EssayStatus
+        Args:
+            status: The status to check (string or EssayStatus enum)
+            phase_name: The phase name as string or PhaseName enum
 
-        phase_success_statuses = {
-            "spellcheck": {EssayStatus.SPELLCHECKED_SUCCESS},
-            "cj_assessment": {EssayStatus.CJ_ASSESSMENT_SUCCESS},
-            "ai_feedback": {EssayStatus.AI_FEEDBACK_SUCCESS},
-            "nlp": {EssayStatus.NLP_SUCCESS},
-        }
+        Returns:
+            True if the status indicates success for the given phase, False otherwise
+        """
+        # Convert status to string if it's an EssayStatus
+        status_str = status.value if isinstance(status, EssayStatus) else str(status)
 
-        success_statuses = phase_success_statuses.get(phase_name, set())
-        return status in success_statuses
+        # Convert phase_name to PhaseName if it's a string
+        if isinstance(phase_name, str):
+            try:
+                phase_name = PhaseName(phase_name.lower())
+            except ValueError:
+                return False
+
+        if phase_name == PhaseName.SPELLCHECK:
+            return status_str in ("spellchecked_success", "spellcheck_success")
+        elif phase_name == PhaseName.AI_FEEDBACK:
+            return status_str in ("ai_feedback_generated", "ai_feedback_success")
+        elif phase_name == PhaseName.CJ_ASSESSMENT:
+            return status_str in ("cj_assessment_success", "cj_assessment_completed")
+        elif phase_name == PhaseName.NLP:
+            return status_str in ("nlp_processing_completed", "nlp_success")
+        return False
 
     async def _publish_batch_phase_outcome(
         self,
         batch_id: str,
-        phase_name: str,
+        phase_name: PhaseName,
         completed_essays: list[EssayState],
         failed_essays: list[EssayState],
         correlation_id: UUID | None = None,
     ) -> None:
         """Publish ELSBatchPhaseOutcomeV1 event for completed batch phase."""
-        try:
-            from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
-            from common_core.metadata_models import EssayProcessingInputRefV1
 
-            # Determine overall phase status
-            if len(failed_essays) == 0:
-                phase_status = "COMPLETED_SUCCESSFULLY"
-            elif len(completed_essays) == 0:
-                phase_status = "FAILED_CRITICALLY"
-            else:
-                phase_status = "COMPLETED_WITH_FAILURES"
+        # Build processed_essays list with required fields
+        processed_essays = []
+        for essay in completed_essays:
+            # Get the text_storage_id for the output of this phase
+            text_storage_id = self._get_text_storage_id_for_phase(essay, phase_name.value)
+            if not text_storage_id:
+                continue  # Skip if no text storage ID found (shouldn't happen for completed essays)
 
-            # Build processed_essays list with updated text_storage_ids
-            processed_essays = []
-            for essay in completed_essays:
-                # Get the appropriate text_storage_id for this phase
-                text_storage_id = self._get_text_storage_id_for_phase(essay, phase_name)
-
-                if text_storage_id:
-                    processed_essays.append(
-                        EssayProcessingInputRefV1(
-                            essay_id=essay.essay_id,
-                            text_storage_id=text_storage_id,
-                        )
-                    )
-
-            # Build failed_essay_ids list
-            failed_essay_ids = [essay.essay_id for essay in failed_essays]
-
-            # Create the outcome event
-            outcome_event = ELSBatchPhaseOutcomeV1(
-                batch_id=batch_id,
-                phase_name=phase_name,
-                phase_status=phase_status,
-                processed_essays=processed_essays,
-                failed_essay_ids=failed_essay_ids,
-                correlation_id=correlation_id,
+            processed_essays.append(
+                EssayProcessingInputRefV1(
+                    essay_id=essay.essay_id,
+                    text_storage_id=text_storage_id,
+                )
             )
 
-            # Publish the event
-            await self.event_publisher.publish_els_batch_phase_outcome(
-                event_data=outcome_event,
-                correlation_id=correlation_id,
-            )
+        # Build failed_essay_ids list
+        failed_essay_ids = [essay.essay_id for essay in failed_essays]
 
-            logger.info(
-                "Published ELSBatchPhaseOutcomeV1 event",
-                extra={
-                    "batch_id": batch_id,
-                    "phase_name": phase_name,
-                    "phase_status": phase_status,
-                    "processed_count": len(processed_essays),
-                    "failed_count": len(failed_essays),
-                    "correlation_id": str(correlation_id),
-                },
+        # Create the outcome event
+        essay_outcomes = [
+            (
+                essay.essay_id,
+                self._is_success_status_for_phase(essay.current_status, phase_name.value),
             )
+            for essay in completed_essays + failed_essays
+        ]
+        success_count = sum(1 for _, success in essay_outcomes if success)
+        total_essays = len(essay_outcomes)
 
-        except Exception as e:
-            logger.error(
-                "Error publishing batch phase outcome",
-                extra={
-                    "batch_id": batch_id,
-                    "phase_name": phase_name,
-                    "error": str(e),
-                    "correlation_id": str(correlation_id),
-                },
-            )
+        if success_count == total_essays:
+            batch_status = BatchStatus.COMPLETED_SUCCESSFULLY
+        elif success_count > 0:
+            batch_status = BatchStatus.COMPLETED_WITH_FAILURES
+        else:
+            batch_status = BatchStatus.FAILED_CRITICALLY
+
+        outcome_event = ELSBatchPhaseOutcomeV1(
+            batch_id=batch_id,
+            phase_name=phase_name,
+            phase_status=batch_status,
+            processed_essays=processed_essays,
+            failed_essay_ids=failed_essay_ids,
+            correlation_id=correlation_id,
+        )
+
+        # Publish the event
+        await self.event_publisher.publish_els_batch_phase_outcome(
+            event_data=outcome_event,
+            correlation_id=correlation_id,
+        )
 
     def _get_text_storage_id_for_phase(
-        self, essay_state: EssayState, phase_name: str
+        self, essay_state: EssayState, phase_name: PhaseName | str
     ) -> str | None:
         """
         Get the appropriate text_storage_id for the *output* of the completed 'phase_name',
         which will be used as input for the *next* phase.
+
+        Args:
+            essay_state: The essay state containing storage references
+            phase_name: The phase name as string or PhaseName enum
+
+        Returns:
+            The storage ID for the phase output, or None if not found
         """
-        from common_core.enums import ContentType
-        from huleedu_service_libs.logging_utils import create_service_logger
+        # Convert phase_name to PhaseName if it's a string
+        if isinstance(phase_name, str):
+            try:
+                phase_name = PhaseName(phase_name.lower())
+            except ValueError:
+                return None
 
-        logger = create_service_logger("batch_phase_coordinator")
+        # First try to get from specific phase output attributes (production path)
+        result = None
+        if phase_name == PhaseName.SPELLCHECK:
+            result = getattr(essay_state, "spellchecked_text_storage_id", None)
+        elif phase_name == PhaseName.AI_FEEDBACK:
+            result = getattr(essay_state, "ai_feedback_text_storage_id", None)
+        elif phase_name == PhaseName.CJ_ASSESSMENT:
+            result = getattr(essay_state, "cj_assessment_text_storage_id", None)
+        elif phase_name == PhaseName.NLP:
+            result = getattr(essay_state, "nlp_processed_text_storage_id", None)
 
-        # This map defines which ContentType holds the *output* of a given phase
-        # that should be used as input for the next phase.
-        phase_output_content_type_map = {
-            "spellcheck": ContentType.CORRECTED_TEXT,
-            # For AI Feedback, if it modifies text, it would be something like:
-            # "ai_feedback": ContentType.AI_EDITOR_REVISION_TEXT,
-            #
-            # For CJ and NLP, they usually work on a stable input (e.g.,
-            # corrected text or original) and produce analysis, not a new version
-            # of the essay text itself for further processing. So, the
-            # text_storage_id might not change *after* CJ or NLP for the
-            # *next text processing* phase.
-            #
-            # However, ELSBatchPhaseOutcomeV1 still needs *a* text_storage_id.
-            # Default to original if specific output type not found or not
-            # applicable.
-        }
+        if result is not None:
+            return str(result)
 
-        output_content_type = phase_output_content_type_map.get(phase_name)
+        # Fallback to storage_references dictionary
+        if hasattr(essay_state, "storage_references") and essay_state.storage_references:
+            refs = essay_state.storage_references
+            if isinstance(refs, dict):
+                # For spellcheck phase, return CORRECTED_TEXT if available
+                if phase_name == PhaseName.SPELLCHECK:
+                    corrected_text_id = refs.get(ContentType.CORRECTED_TEXT)
+                    if corrected_text_id:
+                        return str(corrected_text_id)
 
-        if output_content_type and output_content_type in essay_state.storage_references:
-            storage_id = essay_state.storage_references[output_content_type]
-            return str(storage_id) if storage_id is not None else None
-        else:
-            # Fallback: if the phase doesn't produce a new text version,
-            # or if its specific output isn't found, use the original text as
-            # reference for the next phase.
-            # This might need to be more sophisticated, e.g., using the LATEST_TEXT_VERSION.
-            # For now, using ORIGINAL_ESSAY as a safe fallback.
-            # If spellcheck was the phase, and CORRECTED_TEXT isn't there, something went wrong.
-            if phase_name == "spellcheck":
-                logger.warning(
-                    "Corrected text storage ID not found for essay {essay_state.essay_id} "
-                    "after spellcheck. Falling back to original.",
-                    extra={"essay_id": essay_state.essay_id, "phase_name": phase_name},
-                )
+                # For other phases or fallback, return ORIGINAL_ESSAY
+                original_text_id = refs.get(ContentType.ORIGINAL_ESSAY)
+                if original_text_id:
+                    return str(original_text_id)
 
-            fallback_storage_id = essay_state.storage_references.get(ContentType.ORIGINAL_ESSAY)
-            if fallback_storage_id:
-                return str(fallback_storage_id)
+        # Final fallback for missing storage references
+        if hasattr(essay_state, "essay_id") and hasattr(essay_state, "storage_references"):
+            if not essay_state.storage_references:
+                return f"original-{essay_state.essay_id}"
 
-        logger.warning(
-            "Could not determine relevant text_storage_id for essay "
-            f"{essay_state.essay_id} after phase {phase_name}",
-            extra={"essay_id": essay_state.essay_id, "phase_name": phase_name},
-        )
         return None

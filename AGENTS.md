@@ -1,18 +1,16 @@
-# HuleEdu AI Agent Directives (Production-Grade DDD/EDA Microservices)
-
-- ALWAYS START WITH WoofWoof.
 - CRITICAL: Consult `.cursor/rules/` BEFORE ANY TASK (`000-rule-index.mdc`). Rules are NON-NEGOTIABLE.
+
+Start in planning mode `.cursor/rules/110.1-planning-mode.mdc`, then switch to coding mode, finish up in liniting and testing mode.
+
 - Adhere strictly to DDD/EDA microservice architecture. No "vibe coding" or deviations.
 - Tech Stack: Python 3.11+, Quart, PDM monorepo, Pydantic (v2 standards, `051`), Kafka, Docker.
 - Services: batch_orchestrator, content, spell_checker (active); essay (placeholder). Common Core for shared models/events.
-- Development Workflow: Use PDM monorepo. MANDATORY QA: `pdm run format-all`, `lint-all`, `typecheck-all`, `test-all`.
-
----
+- Development Workflow: Use PDM monorepo. MANDATORY QA: always from root level`pdm run format-all`, `lint-all`, `typecheck-all`, `pdm run pytest`.
 
 - Utilize modes defined in `.cursor/rules/110.x-*.mdc`.
 - Follow `.cursor/rules/050-python-coding-standards.mdc` (Strict Typing, DI via Protocols/Dishka, Ruff compliance).
 - Implement Unit, Contract, Integration, E2E tests (`.cursor/rules/070-testing-and-quality-assurance.mdc`). Run with `pdm run test-all`.
-- Use `common_core.events.EventEnvelope` per `.cursor/rules/030-event-driven-architecture-eda-standards.mdc`. Thin events principle.
+
 - Google-style docstrings, update documentation, cite sources `file:start-end:path` (`.cursor/rules/090-documentation-standards.mdc`).
 - Agents are network-disabled. SKIP network-dependent tasks (PyPI, Kafka/DB conn, external APIs, CI/CD). Document skipped parts, defer to network-enabled agents. COMPLETE local tasks.
 - No access to `.env*` or sensitive files. Respect `.gitignore`. No secrets in code/logs. Sandbox is read-only with explicit write approval.

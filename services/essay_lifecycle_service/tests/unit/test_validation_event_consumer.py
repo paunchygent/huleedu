@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
+from common_core.enums import FileValidationErrorCode
 from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayValidationFailedV1
 
@@ -37,7 +38,7 @@ class TestValidationEventConsumerIntegration:
         return EssayValidationFailedV1(
             batch_id="batch_consumer_test",
             original_file_name="failed_essay.txt",
-            validation_error_code="EMPTY_CONTENT",
+            validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
             validation_error_message="File content is empty or contains only whitespace",
             file_size_bytes=0,
             raw_file_storage_id="test_storage_id_consumer",
@@ -129,8 +130,8 @@ class TestValidationEventConsumerIntegration:
             EssayValidationFailedV1(
                 batch_id="batch_multiple",
                 original_file_name=f"failed_{i}.txt",
-                validation_error_code="CONTENT_TOO_SHORT",
-                validation_error_message=f"Content too short: file {i}",
+                validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+                validation_error_message=f"Content is too short: file {i}",
                 file_size_bytes=10,
                 raw_file_storage_id=f"test_storage_id_multiple_{i:03d}",
             )
@@ -153,8 +154,8 @@ class TestValidationEventConsumerIntegration:
         validation_failure = EssayValidationFailedV1(
             batch_id="batch_correlation",
             original_file_name="tracked_file.txt",
-            validation_error_code="CONTENT_TOO_LONG",
-            validation_error_message="Content exceeds maximum length",
+            validation_error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
+            validation_error_message="Content is too long, exceeds maximum length",
             file_size_bytes=100000,
             raw_file_storage_id="test_storage_id_correlation",
             correlation_id=correlation_id,
@@ -178,7 +179,7 @@ class TestValidationEventConsumerIntegration:
             data=EssayValidationFailedV1(
                 batch_id="batch_invalid",
                 original_file_name="test.txt",
-                validation_error_code="TEST_ERROR",
+                validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
                 validation_error_message="Test error",
                 file_size_bytes=100,
                 raw_file_storage_id="test_storage_id_invalid",
@@ -201,7 +202,7 @@ class TestValidationEventConsumerIntegration:
         validation_failure = EssayValidationFailedV1(
             batch_id="batch_error",
             original_file_name="error_test.txt",
-            validation_error_code="TEST_ERROR",
+            validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
             validation_error_message="Test error message",
             file_size_bytes=50,
             raw_file_storage_id="test_storage_id_error",
@@ -240,8 +241,8 @@ class TestValidationEventConsumerIntegration:
         validation_failure = EssayValidationFailedV1(
             batch_id=batch_id,
             original_file_name="consistency_test.txt",
-            validation_error_code="EMPTY_CONTENT",
-            validation_error_message="Empty content test",
+            validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
+            validation_error_message="Invalid file format",
             file_size_bytes=0,
             raw_file_storage_id="test_storage_id_consistency",
         )
@@ -271,8 +272,8 @@ class TestValidationEventConsumerIntegration:
             EssayValidationFailedV1(
                 batch_id=f"batch_concurrent_{i}",
                 original_file_name=f"concurrent_{i}.txt",
-                validation_error_code="CONTENT_TOO_SHORT",
-                validation_error_message=f"Concurrent processing test {i}",
+                validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+                validation_error_message=f"Content too short for concurrent test {i}",
                 file_size_bytes=15,
                 raw_file_storage_id=f"test_storage_id_concurrent_{i:03d}",
             )
@@ -327,16 +328,20 @@ class TestValidationEventConsumerIntegration:
 
     async def test_validation_error_code_preservation(self, mock_batch_tracker: Mock) -> None:
         """Test that validation error codes are preserved through event processing."""
-        error_codes = ["EMPTY_CONTENT", "CONTENT_TOO_SHORT", "CONTENT_TOO_LONG"]
+        error_codes = [
+            FileValidationErrorCode.EMPTY_CONTENT,
+            FileValidationErrorCode.CONTENT_TOO_SHORT,
+            FileValidationErrorCode.CONTENT_TOO_LONG,
+        ]
 
         for error_code in error_codes:
             validation_failure = EssayValidationFailedV1(
                 batch_id="batch_error_codes",
-                original_file_name=f"test_{error_code.lower()}.txt",
+                original_file_name=f"test_{error_code.value.lower()}.txt",
                 validation_error_code=error_code,
-                validation_error_message=f"Test message for {error_code}",
+                validation_error_message=f"Test message for {error_code.value}",
                 file_size_bytes=100,
-                raw_file_storage_id=f"test_storage_id_{error_code.lower()}",
+                raw_file_storage_id=f"test_storage_id_{error_code.value.lower()}",
             )
 
             await mock_batch_tracker.handle_validation_failure(validation_failure)

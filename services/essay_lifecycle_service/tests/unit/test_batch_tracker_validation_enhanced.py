@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from unittest.mock import patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from common_core.enums import CourseCode
+from common_core.enums import CourseCode, FileValidationErrorCode
 from common_core.events.batch_coordination_events import BatchEssaysReady, BatchEssaysRegistered
 from common_core.events.file_events import EssayValidationFailedV1
 from common_core.metadata_models import (
@@ -57,7 +58,7 @@ class TestEnhancedBatchEssayTracker:
         return EssayValidationFailedV1(
             batch_id="batch_test",
             original_file_name="failed_essay.txt",
-            validation_error_code="EMPTY_CONTENT",
+            validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
             validation_error_message="File content is empty or contains only whitespace",
             file_size_bytes=0,
             raw_file_storage_id="test_storage_id_001",
@@ -94,7 +95,7 @@ class TestEnhancedBatchEssayTracker:
             assert "batch_test" in tracker.validation_failures
             assert len(tracker.validation_failures["batch_test"]) == 1
             failure = tracker.validation_failures["batch_test"][0]
-            assert failure.validation_error_code == "EMPTY_CONTENT"
+            assert failure.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
 
             # Should not trigger completion yet (only 1 of 5 processed)
             mock_complete.assert_not_called()
@@ -133,7 +134,7 @@ class TestEnhancedBatchEssayTracker:
                 failure = EssayValidationFailedV1(
                     batch_id="batch_test",
                     original_file_name=f"failed_essay_{i}.txt",
-                    validation_error_code="CONTENT_TOO_SHORT",
+                    validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
                     validation_error_message="Content below minimum threshold",
                     file_size_bytes=10,
                     raw_file_storage_id=f"test_storage_id_{i:03d}",
@@ -180,8 +181,8 @@ class TestEnhancedBatchEssayTracker:
             failure = EssayValidationFailedV1(
                 batch_id="batch_24_of_25",
                 original_file_name="corrupted_essay_25.pdf",
-                validation_error_code="CONTENT_TOO_SHORT",
-                validation_error_message="Essay content below minimum threshold",
+                validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+                validation_error_message="Content too short",
                 file_size_bytes=15,
                 raw_file_storage_id="test_storage_id_025",
             )
@@ -207,8 +208,8 @@ class TestEnhancedBatchEssayTracker:
             EssayValidationFailedV1(
                 batch_id="batch_test",
                 original_file_name=f"failed_{i}.txt",
-                validation_error_code="EMPTY_CONTENT",
-                validation_error_message=f"Failed file {i}",
+                validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
+                validation_error_message="Empty content",
                 file_size_bytes=0,
                 raw_file_storage_id=f"test_storage_id_{i:03d}",
             )
@@ -222,7 +223,7 @@ class TestEnhancedBatchEssayTracker:
         # Verify all failures are tracked
         assert len(tracker.validation_failures["batch_test"]) == 3
         assert all(
-            f.validation_error_code == "EMPTY_CONTENT"
+            f.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
             for f in tracker.validation_failures["batch_test"]
         )
 
@@ -240,7 +241,7 @@ class TestEnhancedBatchEssayTracker:
         failure = EssayValidationFailedV1(
             batch_id="batch_test",
             original_file_name="failed_4.txt",
-            validation_error_code="CONTENT_TOO_SHORT",
+            validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
             validation_error_message="Failed file 4",
             file_size_bytes=10,
             raw_file_storage_id="test_storage_id_004",
@@ -254,7 +255,7 @@ class TestEnhancedBatchEssayTracker:
         failure2 = EssayValidationFailedV1(
             batch_id="batch_test",
             original_file_name="failed_5.txt",
-            validation_error_code="CONTENT_TOO_SHORT",
+            validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
             validation_error_message="Failed file 5",
             file_size_bytes=10,
             raw_file_storage_id="test_storage_id_005",
@@ -299,7 +300,7 @@ class TestEnhancedBatchEssayTracker:
                 failure = EssayValidationFailedV1(
                     batch_id="batch_all_failed",
                     original_file_name=f"corrupted_{i}.txt",
-                    validation_error_code="EMPTY_CONTENT",
+                    validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
                     validation_error_message="Empty file content",
                     file_size_bytes=0,
                     raw_file_storage_id=f"test_storage_id_failed_{i:03d}",
@@ -324,7 +325,7 @@ class TestEnhancedBatchEssayTracker:
         failure = EssayValidationFailedV1(
             batch_id="batch_test",
             original_file_name="tracked_failure.txt",
-            validation_error_code="CONTENT_TOO_LONG",
+            validation_error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
             validation_error_message="Content exceeds maximum length",
             file_size_bytes=100000,
             raw_file_storage_id="test_storage_id_tracked",
@@ -357,7 +358,7 @@ class TestEnhancedBatchEssayTracker:
             failure = EssayValidationFailedV1(
                 batch_id="batch_test",
                 original_file_name="final_failure.txt",
-                validation_error_code="VALIDATION_ERROR",
+                validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
                 validation_error_message="Final validation error",
                 file_size_bytes=50,
                 raw_file_storage_id="test_storage_id_final",
@@ -381,7 +382,7 @@ class TestEnhancedBatchEssayTracker:
                 failure = EssayValidationFailedV1(
                     batch_id="batch_test",
                     original_file_name=f"failed_{i}.txt",
-                    validation_error_code="EMPTY_CONTENT",
+                    validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
                     validation_error_message="Empty content",
                     file_size_bytes=0,
                     raw_file_storage_id=f"test_storage_id_empty_{i:03d}",
@@ -406,7 +407,7 @@ class TestEnhancedBatchEssayTracker:
         failure = EssayValidationFailedV1(
             batch_id="batch_test",
             original_file_name="failed_4.txt",
-            validation_error_code="CONTENT_TOO_SHORT",
+            validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
             validation_error_message="Content too short: file 4",
             file_size_bytes=20,
             raw_file_storage_id="test_storage_id_short_4",
@@ -428,7 +429,7 @@ class TestEnhancedBatchEssayTracker:
         failure2 = EssayValidationFailedV1(
             batch_id="batch_test",
             original_file_name="failed_5.txt",
-            validation_error_code="CONTENT_TOO_SHORT",
+            validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
             validation_error_message="Content too short: file 5",
             file_size_bytes=20,
             raw_file_storage_id="test_storage_id_short_5",
@@ -453,9 +454,9 @@ class TestEnhancedBatchEssayTracker:
                 EssayValidationFailedV1(
                     batch_id="batch_test",
                     original_file_name=f"concurrent_fail_{i}.txt",
-                    validation_error_code="CONTENT_TOO_SHORT",
-                    validation_error_message=f"Concurrent failure {i}",
-                    file_size_bytes=10,
+                    validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+                    validation_error_message="Content too short: concurrent file",
+                    file_size_bytes=15,
                     raw_file_storage_id=f"test_storage_id_concurrent_{i:03d}",
                 )
                 for i in range(1, 6)

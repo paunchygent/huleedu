@@ -254,8 +254,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             essay_instructions=expectation.essay_instructions,
             class_type="GUEST",  # Placeholder - until Class Management Service integration
             teacher_first_name=None,  # No teacher info for GUEST classes
-            teacher_last_name=None,   # No teacher info for GUEST classes
-
+            teacher_last_name=None,  # No teacher info for GUEST classes
             validation_failures=failures if failures else None,
             total_files_processed=len(expectation.slot_assignments) + len(failures),
         )

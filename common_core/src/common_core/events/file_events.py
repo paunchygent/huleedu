@@ -9,9 +9,12 @@ separate from batch coordination concerns.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+from ..enums import FileValidationErrorCode
 
 
 class EssayContentProvisionedV1(BaseModel):
@@ -52,8 +55,8 @@ class EssayValidationFailedV1(BaseModel):
     raw_file_storage_id: str = Field(
         description="Storage ID of the raw file blob that failed validation.",
     )
-    validation_error_code: str = Field(
-        description="Specific validation error code (e.g., EMPTY_CONTENT, CONTENT_TOO_SHORT)",
+    validation_error_code: FileValidationErrorCode = Field(
+        description="Specific validation error code from FileValidationErrorCode enum"
     )
     validation_error_message: str = Field(description="Human-readable error message with context")
     file_size_bytes: int = Field(description="Size of the failed file for metrics and analysis")

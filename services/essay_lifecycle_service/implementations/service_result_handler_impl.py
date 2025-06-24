@@ -10,23 +10,34 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-if TYPE_CHECKING:
-    from common_core.events.cj_assessment_events import (
-        CJAssessmentCompletedV1,
-        CJAssessmentFailedV1,
-    )
-    from common_core.events.spellcheck_models import SpellcheckResultDataV1
-
 from common_core.enums import EssayStatus
+from common_core.events.cj_assessment_events import (
+    CJAssessmentCompletedV1,
+    CJAssessmentFailedV1,
+)
+from common_core.events.spellcheck_models import SpellcheckResultDataV1
+from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.logging_utils import create_service_logger
 
+# Import event constants from state machine to ensure consistency
 from services.essay_lifecycle_service.essay_state_machine import (
     EVT_CJ_ASSESSMENT_FAILED,
     EVT_CJ_ASSESSMENT_SUCCEEDED,
     EVT_SPELLCHECK_FAILED,
     EVT_SPELLCHECK_SUCCEEDED,
-    EssayStateMachine,
 )
+
+# Import at runtime to avoid circular imports
+if TYPE_CHECKING:
+    from services.essay_lifecycle_service.essay_state_machine import EssayStateMachine
+    from services.essay_lifecycle_service.protocols import (
+        BatchPhaseCoordinator,
+        EssayRepositoryProtocol,
+        ServiceResultHandler,
+    )
+
+# Import EssayStateMachine at runtime since it's used in the code
+from services.essay_lifecycle_service.essay_state_machine import EssayStateMachine
 from services.essay_lifecycle_service.protocols import (
     BatchPhaseCoordinator,
     EssayRepositoryProtocol,
@@ -163,7 +174,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             if updated_essay_state:
                 await self.batch_coordinator.check_batch_completion(
                     essay_state=updated_essay_state,
-                    phase_name="spellcheck",
+                    phase_name=PhaseName.SPELLCHECK,
                     correlation_id=correlation_id,
                 )
 
@@ -270,7 +281,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     if batch_representative_essay_state:
                         await self.batch_coordinator.check_batch_completion(
                             essay_state=batch_representative_essay_state,
-                            phase_name="cj_assessment",
+                            phase_name=PhaseName.CJ_ASSESSMENT,
                             correlation_id=correlation_id,
                         )
 

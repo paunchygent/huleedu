@@ -400,7 +400,10 @@ class TestCJAssessmentCommandHandler:
         )
 
         # Setup essay states - all found and can transition
-        essay_states = [self.create_essay_state_mock(ref.essay_id, batch_id) for ref in command_data.essays_to_process]
+        essay_states = [
+            self.create_essay_state_mock(ref.essay_id, batch_id)
+            for ref in command_data.essays_to_process
+        ]
         mock_repository.get_essay_state.side_effect = essay_states
 
         with patch(
@@ -464,7 +467,9 @@ class TestCJAssessmentCommandHandler:
         )
 
         # Setup essay state
-        essay_state = self.create_essay_state_mock(command_data.essays_to_process[0].essay_id, batch_id)
+        essay_state = self.create_essay_state_mock(
+            command_data.essays_to_process[0].essay_id, batch_id
+        )
         mock_repository.get_essay_state.return_value = essay_state
 
         with patch(
