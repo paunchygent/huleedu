@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from common_core.enums import CourseCode
+from common_core.enums import BatchStatus, CourseCode
 from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_repository_impl import (
@@ -97,7 +97,7 @@ class TestPipelineRealWorldScenarios:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="COMPLETED_WITH_FAILURES",  # 24/25 succeeded, 1 failed
+            phase_status=BatchStatus.COMPLETED_WITH_FAILURES,  # 24/25 succeeded, 1 failed
             correlation_id=correlation_id,
             processed_essays_for_next_phase=successful_essays,  # 24 essays proceed to CJ assessment
         )

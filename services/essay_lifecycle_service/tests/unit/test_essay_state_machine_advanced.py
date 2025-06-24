@@ -32,7 +32,7 @@ class TestEssayStateMachineStringRepresentation:
         str_repr = str(machine)
         assert "EssayStateMachine" in str_repr
         assert "str-test" in str_repr
-        assert "ready_for_processing" in str_repr
+        assert EssayStatus.READY_FOR_PROCESSING.value in str_repr
 
     def test_repr_representation(self) -> None:
         """Test __repr__ method."""

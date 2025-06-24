@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from common_core.enums import CourseCode
+from common_core.enums import BatchStatus, CourseCode
 from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_repository_impl import (
@@ -81,7 +81,7 @@ class TestPipelineFailureHandling:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="failed",  # Phase failed
+            phase_status=BatchStatus.FAILED_CRITICALLY,  # Phase failed
             correlation_id=correlation_id,
         )
 
@@ -137,7 +137,7 @@ class TestPipelineFailureHandling:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="COMPLETED_WITH_FAILURES",  # Partial success
+            phase_status=BatchStatus.COMPLETED_WITH_FAILURES,  # Partial success
             correlation_id=correlation_id,
             processed_essays_for_next_phase=processed_essays,  # 2 successful essays to proceed
         )
@@ -201,7 +201,7 @@ class TestPipelineFailureHandling:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="COMPLETED_WITH_FAILURES",  # Partial success
+            phase_status=BatchStatus.COMPLETED_WITH_FAILURES,  # Partial success
             correlation_id=correlation_id,
             processed_essays_for_next_phase=processed_essays,  # 2 successful essays to proceed
         )

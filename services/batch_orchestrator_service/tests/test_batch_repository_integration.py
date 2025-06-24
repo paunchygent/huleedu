@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 import pytest
 from testcontainers.postgres import PostgresContainer
 
-from common_core.enums import CourseCode
+from common_core.enums import BatchStatus, CourseCode
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_repository_postgres_impl import (
     PostgreSQLBatchRepositoryImpl,
@@ -86,7 +86,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Let's verify we can perform basic operations
         batch_data = {
             "id": "test-schema-batch",
-            "status": "awaiting_content_validation",
+            "status": BatchStatus.AWAITING_CONTENT_VALIDATION.value,
             "name": "Schema Test Batch",
         }
 
@@ -106,7 +106,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
             "correlation_id": "corr-123",
             "name": "Integration Test Batch",
             "description": "Test batch for integration testing",
-            "status": "awaiting_content_validation",
+            "status": BatchStatus.AWAITING_CONTENT_VALIDATION.value,
             "requested_pipelines": ["spellcheck", "ai_feedback"],
             "total_essays": 10,
         }
@@ -122,7 +122,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         assert retrieved_batch is not None
         assert retrieved_batch["id"] == "test-batch-001"
         assert retrieved_batch["name"] == "Integration Test Batch"
-        assert retrieved_batch["status"] == "awaiting_content_validation"
+        assert retrieved_batch["status"] == BatchStatus.AWAITING_CONTENT_VALIDATION.value
         assert retrieved_batch["total_essays"] == 10
         assert retrieved_batch["correlation_id"] == "corr-123"
 
@@ -171,7 +171,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         await postgres_repository.create_batch(
             {
                 "id": batch_id,
-                "status": "ready_for_pipeline_execution",
+                "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
             },
         )
 
@@ -205,7 +205,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         await postgres_repository.create_batch(
             {
                 "id": batch_id,
-                "status": "processing_pipelines",
+                "status": BatchStatus.PROCESSING_PIPELINES.value,
             },
         )
 
@@ -265,7 +265,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         await postgres_repository.create_batch(
             {
                 "id": batch_id,
-                "status": "processing_pipelines",
+                "status": BatchStatus.PROCESSING_PIPELINES.value,
             },
         )
 
@@ -315,14 +315,14 @@ class TestPostgreSQLBatchRepositoryIntegration:
         await postgres_repository.create_batch(
             {
                 "id": batch_id,
-                "status": "awaiting_content_validation",
+                "status": BatchStatus.AWAITING_CONTENT_VALIDATION.value,
             },
         )
 
         # Act - Update status
         update_success = await postgres_repository.update_batch_status(
             batch_id,
-            "ready_for_pipeline_execution",
+            BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
         )
 
         # Act - Retrieve updated batch
@@ -331,7 +331,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Assert
         assert update_success is True
         assert updated_batch is not None
-        assert updated_batch["status"] == "ready_for_pipeline_execution"
+        assert updated_batch["status"] == BatchStatus.READY_FOR_PIPELINE_EXECUTION.value
 
     @pytest.mark.asyncio
     async def test_nonexistent_batch_operations(
@@ -356,7 +356,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Test status update
         status_update = await postgres_repository.update_batch_status(
             nonexistent_id,
-            "completed_successfully",
+            BatchStatus.COMPLETED_SUCCESSFULLY.value,
         )
         assert status_update is False
 

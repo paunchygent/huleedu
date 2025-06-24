@@ -11,7 +11,7 @@ from uuid import uuid4
 
 import pytest
 
-from common_core.enums import CourseCode
+from common_core.enums import BatchStatus, CourseCode
 from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_repository_impl import (
@@ -81,7 +81,7 @@ class TestPipelineEdgeCases:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="completed_successfully",
+            phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=correlation_id,
         )
 
@@ -115,7 +115,7 @@ class TestPipelineEdgeCases:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="completed_successfully",
+            phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=correlation_id,
         )
 
@@ -151,7 +151,7 @@ class TestPipelineEdgeCases:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="completed_successfully",
+            phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=correlation_id,
         )
 
@@ -190,7 +190,7 @@ class TestPipelineEdgeCases:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="completed_successfully",
+            phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=correlation_id,
         )
 
@@ -234,7 +234,7 @@ class TestPipelineEdgeCases:
         await pipeline_coordinator.handle_phase_concluded(
             batch_id=batch_id,
             completed_phase="spellcheck",
-            phase_status="completed_successfully",
+            phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             correlation_id=correlation_id,
         )
 

@@ -13,6 +13,7 @@ from uuid import UUID
 if TYPE_CHECKING:
     from common_core.batch_service_models import BatchServiceCJAssessmentInitiateCommandDataV1
 
+from common_core.enums import Language
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.essay_state_machine import (
@@ -151,9 +152,12 @@ class CJAssessmentCommandHandler:
         # Dispatch requests to CJ Assessment Service AFTER successful state transitions
         if successfully_transitioned_essays:
             try:
+                # Convert string language to Language enum at boundary
+                language_enum = Language(command_data.language)
+
                 await self.request_dispatcher.dispatch_cj_assessment_requests(
                     essays_to_process=successfully_transitioned_essays,
-                    language=command_data.language,
+                    language=language_enum,
                     course_code=command_data.course_code,
                     essay_instructions=command_data.essay_instructions,
                     batch_id=command_data.entity_ref.entity_id,

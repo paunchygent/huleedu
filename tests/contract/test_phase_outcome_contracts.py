@@ -7,10 +7,11 @@ Following 070-testing-and-quality-assurance.mdc principles.
 from __future__ import annotations
 
 from uuid import uuid4
-from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
+
 from common_core.batch_service_models import BatchServiceCJAssessmentInitiateCommandDataV1
-from common_core.metadata_models import EssayProcessingInputRefV1, EntityReference
-from common_core.enums import BatchStatus, ProcessingEvent, CourseCode
+from common_core.enums import BatchStatus, CourseCode, ProcessingEvent
+from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
+from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 
 

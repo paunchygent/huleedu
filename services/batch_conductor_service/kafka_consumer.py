@@ -14,7 +14,7 @@ import json
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
 
-from common_core.enums import ProcessingEvent, topic_name
+from common_core.enums import EssayStatus, ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
@@ -196,7 +196,7 @@ class BCSKafkaConsumer:
                 return
 
             # Determine success based on status
-            is_success = spellcheck_data.status.value in ["spellchecked_success"]
+            is_success = spellcheck_data.status == EssayStatus.SPELLCHECKED_SUCCESS
 
             # Record completion in batch state
             success = await self.batch_state_repo.record_essay_step_completion(

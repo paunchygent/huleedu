@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from api_models import BatchRegistrationRequestV1
 
 # Import common_core models for standardized interfaces
+from common_core.enums import BatchStatus, EssayStatus
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 
@@ -96,7 +97,7 @@ class BatchRepositoryProtocol(Protocol):
         """Create a new batch record."""
         ...
 
-    async def update_batch_status(self, batch_id: str, new_status: str) -> bool:
+    async def update_batch_status(self, batch_id: str, new_status: BatchStatus) -> bool:
         """Update the status of an existing batch."""
         ...
 
@@ -143,6 +144,9 @@ class BatchRepositoryProtocol(Protocol):
         (indicating another process already updated it).
 
         This method prevents race conditions in phase initiation.
+        
+        Note: Phase status uses string literals as it represents pipeline execution status,
+        not the canonical BatchStatus enum. This is correct for internal state management.
         """
         ...
 
@@ -162,7 +166,7 @@ class EssayLifecycleClientProtocol(Protocol):
         """Retrieve the current status of an essay from ELS."""
         ...
 
-    async def update_essay_status(self, essay_id: str, new_status: str) -> bool:
+    async def update_essay_status(self, essay_id: str, new_status: EssayStatus) -> bool:
         """Update the status of an essay in ELS."""
         ...
 
@@ -186,7 +190,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
         self,
         batch_id: str,
         completed_phase: str,
-        phase_status: str,
+        phase_status: BatchStatus,
         correlation_id: str,
         processed_essays_for_next_phase: list[Any] | None = None,
     ) -> None:

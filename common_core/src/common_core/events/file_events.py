@@ -9,7 +9,6 @@ separate from batch coordination concerns.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field

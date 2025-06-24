@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiokafka import ConsumerRecord
 
-from common_core.enums import CourseCode
+from common_core.enums import CourseCode, ProcessingEvent
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.tests.unit.mocks import MockDatabase, MockRedisClient
 
@@ -117,7 +117,7 @@ def mock_boundary_services(
 
     class Settings:
         MAX_PAIRWISE_COMPARISONS = 100
-        CJ_ASSESSMENT_FAILED_TOPIC = "cj_assessment_failed"
+        CJ_ASSESSMENT_FAILED_TOPIC = ProcessingEvent.CJ_ASSESSMENT_FAILED.value
         CJ_ASSESSMENT_COMPLETED_TOPIC = "cj_assessment_completed"
         SERVICE_NAME = "cj_assessment_service"
 
