@@ -79,7 +79,7 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
             "example": {
                 "batch_id": "batch-123-456",
                 "phase_name": "spellcheck",
-                "phase_status": "completed_with_failures",  # Enum value for BatchStatus
+                "phase_status": BatchStatus.COMPLETED_WITH_FAILURES.value,
                 "processed_essays": [
                     {"essay_id": "essay-1", "text_storage_id": "storage-corrected-1"},
                     {"essay_id": "essay-2", "text_storage_id": "storage-corrected-2"},

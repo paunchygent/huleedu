@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.enums import EssayStatus
 from huleedu_service_libs.idempotency import idempotent_consumer
 
 from services.spell_checker_service.event_processor import process_single_message
@@ -143,7 +144,7 @@ async def test_deterministic_event_id_generation(
     base_event_data = {
         "event_name": "essay.spellcheck.requested",
         "entity_ref": {"entity_id": "test-essay-123", "entity_type": "essay"},
-        "status": "awaiting_spellcheck",
+        "status": EssayStatus.AWAITING_SPELLCHECK.value,
         "system_metadata": {
             "entity": {"entity_id": "test-essay-123", "entity_type": "essay"},
             "timestamp": "2024-01-01T12:00:00Z",

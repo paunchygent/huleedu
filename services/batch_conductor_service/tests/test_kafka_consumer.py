@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 from unittest.mock import AsyncMock, Mock
 
+from common_core.enums import EssayStatus
+
 import pytest
 
 from services.batch_conductor_service.kafka_consumer import BCSKafkaConsumer
@@ -58,7 +60,7 @@ def sample_message_data():
                 "entity_type": "essay",
                 "parent_id": "batch-456",
             },
-            "status": "spellchecked_success",
+            "status": EssayStatus.SPELLCHECKED_SUCCESS.value,
             "system_metadata": {
                 "entity": {
                     "entity_id": "essay-123",

@@ -45,7 +45,7 @@ class TestFileContentValidator:
         result = await validator.validate_content("", "empty.txt")
 
         assert result.is_valid is False
-        assert result.error_code == "EMPTY_CONTENT"
+        assert result.error_code == FileValidationErrorCode.EMPTY_CONTENT
         assert result.error_message is not None
         assert "empty.txt" in result.error_message
         assert "no readable text content" in result.error_message
@@ -55,7 +55,7 @@ class TestFileContentValidator:
         result = await validator.validate_content(None, "none.txt")  # type: ignore[arg-type]
 
         assert result.is_valid is False
-        assert result.error_code == "EMPTY_CONTENT"
+        assert result.error_code == FileValidationErrorCode.EMPTY_CONTENT
 
     async def test_validate_whitespace_only(self, validator: FileContentValidator) -> None:
         """Test rejection of content containing only whitespace."""
@@ -64,7 +64,7 @@ class TestFileContentValidator:
         result = await validator.validate_content(whitespace_content, "whitespace.txt")
 
         assert result.is_valid is False
-        assert result.error_code == "EMPTY_CONTENT"
+        assert result.error_code == FileValidationErrorCode.EMPTY_CONTENT
         assert result.error_message is not None
         assert "whitespace.txt" in result.error_message
 
@@ -75,7 +75,7 @@ class TestFileContentValidator:
         result = await validator.validate_content(short_content, "short.txt")
 
         assert result.is_valid is False
-        assert result.error_code == "CONTENT_TOO_SHORT"
+        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
         assert result.error_message is not None
         assert "short.txt" in result.error_message
         assert "9 characters" in result.error_message
@@ -88,7 +88,7 @@ class TestFileContentValidator:
         result = await validator.validate_content(long_content, "long.txt")
 
         assert result.is_valid is False
-        assert result.error_code == "CONTENT_TOO_LONG"
+        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_LONG
         assert result.error_message is not None
         assert "long.txt" in result.error_message
         assert "1001 characters" in result.error_message
@@ -117,7 +117,7 @@ class TestFileContentValidator:
         result = await validator.validate_content(below_min_content, "below_min.txt")
 
         assert result.is_valid is False
-        assert result.error_code == "CONTENT_TOO_SHORT"
+        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
 
     async def test_validate_one_above_maximum(self, validator: FileContentValidator) -> None:
         """Test rejection of content one character above maximum."""
@@ -126,7 +126,7 @@ class TestFileContentValidator:
         result = await validator.validate_content(above_max_content, "above_max.txt")
 
         assert result.is_valid is False
-        assert result.error_code == "CONTENT_TOO_LONG"
+        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_LONG
 
     async def test_validate_content_with_whitespace_trimming(
         self,
@@ -159,7 +159,7 @@ class TestFileContentValidator:
         result = await custom_validator.validate_content(content, "custom_short.txt")
 
         assert result.is_valid is False
-        assert result.error_code == "CONTENT_TOO_SHORT"
+        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
         assert result.error_message is not None
         assert "at least 10 characters" in result.error_message
 
@@ -170,7 +170,7 @@ class TestFileContentValidator:
         result = await custom_validator.validate_content(content, "custom_long.txt")
 
         assert result.is_valid is False
-        assert result.error_code == "CONTENT_TOO_LONG"
+        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_LONG
         assert result.error_message is not None
         assert "not exceed 100 characters" in result.error_message
 

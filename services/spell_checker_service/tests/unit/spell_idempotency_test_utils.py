@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.enums import EssayStatus
 
 from services.spell_checker_service.protocols import (
     ContentClientProtocol,
@@ -92,7 +93,7 @@ def sample_spellcheck_request_event() -> dict:
         "data": {
             "event_name": "essay.spellcheck.requested",
             "entity_ref": {"entity_id": essay_id, "entity_type": "essay"},
-            "status": "awaiting_spellcheck",
+            "status": EssayStatus.AWAITING_SPELLCHECK.value,
             "system_metadata": {
                 "entity": {"entity_id": essay_id, "entity_type": "essay"},
                 "timestamp": datetime.now(UTC).isoformat(),

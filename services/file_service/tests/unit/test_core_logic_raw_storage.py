@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from common_core.enums import ContentType
+from common_core.enums import ContentType, FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from services.file_service.core_logic import process_single_file_upload
 from services.file_service.validation_models import ValidationResult
@@ -112,7 +112,7 @@ async def test_extraction_failure_includes_raw_storage_id() -> None:
 
     assert isinstance(published_event, EssayValidationFailedV1)
     assert published_event.raw_file_storage_id == "raw_storage_id_123"
-    assert published_event.validation_error_code == "TEXT_EXTRACTION_FAILED"
+    assert published_event.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
 
     # Result includes raw storage ID even on failure
     assert result["status"] == "extraction_failed"
@@ -139,7 +139,7 @@ async def test_validation_failure_includes_raw_storage_id() -> None:
     text_extractor.extract_text.return_value = ""  # Empty content
     content_validator.validate_content.return_value = ValidationResult(
         is_valid=False,
-        error_code="CONTENT_TOO_SHORT",
+        error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
         error_message="Content is too short",
     )
 
@@ -164,7 +164,7 @@ async def test_validation_failure_includes_raw_storage_id() -> None:
 
     assert isinstance(published_event, EssayValidationFailedV1)
     assert published_event.raw_file_storage_id == "raw_storage_id_123"
-    assert published_event.validation_error_code == "CONTENT_TOO_SHORT"
+    assert published_event.validation_error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
 
     # Result includes raw storage ID
     assert result["status"] == "content_validation_failed"
