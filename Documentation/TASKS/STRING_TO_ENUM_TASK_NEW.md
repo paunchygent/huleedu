@@ -7,7 +7,9 @@ This document outlines all identified instances where string literals should be 
 ## 1. Missing Enum Imports
 
 ### 1.1 Batch Conductor Service
+
 **File**: `services/batch_conductor_service/protocols.py`
+
 ```python
 # Missing imports:
 # from common_core.enums import ProcessingStage, BatchStatus, ErrorCode, ValidationStatus
@@ -15,7 +17,9 @@ This document outlines all identified instances where string literals should be 
 ```
 
 ### 1.2 Essay Lifecycle Service
+
 **File**: `services/essay_lifecycle_service/protocols.py`
+
 ```python
 # Missing imports:
 # from common_core.enums import BatchStatus, ErrorCode, ValidationStatus, OperationStatus
@@ -23,21 +27,27 @@ This document outlines all identified instances where string literals should be 
 ```
 
 ### 1.3 CJ Assessment Service
+
 **File**: `services/cj_assessment_service/protocols.py`
+
 ```python
 # Missing imports:
 # from common_core.enums import ErrorCode, ProcessingStage, OperationStatus
 ```
 
 ### 1.4 Content Service
+
 **File**: `services/content_service/implementations/prometheus_content_metrics.py`
+
 ```python
 # Missing imports:
 # from common_core.enums import OperationStatus, OperationType
 ```
 
 ### 1.5 File Service
+
 **File**: `services/file_service/core_logic.py`
+
 ```python
 # Missing imports:
 # from common_core.enums import ValidationStatus
@@ -46,7 +56,9 @@ This document outlines all identified instances where string literals should be 
 ## 2. String Literals Instead of Enums
 
 ### 2.1 Processing Operations
+
 **File**: `services/batch_conductor_service/protocols.py`
+
 ```python
 # Before
 async def record_essay_step_completion(
@@ -64,7 +76,9 @@ async def record_essay_step_completion(
 ```
 
 ### 2.2 Event Types
+
 **File**: `services/essay_lifecycle_service/protocols.py`
+
 ```python
 # Before
 async def register_event_callback(
@@ -80,7 +94,9 @@ async def register_event_callback(
 ```
 
 ### 2.3 Processing Status Values
+
 **File**: `services/batch_orchestrator_service/implementations/batch_repository_impl.py`
+
 ```python
 # Before
 return {"id": batch_id, "status": "pending", "processing_metadata": {}}
@@ -91,7 +107,9 @@ return {"id": batch_id, "status": ProcessingStatus.PENDING, "processing_metadata
 ```
 
 ### 2.4 Pipeline Phase Names
+
 **File**: `services/batch_orchestrator_service/implementations/batch_processing_service_impl.py`
+
 ```python
 # Before
 requested_pipelines = ["spellcheck"]
@@ -108,7 +126,9 @@ if include_cj_assessment:
 ## 3. Inconsistent Error Handling
 
 ### 3.1 String Error Messages
+
 **File**: `services/batch_conductor_service/protocols.py`
+
 ```python
 # Before
 raise ValueError("Invalid pipeline configuration")
@@ -119,7 +139,9 @@ raise ValueError(ErrorCode.INVALID_CONFIGURATION)
 ```
 
 ### 3.2 Error Code Returns
+
 **File**: `services/cj_assessment_service/protocols.py`
+
 ```python
 # Before
 def get_cache_stats(self) -> dict[str, Any]:
@@ -133,7 +155,9 @@ def get_cache_stats(self) -> dict[str, Any]:
 ```
 
 ### 3.3 API Error Responses
+
 **File**: `services/file_service/api/file_routes.py`
+
 ```python
 # Before
 return jsonify({"error": "batch_id is required in form data."}), 400
@@ -146,7 +170,9 @@ return jsonify({"error": ErrorCode.MISSING_REQUIRED_FIELD, "field": "batch_id"})
 ## 4. Status Fields
 
 ### 4.1 Batch Status
+
 **File**: `services/batch_orchestrator_service/protocols.py`
+
 ```python
 # Before
 async def update_batch_status(
@@ -160,7 +186,9 @@ async def update_batch_status(
 ```
 
 ### 4.2 Processing Stage in Tests
+
 **File**: `services/spell_checker_service/tests/unit/test_spell_idempotency_basic.py`
+
 ```python
 # Before
 event_data = {
@@ -179,7 +207,9 @@ event_data = {
 ## 5. Content Type Handling
 
 ### 5.1 Content Type Parameters
+
 **File**: `services/content_service/protocols.py`
+
 ```python
 # Before
 async def store_content(
@@ -193,7 +223,9 @@ async def store_content(
 ```
 
 ### 5.2 Validation Status
+
 **File**: `services/file_service/core_logic.py`
+
 ```python
 # Before
 validation_status = "success"
@@ -206,7 +238,9 @@ validation_status = ValidationStatus.SUCCESS
 ## 6. Validation Error Codes
 
 ### 6.1 File Validation
+
 **File**: `services/file_service/protocols.py`
+
 ```python
 # Before
 async def validate_file(
@@ -222,7 +256,9 @@ async def validate_file(
 ## 7. Event Publishing
 
 ### 7.1 Event Type Parameters
+
 **File**: `services/libs/huleedu_service_libs/protocols.py`
+
 ```python
 # Before
 async def publish_event(
@@ -241,7 +277,9 @@ async def publish_event(
 ## 8. Metrics Collection
 
 ### 8.1 Metric Names
+
 **File**: `services/batch_orchestrator_service/protocols.py`
+
 ```python
 # Before
 def record_metric(
@@ -263,7 +301,9 @@ def record_metric(
 ```
 
 ### 8.2 Operation Status in Metrics
+
 **File**: `services/content_service/implementations/prometheus_content_metrics.py`
+
 ```python
 # Before
 def record_operation(self, operation: str, status: str) -> None:
@@ -279,7 +319,9 @@ def record_operation(self, operation: OperationType, status: OperationStatus) ->
 ## 9. Database Operations
 
 ### 9.1 Query Filters
+
 **File**: `services/essay_lifecycle_service/implementations/essay_repository_impl.py`
+
 ```python
 # Before
 async def find_by_status(self, status: str) -> list[EssayState]:
@@ -291,7 +333,9 @@ async def find_by_status(self, status: EssayStatus) -> list[EssayState]:
 ## 10. Configuration Values
 
 ### 10.1 Environment-Specific Settings
+
 **File**: `services/batch_orchestrator_service/config.py`
+
 ```python
 # Before
 class EnvironmentSettings:
@@ -310,7 +354,9 @@ class EnvironmentSettings:
 ## 11. Additional Enum Usage Cases
 
 ### 11.1 Content Service Metrics
+
 **File**: `services/content_service/protocols.py`
+
 ```python
 # Before
 def record_operation(self, operation: str, status: str) -> None:
@@ -326,7 +372,9 @@ def record_operation(
 ```
 
 ### 11.2 Batch Status Updates
+
 **File**: `services/batch_orchestrator_service/implementations/batch_repository_impl.py`
+
 ```python
 # Before
 async def update_batch_status(self, batch_id: str, new_status: str) -> bool:
@@ -342,7 +390,9 @@ async def update_batch_status(
 ```
 
 ### 11.3 State Transitions
+
 **File**: `services/essay_lifecycle_service/implementations/metrics_collector.py`
+
 ```python
 # Before
 def record_state_transition(self, from_status: str, to_status: str) -> None:
@@ -358,7 +408,9 @@ def record_state_transition(
 ```
 
 ### 11.4 Cache Operations
+
 **File**: `services/cj_assessment_service/implementations/cache_manager_impl.py`
+
 ```python
 # Before
 def add_to_cache(self, cache_key: str, data: dict[str, Any]) -> None:
@@ -392,6 +444,7 @@ def add_to_cache(
    - Add docstrings explaining valid enum values where helpful
 
 ## Related Files
+
 - `common_core/enums.py` - Contains core enums
 - `common_core/pipeline_models.py` - Contains pipeline-related enums
 - Service-specific protocol files for type definitions

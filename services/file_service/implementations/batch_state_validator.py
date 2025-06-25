@@ -20,6 +20,25 @@ class BOSBatchStateValidator:
         self.http_session = http_session
         self.settings = settings
 
+    async def _fetch_json(self, url: str) -> tuple[int, Any]:
+        """Perform GET request and return (status, json). Ensures response released."""
+        request_obj = self.http_session.get(url, timeout=aiohttp.ClientTimeout(total=5))
+
+        # Support both aiohttp style (await) and tests using async context manager mocks
+        if hasattr(request_obj, "__aenter__"):
+            async with request_obj as resp:
+                status_code = resp.status
+                data = await resp.json()
+                return status_code, data
+        else:
+            resp = await request_obj
+            try:
+                status_code = resp.status
+                data = await resp.json()
+                return status_code, data
+            finally:
+                resp.release()
+
     async def can_modify_batch_files(self, batch_id: str, user_id: str) -> tuple[bool, str]:
         """
         Check if batch files can be modified by querying BOS pipeline state.
@@ -32,39 +51,34 @@ class BOSBatchStateValidator:
         try:
             bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
 
-            async with self.http_session.get(
-                bos_url,
-                timeout=aiohttp.ClientTimeout(total=5)
-            ) as response:
-                if response.status == 404:
-                    return False, "Batch not found"
-                elif response.status != 200:
-                    logger.error(
-                        f"BOS query failed for batch {batch_id}: status {response.status}"
-                    )
-                    return False, "Unable to verify batch state"
+            status, pipeline_data = await self._fetch_json(bos_url)
+            if status == 404:
+                return False, "Batch not found"
+            elif status != 200:
+                logger.error(
+                    f"BOS query failed for batch {batch_id}: status {status}"
+                )
+                return False, "Unable to verify batch state"
 
-                pipeline_data = await response.json()
+            # Verify user ownership
+            batch_user_id = pipeline_data.get("user_id")
+            if batch_user_id != user_id:
+                return False, "You don't own this batch"
 
-                # Verify user ownership
-                batch_user_id = pipeline_data.get("user_id")
-                if batch_user_id != user_id:
-                    return False, "Access denied: You don't own this batch"
+            # Parse pipeline state using Pydantic model for type safety
+            pipeline_state_data = pipeline_data.get("pipeline_state", {})
 
-                # Parse pipeline state using Pydantic model for type safety
-                pipeline_state_data = pipeline_data.get("pipeline_state", {})
+            try:
+                pipeline_state = ProcessingPipelineState.model_validate(pipeline_state_data)
+            except Exception as e:
+                logger.error(
+                    f"Failed to parse pipeline state for batch {batch_id}: {e}",
+                    exc_info=True,
+                )
+                return False, "Invalid pipeline state format"
 
-                try:
-                    pipeline_state = ProcessingPipelineState.model_validate(pipeline_state_data)
-                except Exception as e:
-                    logger.error(
-                        f"Failed to parse pipeline state for batch {batch_id}: {e}",
-                        exc_info=True
-                    )
-                    return False, "Invalid pipeline state format"
-
-                # Check each phase for locking status using proper enum values
-                return self._check_pipeline_state(pipeline_state)
+            # Check each phase for locking status using proper enum values
+            return self._check_pipeline_state(pipeline_state)
 
         except Exception as e:
             logger.error(f"Error validating batch state for {batch_id}: {e}", exc_info=True)
@@ -93,7 +107,7 @@ class BOSBatchStateValidator:
 
         for phase_name, phase_detail in phases_to_check:
             if phase_detail and phase_detail.status in locking_statuses:
-                return False, f"Batch is locked: {phase_name} processing has started"
+                return False, f"{phase_name} processing has started"
 
         return True, "Batch can be modified"
 
@@ -102,30 +116,26 @@ class BOSBatchStateValidator:
         try:
             bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
 
-            async with self.http_session.get(
-                bos_url,
-                timeout=aiohttp.ClientTimeout(total=5)
-            ) as response:
-                if response.status != 200:
-                    return {
-                        "locked": True,
-                        "reason": "Unable to verify batch state",
-                        "status_code": response.status
-                    }
+            status, pipeline_data = await self._fetch_json(bos_url)
+            if status != 200:
+                return {
+                    "locked": True,
+                    "reason": "Unable to verify batch state",
+                    "status_code": status
+                }
 
-                pipeline_data = await response.json()
-                pipeline_state_data = pipeline_data.get("pipeline_state", {})
+            pipeline_state_data = pipeline_data.get("pipeline_state", {})
 
-                # Use Pydantic model for type safety - no fallback
-                try:
-                    pipeline_state = ProcessingPipelineState.model_validate(pipeline_state_data)
-                    return self._get_lock_status(pipeline_state)
-                except Exception as e:
-                    logger.error(
-                        f"Failed to parse pipeline state for batch {batch_id}: {e}",
-                        exc_info=True
-                    )
-                    return {"locked": True, "reason": "Invalid pipeline state format"}
+            # Use Pydantic model for type safety - no fallback
+            try:
+                pipeline_state = ProcessingPipelineState.model_validate(pipeline_state_data)
+                return self._get_lock_status(pipeline_state)
+            except Exception as e:
+                logger.error(
+                    f"Failed to parse pipeline state for batch {batch_id}: {e}",
+                    exc_info=True,
+                )
+                return {"locked": True, "reason": "Invalid pipeline state format"}
 
         except Exception as e:
             logger.error(f"Error getting batch lock status for {batch_id}: {e}", exc_info=True)

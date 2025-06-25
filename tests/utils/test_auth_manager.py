@@ -15,7 +15,7 @@ Based on testing best practices:
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 import jwt
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -23,7 +23,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 logger = create_service_logger("test.auth_manager")
 
 
-class TestUser:
+class AuthTestUser:
     """Test user representation for functional tests."""
 
     def __init__(
@@ -56,6 +56,7 @@ class TestUser:
         }
 
 
+
 class AuthTestManager:
     """
     Test authentication manager for functional tests.
@@ -68,15 +69,15 @@ class AuthTestManager:
     def __init__(self, jwt_secret: str = "test-secret-key-not-for-production"):
         self.jwt_secret = jwt_secret
         self.jwt_algorithm = "HS256"
-        self._test_users: Dict[str, TestUser] = {}
-        self._default_user: Optional[TestUser] = None
+        self._test_users: Dict[str, AuthTestUser] = {}
+        self._default_user: Optional[AuthTestUser] = None
 
         # Create a default test user
         self._create_default_test_user()
 
     def _create_default_test_user(self) -> None:
         """Create a default test user for convenience."""
-        default_user = TestUser(
+        default_user = AuthTestUser(
             user_id="test_user_123",
             email="test.teacher@huledu.test",
             name="Test Teacher",
@@ -86,6 +87,7 @@ class AuthTestManager:
         self._default_user = default_user
         logger.info(f"Created default test user: {default_user.user_id}")
 
+
     def create_test_user(
         self,
         user_id: Optional[str] = None,
@@ -93,7 +95,7 @@ class AuthTestManager:
         name: Optional[str] = None,
         role: str = "teacher",
         organization_id: Optional[str] = None,
-    ) -> TestUser:
+    ) -> AuthTestUser:
         """
         Create a new test user.
         
@@ -105,7 +107,7 @@ class AuthTestManager:
             organization_id: Organization identifier (auto-generated if None)
             
         Returns:
-            TestUser: Created test user
+            AuthTestUser: Created test user
         """
         if user_id is None:
             user_id = f"test_user_{uuid.uuid4().hex[:8]}"
@@ -116,7 +118,7 @@ class AuthTestManager:
         if name is None:
             name = f"Test User {user_id[-8:]}"
 
-        user = TestUser(
+        user = AuthTestUser(
             user_id=user_id,
             email=email,
             name=name,
@@ -128,17 +130,17 @@ class AuthTestManager:
         logger.info(f"Created test user: {user_id} ({email})")
         return user
 
-    def get_test_user(self, user_id: str) -> Optional[TestUser]:
+    def get_test_user(self, user_id: str) -> Optional[AuthTestUser]:
         """Get a test user by ID."""
         return self._test_users.get(user_id)
 
-    def get_default_user(self) -> TestUser:
+    def get_default_user(self) -> AuthTestUser:
         """Get the default test user."""
         if self._default_user is None:
             raise RuntimeError("No default test user available")
         return self._default_user
 
-    def generate_jwt_token(self, user: Optional[TestUser] = None) -> str:
+    def generate_jwt_token(self, user: Optional[AuthTestUser] = None) -> str:
         """
         Generate a JWT token for a test user.
         
@@ -157,7 +159,7 @@ class AuthTestManager:
         logger.debug(f"Generated JWT token for user {user.user_id}")
         return token
 
-    def get_auth_headers(self, user: Optional[TestUser] = None) -> Dict[str, str]:
+    def get_auth_headers(self, user: Optional[AuthTestUser] = None) -> Dict[str, str]:
         """
         Get authentication headers for HTTP requests.
         
@@ -189,13 +191,13 @@ class AuthTestManager:
             Optional[Dict[str, Any]]: Decoded payload if valid, None if invalid
         """
         try:
-            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+            payload = cast(Dict[str, Any], jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm]))
             return payload
         except jwt.InvalidTokenError as e:
             logger.warning(f"Invalid JWT token: {e}")
             return None
 
-    def create_teacher_user(self, class_designation: str = "Test Class") -> TestUser:
+    def create_teacher_user(self, _class_designation: str = "Test Class") -> AuthTestUser:
         """Create a test teacher user with class context."""
         user_id = f"teacher_{uuid.uuid4().hex[:8]}"
         return self.create_test_user(
@@ -205,7 +207,7 @@ class AuthTestManager:
             role="teacher"
         )
 
-    def create_admin_user(self) -> TestUser:
+    def create_admin_user(self) -> AuthTestUser:
         """Create a test admin user."""
         user_id = f"admin_{uuid.uuid4().hex[:8]}"
         return self.create_test_user(
@@ -215,7 +217,7 @@ class AuthTestManager:
             role="admin"
         )
 
-    def create_student_user(self) -> TestUser:
+    def create_student_user(self) -> AuthTestUser:
         """Create a test student user (for future student-facing features)."""
         user_id = f"student_{uuid.uuid4().hex[:8]}"
         return self.create_test_user(
@@ -256,11 +258,11 @@ def get_auth_headers_for_user(user_id: str) -> Dict[str, str]:
     return test_auth_manager.get_auth_headers(user)
 
 
-def create_test_teacher() -> TestUser:
+def create_test_teacher() -> AuthTestUser:
     """Create a new test teacher user."""
     return test_auth_manager.create_teacher_user()
 
 
-def create_test_admin() -> TestUser:
+def create_test_admin() -> AuthTestUser:
     """Create a new test admin user."""
     return test_auth_manager.create_admin_user()

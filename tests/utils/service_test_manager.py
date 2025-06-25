@@ -20,7 +20,7 @@ import httpx
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core.domain_enums import CourseCode
-from tests.utils.test_auth_manager import AuthTestManager, TestUser
+from tests.utils.test_auth_manager import AuthTestManager, AuthTestUser
 
 logger = create_service_logger("test.service_manager")
 
@@ -148,7 +148,7 @@ class ServiceTestManager:
         self,
         expected_essay_count: int,
         course_code: CourseCode | str = CourseCode.ENG5,
-        user: Optional[TestUser] = None,
+        user: Optional[AuthTestUser] = None,
         correlation_id: str | None = None,
         enable_cj_assessment: bool = False,
     ) -> tuple[str, str]:
@@ -228,7 +228,7 @@ class ServiceTestManager:
         self,
         batch_id: str,
         files: list[dict[str, Any]],
-        user: Optional[TestUser] = None,
+        user: Optional[AuthTestUser] = None,
         correlation_id: str | None = None,
     ) -> dict[str, Any]:
         """
@@ -308,7 +308,7 @@ class ServiceTestManager:
     async def upload_content_directly(
         self,
         content: str,
-        user: Optional[TestUser] = None
+        user: Optional[AuthTestUser] = None
     ) -> str:
         """
         Upload content directly to Content Service.
@@ -352,7 +352,7 @@ class ServiceTestManager:
     async def fetch_content_directly(
         self,
         storage_id: str,
-        user: Optional[TestUser] = None
+        user: Optional[AuthTestUser] = None
     ) -> str:
         """
         Fetch content directly from Content Service.
@@ -392,11 +392,11 @@ class ServiceTestManager:
                         f"Content Service fetch failed: {response.status} - {error_text}",
                     )
 
-    def create_test_user(self, **kwargs) -> TestUser:
+    def create_test_user(self, **kwargs) -> AuthTestUser:
         """Create a test user via the auth manager."""
         return self.auth_manager.create_test_user(**kwargs)
 
-    def get_auth_headers(self, user: Optional[TestUser] = None) -> Dict[str, str]:
+    def get_auth_headers(self, user: Optional[AuthTestUser] = None) -> Dict[str, str]:
         """Get authentication headers for a user."""
         return self.auth_manager.get_auth_headers(user)
 
@@ -414,7 +414,7 @@ async def get_validated_service_endpoints(force_revalidation: bool = False) -> d
 async def create_test_batch(
     expected_essay_count: int,
     course_code: CourseCode | str = CourseCode.ENG5,
-    user: Optional[TestUser] = None,
+    user: Optional[AuthTestUser] = None,
     correlation_id: str | None = None,
     enable_cj_assessment: bool = False,
 ) -> tuple[str, str]:
@@ -431,7 +431,7 @@ async def create_test_batch(
 async def upload_test_files(
     batch_id: str,
     files: list[dict[str, Any]],
-    user: Optional[TestUser] = None,
+    user: Optional[AuthTestUser] = None,
     correlation_id: str | None = None,
 ) -> dict[str, Any]:
     """Convenience function that uses global service manager."""
