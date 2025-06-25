@@ -45,9 +45,7 @@ async def test_file_service_events_contain_raw_storage_id():
 
     # Create batch first (required for file uploads)
     batch_id, correlation_id = await service_manager.create_batch(
-        expected_essay_count=1,
-        course_code="ENG5",
-        user=test_teacher
+        expected_essay_count=1, course_code="ENG5", user=test_teacher
     )
     print(f"✅ Batch created: {batch_id}")
 
@@ -67,10 +65,7 @@ async def test_file_service_events_contain_raw_storage_id():
 
         try:
             upload_result = await service_manager.upload_files(
-                batch_id=batch_id,
-                files=files,
-                user=test_teacher,
-                correlation_id=correlation_id
+                batch_id=batch_id, files=files, user=test_teacher, correlation_id=correlation_id
             )
             upload_correlation_id = upload_result["correlation_id"]
 
@@ -160,9 +155,7 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
 
     # Create batch first (required for file uploads)
     batch_id, correlation_id = await service_manager.create_batch(
-        expected_essay_count=1,
-        course_code="ENG5",
-        user=test_teacher
+        expected_essay_count=1, course_code="ENG5", user=test_teacher
     )
     print(f"✅ Batch created: {batch_id}")
 
@@ -177,10 +170,7 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
 
         try:
             upload_result = await service_manager.upload_files(
-                batch_id=batch_id,
-                files=files,
-                user=test_teacher,
-                correlation_id=correlation_id
+                batch_id=batch_id, files=files, user=test_teacher, correlation_id=correlation_id
             )
             upload_correlation_id = upload_result["correlation_id"]
 

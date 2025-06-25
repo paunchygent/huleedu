@@ -50,17 +50,18 @@ class AuthTestUser:
             "role": self.role,
             "org_id": self.organization_id,
             "iat": int(time.time()),  # Issued at
-            "exp": int((datetime.now(timezone.utc) + timedelta(hours=24)).timestamp()),  # Expires in 24h
+            "exp": int(
+                (datetime.now(timezone.utc) + timedelta(hours=24)).timestamp()
+            ),  # Expires in 24h
             "iss": "huledu-test-auth",  # Issuer
             "aud": "huledu-services",  # Audience
         }
 
 
-
 class AuthTestManager:
     """
     Test authentication manager for functional tests.
-    
+
     Provides JWT token generation and user management without requiring
     external authentication services. Designed for easy migration to
     real authentication when available.
@@ -81,12 +82,11 @@ class AuthTestManager:
             user_id="test_user_123",
             email="test.teacher@huledu.test",
             name="Test Teacher",
-            role="teacher"
+            role="teacher",
         )
         self._test_users[default_user.user_id] = default_user
         self._default_user = default_user
         logger.info(f"Created default test user: {default_user.user_id}")
-
 
     def create_test_user(
         self,
@@ -98,14 +98,14 @@ class AuthTestManager:
     ) -> AuthTestUser:
         """
         Create a new test user.
-        
+
         Args:
             user_id: Unique user identifier (auto-generated if None)
             email: User email (auto-generated if None)
             name: User display name (auto-generated if None)
             role: User role (default: teacher)
             organization_id: Organization identifier (auto-generated if None)
-            
+
         Returns:
             AuthTestUser: Created test user
         """
@@ -119,11 +119,7 @@ class AuthTestManager:
             name = f"Test User {user_id[-8:]}"
 
         user = AuthTestUser(
-            user_id=user_id,
-            email=email,
-            name=name,
-            role=role,
-            organization_id=organization_id
+            user_id=user_id, email=email, name=name, role=role, organization_id=organization_id
         )
 
         self._test_users[user_id] = user
@@ -143,10 +139,10 @@ class AuthTestManager:
     def generate_jwt_token(self, user: Optional[AuthTestUser] = None) -> str:
         """
         Generate a JWT token for a test user.
-        
+
         Args:
             user: Test user (uses default if None)
-            
+
         Returns:
             str: JWT token
         """
@@ -162,10 +158,10 @@ class AuthTestManager:
     def get_auth_headers(self, user: Optional[AuthTestUser] = None) -> Dict[str, str]:
         """
         Get authentication headers for HTTP requests.
-        
+
         Args:
             user: Test user (uses default if None)
-            
+
         Returns:
             Dict[str, str]: Headers including X-User-ID and Authorization
         """
@@ -183,15 +179,17 @@ class AuthTestManager:
     def validate_jwt_token(self, token: str) -> Optional[Dict[str, Any]]:
         """
         Validate a JWT token (for testing token validation logic).
-        
+
         Args:
             token: JWT token to validate
-            
+
         Returns:
             Optional[Dict[str, Any]]: Decoded payload if valid, None if invalid
         """
         try:
-            payload = cast(Dict[str, Any], jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm]))
+            payload = cast(
+                Dict[str, Any], jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+            )
             return payload
         except jwt.InvalidTokenError as e:
             logger.warning(f"Invalid JWT token: {e}")
@@ -204,7 +202,7 @@ class AuthTestManager:
             user_id=user_id,
             email=f"{user_id}@school.test",
             name=f"Teacher {user_id[-8:].title()}",
-            role="teacher"
+            role="teacher",
         )
 
     def create_admin_user(self) -> AuthTestUser:
@@ -214,7 +212,7 @@ class AuthTestManager:
             user_id=user_id,
             email=f"{user_id}@huledu.admin",
             name=f"Admin {user_id[-8:].title()}",
-            role="admin"
+            role="admin",
         )
 
     def create_student_user(self) -> AuthTestUser:
@@ -224,7 +222,7 @@ class AuthTestManager:
             user_id=user_id,
             email=f"{user_id}@student.test",
             name=f"Student {user_id[-8:].title()}",
-            role="student"
+            role="student",
         )
 
     def cleanup_test_users(self) -> None:
@@ -233,8 +231,7 @@ class AuthTestManager:
 
         # Keep only the default user
         self._test_users = {
-            uid: user for uid, user in self._test_users.items()
-            if uid == default_user_id
+            uid: user for uid, user in self._test_users.items() if uid == default_user_id
         }
 
         logger.info("Cleaned up test users (kept default user)")

@@ -56,7 +56,7 @@ class ServiceTestManager:
     def __init__(self, auth_manager: Optional[AuthTestManager] = None):
         """
         Initialize ServiceTestManager with optional authentication.
-        
+
         Args:
             auth_manager: Authentication manager (creates default if None)
         """
@@ -306,9 +306,7 @@ class ServiceTestManager:
             return None
 
     async def upload_content_directly(
-        self,
-        content: str,
-        user: Optional[AuthTestUser] = None
+        self, content: str, user: Optional[AuthTestUser] = None
     ) -> str:
         """
         Upload content directly to Content Service.
@@ -350,9 +348,7 @@ class ServiceTestManager:
                     )
 
     async def fetch_content_directly(
-        self,
-        storage_id: str,
-        user: Optional[AuthTestUser] = None
+        self, storage_id: str, user: Optional[AuthTestUser] = None
     ) -> str:
         """
         Fetch content directly from Content Service.

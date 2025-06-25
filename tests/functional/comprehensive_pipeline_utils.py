@@ -72,7 +72,7 @@ async def register_comprehensive_batch(
     service_manager: ServiceTestManager,
     expected_essay_count: int,
     correlation_id: str | None = None,
-    user = None,
+    user=None,
 ) -> str:
     """
     Register a batch specifically for comprehensive pipeline testing.
@@ -110,7 +110,7 @@ async def upload_real_essays(
     batch_id: str,
     essay_files: list[Path],
     correlation_id: str | None = None,
-    user = None,
+    user=None,
 ) -> dict[str, Any]:
     """
     Upload real student essays for comprehensive testing.
@@ -134,10 +134,7 @@ async def upload_real_essays(
         )
 
     result = await service_manager.upload_files(
-        batch_id=batch_id,
-        files=files_data,
-        user=user,
-        correlation_id=correlation_id
+        batch_id=batch_id, files=files_data, user=user, correlation_id=correlation_id
     )
     logger.info(f"🚀 Uploaded {len(files_data)} real essays")
     return result

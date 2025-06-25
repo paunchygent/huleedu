@@ -84,7 +84,9 @@ async def get_essay_status(
     essay_state = await state_store.get_essay_state(essay_id)
     if essay_state is None:
         if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value).inc()
+            ESSAY_OPERATIONS.labels(
+                operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
+            ).inc()
         error_response = ErrorResponse(
             error="Essay Not Found", detail=f"Essay with ID {essay_id} does not exist"
         )
@@ -105,7 +107,9 @@ async def get_essay_status(
     )
 
     if ESSAY_OPERATIONS:
-        ESSAY_OPERATIONS.labels(operation=OperationType.DOWNLOAD.value, status=OperationStatus.SUCCESS.value).inc()
+        ESSAY_OPERATIONS.labels(
+            operation=OperationType.DOWNLOAD.value, status=OperationStatus.SUCCESS.value
+        ).inc()
     return jsonify(status_response.model_dump(mode="json"))
 
 
@@ -121,7 +125,9 @@ async def get_essay_timeline(
     essay_state = await state_store.get_essay_state(essay_id)
     if essay_state is None:
         if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value).inc()
+            ESSAY_OPERATIONS.labels(
+                operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
+            ).inc()
         response = ErrorResponse(
             error="Essay Not Found", detail=f"Essay with ID {essay_id} does not exist"
         )
@@ -136,5 +142,7 @@ async def get_essay_timeline(
     }
 
     if ESSAY_OPERATIONS:
-        ESSAY_OPERATIONS.labels(operation=OperationType.DOWNLOAD.value, status=OperationStatus.SUCCESS.value).inc()
+        ESSAY_OPERATIONS.labels(
+            operation=OperationType.DOWNLOAD.value, status=OperationStatus.SUCCESS.value
+        ).inc()
     return jsonify(timeline_response)

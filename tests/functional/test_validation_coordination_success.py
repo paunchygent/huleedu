@@ -10,7 +10,6 @@ Test Scenarios:
 Modernized to use ServiceTestManager and KafkaTestManager patterns.
 """
 
-
 import pytest
 
 from tests.utils.kafka_test_manager import kafka_event_monitor
@@ -44,9 +43,7 @@ async def test_all_essays_pass_validation():
     # Create batch first (required for file uploads)
     expected_essay_count = 3
     batch_id, correlation_id = await service_manager.create_batch(
-        expected_essay_count=expected_essay_count,
-        course_code="ENG5",
-        user=test_teacher
+        expected_essay_count=expected_essay_count, course_code="ENG5", user=test_teacher
     )
     print(f"✅ Batch created: {batch_id}")
 
@@ -60,17 +57,23 @@ async def test_all_essays_pass_validation():
     async with kafka_event_monitor("validation_success_test", topics) as consumer:
         # Upload multiple valid files
         files = [
-            {"name": "essay1.txt", "content": b"This is a valid essay with sufficient content for validation."},
-            {"name": "essay2.txt", "content": b"Another valid essay with proper length and content structure."},
-            {"name": "essay3.txt", "content": b"Third valid essay ensuring we have enough content for validation."},
+            {
+                "name": "essay1.txt",
+                "content": b"This is a valid essay with sufficient content for validation.",
+            },
+            {
+                "name": "essay2.txt",
+                "content": b"Another valid essay with proper length and content structure.",
+            },
+            {
+                "name": "essay3.txt",
+                "content": b"Third valid essay ensuring we have enough content for validation.",
+            },
         ]
 
         try:
             upload_result = await service_manager.upload_files(
-                batch_id=batch_id,
-                files=files,
-                user=test_teacher,
-                correlation_id=correlation_id
+                batch_id=batch_id, files=files, user=test_teacher, correlation_id=correlation_id
             )
             upload_correlation_id = upload_result["correlation_id"]
 

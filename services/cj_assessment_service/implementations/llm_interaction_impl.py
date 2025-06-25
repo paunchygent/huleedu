@@ -120,8 +120,12 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             operation=CacheOperation.GET.value, result="hit"
                         ).inc()
 
+                    hit_msg = (
+                        "Cache %s HIT for essays %s vs %s"
+                        % (CacheOperation.GET.value, task.essay_a.id, task.essay_b.id)
+                    )
                     logger.info(
-                        f"Cache {CacheOperation.GET.value} HIT for essays {task.essay_a.id} vs {task.essay_b.id}",
+                        hit_msg,
                         extra={
                             "prompt_hash": cache_key,
                             "cache_operation": CacheOperation.GET.value,
@@ -151,8 +155,12 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             operation=CacheOperation.GET.value, result="miss"
                         ).inc()
 
+                miss_msg = (
+                    "Cache %s MISS for essays %s vs %s. Querying LLM."
+                    % (CacheOperation.GET.value, task.essay_a.id, task.essay_b.id)
+                )
                 logger.info(
-                    f"Cache {CacheOperation.GET.value} MISS for essays {task.essay_a.id} vs {task.essay_b.id}. Querying LLM.",
+                    miss_msg,
                     extra={
                         "prompt_hash": cache_key,
                         "cache_operation": CacheOperation.GET.value,

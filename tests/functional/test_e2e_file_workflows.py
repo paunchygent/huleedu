@@ -52,8 +52,7 @@ class TestE2EFileWorkflows:
         # Create batch first with authenticated user
         try:
             batch_id, correlation_id = await service_manager.create_batch(
-                expected_essay_count=1,
-                user=test_teacher
+                expected_essay_count=1, user=test_teacher
             )
         except RuntimeError as e:
             pytest.skip(f"Batch creation failed: {e}")
@@ -68,7 +67,7 @@ class TestE2EFileWorkflows:
                 batch_id=batch_id,
                 files=files,
                 user=test_teacher,  # Same user for ownership
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
             # Validate response structure
@@ -118,8 +117,7 @@ class TestE2EFileWorkflows:
         # Create batch first with authenticated user
         try:
             batch_id, correlation_id = await service_manager.create_batch(
-                expected_essay_count=len(test_file_paths),
-                user=test_teacher
+                expected_essay_count=len(test_file_paths), user=test_teacher
             )
         except RuntimeError as e:
             pytest.skip(f"Batch creation failed: {e}")
@@ -133,10 +131,7 @@ class TestE2EFileWorkflows:
         # Upload using ServiceTestManager utility with authentication
         try:
             result = await service_manager.upload_files(
-                batch_id=batch_id,
-                files=files,
-                user=test_teacher,
-                correlation_id=correlation_id
+                batch_id=batch_id, files=files, user=test_teacher, correlation_id=correlation_id
             )
 
             assert result["batch_id"] == batch_id
@@ -203,7 +198,8 @@ class TestE2EFileWorkflows:
     @pytest.mark.asyncio
     async def test_complete_workflow_batch_to_els(self):
         """
-        Test complete workflow from batch creation through file upload using utilities with authentication.
+        End-to-end test: create batch, upload files, and verify correlation IDs
+        with authenticated utilities.
 
         Validates:
         - ServiceTestManager.create_batch() creates batch successfully with auth
@@ -249,7 +245,7 @@ class TestE2EFileWorkflows:
                 batch_id=batch_id,
                 files=files,
                 user=test_teacher,  # Same user for ownership
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
             # Validate workflow integration

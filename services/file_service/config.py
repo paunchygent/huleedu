@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     CONTENT_SERVICE_URL: str = "http://content_service:8001/v1/content"
     BOS_URL: str = Field(
         default="http://batch_orchestrator_service:5000",
-        description="Batch Orchestrator Service URL for pipeline state queries"
+        description="Batch Orchestrator Service URL for pipeline state queries",
     )
     ESSAY_CONTENT_PROVISIONED_TOPIC: str = topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED)
     HTTP_PORT: int = 7001

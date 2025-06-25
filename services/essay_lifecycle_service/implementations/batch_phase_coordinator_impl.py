@@ -46,7 +46,8 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
 
         Args:
             essay_state: The essay state that was just updated
-            phase_name: Name of the processing phase (e.g., 'spellcheck', 'cj_assessment') as string or PhaseName enum
+            phase_name: Name of the processing phase (e.g., 'spellcheck',
+                'cj_assessment') as string or PhaseName enum
             correlation_id: Optional correlation ID for event tracking
         """
         # Convert phase_name to PhaseName if it's a string

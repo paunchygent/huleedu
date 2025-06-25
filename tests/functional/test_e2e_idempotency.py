@@ -469,7 +469,7 @@ class TestE2EPipelineIdempotency:
                     {"filename": "test2.txt", "content": "Test essay content 2"},
                 ]
 
-                await service_manager.upload_files(batch_id, test_files, correlation_id)
+                await service_manager.upload_files(batch_id, test_files, None, correlation_id)
 
                 # Collect initial events
                 initial_events = await kafka_manager.collect_events(

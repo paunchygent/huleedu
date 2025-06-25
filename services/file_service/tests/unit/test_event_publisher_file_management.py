@@ -1,7 +1,7 @@
 """
 Unit tests for file management event publishing functionality.
 
-Tests the DefaultEventPublisher implementation for BatchFileAddedV1 and 
+Tests the DefaultEventPublisher implementation for BatchFileAddedV1 and
 BatchFileRemovedV1 events with proper mocking of the KafkaBus.
 """
 
@@ -35,7 +35,9 @@ class TestDefaultEventPublisherFileManagement:
         return settings
 
     @pytest.fixture
-    def event_publisher(self, mock_kafka_bus: AsyncMock, mock_settings: Mock) -> DefaultEventPublisher:
+    def event_publisher(
+        self, mock_kafka_bus: AsyncMock, mock_settings: Mock
+    ) -> DefaultEventPublisher:
         """Create DefaultEventPublisher instance with mocked dependencies."""
         return DefaultEventPublisher(mock_kafka_bus, mock_settings)
 

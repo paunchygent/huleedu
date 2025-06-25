@@ -48,9 +48,7 @@ class TestE2EKafkaMonitoring:
 
         # Create batch first (required for file uploads)
         batch_id, correlation_id = await service_manager.create_batch(
-            expected_essay_count=1,
-            course_code="ENG5",
-            user=test_teacher
+            expected_essay_count=1, course_code="ENG5", user=test_teacher
         )
         print(f"✅ Batch created: {batch_id}")
 
@@ -63,10 +61,7 @@ class TestE2EKafkaMonitoring:
 
             try:
                 upload_result = await service_manager.upload_files(
-                    batch_id=batch_id,
-                    files=files,
-                    user=test_teacher,
-                    correlation_id=correlation_id
+                    batch_id=batch_id, files=files, user=test_teacher, correlation_id=correlation_id
                 )
                 upload_correlation_id = upload_result["correlation_id"]
 
@@ -176,9 +171,7 @@ class TestE2EKafkaMonitoring:
 
         # Create batch first (required for file uploads)
         batch_id, correlation_id = await service_manager.create_batch(
-            expected_essay_count=len(test_file_paths),
-            course_code="ENG5",
-            user=test_teacher
+            expected_essay_count=len(test_file_paths), course_code="ENG5", user=test_teacher
         )
         print(f"✅ Batch created: {batch_id}")
 
@@ -193,10 +186,7 @@ class TestE2EKafkaMonitoring:
 
             try:
                 upload_result = await service_manager.upload_files(
-                    batch_id=batch_id,
-                    files=files,
-                    user=test_teacher,
-                    correlation_id=correlation_id
+                    batch_id=batch_id, files=files, user=test_teacher, correlation_id=correlation_id
                 )
                 upload_correlation_id = upload_result["correlation_id"]
 

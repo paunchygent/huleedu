@@ -43,6 +43,7 @@ VALIDATION_TIMEOUTS = {
 # Store the user globally for the validation tests
 _validation_test_user = None
 
+
 async def create_validation_batch(
     course_code: str,
     essay_count: int,

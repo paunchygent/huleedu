@@ -60,14 +60,10 @@ async def upload_batch_files(
         # Validate batch can be modified before processing any files
         can_modify, reason = await batch_validator.can_modify_batch_files(batch_id, user_id)
         if not can_modify:
-            logger.info(
-                f"File upload blocked for batch {batch_id} by user {user_id}: {reason}"
-            )
-            return jsonify({
-                "error": "Cannot add files to batch",
-                "reason": reason,
-                "batch_id": batch_id
-            }), 409
+            logger.info(f"File upload blocked for batch {batch_id} by user {user_id}: {reason}")
+            return jsonify(
+                {"error": "Cannot add files to batch", "reason": reason, "batch_id": batch_id}
+            ), 409
 
         uploaded_files = files.getlist("files")  # Assuming form field name is 'files'
         if not uploaded_files:
@@ -165,10 +161,7 @@ async def get_batch_state(
 
         logger.info(f"Batch state query for {batch_id} by user {user_id}")
 
-        return jsonify({
-            "batch_id": batch_id,
-            "lock_status": lock_status
-        }), 200
+        return jsonify({"batch_id": batch_id, "lock_status": lock_status}), 200
 
     except Exception as e:
         logger.error(f"Error getting batch state for {batch_id}: {e}", exc_info=True)
@@ -198,20 +191,18 @@ async def add_files_to_batch(
         # Get user_id from authenticated request (provided by API Gateway)
         user_id = request.headers.get("X-User-ID")
         if not user_id:
-            logger.warning(f"File addition attempt for batch {batch_id} without user authentication.")
+            logger.warning(
+                f"File addition attempt for batch {batch_id} without user authentication."
+            )
             return jsonify({"error": "User authentication required"}), 401
 
         # Validate batch can be modified before processing any files
         can_modify, reason = await batch_validator.can_modify_batch_files(batch_id, user_id)
         if not can_modify:
-            logger.info(
-                f"File addition blocked for batch {batch_id} by user {user_id}: {reason}"
-            )
-            return jsonify({
-                "error": "Cannot add files to batch",
-                "reason": reason,
-                "batch_id": batch_id
-            }), 409
+            logger.info(f"File addition blocked for batch {batch_id} by user {user_id}: {reason}")
+            return jsonify(
+                {"error": "Cannot add files to batch", "reason": reason, "batch_id": batch_id}
+            ), 409
 
         uploaded_files = files.getlist("files")  # Assuming form field name is 'files'
         if not uploaded_files:
@@ -247,10 +238,7 @@ async def add_files_to_batch(
                 essay_id = str(uuid.uuid4())  # Generate essay_id for each file
 
                 # Track file for event publishing
-                added_files.append({
-                    "essay_id": essay_id,
-                    "filename": file_storage.filename
-                })
+                added_files.append({"essay_id": essay_id, "filename": file_storage.filename})
 
                 # Pass all required injected dependencies to process_single_file_upload
                 task = asyncio.create_task(
@@ -300,7 +288,7 @@ async def add_files_to_batch(
                 ),
                 "batch_id": batch_id,
                 "correlation_id": str(main_correlation_id),
-                "added_files": len(added_files)
+                "added_files": len(added_files),
             },
         ), 202
 
@@ -327,21 +315,29 @@ async def remove_file_from_batch(
         # Get user_id from authenticated request (provided by API Gateway)
         user_id = request.headers.get("X-User-ID")
         if not user_id:
-            logger.warning(f"File removal attempt for batch {batch_id}, essay {essay_id} without user authentication.")
+            warning_msg = (
+                "File removal attempt for batch %s, essay %s without user authentication."
+                % (batch_id, essay_id)
+            )
+            logger.warning(warning_msg)
             return jsonify({"error": "User authentication required"}), 401
 
         # Validate batch can be modified before removing files
         can_modify, reason = await batch_validator.can_modify_batch_files(batch_id, user_id)
         if not can_modify:
-            logger.info(
-                f"File removal blocked for batch {batch_id}, essay {essay_id} by user {user_id}: {reason}"
+            info_msg = (
+                "File removal blocked for batch %s, essay %s by user %s: %s"
+                % (batch_id, essay_id, user_id, reason)
             )
-            return jsonify({
-                "error": "Cannot remove file from batch",
-                "reason": reason,
-                "batch_id": batch_id,
-                "essay_id": essay_id
-            }), 409
+            logger.info(info_msg)
+            return jsonify(
+                {
+                    "error": "Cannot remove file from batch",
+                    "reason": reason,
+                    "batch_id": batch_id,
+                    "essay_id": essay_id,
+                }
+            ), 409
 
         # Check for X-Correlation-ID header for distributed tracing
         correlation_id_header = request.headers.get("X-Correlation-ID")
@@ -375,12 +371,16 @@ async def remove_file_from_batch(
 
         await event_publisher.publish_batch_file_removed_v1(event_data, correlation_id)
 
-        return jsonify({
-            "message": f"File removal request processed for essay {essay_id} in batch {batch_id}",
-            "batch_id": batch_id,
-            "essay_id": essay_id,
-            "correlation_id": str(correlation_id)
-        }), 200
+        return jsonify(
+            {
+                "message": (
+                    f"File removal request processed for essay {essay_id} in batch {batch_id}"
+                ),
+                "batch_id": batch_id,
+                "essay_id": essay_id,
+                "correlation_id": str(correlation_id),
+            }
+        ), 200
 
     except Exception as e:
         logger.error(f"Error removing file {essay_id} from batch {batch_id}: {e}", exc_info=True)

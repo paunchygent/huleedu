@@ -46,7 +46,7 @@ class BatchExpectation:
 
         self.created_at = datetime.now(UTC)
         self.timeout_seconds = timeout_seconds
-        self._timeout_task: asyncio.Task[None] | None = None
+        self.timeout_task: asyncio.Task[None] | None = None
         self._logger = create_service_logger("batch_expectation")
 
     @property

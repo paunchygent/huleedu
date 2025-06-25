@@ -54,7 +54,8 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         Register batch slot expectations from BOS.
 
         Args:
-            event: BatchEssaysRegistered event from BOS containing internal essay ID slots and course context
+            event: BatchEssaysRegistered from BOS containing essay-ID slots and
+                course context
         """
         batch_essays_registered = BatchEssaysRegistered.model_validate(event)
         batch_id = batch_essays_registered.batch_id
@@ -77,10 +78,16 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         # Start timeout monitoring
         await self._start_timeout_monitoring(expectation)
 
-        self._logger.info(
-            f"Registered batch {batch_id} with {len(batch_essays_registered.essay_ids)} "
-            f"slots: {batch_essays_registered.essay_ids}, course: {batch_essays_registered.course_code.value}"
+        msg = (
+            "Registered batch %s with %d slots: %s, course: %s"
+            % (
+                batch_id,
+                len(batch_essays_registered.essay_ids),
+                batch_essays_registered.essay_ids,
+                batch_essays_registered.course_code.value,
+            )
         )
+        self._logger.info(msg)
 
     def assign_slot_to_content(
         self, batch_id: str, text_storage_id: str, original_file_name: str
@@ -160,14 +167,14 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         return list(self.batch_expectations.keys())
 
     async def handle_validation_failure(
-        self, event: Any
+        self, event_data: Any
     ) -> Any | None:  # EssayValidationFailedV1 -> BatchEssaysReady | None
         """
         Handle validation failure by adjusting batch expectations.
 
         Prevents ELS from waiting indefinitely for content that will never arrive.
         """
-        validation_failed = EssayValidationFailedV1.model_validate(event)
+        validation_failed = EssayValidationFailedV1.model_validate(event_data)
         batch_id = validation_failed.batch_id
 
         # Track validation failure
@@ -232,8 +239,8 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         failures = self.validation_failures.get(batch_id, [])
 
         # Cancel timeout monitoring
-        if expectation._timeout_task:
-            expectation._timeout_task.cancel()
+        if expectation.timeout_task:
+            expectation.timeout_task.cancel()
 
         # Infer language from course code using helper function
         course_language = get_course_language(expectation.course_code).value
@@ -259,11 +266,17 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             total_files_processed=len(expectation.slot_assignments) + len(failures),
         )
 
-        self._logger.info(
-            f"Batch {batch_id} completed: "
-            f"{len(expectation.slot_assignments)} successful, {len(failures)} failed, "
-            f"{ready_event.total_files_processed} total processed, course: {expectation.course_code.value}"
+        summary_msg = (
+            "Batch %s completed: %d successful, %d failed, %d total processed, course: %s"
+            % (
+                batch_id,
+                len(expectation.slot_assignments),
+                len(failures),
+                ready_event.total_files_processed,
+                expectation.course_code.value,
+            )
         )
+        self._logger.info(summary_msg)
 
         # Clean up completed batch
         del self.batch_expectations[batch_id]
@@ -308,4 +321,4 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 # Clean up timed out batch
                 del self.batch_expectations[expectation.batch_id]
 
-        expectation._timeout_task = asyncio.create_task(timeout_monitor())
+        expectation.timeout_task = asyncio.create_task(timeout_monitor())

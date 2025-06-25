@@ -55,9 +55,7 @@ class BOSBatchStateValidator:
             if status == 404:
                 return False, "Batch not found"
             elif status != 200:
-                logger.error(
-                    f"BOS query failed for batch {batch_id}: status {status}"
-                )
+                logger.error(f"BOS query failed for batch {batch_id}: status {status}")
                 return False, "Unable to verify batch state"
 
             # Verify user ownership
@@ -84,10 +82,7 @@ class BOSBatchStateValidator:
             logger.error(f"Error validating batch state for {batch_id}: {e}", exc_info=True)
             return False, "Unable to verify batch state"
 
-    def _check_pipeline_state(
-        self,
-        pipeline_state: ProcessingPipelineState
-    ) -> tuple[bool, str]:
+    def _check_pipeline_state(self, pipeline_state: ProcessingPipelineState) -> tuple[bool, str]:
         """Check pipeline state using Pydantic model with proper enum values."""
         # Define statuses that indicate active processing (batch is locked)
         locking_statuses = {
@@ -121,7 +116,7 @@ class BOSBatchStateValidator:
                 return {
                     "locked": True,
                     "reason": "Unable to verify batch state",
-                    "status_code": status
+                    "status_code": status,
                 }
 
             pipeline_state_data = pipeline_data.get("pipeline_state", {})
@@ -141,10 +136,7 @@ class BOSBatchStateValidator:
             logger.error(f"Error getting batch lock status for {batch_id}: {e}", exc_info=True)
             return {"locked": True, "reason": "Unable to verify batch state"}
 
-    def _get_lock_status(
-        self,
-        pipeline_state: ProcessingPipelineState
-    ) -> dict[str, Any]:
+    def _get_lock_status(self, pipeline_state: ProcessingPipelineState) -> dict[str, Any]:
         """Get lock status using Pydantic model with proper enum values."""
         locking_statuses = {
             PipelineExecutionStatus.DISPATCH_INITIATED,
@@ -166,8 +158,7 @@ class BOSBatchStateValidator:
                     "locked": True,
                     "reason": f"{phase_name} processing has started",
                     "locked_at": (
-                        phase_detail.started_at.isoformat()
-                        if phase_detail.started_at else None
+                        phase_detail.started_at.isoformat() if phase_detail.started_at else None
                     ),
                     "current_phase": phase_name,
                     "phase_status": phase_detail.status.value,

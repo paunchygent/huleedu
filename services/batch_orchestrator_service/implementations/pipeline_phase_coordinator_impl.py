@@ -91,11 +91,12 @@ class DefaultPipelinePhaseCoordinator:
             successful_count = (
                 len(processed_essays_for_next_phase) if processed_essays_for_next_phase else 0
             )
-            logger.info(
-                f"Phase {completed_phase.value} completed with partial failures for batch {batch_id}. "
-                f"Proceeding to next phase with {successful_count} successful essays.",
-                extra={"correlation_id": correlation_id},
+            message = (
+                "Phase %s completed with partial failures for batch %s. "
+                "Proceeding to next phase with %s successful essays."
+                % (completed_phase.value, batch_id, successful_count)
             )
+            logger.info(message, extra={"correlation_id": correlation_id})
 
         # Determine and initiate next phase with data propagation
         await self._initiate_next_phase(

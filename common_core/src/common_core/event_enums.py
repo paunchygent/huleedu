@@ -61,8 +61,12 @@ _TOPIC_MAPPING = {
     ProcessingEvent.ESSAY_VALIDATION_FAILED: "huleedu.file.essay.validation.failed.v1",
     ProcessingEvent.BATCH_ESSAYS_READY: "huleedu.els.batch.essays.ready.v1",
     ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND: "huleedu.els.spellcheck.initiate.command.v1",
-    ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND: "huleedu.batch.cj_assessment.initiate.command.v1",
-    ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND: "huleedu.batch.ai_feedback.initiate.command.v1",
+    ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND: (
+        "huleedu.batch.cj_assessment.initiate.command.v1"
+    ),
+    ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND: (
+        "huleedu.batch.ai_feedback.initiate.command.v1"
+    ),
     ProcessingEvent.BATCH_NLP_INITIATE_COMMAND: ("huleedu.batch.nlp.initiate.command.v1"),
     ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED: "huleedu.els.cj_assessment.requested.v1",
     ProcessingEvent.CJ_ASSESSMENT_COMPLETED: "huleedu.cj_assessment.completed.v1",
@@ -74,7 +78,9 @@ _TOPIC_MAPPING = {
     ProcessingEvent.BATCH_FILE_REMOVED: "huleedu.file.batch.file.removed.v1",
     ProcessingEvent.CLASS_CREATED: "huleedu.class.created.v1",
     ProcessingEvent.STUDENT_CREATED: "huleedu.class.student.created.v1",
-    ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED: "huleedu.class.student.associations.confirmed.v1",
+    ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED: (
+        "huleedu.class.student.associations.confirmed.v1"
+    ),
     ProcessingEvent.VALIDATION_TIMEOUT_PROCESSED: "huleedu.class.validation.timeout.processed.v1",
 }
 

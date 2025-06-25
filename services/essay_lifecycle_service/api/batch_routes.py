@@ -57,7 +57,9 @@ async def get_batch_status(
     essays = await state_store.list_essays_by_batch(batch_id)
     if not essays:
         if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value).inc()
+            ESSAY_OPERATIONS.labels(
+                operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
+            ).inc()
         response = ErrorResponse(
             error="Batch Not Found",
             detail=f"Batch with ID {batch_id} does not exist or has no essays",

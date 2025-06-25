@@ -68,9 +68,7 @@ class TestFileManagementRoutes:
     ) -> AsyncGenerator[QuartTestClient, None]:
         """
         Return a Quart test client configured with mocked dependencies using Dishka.
-
-        This fixture correctly overrides the production providers with test providers
-        that supply our mocks. This follows the established pattern from test_file_routes_validation.py.
+        This fixture overrides production providers with test providers that supply our mocks.
         """
 
         # 1. Define a test-specific provider that provides our mocks
@@ -125,14 +123,13 @@ class TestFileManagementRoutes:
         lock_status = {
             "is_locked": False,
             "pipeline_state": "READY",
-            "reason": "Batch is ready for modifications"
+            "reason": "Batch is ready for modifications",
         }
         mock_batch_validator.get_batch_lock_status.return_value = lock_status
 
         # Act
         response = await app_client.get(
-            f"/v1/files/batch/{batch_id}/state",
-            headers={"X-User-ID": user_id}
+            f"/v1/files/batch/{batch_id}/state", headers={"X-User-ID": user_id}
         )
 
         # Assert
@@ -171,8 +168,7 @@ class TestFileManagementRoutes:
 
         # Act
         response = await app_client.get(
-            f"/v1/files/batch/{batch_id}/state",
-            headers={"X-User-ID": user_id}
+            f"/v1/files/batch/{batch_id}/state", headers={"X-User-ID": user_id}
         )
 
         # Assert
@@ -195,9 +191,7 @@ class TestFileManagementRoutes:
         # Create proper FileStorage object for Quart test client
         file_data = BytesIO(b"Test essay content")
         file_storage = FileStorage(
-            stream=file_data,
-            filename="test_essay.txt",
-            content_type="text/plain"
+            stream=file_data, filename="test_essay.txt", content_type="text/plain"
         )
 
         # Act - using the correct Quart test client pattern
@@ -206,7 +200,7 @@ class TestFileManagementRoutes:
             files={
                 "files": file_storage  # Single file for the 'files' field
             },
-            headers={"X-User-ID": user_id}
+            headers={"X-User-ID": user_id},
         )
 
         # Assert
@@ -253,8 +247,7 @@ class TestFileManagementRoutes:
 
         # Act
         response = await app_client.post(
-            f"/v1/files/batch/{batch_id}/files",
-            headers={"X-User-ID": user_id}
+            f"/v1/files/batch/{batch_id}/files", headers={"X-User-ID": user_id}
         )
 
         # Assert
@@ -277,8 +270,7 @@ class TestFileManagementRoutes:
 
         # Act
         response = await app_client.post(
-            f"/v1/files/batch/{batch_id}/files",
-            headers={"X-User-ID": user_id}
+            f"/v1/files/batch/{batch_id}/files", headers={"X-User-ID": user_id}
         )
 
         # Assert
@@ -300,24 +292,24 @@ class TestFileManagementRoutes:
 
         # Manual multipart form construction for multiple files with same field name
         boundary = "----QuartTestBoundary"
-        form_data = '------QuartTestBoundary\r\n'
+        form_data = "------QuartTestBoundary\r\n"
 
         # First file
-        form_data += '------QuartTestBoundary\r\n'
+        form_data += "------QuartTestBoundary\r\n"
         form_data += 'Content-Disposition: form-data; name="files"; filename="essay1.txt"\r\n'
-        form_data += 'Content-Type: text/plain\r\n\r\n'
-        form_data += 'First essay content\r\n'
+        form_data += "Content-Type: text/plain\r\n\r\n"
+        form_data += "First essay content\r\n"
 
         # Second file
-        form_data += '------QuartTestBoundary\r\n'
+        form_data += "------QuartTestBoundary\r\n"
         form_data += 'Content-Disposition: form-data; name="files"; filename="essay2.txt"\r\n'
-        form_data += 'Content-Type: text/plain\r\n\r\n'
-        form_data += 'Second essay content\r\n'
+        form_data += "Content-Type: text/plain\r\n\r\n"
+        form_data += "Second essay content\r\n"
 
-        form_data += '------QuartTestBoundary--\r\n'
+        form_data += "------QuartTestBoundary--\r\n"
 
         # Convert to bytes
-        form_data_bytes = form_data.encode('utf-8')
+        form_data_bytes = form_data.encode("utf-8")
 
         # Act
         response = await app_client.post(
@@ -326,8 +318,8 @@ class TestFileManagementRoutes:
             headers={
                 "X-User-ID": user_id,
                 "Content-Type": "multipart/form-data; boundary=----QuartTestBoundary",
-                "Content-Length": str(len(form_data_bytes))
-            }
+                "Content-Length": str(len(form_data_bytes)),
+            },
         )
 
         # Assert
@@ -358,8 +350,7 @@ class TestFileManagementRoutes:
 
         # Act
         response = await app_client.delete(
-            f"/v1/files/batch/{batch_id}/files/{essay_id}",
-            headers={"X-User-ID": user_id}
+            f"/v1/files/batch/{batch_id}/files/{essay_id}", headers={"X-User-ID": user_id}
         )
 
         # Assert
@@ -408,8 +399,7 @@ class TestFileManagementRoutes:
 
         # Act
         response = await app_client.delete(
-            f"/v1/files/batch/{batch_id}/files/{essay_id}",
-            headers={"X-User-ID": user_id}
+            f"/v1/files/batch/{batch_id}/files/{essay_id}", headers={"X-User-ID": user_id}
         )
 
         # Assert
@@ -437,10 +427,7 @@ class TestFileManagementRoutes:
         # Act
         response = await app_client.delete(
             f"/v1/files/batch/{batch_id}/files/{essay_id}",
-            headers={
-                "X-User-ID": user_id,
-                "X-Correlation-ID": correlation_id
-            }
+            headers={"X-User-ID": user_id, "X-Correlation-ID": correlation_id},
         )
 
         # Assert

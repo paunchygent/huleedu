@@ -24,7 +24,6 @@ from services.file_service.protocols import (
 
 
 class TestFileRoutesValidation:
-
     @pytest.fixture
     def mock_batch_validator(self) -> AsyncMock:
         """Create mock batch state validator."""
@@ -107,15 +106,13 @@ class TestFileRoutesValidation:
         await container.close()
 
     async def test_upload_batch_files_blocked_when_locked(
-        self,
-        app_client: QuartTestClient,
-        mock_batch_validator: AsyncMock
-    ):
+        self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
+    ) -> None:
         """Test file upload blocked when batch is locked for processing."""
         # Configure validator to return locked status
         mock_batch_validator.can_modify_batch_files.return_value = (
             False,
-            "Batch is locked: Spellcheck has started"
+            "Batch is locked: Spellcheck has started",
         )
 
         # Create test file data
@@ -125,11 +122,8 @@ class TestFileRoutesValidation:
         # Make request with proper multipart form data format
         response = await app_client.post(
             "/v1/files/batch",
-            form={
-                "batch_id": "test-batch-123",
-                "files": (file_data, "test_essay.txt")
-            },
-            headers={"X-User-ID": "test-user-456"}
+            form={"batch_id": "test-batch-123", "files": (file_data, "test_essay.txt")},
+            headers={"X-User-ID": "test-user-456"},
         )
 
         # Should return 409 Conflict
@@ -144,10 +138,7 @@ class TestFileRoutesValidation:
             "test-batch-123", "test-user-456"
         )
 
-    async def test_upload_batch_files_missing_user_id(
-        self,
-        app_client: QuartTestClient
-    ):
+    async def test_upload_batch_files_missing_user_id(self, app_client: QuartTestClient) -> None:
         """Test file upload fails without user authentication."""
         file_data = BytesIO(b"Test essay content")
         file_data.name = "test_essay.txt"
@@ -155,10 +146,7 @@ class TestFileRoutesValidation:
         # Make request without X-User-ID header
         response = await app_client.post(
             "/v1/files/batch",
-            form={
-                "batch_id": "test-batch-123",
-                "files": (file_data, "test_essay.txt")
-            }
+            form={"batch_id": "test-batch-123", "files": (file_data, "test_essay.txt")},
         )
 
         # Should return 401 Unauthorized
@@ -168,10 +156,7 @@ class TestFileRoutesValidation:
         assert "error" in data
         assert "authentication" in data["error"].lower()
 
-    async def test_upload_batch_files_missing_batch_id(
-        self,
-        app_client: QuartTestClient
-    ):
+    async def test_upload_batch_files_missing_batch_id(self, app_client: QuartTestClient) -> None:
         """Test file upload fails without batch_id in form data."""
         file_data = BytesIO(b"Test essay content")
         file_data.name = "test_essay.txt"
@@ -179,10 +164,8 @@ class TestFileRoutesValidation:
         # Make request without batch_id in form
         response = await app_client.post(
             "/v1/files/batch",
-            form={
-                "files": (file_data, "test_essay.txt")
-            },
-            headers={"X-User-ID": "test-user-456"}
+            form={"files": (file_data, "test_essay.txt")},
+            headers={"X-User-ID": "test-user-456"},
         )
 
         # Should return 400 Bad Request
@@ -193,10 +176,8 @@ class TestFileRoutesValidation:
         assert "batch_id is required" in data["error"]
 
     async def test_upload_batch_files_no_files_provided(
-        self,
-        app_client: QuartTestClient,
-        mock_batch_validator: AsyncMock
-    ):
+        self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
+    ) -> None:
         """Test file upload fails when no files are provided."""
         # Configure validator to allow modifications
         mock_batch_validator.can_modify_batch_files.return_value = (True, "Batch can be modified")
@@ -206,9 +187,9 @@ class TestFileRoutesValidation:
             "/v1/files/batch",
             form={
                 "batch_id": "test-batch-123",
-                "files": []  # Empty files list
+                "files": [],  # Empty files list
             },
-            headers={"X-User-ID": "test-user-456"}
+            headers={"X-User-ID": "test-user-456"},
         )
 
         # Should return 400 Bad Request
@@ -219,10 +200,8 @@ class TestFileRoutesValidation:
         assert "No files provided in 'files' field" in data["error"]
 
     async def test_upload_batch_files_success_returns_202(
-        self,
-        app_client: QuartTestClient,
-        mock_batch_validator: AsyncMock
-    ):
+        self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
+    ) -> None:
         """Test successful file upload returns 202 Accepted with proper JSON structure."""
         # Configure validator to allow modifications
         mock_batch_validator.can_modify_batch_files.return_value = (True, "Batch can be modified")
@@ -230,22 +209,18 @@ class TestFileRoutesValidation:
         # Create proper FileStorage object for Quart test client
         file_data = BytesIO(b"Test essay content")
         file_storage = FileStorage(
-            stream=file_data,
-            filename="test_essay.txt",
-            content_type="text/plain"
+            stream=file_data, filename="test_essay.txt", content_type="text/plain"
         )
 
         # Make valid request using Quart test client format
         # Note: Quart test client expects files as a dict mapping field names to FileStorage objects
         response = await app_client.post(
             "/v1/files/batch",
-            form={
-                "batch_id": "test-batch-123"
-            },
+            form={"batch_id": "test-batch-123"},
             files={
                 "files": file_storage  # Single file for the 'files' field
             },
-            headers={"X-User-ID": "test-user-456"}
+            headers={"X-User-ID": "test-user-456"},
         )
 
         # Debug: Print response details if not 202
@@ -275,13 +250,12 @@ class TestFileRoutesValidation:
 
         # Verify correlation_id is a valid UUID string
         import uuid
+
         uuid.UUID(data["correlation_id"])  # Should not raise exception
 
     async def test_upload_multiple_files_returns_202(
-        self,
-        app_client: QuartTestClient,
-        mock_batch_validator: AsyncMock
-    ):
+        self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
+    ) -> None:
         """Test multiple files upload in single request returns 202 with correct file count."""
         # Configure validator to allow modifications
         mock_batch_validator.can_modify_batch_files.return_value = (True, "Batch can be modified")
@@ -293,26 +267,26 @@ class TestFileRoutesValidation:
         boundary = "----QuartTestBoundary"
 
         # Construct multipart form data manually
-        form_data = '------QuartTestBoundary\r\n'
+        form_data = "------QuartTestBoundary\r\n"
         form_data += 'Content-Disposition: form-data; name="batch_id"\r\n\r\n'
-        form_data += 'test-batch-456\r\n'
+        form_data += "test-batch-456\r\n"
 
         # First file
-        form_data += '------QuartTestBoundary\r\n'
+        form_data += "------QuartTestBoundary\r\n"
         form_data += 'Content-Disposition: form-data; name="files"; filename="essay1.txt"\r\n'
-        form_data += 'Content-Type: text/plain\r\n\r\n'
-        form_data += 'First essay content\r\n'
+        form_data += "Content-Type: text/plain\r\n\r\n"
+        form_data += "First essay content\r\n"
 
         # Second file
-        form_data += '------QuartTestBoundary\r\n'
+        form_data += "------QuartTestBoundary\r\n"
         form_data += 'Content-Disposition: form-data; name="files"; filename="essay2.txt"\r\n'
-        form_data += 'Content-Type: text/plain\r\n\r\n'
-        form_data += 'Second essay content\r\n'
+        form_data += "Content-Type: text/plain\r\n\r\n"
+        form_data += "Second essay content\r\n"
 
-        form_data += '------QuartTestBoundary--\r\n'
+        form_data += "------QuartTestBoundary--\r\n"
 
         # Convert to bytes
-        form_data_bytes = form_data.encode('utf-8')
+        form_data_bytes = form_data.encode("utf-8")
 
         # Test YOUR actual architecture - single request with multiple files using same field name
         response = await app_client.post(
@@ -321,8 +295,8 @@ class TestFileRoutesValidation:
             headers={
                 "X-User-ID": "test-user-789",
                 "Content-Type": "multipart/form-data; boundary=----QuartTestBoundary",
-                "Content-Length": str(len(form_data_bytes))
-            }
+                "Content-Length": str(len(form_data_bytes)),
+            },
         )
 
         # Should return 202 Accepted (fire-and-forget async pattern)
@@ -337,6 +311,7 @@ class TestFileRoutesValidation:
 
         # Verify single correlation ID shared by all files (YOUR design)
         import uuid
+
         uuid.UUID(data["correlation_id"])  # Should not raise exception
 
         # Verify batch validator was called once before processing any files
@@ -345,10 +320,8 @@ class TestFileRoutesValidation:
         )
 
     async def test_correlation_id_header_handling(
-        self,
-        app_client: QuartTestClient,
-        mock_batch_validator: AsyncMock
-    ):
+        self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
+    ) -> None:
         """Test that provided correlation ID is used in response."""
         # Configure validator to allow modifications
         mock_batch_validator.can_modify_batch_files.return_value = (True, "Batch can be modified")
@@ -356,9 +329,7 @@ class TestFileRoutesValidation:
         # Create FileStorage object
         file_data = BytesIO(b"Test essay content")
         file_storage = FileStorage(
-            stream=file_data,
-            filename="test_essay.txt",
-            content_type="text/plain"
+            stream=file_data, filename="test_essay.txt", content_type="text/plain"
         )
 
         # Provide correlation ID in header
@@ -367,16 +338,9 @@ class TestFileRoutesValidation:
         # Make request with correlation ID header
         response = await app_client.post(
             "/v1/files/batch",
-            form={
-                "batch_id": "test-batch-789"
-            },
-            files={
-                "files": file_storage
-            },
-            headers={
-                "X-User-ID": "test-user-999",
-                "X-Correlation-ID": test_correlation_id
-            }
+            form={"batch_id": "test-batch-789"},
+            files={"files": file_storage},
+            headers={"X-User-ID": "test-user-999", "X-Correlation-ID": test_correlation_id},
         )
 
         # Should return 202 Accepted
@@ -388,10 +352,8 @@ class TestFileRoutesValidation:
         assert data["correlation_id"] == test_correlation_id
 
     async def test_invalid_correlation_id_generates_new_one(
-        self,
-        app_client: QuartTestClient,
-        mock_batch_validator: AsyncMock
-    ):
+        self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
+    ) -> None:
         """Test that invalid correlation ID generates a new one."""
         # Configure validator to allow modifications
         mock_batch_validator.can_modify_batch_files.return_value = (True, "Batch can be modified")
@@ -399,24 +361,15 @@ class TestFileRoutesValidation:
         # Create FileStorage object
         file_data = BytesIO(b"Test essay content")
         file_storage = FileStorage(
-            stream=file_data,
-            filename="test_essay.txt",
-            content_type="text/plain"
+            stream=file_data, filename="test_essay.txt", content_type="text/plain"
         )
 
         # Make request with invalid correlation ID
         response = await app_client.post(
             "/v1/files/batch",
-            form={
-                "batch_id": "test-batch-999"
-            },
-            files={
-                "files": file_storage
-            },
-            headers={
-                "X-User-ID": "test-user-111",
-                "X-Correlation-ID": "invalid-uuid-format"
-            }
+            form={"batch_id": "test-batch-999"},
+            files={"files": file_storage},
+            headers={"X-User-ID": "test-user-111", "X-Correlation-ID": "invalid-uuid-format"},
         )
 
         # Should return 202 Accepted
@@ -429,4 +382,5 @@ class TestFileRoutesValidation:
 
         # Verify it's a valid UUID
         import uuid
+
         uuid.UUID(data["correlation_id"])  # Should not raise exception
