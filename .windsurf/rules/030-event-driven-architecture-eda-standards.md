@@ -1,10 +1,4 @@
 ---
-description: "Standards for event-driven communication. Follow when publishing/consuming events or designing event schemas to ensure reliable event handling."
-globs: 
-alwaysApply: true
----
-
----
 description: 
 globs: 
 alwaysApply: true

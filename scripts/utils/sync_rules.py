@@ -1,12 +1,11 @@
 import argparse
-import difflib
 import os
 
 
-def sync_files(mdc_path: str, md_path: str, dry_run: bool = False) -> None:
+def sync_files(mdc_path: str, md_path: str) -> None:
     """
-    Synchronizes content from a source .mdc file to a target .md file.
-    The content of the .mdc file completely overwrites the .md file.
+    Synchronizes content from a source .mdc file to a target .md file,
+    ensuring the target is perfectly formatted for pre-commit hooks.
     """
     try:
         with open(mdc_path, "r", encoding="utf-8") as mdc_file:
@@ -18,6 +17,13 @@ def sync_files(mdc_path: str, md_path: str, dry_run: bool = False) -> None:
         print(f"⚠️ Error reading .mdc file {mdc_path}: {e} (Skipping)")
         return
 
+    # A simpler, more robust normalization logic.
+    # First, strip all trailing whitespace including newlines from the entire content.
+    new_md_content_normalized = new_md_content.rstrip()
+    # If the content is not empty after stripping, add exactly one newline.
+    if new_md_content_normalized:
+        new_md_content_normalized += "\n"
+
     md_content_original = ""
     original_file_existed = os.path.exists(md_path)
     if original_file_existed:
@@ -25,150 +31,94 @@ def sync_files(mdc_path: str, md_path: str, dry_run: bool = False) -> None:
             with open(md_path, "r", encoding="utf-8") as md_file:
                 md_content_original = md_file.read()
         except Exception as e:
-            print(
-                f"⚠️ Error reading existing .md file {md_path}: {e} (Treating as new file for sync)"
-            )
-            original_file_existed = False
+            print(f"⚠️ Error reading existing .md file {md_path}: {e}")
+            # Force a write by making the original content different
+            md_content_original = "<read_error>"
 
-    # Normalize line endings for comparison and writing
-    new_md_content_normalized = new_md_content.replace("\r\n", "\n").strip()
-    md_content_original_normalized = md_content_original.replace("\r\n", "\n")
-
-    if md_content_original_normalized == new_md_content_normalized:
-        if original_file_existed:
-            print(f"✨ No changes needed for {md_path} (already in sync with {mdc_path})")
-        return
-
-    if dry_run:
-        operation = "update" if original_file_existed else "create"
-        print(f"\n🔍 [{operation.upper()}] Diff for {md_path} (target):")
-
-        fromfile_content = md_content_original_normalized if original_file_existed else ""
-        fromfile_label = md_path + (
-            " (original)" if original_file_existed else " (as new empty file)"
-        )
-
-        diff = difflib.unified_diff(
-            fromfile_content.splitlines(keepends=True),
-            new_md_content_normalized.splitlines(keepends=True),
-            fromfile=fromfile_label,
-            tofile=md_path + " (proposed)",
-            lineterm="",
-        )
-        for line in diff:
-            print(line, end="")
-        if not original_file_existed:
-            print(f"ℹ️  Would create {md_path} with content from {mdc_path}")
-        else:
-            print(f"ℹ️  Would update {md_path} with content from {mdc_path}")
-
-    else:
-        action_verb = "Updated" if original_file_existed else "Created"
-        try:
-            with open(md_path, "w", encoding="utf-8", newline="\n") as md_file_to_write:
-                md_file_to_write.write(new_md_content_normalized)
+    # Unconditionally write the canonical content to disk to ensure that
+    # what the next hook sees is exactly what this script produces.
+    has_changed = md_content_original != new_md_content_normalized
+    action_verb = "Updated" if original_file_existed else "Created"
+    try:
+        with open(md_path, "w", encoding="utf-8", newline="\n") as md_file_to_write:
+            md_file_to_write.write(new_md_content_normalized)
+        if has_changed:
             print(f"✅ {action_verb} {md_path} from {mdc_path}")
-        except Exception as e:
-            print(f"❌ Error writing to file {md_path}: {e}")
+        else:
+            # The file was already perfect, but we're re-writing to be certain.
+            print(f"✨ Verified {md_path} (already perfect)")
+    except Exception as e:
+        print(f"❌ Error writing to file {md_path}: {e}")
 
 
-def sync_directory(mdc_dir: str, md_dir: str, dry_run: bool) -> None:
+def sync_directory(mdc_dir: str, md_dir: str) -> None:
     """
     Synchronizes .md files in md_dir with .mdc files from mdc_dir.
-    Creates new .md files, updates existing ones,
-    and prunes orphaned .md files.
+    Creates new .md files, updates existing ones, and prunes orphaned .md files.
     """
     print(f"🔄 Starting sync from '{mdc_dir}' to '{md_dir}'...")
-    if dry_run:
-        print("DRY RUN MODE: No files will be changed on disk.")
 
     if not os.path.exists(md_dir):
-        if dry_run:
-            print(f"ℹ️  Target directory '{md_dir}' does not exist. Would create it.")
-        else:
-            try:
-                os.makedirs(md_dir, exist_ok=True)
-                print(f"📁 Created target directory '{md_dir}'.")
-            except OSError as e:
-                print(f"❌ Error creating target directory '{md_dir}': {e}. Aborting sync.")
-                return
+        try:
+            os.makedirs(md_dir, exist_ok=True)
+            print(f"📁 Created target directory '{md_dir}'.")
+        except OSError as e:
+            print(f"❌ Error creating target directory '{md_dir}': {e}. Aborting sync.")
+            return
     elif not os.path.isdir(md_dir):
         print(f"❌ Error: Target path '{md_dir}' exists but is not a directory. Aborting sync.")
         return
 
-    mdc_basenames = set()
-
-    if not os.path.exists(mdc_dir) or not os.path.isdir(mdc_dir):
-        print(
-            f"⚠️ Source directory '{mdc_dir}' not found or not a directory. "
-            f"Will proceed to prune target directory if applicable."
-        )
+    print(f"\nProcessing files from '{mdc_dir}':")
+    expected_md_files = set()
+    if not os.path.isdir(mdc_dir):
+        print(f"⚠️ Source directory '{mdc_dir}' not found. Cannot sync files.")
     else:
-        print(f"\nProcessing files from '{mdc_dir}':")
         for mdc_filename in sorted(os.listdir(mdc_dir)):
             if mdc_filename.endswith(".mdc"):
-                base_name = os.path.splitext(mdc_filename)[0]
-                mdc_basenames.add(base_name)
+                md_filename = mdc_filename.replace(".mdc", ".md")
+                expected_md_files.add(md_filename)
                 mdc_path = os.path.join(mdc_dir, mdc_filename)
-                md_filename = base_name + ".md"
                 md_path = os.path.join(md_dir, md_filename)
-                sync_files(mdc_path, md_path, dry_run)
+                sync_files(mdc_path, md_path)
 
     print(f"\n🔎 Checking for orphaned files in '{md_dir}' to prune...")
-    found_orphans_to_prune = 0
-    if os.path.isdir(md_dir):
-        for md_filename_to_check in sorted(os.listdir(md_dir)):
-            if md_filename_to_check.endswith(".md"):
-                md_base_name = os.path.splitext(md_filename_to_check)[0]
-                if md_base_name not in mdc_basenames:
-                    orphaned_md_path = os.path.join(md_dir, md_filename_to_check)
-                    found_orphans_to_prune += 1
-                    if dry_run:
-                        print(f"🗑️ Would delete orphaned file: {orphaned_md_path}")
-                    else:
-                        try:
-                            os.remove(orphaned_md_path)
-                            print(f"🗑️ Deleted orphaned file: {orphaned_md_path}")
-                        except OSError as e:
-                            print(f"❌ Error deleting file '{orphaned_md_path}': {e}")
-    else:
-        print(f"⚠️ Target directory '{md_dir}' not found. Cannot prune.")
+    try:
+        existing_md_files = {f for f in os.listdir(md_dir) if f.endswith(".md")}
+        orphaned_files = existing_md_files - expected_md_files
 
-    if found_orphans_to_prune == 0:
-        print("👍 No orphaned .md files to prune.")
-    else:
-        print(f"Total orphaned files processed for pruning: {found_orphans_to_prune}")
+        if orphaned_files:
+            for orphan in sorted(list(orphaned_files)):
+                try:
+                    os.remove(os.path.join(md_dir, orphan))
+                    print(f"🗑️  Pruned orphaned file: {orphan}")
+                except OSError as e:
+                    print(f"❌ Error pruning file {orphan}: {e}")
+        else:
+            print("👍 No orphaned .md files to prune.")
+    except FileNotFoundError:
+        print(f"👍 Target directory '{md_dir}' does not exist. No orphans to prune.")
 
     print("\n🏁 Sync process complete.")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description=(
-            "Synchronizes .md files from .mdc source files.\n"
-            "Key features:\n"
-            "- Overwrites target .md files with content from source .mdc files.\n"
-            "- Creates new .md files if they don't exist in the target directory.\n"
-            "- Deletes (prunes) .md files if their .mdc source is removed.\n"
-            "- Creates the target directory if it doesn't exist."
-        ),
+        description="Synchronize .md files from a source .mdc directory.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
-        "--mdc-dir",
+        "--source",
+        dest="mdc_dir",
         default=".cursor/rules",
         help="Directory with source .mdc files (default: .cursor/rules)",
     )
     parser.add_argument(
-        "--md-dir",
+        "--target",
+        dest="md_dir",
         default=".windsurf/rules",
         help="Directory with target .md files (default: .windsurf/rules)",
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Preview all changes (creations, updates, deletions) without modifying the disk.",
-    )
     args = parser.parse_args()
 
-    sync_directory(args.mdc_dir, args.md_dir, args.dry_run)
+    sync_directory(args.mdc_dir, args.md_dir)

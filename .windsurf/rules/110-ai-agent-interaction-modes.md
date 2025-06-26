@@ -1,9 +1,4 @@
 ---
-trigger: model_decision
-description: This rule defines your (AI agent's) operational modes and general interaction principles with the user and codebase
----
-
----
 description: 
 globs: 
 alwaysApply: true

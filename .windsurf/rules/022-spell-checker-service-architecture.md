@@ -1,48 +1,111 @@
 ---
-description: "Rules for the Spell Checker Service. Ensures consistent text processing in an event-driven architecture."
+description: defines the architecture and implementation details of the HuleEdu Spell Checker Service
 globs: 
-  - "services/spell_checker_service/**/*.py"
-alwaysApply: true
+alwaysApply: false
 ---
 # 022: Spell Checker Service Architecture
 
 ## 1. Service Identity
-
 - **Package**: `huleedu-spell-checker-service`
-- **Type**: Combined Service (Kafka Worker + HTTP Health API)
-- **Stack**: `aiokafka`, `aiohttp`, `quart`, `dishka`
-- **Purpose**: Event-driven spell checking with health monitoring.
+- **Type**: Combined Service (Kafka Consumer Worker + HTTP Health API)
+- **Stack**: aiokafka, aiohttp, quart, quart-dishka, Python asyncio, Dishka (for DI)
+- **Purpose**: Event-driven spell checking service with health monitoring
 
-## 2. Architectural Mandates
+## 2. Internal Structure (✅ Refactored - Clean Architecture + Combined Service Pattern)
 
-### 2.1. Combined Service Pattern
+### 2.1. Combined Service Architecture
+- **`run_service.py`**: Main orchestrator running both HTTP API and Kafka worker concurrently using ServiceManager class
+- **`app.py`**: Lean Quart HTTP application factory with Blueprint registration and shared DI container
+- **`api/health_routes.py`**: Health (`/healthz`) and metrics (`/metrics`) endpoints using Blueprint pattern
+- **`startup_setup.py`**: Metrics initialization and app-level service setup
+- **`worker_main.py`**: Service lifecycle (startup, shutdown), Kafka client management (consumer/producer via `kafka_clients` context manager), signal handling, and the primary message consumption loop. Initializes Dishka DI container and passes protocol instances to `process_single_message`.
 
-- **MUST** run both the Kafka worker and health API concurrently using `run_service.py`.
-- The HTTP API (`app.py`) **MUST** only provide `/healthz` and `/metrics` endpoints via the `health_routes` Blueprint.
-- The worker entrypoint **MUST** be `worker_main.py`.
+### 2.2. Core Components
+- **`event_processor.py`**: Clean message processing logic that depends ONLY on injected protocol interfaces. Contains `process_single_message()` which handles incoming `ConsumerRecord`, deserializes `EventEnvelope[EssayLifecycleSpellcheckRequestV1]`, and orchestrates the fetch-spellcheck-store-publish flow with language parameter extraction.
+- **`protocols.py`**: Defines `typing.Protocol` interfaces for internal dependencies:
+    - `ContentClientProtocol`
+    - `SpellLogicProtocol` (enhanced with language parameter support)
+    - `ResultStoreProtocol`
+    - `SpellcheckEventPublisherProtocol`
+- **`core_logic.py`**: Fundamental, reusable business logic functions:
+    - `default_fetch_content_impl()`: Fetches content via HTTP
+    - `default_store_content_impl()`: Stores content via HTTP  
+    - `default_perform_spell_check_algorithm()`: Core L2 + pyspellchecker spell checking algorithm
+- **`di.py`**: Dishka dependency injection providers that import implementations from `protocol_implementations/` and configure them with constructor dependencies
 
-### 2.2. Clean Architecture & DI
+### 2.3. Protocol Implementations (Clean Architecture)
+- **`protocol_implementations/`**: Directory containing canonical protocol implementations:
+    - **`content_client_impl.py`**: `DefaultContentClientImpl` - HTTP content fetching with constructor-injected dependencies
+    - **`result_store_impl.py`**: `DefaultResultStoreImpl` - HTTP content storage with constructor-injected dependencies
+    - **`spell_logic_impl.py`**: `DefaultSpellLogicImpl` - Spell checking orchestration using `core_logic` functions
+    - **`event_publisher_impl.py`**: `DefaultSpellcheckEventPublisherImpl` - Kafka event publishing with constructor-injected producer
 
-- Business logic **MUST** be separated into:
-  - `event_processor.py`: Orchestrates the fetch-process-store-publish workflow for a single message.
-  - `core_logic.py`: Contains pure, reusable algorithms (e.g., `default_perform_spell_check_algorithm`).
-  - `protocol_implementations/`: Contains all concrete implementations of protocols.
-- All dependencies **MUST** be defined as interfaces in `protocols.py` and injected via Dishka providers in `di.py`.
+### 2.4. Architecture Benefits
+- ✅ **Single Responsibility**: Each file has one clear purpose
+- ✅ **Dependency Injection**: All business logic depends on abstractions, not concrete implementations  
+- ✅ **No Code Duplication**: Single canonical source for each protocol implementation
+- ✅ **Clean Separation**: Message processing ↔ Protocol implementations ↔ Business logic
 
-## 3. Event Contracts
+## 3. Event-Driven Architecture
 
-- **MUST Consume**: `huleedu.essay.spellcheck.requested.v1` with an `EventEnvelope[EssayLifecycleSpellcheckRequestV1]` payload.
-- **MUST Publish**: `huleedu.essay.spellcheck.completed.v1` with an `EventEnvelope[SpellcheckResultDataV1]` payload.
-- **Consumer Group ID**: MUST be configured via `CONSUMER_GROUP` in `config.py`.
+**Consumes**: `huleedu.essay_lifecycle.spellcheck.request.v1` (`EssayLifecycleSpellcheckRequestV1`)
+**Publishes**: `huleedu.essay.spellcheck.completed.v1` (via `DefaultSpellcheckEventPublisherImpl` using `SpellcheckResultDataV1`)
+**Consumer Group**: `spellchecker-service-group-v1.1` (from settings)
 
-## 4. Integration & Logic Requirements
+**Integration**: Receives spellcheck requests from Essay Lifecycle Service (ELS) after essay slot assignment coordination with Batch Orchestrator Service (BOS).
 
-- **Content Service**: All interactions **MUST** go through the `ContentClientProtocol` and `ResultStoreProtocol`.
-- **Language Parameter**: The core spell check logic **MUST** accept and use the `language` parameter from the `EssayLifecycleSpellcheckRequestV1` payload.
-- **Kafka Client**: Kafka interactions **MUST** use the shared `KafkaBus` from `huleedu-service-libs` for publishing. The consumer **MUST** use manual offset commits.
+**Flow**: `worker_main.py` consumes message ➜ `process_single_message` in `event_processor.py` orchestrates: `ContentClientProtocol.fetch_content` ➜ `SpellLogicProtocol.perform_spell_check` (with language parameter) ➜ `ResultStoreProtocol.store_content` ➜ `SpellcheckEventPublisherProtocol.publish_spellcheck_result` ➜ `worker_main.py` commits offset.
 
-## 5. Configuration & Deployment
+## 4. Integration Points
 
-- **Configuration**: All settings **MUST** be defined in `config.py` using Pydantic `BaseSettings` with the `SPELL_CHECKER_SERVICE_` prefix.
-- **Deployment**: The Docker container **MUST** use `pdm run start_service` as its `CMD` to launch the combined service.
-- **Health Check**: The Docker health check **MUST** target the `/healthz` endpoint on the exposed health API port (8002).
+- **Content Service**: HTTP REST API via aiohttp.ClientSession (injected into protocol implementations)
+- **Kafka**: AIOKafkaConsumer/Producer with manual offset management
+- **Health API**: Quart HTTP server with `/healthz` and `/metrics` endpoints on port 8002
+- **Metrics**: Prometheus metrics via `/metrics` endpoint and service-specific counters/histograms
+
+## 5. Spell Checking Implementation
+
+**Current**: L2 + pyspellchecker dual-algorithm approach:
+- **L2 Error Dictionary**: 4886 common ESL learner corrections 
+- **PySpellChecker**: General English spell checking with contextual suggestions
+- **Correction Logging**: Detailed correction logs saved to `data/corrected_essays/`
+
+## 6. Configuration
+
+**Environment**: `KAFKA_BOOTSTRAP_SERVERS`, `CONTENT_SERVICE_URL`, `LOG_LEVEL`, `KAFKA_CONSUMER_GROUP_ID`
+**Dependencies**: aiokafka, aiohttp, pyspellchecker, huleedu-common-core, huleedu-service-libs
+
+## 7. Error Handling
+
+**Scenarios**: Content Service unavailable, invalid event format, spell check failure, Kafka producer errors
+**Pattern**: Comprehensive error handling with failure event publishing and correlation ID tracking
+**Resilience**: Service continues processing after individual message failures
+
+## 8. Data Models
+
+**Input**: `EssayLifecycleSpellcheckRequestV1` with entity_ref, system_metadata, text_storage_id, language (for multilingual support)
+**Output**: `SpellcheckResultDataV1` with entity_ref, system_metadata, storage_metadata, corrections_made
+
+## 9. Deployment
+
+**Docker**: `python:3.11-slim` base, PDM, entry point: `pdm run start_service`
+**Port**: 8002 (Health API with `/healthz` and `/metrics` endpoints)
+**Health**: HTTP health check via `/healthz` endpoint + Kafka consumer monitoring
+**Architecture**: Combined service running HTTP API and Kafka worker concurrently
+
+## 10. Testing
+
+**Coverage**: 71 tests covering all architectural components
+- Unit tests for core logic and protocol implementations
+- Contract compliance tests for event schemas
+- Integration tests for end-to-end message processing
+- All tests pass with architectural refactoring
+
+## 11. Production Implementation Standards
+
+### 11.1. Mandatory Production Patterns
+- **MUST** implement graceful shutdown with proper async resource cleanup
+- **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
+- **MUST** use manual Kafka commits with error boundaries (no auto-commit)
+- **MUST** implement `/healthz` with consistent JSON response format
+- **MUST** fail fast on startup errors with `logger.critical()` and `raise`

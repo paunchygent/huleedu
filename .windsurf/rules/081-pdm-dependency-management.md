@@ -1,9 +1,4 @@
 ---
-trigger: model_decision
-description: "PDM dependency management standards. Follow when adding, updating, or removing Python dependencies to ensure consistency and reproducibility."
----
-
----
 description: MUST READ whenever working on or discussing pdm resolution, versioning, and .toml files
 globs: 
 alwaysApply: false

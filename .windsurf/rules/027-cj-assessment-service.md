@@ -1,12 +1,15 @@
 ---
-trigger: model_decision
-description: Defines the architecture and implementation details of CJ Assessment Service
+description: Defines the architecture and implementation details of the HuleEdu CJ Assessment Service
+# Applies automatically when editing files in the cj_assessment_service directory
+# (kept in sync with build tooling)
+globs: 
+  - "services/cj_assessment_service/**"
+alwaysApply: false
 ---
 
 # 027: CJ Assessment Service Architecture
 
 ## 1. Service Identity
-
 - **Package**: `huleedu-cj-assessment-service`
 - **Folders**: `services/cj_assessment_service/`
 - **Ports**: 9090 (HTTP health / metrics), **Kafka**: Consumer/Producer, **DB**: postgres (configurable)
@@ -16,13 +19,11 @@ description: Defines the architecture and implementation details of CJ Assessmen
 ## 2. Dual-Component Architecture
 
 ### 2.1. HTTP Health API (`app.py`)
-
 - **GET /healthz**: JSON health status (200/503)
 - **GET /metrics**: Prometheus exposition
 - **Pattern**: Under 150 LOC, Blueprint-only (`api/health_routes.py`), shared DI container.
 
 ### 2.2. Kafka Worker (`worker_main.py`)
-
 - **Consumes**: `huleedu.els.cj_assessment.requested.v1`
 - **Produces**: `huleedu.cj_assessment.completed.v1`, `huleedu.cj_assessment.failed.v1`
 - **Loop**: Deserialize envelope → `event_processor.process_single_message()` → `run_cj_assessment_workflow()` → publish result/failure.
@@ -42,13 +43,11 @@ description: Defines the architecture and implementation details of CJ Assessmen
 | `di.py` | `CJAssessmentServiceProvider` supplying Dishka providers & single `make_async_container` entry |
 
 ## 4. Dependency Injection (Dishka)
-
 - DI container instantiated **before** Blueprint registration (see `app.py`) following Memory `55c2a6bd...`.
 - **Scope**: `Scope.APP` for all provided components.
 - Providers include LLM provider map and optional `MockLLMInteractionImpl` (controlled by `USE_MOCK_LLM`).
 
 ## 5. Event Contracts
-
 - **Consumed**: `ELS_CJAssessmentRequestV1` (thin event, payload includes essay refs + overrides).
 - **Published**:
   - `CJAssessmentCompletedV1` with rankings list.
@@ -57,13 +56,11 @@ description: Defines the architecture and implementation details of CJ Assessmen
 - **Correlation IDs**: Always `uuid.UUID`; test mocks must expect UUID objects (Memory 234cf4fe...).
 
 ## 6. Database Schema (Async SQLAlchemy)
-
 - Tables: `cj_batches`, `cj_processed_essays`, `cj_comparison_pairs`, `cj_rankings`.
 - Migration: Automatic `initialize_db_schema()` on worker startup.
 - Connection: URL `DATABASE_URL_CJ` (default sqlite for dev, Postgres in prod), with pool settings in `config.py`.
 
 ## 7. LLM Interaction Flow
-
 1. `pair_generation.py` selects comparison pairs.
 2. For each pair a prompt is rendered from `ASSESSMENT_PROMPT_TEMPLATE`.
 3. `LLMInteractionImpl.perform_comparisons()` dispatches batched calls to chosen provider via `RetryManagerImpl` (exponential back-off).
@@ -71,9 +68,7 @@ description: Defines the architecture and implementation details of CJ Assessmen
 5. `scoring_ranking.py` aggregates pairwise results using Bradley-Terry to final rankings.
 
 ## 8. Configuration (env vars / Settings)
-
 Key vars from `Settings` (env prefix `CJ_ASSESSMENT_SERVICE_`):
-
 - `LOG_LEVEL`, `USE_MOCK_LLM`, `KAFKA_BOOTSTRAP_SERVERS`, `DEFAULT_LLM_PROVIDER`.
 - `DATABASE_URL_CJ`, pool tuning vars.
 - `CONTENT_SERVICE_URL` for text fetch via `ContentClientImpl`.
@@ -81,20 +76,17 @@ Key vars from `Settings` (env prefix `CJ_ASSESSMENT_SERVICE_`):
 - `METRICS_PORT` (default 9090).
 
 ## 9. Metrics & Logging
-
 - Prometheus `CollectorRegistry` injected via DI; `/metrics` Blueprint exposes default & custom metrics.
 - Core counters: processed messages, LLM calls, cache hits/misses, workflow duration.
 - Logging through `huleedu_service_libs.logging_utils`; all log entries include `correlation_id` extra.
 
 ## 10. Security & Limits (Walking Skeleton)
-
 - No auth; internal service only.
 - DB credentials via env vars; no secrets in repo.
 - Rate limit for LLM calls enforced by `RetryManagerImpl` back-off.
 - Future: OAuth for external API, essay text PII scrubbing.
 
 ## 11. Deployment
-
 - **Docker**: `python:3.11-slim`, multi-stage.
 - **Entrypoints**:
   - `run_service.py` (starts worker + health API concurrently)
@@ -102,15 +94,13 @@ Key vars from `Settings` (env prefix `CJ_ASSESSMENT_SERVICE_`):
 - Ports exposed: 9090 (metrics/health), no external HTTP API.
 
 ## 12. Limitations & Future Work
-
 - Current DB schema minimal; migrate to dedicated migrations tool (e.g., Alembic).
 - Ranking stability threshold heuristic to be tuned (`SCORE_STABILITY_THRESHOLD`).
 - LLM provider selection static; future: dynamic provider fail-over.
 
 ---
 
-## 13. **CRITICAL IMPLEMENTATION NOTES**
-
+**CRITICAL IMPLEMENTATION NOTES**
 - DI container **must** be created *before* Blueprint registration – see Memory `55c2a6bd-...`.
 - When serializing envelopes, use `json.dumps(envelope.model_dump(mode="json"))` to ensure UUIDs encode (Rule 026 §12.1 pattern applies here too).
 - Tests must mock protocols rather than concrete classes (Rule 070 QA enhancements).

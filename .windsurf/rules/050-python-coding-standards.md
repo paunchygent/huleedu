@@ -1,11 +1,4 @@
 ---
-description: "Python coding standards for HuleEdu. Ensures consistent, maintainable, and high-quality Python code."
-globs: 
-  - "**/*.py"
-alwaysApply: true
----
-
----
 description: 
 globs: 
 alwaysApply: true
@@ -32,15 +25,44 @@ alwaysApply: true
 - **MUST** type-annotate all public functions, methods, class attributes
 - **MUST** use `from __future__ import annotations`
 - **MUST** prefer precise types over `typing.Any`
-- **MUST** pass `pdm run typecheck-all`
+- **MUST** pass `pdm run mypy` (run from repository root to catch complex multi-level issues)
 - **FORBIDDEN**: `typing.Any` where precise type possible
 
-### 3.2. Missing Type Stubs
+### 3.2. Execution Patterns
+**MUST** run mypy from repository root:
+
+```bash
+# ✅ CORRECT
+pdm run mypy        # Standard command
+pdm run mypy services/       # Check services
+
+### 3.3. Missing Type Stubs
 - **FORBIDDEN**: Creating `py.typed` marker files for internal modules
 - **REQUIRED**: Add modules without type stubs to `pyproject.toml` MyPy overrides
 - **Pattern**: Add to external libraries section with `ignore_missing_imports = true`
 
-### 3.2. Dependency Injection Principle
+### 3.4. Protocol Implementation Patterns
+- **MUST** use explicit protocol inheritance to resolve DI type issues
+- **PATTERN**: Use `TYPE_CHECKING` imports for protocol type aliases when needed
+
+```python
+# ✅ CORRECT - Explicit protocol implementation
+from services.my_service.protocols import MyProtocol
+
+class ConcreteImpl(MyProtocol):
+    # Implementation methods
+
+# ✅ CORRECT - TYPE_CHECKING pattern for type aliases
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from services.my_service.protocols import MyProtocol as ProtocolMyProtocol
+
+class ConcreteImpl:
+    def method(self) -> ConcreteMyType:  # Returns concrete type
+        # MyPy accepts this as implementing ProtocolMyProtocol
+```
+
+### 3.5. Dependency Injection Principle
 - Business logic **MUST** depend on abstractions (`typing.Protocol`), not concrete implementations.
 - **MUST** use Dishka DI framework; every provider lives in `<service>/di.py`
 - HTTP services **MUST** use `quart-dishka` integration with `@inject` decorator
@@ -64,29 +86,19 @@ alwaysApply: true
 - Private: `_private_member`
 
 ## 6. Code Structure
-- **Imports**: Use absolute imports for modules outside the current service. **MUST** use absolute imports for intra-service modules.
 - **Error Handling**: Catch specific exceptions, use domain-specific exceptions
 - **Line Length**: Max 100 characters (hard limit enforced by CI where possible).
 - **File Size**: Max 400 lines of code (LoC) per Python file (hard limit enforced by CI where possible, e.g., via `scripts/loc_guard.sh`).
 - **Blank Lines**: Per PEP 8
+- **Imports**: Prefer consistent patterns within services; actual import failures are usually service configuration issues
 
-## 7. Import Standards for Containerized Services
+## 7. Service Configuration Priority
 
-- **MUST** use absolute imports for all intra-service modules
-- **Reason**: Container script context breaks relative import resolution between containers
-- **For services in containers**: Use fully-qualified module paths (e.g., `services.cj_assessment_service.module`)
+**When debugging import errors, prioritize service setup over import patterns**:
+- Verify `PYTHONPATH=/app` in Dockerfiles
+- Check DI container usage vs manual instantiation  
+- Validate framework configuration methods
+- Confirm environment variable alignment
 
-```python
-# ✅ CORRECT - For containerized services
-from services.cj_assessment_service.api.health_routes import health_bp
-from services.cj_assessment_service.config import settings
-
-# ✅ CORRECT - For non-containerized contexts
-from api.health_routes import health_bp
-from config import settings
-
-# ❌ FORBIDDEN  
-from .api.health_routes import health_bp
-from .config import settings
-```
+See [044-service-debugging-and-troubleshooting.md](mdc:044-service-debugging-and-troubleshooting.md) for systematic debugging approach.
 ===

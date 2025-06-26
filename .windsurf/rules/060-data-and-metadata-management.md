@@ -1,9 +1,4 @@
 ---
-trigger: model_decision
-description: "Standards for data and metadata management. Follow when designing database schemas, data access, or metadata to ensure data consistency and integrity."
----
-
----
 description: Read when tasked with data models, and data storage
 globs: 
 alwaysApply: false

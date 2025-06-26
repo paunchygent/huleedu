@@ -1,9 +1,4 @@
 ---
-trigger: model_decision
-description: "Pydantic v2 standards. Follow when defining data models, schemas, or validation logic to ensure type safety and data consistency."
----
-
----
 description: Pydantic v2 standards. Follow when defining data models, schemas, or validation logic to ensure type safety and data consistency.
 globs: 
 alwaysApply: false
@@ -13,7 +8,7 @@ trigger: model_decision
 description: "Pydantic v2 standards. Follow when defining data models, schemas, or validation logic to ensure type safety and data consistency."
 ---
 
-# 051: Pydantic v2 Standards
+# 051: Pydantic V2 Standards
 
 ## 1. Model Configuration
 
@@ -164,3 +159,12 @@ model_config = ConfigDict(...)  # NameError
 # ✅ CORRECT: Proper import
 from pydantic import BaseModel, ConfigDict
 ```
+
+## 8. Event Processing and Validation
+- **MUST** handle failed validations gracefully
+- **MUST** log validation errors for debugging
+- **FORBIDDEN**: Silent validation failures that can mask data corruption
+
+### 8.2. Testing Patterns
+- Use explicit Pydantic model instances in tests
+- Avoid `try/except pass` blocks that hide model rebuilding failures

@@ -1,9 +1,4 @@
 ---
-trigger: model_decision
-description: "Ruff linting standards. Follow when writing or reviewing Python code to ensure code quality and consistency through automated style enforcement."
----
-
----
 description: Read whenever discussing linter settings
 globs: 
 alwaysApply: false

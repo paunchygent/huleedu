@@ -1,0 +1,71 @@
+---
+description: description: Defines the architecture and implementation details of the HuleEdu Class Management Service.
+globs: 
+alwaysApply: false
+---
+
+# 029: Class Management Service Architecture
+
+## 1. Service Identity
+
+- **Package**: `huleedu-class-management-service`
+- **Folders**: `services/class_management_service/`
+- **Port**: 5002 (Internal HTTP API)
+- **Stack**: Quart, Hypercorn, SQLAlchemy (asyncpg), Dishka, Kafka
+- **Purpose**: Authoritative source of truth for managing classes, students, and their relationships. Provides a synchronous API for data management by the API Gateway and other internal services.
+
+## 2. Architecture & Service Pattern
+
+The service is a standard **HuleEdu HTTP API Service**.
+
+- **Framework**: Quart application with a lean `app.py` that handles setup and registers API blueprints [cite: services/class_management_service/app.py].
+- **API Structure**: Routes are defined in `api/class_routes.py` using the Blueprint pattern, as required by rule `041-http-service-blueprint.mdc` [cite: services/class_management_service/api/class_routes.py].
+- **Dependency Injection**: Uses Dishka for DI. Protocols are defined in `protocols.py`, and the provider in `di.py` binds them to `PostgreSQLClassRepositoryImpl` and `ClassManagementServiceImpl` [cite: services/class_management_service/di.py].
+
+## 3. API Specification
+
+The service provides a versioned, internal RESTful API for CRUD operations. All endpoints require an `X-User-ID` header for ownership validation.
+
+### Endpoints
+
+- `POST /v1/classes/`: Create a new class.
+- `GET /v1/classes/<class_id>`: Retrieve a class by its ID.
+- `PUT /v1/classes/<class_id>`: Update a class's details.
+- `DELETE /v1/classes/<class_id>`: Delete a class.
+- `POST /v1/classes/students`: Create a new student and associate with classes.
+- `GET /v1/classes/students/<student_id>`: Retrieve a student by ID.
+- `PUT /v1/classes/students/<student_id>`: Update a student's details.
+- `DELETE /v1/classes/students/<student_id>`: Delete a student.
+
+### Data Contracts
+
+- All request and response bodies are strictly validated using Pydantic models defined in `api_models.py` [cite: services/class_management_service/api_models.py].
+- The `PersonNameV1` model from `common_core` is used for all student name data, enforcing a consistent, structured format [cite: common_core/src/common_core/metadata_models.py].
+
+## 4. Database & Persistence
+
+- **Database**: PostgreSQL, running in a dedicated `class_management_db` container on host port `5435` [cite: docker-compose.infrastructure.yml].
+- **ORM**: SQLAlchemy with the `asyncpg` driver.
+- **Models**: Defined in `models_db.py`, including `UserClass`, `Student`, and `Course`. The models correctly implement relationships and use `SQLAlchemyEnum` for `CourseCode` and `Language` types [cite: services/class_management_service/models_db.py].
+- **Repository Pattern**: Data access is abstracted through `ClassRepositoryProtocol`, with `PostgreSQLClassRepositoryImpl` providing the production implementation [cite: services/class_management_service/implementations/class_repository_postgres_impl.py].
+
+## 5. Event Integration (Outgoing)
+
+The service publishes events to Kafka to notify the ecosystem of state changes.
+
+- **Published Events**:
+    - `ClassCreatedV1`
+    - `ClassUpdatedV1`
+    - `StudentCreatedV1`
+    - `StudentUpdatedV1`
+- **Event Contracts**: All events are defined in `common_core/src/common_core/events/class_events.py` and are published within the standard `EventEnvelope`.
+- **Publisher**: The `DefaultClassEventPublisherImpl` uses the shared `KafkaBus` library for publishing [cite: services/class_management_service/implementations/event_publisher_impl.py].
+
+## 6. Configuration
+
+- **Environment Prefix**: `CLASS_MANAGEMENT_SERVICE_`
+- **Key Variables**:
+    - `DATABASE_URL`: The full connection string for the PostgreSQL database.
+    - `KAFKA_BOOTSTRAP_SERVERS`: Connection string for the Kafka cluster.
+    - `USE_MOCK_REPOSITORY`: Flag to enable the in-memory mock repository for testing.
+- **Source File**: `services/class_management_service/config.py`.

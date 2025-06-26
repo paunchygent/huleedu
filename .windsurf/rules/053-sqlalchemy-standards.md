@@ -1,0 +1,62 @@
+---
+description: Read and follow SQLAlchemy implementations standards found here if your code contains SQL
+globs: 
+alwaysApply: false
+---
+# 052: SQLAlchemy Standards
+
+## 1. Database Enums
+- **MUST** use `str, enum.Enum` inheritance for database enums
+- **FORBIDDEN**: Plain `enum.Enum` inheritance (causes SQLAlchemy KeyError)
+
+```python
+# ✅ CORRECT
+class StatusEnum(str, enum.Enum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+
+# ❌ FORBIDDEN
+class StatusEnum(enum.Enum):
+    PENDING = "pending"
+```
+
+## 2. PostgreSQL Timestamps
+- **MUST** use naive UTC timestamps for `TIMESTAMP WITHOUT TIME ZONE`
+- **PATTERN**: Use `.replace(tzinfo=None)` to convert timezone-aware datetimes
+
+```python
+# ✅ CORRECT
+updated_at=datetime.now(timezone.utc).replace(tzinfo=None)
+
+# ❌ FORBIDDEN 
+updated_at=datetime.now(timezone.utc)  # Causes timezone errors
+```
+
+## 3. Enum Field Configuration
+- **REQUIRED**: Use `values_callable=lambda obj: [e.value for e in obj]` for PostgreSQL enums
+
+```python
+status: Mapped[StatusEnum] = mapped_column(
+    SQLAlchemyEnum(
+        StatusEnum,
+        name="status_enum",
+        values_callable=lambda obj: [e.value for e in obj]
+    ),
+    nullable=False,
+)
+```
+
+## 4. JSON Field Datetime Serialization
+- **MUST** convert datetime objects to ISO strings before storing in JSON fields
+- **PATTERN**: Use `.isoformat()` for datetime serialization in update operations
+
+```python
+# ✅ CORRECT - Convert datetime to string for JSON storage
+timeline_for_db = {k: v.isoformat() for k, v in timeline.items()}
+stmt = update(Table).values(timeline=timeline_for_db)
+
+# ❌ FORBIDDEN - Direct datetime storage causes JSON serialization error
+stmt = update(Table).values(timeline=timeline)  # TypeError: datetime not JSON serializable
+```
+
+===

@@ -1,9 +1,4 @@
 ---
-trigger: model_decision
-description: "Rule management guidelines. Follow when creating, updating, or removing rules in the HuleEdu codebase."
----
-
----
 description: Read before attempting to edit .cursor/rules
 globs: 
 alwaysApply: false

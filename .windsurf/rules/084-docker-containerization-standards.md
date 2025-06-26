@@ -1,35 +1,34 @@
 ---
-description: 
-globs: 
-alwaysApply: false
----
-
----
-description: 
+description: rules for correct docker containerization patterns
 globs: 
 alwaysApply: false
 ---
 # 084: Docker Containerization Standards
 
-## 1. Critical Import Requirements
+## 1. Docker Environment Requirements
 
-### 1.1. Import Context Compatibility
-- **MUST** use absolute imports for intra-service modules
-- **FORBIDDEN**: Relative imports (`from .api`, `from .config`) in containerized services
-- **Reason**: Docker containers run services as scripts, breaking relative import resolution
+### 1.1. Python Path Configuration
+- **MUST** ensure `PYTHONPATH=/app` in service Dockerfiles for module resolution
+- **Critical**: Missing PYTHONPATH causes import failures, not import pattern issues
+- **Runtime Import Flexibility**: Services with proper PYTHONPATH can use mixed import patterns
 
-### 1.2. Import Pattern Standards
-```python
-# ✅ CORRECT - Works in both development and containers
-from api.health_routes import health_bp
-from config import settings
-from protocols import ServiceProtocol
+### 1.2. Import Pattern Requirements by Context
+**Runtime Services (Docker)**: Can use mixed import patterns when properly configured
+- Relative imports work within service context due to `PYTHONPATH=/app`
+- Service configuration issues are primary concern, not import patterns
 
-# ❌ FORBIDDEN - Fails in Docker containers
-from .api.health_routes import health_bp
-from .config import settings
-from .protocols import ServiceProtocol
-```
+**Test Environment (pytest)**: Requires absolute imports for disambiguation
+- Tests run from repository root, cannot distinguish identically-named files across services
+- Any file in test import chain needs absolute paths: `from services.{service_name}.{module} import`
+- Includes: test files, implementation files imported by tests, transitively imported dependencies
+
+### 1.3. Service Configuration Priority
+**Before investigating import patterns, verify**:
+- Dockerfile has correct `PYTHONPATH=/app` environment variable
+- Health check ports match actual service configuration
+- Environment variables align with service `env_prefix` patterns
+- DI container usage vs manual instantiation
+- Framework configuration methods (e.g., Hypercorn config loading)
 
 ## 2. Dockerfile Requirements
 
@@ -102,7 +101,7 @@ environment:
 
 ### 4.2. Testing Requirements
 - **MUST** test services in both development and container environments
-- **MUST** verify import resolution in Docker builds
+- **MUST** verify service configuration in Docker builds (DI, health checks, environment variables)
 - **Blueprint patterns MUST preserve functionality across contexts**
 
 ## 5. Container Build Standards
@@ -140,21 +139,34 @@ curl -f http://localhost:{port}/metrics
 docker compose ps
 ```
 
-### 6.2. Import Issue Prevention
-- **Pre-container testing**: Verify imports work with `python -c "from api import health_routes"`
-- **Build validation**: No import errors in container logs
-- **Runtime verification**: All endpoints accessible
+### 6.2. Service Configuration Validation
+- **Service setup testing**: Verify DI container usage, not manual instantiation
+- **Configuration validation**: Test framework configuration methods work correctly
+- **Runtime verification**: All health endpoints accessible with correct ports
 
 ## 7. Troubleshooting Guide
 
-### 7.1. Common Import Errors
-```python
-# Error: "attempted relative import with no known parent package"
-# Fix: Change from .module to module
+### 7.1. Configuration Issues (Check First)
+**Service configuration problems often manifest as "import errors"**:
 
-# Error: "No module named 'api'"
-# Fix: Verify WORKDIR in Dockerfile is correct service directory
+```bash
+# Check PYTHONPATH in container
+docker exec <container> env | grep PYTHONPATH
+
+# Verify health check ports match service ports
+curl -f http://localhost:<external_port>/healthz
+
+# Check DI container resolution
+# Add debug output to verify dependencies resolve correctly
+
+# Test import patterns in runtime context
+docker exec <container> python -c "from protocols import SomeProtocol; print('Import OK')"
 ```
+
+**Import vs Configuration Debugging Priority**:
+1. **First**: Verify service configuration (PYTHONPATH, DI, ports, environment variables)
+2. **Second**: Check import patterns if configuration is correct
+3. **Test failures**: Use absolute imports in test chain files for disambiguation
 
 ### 7.2. Container Debug Commands
 ```bash
@@ -169,4 +181,4 @@ docker compose build {service_name} --no-cache
 ```
 
 ---
-**Critical**: Import context consistency is essential for microservice containerization success.
+**Critical**: Service configuration validation is essential for microservice containerization success. See [044-service-debugging-and-troubleshooting.md](mdc:044-service-debugging-and-troubleshooting.md) for debugging priority guidelines.

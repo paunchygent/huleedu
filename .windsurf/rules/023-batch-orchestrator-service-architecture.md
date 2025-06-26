@@ -1,0 +1,226 @@
+---
+description: Defines the architecture and implementation details of the HuleEdu Batch Service
+globs: 
+alwaysApply: false
+---
+# 023: Batch Service Architecture
+
+## 1. Service Identity
+- **Package**: `huleedu-batch-service`
+- **Port**: 5000 (HTTP API)
+- **Stack**: Quart, aiokafka, aiohttp, Hypercorn, Dishka
+- **Purpose**: Central orchestrator for essay batch processing workflows
+
+## 2. Clean Architecture Implementation
+
+### 2.1. Service Structure
+```
+services/batch_orchestrator_service/
+├── app.py                         # Lean Quart entry point (<50 lines)
+├── startup_setup.py               # DI initialization, service lifecycle
+├── metrics.py                     # Prometheus metrics middleware
+├── api/                           # HTTP Blueprint routes
+│   ├── health_routes.py           # Health and metrics endpoints
+│   └── batch_routes.py            # Batch operations (thin HTTP adapters)
+├── implementations/               # Clean Architecture implementations
+│   ├── batch_repository_impl.py   # MockBatchRepositoryImpl
+│   ├── event_publisher_impl.py    # DefaultBatchEventPublisherImpl
+│   ├── essay_lifecycle_client_impl.py # DefaultEssayLifecycleClientImpl
+│   └── batch_processing_service_impl.py # Service layer business logic
+├── protocols.py                   # Protocol definitions for DI
+├── di.py                          # Dishka providers importing implementations
+├── config.py                      # Pydantic settings
+├── api_models.py                  # Request/response models
+└── kafka_consumer.py              # Kafka event consumer
+```
+
+### 2.2. Architectural Patterns
+- **Service Layer**: Business logic extracted into `BatchProcessingServiceImpl`
+- **Protocol-Based DI**: All dependencies injected via `typing.Protocol` abstractions
+- **Constructor Injection**: Implementations receive dependencies through constructors
+- **Single Responsibility**: Each module has one clear purpose
+- **Blueprint Pattern**: HTTP routes organized in `api/` directory
+
+## 3. API Endpoints
+
+### 3.1. Current Endpoints
+
+#### POST /v1/batches/register
+- **Request**: `BatchRegistrationRequestV1` (user_id, course_code, essay_instructions) - **LEAN REGISTRATION**
+- **Response**: `{"batch_id": "uuid", "correlation_id": "uuid", "status": "registered"}`
+- **Status**: 202 (accepted), 400 (validation error), 500 (server error)
+- **Flow**: HTTP → Service Layer → Repository + Event Publishing
+- **Note**: Educational context (teacher names, class designation) handled by Class Management Service
+
+#### POST /v1/batches/trigger-spellcheck-test
+- **Purpose**: Integration testing endpoint
+- **Response**: Event details with essay_id and storage_id
+- **Status**: 202 (accepted), 500 (server error)
+
+#### GET /healthz
+- **Response**: `{"status": "ok", "message": "Batch Orchestrator Service is healthy"}`
+
+#### GET /metrics
+- **Response**: Prometheus metrics in OpenMetrics format
+- **Metrics**: HTTP requests, batch operations, response times
+
+### 3.2. Planned Endpoints
+- `POST /v1/batches/{batch_id}/initiate-spellcheck`: Initiate batch spellchecking
+- `GET /v1/batches/{batch_id}/status`: Get batch processing status
+
+## 4. Event Architecture
+
+### 4.1. Event Publishing
+- **Topic**: `huleedu.batch.essays.registered.v1`
+  - **Data**: `BatchEssaysRegistered` (with internal essay ID slots)
+  - **Trigger**: After batch registration
+  - **Consumer**: Essay Lifecycle Service
+
+- **Topic**: `huleedu.els.spellcheck.initiate.command.v1`
+  - **Data**: `BatchServiceSpellcheckInitiateCommandDataV1`
+  - **Trigger**: After client pipeline request received and processed
+  - **Consumer**: Essay Lifecycle Service
+
+### 4.2. Event Consumption
+- **Topic**: `huleedu.els.batch.essays.ready.v1`
+  - **Data**: `BatchEssaysReady` (with `ready_essays: List[EssayProcessingInputRefV1]`)
+  - **Handler**: Stores essay metadata and storage references in persistent PostgreSQL database, awaiting client pipeline trigger
+  - **Implementation**: Background Kafka consumer task
+
+### 4.3. Event Flow
+HTTP Request → Service Layer → Repository → Event Publisher → Kafka → Downstream Services
+
+## 5. Dependency Injection
+
+### 5.1. Dishka Configuration
+- **Provider**: `BatchOrchestratorServiceProvider` in `di.py`
+- **Integration**: `quart-dishka` with `@inject` decorator
+- **Lifecycle**: App-scoped singletons for stateful dependencies
+
+### 5.2. Protocol Implementations
+- **`BatchRepositoryProtocol`**: `PostgreSQLBatchRepositoryImpl` (production PostgreSQL) and `MockBatchRepositoryImpl` (testing)
+- **`BatchEventPublisherProtocol`**: `DefaultBatchEventPublisherImpl` (Kafka wrapper)
+- **`EssayLifecycleClientProtocol`**: `DefaultEssayLifecycleClientImpl` (HTTP client)
+- **`BatchProcessingServiceProtocol`**: `BatchProcessingServiceImpl` (service layer)
+
+## 6. Configuration
+
+### 6.1. Environment Variables
+- **`SERVICE_NAME`**: "batch-service" (default)
+- **`PORT`**: 5000 (default)
+- **`LOG_LEVEL`**: INFO (default)
+- **`KAFKA_BOOTSTRAP_SERVERS`**: "kafka:9092" (default)
+- **`CONTENT_SERVICE_URL`**: Content Service API URL
+- **`ESSAY_LIFECYCLE_SERVICE_URL`**: ELS API URL
+
+### 6.2. Configuration Management
+- **Pattern**: Pydantic `BaseSettings` in `config.py`
+- **Loading**: Environment variables with service prefix
+- **Validation**: Type-safe configuration with defaults
+
+## 7. Integration Points
+
+### 7.1. Internal Services
+- **Content Service**: HTTP REST API via `aiohttp.ClientSession`
+- **Essay Lifecycle Service**: Event coordination and HTTP API
+- **Kafka**: Event publishing via `AIOKafkaProducer`
+
+### 7.2. External Dependencies
+- **Dishka**: Dependency injection framework
+- **Quart**: Asynchronous HTTP framework
+- **Prometheus**: Metrics collection and exposure
+
+## 8. Data Models
+
+### 8.1. Request Models
+- **`BatchRegistrationRequestV1`**: Batch creation request
+- **API Response**: Standard JSON responses with correlation IDs
+
+### 8.2. Event Models
+- **`BatchEssaysRegistered`**: Batch registration event
+- **`SpellcheckRequestedDataV1`**: Spellcheck request event
+- **`BatchEssaysReady`**: Batch readiness notification
+
+## 9. Error Handling
+
+### 9.1. HTTP Error Responses
+- **400**: Validation errors with Pydantic error details
+- **500**: Server errors with correlation IDs
+- **Response Format**: `{"error": "description", "details": "..."}`
+
+### 9.2. Event Error Handling
+- **Kafka Failures**: Logged with correlation IDs
+- **Downstream Errors**: Service continues processing
+- **Retry Strategy**: Implemented in Kafka consumer
+
+## 10. Monitoring & Observability
+
+### 10.1. Prometheus Metrics
+- **HTTP Metrics**: `http_requests_total`, `http_request_duration_seconds`
+- **Business Metrics**: `batch_operations_total` with labels
+- **Endpoint**: `/metrics` in OpenMetrics format
+
+### 10.2. Logging
+- **Format**: Structured JSON with correlation IDs
+- **Levels**: INFO, ERROR, DEBUG
+- **Integration**: `huleedu_service_libs.logging_utils`
+
+## 11. Deployment
+
+### 11.1. Docker Configuration
+- **Base**: `python:3.11-slim`
+- **Package Manager**: PDM
+- **Command**: `pdm run start`
+- **Port**: 5000
+
+### 11.2. Health Checks
+- **Endpoint**: `/healthz`
+- **Kafka Consumer**: Background task health monitoring
+- **Dependencies**: Content Service, Kafka availability
+
+## 12. Development Patterns
+
+### 12.1. Clean Architecture Benefits
+- **Testability**: Protocol-based mocking
+- **Maintainability**: Clear separation of concerns
+- **Extensibility**: New implementations via DI
+- **Consistency**: Follows established service patterns
+
+### 12.2. Service Layer Pattern
+- **Thin Controllers**: HTTP routes delegate to service layer
+- **Business Logic**: Centralized in `BatchProcessingServiceImpl`
+- **Repository Pattern**: Data access abstracted via protocols
+- **Event Publishing**: Coordinated through service layer
+
+## 13. Production Requirements
+
+### 13.1. Database Atomicity Requirements
+- **CRITICAL**: Production `BatchRepositoryProtocol` implementation **MUST** provide atomic operations for `ProcessingPipelineState` updates
+- **Race Condition Prevention**: Pipeline state transitions (e.g., `PENDING_DEPENDENCIES` → `DISPATCH_INITIATED`) must be atomic to prevent duplicate phase initiations
+- **Implementation Options**:
+  - Database-level transactions with optimistic locking
+  - Compare-and-set operations with version fields
+  - Unique constraints on `(batch_id, phase_name, status)` combinations
+- **Mock Repository**: Must simulate production atomicity behavior to prevent anti-pattern development
+
+### 13.2. Idempotency Requirements
+- **Phase Initiation**: Must be idempotent across multiple events/retries
+- **State Transitions**: Must prevent race conditions in concurrent environments
+- **Database Implementation**: Repository layer responsible for atomicity, not application layer
+
+## 14. Production Implementation Standards
+
+### 14.1. Mandatory Production Patterns
+- **MUST** implement graceful shutdown with proper async resource cleanup
+- **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
+- **MUST** use manual Kafka commits with error boundaries (no auto-commit)
+- **MUST** implement `/healthz` with consistent JSON response format
+- **MUST** fail fast on startup errors with `logger.critical()` and `raise`
+
+## 15. Architectural Evolution
+
+### 15.1. Educational Context Management ✅ COMPLETED
+- **Previous**: `teacher_name` manually provided in `BatchRegistrationRequestV1`
+- **Current**: Educational context provided by Class Management Service during processing
+- **Implementation**: Processing services receive complete teacher context via enhanced `BatchEssaysReady` events
+- **Benefit**: Clean service boundaries, single source of truth for educational data

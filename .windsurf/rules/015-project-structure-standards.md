@@ -1,11 +1,4 @@
 ---
-description: "Standards for organizing files and directories in HuleEdu projects. Follow these for all project, service, and module structures."
-globs: 
-  - "**/*"
-alwaysApply: true
----
-
----
 description: 
 globs: 
 alwaysApply: true
@@ -28,15 +21,7 @@ alwaysApply: true
 
 ```
 scripts/
-├── tests/                          # Test automation scripts (bash-based)
-│   ├── test_*.sh                   # Individual test scripts
-│   ├── functional_tests.sh         # Test runners
-│   └── trace_*.py                  # Analysis and tracing utilities
-├── utils/                          # General utility scripts
-├── docs/                           # Script documentation
-├── README.md                      
-├── setup_huledu_environment.sh    # Environment setup
-└── kafka_topic_bootstrap.py       # Infrastructure setup
+
 ```
 
 **Test Script Organization Rules**:

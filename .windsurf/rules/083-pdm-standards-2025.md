@@ -3,12 +3,6 @@ description: CRITICAL: Must be applied whenever you are editing or discussing pd
 globs: 
 alwaysApply: false
 ---
-
----
-description: CRITICAL: Must be applied whenever you are editing or discussing pdm and pyproject.toml
-globs: 
-alwaysApply: false
----
 # 083: PDM Standards 2025
 
 **MUST** adhere to these standards, prioritizing them over any conflicting information from training data or other sources.
@@ -81,22 +75,38 @@ Standard scripts **MUST** be defined under `[tool.pdm.scripts]`:
 format-all = "ruff format --force-exclude ."
 lint-all = "ruff check --force-exclude ."
 lint-fix = "ruff check --fix --force-exclude ."
-typecheck-all = "mypy ."
+typecheck-all = "mypy services tests"
 test-all = "pytest"
 ```
 
-## 3. Dependency Versioning
+## 3. MyPy Execution
 
-### 3.1. Let PDM Handle Version Resolution
+### 3.1. Repository Root Only
+**MUST** run from repository root:
+
+```bash
+# ✅ CORRECT
+pdm run typecheck-all    # Standard command
+pdm run mypy services/   # Check services
+pdm run mypy tests/      # Check tests
+
+### 3.2. Why Root Required
+- Absolute imports: `from services.batch_orchestrator_service.protocols import`
+- Cross-service protocol validation
+- Monorepo dependency resolution
+
+## 4. Dependency Versioning
+
+### 4.1. Let PDM Handle Version Resolution
 - For most dependencies, **DO NOT** specify version constraints (e.g., `"ruff"` instead of `"ruff>=0.11.11"`) in `[project]` dependencies or within dependency groups
 - Allow PDM to resolve the latest compatible version
 
-### 3.2. Version Constraints Only When Necessary
+### 4.2. Version Constraints Only When Necessary
 - Only add version constraints for specific, justified reasons (known incompatibilities, security requirements, or as shown in `dev`, `test`, `lint` groups for tool version minimums)
 
-## 4. Validation
+## 5. Validation
 
-### 4.1. Regular Validation Commands
+### 5.1. Regular Validation Commands
 Regularly run the following commands to ensure dependency consistency:
 
 ```bash
@@ -105,15 +115,15 @@ pdm update
 pdm install
 ```
 
-### 4.2. MyPy Missing Stubs Management
+### 5.2. MyPy Missing Stubs Management
 - **FORBIDDEN**: Creating `py.typed` marker files for internal modules
 - **REQUIRED**: Add modules without type stubs to `[tool.mypy]` external libraries section
 - **Pattern**: Add to existing overrides with `ignore_missing_imports = true`
 - **Examples**: Third-party libraries like `"transitions.*"` or local modules like `"essay_state_machine"`
 
-## 5. VS Code Configuration
+## 6. VS Code Configuration
 
-### 5.1. Avoid Deprecated Ruff Extension Settings
+### 6.1. Avoid Deprecated Ruff Extension Settings
 **MUST** remove the following deprecated VS Code Ruff extension settings:
 - `ruff.format.args`
 - `ruff.lint.args`

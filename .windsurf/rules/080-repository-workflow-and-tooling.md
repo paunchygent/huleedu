@@ -1,9 +1,4 @@
 ---
-trigger: model_decision
-description: "Version control and workflow standards. Follow when using git, creating branches, or managing PRs to ensure an efficient development process."
----
-
----
 description: Read before any interaction with pyproject.toml or  git commands
 globs: 
 alwaysApply: false

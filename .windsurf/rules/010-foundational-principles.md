@@ -1,10 +1,4 @@
 ---
-description: "Core principles for HuleEdu development. These take precedence over all other rules and guide all architectural and implementation decisions."
-globs: 
-alwaysApply: true
----
-
----
 description: 
 globs: 
 alwaysApply: true
