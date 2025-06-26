@@ -1,0 +1,27 @@
+# .pre-commit-config.yaml
+# See https://pre-commit.com for more information
+
+repos:
+-   repo: local
+    hooks:
+    -   id: sync-rules
+        name: Sync Rules from .mdc to .md
+        entry: python scripts/utils/sync_rules.py
+        language: python
+        files: '^(.*\.mdc|\.windsurf/rules/.*\.md)$'
+        stages: [pre-commit]
+        pass_filenames: false # We run the script on the whole directory, not per-file
+
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+    -   id: check-yaml
+    -   id: end-of-file-fixer
+    -   id: trailing-whitespace
+
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.0
+    hooks:
+    -   id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+    -   id: ruff-format
