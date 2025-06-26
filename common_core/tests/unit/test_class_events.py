@@ -223,6 +223,7 @@ class TestStudentCreatedV1:
 
         assert model.first_name == "Lars-Erik"
         assert model.last_name == "Svensson-Andersson"
+        assert model.student_email is not None  # Ensure it's not None before checking substring
         assert "gymnasium.se" in model.student_email
 
 

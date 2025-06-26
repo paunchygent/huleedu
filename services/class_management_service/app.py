@@ -1,10 +1,10 @@
-
-import startup_setup
-from api.class_routes import class_bp
-from api.health_routes import health_bp
-from config import settings
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from quart import Quart
+
+import services.class_management_service.startup_setup as startup_setup
+from services.class_management_service.api.class_routes import class_bp
+from services.class_management_service.api.health_routes import health_bp
+from services.class_management_service.config import settings
 
 configure_service_logging("class-management-service", log_level=settings.LOG_LEVEL)
 logger = create_service_logger("cms.app")
@@ -23,7 +23,7 @@ async def shutdown() -> None:
 
 
 app.register_blueprint(health_bp)
-app.register_blueprint(class_bp)
+app.register_blueprint(class_bp, url_prefix="/v1/classes")
 
 
 if __name__ == "__main__":

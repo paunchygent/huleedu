@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from typing import Any, cast
+
 import aiosqlite
 from common_core.domain_enums import ContentType
 from common_core.metadata_models import EntityReference

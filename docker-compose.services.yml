@@ -306,3 +306,43 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  class_management_service:
+    build:
+      context: .
+      dockerfile: services/class_management_service/Dockerfile
+    container_name: huleedu_class_management_service
+    restart: unless-stopped
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      class_management_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5002:5002"
+    environment:
+      - ENV_TYPE=docker
+      - ENVIRONMENT=production
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - LOG_LEVEL=INFO
+      - CLASS_MANAGEMENT_SERVICE_DB_HOST=class_management_db
+      - CLASS_MANAGEMENT_SERVICE_DB_PORT=5432
+      - CLASS_MANAGEMENT_SERVICE_DB_NAME=huledu_class_management
+      - CLASS_MANAGEMENT_SERVICE_DB_USER=${HULEEDU_DB_USER}
+      - CLASS_MANAGEMENT_SERVICE_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5002/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

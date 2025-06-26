@@ -230,6 +230,7 @@ testpaths = [
     "services/essay_lifecycle_service/tests",
     "services/file_service/tests",
     "services/cj_assessment_service/tests",
+    "services/class_management_service/tests",
     "tests"
 ]
 pythonpath = [

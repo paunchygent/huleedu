@@ -264,8 +264,7 @@ class TestFileRoutesValidation:
         # we need to manually construct multipart form data since Quart's test client
         # has limitations with multiple files using the same field name
 
-        boundary = "----QuartTestBoundary"
-
+        # boundary = "----QuartTestBoundary" # Removed as unused
         # Construct multipart form data manually
         form_data = "------QuartTestBoundary\r\n"
         form_data += 'Content-Disposition: form-data; name="batch_id"\r\n\r\n'

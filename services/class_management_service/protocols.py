@@ -3,8 +3,6 @@ from __future__ import annotations
 import uuid
 from typing import Generic, Protocol, TypeVar
 
-from models_db import Student, UserClass
-
 from common_core.events.envelope import EventEnvelope
 from services.class_management_service.api_models import (
     CreateClassRequest,
@@ -12,6 +10,7 @@ from services.class_management_service.api_models import (
     UpdateClassRequest,
     UpdateStudentRequest,
 )
+from services.class_management_service.models_db import Student, UserClass
 
 T = TypeVar('T', bound=UserClass, covariant=True)  # For UserClass types
 U = TypeVar('U', bound=Student, covariant=True)    # For Student types
@@ -73,7 +72,43 @@ class ClassManagementServiceProtocol(Protocol, Generic[T, U]):
     ) -> T:  # Returns type T (UserClass or subclass)
         ...
 
+    async def get_class_by_id(self, class_id: uuid.UUID) -> T | None:
+        """Retrieve a class by its ID."""
+        ...
+
+    async def update_class(
+        self,
+        user_id: str,
+        class_id: uuid.UUID,
+        request: UpdateClassRequest,
+        correlation_id: uuid.UUID,
+    ) -> T | None:
+        """Update an existing class."""
+        ...
+
+    async def delete_class(self, class_id: uuid.UUID) -> bool:
+        """Delete a class by its ID."""
+        ...
+
     async def add_student_to_class(
         self, user_id: str, request: CreateStudentRequest, correlation_id: uuid.UUID
     ) -> U:  # Returns type U (Student or subclass)
+        ...
+
+    async def get_student_by_id(self, student_id: uuid.UUID) -> U | None:
+        """Retrieve a student by their ID."""
+        ...
+
+    async def update_student(
+        self,
+        user_id: str,
+        student_id: uuid.UUID,
+        request: UpdateStudentRequest,
+        correlation_id: uuid.UUID,
+    ) -> U | None:
+        """Update an existing student."""
+        ...
+
+    async def delete_student(self, student_id: uuid.UUID) -> bool:
+        """Delete a student by their ID."""
         ...

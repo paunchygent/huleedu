@@ -68,8 +68,22 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
     async def update_class(
         self, class_id: uuid.UUID, class_data: UpdateClassRequest
     ) -> T | None:  # Returns type T or None
-        # Implementation would go here
-        pass
+        db_class = await self.get_class_by_id(class_id)
+        if not db_class:
+            return None
+
+        if class_data.name is not None:
+            db_class.name = class_data.name
+
+        if class_data.course_codes is not None:
+            stmt = select(Course).where(Course.course_code.in_(class_data.course_codes))
+            result = await self.session.execute(stmt)
+            courses = result.scalars().all()
+            if courses:
+                db_class.course = courses[0]
+
+        await self.session.flush()
+        return db_class
 
     async def delete_class(self, class_id: uuid.UUID) -> bool:
         stmt = delete(UserClass).where(UserClass.id == class_id)
@@ -109,8 +123,33 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
     async def update_student(
         self, student_id: uuid.UUID, student_data: UpdateStudentRequest
     ) -> U | None:  # Returns type U or None
-        # Implementation would go here
-        pass
+        db_student = await self.get_student_by_id(student_id)
+        if not db_student:
+            return None
+
+        if student_data.person_name:
+            db_student.first_name = student_data.person_name.first_name
+            db_student.last_name = student_data.person_name.last_name
+            db_student.legal_full_name = student_data.person_name.legal_full_name
+
+        if student_data.email is not None:
+            db_student.email = student_data.email
+
+        if student_data.add_class_ids:
+            stmt = select(UserClass).where(UserClass.id.in_(student_data.add_class_ids))
+            result = await self.session.execute(stmt)
+            classes_to_add = result.scalars().all()
+            for cls in classes_to_add:
+                if cls not in db_student.classes:
+                    db_student.classes.append(cls)
+
+        if student_data.remove_class_ids:
+            db_student.classes = [
+                c for c in db_student.classes if c.id not in student_data.remove_class_ids
+            ]
+
+        await self.session.flush()
+        return db_student
 
     async def delete_student(self, student_id: uuid.UUID) -> bool:
         stmt = delete(Student).where(Student.id == student_id)

@@ -79,13 +79,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         await self._start_timeout_monitoring(expectation)
 
         msg = (
-            "Registered batch %s with %d slots: %s, course: %s"
-            % (
-                batch_id,
-                len(batch_essays_registered.essay_ids),
-                batch_essays_registered.essay_ids,
-                batch_essays_registered.course_code.value,
-            )
+            f"Registered batch {batch_id} with {len(batch_essays_registered.essay_ids)} slots: {batch_essays_registered.essay_ids}, course: {batch_essays_registered.course_code.value}"
         )
         self._logger.info(msg)
 
@@ -266,15 +260,14 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             total_files_processed=len(expectation.slot_assignments) + len(failures),
         )
 
+        successful_count = len(expectation.slot_assignments)
+        failed_count = len(failures)
+        total_processed = successful_count + failed_count
+        course_code = expectation.course_code.value
+
         summary_msg = (
-            "Batch %s completed: %d successful, %d failed, %d total processed, course: %s"
-            % (
-                batch_id,
-                len(expectation.slot_assignments),
-                len(failures),
-                len(expectation.slot_assignments) + len(failures),
-                expectation.course_code.value,
-            )
+            f"Batch {batch_id} completed: {successful_count} successful, {failed_count} failed, {total_processed} total processed,"
+            f" course: {course_code}"
         )
         self._logger.info(summary_msg)
 

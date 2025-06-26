@@ -1,12 +1,16 @@
 
-import asyncio
 
-from config import Settings
-from di import DatabaseProvider, RepositoryProvider, ServiceProvider
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Quart
 from quart_dishka import QuartDishka
+
+from services.class_management_service.config import Settings
+from services.class_management_service.di import (
+    DatabaseProvider,
+    RepositoryProvider,
+    ServiceProvider,
+)
 
 logger = create_service_logger("cms.startup")
 

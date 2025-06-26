@@ -46,7 +46,9 @@ class DatabaseProvider(Provider):
         return async_sessionmaker(engine, expire_on_commit=False)
 
     @provide(scope=Scope.REQUEST)
-    async def provide_session(self, sessionmaker: async_sessionmaker[AsyncSession]) -> AsyncGenerator[AsyncSession, None]:
+    async def provide_session(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> AsyncGenerator[AsyncSession, None]:
         async with sessionmaker() as session:
             yield session
 
@@ -56,7 +58,7 @@ class RepositoryProvider(Provider):
     def provide_class_repository(
         self, settings: Settings, session: AsyncSession
     ) -> ClassRepositoryProtocol[UserClass, Student]:
-        if settings.ENVIRONMENT == "test":
+        if settings.ENVIRONMENT == "test" or settings.USE_MOCK_REPOSITORY:
             return MockClassRepositoryImpl[UserClass, Student]()
         return PostgreSQLClassRepositoryImpl[UserClass, Student](session)
 

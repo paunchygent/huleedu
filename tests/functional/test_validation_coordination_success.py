@@ -54,7 +54,7 @@ async def test_all_essays_pass_validation():
         "huleedu.els.batch.essays.ready.v1",
     ]
 
-    async with kafka_event_monitor("validation_success_test", topics) as consumer:
+    async with kafka_event_monitor("validation_success_test", topics) as _consumer:
         # Upload multiple valid files
         files = [
             {

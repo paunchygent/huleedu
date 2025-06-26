@@ -1,8 +1,8 @@
 
 from huleedu_service_libs.kafka_client import KafkaBus
-from protocols import ClassEventPublisherProtocol
 
 from common_core.events.envelope import EventEnvelope
+from services.class_management_service.protocols import ClassEventPublisherProtocol
 
 
 class DefaultClassEventPublisherImpl(ClassEventPublisherProtocol):

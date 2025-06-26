@@ -95,7 +95,12 @@ class MockDatabase(CJRepositoryProtocol):
             async def __aenter__(self) -> 'MockTransaction':
                 return self
 
-            async def __aexit__(self, exc_type: Type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> bool | None:
+            async def __aexit__(
+                self,
+                exc_type: Type[BaseException] | None,
+                exc_val: BaseException | None,
+                exc_tb: TracebackType | None,
+            ) -> bool | None:
                 pass
 
         # begin() should return an awaitable MockTransaction for session.begin() usage
@@ -106,14 +111,19 @@ class MockDatabase(CJRepositoryProtocol):
         mock_session.commit.return_value = AsyncMock()  # Make commit() awaitable
         mock_session.rollback.return_value = AsyncMock()  # Make rollback() awaitable
 
-        class AsyncContextManagerMock:
-            async def __aenter__(self) -> AsyncSession:
-                return mock_session
+        class MockAsyncContextManagerTwo:
+            async def __aenter__(self) -> Any:
+                return self
 
-            async def __aexit__(self, exc_type: Type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> bool | None:
+            async def __aexit__(
+                self,
+                exc_type: type[BaseException] | None,
+                exc_val: BaseException | None,
+                exc_tb: TracebackType | None,
+            ) -> bool | None:
                 pass
 
-        return AsyncContextManagerMock()
+        return MockAsyncContextManagerTwo()
 
     async def create_new_cj_batch(
         self,

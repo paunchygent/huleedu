@@ -71,7 +71,8 @@ class PersonNameV1(BaseModel):
     Attributes:
         first_name (str): The person's given name.
         last_name (str): The person's family name.
-        legal_full_name (str): The full legal name, defaults to a combination of first and last name.
+        legal_full_name (str): The full legal name, defaults to a
+            combination of first and last name.
     """
 
     first_name: str

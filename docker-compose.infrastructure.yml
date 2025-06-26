@@ -66,6 +66,27 @@ services:
       retries: 5
       start_period: 30s
 
+  class_management_db:
+    image: postgres:15
+    container_name: huleedu_class_management_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_DB=huledu_class_management
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
+    volumes:
+      - class_management_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huledu_class_management"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # Redis cache for idempotency and session management
   redis:
     image: redis:7-alpine

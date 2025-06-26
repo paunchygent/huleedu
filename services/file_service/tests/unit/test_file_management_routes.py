@@ -291,7 +291,7 @@ class TestFileManagementRoutes:
         mock_batch_validator.can_modify_batch_files.return_value = (True, "")
 
         # Manual multipart form construction for multiple files with same field name
-        boundary = "----QuartTestBoundary"
+        # boundary = "----QuartTestBoundary" # Removed as unused
         form_data = "------QuartTestBoundary\r\n"
 
         # First file
