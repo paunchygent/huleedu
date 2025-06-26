@@ -8,7 +8,7 @@ and CJ assessment workflow requirements.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, AsyncIterator
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
@@ -57,7 +57,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         self.logger.info("CJ Assessment Service database schema initialized")
 
     @asynccontextmanager
-    async def session(self):
+    async def session(self) -> AsyncIterator[AsyncSession]:
         """Context manager for database sessions."""
         session = self.async_session_maker()
         try:

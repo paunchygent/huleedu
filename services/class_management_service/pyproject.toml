@@ -1,0 +1,29 @@
+[project]
+name = "huleedu-class-management-service"
+version = "0.1.0"
+description = "HuleEdu Class Management Service - Manages classes, students, and related operations"
+authors = [
+    { name = "Olof Larsson", email = "paunchygent@gmail.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "quart",
+    "hypercorn",
+    "aiokafka",
+    "aiohttp",
+    "python-dotenv",
+    "huleedu-common-core",
+    "huleedu-service-libs",
+    "pydantic",
+    "pydantic-settings",
+    "prometheus-client",
+    "dishka",
+    "quart-dishka",
+    "sqlalchemy[asyncio]",
+    "asyncpg",
+    "alembic",
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

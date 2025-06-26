@@ -7,7 +7,8 @@ multiple test files to reduce duplication and ensure consistency.
 
 from __future__ import annotations
 
-from typing import Any, AsyncContextManager
+from types import TracebackType
+from typing import Any, AsyncContextManager, Type
 from unittest.mock import AsyncMock
 
 from huleedu_service_libs.protocols import RedisClientProtocol
@@ -76,14 +77,14 @@ class MockDatabase(CJRepositoryProtocol):
 
         # Create a proper result mock that behaves like SQLAlchemy
         class MockResult:
-            def scalars(self):
+            def scalars(self) -> Any:
                 return MockScalars()
 
-            def all(self):
+            def all(self) -> list[Any]:
                 return []
 
         class MockScalars:
-            def all(self):
+            def all(self) -> list[Any]:
                 return []  # Return empty list for rankings query
 
         # Configure the mock session's methods
@@ -91,14 +92,14 @@ class MockDatabase(CJRepositoryProtocol):
 
         # Create a proper async context manager for begin()
         class MockTransaction:
-            async def __aenter__(self):
+            async def __aenter__(self) -> 'MockTransaction':
                 return self
 
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
+            async def __aexit__(self, exc_type: Type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> bool | None:
                 pass
 
         # begin() should return an awaitable MockTransaction for session.begin() usage
-        async def mock_begin():
+        async def mock_begin() -> MockTransaction:
             return MockTransaction()
 
         mock_session.begin = AsyncMock(side_effect=mock_begin)
@@ -106,10 +107,10 @@ class MockDatabase(CJRepositoryProtocol):
         mock_session.rollback.return_value = AsyncMock()  # Make rollback() awaitable
 
         class AsyncContextManagerMock:
-            async def __aenter__(self):
+            async def __aenter__(self) -> AsyncSession:
                 return mock_session
 
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
+            async def __aexit__(self, exc_type: Type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> bool | None:
                 pass
 
         return AsyncContextManagerMock()
@@ -141,7 +142,7 @@ class MockDatabase(CJRepositoryProtocol):
         }
 
         class Batch:
-            def __init__(self, batch_id_val):
+            def __init__(self, batch_id_val: int) -> None:
                 self.id = batch_id_val
 
         return Batch(batch_id)
@@ -164,7 +165,7 @@ class MockDatabase(CJRepositoryProtocol):
 
         # Return a mock object with the expected attributes
         class MockProcessedEssay:
-            def __init__(self):
+            def __init__(self) -> None:
                 self.current_bt_score = 0.0
                 self.els_essay_id = els_essay_id
                 self.text_storage_id = text_storage_id
@@ -203,8 +204,8 @@ class MockDatabase(CJRepositoryProtocol):
         cj_batch_id: int,
         scores: dict[str, float],
     ) -> None:
-        """Update essay Bradley-Terry scores."""
-        # Mock implementation - no need for actual behavior in these tests
+        """Update essay scores within a batch."""
+        # Mock implementation
         pass
 
     async def update_cj_batch_status(
@@ -213,8 +214,8 @@ class MockDatabase(CJRepositoryProtocol):
         cj_batch_id: int,
         status: Any,
     ) -> None:
-        """Update CJ batch status."""
-        # Mock implementation - no need for actual behavior in these tests
+        """Update the status of a CJ batch."""
+        # Mock implementation
         pass
 
     async def get_final_cj_rankings(
@@ -222,10 +223,10 @@ class MockDatabase(CJRepositoryProtocol):
         session: AsyncSession,
         cj_batch_id: int,
     ) -> list[dict[str, Any]]:
-        """Get final rankings for a CJ batch."""
-        return []  # Mock implementation for tests
+        """Get the final ranked list of essays for a CJ batch."""
+        return []
 
     async def initialize_db_schema(self) -> None:
-        """Initialize database schema (create tables)."""
+        """Initialize the database schema for testing."""
         # Mock implementation - no need for actual behavior in these tests
         pass

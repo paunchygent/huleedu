@@ -53,7 +53,8 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/batch_orchestrator_service",
     "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service",
     "-e file:///${PROJECT_ROOT}/services/file_service",
-    "-e file:///${PROJECT_ROOT}/services/cj_assessment_service"
+    "-e file:///${PROJECT_ROOT}/services/cj_assessment_service",
+    "-e file:///${PROJECT_ROOT}/services/class_management_service"
 ]
 
 [tool.pdm.scripts]
@@ -157,6 +158,8 @@ module = [
     "services.batch_orchestrator_service.*",
     "services.essay_lifecycle_service.*",
     "services.file_service.*",
+    "services.cj_assessment_service.*",
+    "services.class_management_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true

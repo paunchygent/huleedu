@@ -15,6 +15,8 @@ __all__ = [
     "EssayProcessingInputRefV1",
     "StorageReferenceMetadata",
     "SystemProcessingMetadata",
+    "PersonNameV1",
+    "ParsedNameMetadata",
 ]
 
 
@@ -61,3 +63,36 @@ class EssayProcessingInputRefV1(BaseModel):
 
     essay_id: str
     text_storage_id: str
+
+
+class PersonNameV1(BaseModel):
+    """Standardized model for person names.
+
+    Attributes:
+        first_name (str): The person's given name.
+        last_name (str): The person's family name.
+        legal_full_name (str): The full legal name, defaults to a combination of first and last name.
+    """
+
+    first_name: str
+    last_name: str
+    legal_full_name: str | None = None
+
+    def __pydantic_post_init__(self, **kwargs: Any) -> None:
+        if self.legal_full_name is None:
+            self.legal_full_name = f"{self.first_name} {self.last_name}".strip()
+
+    model_config = {
+        "frozen": True,
+        "populate_by_name": True,
+    }
+
+
+class ParsedNameMetadata(BaseModel):
+    """
+    Metadata about a parsed person's name.
+
+    Attributes:
+        parsed_name (PersonNameV1): The structured person name (first, last, legal full name).
+    """
+    parsed_name: PersonNameV1 = Field(..., description="The structured person name.")

@@ -12,14 +12,17 @@ import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
+from huleedu_service_libs.idempotency import idempotent_consumer
 
 from common_core.domain_enums import CourseCode
-from common_core.event_enums import ProcessingEvent
+from common_core.events.utils import generate_deterministic_event_id
+from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_single_message
+from services.cj_assessment_service.models_api import ComparisonResult, LLMAssessmentResponseSchema
 from services.cj_assessment_service.tests.unit.mocks import MockDatabase, MockRedisClient
 
 # --- Test Helpers ---
@@ -79,7 +82,7 @@ def sample_cj_request_event() -> dict:
 @pytest.fixture
 def mock_boundary_services(
     mock_cj_repository: MockDatabase,
-) -> tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Any]:
+) -> tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Settings]:
     """Create mock boundary services (external dependencies only)."""
     mock_content_client = AsyncMock()
     mock_content_client.fetch_content = AsyncMock(
@@ -90,12 +93,8 @@ def mock_boundary_services(
     mock_event_publisher.publish_assessment_failed = AsyncMock()
     mock_llm_interaction = AsyncMock()
     # Configure LLM to return valid comparison results to prevent infinite loop
-    from services.cj_assessment_service.models_api import (
-        ComparisonResult,
-        LLMAssessmentResponseSchema,
-    )
 
-    async def mock_perform_comparisons(tasks, **kwargs):
+    async def mock_perform_comparisons(tasks: list[Any], **kwargs: Any) -> list[ComparisonResult]:
         results = []
         for task in tasks:
             results.append(
@@ -116,12 +115,6 @@ def mock_boundary_services(
 
     mock_llm_interaction.perform_comparisons = AsyncMock(side_effect=mock_perform_comparisons)
 
-    class Settings:
-        MAX_PAIRWISE_COMPARISONS = 100
-        CJ_ASSESSMENT_FAILED_TOPIC = ProcessingEvent.CJ_ASSESSMENT_FAILED.value
-        CJ_ASSESSMENT_COMPLETED_TOPIC = "cj_assessment_completed"
-        SERVICE_NAME = "cj_assessment_service"
-
     settings = Settings()
     return (
         mock_cj_repository,
@@ -138,12 +131,10 @@ def mock_boundary_services(
 @pytest.mark.asyncio
 async def test_first_time_event_processing_success(
     sample_cj_request_event: dict,
-    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock],
+    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Settings],
     mock_redis_client: MockRedisClient,
 ) -> None:
     """Test that first-time CJ assessment events are processed successfully with idempotency."""
-    from huleedu_service_libs.idempotency import idempotent_consumer
-
     database, content_client, event_publisher, llm_interaction, settings = mock_boundary_services
 
     kafka_msg = create_mock_kafka_message(sample_cj_request_event)
@@ -179,14 +170,10 @@ async def test_first_time_event_processing_success(
 @pytest.mark.asyncio
 async def test_duplicate_event_skipped(
     sample_cj_request_event: dict,
-    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock],
+    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Settings],
     mock_redis_client: MockRedisClient,
 ) -> None:
     """Test that duplicate events are skipped without processing business logic."""
-    from huleedu_service_libs.idempotency import idempotent_consumer
-
-    from common_core.events.utils import generate_deterministic_event_id
-
     database, content_client, event_publisher, llm_interaction, settings = mock_boundary_services
 
     kafka_msg = create_mock_kafka_message(sample_cj_request_event)
@@ -218,12 +205,10 @@ async def test_duplicate_event_skipped(
 
 @pytest.mark.asyncio
 async def test_deterministic_event_id_generation(
-    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock],
+    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Settings],
     mock_redis_client: MockRedisClient,
 ) -> None:
     """Test that deterministic event IDs are generated correctly for CJ assessment events."""
-    from huleedu_service_libs.idempotency import idempotent_consumer
-
     database, content_client, event_publisher, llm_interaction, settings = mock_boundary_services
 
     base_event_data = {

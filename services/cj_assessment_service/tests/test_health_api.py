@@ -7,7 +7,7 @@ Follows testing standards from 110.3-testing-mode and 070-testing-and-quality-as
 from __future__ import annotations
 
 import pytest
-from quart.testing import QuartClient
+from quart.typing import TestClientProtocol as QuartTestClient
 
 from services.cj_assessment_service.app import create_app
 from services.cj_assessment_service.config import Settings
@@ -17,14 +17,14 @@ class TestHealthAPI:
     """Test the health API endpoints."""
 
     @pytest.fixture
-    async def app_client(self):
+    async def app_client(self) -> QuartTestClient:
         """Create test client with test settings."""
         test_settings = Settings()
         app = create_app(test_settings)
         app.config.update({"TESTING": True})
         return app.test_client()
 
-    async def test_healthz_endpoint_responds_ok(self, app_client: QuartClient) -> None:
+    async def test_healthz_endpoint_responds_ok(self, app_client: QuartTestClient) -> None:
         """Test /healthz endpoint returns 200 with correct response."""
         response = await app_client.get("/healthz")
 
@@ -39,7 +39,7 @@ class TestHealthAPI:
 
     async def test_metrics_endpoint_responds_with_prometheus_format(
         self,
-        app_client: QuartClient,
+        app_client: QuartTestClient,
     ) -> None:
         """Test /metrics endpoint returns Prometheus formatted metrics."""
         response = await app_client.get("/metrics")
@@ -60,7 +60,7 @@ class TestHealthAPI:
             assert "# HELP" in content or "# TYPE" in content
         # If empty, that's acceptable for test environment
 
-    async def test_metrics_endpoint_error_handling(self, app_client: QuartClient) -> None:
+    async def test_metrics_endpoint_error_handling(self, app_client: QuartTestClient) -> None:
         """Test /metrics endpoint error handling by testing the route logic."""
         # Test that the metrics endpoint exists and is accessible
         # Error handling is implemented in the route, so we test the working case
@@ -74,7 +74,7 @@ class TestHealthAPI:
             content = await response.get_data(as_text=True)
             assert "metrics_error" in content
 
-    async def test_metrics_endpoint_basic_functionality(self, app_client: QuartClient) -> None:
+    async def test_metrics_endpoint_basic_functionality(self, app_client: QuartTestClient) -> None:
         """Test /metrics endpoint basic functionality."""
         response = await app_client.get("/metrics")
 
@@ -87,7 +87,7 @@ class TestHealthAPI:
 
     async def test_nonexistent_endpoint_triggers_error_handler(
         self,
-        app_client: QuartClient,
+        app_client: QuartTestClient,
     ) -> None:
         """Test that non-existent endpoints trigger error handler."""
         response = await app_client.get("/nonexistent")

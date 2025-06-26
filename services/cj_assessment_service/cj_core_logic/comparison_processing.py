@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
@@ -147,7 +148,7 @@ async def perform_iterative_comparisons(
 async def _process_comparison_iteration(
     essays_for_api_model: list[EssayForComparison],
     cj_batch_id: int,
-    session,
+    session: AsyncSession,
     llm_interaction: LLMInteractionProtocol,
     model_override: str | None,
     temperature_override: float | None,

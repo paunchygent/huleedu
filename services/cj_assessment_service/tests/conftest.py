@@ -38,6 +38,8 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 from common_core.status_enums import ProcessingStage
+from services.cj_assessment_service.config import Settings
+from services.cj_assessment_service.tests.unit.mocks import MockDatabase, MockRedisClient
 
 # NOW rebuild models with all types available
 BaseEventData.model_rebuild(raise_errors=True)
@@ -236,7 +238,7 @@ def mock_http_session() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_settings() -> MagicMock:
+def mock_settings() -> Settings:
     """Provide mock settings for testing."""
     settings = MagicMock()
     settings.DEFAULT_LLM_PROVIDER = "openai"
@@ -299,7 +301,7 @@ def sample_comparison_results() -> list[dict[str, Any]]:
 
 
 @pytest.fixture
-def mock_redis_client():  # -> MockRedisClient
+def mock_redis_client() -> MockRedisClient:
     """Provide a mock Redis client for idempotency testing."""
     from services.cj_assessment_service.tests.unit.mocks import MockRedisClient
 
@@ -307,7 +309,7 @@ def mock_redis_client():  # -> MockRedisClient
 
 
 @pytest.fixture
-def mock_cj_repository():  # -> MockDatabase
+def mock_cj_repository() -> MockDatabase:
     """Provide a mock CJ repository for idempotency testing."""
     from services.cj_assessment_service.tests.unit.mocks import MockDatabase
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dishka import AsyncContainer
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Quart
 
@@ -12,7 +13,7 @@ from services.cj_assessment_service.protocols import CJRepositoryProtocol
 logger = create_service_logger("cj_assessment_service.startup")
 
 
-async def initialize_services(app: Quart, settings: Settings, container) -> None:
+async def initialize_services(app: Quart, settings: Settings, container: AsyncContainer) -> None:
     """Initialize database schema and metrics (DI container already initialized in app.py)."""
     try:
         # Initialize database schema directly (following BOS/ELS pattern)

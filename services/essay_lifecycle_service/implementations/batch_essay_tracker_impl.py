@@ -236,7 +236,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
     ) -> BatchEssaysReady:
         """Create BatchEssaysReady event and clean up completed batch."""
         # Get validation failures for this batch
-        failures = self.validation_failures.get(batch_id, [])
+        failures: list[EssayValidationFailedV1] = self.validation_failures.get(batch_id, [])
 
         # Cancel timeout monitoring
         if expectation.timeout_task:
@@ -272,7 +272,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 batch_id,
                 len(expectation.slot_assignments),
                 len(failures),
-                ready_event.total_files_processed,
+                len(expectation.slot_assignments) + len(failures),
                 expectation.course_code.value,
             )
         )

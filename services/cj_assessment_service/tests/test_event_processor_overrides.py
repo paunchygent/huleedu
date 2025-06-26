@@ -11,8 +11,12 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from aiokafka import ConsumerRecord
 
-from common_core.events.cj_assessment_events import LLMConfigOverrides
+from common_core.events.cj_assessment_events import (
+    ELS_CJAssessmentRequestV1,
+    LLMConfigOverrides,
+)
 from common_core.events.envelope import EventEnvelope
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_single_message
@@ -64,7 +68,7 @@ class TestEventProcessorOverrides:
     @pytest.mark.asyncio
     async def test_process_message_with_llm_overrides(
         self,
-        kafka_message_with_overrides,
+        kafka_message_with_overrides: ConsumerRecord,
         mock_database: AsyncMock,
         mock_content_client: AsyncMock,
         mock_llm_interaction: AsyncMock,
@@ -127,7 +131,7 @@ class TestEventProcessorOverrides:
     @pytest.mark.asyncio
     async def test_process_message_without_llm_overrides(
         self,
-        kafka_message_no_overrides,
+        kafka_message_no_overrides: ConsumerRecord,
         mock_database: AsyncMock,
         mock_content_client: AsyncMock,
         mock_llm_interaction: AsyncMock,
@@ -186,7 +190,7 @@ class TestEventProcessorOverrides:
     @pytest.mark.asyncio
     async def test_process_message_deserialization_with_overrides(
         self,
-        kafka_message_with_overrides,
+        kafka_message_with_overrides: ConsumerRecord,
         mock_database: AsyncMock,
         mock_content_client: AsyncMock,
         mock_llm_interaction: AsyncMock,
@@ -225,13 +229,13 @@ class TestEventProcessorOverrides:
     @pytest.mark.asyncio
     async def test_process_message_correlation_id_propagation_with_overrides(
         self,
-        kafka_message_with_overrides,
+        kafka_message_with_overrides: ConsumerRecord,
         mock_database: AsyncMock,
         mock_content_client: AsyncMock,
         mock_llm_interaction: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
-        cj_request_envelope_with_overrides,
+        cj_request_envelope_with_overrides: EventEnvelope[ELS_CJAssessmentRequestV1],
     ) -> None:
         """Test correlation ID propagation when processing messages with overrides.
 
