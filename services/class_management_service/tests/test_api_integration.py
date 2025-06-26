@@ -8,17 +8,15 @@ from unittest.mock import AsyncMock
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
+from prometheus_client import REGISTRY
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 
 from common_core.domain_enums import CourseCode
 from common_core.events.class_events import ClassUpdatedV1, StudentUpdatedV1
 from common_core.events.envelope import EventEnvelope
-from services.class_management_service.api_models import (
-    UpdateClassRequest,
-    UpdateStudentRequest,
-)
 from services.class_management_service.app import app
+from services.class_management_service.di import MetricsProvider
 from services.class_management_service.implementations.class_management_service_impl import (
     ClassManagementServiceImpl,
 )
@@ -28,6 +26,15 @@ from services.class_management_service.protocols import (
     ClassManagementServiceProtocol,
     ClassRepositoryProtocol,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_prometheus_registry():
+    """Fixture to clear the default Prometheus registry before each test."""
+    collectors = list(REGISTRY._collector_to_names.keys())
+    for collector in collectors:
+        REGISTRY.unregister(collector)
+    yield
 
 
 class TestClassManagementApi:
@@ -69,7 +76,7 @@ class TestClassManagementApi:
                     student_type=Student,
                 )
 
-        container = make_async_container(TestProvider())
+        container = make_async_container(TestProvider(), MetricsProvider())
 
         app.config.update({"TESTING": True})
         QuartDishka(app=app, container=container)

@@ -342,7 +342,18 @@ The frontend application will interact with the backend microservices primarily 
   * **Hardening of Phase 1 Services**:
     * Improve error handling, logging, and Prometheus metrics for all services.
 * **Key Deliverables (Frontend - MVP)**:
-  * (Frontend deliverables remain largely the same, but will now interact with the FastAPI-based interface services.)
+  * **Build the Class and Student Management UI**: Develop the core UI components for managing educational structures. These components will interact directly with the `class_management_service` API, providing a seamless data management experience.
+    * **Component Breakdown & API Mapping:**
+      * **ClassList Panel:** A primary view component that lists all existing classes for the authenticated user. It will fetch data using `GET /v1/classes/`.
+      * **CreateClassModal:** A modal dialog containing a form to create a new class. On submission, it will send a request to `POST /v1/classes/`.
+      * **StudentTable:** A detailed table view to display all students associated with a selected class. It will retrieve student data via `GET /v1/classes/students/<student_id>`.
+      * **AddStudentToClassForm:** A form, likely in a modal, for adding new students and associating them with one or more classes. This will interact with the `POST /v1/classes/students` endpoint.
+      * **EditStudentForm:** A form to update the details of an existing student, which will send requests to `PUT /v1/classes/students/<student_id>`.
+  * **Construct the Real-Time Processing Dashboard**: Implement UI elements that provide live feedback on backend processes by consuming events from the WebSocket Manager.
+    * **UI Element Descriptions:**
+      * **Dynamic Status Badges:** Color-coded badges (e.g., blue for "Processing", green for "Completed", red for "Failed") that update in real-time for both batches and individual essays.
+      * **Individual Essay Progress Bars:** Visual progress bars for each essay, illustrating its journey through the processing pipeline (e.g., "Uploaded", "Spellcheck", "NLP Analysis").
+      * **Live File List:** Within a batch view, the list of associated files will populate dynamically as `EssayContentReady` events are received from the backend, confirming successful ingestion.
 
 ### Phase 3: Expanding Processing Capabilities & Frontend Richness (Target Sprint 5-7)
 
@@ -367,10 +378,6 @@ The frontend application will interact with the backend microservices primarily 
   * (Configurable pipelines, advanced batch actions, analytics dashboards.)
 
 ### Continuous Improvement (Ongoing - All Phases)
-
-(Remains the same)
-
----
 
 ## 10. Open Questions & Areas for Further Design ❓
 

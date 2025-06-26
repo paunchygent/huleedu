@@ -19,6 +19,7 @@ alwaysApply: false
 - [026-file-service-architecture.mdc](mdc:026-file-service-architecture.mdc): File Service architecture and implementation
 - [027-cj-assessment-service.mdc](mdc:027-cj-assessment-service.mdc): CJ Assessment Service architecture and implementation
 - [028-batch-conductor-service.mdc](mdc:028-batch-conductor-service.mdc): Batch Conductor Service (BCS) architecture and implementation
+- [029-class-management-service.mdc](mdc:029-class-management-service.mdc): Class Management Service architecture and implementation
 - [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc): Event-driven communication standards
 
 ## Implementation & Coding Standards

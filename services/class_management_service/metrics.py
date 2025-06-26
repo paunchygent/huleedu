@@ -1,13 +1,32 @@
-"""Metrics definitions and providers for the Class Management Service."""
+"""Metrics definitions for the Class Management Service."""
 
-from dishka import Provider, Scope, provide
-from prometheus_client import CollectorRegistry, REGISTRY
+from prometheus_client import Counter, Histogram
 
 
-class MetricsProvider(Provider):
-    """Provides Prometheus metrics-related dependencies."""
+class CmsMetrics:
+    """A container for all Prometheus metrics for the service."""
 
-    @provide(scope=Scope.APP)
-    def provide_registry(self) -> CollectorRegistry:
-        """Provide the default Prometheus collector registry."""
-        return REGISTRY
+    def __init__(self):
+        self.http_requests_total = Counter(
+            "cms_http_requests_total",
+            "Total number of HTTP requests for Class Management Service.",
+            ["method", "endpoint", "http_status"],
+        )
+        self.http_request_duration_seconds = Histogram(
+            "cms_http_request_duration_seconds",
+            "HTTP request duration in seconds for Class Management Service.",
+            ["method", "endpoint"],
+        )
+        self.class_creations_total = Counter(
+            "cms_class_creations_total",
+            "Total number of classes created successfully.",
+        )
+        self.student_creations_total = Counter(
+            "cms_student_creations_total",
+            "Total number of students created successfully.",
+        )
+        self.api_errors_total = Counter(
+            "cms_api_errors_total",
+            "Total number of API errors.",
+            ["endpoint", "error_type"],
+        )

@@ -3,8 +3,7 @@ from __future__ import annotations
 from typing import AsyncGenerator
 
 from config import Settings, settings
-from dishka import Provider, Scope, provide, make_async_container, AsyncContainer
-
+from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from huleedu_service_libs.kafka_client import KafkaBus
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -25,13 +24,13 @@ from services.class_management_service.implementations.class_repository_postgres
 from services.class_management_service.implementations.event_publisher_impl import (
     DefaultClassEventPublisherImpl,
 )
+from services.class_management_service.metrics import CmsMetrics
 from services.class_management_service.models_db import Student, UserClass
 from services.class_management_service.protocols import (
     ClassEventPublisherProtocol,
     ClassManagementServiceProtocol,
     ClassRepositoryProtocol,
 )
-from services.class_management_service.metrics import MetricsProvider
 
 
 class DatabaseProvider(Provider):
@@ -94,6 +93,22 @@ class ServiceProvider(Provider):
             user_class_type=UserClass,
             student_type=Student,
         )
+
+from prometheus_client import CollectorRegistry, REGISTRY
+
+class MetricsProvider(Provider):
+    """Provides Prometheus metrics-related dependencies."""
+
+    @provide(scope=Scope.APP)
+    def provide_metrics(self) -> CmsMetrics:
+        """Provide an application-scoped instance of the metrics container."""
+        return CmsMetrics()
+
+    @provide(scope=Scope.APP)
+    def provide_registry(self) -> CollectorRegistry:
+        """Provide the default Prometheus collector registry."""
+        return REGISTRY
+
 
 def create_container() -> AsyncContainer:
     """Create and configure the application's dependency injection container."""

@@ -1,23 +1,10 @@
 
 
-from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
-from quart import Quart
-from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from services.class_management_service.models_db import Base
-
 from services.class_management_service.config import Settings
-from services.class_management_service.di import (
-    DatabaseProvider,
-    RepositoryProvider,
-    ServiceProvider,
-    MetricsProvider,
-)
-from services.class_management_service.implementations.class_repository_postgres_impl import (
-    PostgreSQLClassRepositoryImpl,
-)
+from services.class_management_service.models_db import Base
 
 logger = create_service_logger("cms.startup")
 

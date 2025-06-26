@@ -15,6 +15,7 @@ from services.class_management_service.api_models import (
     UpdateClassRequest,
     UpdateStudentRequest,
 )
+from services.class_management_service.metrics import CmsMetrics
 from services.class_management_service.models_db import Student, UserClass
 from services.class_management_service.protocols import ClassManagementServiceProtocol
 
@@ -26,25 +27,38 @@ class_bp = Blueprint("class_routes", __name__)
 @inject
 async def create_class(
     service: FromDishka[ClassManagementServiceProtocol[UserClass, Student]],
+    metrics: FromDishka[CmsMetrics],
 ) -> Response | tuple[Response, int]:
     """Create a new class."""
     user_id = request.headers.get("X-User-ID")
     if not user_id:
         return jsonify({"error": "User authentication required"}), 401
 
-    try:
-        data = await request.get_json()
-        create_request = CreateClassRequest(**data)
-        correlation_id = uuid.uuid4()  # Generate correlation ID
+    with metrics.http_request_duration_seconds.labels(
+        method="POST", endpoint="/v1/classes/"
+    ).time():
+        try:
+            data = await request.get_json()
+            create_request = CreateClassRequest(**data)
+            correlation_id = uuid.uuid4()  # Generate correlation ID
 
-        new_class = await service.register_new_class(
-            user_id, create_request, correlation_id
-        )
-
-        return jsonify({"id": str(new_class.id), "name": new_class.name}), 201
-    except Exception as e:
-        logger.error(f"Error creating class: {e}", exc_info=True)
-        return jsonify({"error": "Internal server error"}), 500
+            new_class = await service.register_new_class(
+                user_id, create_request, correlation_id
+            )
+            metrics.http_requests_total.labels(
+                method="POST", endpoint="/v1/classes/", http_status=201
+            ).inc()
+            metrics.class_creations_total.inc()
+            return jsonify({"id": str(new_class.id), "name": new_class.name}), 201
+        except Exception as e:
+            logger.error(f"Error creating class: {e}", exc_info=True)
+            metrics.http_requests_total.labels(
+                method="POST", endpoint="/v1/classes/", http_status=500
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint="/v1/classes/", error_type="server_error"
+            ).inc()
+            return jsonify({"error": "Internal server error"}), 500
 
 
 @class_bp.route("/<class_id>", methods=["GET"])
@@ -143,33 +157,47 @@ async def delete_class(
 @inject
 async def create_student(
     service: FromDishka[ClassManagementServiceProtocol[UserClass, Student]],
+    metrics: FromDishka[CmsMetrics],
 ) -> Response | tuple[Response, int]:
     """Create a new student and associate with classes."""
     user_id = request.headers.get("X-User-ID")
     if not user_id:
         return jsonify({"error": "User authentication required"}), 401
 
-    try:
-        data = await request.get_json()
-        create_request = CreateStudentRequest(**data)
-        correlation_id = uuid.uuid4()
+    with metrics.http_request_duration_seconds.labels(
+        method="POST", endpoint="/v1/classes/students"
+    ).time():
+        try:
+            data = await request.get_json()
+            create_request = CreateStudentRequest(**data)
+            correlation_id = uuid.uuid4()
 
-        new_student = await service.add_student_to_class(
-            user_id, create_request, correlation_id
-        )
+            new_student = await service.add_student_to_class(
+                user_id, create_request, correlation_id
+            )
 
-        return (
-            jsonify(
-                {
-                    "id": str(new_student.id),
-                    "full_name": f"{new_student.first_name} {new_student.last_name}",
-                }
-            ),
-            201,
-        )
-    except Exception as e:
-        logger.error(f"Error creating student: {e}", exc_info=True)
-        return jsonify({"error": "Internal server error"}), 500
+            metrics.http_requests_total.labels(
+                method="POST", endpoint="/v1/classes/students", http_status=201
+            ).inc()
+            metrics.student_creations_total.inc()
+            return (
+                jsonify(
+                    {
+                        "id": str(new_student.id),
+                        "full_name": f"{new_student.first_name} {new_student.last_name}",
+                    }
+                ),
+                201,
+            )
+        except Exception as e:
+            logger.error(f"Error creating student: {e}", exc_info=True)
+            metrics.http_requests_total.labels(
+                method="POST", endpoint="/v1/classes/students", http_status=500
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint="/v1/classes/students", error_type="server_error"
+            ).inc()
+            return jsonify({"error": "Internal server error"}), 500
 
 
 @class_bp.route("/students/<student_id>", methods=["GET"])

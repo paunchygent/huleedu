@@ -1,13 +1,11 @@
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from quart import Quart
-
-from dishka import FromDishka
-from quart_dishka import QuartDishka, inject
+from quart_dishka import QuartDishka
 
 import services.class_management_service.startup_setup as startup_setup
 from services.class_management_service.api.class_routes import class_bp
 from services.class_management_service.api.health_routes import health_bp
-from services.class_management_service.config import Settings, settings
+from services.class_management_service.config import settings
 from services.class_management_service.di import create_container
 
 # Configure logging first
