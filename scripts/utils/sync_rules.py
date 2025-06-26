@@ -17,8 +17,6 @@ def sync_files(mdc_path: str, md_path: str) -> None:
         print(f"⚠️ Error reading .mdc file {mdc_path}: {e} (Skipping)")
         return
 
-    # A simpler, more robust normalization logic.
-    # First, strip all trailing whitespace including newlines from the entire content.
     new_md_content_normalized = new_md_content.rstrip()
     # If the content is not empty after stripping, add exactly one newline.
     if new_md_content_normalized:
