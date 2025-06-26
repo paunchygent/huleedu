@@ -102,6 +102,7 @@ def sync_directory(mdc_dir: str, md_dir: str) -> None:
     print("\n🏁 Sync process complete.")
 
 
+# Trivial change to trigger commit hook
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Synchronize .md files from a source .mdc directory.",
@@ -118,6 +119,11 @@ if __name__ == "__main__":
         dest="md_dir",
         default=".windsurf/rules",
         help="Directory with target .md files (default: .windsurf/rules)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Accepts --dry-run for pre-commit compatibility, but the flag is ignored.",
     )
     args = parser.parse_args()
 

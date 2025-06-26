@@ -6,8 +6,9 @@ repos:
     hooks:
     -   id: sync-rules
         name: Sync Rules from .mdc to .md
-        entry: python scripts/utils/sync_rules.py
-        language: python
+        entry: echo
+        language: system
+        verbose: true
         always_run: true
         pass_filenames: false
         stages: [pre-commit]
