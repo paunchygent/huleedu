@@ -76,6 +76,12 @@ The HuleEdu ecosystem currently comprises the following services:
   * **API**: `/internal/v1/pipelines/define` for pipeline resolution, `/healthz` and `/metrics` endpoints
   * **Architecture**: Protocol-based DI with Dishka, event-driven architecture consuming spellcheck/CJ assessment completion events, Redis-cached state management with atomic WATCH/MULTI/EXEC operations
 
+* **Class Management Service (CMS)** ✅ **IMPLEMENTED**:
+  * **Description**: A Quart-based HTTP service acting as the authoritative source for managing classes, students, and their relationships. Provides a synchronous API for data management.
+  * **Port**: 5002 (Internal HTTP API)
+  * **Location**: `services/class_management_service/`
+  * **API**: `/v1/classes` and `/v1/students` for full CRUD operations.
+
 ## Key Technologies
 
 * **Python**: Version 3.11+
@@ -222,7 +228,7 @@ The HuleEdu platform continues evolving with dynamic pipeline orchestration. The
   * **CJ (Comparative Judgement) Assessment Service**: ✅ **IMPLEMENTED** - AI-driven comparative judgement of essays with dynamic LLM configuration
 * **Future Architectural Components**:
   * **LLM-Caller Gateway**: Centralized service for managing Large Language Model interactions
-  * **API Gateway**: Single entry point for external clients
+  * **API Gateway and Websocket**: Single entry point for external clients
   * **React Frontend**: Modern user interface for students and educators
   * **User Service**: Authentication, authorization, and user profiles
   * **Result Aggregator**: Processing results collection and presentation
