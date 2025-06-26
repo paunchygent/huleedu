@@ -2,12 +2,9 @@ from __future__ import annotations
 
 from typing import AsyncGenerator
 
-# Local application imports
 from config import Settings, settings
+from dishka import Provider, Scope, provide, make_async_container, AsyncContainer
 
-# Standard library imports
-# Third-party imports
-from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -34,6 +31,7 @@ from services.class_management_service.protocols import (
     ClassManagementServiceProtocol,
     ClassRepositoryProtocol,
 )
+from services.class_management_service.metrics import MetricsProvider
 
 
 class DatabaseProvider(Provider):
@@ -54,13 +52,14 @@ class DatabaseProvider(Provider):
 
 
 class RepositoryProvider(Provider):
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.REQUEST)
     def provide_class_repository(
         self, settings: Settings, session: AsyncSession
     ) -> ClassRepositoryProtocol[UserClass, Student]:
         if settings.ENVIRONMENT == "test" or settings.USE_MOCK_REPOSITORY:
             return MockClassRepositoryImpl[UserClass, Student]()
         return PostgreSQLClassRepositoryImpl[UserClass, Student](session)
+
 
 
 class ServiceProvider(Provider):
@@ -95,3 +94,12 @@ class ServiceProvider(Provider):
             user_class_type=UserClass,
             student_type=Student,
         )
+
+def create_container() -> AsyncContainer:
+    """Create and configure the application's dependency injection container."""
+    return make_async_container(
+        DatabaseProvider(),
+        RepositoryProvider(),
+        ServiceProvider(),
+        MetricsProvider(),
+    )

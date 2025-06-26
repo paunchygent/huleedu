@@ -4,36 +4,35 @@ from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Quart
 from quart_dishka import QuartDishka
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from services.class_management_service.models_db import Base
 
 from services.class_management_service.config import Settings
 from services.class_management_service.di import (
     DatabaseProvider,
     RepositoryProvider,
     ServiceProvider,
+    MetricsProvider,
+)
+from services.class_management_service.implementations.class_repository_postgres_impl import (
+    PostgreSQLClassRepositoryImpl,
 )
 
 logger = create_service_logger("cms.startup")
 
 
-async def initialize_services(app: Quart, settings: Settings) -> None:
-    """Initialize DI container, Quart-Dishka integration, and other services."""
+async def initialize_database_schema(settings: Settings) -> None:
+    """Initialize the database schema using the provided engine."""
     try:
-        container = make_async_container(
-            DatabaseProvider(),
-            RepositoryProvider(),
-            ServiceProvider(),
-        )
-        QuartDishka(app=app, container=container)
-
-        # In a real application, you would initialize the DB schema here
-        # async with container() as request_container:
-        #     engine = await request_container.get(Engine)
-        #     async with engine.begin() as conn:
-        #         await conn.run_sync(Base.metadata.create_all)
-
-        logger.info("Class Management Service startup completed successfully")
+        logger.info("Initializing database schema...")
+        engine = create_async_engine(settings.DATABASE_URL)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        await engine.dispose()
+        logger.info("Database schema initialized successfully")
     except Exception as e:
-        logger.critical(f"Failed to start Class Management Service: {e}", exc_info=True)
+        logger.critical(f"Failed to initialize database schema: {e}", exc_info=True)
         raise
 
 

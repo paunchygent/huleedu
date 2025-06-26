@@ -27,3 +27,14 @@ dependencies = [
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/common_core"
+huleedu-service-libs = "file:///app/services/libs"
+
+[tool.pdm.scripts]
+start = "python app.py"
+dev = "quart --app services/class_management_service/app:app --debug run -p 5002"

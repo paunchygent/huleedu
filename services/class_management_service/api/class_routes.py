@@ -22,7 +22,7 @@ logger = create_service_logger("class_management_service.api.class")
 class_bp = Blueprint("class_routes", __name__)
 
 
-@class_bp.route("/v1/classes", methods=["POST"])
+@class_bp.route("/", methods=["POST"])
 @inject
 async def create_class(
     service: FromDishka[ClassManagementServiceProtocol[UserClass, Student]],
@@ -47,7 +47,7 @@ async def create_class(
         return jsonify({"error": "Internal server error"}), 500
 
 
-@class_bp.route("/v1/classes/<class_id>", methods=["GET"])
+@class_bp.route("/<class_id>", methods=["GET"])
 @inject
 async def get_class(
     class_id: str,
@@ -77,7 +77,7 @@ async def get_class(
         return jsonify({"error": "Internal server error"}), 500
 
 
-@class_bp.route("/v1/classes/<class_id>", methods=["PUT"])
+@class_bp.route("/<class_id>", methods=["PUT"])
 @inject
 async def update_class(
     class_id: str,
@@ -113,7 +113,7 @@ async def update_class(
         return jsonify({"error": "Internal server error"}), 500
 
 
-@class_bp.route("/v1/classes/<class_id>", methods=["DELETE"])
+@class_bp.route("/<class_id>", methods=["DELETE"])
 @inject
 async def delete_class(
     class_id: str,
@@ -139,7 +139,7 @@ async def delete_class(
         return jsonify({"error": "Internal server error"}), 500
 
 
-@class_bp.route("/v1/students", methods=["POST"])
+@class_bp.route("/students", methods=["POST"])
 @inject
 async def create_student(
     service: FromDishka[ClassManagementServiceProtocol[UserClass, Student]],
@@ -172,7 +172,7 @@ async def create_student(
         return jsonify({"error": "Internal server error"}), 500
 
 
-@class_bp.route("/v1/students/<student_id>", methods=["GET"])
+@class_bp.route("/students/<student_id>", methods=["GET"])
 @inject
 async def get_student(
     student_id: str,
@@ -204,7 +204,7 @@ async def get_student(
         return jsonify({"error": "Internal server error"}), 500
 
 
-@class_bp.route("/v1/students/<student_id>", methods=["PUT"])
+@class_bp.route("/students/<student_id>", methods=["PUT"])
 @inject
 async def update_student(
     student_id: str,
@@ -242,7 +242,7 @@ async def update_student(
         return jsonify({"error": "Internal server error"}), 500
 
 
-@class_bp.route("/v1/students/<student_id>", methods=["DELETE"])
+@class_bp.route("/students/<student_id>", methods=["DELETE"])
 @inject
 async def delete_student(
     student_id: str,
