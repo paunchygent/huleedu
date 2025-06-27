@@ -1,9 +1,9 @@
 ---
-description: Defines the architecture and implementation details of the HuleEdu Essay Lifecycle Service
+description: Defines the Essay Lifecycle Service (ELS). Manages individual essay state via a Kafka worker and HTTP API. Uses SQLite for persistence and coordinates with the Batch Orchestrator Service.
 globs: 
 alwaysApply: false
 ---
-# 025: Essay Lifecycle Service Architecture
+# 020.5: Essay Lifecycle Service Architecture
 
 **STATUS**: ✅ **OPERATIONAL** - Service tested and confirmed working (Jan 2025)
 - **Health Endpoint**: `/healthz` returns HTTP 200 with service status

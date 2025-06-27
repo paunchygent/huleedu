@@ -1,0 +1,72 @@
+---
+description: Defines the API Gateway & WebSocket Service. The primary client entry point. Handles JWT auth, proxies requests to downstream services, and manages real-time WebSocket notifications.
+globs: 
+alwaysApply: false
+---
+# 020.10: API Gateway & WebSocket Service Architecture
+
+## 1. Service Identity
+- **Package**: `huleedu-api-gateway-service`
+- **Folders**: `services/api_gateway_service/`
+- **Port**: 4001 (client-facing), 8080 (internal Docker)
+- **Stack**: FastAPI, Uvicorn, Dishka, `python-jose` & `PyJWT` (for JWT), `slowapi` (for rate limiting)
+- **Purpose**: Secure, client-facing entry point for the HuleEdu platform. Handles API requests, WebSocket connections, authentication, and routing to internal services.
+
+## 2. Core Architectural Patterns
+
+The gateway acts as a mediator, implementing three distinct patterns for backend interaction.
+
+### 2.1. Command Publishing
+For asynchronous operations, the gateway publishes commands to Kafka and returns `202 Accepted`.
+- **File**: `routers/batch_routes.py`
+- **Endpoint**: `POST /v1/batches/{batch_id}/pipelines`
+- **Logic**:
+    1. Validates `batch_id` consistency between URL path and request body.
+    2. Constructs a formal `ClientBatchPipelineRequestV1` event from `common_core`.
+    3. Wraps the event in a standard `EventEnvelope`.
+    4. Publishes to the `huleedu.commands.batch.pipeline.v1` Kafka topic via the injected `KafkaBus`.
+
+### 2.2. Request Proxying
+For synchronous CRUD operations, the gateway proxies requests to the appropriate internal service.
+- **File Proxy (`routers/file_routes.py`)**:
+    - **Endpoint**: `POST /v1/files/batch`
+    - **Logic**: Handles `multipart/form-data`. Injects the authenticated `X-User-ID` header and forwards the request to the `file_service`.
+- **Class Management Proxy (`routers/class_routes.py`)**:
+    - **Endpoint**: `ANY /v1/classes/{path:path}`
+    - **Logic**: A generic, streaming proxy. Captures all methods and paths under `/v1/classes/` and streams the request and response to/from the `class_management_service`.
+
+### 2.3. Query with Fallback
+For data retrieval, the gateway can orchestrate queries and implement fallback logic.
+- **File**: `routers/status_routes.py`
+- **Endpoint**: `GET /v1/batches/{batch_id}/status`
+- **Logic**:
+    1.  Queries the `result_aggregator_service`.
+    2.  On a 404 response, it performs a fallback query to the `batch_orchestrator_service` if `HANDLE_MISSING_BATCHES` is configured.
+    3.  **Ownership Enforcement**: It validates that the `user_id` in the downstream service's response payload matches the JWT's `sub` claim.
+
+## 3. Security Implementation
+
+### 3.1. JWT Authentication
+- **File**: `auth.py`
+- **Mechanism**: The `get_current_user_id` dependency uses `OAuth2PasswordBearer` to extract the token.
+- **Validation**:
+    1.  Decodes the token using `settings.JWT_SECRET_KEY`.
+    2.  Validates the signature and algorithm (`HS256`).
+    3.  **Critically**, it validates the `exp` (expiration) claim against the current time.
+    4.  Extracts the user ID from the `sub` claim.
+- **WebSocket Auth**: The same dependency is used for WebSockets, but it is configured to extract the token from a query parameter named `token`.
+
+### 3.2. Rate Limiting
+- **File**: `app/rate_limiter.py`
+- **Mechanism**: Uses `slowapi`. The key is dynamically set to the authenticated `user_id` (from request state) or falls back to the client's IP address.
+- **Configuration**: Limits are applied directly to routes via the `@limiter.limit(...)` decorator (e.g., `10/minute`).
+
+## 4. Real-Time Communication (WebSockets)
+
+- **File**: `routers/websocket_routes.py`
+- **Endpoint**: `ws://<host>/ws/v1/status/{client_id}`
+- **Architecture**: Implements a Redis Pub/Sub bridge.
+    1.  An authenticated WebSocket connection subscribes to a user-specific Redis channel (`ws:{user_id}`).
+    2.  A concurrent `redis_listener` task listens for messages on this channel.
+    3.  When a backend service publishes a notification to the user's channel (via `RedisClient.publish_user_notification`), the listener forwards the message payload to the client over the WebSocket.
+    4.  The connection lifecycle (`WebSocketDisconnect`) is managed to ensure the listener task is properly cancelled.

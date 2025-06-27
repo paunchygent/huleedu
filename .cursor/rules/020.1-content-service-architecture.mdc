@@ -1,9 +1,9 @@
 ---
-description: Defines the architecture and implementation details for the Content Service
+description: Defines the Content Service, a Quart microservice for storing and retrieving essay content. Details its API, async file storage, and client protocol integration.
 globs: 
 alwaysApply: false
 ---
-# 021: Content Service Architecture
+# 020.1: Content Service Architecture
 
 ## 1. Service Identity
 - **Package**: `huleedu-content-service`

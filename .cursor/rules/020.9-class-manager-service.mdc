@@ -1,10 +1,10 @@
 ---
-description: Defines the architecture and implementation details of the Class Management Service.
+description: Defines the Class Management Service architecture. The authoritative source for classes and students. Provides a synchronous CRUD API and publishes state change events to Kafka.
 globs: 
 alwaysApply: false
 ---
 
-# 029: Class Management Service Architecture
+# 020.9: Class Management Service Architecture
 
 ## 1. Service Identity
 
@@ -69,3 +69,4 @@ The service publishes events to Kafka to notify the ecosystem of state changes.
     - `KAFKA_BOOTSTRAP_SERVERS`: Connection string for the Kafka cluster.
     - `USE_MOCK_REPOSITORY`: Flag to enable the in-memory mock repository for testing.
 - **Source File**: `services/class_management_service/config.py`.
+

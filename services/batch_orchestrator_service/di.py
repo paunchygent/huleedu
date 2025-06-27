@@ -84,7 +84,7 @@ class CoreInfrastructureProvider(Provider):
         async def _shutdown_redis() -> None:
             await redis_client.stop()
 
-        # Note: In production, this would be registered with the app lifecycle
+        # TODO Note: In production, this would be registered with the app lifecycle
         # For now, we rely on container cleanup
 
         # RedisClient implements all AtomicRedisClientProtocol methods
