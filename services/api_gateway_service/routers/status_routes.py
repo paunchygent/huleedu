@@ -79,9 +79,6 @@ async def get_batch_status(
         logger.error(f"Aggregator service error for batch {batch_id}: {e}")
         raise HTTPException(status_code=e.response.status_code, detail=e.response.text) from e
 
-    except HTTPException:
-        raise
-
     except Exception as e:
         logger.error(f"Unexpected error for batch {batch_id}: {e}", exc_info=True)
         raise HTTPException(

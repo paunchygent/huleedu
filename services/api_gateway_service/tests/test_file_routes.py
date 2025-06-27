@@ -1,7 +1,7 @@
 """
 Tests for file upload routes in API Gateway Service.
 
-Tests the POST /v1/files/batch endpoint with proper authentication, rate limiting, 
+Tests the POST /v1/files/batch endpoint with proper authentication, rate limiting,
 and proxy functionality to the File Service.
 """
 

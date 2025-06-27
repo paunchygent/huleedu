@@ -79,6 +79,14 @@ class CoreInfrastructureProvider(Provider):
             redis_url=settings.REDIS_URL,
         )
         await redis_client.start()
+
+        # Register shutdown finalizer to prevent connection leaks
+        async def _shutdown_redis() -> None:
+            await redis_client.stop()
+
+        # Note: In production, this would be registered with the app lifecycle
+        # For now, we rely on container cleanup
+
         # RedisClient implements all AtomicRedisClientProtocol methods
         return cast(AtomicRedisClientProtocol, redis_client)
 
@@ -175,9 +183,10 @@ class PipelineCoordinationProvider(Provider):
         self,
         batch_repo: BatchRepositoryProtocol,
         phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol],
+        redis_client: AtomicRedisClientProtocol,
     ) -> PipelinePhaseCoordinatorProtocol:
-        """Provide pipeline phase coordinator implementation."""
-        return DefaultPipelinePhaseCoordinator(batch_repo, phase_initiators_map)
+        """Provide pipeline phase coordinator implementation with Redis support."""
+        return DefaultPipelinePhaseCoordinator(batch_repo, phase_initiators_map, redis_client)
 
     @provide(scope=Scope.APP)
     def provide_batch_processing_service(

@@ -6,6 +6,7 @@ import uuid
 
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
 from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
@@ -17,11 +18,17 @@ logger = create_service_logger("file_service.implementations.event_publisher")
 
 
 class DefaultEventPublisher(EventPublisherProtocol):
-    """Default implementation of EventPublisherProtocol."""
+    """Default implementation of EventPublisherProtocol with Kafka and Redis support."""
 
-    def __init__(self, kafka_bus: KafkaBus, settings: Settings):
+    def __init__(
+        self,
+        kafka_bus: KafkaBus,
+        settings: Settings,
+        redis_client: AtomicRedisClientProtocol,
+    ):
         self.kafka_bus = kafka_bus
         self.settings = settings
+        self.redis_client = redis_client
 
     async def publish_essay_content_provisioned(
         self,
@@ -76,7 +83,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
 
             logger.info(
                 f"Published EssayValidationFailedV1 event for file: "
-                f"{event_data.original_file_name} (error: {event_data.validation_error_code})",
+                f"{event_data.original_file_name}",
             )
 
         except Exception as e:
@@ -88,7 +95,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
         event_data: BatchFileAddedV1,
         correlation_id: uuid.UUID | None,
     ) -> None:
-        """Publish BatchFileAddedV1 event to Kafka."""
+        """Publish BatchFileAddedV1 event to both Kafka and Redis."""
         try:
             # Construct EventEnvelope
             envelope = EventEnvelope[BatchFileAddedV1](
@@ -109,6 +116,18 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 f"essay {event_data.essay_id}, file: {event_data.filename}",
             )
 
+            # Publish to Redis for real-time updates
+            await self._publish_file_event_to_redis(
+                event_data.user_id,
+                "batch_file_added",
+                {
+                    "batch_id": event_data.batch_id,
+                    "essay_id": event_data.essay_id,
+                    "filename": event_data.filename,
+                    "timestamp": event_data.timestamp.isoformat(),
+                }
+            )
+
         except Exception as e:
             logger.error(f"Error publishing BatchFileAddedV1 event: {e}")
             raise
@@ -118,7 +137,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
         event_data: BatchFileRemovedV1,
         correlation_id: uuid.UUID | None,
     ) -> None:
-        """Publish BatchFileRemovedV1 event to Kafka."""
+        """Publish BatchFileRemovedV1 event to both Kafka and Redis."""
         try:
             # Construct EventEnvelope
             envelope = EventEnvelope[BatchFileRemovedV1](
@@ -139,6 +158,45 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 f"essay {event_data.essay_id}, file: {event_data.filename}",
             )
 
+            # Publish to Redis for real-time updates
+            await self._publish_file_event_to_redis(
+                event_data.user_id,
+                "batch_file_removed",
+                {
+                    "batch_id": event_data.batch_id,
+                    "essay_id": event_data.essay_id,
+                    "filename": event_data.filename,
+                    "timestamp": event_data.timestamp.isoformat(),
+                }
+            )
+
         except Exception as e:
             logger.error(f"Error publishing BatchFileRemovedV1 event: {e}")
             raise
+
+    async def _publish_file_event_to_redis(
+        self,
+        user_id: str,
+        event_type: str,
+        data: dict,
+    ) -> None:
+        """Publish file event to Redis for real-time UI notifications."""
+        try:
+            await self.redis_client.publish_user_notification(
+                user_id=user_id,
+                event_type=event_type,
+                data=data
+            )
+
+            logger.info(
+                f"Published {event_type} notification to Redis for user {user_id}",
+                extra={"user_id": user_id, "event_type": event_type}
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Error publishing {event_type} to Redis: {e}",
+                extra={"user_id": user_id, "event_type": event_type},
+                exc_info=True
+            )
+            # Don't fail the entire event publishing if Redis fails

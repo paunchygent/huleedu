@@ -26,6 +26,11 @@ class TestDefaultEventPublisherFileManagement:
         return AsyncMock()
 
     @pytest.fixture
+    def mock_redis_client(self) -> AsyncMock:
+        """Create a mocked Redis client for testing."""
+        return AsyncMock()
+
+    @pytest.fixture
     def mock_settings(self) -> Mock:
         """Create mock settings for testing."""
         settings = Mock(spec=Settings)
@@ -36,15 +41,16 @@ class TestDefaultEventPublisherFileManagement:
 
     @pytest.fixture
     def event_publisher(
-        self, mock_kafka_bus: AsyncMock, mock_settings: Mock
+        self, mock_kafka_bus: AsyncMock, mock_redis_client: AsyncMock, mock_settings: Mock
     ) -> DefaultEventPublisher:
         """Create DefaultEventPublisher instance with mocked dependencies."""
-        return DefaultEventPublisher(mock_kafka_bus, mock_settings)
+        return DefaultEventPublisher(mock_kafka_bus, mock_settings, mock_redis_client)
 
     async def test_publish_batch_file_added_v1_success(
         self,
         event_publisher: DefaultEventPublisher,
         mock_kafka_bus: AsyncMock,
+        mock_redis_client: AsyncMock,
         mock_settings: Mock,
     ) -> None:
         """Test successful publishing of BatchFileAddedV1 event."""
@@ -74,10 +80,23 @@ class TestDefaultEventPublisherFileManagement:
         assert envelope.correlation_id == correlation_id
         assert envelope.data == event_data
 
+        # Verify Redis publish was called
+        mock_redis_client.publish_user_notification.assert_called_once_with(
+            user_id="user-789",
+            event_type="batch_file_added",
+            data={
+                "batch_id": "test-batch-123",
+                "essay_id": "essay-456",
+                "filename": "test_essay.txt",
+                "timestamp": event_data.timestamp.isoformat(),
+            }
+        )
+
     async def test_publish_batch_file_added_v1_with_none_correlation_id(
         self,
         event_publisher: DefaultEventPublisher,
         mock_kafka_bus: AsyncMock,
+        mock_redis_client: AsyncMock,
     ) -> None:
         """Test publishing BatchFileAddedV1 event with None correlation_id."""
         # Arrange
@@ -96,10 +115,14 @@ class TestDefaultEventPublisherFileManagement:
         envelope = mock_kafka_bus.publish.call_args.kwargs["envelope"]
         assert envelope.correlation_id is None
 
+        # Verify Redis publish was called
+        mock_redis_client.publish_user_notification.assert_called_once()
+
     async def test_publish_batch_file_added_v1_kafka_error(
         self,
         event_publisher: DefaultEventPublisher,
         mock_kafka_bus: AsyncMock,
+        mock_redis_client: AsyncMock,
     ) -> None:
         """Test error handling when Kafka publishing fails for BatchFileAddedV1."""
         # Arrange
@@ -119,6 +142,7 @@ class TestDefaultEventPublisherFileManagement:
         self,
         event_publisher: DefaultEventPublisher,
         mock_kafka_bus: AsyncMock,
+        mock_redis_client: AsyncMock,
         mock_settings: Mock,
     ) -> None:
         """Test successful publishing of BatchFileRemovedV1 event."""
@@ -148,10 +172,23 @@ class TestDefaultEventPublisherFileManagement:
         assert envelope.correlation_id == correlation_id
         assert envelope.data == event_data
 
+        # Verify Redis publish was called
+        mock_redis_client.publish_user_notification.assert_called_once_with(
+            user_id="user-789",
+            event_type="batch_file_removed",
+            data={
+                "batch_id": "test-batch-123",
+                "essay_id": "essay-456",
+                "filename": "test_essay.txt",
+                "timestamp": event_data.timestamp.isoformat(),
+            }
+        )
+
     async def test_publish_batch_file_removed_v1_with_none_correlation_id(
         self,
         event_publisher: DefaultEventPublisher,
         mock_kafka_bus: AsyncMock,
+        mock_redis_client: AsyncMock,
     ) -> None:
         """Test publishing BatchFileRemovedV1 event with None correlation_id."""
         # Arrange
@@ -170,10 +207,14 @@ class TestDefaultEventPublisherFileManagement:
         envelope = mock_kafka_bus.publish.call_args.kwargs["envelope"]
         assert envelope.correlation_id is None
 
+        # Verify Redis publish was called
+        mock_redis_client.publish_user_notification.assert_called_once()
+
     async def test_publish_batch_file_removed_v1_kafka_error(
         self,
         event_publisher: DefaultEventPublisher,
         mock_kafka_bus: AsyncMock,
+        mock_redis_client: AsyncMock,
     ) -> None:
         """Test error handling when Kafka publishing fails for BatchFileRemovedV1."""
         # Arrange

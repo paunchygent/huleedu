@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     SERVICE_NAME: str = "file-service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
+    REDIS_URL: str = "redis://redis:6379"
     CONTENT_SERVICE_URL: str = "http://content_service:8001/v1/content"
     BOS_URL: str = Field(
         default="http://batch_orchestrator_service:5000",

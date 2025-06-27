@@ -96,6 +96,14 @@ class CoreInfrastructureProvider(Provider):
             client_id=f"{settings.SERVICE_NAME}-redis", redis_url=settings.REDIS_URL
         )
         await redis_client.start()
+
+        # Register shutdown finalizer to prevent connection leaks
+        async def _shutdown_redis() -> None:
+            await redis_client.stop()
+
+        # TODO Note: In production, this would be registered with the app lifecycle
+        # For now, we rely on container cleanup
+
         # RedisClient implements all AtomicRedisClientProtocol methods
         return cast(AtomicRedisClientProtocol, redis_client)
 
@@ -125,9 +133,14 @@ class ServiceClientsProvider(Provider):
     """Provider for external service client implementations."""
 
     @provide(scope=Scope.APP)
-    def provide_event_publisher(self, kafka_bus: KafkaBus, settings: Settings) -> EventPublisher:
-        """Provide event publisher implementation."""
-        return DefaultEventPublisher(kafka_bus, settings)
+    def provide_event_publisher(
+        self,
+        kafka_bus: KafkaBus,
+        settings: Settings,
+        redis_client: AtomicRedisClientProtocol,
+    ) -> EventPublisher:
+        """Provide event publisher implementation with Redis support."""
+        return DefaultEventPublisher(kafka_bus, settings, redis_client)
 
     @provide(scope=Scope.APP)
     def provide_metrics_collector(self, registry: CollectorRegistry) -> MetricsCollector:

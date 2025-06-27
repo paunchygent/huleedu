@@ -251,6 +251,8 @@ services:
         condition: service_completed_successfully
       content_service:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:
@@ -262,7 +264,8 @@ services:
       - FILE_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - FILE_SERVICE_HTTP_PORT=7001
       - FILE_SERVICE_HOST=0.0.0.0
-      - FILE_SERVICE_LOG_LEVEL=INFO 
+      - FILE_SERVICE_LOG_LEVEL=INFO
+      - FILE_SERVICE_REDIS_URL=redis://redis:6379
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:7001/healthz || exit 1"]
       interval: 15s
@@ -313,6 +316,46 @@ services:
       retries: 3
       start_period: 20s
 
+  api_gateway_service:
+    build:
+      context: .
+      dockerfile: services/api_gateway_service/Dockerfile
+    container_name: huleedu_api_gateway_service
+    restart: unless-stopped
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      batch_orchestrator_service:
+        condition: service_healthy
+      class_management_service:
+        condition: service_healthy
+      file_service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "8080:8080"
+    environment:
+      - ENV_TYPE=docker
+      - ENVIRONMENT=production
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - LOG_LEVEL=INFO
+      - API_GATEWAY_SERVICE_PORT=8080
+      - API_GATEWAY_SERVICE_HOST=0.0.0.0
+      - API_GATEWAY_SERVICE_REDIS_URL=redis://redis:6379
+      # Backend service URLs
+      - BATCH_ORCHESTRATOR_SERVICE_URL=http://batch_orchestrator_service:5000
+      - CLASS_MANAGEMENT_SERVICE_URL=http://class_management_service:5002
+      - FILE_SERVICE_URL=http://file_service:7001
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   class_management_service:
     build:
       context: .
@@ -340,6 +383,7 @@ services:
       - CLASS_MANAGEMENT_SERVICE_DB_NAME=huledu_class_management
       - CLASS_MANAGEMENT_SERVICE_DB_USER=${HULEEDU_DB_USER}
       - CLASS_MANAGEMENT_SERVICE_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - CLASS_MANAGEMENT_SERVICE_REDIS_URL=redis://redis:6379
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5002/healthz || exit 1"]
       interval: 15s

@@ -37,7 +37,14 @@ class TestPipelineFailureHandling:
         return MockBatchRepositoryImpl()
 
     @pytest.fixture
-    def pipeline_coordinator(self, batch_repository, mock_cj_initiator):
+    def mock_redis_client(self) -> AsyncMock:
+        """Mock the Redis client for UI notifications."""
+        return AsyncMock()
+
+    @pytest.fixture
+    def pipeline_coordinator(
+        self, batch_repository, mock_cj_initiator, mock_redis_client
+    ):
         """Create real DefaultPipelinePhaseCoordinator with mocked external dependencies."""
         # Create phase initiators map with the mock CJ initiator
         phase_initiators_map = {
@@ -47,6 +54,7 @@ class TestPipelineFailureHandling:
         return DefaultPipelinePhaseCoordinator(
             batch_repo=batch_repository,
             phase_initiators_map=phase_initiators_map,
+            redis_client=mock_redis_client,
         )
 
     async def test_failed_phase_handling(

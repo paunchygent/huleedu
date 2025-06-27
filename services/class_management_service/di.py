@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import AsyncGenerator
+from typing import AsyncGenerator, cast
 
 from config import Settings, settings
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from huleedu_service_libs.redis_client import RedisClient
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -75,8 +77,30 @@ class ServiceProvider(Provider):
         return kafka_bus
 
     @provide(scope=Scope.APP)
-    def provide_event_publisher(self, kafka_bus: KafkaBus) -> ClassEventPublisherProtocol:
-        return DefaultClassEventPublisherImpl(kafka_bus)
+    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
+        """Provide Redis client for pub/sub operations."""
+        redis_client = RedisClient(
+            client_id=f"{settings.SERVICE_NAME}-redis",
+            redis_url=settings.REDIS_URL,
+        )
+        await redis_client.start()
+
+        # Register shutdown finalizer to prevent connection leaks
+        async def _shutdown_redis() -> None:
+            await redis_client.stop()
+
+        # TODO Note: In production, this would be registered with the app lifecycle
+        # For now, we rely on container cleanup
+
+        return cast(AtomicRedisClientProtocol, redis_client)
+
+    @provide(scope=Scope.APP)
+    def provide_event_publisher(
+        self,
+        kafka_bus: KafkaBus,
+        redis_client: AtomicRedisClientProtocol,
+    ) -> ClassEventPublisherProtocol:
+        return DefaultClassEventPublisherImpl(kafka_bus, redis_client)
 
     @provide(scope=Scope.REQUEST)
     def provide_class_management_service(

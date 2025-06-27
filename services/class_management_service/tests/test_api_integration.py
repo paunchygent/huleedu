@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -29,7 +30,7 @@ from services.class_management_service.protocols import (
 
 
 @pytest.fixture(autouse=True)
-def _clear_prometheus_registry():
+def _clear_prometheus_registry() -> Any:
     """Fixture to clear the default Prometheus registry before each test."""
     collectors = list(REGISTRY._collector_to_names.keys())
     for collector in collectors:

@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,6 +16,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     SERVICE_NAME: str = "class_management_service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
+    REDIS_URL: str = "redis://redis:6379"
     DB_USER: str = "user"
     DB_PASSWORD: str = "password"
     DB_HOST: str = "localhost"
@@ -22,7 +25,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str | None = None
 
     @model_validator(mode="before")
-    def assemble_db_connection(cls, v):
+    def assemble_db_connection(cls, v: Any) -> Any:
         if isinstance(v, dict) and v.get("DATABASE_URL") is None:
             v["DATABASE_URL"] = (
                 f"postgresql+asyncpg://{v.get('DB_USER')}:{v.get('DB_PASSWORD')}"

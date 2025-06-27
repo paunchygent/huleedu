@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from protocols import (
     BatchRepositoryProtocol,
     DataValidationError,
@@ -27,9 +28,11 @@ class DefaultPipelinePhaseCoordinator:
         self,
         batch_repo: BatchRepositoryProtocol,
         phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol],
+        redis_client: AtomicRedisClientProtocol,
     ) -> None:
         self.batch_repo = batch_repo
         self.phase_initiators_map = phase_initiators_map
+        self.redis_client = redis_client
 
     async def handle_phase_concluded(
         self,
@@ -53,6 +56,7 @@ class DefaultPipelinePhaseCoordinator:
         4. Resolve and delegate to appropriate phase initiator from phase_initiators_map
         5. Handle end-of-pipeline completion scenarios
         6. Handle errors with proper state updates and diagnostic logging
+        7. Publish real-time updates to Redis for UI notifications
         """
         logger.info(
             f"Handling phase conclusion: batch={batch_id}, phase={completed_phase.value}, "
@@ -74,6 +78,11 @@ class DefaultPipelinePhaseCoordinator:
             completed_phase,
             updated_status,
             datetime.now(UTC).isoformat(),
+        )
+
+        # Publish real-time update to Redis for UI notifications
+        await self._publish_phase_completion_to_redis(
+            batch_id, completed_phase, phase_status, correlation_id
         )
 
         # Allow progression for both COMPLETED_SUCCESSFULLY and COMPLETED_WITH_FAILURES
@@ -451,3 +460,56 @@ class DefaultPipelinePhaseCoordinator:
             return getattr(phase_obj, "status", None) if phase_obj else None
         else:  # Dictionary
             return pipeline_state.get(f"{phase}_status")
+
+    async def _publish_phase_completion_to_redis(
+        self,
+        batch_id: str,
+        completed_phase: PhaseName,
+        phase_status: BatchStatus,
+        correlation_id: str,
+    ) -> None:
+        """Publish phase completion notification to Redis for real-time UI updates."""
+        try:
+            # Get batch context to extract user_id
+            batch_context = await self.batch_repo.get_batch_context(batch_id)
+            user_id = batch_context.user_id if batch_context else None
+
+            if user_id:
+                await self.redis_client.publish_user_notification(
+                    user_id=user_id,
+                    event_type="batch_phase_concluded",
+                    data={
+                        "batch_id": batch_id,
+                        "phase": completed_phase.value,
+                        "status": phase_status.value,
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "correlation_id": correlation_id,
+                    }
+                )
+
+                logger.info(
+                    f"Published phase completion notification to Redis for user {user_id}",
+                    extra={
+                        "batch_id": batch_id,
+                        "phase": completed_phase.value,
+                        "user_id": user_id,
+                        "correlation_id": correlation_id,
+                    }
+                )
+            else:
+                logger.warning(
+                    "No user_id found in batch context, skipping Redis notification",
+                    extra={"batch_id": batch_id, "correlation_id": correlation_id}
+                )
+
+        except Exception as e:
+            logger.error(
+                f"Error publishing phase completion to Redis: {e}",
+                extra={
+                    "batch_id": batch_id,
+                    "phase": completed_phase.value,
+                    "correlation_id": correlation_id,
+                },
+                exc_info=True
+            )
+            # Don't fail the entire phase handling if Redis fails

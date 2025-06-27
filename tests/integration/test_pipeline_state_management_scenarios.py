@@ -44,9 +44,11 @@ class TestPipelineRealWorldScenarios:
             PhaseName.CJ_ASSESSMENT: mock_cj_initiator,
             # Add other phases as needed for testing
         }
+        mock_redis_client = AsyncMock()
         return DefaultPipelinePhaseCoordinator(
             batch_repo=batch_repository,
             phase_initiators_map=phase_initiators_map,
+            redis_client=mock_redis_client,
         )
 
     async def test_real_world_24_of_25_essays_scenario(

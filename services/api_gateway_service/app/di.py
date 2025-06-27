@@ -1,11 +1,12 @@
 from collections.abc import AsyncIterator
+from typing import cast
 
 import httpx
 from dishka import Provider, Scope, provide
 
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
-
 from services.api_gateway_service.config import Settings, settings
 
 
@@ -27,16 +28,16 @@ class ApiGatewayProvider(Provider):
             yield client
 
     @provide
-    async def get_redis_client(self) -> AsyncIterator[RedisClient]:
-        client = RedisClient(client_id=settings.SERVICE_NAME, redis_url="redis://redis:6379")
+    async def get_redis_client(self, config: Settings) -> AsyncIterator[AtomicRedisClientProtocol]:
+        client = RedisClient(client_id=config.SERVICE_NAME, redis_url=config.REDIS_URL)
         await client.start()
-        yield client
+        yield cast(AtomicRedisClientProtocol, client)
         await client.stop()
 
     @provide
-    async def get_kafka_bus(self) -> AsyncIterator[KafkaBus]:
+    async def get_kafka_bus(self, config: Settings) -> AsyncIterator[KafkaBus]:
         kafka_bus = KafkaBus(
-            client_id=settings.SERVICE_NAME, bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS
+            client_id=config.SERVICE_NAME, bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS
         )
         await kafka_bus.start()
         yield kafka_bus

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import REGISTRY, CollectorRegistry
 
 from services.file_service.config import Settings, settings
@@ -60,6 +62,24 @@ class CoreInfrastructureProvider(Provider):
         """Provide HTTP client session."""
         return ClientSession()
 
+    @provide(scope=Scope.APP)
+    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
+        """Provide Redis client for pub/sub operations."""
+        redis_client = RedisClient(
+            client_id=f"{settings.SERVICE_NAME}-redis",
+            redis_url=settings.REDIS_URL,
+        )
+        await redis_client.start()
+
+        # Register shutdown finalizer to prevent connection leaks
+        async def _shutdown_redis() -> None:
+            await redis_client.stop()
+
+        # TODO Note: In production, this would be registered with the app lifecycle
+        # For now, we rely on container cleanup
+
+        return cast(AtomicRedisClientProtocol, redis_client)
+
 
 class ServiceImplementationsProvider(Provider):
     """Provider for service implementation dependencies."""
@@ -78,9 +98,10 @@ class ServiceImplementationsProvider(Provider):
         self,
         kafka_bus: KafkaBus,
         settings: Settings,
+        redis_client: AtomicRedisClientProtocol,
     ) -> EventPublisherProtocol:
-        """Provide event publisher implementation."""
-        return DefaultEventPublisher(kafka_bus, settings)
+        """Provide event publisher implementation with Redis support."""
+        return DefaultEventPublisher(kafka_bus, settings, redis_client)
 
     @provide(scope=Scope.APP)
     def provide_text_extractor(self) -> TextExtractorProtocol:

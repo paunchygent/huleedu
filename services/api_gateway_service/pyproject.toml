@@ -18,6 +18,8 @@ dependencies = [
     "python-multipart",
     "slowapi",  # Rate limiting
     "python-jose[cryptography]", # For JWT
+    "PyJWT",    # JWT token handling
+    "httpx",    # HTTP client for service communication
     "passlib[bcrypt]"           # For password hashing (future)
 ]
 readme = "README.md"
@@ -28,7 +30,6 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "pytest-mock",
-    "httpx",
     "respx",
 ]
 
@@ -40,8 +41,8 @@ build-backend = "pdm.backend"
 distribution = true
 
 [tool.pdm.scripts]
-start = "uvicorn services.api_gateway_service.main:app --host 0.0.0.0 --port 4001"
-dev = "uvicorn services.api_gateway_service.main:app --host 0.0.0.0 --port 4001 --reload"
+start = "uvicorn services.api_gateway_service.app.main:app --host 0.0.0.0 --port 8080"
+dev = "uvicorn services.api_gateway_service.app.main:app --host 0.0.0.0 --port 8080 --reload"
 test = "pytest services/api_gateway_service/tests/ -v"
 lint = "ruff check services/api_gateway_service/ --fix"
 format = "ruff format services/api_gateway_service/"
@@ -75,4 +76,8 @@ warn_unreachable = true
 
 [[tool.mypy.overrides]]
 module = ["uvicorn.*", "slowapi.*", "respx.*"]
-ignore_missing_imports = true 
+ignore_missing_imports = true
+
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/common_core"
+huleedu-service-libs = "file:///app/services/libs" 
