@@ -111,9 +111,12 @@ class MockDatabase(CJRepositoryProtocol):
         mock_session.commit.return_value = AsyncMock()  # Make commit() awaitable
         mock_session.rollback.return_value = AsyncMock()  # Make rollback() awaitable
 
-        class MockAsyncContextManagerTwo:
-            async def __aenter__(self) -> Any:
-                return self
+        class MockAsyncContextManager:
+            def __init__(self, session_to_return: AsyncMock):
+                self._session = session_to_return
+
+            async def __aenter__(self) -> AsyncMock:
+                return self._session
 
             async def __aexit__(
                 self,
@@ -123,7 +126,7 @@ class MockDatabase(CJRepositoryProtocol):
             ) -> bool | None:
                 pass
 
-        return MockAsyncContextManagerTwo()
+        return MockAsyncContextManager(mock_session)
 
     async def create_new_cj_batch(
         self,
