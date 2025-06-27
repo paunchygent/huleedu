@@ -13,6 +13,7 @@ import pytest
 from testcontainers.postgres import PostgresContainer
 
 from common_core.domain_enums import CourseCode
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 from common_core.status_enums import BatchStatus
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_repository_postgres_impl import (
@@ -108,7 +109,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
             "name": "Integration Test Batch",
             "description": "Test batch for integration testing",
             "status": BatchStatus.AWAITING_CONTENT_VALIDATION.value,
-            "requested_pipelines": ["spellcheck", "ai_feedback"],
+            "requested_pipelines": [PhaseName.SPELLCHECK.value, PhaseName.AI_FEEDBACK.value],
             "total_essays": 10,
         }
 
@@ -163,8 +164,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Arrange
         batch_id = "test-pipeline-batch"
         pipeline_state = {
-            "spellcheck_status": "pending",
-            "ai_feedback_status": "not_started",
+            f"{PhaseName.SPELLCHECK.value}_status": "pending",
+            f"{PhaseName.AI_FEEDBACK.value}_status": "not_started",
             "processing_metadata": {"started_at": "2025-01-30T10:00:00Z"},
         }
 
@@ -188,8 +189,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Assert
         assert save_success is True
         assert retrieved_state is not None
-        assert retrieved_state["spellcheck_status"] == "pending"
-        assert retrieved_state["ai_feedback_status"] == "not_started"
+        assert retrieved_state[f"{PhaseName.SPELLCHECK.value}_status"] == "pending"
+        assert retrieved_state[f"{PhaseName.AI_FEEDBACK.value}_status"] == "not_started"
         assert retrieved_state["processing_metadata"]["started_at"] == "2025-01-30T10:00:00Z"
 
     @pytest.mark.asyncio
@@ -200,7 +201,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         """Test atomic phase status updates prevent race conditions."""
         # Arrange
         batch_id = "test-atomic-batch"
-        phase_name = "spellcheck"
+        phase_name = PhaseName.SPELLCHECK
 
         # Create batch and set initial pipeline state
         await postgres_repository.create_batch(
@@ -212,15 +213,15 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
         await postgres_repository.save_processing_pipeline_state(
             batch_id,
-            {f"{phase_name}_status": "pending"},
+            {f"{phase_name.value}_status": PipelineExecutionStatus.PENDING_DEPENDENCIES.value},
         )
 
         # Act - First atomic update (should succeed)
         success1 = await postgres_repository.update_phase_status_atomically(
             batch_id=batch_id,
             phase_name=phase_name,
-            expected_status="pending",
-            new_status="in_progress",
+            expected_status=PipelineExecutionStatus.PENDING_DEPENDENCIES,
+            new_status=PipelineExecutionStatus.IN_PROGRESS,
             completion_timestamp="2025-01-30T10:30:00Z",
         )
 
@@ -228,16 +229,16 @@ class TestPostgreSQLBatchRepositoryIntegration:
         success2 = await postgres_repository.update_phase_status_atomically(
             batch_id=batch_id,
             phase_name=phase_name,
-            expected_status="pending",  # Wrong - it's now "in_progress"
-            new_status="completed",
+            expected_status=PipelineExecutionStatus.PENDING_DEPENDENCIES,  # Wrong - it's now IN_PROGRESS
+            new_status=PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
         )
 
         # Act - Third atomic update with correct expected status (should succeed)
         success3 = await postgres_repository.update_phase_status_atomically(
             batch_id=batch_id,
             phase_name=phase_name,
-            expected_status="in_progress",  # Correct current status
-            new_status="completed",
+            expected_status=PipelineExecutionStatus.IN_PROGRESS,  # Correct current status
+            new_status=PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
             completion_timestamp="2025-01-30T11:00:00Z",
         )
 
@@ -249,8 +250,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Verify final state
         final_state = await postgres_repository.get_processing_pipeline_state(batch_id)
         assert final_state is not None
-        assert final_state[f"{phase_name}_status"] == "completed"
-        assert final_state[f"{phase_name}_completed_at"] == "2025-01-30T11:00:00Z"
+        assert final_state[f"{phase_name.value}_status"] == PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value
+        assert final_state[f"{phase_name.value}_completed_at"] == "2025-01-30T11:00:00Z"
 
     @pytest.mark.asyncio
     async def test_concurrent_atomic_operations(
@@ -260,7 +261,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         """Test that concurrent atomic operations are handled correctly."""
         # Arrange
         batch_id = "test-concurrent-batch"
-        phase_name = "spellcheck"
+        phase_name = PhaseName.SPELLCHECK
 
         # Create batch and set initial state
         await postgres_repository.create_batch(
@@ -272,11 +273,13 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
         await postgres_repository.save_processing_pipeline_state(
             batch_id,
-            {f"{phase_name}_status": "pending"},
+            {f"{phase_name.value}_status": PipelineExecutionStatus.PENDING_DEPENDENCIES.value},
         )
 
         # Act - Run concurrent atomic updates
-        async def attempt_update(expected: str, new: str) -> bool:
+        async def attempt_update(
+            expected: PipelineExecutionStatus, new: PipelineExecutionStatus
+        ) -> bool:
             return await postgres_repository.update_phase_status_atomically(
                 batch_id=batch_id,
                 phase_name=phase_name,
@@ -284,9 +287,13 @@ class TestPostgreSQLBatchRepositoryIntegration:
                 new_status=new,
             )
 
-        # Run two concurrent updates trying to move from "pending" to different states
-        task1 = asyncio.create_task(attempt_update("pending", "in_progress"))
-        task2 = asyncio.create_task(attempt_update("pending", "failed"))
+        # Run two concurrent updates trying to move from PENDING_DEPENDENCIES to different states
+        task1 = asyncio.create_task(
+            attempt_update(PipelineExecutionStatus.PENDING_DEPENDENCIES, PipelineExecutionStatus.IN_PROGRESS)
+        )
+        task2 = asyncio.create_task(
+            attempt_update(PipelineExecutionStatus.PENDING_DEPENDENCIES, PipelineExecutionStatus.FAILED)
+        )
 
         results = await asyncio.gather(task1, task2, return_exceptions=True)
 
@@ -300,7 +307,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Verify the final state is one of the attempted states
         final_state = await postgres_repository.get_processing_pipeline_state(batch_id)
         assert final_state is not None
-        final_status = final_state[f"{phase_name}_status"]
+        final_status = final_state[f"{phase_name.value}_status"]
         assert final_status in ["in_progress", "failed"]
 
     @pytest.mark.asyncio

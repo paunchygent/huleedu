@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
+from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -39,10 +40,8 @@ class BatchPipelineRequest(BaseModel):
         min_length=1,
         max_length=255,
     )
-    requested_pipeline: str = Field(
-        description="The final pipeline the user wants to run (e.g., 'ai_feedback', 'cj_assessment').",
-        min_length=1,
-        max_length=100,
+    requested_pipeline: PhaseName = Field(
+        description="The final pipeline phase the user wants to run."
     )
     is_retry: bool = Field(
         default=False,
@@ -97,7 +96,7 @@ async def request_pipeline_execution(
             # Construct ClientBatchPipelineRequestV1 with authenticated user_id
             client_request = ClientBatchPipelineRequestV1(
                 batch_id=batch_id,  # Always use path batch_id
-                requested_pipeline=pipeline_request.requested_pipeline,
+                requested_pipeline=pipeline_request.requested_pipeline.value,  # Convert enum to string
                 client_correlation_id=correlation_id,
                 user_id=user_id,  # From authentication
                 is_retry=pipeline_request.is_retry,

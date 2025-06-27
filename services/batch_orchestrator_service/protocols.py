@@ -213,7 +213,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
     async def initiate_resolved_pipeline(
         self,
         batch_id: str,
-        resolved_pipeline: list[str],
+        resolved_pipeline: list[PhaseName],
         correlation_id: str,
         batch_context: Any,
     ) -> None:
@@ -225,7 +225,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
 
         Args:
             batch_id: Unique identifier of the batch
-            resolved_pipeline: BCS-resolved pipeline sequence (e.g., ["spellcheck", "ai_feedback"])
+            resolved_pipeline: BCS-resolved pipeline sequence using PhaseName enum values
             correlation_id: Event correlation ID for tracing
             batch_context: Full batch context for essay retrieval
 
@@ -278,7 +278,7 @@ class NLPInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
 class BatchConductorClientProtocol(Protocol):
     """Protocol for HTTP communication with Batch Conductor Service."""
 
-    async def resolve_pipeline(self, batch_id: str, requested_pipeline: str) -> dict[str, Any]:
+    async def resolve_pipeline(self, batch_id: str, requested_pipeline: PhaseName) -> dict[str, Any]:
         """
         Request pipeline resolution from BCS internal API.
 
@@ -302,7 +302,7 @@ class BatchMetricsProtocol(Protocol):
         self,
         operation: OperationType,
         status: OperationStatus,
-        pipeline_type: str,
+        pipeline_type: PhaseName,
         batch_id: str,
     ) -> None:
         """Record pipeline operation metrics with standardized enum types."""

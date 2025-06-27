@@ -10,6 +10,8 @@ from config import Settings
 from huleedu_service_libs.logging_utils import create_service_logger
 from protocols import BatchConductorClientProtocol
 
+from common_core.pipeline_models import PhaseName
+
 
 class BatchConductorClientImpl(BatchConductorClientProtocol):
     """HTTP client for communicating with Batch Conductor Service internal API."""
@@ -23,13 +25,13 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
         # Construct full BCS endpoint URL
         self.bcs_endpoint = f"{settings.BCS_BASE_URL}{settings.BCS_PIPELINE_ENDPOINT}"
 
-    async def resolve_pipeline(self, batch_id: str, requested_pipeline: str) -> dict[str, Any]:
+    async def resolve_pipeline(self, batch_id: str, requested_pipeline: PhaseName) -> dict[str, Any]:
         """
         Request pipeline resolution from BCS internal API.
 
         Args:
             batch_id: The unique identifier of the target batch
-            requested_pipeline: The final pipeline the user wants to run
+            requested_pipeline: The final pipeline phase the user wants to run
 
         Returns:
             BCS response containing resolved pipeline and analysis
@@ -41,14 +43,14 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
         # Prepare request payload following BCS API contract
         request_data = {
             "batch_id": batch_id,
-            "requested_pipeline": requested_pipeline,
+            "requested_pipeline": requested_pipeline.value,  # Convert enum to string for API
         }
 
         self.logger.info(
             "Requesting pipeline resolution from BCS",
             extra={
                 "batch_id": batch_id,
-                "requested_pipeline": requested_pipeline,
+                "requested_pipeline": requested_pipeline.value,
                 "bcs_endpoint": self.bcs_endpoint,
             },
         )

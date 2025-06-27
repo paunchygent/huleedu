@@ -69,15 +69,28 @@ test-all = "pytest"
 test-parallel = "pytest -n auto"
 test-sequential = "pytest -n 0"
 
-# Docker convenience scripts
-docker-build = "docker compose build"
-docker-up = "docker compose up -d"
-docker-down = "docker compose down"
-docker-down-clean = "docker compose down --remove-orphans"
-docker-logs = "docker compose logs -f --tail=100"
-docker-restart = {composite = ["docker compose down", "docker compose up -d --build"]}
-docker-rebuild = {composite = ["docker compose down --remove-orphans", "docker compose build", "docker compose up -d"]}
-docker-reset = {composite = ["docker compose down --remove-orphans --volumes", "docker compose build", "docker compose up -d"]}
+# Docker convenience scripts - Development workflow
+# Quick commands
+dc-up = "docker compose up -d"  # Start services (uses existing images)
+dc-build = "docker compose up -d --build"  # Rebuild and start services
+dc-down = "docker compose down --remove-orphans"  # Stop and clean up
+dc-logs = "docker compose logs -f --tail=100"  # Follow logs with last 100 lines
+dc-ps = "docker compose ps"  # Show running services
+
+# Service-specific commands (use service names as arguments)
+dc-restart = "docker compose restart"  # Restart service: pdm run dc-restart api_gateway_service
+dc-rebuild = "docker compose up -d --build"  # Rebuild specific service: pdm run dc-rebuild batch_orchestrator_service
+dc-logs-service = "docker compose logs -f --tail=50"  # Logs for specific service: pdm run dc-logs-service content_service
+
+# Development workflow commands
+dev-up = "docker compose up -d"  # Start with volume mounts (uses override file)
+dev-build = "DOCKER_BUILDKIT=1 docker compose build --parallel"  # Fast parallel build
+dev-rebuild = {composite = ["docker compose down --remove-orphans", "DOCKER_BUILDKIT=1 docker compose build --parallel", "docker compose up -d"]}
+dev-fresh = "docker compose build --no-cache"  # Force fresh build (when caching issues occur)
+
+# System management
+docker-reset = {composite = ["docker compose down --remove-orphans --volumes", "docker compose build", "docker compose up -d"]}  # Full reset including volumes
+docker-clean = "docker system prune -af --volumes"  # Clean all unused Docker resources (use with caution!)
 
 # Individual service development
 dev-content = "pdm run -p services/content_service dev"
@@ -93,10 +106,10 @@ build-common-core = "pdm build -p common_core"
 kafka-setup-topics = "python scripts/kafka_topic_bootstrap.py"
 
 # Observability convenience scripts
-obs-up = {composite = ["docker compose up -d prometheus loki promtail grafana"]}
-obs-down = {composite = ["docker compose down prometheus loki promtail grafana"]}
-obs-logs = {composite = ["docker compose logs -f prometheus loki promtail grafana"]}
-obs-restart = {composite = ["docker compose restart prometheus loki promtail grafana"]}
+obs-up = {composite = ["docker compose -f observability/docker-compose.observability.yml up -d"]}
+obs-down = {composite = ["docker compose -f observability/docker-compose.observability.yml down"]}
+obs-logs = {composite = ["docker compose -f observability/docker-compose.observability.yml logs -f"]}
+obs-restart = {composite = ["docker compose -f observability/docker-compose.observability.yml restart"]}
 
 [tool.ruff]
 line-length = 100

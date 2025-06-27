@@ -1,0 +1,73 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+- job_name: huleedu_services
+  docker_sd_configs:
+    - host: unix:///var/run/docker.sock
+      refresh_interval: 5s
+      filters:
+        - name: network
+          values: [huledu-reboot_huleedu_internal_network]
+  relabel_configs:
+    - source_labels: ['__meta_docker_container_name']
+      regex: '/(.*)'
+      target_label: 'container'
+    - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+      target_label: 'service'
+  pipeline_stages:
+    # First, detect if the line is JSON
+    - regex:
+        expression: '^(?P<json_line>\{.+\})$'
+    
+    # If it's JSON, parse it
+    - json:
+        expressions:
+          timestamp: timestamp
+          level: level
+          event: event
+          message: message
+          msg: msg
+          correlation_id: correlation_id
+          event_id: event_id
+          event_type: event_type
+          source_service: source_service
+          logger_name: logger_name
+        source: json_line
+    
+    # Handle different message field names (structlog uses 'event', some use 'message' or 'msg')
+    - template:
+        source: message
+        template: '{{ or .event .message .msg .json_line }}'
+    
+    # Ensure we have a timestamp
+    - timestamp:
+        source: timestamp
+        format: RFC3339
+        fallback_formats:
+          - RFC3339Nano
+          - "2006-01-02T15:04:05.000Z"
+          - "2006-01-02 15:04:05"
+    
+    # Set default level if not present
+    - template:
+        source: level
+        template: '{{ or .level "info" }}'
+    
+    # Promote key fields to Loki labels for fast querying
+    - labels:
+        level:
+        correlation_id:
+        service:
+        logger_name:
+    
+    # Output the processed log line
+    - output:
+        source: message

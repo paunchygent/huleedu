@@ -7,7 +7,7 @@ volumes:
   grafana_data: {}
   alertmanager_data: {}
 
-# Networks are defined in main docker-compose.yml file
+# Networks are defined in the parent docker-compose.yml
 
 services:
   prometheus:
@@ -19,7 +19,7 @@ services:
     ports:
       - "9091:9090"  # FIXED: Changed from 9092 to 9091 to avoid Kafka conflict
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./prometheus/rules:/etc/prometheus/rules
       - prometheus_data:/prometheus
     command:
@@ -45,7 +45,7 @@ services:
     ports:
       - "9094:9093"
     volumes:
-      - ./alertmanager.yml:/etc/alertmanager/config.yml
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/config.yml
       - alertmanager_data:/alertmanager
     command:
       - '--config.file=/etc/alertmanager/config.yml'
@@ -74,7 +74,7 @@ services:
       - huleedu_internal_network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./promtail-config.yml:/etc/promtail/config.yml
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml
     command: -config.file=/etc/promtail/config.yml
 
   grafana:

@@ -18,6 +18,7 @@ from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcome
 from kafka_consumer import BatchKafkaConsumer
 
 from common_core.domain_enums import CourseCode
+from common_core.pipeline_models import PhaseName
 
 
 class MockRedisClient:
@@ -132,7 +133,7 @@ def sample_els_phase_outcome_event() -> dict:
         "correlation_id": correlation_id,
         "data": {
             "batch_id": batch_id,
-            "phase_name": "spellcheck",
+            "phase_name": PhaseName.SPELLCHECK.value,
             "phase_status": BatchStatus.COMPLETED_SUCCESSFULLY,
             "processed_essays": [{"essay_id": "essay-1", "text_storage_id": "storage-1-processed"}],
             "failed_essay_ids": [],

@@ -19,6 +19,7 @@ from protocols import (
 
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
+from common_core.pipeline_models import PhaseName
 
 logger = create_service_logger("bos.handlers.client_pipeline_request")
 
@@ -97,9 +98,24 @@ class ClientPipelineRequestHandler:
                 )
                 return
 
+            # Convert string pipeline name to PhaseName enum for BCS client
+            try:
+                requested_pipeline_enum = PhaseName(requested_pipeline)
+            except ValueError:
+                error_msg = f"Invalid pipeline name: {requested_pipeline}"
+                logger.error(
+                    error_msg,
+                    extra={
+                        "batch_id": batch_id,
+                        "requested_pipeline": requested_pipeline,
+                        "correlation_id": correlation_id,
+                    },
+                )
+                raise ValueError(error_msg)
+
             # Request pipeline resolution from BCS
             try:
-                bcs_response = await self.bcs_client.resolve_pipeline(batch_id, requested_pipeline)
+                bcs_response = await self.bcs_client.resolve_pipeline(batch_id, requested_pipeline_enum)
             except Exception as e:
                 error_msg = f"BCS pipeline resolution failed: {e}"
                 logger.error(
@@ -114,8 +130,8 @@ class ClientPipelineRequestHandler:
                 raise Exception(error_msg) from e
 
             # Extract resolved pipeline from BCS response
-            resolved_pipeline = bcs_response.get("final_pipeline", [])
-            if not resolved_pipeline:
+            resolved_pipeline_strings = bcs_response.get("final_pipeline", [])
+            if not resolved_pipeline_strings:
                 error_msg = f"BCS returned empty pipeline for {requested_pipeline}"
                 logger.error(
                     error_msg,
@@ -127,13 +143,27 @@ class ClientPipelineRequestHandler:
                     },
                 )
                 raise ValueError(error_msg)
+            
+            # Convert string pipeline to PhaseName enums
+            resolved_pipeline = []
+            for phase_str in resolved_pipeline_strings:
+                try:
+                    # Map string values to PhaseName enum
+                    phase_enum = PhaseName(phase_str)
+                    resolved_pipeline.append(phase_enum)
+                except ValueError:
+                    logger.warning(
+                        f"Unknown phase name '{phase_str}' in resolved pipeline, skipping",
+                        extra={"batch_id": batch_id}
+                    )
+                    continue
 
             logger.info(
                 "BCS resolved pipeline successfully",
                 extra={
                     "batch_id": batch_id,
                     "requested_pipeline": requested_pipeline,
-                    "resolved_pipeline": resolved_pipeline,
+                    "resolved_pipeline": [phase.value for phase in resolved_pipeline],
                     "pipeline_length": len(resolved_pipeline),
                     "correlation_id": correlation_id,
                 },
@@ -224,15 +254,10 @@ class ClientPipelineRequestHandler:
                 PipelineExecutionStatus.DISPATCH_INITIATED,
             }
 
-            phases = [
-                state_obj.spellcheck,
-                state_obj.cj_assessment,
-                state_obj.ai_feedback,
-                state_obj.nlp_metrics,
-            ]
-
-            for phase in phases:
-                if phase and phase.status in active_statuses:
+            # Check all phases using the enum values
+            for phase_name in PhaseName:
+                phase_detail = state_obj.get_pipeline(phase_name.value)
+                if phase_detail and phase_detail.status in active_statuses:
                     return True
 
             return False
@@ -244,7 +269,7 @@ class ClientPipelineRequestHandler:
     async def _update_batch_with_resolved_pipeline(
         self,
         batch_id: str,
-        resolved_pipeline: list[str],
+        resolved_pipeline: list[PhaseName],
         batch_context: Any,
     ) -> None:
         """Update batch processing state with BCS-resolved pipeline."""
@@ -258,28 +283,28 @@ class ClientPipelineRequestHandler:
         spellcheck_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
-                if "spellcheck" in resolved_pipeline
+                if PhaseName.SPELLCHECK in resolved_pipeline
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
             ),
         )
         cj_assessment_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
-                if "cj_assessment" in resolved_pipeline
+                if PhaseName.CJ_ASSESSMENT in resolved_pipeline
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
             ),
         )
         ai_feedback_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
-                if "ai_feedback" in resolved_pipeline
+                if PhaseName.AI_FEEDBACK in resolved_pipeline
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
             ),
         )
         nlp_metrics_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
-                if "nlp_metrics" in resolved_pipeline
+                if PhaseName.NLP in resolved_pipeline
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
             ),
         )
@@ -287,7 +312,7 @@ class ClientPipelineRequestHandler:
         # Create updated pipeline state
         updated_pipeline_state = ProcessingPipelineState(
             batch_id=batch_id,
-            requested_pipelines=resolved_pipeline,  # Use BCS-resolved pipeline
+            requested_pipelines=[phase.value for phase in resolved_pipeline],  # Convert enums to strings
             spellcheck=spellcheck_detail,
             cj_assessment=cj_assessment_detail,
             ai_feedback=ai_feedback_detail,

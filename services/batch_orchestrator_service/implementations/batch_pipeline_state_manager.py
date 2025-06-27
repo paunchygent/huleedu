@@ -9,6 +9,9 @@ from implementations.batch_database_infrastructure import BatchDatabaseInfrastru
 from models_db import Batch, PhaseStatusLog
 from sqlalchemy import select, update
 
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from enums_db import PhaseStatusEnum
+
 
 class BatchPipelineStateManager:
     """
@@ -22,6 +25,22 @@ class BatchPipelineStateManager:
         """Initialize pipeline state manager with database infrastructure."""
         self.db = db_infrastructure
         self.logger = create_service_logger("bos.repository.pipeline")
+
+    def _map_pipeline_status_to_phase_status(self, status: PipelineExecutionStatus) -> PhaseStatusEnum:
+        """Map PipelineExecutionStatus to PhaseStatusEnum for database storage."""
+        mapping = {
+            PipelineExecutionStatus.PENDING_DEPENDENCIES: PhaseStatusEnum.PENDING,
+            PipelineExecutionStatus.DISPATCH_INITIATED: PhaseStatusEnum.INITIATED,
+            PipelineExecutionStatus.IN_PROGRESS: PhaseStatusEnum.IN_PROGRESS,
+            PipelineExecutionStatus.COMPLETED_SUCCESSFULLY: PhaseStatusEnum.COMPLETED,
+            PipelineExecutionStatus.COMPLETED_WITH_PARTIAL_SUCCESS: PhaseStatusEnum.COMPLETED,
+            PipelineExecutionStatus.FAILED: PhaseStatusEnum.FAILED,
+            PipelineExecutionStatus.CANCELLED: PhaseStatusEnum.CANCELLED,
+            PipelineExecutionStatus.SKIPPED_DUE_TO_DEPENDENCY_FAILURE: PhaseStatusEnum.FAILED,
+            PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG: PhaseStatusEnum.CANCELLED,
+            PipelineExecutionStatus.REQUESTED_BY_USER: PhaseStatusEnum.PENDING,
+        }
+        return mapping.get(status, PhaseStatusEnum.FAILED)
 
     async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
         """Save pipeline processing state for a batch."""
@@ -72,9 +91,9 @@ class BatchPipelineStateManager:
     async def update_phase_status_atomically(
         self,
         batch_id: str,
-        phase_name: str,
-        expected_status: str,
-        new_status: str,
+        phase_name: PhaseName,
+        expected_status: PipelineExecutionStatus,
+        new_status: PipelineExecutionStatus,
         completion_timestamp: str | None = None,
     ) -> bool:
         """
@@ -95,22 +114,22 @@ class BatchPipelineStateManager:
 
                 # Check current pipeline state
                 current_pipeline_state = batch.pipeline_configuration or {}
-                current_phase_status = current_pipeline_state.get(f"{phase_name}_status")
+                current_phase_status = current_pipeline_state.get(f"{phase_name.value}_status")
 
                 # Atomic compare-and-set operation
-                if current_phase_status != expected_status:
+                if current_phase_status != expected_status.value:
                     self.logger.warning(
                         f"Phase {phase_name} status mismatch for batch {batch_id}: "
-                        f"expected {expected_status}, got {current_phase_status}",
+                        f"expected {expected_status.value}, got {current_phase_status}",
                     )
                     return False
 
                 # Update pipeline state atomically
                 updated_pipeline_state = current_pipeline_state.copy()
-                updated_pipeline_state[f"{phase_name}_status"] = new_status
+                updated_pipeline_state[f"{phase_name.value}_status"] = new_status.value
 
                 if completion_timestamp:
-                    updated_pipeline_state[f"{phase_name}_completed_at"] = completion_timestamp
+                    updated_pipeline_state[f"{phase_name.value}_completed_at"] = completion_timestamp
 
                 # Use optimistic locking with version field
                 stmt = (
@@ -134,13 +153,13 @@ class BatchPipelineStateManager:
                 phase_log = PhaseStatusLog(
                     batch_id=batch_id,
                     phase=phase_name,
-                    status=new_status,
+                    status=self._map_pipeline_status_to_phase_status(new_status),
                     phase_completed_at=datetime.fromisoformat(completion_timestamp).replace(
                         tzinfo=None,
                     )
                     if completion_timestamp
                     else None,
-                    processing_metadata={"previous_status": expected_status},
+                    processing_metadata={"previous_status": expected_status.value},
                 )
                 session.add(phase_log)
 

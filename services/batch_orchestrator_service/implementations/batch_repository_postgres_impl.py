@@ -15,6 +15,7 @@ from protocols import BatchRepositoryProtocol
 from sqlalchemy import delete, select
 
 from common_core.metadata_models import EssayProcessingInputRefV1
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 
 
 class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
@@ -71,9 +72,9 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
     async def update_phase_status_atomically(
         self,
         batch_id: str,
-        phase_name: str,
-        expected_status: str,
-        new_status: str,
+        phase_name: PhaseName,
+        expected_status: PipelineExecutionStatus,
+        new_status: PipelineExecutionStatus,
         completion_timestamp: str | None = None,
     ) -> bool:
         """Atomically update phase status if current status matches expected."""

@@ -352,7 +352,7 @@ class DefaultPipelinePhaseCoordinator:
     async def initiate_resolved_pipeline(
         self,
         batch_id: str,
-        resolved_pipeline: list[str],
+        resolved_pipeline: list[PhaseName],
         correlation_id: str,
         batch_context: Any,
     ) -> None:
@@ -360,7 +360,7 @@ class DefaultPipelinePhaseCoordinator:
         logger.info(
             f"Initiating resolved pipeline for batch {batch_id}",
             extra={
-                "resolved_pipeline": resolved_pipeline,
+                "resolved_pipeline": [phase.value for phase in resolved_pipeline],
                 "correlation_id": correlation_id,
             },
         )
@@ -370,14 +370,7 @@ class DefaultPipelinePhaseCoordinator:
             raise DataValidationError(f"Empty resolved pipeline for batch {batch_id}")
 
         # Get first phase from resolved pipeline
-        first_phase_str = resolved_pipeline[0]
-        try:
-            first_phase_name = PhaseName(first_phase_str)
-        except ValueError as e:
-            raise DataValidationError(
-                f"Invalid first phase '{first_phase_str}' in resolved pipeline "
-                f"for batch {batch_id}: {e}",
-            )
+        first_phase_name = resolved_pipeline[0]
 
         # Check idempotency - don't re-initiate if already started
         current_pipeline_state = await self.batch_repo.get_processing_pipeline_state(batch_id)

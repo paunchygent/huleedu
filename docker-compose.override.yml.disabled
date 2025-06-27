@@ -1,0 +1,122 @@
+# Development override configuration for live code reloading
+# This file is automatically loaded by Docker Compose and overrides settings in the main compose files
+# Use this for local development only - do not commit sensitive data
+
+services:
+  # Content Service - Quart-based
+  content_service:
+    volumes:
+      # Mount entire monorepo read-only to preserve import paths
+      - .:/app:ro
+      # Mount service source code only (not the entire directory with venv)
+      - ./services/content_service/src:/app/services/content_service/src:rw
+      - ./services/content_service/app.py:/app/services/content_service/app.py:rw
+      - ./services/content_service/config.py:/app/services/content_service/config.py:rw
+    environment:
+      - QUART_ENV=development
+      - QUART_DEBUG=true
+      - LOG_LEVEL=DEBUG
+    # Use start command which exists in the container
+    command: ["pdm", "run", "start"]
+
+  # Batch Orchestrator Service - Quart-based
+  batch_orchestrator_service:
+    volumes:
+      - .:/app:ro
+      - ./services/batch_orchestrator_service:/app/services/batch_orchestrator_service:rw
+      - /app/services/batch_orchestrator_service/.venv
+    environment:
+      - QUART_ENV=development
+      - QUART_DEBUG=true
+      - LOG_LEVEL=DEBUG
+    command: ["pdm", "run", "dev"]
+
+  # Batch Conductor Service - Quart-based
+  batch_conductor_service:
+    volumes:
+      - .:/app:ro
+      - ./services/batch_conductor_service:/app/services/batch_conductor_service:rw
+      - /app/services/batch_conductor_service/.venv
+    environment:
+      - QUART_ENV=development
+      - QUART_DEBUG=true
+      - LOG_LEVEL=DEBUG
+    command: ["pdm", "run", "dev"]
+
+  # File Service - Quart-based
+  file_service:
+    volumes:
+      - .:/app:ro
+      - ./services/file_service:/app/services/file_service:rw
+      - /app/services/file_service/.venv
+    environment:
+      - QUART_ENV=development
+      - QUART_DEBUG=true
+      - LOG_LEVEL=DEBUG
+    command: ["pdm", "run", "dev"]
+
+  # Essay Lifecycle API - Quart-based
+  essay_lifecycle_api:
+    volumes:
+      - .:/app:ro
+      - ./services/essay_lifecycle_service:/app/services/essay_lifecycle_service:rw
+      - /app/services/essay_lifecycle_service/.venv
+    environment:
+      - QUART_ENV=development
+      - QUART_DEBUG=true
+      - LOG_LEVEL=DEBUG
+    command: ["pdm", "run", "dev"]
+
+  # Essay Lifecycle Worker
+  essay_lifecycle_worker:
+    volumes:
+      - .:/app:ro
+      - ./services/essay_lifecycle_service:/app/services/essay_lifecycle_service:rw
+      - /app/services/essay_lifecycle_service/.venv
+    environment:
+      - LOG_LEVEL=DEBUG
+
+  # Class Management Service - Quart-based
+  class_management_service:
+    volumes:
+      - .:/app:ro
+      - ./services/class_management_service:/app/services/class_management_service:rw
+      - /app/services/class_management_service/.venv
+    environment:
+      - QUART_ENV=development
+      - QUART_DEBUG=true
+      - LOG_LEVEL=DEBUG
+    command: ["pdm", "run", "dev"]
+
+  # API Gateway Service - FastAPI-based
+  api_gateway_service:
+    volumes:
+      - .:/app:ro
+      - ./services/api_gateway_service:/app/services/api_gateway_service:rw
+      - /app/services/api_gateway_service/.venv
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    # FastAPI with reload flag
+    command: ["pdm", "run", "dev"]
+
+  # Worker Services (no HTTP server, but still benefit from volume mounts)
+  spell_checker_service:
+    volumes:
+      - .:/app:ro
+      - ./services/spell_checker_service:/app/services/spell_checker_service:rw
+      - /app/services/spell_checker_service/.venv
+    environment:
+      - LOG_LEVEL=DEBUG
+    # Workers typically don't have auto-reload, but code changes will apply on restart
+
+  cj_assessment_service:
+    volumes:
+      - .:/app:ro
+      - ./services/cj_assessment_service:/app/services/cj_assessment_service:rw
+      - /app/services/cj_assessment_service/.venv
+    environment:
+      - LOG_LEVEL=DEBUG
+
+# Note: Infrastructure services (Kafka, PostgreSQL, Redis) don't need volume mounts
+# as we don't modify their code during development

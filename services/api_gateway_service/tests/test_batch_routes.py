@@ -15,6 +15,8 @@ from fastapi.testclient import TestClient
 
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
+from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.kafka_client import KafkaBus
 from prometheus_client import CollectorRegistry
 from services.api_gateway_service.app.main import create_app
@@ -114,7 +116,7 @@ async def test_successful_pipeline_request(client_with_mocks, mock_kafka_bus):
     batch_id = "test_batch_123"
     request_data = {
         "batch_id": batch_id,
-        "requested_pipeline": "ai_feedback",
+        "requested_pipeline": PhaseName.AI_FEEDBACK.value,
         "is_retry": False,
     }
 
@@ -144,7 +146,7 @@ async def test_successful_pipeline_request(client_with_mocks, mock_kafka_bus):
     # Verify ClientBatchPipelineRequestV1 data
     assert isinstance(envelope.data, ClientBatchPipelineRequestV1)
     assert envelope.data.batch_id == batch_id
-    assert envelope.data.requested_pipeline == "ai_feedback"
+    assert envelope.data.requested_pipeline == PhaseName.AI_FEEDBACK.value
     assert envelope.data.user_id == "test_user_123"
     assert envelope.data.is_retry is False
 
@@ -157,7 +159,7 @@ async def test_batch_id_mismatch_validation(client_with_mocks):
 
     request_data = {
         "batch_id": body_batch_id,
-        "requested_pipeline": "spellcheck",
+        "requested_pipeline": PhaseName.SPELLCHECK.value,
     }
 
     response = client_with_mocks.post(f"/v1/batches/{path_batch_id}/pipelines", json=request_data)
@@ -172,7 +174,7 @@ async def test_user_id_propagation(client_with_mocks, mock_kafka_bus):
     batch_id = "test_batch_456"
     request_data = {
         "batch_id": batch_id,
-        "requested_pipeline": "cj_assessment",
+        "requested_pipeline": PhaseName.CJ_ASSESSMENT.value,
     }
 
     response = client_with_mocks.post(f"/v1/batches/{batch_id}/pipelines", json=request_data)
@@ -193,7 +195,7 @@ async def test_kafka_publish_failure_handling(client_with_mocks, mock_kafka_bus)
     batch_id = "test_batch_789"
     request_data = {
         "batch_id": batch_id,
-        "requested_pipeline": "spellcheck",
+        "requested_pipeline": PhaseName.SPELLCHECK.value,
     }
 
     response = client_with_mocks.post(f"/v1/batches/{batch_id}/pipelines", json=request_data)
@@ -208,7 +210,7 @@ async def test_retry_request_handling(client_with_mocks, mock_kafka_bus):
     batch_id = "test_batch_retry"
     request_data = {
         "batch_id": batch_id,
-        "requested_pipeline": "ai_feedback",
+        "requested_pipeline": PhaseName.AI_FEEDBACK.value,
         "is_retry": True,
         "retry_reason": "Previous attempt failed due to network error",
     }
@@ -225,8 +227,8 @@ async def test_retry_request_handling(client_with_mocks, mock_kafka_bus):
 
 
 @pytest.mark.asyncio
-async def test_invalid_pipeline_request_validation(client_with_mocks):
-    """Test validation of invalid ClientBatchPipelineRequestV1 data."""
+async def test_missing_pipeline_field_validation(client_with_mocks):
+    """Test validation when the requested_pipeline field is missing."""
     batch_id = "test_batch_invalid"
 
     # Missing required field
@@ -239,8 +241,27 @@ async def test_invalid_pipeline_request_validation(client_with_mocks):
         f"/v1/batches/{batch_id}/pipelines", json=invalid_request_data
     )
 
-    assert response.status_code == 422  # Validation error
+    assert response.status_code == 422  # Unprocessable Entity
+    assert "Field required" in str(response.json())
     assert "requested_pipeline" in str(response.json())
+
+
+@pytest.mark.asyncio
+async def test_invalid_enum_value_for_pipeline(client_with_mocks):
+    """Test validation when an invalid string is provided for the pipeline enum."""
+    batch_id = "test_batch_invalid_enum"
+    request_data = {
+        "batch_id": batch_id,
+        "requested_pipeline": "invalid_pipeline_name",
+    }
+
+    response = client_with_mocks.post(f"/v1/batches/{batch_id}/pipelines", json=request_data)
+
+    assert response.status_code == 422  # Unprocessable Entity
+    error_detail = response.json()["detail"][0]
+    assert error_detail["type"] == "enum"
+    assert error_detail["loc"] == ["body", "requested_pipeline"]
+    assert "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment' or 'nlp'" in error_detail["msg"]
 
 
 @pytest.mark.asyncio
@@ -249,7 +270,7 @@ async def test_correlation_id_generation(client_with_mocks, mock_kafka_bus):
     batch_id = "test_batch_correlation"
     request_data = {
         "batch_id": batch_id,
-        "requested_pipeline": "spellcheck",
+        "requested_pipeline": PhaseName.SPELLCHECK.value,
     }
 
     response = client_with_mocks.post(f"/v1/batches/{batch_id}/pipelines", json=request_data)

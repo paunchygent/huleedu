@@ -56,7 +56,7 @@ class TestSimplifiedRetryLogic:
         # Test normal request
         normal_request = ClientBatchPipelineRequestV1(
             batch_id="batch_123",
-            requested_pipeline="spellcheck",
+            requested_pipeline=PhaseName.SPELLCHECK.value,
             user_id="user_123",
         )
 
@@ -66,7 +66,7 @@ class TestSimplifiedRetryLogic:
         # Test retry request
         retry_request = ClientBatchPipelineRequestV1(
             batch_id="batch_123",
-            requested_pipeline="spellcheck",
+            requested_pipeline=PhaseName.SPELLCHECK.value,
             user_id="user_123",
             is_retry=True,
             retry_reason="Network error occurred, retrying spellcheck",
@@ -81,7 +81,7 @@ class TestSimplifiedRetryLogic:
         # Valid retry request
         retry_request = ClientBatchPipelineRequestV1(
             batch_id="batch_123",
-            requested_pipeline="ai_feedback",
+            requested_pipeline=PhaseName.AI_FEEDBACK.value,
             user_id="user_123",
             is_retry=True,
             retry_reason="User initiated retry from UI",
@@ -89,7 +89,7 @@ class TestSimplifiedRetryLogic:
 
         # Verify all fields are properly set
         assert retry_request.batch_id == "batch_123"
-        assert retry_request.requested_pipeline == "ai_feedback"
+        assert retry_request.requested_pipeline == PhaseName.AI_FEEDBACK.value
         assert retry_request.user_id == "user_123"
         assert retry_request.is_retry is True
         assert retry_request.retry_reason == "User initiated retry from UI"
@@ -98,14 +98,15 @@ class TestSimplifiedRetryLogic:
     async def test_phase_name_validation_for_retry(self) -> None:
         """Test that phase names are properly validated for retry requests."""
         # Valid phase names
-        valid_phases = ["spellcheck", "ai_feedback", "cj_assessment", "nlp"]
+        valid_phases = [phase for phase in PhaseName]
 
-        for phase in valid_phases:
+        for phase_enum in valid_phases:
             try:
-                phase_enum = PhaseName(phase)
-                assert phase_enum.value == phase
+                # Test that we can create enum from value
+                recreated = PhaseName(phase_enum.value)
+                assert recreated == phase_enum
             except ValueError:
-                pytest.fail(f"Valid phase {phase} should not raise ValueError")
+                pytest.fail(f"Valid phase {phase_enum.value} should not raise ValueError")
 
         # Invalid phase name should raise ValueError
         with pytest.raises(ValueError):
@@ -117,14 +118,14 @@ class TestSimplifiedRetryLogic:
         # CJ Assessment retry request
         cj_retry_request = ClientBatchPipelineRequestV1(
             batch_id="batch_123",
-            requested_pipeline="cj_assessment",
+            requested_pipeline=PhaseName.CJ_ASSESSMENT.value,
             user_id="user_123",
             is_retry=True,
             retry_reason="CJ Assessment failed, retrying entire batch",
         )
 
         # Verify the request is valid
-        assert cj_retry_request.requested_pipeline == "cj_assessment"
+        assert cj_retry_request.requested_pipeline == PhaseName.CJ_ASSESSMENT.value
         assert cj_retry_request.is_retry is True
 
         # The batch-only constraint is enforced at the API level,
@@ -137,7 +138,7 @@ class TestSimplifiedRetryLogic:
         short_reason = "Network error"
         retry_request = ClientBatchPipelineRequestV1(
             batch_id="batch_123",
-            requested_pipeline="spellcheck",
+            requested_pipeline=PhaseName.SPELLCHECK.value,
             user_id="user_123",
             is_retry=True,
             retry_reason=short_reason,
@@ -148,7 +149,7 @@ class TestSimplifiedRetryLogic:
         max_length_reason = "x" * 500
         retry_request_max = ClientBatchPipelineRequestV1(
             batch_id="batch_123",
-            requested_pipeline="spellcheck",
+            requested_pipeline=PhaseName.SPELLCHECK.value,
             user_id="user_123",
             is_retry=True,
             retry_reason=max_length_reason,
@@ -160,7 +161,7 @@ class TestSimplifiedRetryLogic:
         with pytest.raises(ValueError):
             ClientBatchPipelineRequestV1(
                 batch_id="batch_123",
-                requested_pipeline="spellcheck",
+                requested_pipeline=PhaseName.SPELLCHECK.value,
                 user_id="user_123",
                 is_retry=True,
                 retry_reason="x" * 501,  # Exceeds max length
@@ -171,7 +172,7 @@ class TestSimplifiedRetryLogic:
         """Test that retry context serializes properly for Kafka."""
         retry_request = ClientBatchPipelineRequestV1(
             batch_id="batch_123",
-            requested_pipeline="spellcheck",
+            requested_pipeline=PhaseName.SPELLCHECK.value,
             user_id="user_123",
             is_retry=True,
             retry_reason="Transient network error, retrying",
@@ -181,7 +182,7 @@ class TestSimplifiedRetryLogic:
         serialized = retry_request.model_dump()
 
         assert serialized["batch_id"] == "batch_123"
-        assert serialized["requested_pipeline"] == "spellcheck"
+        assert serialized["requested_pipeline"] == PhaseName.SPELLCHECK.value
         assert serialized["user_id"] == "user_123"
         assert serialized["is_retry"] is True
         assert serialized["retry_reason"] == "Transient network error, retrying"
