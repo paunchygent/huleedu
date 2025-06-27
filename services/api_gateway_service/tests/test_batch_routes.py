@@ -43,6 +43,7 @@ class MockProvider(Provider):
     @provide
     def provide_registry(self) -> CollectorRegistry:
         from prometheus_client import REGISTRY
+
         return REGISTRY
 
 
@@ -50,6 +51,7 @@ class MockProvider(Provider):
 def _clear_prometheus_registry():
     """Clear Prometheus registry before each test to avoid collisions."""
     from prometheus_client import REGISTRY
+
     collectors = list(REGISTRY._collector_to_names.keys())
     for collector in collectors:
         REGISTRY.unregister(collector)

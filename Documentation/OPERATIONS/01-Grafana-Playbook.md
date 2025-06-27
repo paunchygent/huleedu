@@ -1,3 +1,8 @@
+---
+trigger: model_decision
+description: This document serves as the team's shared brain for observability. It contains dashboard guides, key queries, and alert runbooks to empower effective debugging and monitoring.
+---
+
 # HuleEdu Grafana Playbook
 
 **Purpose**: This document serves as the team's shared brain for observability. It contains dashboard guides, key queries, and alert runbooks to empower effective debugging and monitoring.
@@ -16,7 +21,7 @@
 **Key Panels**:
 
 - Service Health: `count(up{job=~".*_service"} == 1) / count(up{job=~".*_service"}) * 100`
-- API Error Rate: `sum(rate(http_requests_total{status_code=~"5.."}[5m])) by (endpoint)`
+- API Error Rate: `sum(rate({__name__=~".*_http_requests_total",status_code=~"5.."}[5m])) by (service, endpoint)`
 
 ### Essay Processing Funnel (Future)
 
@@ -36,10 +41,10 @@
 up{job="content_service"}
 
 # Service Response Times
-histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job))
+histogram_quantile(0.95, sum(rate({__name__=~".*_http_request_duration_seconds_bucket"}[5m])) by (le, job))
 
 # Error Rates by Service
-rate(http_requests_total{status_code=~"5.."}[5m])
+rate({__name__=~".*_http_requests_total",status_code=~"5.."}[5m])
 
 # Memory Usage by Container
 container_memory_usage_bytes{name=~"huleedu_.*"}

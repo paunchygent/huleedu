@@ -70,6 +70,11 @@ def create_app(settings: Settings | None = None) -> Quart:
     async def startup() -> None:
         """Application startup tasks."""
         await initialize_services(app, settings, container)
+        
+        # Setup metrics middleware for HTTP request collection
+        from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
+        setup_standard_service_metrics_middleware(app, "cj_assessment")
+        
         logger.info("CJ Assessment Service health API starting up")
         logger.info("Health endpoint: /healthz")
         logger.info("Metrics endpoint: /metrics")

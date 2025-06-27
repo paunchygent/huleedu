@@ -11,7 +11,7 @@ groups:
       description: "The Prometheus target for {{ $labels.job }} has been down for more than 1 minute."
       
   - alert: HighErrorRate
-    expr: rate(http_requests_total{status_code=~"5.."}[5m]) > 0.1
+    expr: rate({__name__=~".*_http_requests_total",status_code=~"5.."}[5m]) > 0.1
     for: 2m
     labels:
       severity: warning

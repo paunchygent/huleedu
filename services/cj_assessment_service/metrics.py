@@ -47,13 +47,13 @@ def _create_metrics() -> dict[str, Any]:
         metrics = {
             # HTTP operational metrics
             "request_count": Counter(
-                "http_requests_total",
+                "cj_assessment_http_requests_total",
                 "Total HTTP requests",
                 ["method", "endpoint", "status_code"],
                 registry=REGISTRY,
             ),
             "request_duration": Histogram(
-                "http_request_duration_seconds",
+                "cj_assessment_http_request_duration_seconds",
                 "HTTP request duration in seconds",
                 ["method", "endpoint"],
                 registry=REGISTRY,
@@ -66,7 +66,7 @@ def _create_metrics() -> dict[str, Any]:
                 registry=REGISTRY,
             ),
             "llm_api_calls": Counter(
-                "llm_api_calls_total",
+                "cj_assessment_llm_api_calls_total",
                 "Total LLM API calls",
                 ["provider", "model", "status"],
                 registry=REGISTRY,
@@ -91,7 +91,7 @@ def _create_metrics() -> dict[str, Any]:
             ),
             # Cache operation metrics using OperationType enum
             "cache_operations": Counter(
-                "cache_operations_total",
+                "cj_assessment_cache_operations_total",
                 "Total cache operations",
                 ["operation", "result"],
                 registry=REGISTRY,
@@ -122,14 +122,14 @@ def _get_existing_metrics() -> dict[str, Any]:
     from prometheus_client import REGISTRY  # local import to avoid circular deps
 
     name_map: dict[str, str] = {
-        "request_count": "http_requests_total",
-        "request_duration": "http_request_duration_seconds",
+        "request_count": "cj_assessment_http_requests_total",
+        "request_duration": "cj_assessment_http_request_duration_seconds",
         "cj_assessment_operations": "cj_assessment_operations_total",
-        "llm_api_calls": "llm_api_calls_total",
+        "llm_api_calls": "cj_assessment_llm_api_calls_total",
         MetricName.PIPELINE_EXECUTION_TIME.value: "huleedu_cj_comparisons_made",
         "cj_assessment_duration_seconds": "huleedu_cj_assessment_duration_seconds",
         "kafka_queue_latency_seconds": "kafka_message_queue_latency_seconds",
-        "cache_operations": "cache_operations_total",
+        "cache_operations": "cj_assessment_cache_operations_total",
     }
 
     existing: dict[str, Any] = {}

@@ -21,13 +21,13 @@ def _create_metrics() -> dict[str, Any]:
         # Generic counter used throughout the core logic to track upload result
         # Labels mirror those in `core_logic.process_single_file_upload`
         "request_count": Counter(
-            "request_count",
+            "file_service_http_requests_total",
             "Total number of HTTP requests",
             ["method", "endpoint", "status"],
             registry=REGISTRY,
         ),
         "request_duration": Histogram(
-            "request_duration",
+            "file_service_http_request_duration_seconds",
             "HTTP request duration in seconds",
             ["method", "endpoint"],
             registry=REGISTRY,

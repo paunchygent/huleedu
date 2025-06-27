@@ -108,24 +108,47 @@ Pattern: `<descriptive_name>_<unit>`
 ## 6. Container Integration
 
 ### 6.1. Service Library Integration
+
+#### Quart Services (Standard Pattern)
 **MUST** use established patterns:
-- **Metrics Class**: Define all metrics in dedicated `<service>/metrics.py` or `<service>/app/metrics.py`
+- **Metrics Definition**: Create `<service>/metrics.py` with `get_http_metrics()` and `get_business_metrics()` functions
+- **Metrics Storage**: Store in `app.extensions["metrics"]` during startup
+- **Middleware Setup**: Call `setup_standard_service_metrics_middleware(app, "service_prefix")` in `@app.before_serving`
+- **Port Configuration**: Document metrics endpoint port in service README
+
+```python
+# metrics.py - Standard pattern for Quart services
+def get_http_metrics() -> dict[str, Any]:
+    all_metrics = get_metrics()
+    return {
+        "request_count": all_metrics.get("request_count"),
+        "request_duration": all_metrics.get("request_duration"),
+    }
+
+# app.py - Middleware setup
+@app.before_serving
+async def startup() -> None:
+    await initialize_services(app, settings, container)
+    from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
+    setup_standard_service_metrics_middleware(app, "service_prefix")
+
+# startup_setup.py - Storage in app extensions
+metrics = get_http_metrics()
+app.extensions = getattr(app, "extensions", {})
+app.extensions["metrics"] = metrics
+```
+
+#### FastAPI Services (Different Pattern)
+- **Metrics Class**: Define all metrics in dedicated `<service>/app/metrics.py`
 - **DI Provider**: Provide both metrics class and `CollectorRegistry` via Dishka with `Scope.APP`
-- **Metrics Instantiation**: Create Counter/Histogram instances in metrics class `__init__()` method
 - **Injection Pattern**: Inject metrics class into route handlers using `FromDishka[MetricsClass]`
 
 ```python
-# metrics.py
+# FastAPI pattern (API Gateway example)
 class GatewayMetrics:
     def __init__(self) -> None:
         self.http_requests_total = Counter(...)
 
-# di.py
-@provide(scope=Scope.APP)
-def provide_metrics(self) -> GatewayMetrics:
-    return GatewayMetrics()
-
-# routes.py
 @router.post("/endpoint")
 async def handler(metrics: FromDishka[GatewayMetrics]):
     metrics.http_requests_total.inc()
@@ -151,15 +174,53 @@ async def handler(metrics: FromDishka[GatewayMetrics]):
 - Check alert rule functionality after configuration changes
 - Update playbook documentation with lessons learned
 
-## 8. Performance and Resource Management
+## 8. Service Ports and Testing Patterns
 
-### 8.1. Resource Limits
+### 8.1. Metrics Endpoint Ports
+**Direct Service Access:**
+- `file_service`: Port 7001 → `curl http://localhost:7001/metrics`
+- `cj_assessment_service`: Port 9090 → `curl http://localhost:9090/metrics` (inside container)
+- `batch_orchestrator_service`: Port 5000 → `curl http://localhost:5000/metrics`
+- `spell_checker_service`: Port 8002 → `curl http://localhost:8002/metrics`
+
+**Docker External Mapping:**
+- `cj_assessment_service`: Port 8095 → `curl http://localhost:8095/metrics` (from host)
+
+### 8.2. Prometheus Query Testing
+**From Host:**
+```bash
+# BROKEN - host curl often fails with JSON parsing
+curl -s "http://localhost:9090/api/v1/query?query=up"
+
+# WORKING - query from inside Prometheus container
+docker exec huleedu_prometheus wget -qO- "http://localhost:9090/api/v1/query?query=up"
+```
+
+**Container Rebuild Protocol:**
+- After modifying service code, ALWAYS rebuild containers before testing
+- Pattern: `docker compose down && docker build <services> && docker compose up -d`
+- Metrics middleware changes require container rebuild to take effect
+
+### 8.3. Middleware Troubleshooting
+**Missing Metrics Data (metrics defined but no values):**
+- Check `setup_standard_service_metrics_middleware(app, "prefix")` call in `@app.before_serving`
+- Verify `app.extensions["metrics"]` contains `"request_count"` and `"request_duration"` keys
+- Ensure metrics initialization happens BEFORE middleware setup in startup sequence
+
+**Port Access Issues:**
+- Use `docker exec <container> curl http://localhost:<port>/metrics` for direct testing
+- External port mapping may differ from internal container ports
+- Check `prometheus.yml` for correct target configuration
+
+## 9. Performance and Resource Management
+
+### 9.1. Resource Limits
 - Observability stack should use <500MB total memory
 - Prometheus retention: 15 days default
 - Loki retention: 30 days default
 - Monitor observability stack resource usage weekly
 
-### 8.2. Query Performance
+### 9.2. Query Performance
 - Use recording rules for expensive calculations
 - Implement query timeouts in Grafana
 - Monitor Prometheus query performance via internal metrics
