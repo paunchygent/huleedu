@@ -190,6 +190,9 @@ class TestPipelineResolutionIntegration:
             ),
         )
 
+        # Configure the repository to indicate no pipeline is currently active
+        mock_batch_repository.get_processing_pipeline_state.return_value = None
+
         # Create mock Kafka message (mimicking aiokafka.ConsumerRecord)
         mock_msg = self.create_mock_kafka_message(test_event)
 
@@ -263,24 +266,22 @@ class TestPipelineResolutionIntegration:
     @pytest.mark.docker
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_bcs_http_error_propagation(
+    async def test_invalid_pipeline_name_raises_value_error(
         self,
         pipeline_request_handler: ClientPipelineRequestHandler,
         mock_batch_repository: AsyncMock,
-        mock_event_publisher: AsyncMock,
     ):
         """
-        Test error handling when BCS returns HTTP errors.
+        Test that an invalid pipeline name raises a ValueError before calling BCS.
 
         Validates:
-        - Handler gracefully handles BCS API errors
-        - Batch state indicates pipeline resolution failed
-        - Error event published with appropriate details
+        - Handler correctly identifies and rejects invalid pipeline names.
+        - No call is made to the Batch Conductor Service.
         """
-        # Configure batch repository to return a valid batch
+        # Configure batch repository to return a valid batch context
         mock_batch_repository.get_batch_context.return_value = {
-            "batch_id": "test-batch-bcs-error-001",
-            "requested_pipeline": "invalid_pipeline_name",  # This should cause BCS error
+            "batch_id": "test-batch-invalid-name-001",
+            "requested_pipeline": "invalid_pipeline_name",
             "current_state": "pipeline_resolution_requested",
             "resolved_pipeline": None,
             "created_at": "2025-01-01T00:00:00Z",
@@ -294,8 +295,63 @@ class TestPipelineResolutionIntegration:
             source_service="api_gateway",
             correlation_id=uuid.uuid4(),
             data=ClientBatchPipelineRequestV1(
-                batch_id="test-batch-bcs-error-001",
+                batch_id="test-batch-invalid-name-001",
                 requested_pipeline="invalid_pipeline_name",
+                user_id="test_user_123",
+            ),
+        )
+
+        mock_msg = self.create_mock_kafka_message(test_event)
+
+        # Process the event - should raise ValueError due to the invalid pipeline name
+        with pytest.raises(ValueError, match="Invalid pipeline name: invalid_pipeline_name"):
+            await pipeline_request_handler.handle_client_pipeline_request(mock_msg)
+
+        print("✅ Invalid pipeline name validation verified")
+
+    @pytest.mark.docker
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_bcs_http_error_propagation(
+        self,
+        pipeline_request_handler: ClientPipelineRequestHandler,
+        mock_batch_repository: AsyncMock,
+        monkeypatch,
+    ):
+        """
+        Test error handling when BCS returns an HTTP error for a valid request.
+
+        Validates:
+        - Handler gracefully handles BCS API errors.
+        - The error is propagated with a specific 'BCS pipeline resolution failed' message.
+        """
+        # Configure batch repository to return a valid batch context
+        mock_batch_repository.get_batch_context.return_value = {
+            "batch_id": "test-batch-bcs-error-001",
+            "requested_pipeline": "spellcheck",  # Use a valid pipeline name
+            "current_state": "pipeline_resolution_requested",
+            "resolved_pipeline": None,
+            "created_at": "2025-01-01T00:00:00Z",
+        }
+        mock_batch_repository.get_processing_pipeline_state.return_value = None
+
+        # Use monkeypatch to simulate an error from the BCS client
+        mock_resolve_pipeline = AsyncMock(
+            side_effect=aiohttp.ClientError("Simulated BCS 500 Internal Server Error")
+        )
+        monkeypatch.setattr(
+            pipeline_request_handler.bcs_client, "resolve_pipeline", mock_resolve_pipeline
+        )
+
+        test_event = EventEnvelope(
+            event_id=uuid.uuid4(),
+            event_type="huleedu.commands.batch.pipeline.v1",
+            event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
+            source_service="api_gateway",
+            correlation_id=uuid.uuid4(),
+            data=ClientBatchPipelineRequestV1(
+                batch_id="test-batch-bcs-error-001",
+                requested_pipeline="spellcheck",  # Use a valid pipeline name
                 user_id="test_user_123",
             ),
         )
@@ -305,6 +361,11 @@ class TestPipelineResolutionIntegration:
         # Process the event - should handle BCS error gracefully
         with pytest.raises(Exception, match="BCS pipeline resolution failed"):
             await pipeline_request_handler.handle_client_pipeline_request(mock_msg)
+
+        # Verify that the mocked BCS client was called
+        mock_resolve_pipeline.assert_awaited_once_with(
+            "test-batch-bcs-error-001", "spellcheck"
+        )
 
         print("✅ BCS HTTP error propagation verified")
 
