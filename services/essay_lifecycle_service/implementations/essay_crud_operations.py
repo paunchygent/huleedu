@@ -143,7 +143,9 @@ class SQLiteEssayCrudOperations:
                     essay_state.batch_id,
                     essay_state.current_status.value,
                     json.dumps(essay_state.processing_metadata),
-                    json.dumps({k: cast(datetime, v).isoformat() for k, v in essay_state.timeline.items()}),
+                    json.dumps(
+                        {k: cast(datetime, v).isoformat() for k, v in essay_state.timeline.items()}
+                    ),
                     json.dumps({k.value: v for k, v in essay_state.storage_references.items()}),
                     cast(datetime, essay_state.created_at).isoformat(),
                     cast(datetime, essay_state.updated_at).isoformat(),

@@ -569,69 +569,79 @@ The WebSocket implementation now supports these additional event types for the e
         await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
     ```
 
-4. **Class Management Service Event Publishing**: Create event publisher for class and student management.
+4. **Class Management Service Event Publishing**: Implement an event publisher to notify the frontend of changes to classes and students.
 
     **File**: `services/class_management_service/implementations/event_publisher_impl.py`
 
     ```python
-    from huleedu_service_libs.protocols import AtomicRedisClientProtocol
     import json
+    from uuid import UUID
     from datetime import datetime, timezone
+    from huleedu_service_libs.protocols import AtomicRedisClientProtocol, LoggerProtocol
+    from common_core.db.models import Class, Student
 
-    class ClassManagementEventPublisher:
-        def __init__(self, redis_client: AtomicRedisClientProtocol):
-            self.redis_client = redis_client
+    class CmsEventPublisher:
+        def __init__(self, redis_client: AtomicRedisClientProtocol, logger: LoggerProtocol):
+            self._redis = redis_client
+            self._logger = logger
 
-        async def publish_class_created_event(
-            self, 
-            class_id: str, 
-            class_designation: str, 
-            user_id: str
-        ) -> None:
-            """Publish real-time update when class is created."""
-            redis_message = {
-                "event": "class_created",
-                "class_id": class_id,
-                "class_designation": class_designation,
+        async def _publish(self, user_id: UUID, event_type: str, data: dict):
+            channel = f"ws:{user_id}"
+            payload = {
+                "event": event_type,
+                "data": data,
+                "source": "class_management_service",
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
-            await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
+            try:
+                # Use default=str to handle non-serializable types like UUID and datetime
+                await self._redis.publish(channel, json.dumps(payload, default=str))
+                self._logger.info(f"Published {event_type} event to {channel}", extra={"data": data})
+            except Exception:
+                self._logger.error(f"Failed to publish {event_type} to {channel}", exc_info=True)
 
-        async def publish_student_created_event(
-            self, 
-            student_id: str, 
-            student_name: str, 
-            student_email: str, 
-            user_id: str
-        ) -> None:
-            """Publish real-time update when student is created."""
-            redis_message = {
-                "event": "student_created",
-                "student_id": student_id,
-                "student_name": student_name,
-                "student_email": student_email,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-            await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
+        async def publish_class_created(self, user_id: UUID, class_obj: Class):
+            await self._publish(
+                user_id,
+                "class_created",
+                {"id": class_obj.id, "name": class_obj.name, "created_at": class_obj.created_at}
+            )
 
-        async def publish_essay_student_association_event(
-            self,
-            batch_id: str,
-            essay_id: str,
-            student_id: str,
-            association_method: str,
-            user_id: str
-        ) -> None:
-            """Publish real-time update when essay-student association is made."""
-            redis_message = {
-                "event": "essay_student_association_updated",
-                "batch_id": batch_id,
-                "essay_id": essay_id,
-                "student_id": student_id,
-                "association_method": association_method,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-            await self.redis_client.publish(f"ws:{user_id}", json.dumps(redis_message))
+        async def publish_class_update(self, user_id: UUID, class_obj: Class):
+            await self._publish(
+                user_id,
+                "class_updated",
+                {"id": class_obj.id, "name": class_obj.name, "updated_at": class_obj.updated_at}
+            )
+
+        async def publish_student_created(self, user_id: UUID, student_obj: Student):
+             await self._publish(
+                user_id,
+                "student_created",
+                {"id": student_obj.id, "name": student_obj.name, "class_id": student_obj.class_id}
+            )
+
+        async def publish_student_update(self, user_id: UUID, student_obj: Student):
+            await self._publish(
+                user_id,
+                "student_updated",
+                {"id": student_obj.id, "name": student_obj.name, "class_id": student_obj.class_id}
+            )
+    ```
+
+    **File**: `services/class_management_service/implementations/service_impl.py` (Usage Example)
+
+    ```python
+    # In ClassManagementServiceImpl methods...
+
+    async def update_class(self, class_id: UUID, update_data: UpdateClassRequest, user_id: UUID) -> Class:
+        # ... logic to update class in database ...
+        updated_class = await self.repo.update_class(...)
+
+        # Publish event to Redis backplane
+        await self.event_publisher.publish_class_update(user_id, updated_class)
+
+        return updated_class
     ```
 
 5. **Repeat Enhanced Logic for ELS**: Perform the same dependency injection and logic addition for the `DefaultServiceResultHandler` in the `essay_lifecycle_service`, adding essay status update events.

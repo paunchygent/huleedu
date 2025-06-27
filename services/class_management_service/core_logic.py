@@ -20,7 +20,7 @@ def parse_student_name(full_name: str) -> StudentParsingResult:
             parsed_name=ParsedNameMetadata(
                 parsed_name=PersonNameV1(first_name="", last_name="", legal_full_name="")
             ),
-            confidence=0.0
+            confidence=0.0,
         )
     elif num_parts == 1:
         # Treat single names as last names with lower confidence
@@ -28,7 +28,7 @@ def parse_student_name(full_name: str) -> StudentParsingResult:
             parsed_name=ParsedNameMetadata(
                 parsed_name=PersonNameV1(first_name="", last_name=parts[0])
             ),
-            confidence=0.5 # Lower confidence for single name
+            confidence=0.5,  # Lower confidence for single name
         )
     else:
         # Assume last part is last name, rest is first name
@@ -38,5 +38,5 @@ def parse_student_name(full_name: str) -> StudentParsingResult:
             parsed_name=ParsedNameMetadata(
                 parsed_name=PersonNameV1(first_name=first_name, last_name=last_name)
             ),
-            confidence=0.9 # Higher confidence for multiple parts
+            confidence=0.9,  # Higher confidence for multiple parts
         )

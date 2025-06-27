@@ -24,8 +24,8 @@ from services.class_management_service.protocols import (
 )
 
 # Define concrete types for this implementation
-T = TypeVar('T', bound=UserClass)
-U = TypeVar('U', bound=Student)
+T = TypeVar("T", bound=UserClass)
+U = TypeVar("U", bound=Student)
 
 
 class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
@@ -113,9 +113,7 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
 
     async def get_student_by_id(self, student_id: uuid.UUID) -> U | None:  # Returns type U or None
         stmt = (
-            select(Student)
-            .where(Student.id == student_id)
-            .options(selectinload(Student.classes))
+            select(Student).where(Student.id == student_id).options(selectinload(Student.classes))
         )
         result = await self.session.execute(stmt)
         return cast(U | None, result.scalars().first())

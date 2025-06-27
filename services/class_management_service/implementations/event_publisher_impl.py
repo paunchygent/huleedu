@@ -1,4 +1,3 @@
-
 from huleedu_service_libs.kafka_client import KafkaBus
 
 from common_core.events.envelope import EventEnvelope

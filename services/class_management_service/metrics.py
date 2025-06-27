@@ -6,7 +6,7 @@ from prometheus_client import Counter, Histogram
 class CmsMetrics:
     """A container for all Prometheus metrics for the service."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.http_requests_total = Counter(
             "cms_http_requests_total",
             "Total number of HTTP requests for Class Management Service.",

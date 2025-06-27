@@ -17,8 +17,9 @@ from services.class_management_service.protocols import (
 )
 
 # Define concrete types for this implementation
-T = TypeVar('T', bound=UserClass)  # T must be UserClass or a subclass
-U = TypeVar('U', bound=Student)    # U must be Student or a subclass
+T = TypeVar("T", bound=UserClass)  # T must be UserClass or a subclass
+U = TypeVar("U", bound=Student)  # U must be Student or a subclass
+
 
 class MockClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
     """Mock implementation of ClassRepositoryProtocol for testing with generic types."""
@@ -48,7 +49,7 @@ class MockClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             created_by_user_id=user_id,
             course_id=course.id,
             course=course,
-            students=[]
+            students=[],
         )
         self.classes[class_id] = cast(T, new_class)
         return cast(T, new_class)
@@ -83,7 +84,7 @@ class MockClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             legal_full_name=student_data.person_name.legal_full_name,
             email=student_data.email,
             created_by_user_id=user_id,
-            classes=[]
+            classes=[],
         )
         self.students[student_id] = cast(U, new_student)
         if student_data.class_ids:

@@ -36,7 +36,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         repo: ClassRepositoryProtocol[T, U],  # Repository that returns T and U
         event_publisher: ClassEventPublisherProtocol,
         user_class_type: Type[T],
-        student_type: Type[U]
+        student_type: Type[U],
     ) -> None:
         self.repo = repo
         self.event_publisher = event_publisher
@@ -45,13 +45,11 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         # Verify at runtime that the types match
         if not issubclass(user_class_type, UserClass):
             raise TypeError(
-                f"user_class_type must be a subclass of UserClass,"
-                f" got {user_class_type.__name__}"
+                f"user_class_type must be a subclass of UserClass, got {user_class_type.__name__}"
             )
         if not issubclass(student_type, Student):
             raise TypeError(
-                f"student_type must be a subclass of Student,"
-                f" got {student_type.__name__}"
+                f"student_type must be a subclass of Student, got {student_type.__name__}"
             )
 
     async def register_new_class(

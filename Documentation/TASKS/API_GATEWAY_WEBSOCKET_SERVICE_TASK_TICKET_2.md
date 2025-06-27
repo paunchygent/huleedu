@@ -27,7 +27,7 @@ This part covers the creation of the new FastAPI-based `api_gateway_service`, wh
 
 1. **Create Service Structure**: Create the new service directory `services/api_gateway_service/` with the following structure. This differs from our Quart services and must follow the FastAPI router pattern.
 
-    ```
+    ```bash
     services/api_gateway_service/
     ├── main.py             # FastAPI app instantiation and startup logic
     ├── di.py               # Dishka dependency injection providers
@@ -865,5 +865,47 @@ class Settings(BaseSettings):
 - ✅ Enhanced batch registration supports GUEST class and validation timeout configuration
 - ✅ Batch status endpoint provides enhanced information including validation state
 - ✅ All endpoints include proper authentication, rate limiting, and error handling
+
+### Checkpoint 2.4: Implement Class Management Service (CMS) API Proxy Router
+
+**Goal:** Create a new router in the `api_gateway_service` that proxies all class and student management requests to the `class_management_service` API.
+
+**Affected Files**:
+
+- `services/api_gateway_service/routers/class_routes.py` (new)
+- `services/api_gateway_service/main.py` (updated)
+- `services/api_gateway_service/config.py` (updated)
+
+**Implementation Steps**:
+
+1. **Create `api_gateway_service/routers/class_routes.py`**:
+    - Define a new `APIRouter` for class management routes (e.g., `/v1/classes`).
+    - Implement proxy endpoints for all CMS API routes:
+        - `POST /v1/classes/`
+        - `GET /v1/classes/{class_id}`
+        - `PUT /v1/classes/{class_id}`
+        - `DELETE /v1/classes/{class_id}`
+        - `POST /v1/classes/students`
+        - `GET /v1/classes/students/{student_id}`
+        - `PUT /v1/classes/students/{student_id}`
+        - `DELETE /v1/classes/students/{student_id}`
+
+2. **Implement Proxy Logic**:
+    - Inject an `httpx.AsyncClient` for making requests to the CMS.
+    - Forward the original request's method, path, headers (including `X-User-ID`), and body to the corresponding CMS endpoint.
+    - The CMS service location will be retrieved from configuration (`CMS_API_URL`).
+    - Return the response (status code, headers, and body) from the CMS directly to the client.
+
+3. **Update Configuration**:
+    - Add `CMS_API_URL` to `services/api_gateway_service/config.py`.
+
+4. **Integrate Router into API Gateway App**:
+    - Register the new `class_routes` router with the main FastAPI application in `api_gateway_service/main.py`.
+
+**Done When**:
+
+- ✅ All class and student management endpoints are proxied to the CMS.
+- ✅ Requests are successfully forwarded and responses are returned to the client.
+- ✅ The new router is integrated into the main application.
 
 This completes Part 2 of the implementation guide. The API Gateway is now capable of receiving and processing commands. Part 3 will focus on implementing the query and real-time WebSocket components.

@@ -1,0 +1,133 @@
+"""
+Batch management routes for API Gateway Service.
+
+Implements secure batch command processing using proper common_core contracts.
+"""
+
+from __future__ import annotations
+
+from uuid import uuid4
+
+from dishka.integrations.fastapi import DishkaRoute, FromDishka
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
+
+from common_core.events.client_commands import ClientBatchPipelineRequestV1
+from common_core.events.envelope import EventEnvelope
+from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.logging_utils import create_service_logger
+
+from ..app.rate_limiter import limiter
+from ..auth import get_current_user_id
+
+router = APIRouter(route_class=DishkaRoute)
+logger = create_service_logger("api_gateway.batch_routes")
+
+
+class BatchPipelineRequest(BaseModel):
+    """
+    Input model for batch pipeline requests from API Gateway clients.
+
+    This is separate from ClientBatchPipelineRequestV1 to avoid requiring
+    user_id in the client request (it comes from authentication).
+    """
+    batch_id: str | None = Field(
+        default=None,
+        description="The unique identifier of the target batch (optional, taken from path).",
+        min_length=1,
+        max_length=255,
+    )
+    requested_pipeline: str = Field(
+        description="The final pipeline the user wants to run (e.g., 'ai_feedback', 'cj_assessment').",
+        min_length=1,
+        max_length=100,
+    )
+    is_retry: bool = Field(
+        default=False,
+        description="Flag indicating this is a user-initiated retry request.",
+    )
+    retry_reason: str | None = Field(
+        default=None,
+        description="Optional user-provided reason for the retry.",
+        max_length=500,
+    )
+
+
+@router.post("/batches/{batch_id}/pipelines", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("10/minute")
+async def request_pipeline_execution(
+    request: Request,  # Required for rate limiting
+    batch_id: str,
+    pipeline_request: BatchPipelineRequest,
+    kafka_bus: FromDishka[KafkaBus],
+    user_id: str = Depends(get_current_user_id),  # noqa: B008
+):
+    """
+    Request pipeline execution for a batch with comprehensive validation and security.
+
+    Uses proper ClientBatchPipelineRequestV1 contract from common_core and publishes
+    events in EventEnvelope format to the correct Kafka topic.
+    """
+    correlation_id = uuid4()
+
+    # CRITICAL: Validate batch_id consistency
+    if pipeline_request.batch_id and pipeline_request.batch_id != batch_id:
+        logger.warning(
+            f"Batch ID mismatch: path='{batch_id}', body='{pipeline_request.batch_id}', "
+            f"user_id='{user_id}', correlation_id='{correlation_id}'"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Batch ID in path must match batch ID in request body",
+        )
+
+    # Construct ClientBatchPipelineRequestV1 with authenticated user_id
+    client_request = ClientBatchPipelineRequestV1(
+        batch_id=batch_id,  # Always use path batch_id
+        requested_pipeline=pipeline_request.requested_pipeline,
+        client_correlation_id=correlation_id,
+        user_id=user_id,  # From authentication
+        is_retry=pipeline_request.is_retry,
+        retry_reason=pipeline_request.retry_reason,
+    )
+
+    try:
+        # Create proper EventEnvelope with ClientBatchPipelineRequestV1 data
+        envelope = EventEnvelope[ClientBatchPipelineRequestV1](
+            event_type="huleedu.commands.batch.pipeline.v1",
+            source_service="api_gateway_service",
+            correlation_id=correlation_id,
+            data=client_request,
+        )
+
+        # Publish using KafkaBus.publish method with EventEnvelope
+        await kafka_bus.publish(
+            topic="huleedu.commands.batch.pipeline.v1",
+            envelope=envelope,
+            key=batch_id,  # Partition by batch_id for ordering
+        )
+
+        # CRITICAL: Comprehensive logging for traceability
+        logger.info(
+            f"Pipeline request published: batch_id='{batch_id}', "
+            f"pipeline='{client_request.requested_pipeline}', "
+            f"user_id='{user_id}', correlation_id='{correlation_id}'"
+        )
+
+        return {
+            "status": "accepted",
+            "message": "Pipeline execution request received",
+            "batch_id": batch_id,
+            "correlation_id": str(correlation_id),
+        }
+
+    except Exception as e:
+        logger.error(
+            f"Failed to publish pipeline request: batch_id='{batch_id}', "
+            f"user_id='{user_id}', correlation_id='{correlation_id}', error='{e}'",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to process pipeline request",
+        ) from e

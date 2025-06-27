@@ -2,54 +2,118 @@
 
 ## Overview **Client-facing API for React frontend integration**
 
-The API Gateway Service is a FastAPI-based microservice that provides client-facing HTTP endpoints for React frontend applications. It serves as the entry point for external clients and publishes commands to internal microservices via Kafka.
+The API Gateway Service is a FastAPI-based microservice that provides client-facing HTTP endpoints for React frontend applications. It serves as the secure entry point for external clients, implementing authentication, rate limiting, and proper request validation while proxying to internal microservices.
 
 ## Architecture
 
 - **Framework**: FastAPI + uvicorn (client-facing optimization)
-- **Communication**: HTTP API for React frontend, Kafka for internal commands
+- **Communication**: HTTP API for React frontend, Kafka for batch commands, HTTP proxy for file uploads
 - **Port**: 4001 (client-facing)
-- **Features**: CORS, OpenAPI docs, rate limiting, authentication-ready
+- **Features**: CORS, OpenAPI docs, rate limiting, JWT authentication, WebSocket support
 
 ## Key Responsibilities
 
-1. **Client API**: HTTP endpoints for React frontend
-2. **Command Publishing**: Kafka event publishing to internal services
-3. **Request Validation**: Comprehensive input validation and sanitization
-4. **Documentation**: Automatic OpenAPI/Swagger documentation
-5. **Security**: Rate limiting, CORS, authentication hooks
+1. **Client API**: Secure HTTP endpoints for React frontend
+2. **Batch Commands**: Kafka event publishing using proper `ClientBatchPipelineRequestV1` contracts
+3. **File Upload Proxy**: Secure file upload proxy to File Service with authentication headers
+4. **Real-time Updates**: WebSocket connections for live batch status updates
+5. **Class Management Proxy**: Complete proxy to Class Management Service API
+6. **Security**: Authentication, rate limiting, CORS, input validation
 
 ## API Endpoints
 
-### Client-Facing API
+### Batch Management
 
-- `POST /v1/batches/{batch_id}/pipelines` - Request pipeline execution
-- `GET /v1/batches/{batch_id}/status` - Get batch status
+- `POST /v1/batches/{batch_id}/pipelines` - Request pipeline execution (uses `ClientBatchPipelineRequestV1`)
+- `GET /v1/batches/{batch_id}/status` - Get batch status with ownership validation
+- `GET /v1/batches/{batch_id}/validation-status` - Get validation status for student associations
+
+### File Operations  
+
+- `POST /v1/files/batch` - Upload files to batch (proxy to File Service)
+
+### Class Management (Proxy)
+
+- `POST /v1/classes/` - Create new class
+- `GET /v1/classes/{class_id}` - Get class details
+- `PUT /v1/classes/{class_id}` - Update class
+- `DELETE /v1/classes/{class_id}` - Delete class
+- `POST /v1/classes/students` - Add student to class
+- `GET /v1/classes/students/{student_id}` - Get student details
+- `PUT /v1/classes/students/{student_id}` - Update student
+- `DELETE /v1/classes/students/{student_id}` - Remove student
+
+### Real-time Communication
+
+- `WebSocket /ws` - Real-time batch status updates (requires JWT token in query parameter)
+
+### Service Management
+
 - `GET /healthz` - Health check
-- `GET /metrics` - Prometheus metrics
+- `GET /metrics` - Prometheus metrics  
 - `GET /docs` - Interactive API documentation (Swagger UI)
 - `GET /redoc` - Alternative API documentation (ReDoc)
+
+## Security Features
+
+### JWT Authentication
+
+- All endpoints require valid JWT tokens
+- User ownership validation for batch operations
+- Secure WebSocket authentication via query parameters
+
+### Rate Limiting
+
+- Batch commands: 10 requests/minute
+- File uploads: 5 requests/minute  
+- Status queries: 50 requests/minute
+- Per-client enforcement with Redis backend
+
+### Request Validation
+
+- Strict Pydantic model validation using `common_core` contracts
+- Batch ID consistency validation (path vs. body)
+- Comprehensive error handling with detailed logging
+
+## Data Contracts
+
+Uses proper shared contracts from `common_core`:
+
+- **Pipeline Commands**: `ClientBatchPipelineRequestV1` with user context and retry support
+- **Event Publishing**: `EventEnvelope` format to `huleedu.commands.batch.pipeline.v1` topic
+- **Validation**: Student association handling for class-based batches
 
 ## React Frontend Integration
 
 ### CORS Configuration
 
-Configured for React development and production environments:
-
 - Development: `http://localhost:3000`, `http://localhost:3001`
-- Production: Configurable via environment variables
+- Production: Configurable via `API_GATEWAY_CORS_ORIGINS`
 
-### Request/Response Format
+### WebSocket Integration
 
-Optimized for React state management with comprehensive validation and helpful error messages.
+```javascript
+const ws = new WebSocket(`ws://localhost:4001/ws?token=${jwtToken}`);
+ws.onmessage = (event) => {
+  const update = JSON.parse(event.data);
+  // Handle batch_phase_concluded, file_added, etc.
+};
+```
 
-### API Documentation
+### File Upload
 
-Automatic OpenAPI schema generation for frontend development:
+```javascript
+const formData = new FormData();
+formData.append('files', file1);
+formData.append('files', file2);
+formData.append('batch_id', batchId);
 
-- Interactive documentation at `/docs`
-- Alternative documentation at `/redoc`
-- JSON schema available at `/openapi.json`
+fetch('/v1/files/batch', {
+  method: 'POST',
+  body: formData,
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+```
 
 ## Development
 
@@ -76,78 +140,55 @@ pdm run lint
 pdm run format
 ```
 
-### Docker
+### Testing
 
-```bash
-# Build image
-docker build -t huleedu/api-gateway-service .
+Comprehensive test suite with:
 
-# Run container
-docker run -p 4001:4001 huleedu/api-gateway-service
-```
+- Contract validation tests for `ClientBatchPipelineRequestV1`
+- File upload proxy tests with mocked File Service
+- Authentication and rate limiting tests
+- Error handling and edge case validation
 
 ## Configuration
 
 Environment variables (prefix: `API_GATEWAY_`):
 
-- `API_GATEWAY_HTTP_HOST`: Server host (default: 0.0.0.0)
+- `API_GATEWAY_SERVICE_NAME`: Service identifier (default: api-gateway-service)
+- `API_GATEWAY_HTTP_HOST`: Server host (default: 0.0.0.0)  
 - `API_GATEWAY_HTTP_PORT`: Server port (default: 4001)
 - `API_GATEWAY_LOG_LEVEL`: Logging level (default: INFO)
 - `API_GATEWAY_CORS_ORIGINS`: Allowed CORS origins (JSON array)
-- `API_GATEWAY_KAFKA_BOOTSTRAP_SERVERS`: Kafka servers
-- `API_GATEWAY_RATE_LIMIT_REQUESTS`: Requests per minute (default: 100)
-
-## Security Features
-
-### Rate Limiting
-
-- Per-client rate limiting (100 requests/minute default)
-- Per-endpoint granular limits
-- Burst protection
-
-### Authentication (Future)
-
-- JWT middleware hooks ready
-- OAuth integration preparation
-- Role-based access control framework
-
-### Input Validation
-
-- Strict Pydantic model validation
-- SQL injection prevention
-- XSS protection in error responses
+- `API_GATEWAY_KAFKA_BOOTSTRAP_SERVERS`: Kafka servers (default: kafka:9092)
+- `API_GATEWAY_FILE_SERVICE_URL`: File Service URL (default: http://file_service:8000)
+- `API_GATEWAY_CMS_API_URL`: Class Management Service URL (default: http://class_management_service:8000)
+- `API_GATEWAY_REDIS_URL`: Redis URL for rate limiting (default: redis://redis:6379)
+- `API_GATEWAY_JWT_SECRET_KEY`: JWT signing secret (REQUIRED)
 
 ## Service Integration
 
-**Publishes to**: Kafka (`huleedu.commands.batch.pipeline.v1`)  
+**Publishes to**:
+
+- Kafka topic: `huleedu.commands.batch.pipeline.v1` (batch pipeline commands)
+
+**Proxies to**:
+
+- File Service: `/v1/files/batch` (file uploads)
+- Class Management Service: `/v1/classes/*` (all class operations)
+
+**Real-time**:
+
+- Redis Pub/Sub: User-specific channels for WebSocket updates
+
 **Consumed by**: React Frontend Applications
 
 ## Monitoring
 
 - Health checks via `/healthz`
 - Prometheus metrics via `/metrics`
-- Request/response logging with correlation IDs
-- Performance metrics (request duration, error rates)
-
-## Testing
-
-### FastAPI TestClient
-
-Comprehensive testing with FastAPI's built-in test client:
-
-```python
-from fastapi.testclient import TestClient
-from .main import app
-
-client = TestClient(app)
-response = client.get("/healthz")
-```
-
-### CORS Testing
-
-Validation of CORS configuration with React development server.
+- Comprehensive logging with correlation IDs
+- User action traceability for security auditing
 
 ---
 
-**Status**: Phase 1 - Architectural Foundation Complete  
-**Next Phase**: Phase 3 - API Gateway Implementation 
+**Status**: ✅ **IMPLEMENTATION COMPLETE**  
+**Features**: Batch commands, file uploads, class management proxy, WebSocket support, comprehensive testing

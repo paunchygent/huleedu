@@ -88,6 +88,13 @@ class BatchStatus(str, Enum):
 
 
 # --- Generic Statuses (New) ---
+class BatchClientStatus(str, Enum):
+    """Defines the status of a batch as reported to the client."""
+
+    AVAILABLE = "available"
+    PROCESSING = "processing"
+
+
 class ProcessingStatus(str, Enum):
     """Generic processing statuses."""
 

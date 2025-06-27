@@ -1,5 +1,5 @@
 ---
-description: description: Defines the architecture and implementation details of the HuleEdu Class Management Service.
+description: Defines the architecture and implementation details of the Class Management Service.
 globs: 
 alwaysApply: false
 ---

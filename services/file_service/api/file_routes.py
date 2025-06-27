@@ -325,9 +325,11 @@ async def remove_file_from_batch(
         # Validate batch can be modified before removing files
         can_modify, reason = await batch_validator.can_modify_batch_files(batch_id, user_id)
         if not can_modify:
-            info_msg = (
-                "File removal blocked for batch %s, essay %s by user %s: %s"
-                % (batch_id, essay_id, user_id, reason)
+            info_msg = "File removal blocked for batch %s, essay %s by user %s: %s" % (
+                batch_id,
+                essay_id,
+                user_id,
+                reason,
             )
             logger.info(info_msg)
             return jsonify(

@@ -104,8 +104,7 @@ class TestBosElsPhaseCoordination:
     @pytest.fixture
     def mock_client_pipeline_request_handler(self):
         """Mock the ClientPipelineRequestHandler external boundary."""
-        from services.batch_orchestrator_service.implementations \
-            .client_pipeline_request_handler import (
+        from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
             ClientPipelineRequestHandler,
         )
 

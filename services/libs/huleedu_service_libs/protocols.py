@@ -34,7 +34,7 @@ class RedisClientProtocol(Protocol):
         Returns:
             True if key was set (first time processing), False if key already exists
         """
-        ...
+        pass
 
     async def delete_key(self, key: str) -> int:
         """
@@ -46,7 +46,7 @@ class RedisClientProtocol(Protocol):
         Returns:
             Number of keys deleted (0 or 1)
         """
-        ...
+        pass
 
     async def get(self, key: str) -> str | None:
         """
@@ -58,7 +58,7 @@ class RedisClientProtocol(Protocol):
         Returns:
             String value if key exists, None otherwise
         """
-        ...
+        pass
 
     async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
         """
@@ -72,7 +72,7 @@ class RedisClientProtocol(Protocol):
         Returns:
             True if operation succeeded
         """
-        ...
+        pass
 
 
 class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
@@ -95,7 +95,7 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         Returns:
             True if WATCH command succeeded
         """
-        ...
+        pass
 
     async def multi(self) -> bool:
         """
@@ -104,7 +104,7 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         Returns:
             True if MULTI command succeeded
         """
-        ...
+        pass
 
     async def exec(self) -> list[Any] | None:
         """
@@ -113,7 +113,7 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         Returns:
             List of results if transaction succeeded, None if transaction was discarded
         """
-        ...
+        pass
 
     async def unwatch(self) -> bool:
         """
@@ -122,7 +122,7 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         Returns:
             True if UNWATCH command succeeded
         """
-        ...
+        pass
 
     async def scan_pattern(self, pattern: str) -> list[str]:
         """
@@ -134,7 +134,7 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         Returns:
             List of keys matching the pattern
         """
-        ...
+        pass
 
     async def publish(self, channel: str, message: str) -> int:
         """
@@ -148,7 +148,7 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         Returns:
             The integer number of clients that received the message.
         """
-        ...
+        pass
 
     def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
         """
@@ -161,12 +161,12 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         Yields:
             A PubSub object that can be iterated over to listen for messages.
         """
-        ...
+        pass
 
     def get_user_channel(self, user_id: str) -> str:
         """Generate standardized user-specific channel name."""
-        ...
+        pass
 
     async def publish_user_notification(self, user_id: str, event_type: str, data: dict) -> int:
         """Convenience method to publish structured notifications to user-specific channels."""
-        ...
+        pass

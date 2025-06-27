@@ -60,7 +60,6 @@ class RepositoryProvider(Provider):
         return PostgreSQLClassRepositoryImpl[UserClass, Student](session)
 
 
-
 class ServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_settings(self) -> Settings:
@@ -76,9 +75,7 @@ class ServiceProvider(Provider):
         return kafka_bus
 
     @provide(scope=Scope.APP)
-    def provide_event_publisher(
-        self, kafka_bus: KafkaBus
-    ) -> ClassEventPublisherProtocol:
+    def provide_event_publisher(self, kafka_bus: KafkaBus) -> ClassEventPublisherProtocol:
         return DefaultClassEventPublisherImpl(kafka_bus)
 
     @provide(scope=Scope.REQUEST)
@@ -94,7 +91,9 @@ class ServiceProvider(Provider):
             student_type=Student,
         )
 
-from prometheus_client import CollectorRegistry, REGISTRY
+
+from prometheus_client import REGISTRY, CollectorRegistry
+
 
 class MetricsProvider(Provider):
     """Provides Prometheus metrics-related dependencies."""

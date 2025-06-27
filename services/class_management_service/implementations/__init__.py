@@ -6,8 +6,8 @@ from .class_repository_postgres_impl import PostgreSQLClassRepositoryImpl
 from .event_publisher_impl import DefaultClassEventPublisherImpl
 
 __all__ = [
-    'MockClassRepositoryImpl',
-    'PostgreSQLClassRepositoryImpl',
-    'DefaultClassEventPublisherImpl',
-    'ClassManagementServiceImpl',
+    "MockClassRepositoryImpl",
+    "PostgreSQLClassRepositoryImpl",
+    "DefaultClassEventPublisherImpl",
+    "ClassManagementServiceImpl",
 ]

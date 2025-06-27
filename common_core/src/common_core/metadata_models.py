@@ -96,4 +96,5 @@ class ParsedNameMetadata(BaseModel):
     Attributes:
         parsed_name (PersonNameV1): The structured person name (first, last, legal full name).
     """
+
     parsed_name: PersonNameV1 = Field(..., description="The structured person name.")

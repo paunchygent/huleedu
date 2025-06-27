@@ -136,9 +136,7 @@ class TestClassManagementApi:
             "person_name": {"first_name": "Test", "last_name": "Student"},
             "email": "test.student@example.com",
         }
-        response = await app_client.post(
-            "/v1/classes/students", json=payload, headers=headers
-        )
+        response = await app_client.post("/v1/classes/students", json=payload, headers=headers)
 
         assert response.status_code == 201
         data = await response.get_json()
@@ -288,7 +286,9 @@ class TestClassManagementApi:
 
         headers = {"X-User-ID": "test-user"}
         payload = {"person_name": {"first_name": "John", "last_name": "Smith"}}
-        response = await app_client.put(f"/v1/classes/students/{student_id}", json=payload, headers=headers)
+        response = await app_client.put(
+            f"/v1/classes/students/{student_id}", json=payload, headers=headers
+        )
 
         assert response.status_code == 200
         data = await response.get_json()
@@ -312,7 +312,9 @@ class TestClassManagementApi:
 
         headers = {"X-User-ID": "test-user"}
         payload = {"person_name": {"first_name": "John", "last_name": "Smith"}}
-        response = await app_client.put(f"/v1/classes/students/{student_id}", json=payload, headers=headers)
+        response = await app_client.put(
+            f"/v1/classes/students/{student_id}", json=payload, headers=headers
+        )
 
         assert response.status_code == 404
 

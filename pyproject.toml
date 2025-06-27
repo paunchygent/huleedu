@@ -42,6 +42,7 @@ monorepo-tools = [
     "pre-commit",
     "testcontainers[postgres,kafka]",  # For PostgreSQL and Kafka integration tests
     "kafka-python",
+    "respx",
 ]
 
 # Install all services and common_core for unified development
@@ -54,7 +55,8 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service",
     "-e file:///${PROJECT_ROOT}/services/file_service",
     "-e file:///${PROJECT_ROOT}/services/cj_assessment_service",
-    "-e file:///${PROJECT_ROOT}/services/class_management_service"
+    "-e file:///${PROJECT_ROOT}/services/class_management_service",
+    "-e file:///${PROJECT_ROOT}/services/api_gateway_service"
 ]
 
 [tool.pdm.scripts]
@@ -82,6 +84,7 @@ dev-content = "pdm run -p services/content_service dev"
 dev-batch = "pdm run -p services/batch_orchestrator_service dev"
 dev-file = "pdm run -p services/file_service dev"
 run-spellchecker = "pdm run -p services/spell_checker_service start_worker"
+dev-gateway = "pdm run -p services/api_gateway_service dev"
 
 # Build common_core wheel
 build-common-core = "pdm build -p common_core"
@@ -185,6 +188,8 @@ module = [
     "models_db",      # Database models module without type stubs
     "yaml.*",       # PyYAML stubs
     "pypandoc.*",   # pypandoc lacks type stubs
+    "fastapi.*",
+    "starlette.*",
 ]
 ignore_missing_imports = true
 

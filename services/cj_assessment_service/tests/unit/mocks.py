@@ -92,7 +92,7 @@ class MockDatabase(CJRepositoryProtocol):
 
         # Create a proper async context manager for begin()
         class MockTransaction:
-            async def __aenter__(self) -> 'MockTransaction':
+            async def __aenter__(self) -> "MockTransaction":
                 return self
 
             async def __aexit__(

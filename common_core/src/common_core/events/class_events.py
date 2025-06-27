@@ -47,7 +47,9 @@ class ClassUpdatedV1(BaseModel):
     event: str = Field(default="class.updated")
     class_id: str = Field(description="Updated class identifier")
     class_designation: str | None = Field(None, description="Updated class designation name")
-    course_codes: list[CourseCode] | None = Field(None, description="Updated associated course codes")
+    course_codes: list[CourseCode] | None = Field(
+        None, description="Updated associated course codes"
+    )
     user_id: str = Field(description="Teacher who owns the class")
     correlation_id: UUID | None = Field(default=None)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))

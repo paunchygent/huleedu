@@ -78,9 +78,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         # Start timeout monitoring
         await self._start_timeout_monitoring(expectation)
 
-        msg = (
-            f"Registered batch {batch_id} with {len(batch_essays_registered.essay_ids)} slots: {batch_essays_registered.essay_ids}, course: {batch_essays_registered.course_code.value}"
-        )
+        msg = f"Registered batch {batch_id} with {len(batch_essays_registered.essay_ids)} slots: {batch_essays_registered.essay_ids}, course: {batch_essays_registered.course_code.value}"
         self._logger.info(msg)
 
     def assign_slot_to_content(

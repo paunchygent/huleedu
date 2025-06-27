@@ -21,14 +21,15 @@ class Settings(BaseSettings):
     DB_NAME: str = "huledu_class_management"
     DATABASE_URL: str | None = None
 
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     def assemble_db_connection(cls, v):
-        if isinstance(v, dict) and v.get('DATABASE_URL') is None:
-            v['DATABASE_URL'] = (
+        if isinstance(v, dict) and v.get("DATABASE_URL") is None:
+            v["DATABASE_URL"] = (
                 f"postgresql+asyncpg://{v.get('DB_USER')}:{v.get('DB_PASSWORD')}"
                 f"@{v.get('DB_HOST')}:{v.get('DB_PORT')}/{v.get('DB_NAME')}"
             )
         return v
+
     PORT: int = 5002
     HOST: str = "0.0.0.0"
     USE_MOCK_REPOSITORY: bool = False

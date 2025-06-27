@@ -36,9 +36,7 @@ class_student_association = Table(
 
 class Course(Base):
     __tablename__ = "courses"
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     course_code: Mapped[CourseCode] = mapped_column(
         SQLAlchemyEnum(
             CourseCode,
@@ -65,9 +63,7 @@ class Course(Base):
 
 class UserClass(Base):
     __tablename__ = "classes"
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     created_by_user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id"), nullable=False)
@@ -84,9 +80,7 @@ class UserClass(Base):
 
 class Student(Base):
     __tablename__ = "students"
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # PersonNameV1 Fields
     first_name: Mapped[str] = mapped_column(String(255), nullable=False)
     last_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -120,9 +114,7 @@ class Student(Base):
 
 class EssayStudentAssociation(Base):
     __tablename__ = "essay_student_associations"
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     essay_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False, index=True, unique=True
     )

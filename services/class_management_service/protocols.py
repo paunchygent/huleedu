@@ -12,8 +12,9 @@ from services.class_management_service.api_models import (
 )
 from services.class_management_service.models_db import Student, UserClass
 
-T = TypeVar('T', bound=UserClass, covariant=True)  # For UserClass types
-U = TypeVar('U', bound=Student, covariant=True)    # For Student types
+T = TypeVar("T", bound=UserClass, covariant=True)  # For UserClass types
+U = TypeVar("U", bound=Student, covariant=True)  # For Student types
+
 
 class ClassRepositoryProtocol(Protocol, Generic[T, U]):
     """Protocol for class and student data persistence operations."""
@@ -31,8 +32,7 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
     ) -> T | None:  # Returns type T or None
         ...
 
-    async def delete_class(self, class_id: uuid.UUID) -> bool:
-        ...
+    async def delete_class(self, class_id: uuid.UUID) -> bool: ...
 
     async def create_student(
         self, user_id: str, student_data: CreateStudentRequest
@@ -47,13 +47,11 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
     ) -> U | None:  # Returns type U or None
         ...
 
-    async def delete_student(self, student_id: uuid.UUID) -> bool:
-        ...
+    async def delete_student(self, student_id: uuid.UUID) -> bool: ...
 
     async def associate_essay_to_student(
         self, user_id: str, essay_id: uuid.UUID, student_id: uuid.UUID
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 class ClassEventPublisherProtocol(Protocol):
