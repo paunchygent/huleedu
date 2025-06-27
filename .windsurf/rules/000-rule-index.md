@@ -11,21 +11,23 @@ alwaysApply: false
 - [010-foundational-principles.mdc](mdc:010-foundational-principles.mdc): Core tenets and mindset
 - [015-project-structure-standards.mdc](mdc:015-project-structure-standards.mdc): File and folder organization standards
 - [020-architectural-mandates.mdc](mdc:020-architectural-mandates.mdc): DDD, Service Autonomy, Explicit Contracts
-- [021-content-service-architecture.mdc](mdc:021-content-service-architecture.mdc): Content Service architecture and implementation
-- [022-spell-checker-service-architecture.mdc](mdc:022-spell-checker-service-architecture.mdc): Spell Checker Service architecture and implementation
-- [023-batch-orchestrator-service-architecture.mdc](mdc:023-batch-orchestrator-service-architecture.mdc): Batch Orchestrator Service architecture and implementation
-- [024-common-core-architecture.mdc](mdc:024-common-core-architecture.mdc): Common Core package architecture and implementation
-- [025-essay-lifecycle-service-architecture.mdc](mdc:025-essay-lifecycle-service-architecture.mdc): Essay Lifecycle Service architecture and implementation
-- [026-file-service-architecture.mdc](mdc:026-file-service-architecture.mdc): File Service architecture and implementation
-- [027-cj-assessment-service.mdc](mdc:027-cj-assessment-service.mdc): CJ Assessment Service architecture and implementation
-- [028-batch-conductor-service.mdc](mdc:028-batch-conductor-service.mdc): Batch Conductor Service (BCS) architecture and implementation
-- [029-class-management-service.mdc](mdc:029-class-management-service.mdc): Class Management Service architecture and implementation
+- **Service-Specific Architectures (`020.x`)**
+  - [020.1-content-service-architecture.mdc](mdc:020.1-content-service-architecture.mdc): Content Service
+  - [020.2-spell-checker-service-architecture.mdc](mdc:020.2-spell-checker-service-architecture.mdc): Spell Checker Service
+  - [020.3-batch-orchestrator-service-architecture.mdc](mdc:020.3-batch-orchestrator-service-architecture.mdc): Batch Orchestrator Service
+  - [020.4-common-core-architecture.mdc](mdc:020.4-common-core-architecture.mdc): Common Core Library
+  - [020.5-essay-lifecycle-service-architecture.mdc](mdc:020.5-essay-lifecycle-service-architecture.mdc): Essay Lifecycle Service
+  - [020.6-file-service-architecture.mdc](mdc:020.6-file-service-architecture.mdc): File Service
+  - [020.7-cj-assessment-service.mdc](mdc:020.7-cj-assessment-service.mdc): CJ Assessment Service
+  - [020.8-batch-conductor-service.mdc](mdc:020.8-batch-conductor-service.mdc): Batch Conductor Service
+  - [020.9-class-management-service.mdc](mdc:020.9-class-management-service.mdc): Class Management Service
+  - [020.10-api-gateway-and-websocket-service.mdc](mdc:020.10-api-gateway-and-websocket-service.mdc): API Gateway & WebSocket Service
 - [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc): Event-driven communication standards
 
 ## Implementation & Coding Standards
 - [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc): High-level service implementation principles and stack requirements
 - [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc): HTTP service architecture patterns and Blueprint implementation
-- [041-fastapi-integration-patterns.mdc](mdc:041-fastapi-integration-patterns.mdc): FastAPI integration patterns for client-facing services with React frontend support
+- [041-fastapi-integration-patterns.mdc](mdc:041-fastapi-integration-patterns.mdc): Concise FastAPI integration patterns for client-facing services
 - [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc): Async patterns, protocols, dependency injection, and worker service structure
 - [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc): Configuration management and logging standards
 - [044-service-debugging-and-troubleshooting.mdc](mdc:044-service-debugging-and-troubleshooting.mdc): CRITICAL debugging priority: service configuration over import patterns
