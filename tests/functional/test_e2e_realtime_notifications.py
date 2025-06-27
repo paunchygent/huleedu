@@ -11,7 +11,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import AsyncGenerator
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 import redis.asyncio as redis
@@ -146,20 +146,30 @@ class TestEndToEndRealtimeNotifications:
         # Mock the publish method to capture the channel name
         captured_channel = None
 
-        async def mock_publish(self, channel: str, message: str) -> int:
+        async def mock_publish(channel: str, _message: str) -> int:
             nonlocal captured_channel
             captured_channel = channel
             return 1  # Simulate successful publish
 
-        # Use unittest.mock to patch the publish method at the class level
-        with patch("huleedu_service_libs.redis_client.RedisClient.publish", new=mock_publish):
-            # Act
-            await redis_service_client.publish_user_notification(
-                user_id=test_user_id, event_type="test_event", data={"test": "data"}
-            )
+        # After refactoring, we need to patch the RedisPubSub publish method
+        if redis_service_client._pubsub:
+            # Patch the actual pubsub instance's publish method
+            original_publish = redis_service_client._pubsub.publish
+            redis_service_client._pubsub.publish = mock_publish
+            
+            try:
+                # Act
+                await redis_service_client.publish_user_notification(
+                    user_id=test_user_id, event_type="test_event", data={"test": "data"}
+                )
 
-            # Assert
-            assert captured_channel == f"ws:{test_user_id}"
+                # Assert
+                assert captured_channel == f"ws:{test_user_id}"
+            finally:
+                # Restore original method
+                redis_service_client._pubsub.publish = original_publish
+        else:
+            pytest.skip("Redis client not properly initialized with pubsub")
 
     @pytest.mark.asyncio
     async def test_graceful_degradation_on_redis_failure(self) -> None:

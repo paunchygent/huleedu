@@ -10,9 +10,11 @@ from di import (
     EventHandlingProvider,
     ExternalClientsProvider,
     InitiatorMapProvider,
+    NotificationServiceProvider,
     PhaseInitiatorsProvider,
     PipelineCoordinationProvider,
     RepositoryAndPublishingProvider,
+    StateManagementProvider,
 )
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -43,6 +45,8 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
             RepositoryAndPublishingProvider(),
             ExternalClientsProvider(),
             PhaseInitiatorsProvider(),
+            NotificationServiceProvider(),
+            StateManagementProvider(),
             PipelineCoordinationProvider(),
             EventHandlingProvider(),
             InitiatorMapProvider(),

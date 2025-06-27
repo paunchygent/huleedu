@@ -4,8 +4,9 @@ from dishka import FromDishka
 from dishka.integrations.fastapi import inject
 from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse
-from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
+
+from huleedu_service_libs.logging_utils import create_service_logger
 
 logger = create_service_logger("api_gateway_service.routers.health")
 router = APIRouter(tags=["Health"])

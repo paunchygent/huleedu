@@ -5,13 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from httpx import AsyncClient, HTTPStatusError
 from pydantic import BaseModel, Field
 
+from common_core.status_enums import BatchClientStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from .. import auth
 from ..app.metrics import GatewayMetrics
 from ..config import settings
-from common_core.status_enums import BatchClientStatus
-
 
 router = APIRouter(route_class=DishkaRoute)
 logger = create_service_logger("api_gateway.status_routes")

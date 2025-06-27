@@ -7,15 +7,13 @@ Follows the same lifecycle management pattern as KafkaBus.
 
 from __future__ import annotations
 
-import json
 import os
-from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
 import redis.asyncio as aioredis
 from huleedu_service_libs.logging_utils import create_service_logger
-from redis.client import PubSub
+from huleedu_service_libs.redis_pubsub import RedisPubSub
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
@@ -38,6 +36,7 @@ class RedisClient:
         )
         self._started = False
         self._transaction_pipeline = None  # Track transaction state
+        self._pubsub: RedisPubSub | None = None
 
     async def start(self) -> None:
         """Initialize Redis connection with health verification."""
@@ -45,6 +44,7 @@ class RedisClient:
             try:
                 await self.client.ping()
                 self._started = True
+                self._pubsub = RedisPubSub(self.client, self.client_id)
                 logger.info(f"Redis client '{self.client_id}' connected to {self.redis_url}")
             except RedisConnectionError as e:
                 logger.error(f"Redis client '{self.client_id}' failed to connect: {e}")
@@ -383,96 +383,40 @@ class RedisClient:
 
     async def publish(self, channel: str, message: str) -> int:
         """
-        Publish a message to a Redis channel with proper error handling and logging.
-
-        CRITICAL: This method enables the WebSocket backplane by allowing backend
-        services to publish real-time updates to user-specific channels.
+        Publish a message to a Redis channel.
+        Delegates to RedisPubSub for pub/sub functionality.
         """
-        if not self._started:
+        if not self._started or not self._pubsub:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-
-        try:
-            # Publish message and get subscriber count
-            receiver_count = await self.client.publish(channel, message)
-            receiver_count = int(receiver_count)  # Ensure it's an integer
-
-            logger.debug(
-                f"Redis PUBLISH by '{self.client_id}': channel='{channel}', "
-                f"message='{message[:75]}...', receivers={receiver_count}",
-            )
-            return receiver_count
-
-        except Exception as e:
-            logger.error(
-                f"Error in Redis PUBLISH operation by '{self.client_id}' "
-                f"for channel '{channel}': {e}",
-                exc_info=True,
-            )
-            raise
+        return await self._pubsub.publish(channel, message)
 
     @asynccontextmanager
-    async def subscribe(self, channel: str) -> AsyncGenerator[PubSub, None]:
+    async def subscribe(self, channel: str):
         """
-        Subscribe to a Redis channel with proper lifecycle management.
-
-        CRITICAL: This method enables API Gateway instances to listen for
-        user-specific real-time updates from backend services.
+        Subscribe to a Redis channel.
+        Delegates to RedisPubSub for pub/sub functionality.
         """
-        if not self._started:
+        if not self._started or not self._pubsub:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-
-        pubsub = self.client.pubsub()
-        try:
-            await pubsub.subscribe(channel)
-            logger.debug(f"Redis SUBSCRIBE by '{self.client_id}' to channel '{channel}'")
+        async with self._pubsub.subscribe(channel) as pubsub:
             yield pubsub
-        except Exception as e:
-            logger.error(
-                f"Error in Redis SUBSCRIBE operation by '{self.client_id}' "
-                f"for channel '{channel}': {e}",
-                exc_info=True,
-            )
-            raise
-        finally:
-            try:
-                await pubsub.unsubscribe(channel)
-                await pubsub.aclose()  # Use aclose() instead of deprecated close()
-                logger.debug(
-                    f"Redis UNSUBSCRIBE cleanup by '{self.client_id}' from channel '{channel}'",
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error during Redis UNSUBSCRIBE cleanup by '{self.client_id}': {e}",
-                    exc_info=True,
-                )
-                # Don't re-raise cleanup errors
 
-    # CRITICAL: Helper method for user-specific channel management
     def get_user_channel(self, user_id: str) -> str:
         """
         Generate standardized user-specific channel name.
-
-        Args:
-            user_id: The authenticated user's ID
-
-        Returns:
-            Standardized channel name for the user (e.g., "ws:user_123")
+        Delegates to RedisPubSub for consistency.
         """
-        return f"ws:{user_id}"
+        if not self._pubsub:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+        return self._pubsub.get_user_channel(user_id)
 
-    async def publish_user_notification(self, user_id: str, event_type: str, data: dict) -> int:
+    async def publish_user_notification(
+        self, user_id: str, event_type: str, data: dict[str, Any]
+    ) -> int:
         """
         Convenience method to publish structured notifications to user-specific channels.
-
-        Args:
-            user_id: The target user's ID
-            event_type: The type of event (e.g., "batch_status_update")
-            data: The event data payload
-
-        Returns:
-            Number of subscribers that received the notification
+        Delegates to RedisPubSub for pub/sub functionality.
         """
-        channel = self.get_user_channel(user_id)
-        notification = {"event": event_type, "data": data}
-        message = json.dumps(notification)
-        return await self.publish(channel, message)
+        if not self._started or not self._pubsub:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+        return await self._pubsub.publish_user_notification(user_id, event_type, data)

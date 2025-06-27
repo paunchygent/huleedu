@@ -22,7 +22,9 @@ from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcome
 from implementations.essay_lifecycle_client_impl import DefaultEssayLifecycleClientImpl
 from implementations.event_publisher_impl import DefaultBatchEventPublisherImpl
 from implementations.nlp_initiator_impl import NLPInitiatorImpl
+from implementations.notification_service import NotificationService
 from implementations.pipeline_phase_coordinator_impl import DefaultPipelinePhaseCoordinator
+from implementations.pipeline_state_manager import PipelineStateManager
 from implementations.spellcheck_initiator_impl import SpellcheckInitiatorImpl
 from kafka_consumer import BatchKafkaConsumer
 from prometheus_client import CollectorRegistry
@@ -175,6 +177,31 @@ class PhaseInitiatorsProvider(Provider):
         return NLPInitiatorImpl(event_publisher)
 
 
+class NotificationServiceProvider(Provider):
+    """Provider for notification service dependencies."""
+
+    @provide(scope=Scope.APP)
+    def provide_notification_service(
+        self,
+        redis_client: AtomicRedisClientProtocol,
+        batch_repo: BatchRepositoryProtocol,
+    ) -> NotificationService:
+        """Provide notification service for real-time updates."""
+        return NotificationService(redis_client, batch_repo)
+
+
+class StateManagementProvider(Provider):
+    """Provider for pipeline state management dependencies."""
+
+    @provide(scope=Scope.APP)
+    def provide_pipeline_state_manager(
+        self,
+        batch_repo: BatchRepositoryProtocol,
+    ) -> PipelineStateManager:
+        """Provide pipeline state manager for state persistence."""
+        return PipelineStateManager(batch_repo)
+
+
 class PipelineCoordinationProvider(Provider):
     """Provider for high-level pipeline coordination and processing services."""
 
@@ -184,9 +211,13 @@ class PipelineCoordinationProvider(Provider):
         batch_repo: BatchRepositoryProtocol,
         phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol],
         redis_client: AtomicRedisClientProtocol,
+        notification_service: NotificationService,
+        state_manager: PipelineStateManager,
     ) -> PipelinePhaseCoordinatorProtocol:
-        """Provide pipeline phase coordinator implementation with Redis support."""
-        return DefaultPipelinePhaseCoordinator(batch_repo, phase_initiators_map, redis_client)
+        """Provide pipeline phase coordinator implementation with extracted services."""
+        return DefaultPipelinePhaseCoordinator(
+            batch_repo, phase_initiators_map, redis_client, notification_service, state_manager
+        )
 
     @provide(scope=Scope.APP)
     def provide_batch_processing_service(

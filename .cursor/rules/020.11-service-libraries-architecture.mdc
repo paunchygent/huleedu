@@ -1,0 +1,145 @@
+---
+description: Defines the HuleEdu Service Libraries architecture. Shared components for cross-service functionality including Kafka, Redis, logging, and common utilities.
+globs: 
+alwaysApply: false
+---
+
+# 020.11: Service Libraries Architecture
+
+## 1. Library Identity
+- **Package**: `huleedu-service-libs`
+- **Location**: `services/libs/huleedu_service_libs/`
+- **Purpose**: Shared utilities and clients for HuleEdu microservices
+- **Consumers**: All HuleEdu services
+
+## 2. Architecture & Structure
+
+```
+services/libs/huleedu_service_libs/
+├── kafka_client.py          # KafkaBus async wrapper for aiokafka
+├── redis_client.py          # RedisClient for key-value & atomic ops (422 lines)
+├── redis_pubsub.py          # RedisPubSub for pub/sub operations (130 lines)
+├── logging_utils.py         # Structured JSON logging with service context
+├── event_utils.py           # Event data extraction utilities
+├── protocols.py             # Shared protocol definitions
+└── py.typed                 # Type stub marker
+```
+
+## 3. Core Components
+
+### 3.1. KafkaBus
+- **Purpose**: Simplified async Kafka producer wrapper
+- **Key Methods**: `start()`, `stop()`, `publish_event()`
+- **Features**: Connection pooling, graceful shutdown, automatic serialization
+
+### 3.2. RedisClient
+- **Purpose**: Key-value operations and atomic transactions
+- **Key Methods**: 
+  - `set_if_not_exists()`: Atomic SET NX for idempotency
+  - `watch()`, `multi()`, `exec()`: Transaction support
+  - `scan_pattern()`: Key pattern scanning
+- **Lifecycle**: Explicit `start()` and `stop()` methods
+- **Delegation**: Pub/sub operations delegated to `RedisPubSub`
+
+### 3.3. RedisPubSub
+- **Purpose**: Redis pub/sub operations (extracted for SRP)
+- **Key Methods**:
+  - `publish()`: Publish messages to channels
+  - `subscribe()`: Context manager for subscriptions
+  - `get_user_channel()`: Standard channel naming (`ws:{user_id}`)
+  - `publish_user_notification()`: Structured notification publishing
+- **Critical**: Enables WebSocket backplane for real-time updates
+
+### 3.4. Logging Utilities
+- **Function**: `create_service_logger(name: str)`
+- **Format**: Structured JSON with service context
+- **Fields**: timestamp, level, service, module, message, extra context
+- **Standard**: All services use this for consistent logging
+
+### 3.5. Protocols
+- **`AtomicRedisClientProtocol`**: Interface for Redis operations
+- **Benefits**: Protocol-based testing, clean dependency injection
+
+## 4. Design Patterns
+
+### 4.1. Lifecycle Management
+- Services have explicit `start()` and `stop()` methods
+- Managed by DI containers or startup hooks
+- Ensures proper resource cleanup
+
+### 4.2. Protocol-Based Design
+- All major components expose protocols
+- Enables clean mocking in tests
+- Supports multiple implementations
+
+### 4.3. Separation of Concerns
+- Redis functionality split between key-value and pub/sub
+- Each component under 400 LoC limit
+- Single responsibility per module
+
+## 5. Integration Patterns
+
+### 5.1. Dependency Injection
+```python
+@provide(scope=Scope.APP)
+async def provide_redis_client(settings: Settings) -> AtomicRedisClientProtocol:
+    client = RedisClient(
+        client_id=f"{settings.SERVICE_NAME}-redis",
+        redis_url=settings.REDIS_URL,
+    )
+    await client.start()
+    return cast(AtomicRedisClientProtocol, client)
+```
+
+### 5.2. Event Publishing
+```python
+async def publish_event(kafka_bus: KafkaBus, envelope: EventEnvelope):
+    await kafka_bus.publish_event(
+        topic=topic_name(envelope.event_type),
+        event_envelope=envelope
+    )
+```
+
+### 5.3. Redis Pub/Sub
+```python
+# Publishing
+await redis_client.publish_user_notification(
+    user_id="user123",
+    event_type="batch_status_update",
+    data={"batch_id": "...", "status": "..."}
+)
+
+# Subscribing
+async with redis_client.subscribe("ws:user123") as pubsub:
+    async for msg in pubsub.listen():
+        # Process message
+```
+
+## 6. Critical Requirements
+
+### 6.1. Redis Client
+- **MUST** call `start()` before use
+- **MUST** handle connection failures gracefully
+- **MUST** support atomic operations for idempotency
+
+### 6.2. Kafka Client
+- **MUST** serialize EventEnvelope to JSON
+- **MUST** handle producer errors without crashing
+- **MUST** support graceful shutdown
+
+### 6.3. Logging
+- **MUST** output structured JSON
+- **MUST** include service name in all logs
+- **MUST** support correlation IDs in extra context
+
+## 7. Testing Considerations
+
+### 7.1. Mock Implementations
+- Use `AsyncMock(spec=Protocol)` for testing
+- Mock at protocol level, not implementation
+- Simulate realistic behavior (timeouts, failures)
+
+### 7.2. Integration Testing
+- Redis: Use testcontainers or real instance
+- Kafka: Use testcontainers for full integration
+- Verify lifecycle management works correctly

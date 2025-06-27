@@ -3,8 +3,8 @@
 from dishka import make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
-from huleedu_service_libs.logging_utils import create_service_logger
 
+from huleedu_service_libs.logging_utils import create_service_logger
 from services.api_gateway_service.app.di import ApiGatewayProvider
 
 logger = create_service_logger("api_gateway_service.startup")

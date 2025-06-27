@@ -115,7 +115,9 @@ class ClientPipelineRequestHandler:
 
             # Request pipeline resolution from BCS
             try:
-                bcs_response = await self.bcs_client.resolve_pipeline(batch_id, requested_pipeline_enum)
+                bcs_response = await self.bcs_client.resolve_pipeline(
+                    batch_id, requested_pipeline_enum
+                )
             except Exception as e:
                 error_msg = f"BCS pipeline resolution failed: {e}"
                 logger.error(
@@ -143,7 +145,7 @@ class ClientPipelineRequestHandler:
                     },
                 )
                 raise ValueError(error_msg)
-            
+
             # Convert string pipeline to PhaseName enums
             resolved_pipeline = []
             for phase_str in resolved_pipeline_strings:
@@ -154,7 +156,7 @@ class ClientPipelineRequestHandler:
                 except ValueError:
                     logger.warning(
                         f"Unknown phase name '{phase_str}' in resolved pipeline, skipping",
-                        extra={"batch_id": batch_id}
+                        extra={"batch_id": batch_id},
                     )
                     continue
 
@@ -312,7 +314,9 @@ class ClientPipelineRequestHandler:
         # Create updated pipeline state
         updated_pipeline_state = ProcessingPipelineState(
             batch_id=batch_id,
-            requested_pipelines=[phase.value for phase in resolved_pipeline],  # Convert enums to strings
+            requested_pipelines=[
+                phase.value for phase in resolved_pipeline
+            ],  # Convert enums to strings
             spellcheck=spellcheck_detail,
             cj_assessment=cj_assessment_detail,
             ai_feedback=ai_feedback_detail,

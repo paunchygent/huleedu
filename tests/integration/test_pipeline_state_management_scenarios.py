@@ -18,8 +18,14 @@ from services.batch_orchestrator_service.api_models import BatchRegistrationRequ
 from services.batch_orchestrator_service.implementations.batch_repository_impl import (
     MockBatchRepositoryImpl,
 )
+from services.batch_orchestrator_service.implementations.notification_service import (
+    NotificationService,
+)
 from services.batch_orchestrator_service.implementations.pipeline_phase_coordinator_impl import (
     DefaultPipelinePhaseCoordinator,
+)
+from services.batch_orchestrator_service.implementations.pipeline_state_manager import (
+    PipelineStateManager,
 )
 
 
@@ -45,10 +51,14 @@ class TestPipelineRealWorldScenarios:
             # Add other phases as needed for testing
         }
         mock_redis_client = AsyncMock()
+        notification_service = NotificationService(mock_redis_client, batch_repository)
+        state_manager = PipelineStateManager(batch_repository)
         return DefaultPipelinePhaseCoordinator(
             batch_repo=batch_repository,
             phase_initiators_map=phase_initiators_map,
             redis_client=mock_redis_client,
+            notification_service=notification_service,
+            state_manager=state_manager,
         )
 
     async def test_real_world_24_of_25_essays_scenario(

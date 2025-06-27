@@ -12,13 +12,12 @@ from unittest.mock import AsyncMock
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
 from fastapi.testclient import TestClient
+from prometheus_client import CollectorRegistry
 
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
-from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.kafka_client import KafkaBus
-from prometheus_client import CollectorRegistry
 from services.api_gateway_service.app.main import create_app
 from services.api_gateway_service.app.metrics import GatewayMetrics
 from services.api_gateway_service.auth import get_current_user_id
@@ -261,7 +260,10 @@ async def test_invalid_enum_value_for_pipeline(client_with_mocks):
     error_detail = response.json()["detail"][0]
     assert error_detail["type"] == "enum"
     assert error_detail["loc"] == ["body", "requested_pipeline"]
-    assert "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment' or 'nlp'" in error_detail["msg"]
+    assert (
+        "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment' or 'nlp'"
+        in error_detail["msg"]
+    )
 
 
 @pytest.mark.asyncio

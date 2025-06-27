@@ -25,7 +25,9 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
         # Construct full BCS endpoint URL
         self.bcs_endpoint = f"{settings.BCS_BASE_URL}{settings.BCS_PIPELINE_ENDPOINT}"
 
-    async def resolve_pipeline(self, batch_id: str, requested_pipeline: PhaseName) -> dict[str, Any]:
+    async def resolve_pipeline(
+        self, batch_id: str, requested_pipeline: PhaseName
+    ) -> dict[str, Any]:
         """
         Request pipeline resolution from BCS internal API.
 

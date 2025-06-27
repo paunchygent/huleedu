@@ -26,7 +26,10 @@ services/batch_orchestrator_service/
 │   ├── batch_repository_impl.py   # MockBatchRepositoryImpl
 │   ├── event_publisher_impl.py    # DefaultBatchEventPublisherImpl
 │   ├── essay_lifecycle_client_impl.py # DefaultEssayLifecycleClientImpl
-│   └── batch_processing_service_impl.py # Service layer business logic
+│   ├── batch_processing_service_impl.py # Service layer business logic
+│   ├── pipeline_phase_coordinator_impl.py # Pipeline orchestration (424 lines)
+│   ├── notification_service.py    # Redis pub/sub notifications (87 lines)
+│   └── pipeline_state_manager.py  # Pipeline state persistence (73 lines)
 ├── protocols.py                   # Protocol definitions for DI
 ├── di.py                          # Dishka providers importing implementations
 ├── config.py                      # Pydantic settings
@@ -38,8 +41,12 @@ services/batch_orchestrator_service/
 - **Service Layer**: Business logic extracted into `BatchProcessingServiceImpl`
 - **Protocol-Based DI**: All dependencies injected via `typing.Protocol` abstractions
 - **Constructor Injection**: Implementations receive dependencies through constructors
-- **Single Responsibility**: Each module has one clear purpose
+- **Single Responsibility**: Each module has one clear purpose (enforced via 400 LoC limit)
 - **Blueprint Pattern**: HTTP routes organized in `api/` directory
+- **Separation of Concerns**: Pipeline coordination separated into:
+  - `DefaultPipelinePhaseCoordinator`: Core orchestration logic
+  - `NotificationService`: Real-time Redis notifications
+  - `PipelineStateManager`: State persistence operations
 
 ## 3. API Endpoints
 
@@ -93,7 +100,16 @@ HTTP Request → Service Layer → Repository → Event Publisher → Kafka → 
 ## 5. Dependency Injection
 
 ### 5.1. Dishka Configuration
-- **Provider**: `BatchOrchestratorServiceProvider` in `di.py`
+- **Providers**: Multiple providers in `di.py`:
+  - `CoreInfrastructureProvider`: Settings, Kafka, Redis, HTTP clients
+  - `RepositoryAndPublishingProvider`: Data access and event publishing
+  - `ExternalClientsProvider`: HTTP clients for other services
+  - `PhaseInitiatorsProvider`: Pipeline phase initiators
+  - `NotificationServiceProvider`: Redis notification service
+  - `StateManagementProvider`: Pipeline state manager
+  - `PipelineCoordinationProvider`: Main coordinator with injected services
+  - `EventHandlingProvider`: Kafka message handlers
+  - `InitiatorMapProvider`: Dynamic phase dispatch map
 - **Integration**: `quart-dishka` with `@inject` decorator
 - **Lifecycle**: App-scoped singletons for stateful dependencies
 

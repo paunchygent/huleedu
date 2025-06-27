@@ -250,7 +250,10 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Verify final state
         final_state = await postgres_repository.get_processing_pipeline_state(batch_id)
         assert final_state is not None
-        assert final_state[f"{phase_name.value}_status"] == PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value
+        assert (
+            final_state[f"{phase_name.value}_status"]
+            == PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value
+        )
         assert final_state[f"{phase_name.value}_completed_at"] == "2025-01-30T11:00:00Z"
 
     @pytest.mark.asyncio
@@ -289,10 +292,14 @@ class TestPostgreSQLBatchRepositoryIntegration:
 
         # Run two concurrent updates trying to move from PENDING_DEPENDENCIES to different states
         task1 = asyncio.create_task(
-            attempt_update(PipelineExecutionStatus.PENDING_DEPENDENCIES, PipelineExecutionStatus.IN_PROGRESS)
+            attempt_update(
+                PipelineExecutionStatus.PENDING_DEPENDENCIES, PipelineExecutionStatus.IN_PROGRESS
+            )
         )
         task2 = asyncio.create_task(
-            attempt_update(PipelineExecutionStatus.PENDING_DEPENDENCIES, PipelineExecutionStatus.FAILED)
+            attempt_update(
+                PipelineExecutionStatus.PENDING_DEPENDENCIES, PipelineExecutionStatus.FAILED
+            )
         )
 
         results = await asyncio.gather(task1, task2, return_exceptions=True)

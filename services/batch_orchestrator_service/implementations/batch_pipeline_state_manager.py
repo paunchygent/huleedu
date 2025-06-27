@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from enums_db import PhaseStatusEnum
 from huleedu_service_libs.logging_utils import create_service_logger
 from implementations.batch_database_infrastructure import BatchDatabaseInfrastructure
 from models_db import Batch, PhaseStatusLog
 from sqlalchemy import select, update
 
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
-from enums_db import PhaseStatusEnum
 
 
 class BatchPipelineStateManager:
@@ -26,7 +26,9 @@ class BatchPipelineStateManager:
         self.db = db_infrastructure
         self.logger = create_service_logger("bos.repository.pipeline")
 
-    def _map_pipeline_status_to_phase_status(self, status: PipelineExecutionStatus) -> PhaseStatusEnum:
+    def _map_pipeline_status_to_phase_status(
+        self, status: PipelineExecutionStatus
+    ) -> PhaseStatusEnum:
         """Map PipelineExecutionStatus to PhaseStatusEnum for database storage."""
         mapping = {
             PipelineExecutionStatus.PENDING_DEPENDENCIES: PhaseStatusEnum.PENDING,
@@ -129,7 +131,9 @@ class BatchPipelineStateManager:
                 updated_pipeline_state[f"{phase_name.value}_status"] = new_status.value
 
                 if completion_timestamp:
-                    updated_pipeline_state[f"{phase_name.value}_completed_at"] = completion_timestamp
+                    updated_pipeline_state[f"{phase_name.value}_completed_at"] = (
+                        completion_timestamp
+                    )
 
                 # Use optimistic locking with version field
                 stmt = (

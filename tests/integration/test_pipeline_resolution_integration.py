@@ -363,9 +363,7 @@ class TestPipelineResolutionIntegration:
             await pipeline_request_handler.handle_client_pipeline_request(mock_msg)
 
         # Verify that the mocked BCS client was called
-        mock_resolve_pipeline.assert_awaited_once_with(
-            "test-batch-bcs-error-001", "spellcheck"
-        )
+        mock_resolve_pipeline.assert_awaited_once_with("test-batch-bcs-error-001", "spellcheck")
 
         print("✅ BCS HTTP error propagation verified")
 

@@ -5,6 +5,7 @@ from quart_dishka import QuartDishka
 import services.class_management_service.startup_setup as startup_setup
 from services.class_management_service.api.class_routes import class_bp
 from services.class_management_service.api.health_routes import health_bp
+from services.class_management_service.api.student_routes import student_bp
 from services.class_management_service.config import settings
 from services.class_management_service.di import create_container
 
@@ -24,6 +25,7 @@ QuartDishka(app=app, container=container)
 # 3. Register Blueprints
 app.register_blueprint(health_bp)
 app.register_blueprint(class_bp, url_prefix="/v1/classes")
+app.register_blueprint(student_bp, url_prefix="/v1/classes")
 
 
 @app.before_serving

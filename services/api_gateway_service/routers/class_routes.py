@@ -2,6 +2,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, Request
 from httpx import AsyncClient
 from starlette.responses import StreamingResponse
+
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from ..app.metrics import GatewayMetrics

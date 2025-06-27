@@ -1,8 +1,8 @@
 from collections.abc import AsyncIterator
 from unittest.mock import AsyncMock
 
-import pytest
 import httpx
+import pytest
 from dishka import Provider, Scope, make_async_container, provide
 from httpx import ASGITransport, AsyncClient, Response
 from prometheus_client import CollectorRegistry
