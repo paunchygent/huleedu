@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description: Defines the canonical project structure for the HuleEdu monorepo, including root layout, service patterns, and documentation standards. This is a foundational rule.
+globs: []
 alwaysApply: true
 ---
 # 015: Project Structure Standards
@@ -13,7 +13,7 @@ alwaysApply: true
 
 **Permitted Root Directories:**
 - `.git/`, `.venv/`, `.mypy_cache/`, `__pycache__/`, `.cursor/`, `.ruff_cache/`, `.windsurf/`
-- `common_core/`, `services/`, `scripts/`, `Documentation/`
+- `common_core/`, `services/`, `scripts/`, `documentation/`
 
 **FORBIDDEN**: Setup scripts, service-specific files, temporary files in root
 
@@ -21,112 +21,59 @@ alwaysApply: true
 
 ```
 scripts/
-
+├── README.md
+├── docker-rebuild.sh                 # Script to rebuild Docker containers
+├── kafka_topic_bootstrap.py          # Python script to create Kafka topics
+├── setup_huledu_environment.sh       # Main environment setup script
+├── validate_batch_coordination.sh    # Test script for batch coordination
+├── docs/
+│   └── manual_validation_guide.md    # Manual for validation steps
+├── tests/
+│   └── __init__.py
+└── utils/
+    └── sync_rules.py                 # Syncs .mdc rules to .md files for pre-commit
 ```
-
-**Test Script Organization Rules**:
-- **Integration Tests**: Use `tests/functional/` for Python pytest-based tests
-- **Shell Test Scripts**: Use `scripts/tests/` for bash-based automation and validation
-- **Test Utilities**: Use `scripts/tests/` for analysis, tracing, and test support tools
 
 ## 3. Services Directory Structure **structural mandates**
 
+This is a high-level overview. For detailed service architecture, see the `020.x` series of rules.
+
 ```
 services/
-├── libs/                          # Shared service libraries
-├── content_service/               # Individual microservice (Quart HTTP app)
-│   ├── app.py                     # Lean Quart application entry point (setup, DI, Blueprint registration)
-│   ├── api/                       # **REQUIRED**: Blueprint API routes directory
-│   │   ├── __init__.py
-│   │   ├── health_routes.py       # Standard health and metrics endpoints
-│   │   └── content_routes.py      # Domain-specific API routes
-│   ├── pyproject.toml
-│   ├── Dockerfile
-│   ├── config.py                  # Pydantic settings configuration
-│   ├── protocols.py               # Optional: Service-specific behavioral contracts
-│   ├── tests/
-│   └── docs/
-├── batch_orchestrator_service/    # Individual microservice (primary orchestrator)
-│   ├── app.py                     # Lean Quart application entry point
-│   ├── startup_setup.py           # DI initialization, service lifecycle management  
-│   ├── metrics.py                 # Prometheus metrics middleware
-│   ├── api/                       # **REQUIRED**: Blueprint API routes directory
-│   │   ├── __init__.py
-│   │   ├── health_routes.py       # Standard health and metrics endpoints
-│   │   └── batch_routes.py        # Domain-specific API routes (thin HTTP adapters)
-│   ├── implementations/           # **CLEAN ARCHITECTURE**: Protocol implementations
-│   │   ├── __init__.py
-│   │   ├── batch_repository_impl.py       # MockBatchRepositoryImpl
-│   │   ├── event_publisher_impl.py        # DefaultBatchEventPublisherImpl
-│   │   ├── essay_lifecycle_client_impl.py # DefaultEssayLifecycleClientImpl
-│   │   └── batch_processing_service_impl.py # Service layer business logic
-│   ├── protocols.py               # Service-specific behavioral contracts
-│   ├── di.py                      # Dishka dependency injection providers
-│   ├── config.py                  # Pydantic settings configuration
-│   ├── api_models.py              # Request/response models
-│   ├── kafka_consumer.py          # Kafka event consumer
-│   ├── pyproject.toml
-│   ├── Dockerfile
-│   ├── tests/
-│   └── docs/
-├── spell_checker_service/         # Example Kafka worker service (no HTTP API)
-│   ├── worker_main.py             # Main entry point, DI setup, Kafka consumer loop
-│   ├── event_processor.py         # Clean message processing logic with injected dependencies
-│   ├── core_logic.py              # Core algorithms and helper functions
-│   ├── protocols.py               # Service-specific behavioral contracts
-│   ├── config.py                  # Service configuration with Pydantic BaseSettings
-│   ├── di.py                      # Dishka dependency injection providers
-│   ├── protocol_implementations/  # **CLEAN ARCHITECTURE**: Protocol implementations
-│   │   ├── __init__.py
-│   │   ├── content_client_impl.py # HTTP content fetching implementation
-│   │   ├── result_store_impl.py   # HTTP content storage implementation
-│   │   ├── spell_logic_impl.py    # Spell checking orchestration implementation
-│   │   └── event_publisher_impl.py # Kafka event publishing implementation
-│   ├── pyproject.toml
-│   ├── Dockerfile
-│   ├── tests/
-│   └── docs/
-├── file_service/                  # File upload and content ingestion service (HTTP + Kafka)
-│   ├── app.py                     # Lean Quart application entry point (setup, DI, Blueprint registration)
-│   ├── api/                       # **REQUIRED**: Blueprint API routes directory
-│   │   ├── __init__.py
-│   │   ├── health_routes.py       # Standard health and metrics endpoints
-│   │   └── file_routes.py         # File upload and batch processing API routes
-│   ├── config.py                  # Pydantic settings configuration
-│   ├── protocols.py               # Service-specific behavioral contracts
-│   ├── di.py                      # Dishka dependency injection providers
-│   ├── core_logic.py              # File processing workflow logic
-│   ├── text_processing.py         # Text extraction and student info parsing
-│   ├── hypercorn_config.py        # Hypercorn server configuration
-│   ├── pyproject.toml
-│   ├── Dockerfile
-│   ├── README.md
-│   ├── tests/
-│   └── docs/
-└── essay_lifecycle_service/       # Hybrid HTTP + Kafka service
+├── api_gateway_service/             # FastAPI-based API Gateway
+├── batch_conductor_service/         # Kafka worker service
+├── batch_orchestrator_service/      # Quart-based orchestrator service
+├── cj_assessment_service/           # Kafka worker service
+├── class_management_service/        # FastAPI CRUD service
+├── content_service/                 # Quart-based content storage service
+├── essay_lifecycle_service/         # Hybrid Quart HTTP + Kafka worker service
+├── file_service/                    # Quart-based file upload service
+├── spell_checker_service/           # Kafka worker service
+└── libs/                            # Shared libraries for services
+```
+
+### Representative Service Example (`essay_lifecycle_service`)
+
+```
+services/essay_lifecycle_service/    # Hybrid HTTP + Kafka service
     ├── app.py                     # Lean Quart HTTP API entry point
+    ├── worker_main.py             # Kafka event consumer entry point
     ├── api/                       # **REQUIRED**: Blueprint API routes directory
     │   ├── __init__.py
-    │   ├── health_routes.py       # Standard health and metrics endpoints
-    │   └── essay_routes.py        # Essay status and lifecycle API routes
-    ├── worker_main.py             # Kafka event consumer entry point
-    ├── state_store.py             # Essay state persistence layer
-    ├── batch_tracker.py           # Batch coordination and readiness tracking
-    ├── batch_command_handlers.py  # Command processing for batch operations
-    ├── core_logic.py              # Business logic and state transitions
-    ├── protocols.py               # Service behavioral contracts
-    ├── config.py                  # Service configuration
-    ├── di.py                      # Dependency injection setup (lean, ~114 lines)
-    ├── implementations/           # **CLEAN ARCHITECTURE**: Business logic implementations
+    │   ├── health_routes.py
+    │   └── essay_routes.py
+    ├── implementations/           # **CLEAN ARCHITECTURE**: Protocol implementations
     │   ├── __init__.py
-    │   ├── content_client.py      # HTTP content storage operations
-    │   ├── event_publisher.py     # Kafka event publishing logic
-    │   ├── metrics_collector.py   # Prometheus metrics collection
-    │   ├── batch_command_handler_impl.py # Batch command processing
-    │   └── service_request_dispatcher.py # Specialized service request dispatching
+    │   ├── content_client.py
+    │   ├── event_publisher.py
+    │   └── ...
+    ├── protocols.py               # Service behavioral contracts (typing.Protocol)
+    ├── di.py                      # Dishka dependency injection providers
+    ├── config.py                  # Pydantic settings configuration
+    ├── state_store.py             # Essay state persistence layer (e.g., SQLite)
     ├── pyproject.toml
-    ├── tests/
-    └── docs/
+    ├── Dockerfile
+    └── tests/
 ```
 
 ## 4. HTTP Service Blueprint Structure **MANDATORY**
@@ -157,25 +104,35 @@ common_core/
 ├── src/
 │   └── common_core/
 │       ├── __init__.py
-│       ├── enums.py
+│       ├── config_enums.py
+│       ├── domain_enums.py
+│       ├── error_enums.py
+│       ├── event_enums.py
+│       ├── status_enums.py
+│       ├── observability_enums.py
 │       ├── metadata_models.py
+│       ├── pipeline_models.py
 │       ├── events/
+│       │   ├── __init__.py
+│       │   ├── envelope.py
+│       │   └── # all consumer defined and thin event contracts
 │       └── py.typed
-├── tests/                         
+├── tests/
 ├── pyproject.toml
-└── README.md                      
+└── README.md
 ```
 
 ## 6. Documentation Directory Structure
 
 ```
-Documentation/
+documentation/
+├── OPERATIONS/
+├── PRD:s/
+├── SERVICE_FUTURE_ENHANCEMENTS/
 ├── TASKS/
-│   ├── PHASE_1.0.md               
-│   ├── PHASE_1.1.md
-│   └── PHASE_1.2.md
+│   ├── PHASE_1.0.md
+│   └── ...
 ├── dependencies/
-├── PDR:s/
 └── setup_environment/
 ```
 

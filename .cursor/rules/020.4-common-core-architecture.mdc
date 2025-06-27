@@ -20,19 +20,33 @@ Defines HuleEdu's Common Core package with shared models, enums, and event schem
 ### 2.2. Module Structure
 
 ```
-common_core/
-├── enums.py                    # Business enums, ProcessingEvent, topic mapping
-├── metadata_models.py          # Metadata/reference models  
-├── pipeline_models.py          # Pipeline state models
-├── essay_service_models.py     # ELS request models
-├── batch_service_models.py     # BOS command models
-└── events/                     # Event schemas
-    ├── envelope.py             # EventEnvelope wrapper
-    ├── base_event_models.py    # Base event classes
-    ├── file_events.py          # File Service domain events
-    ├── batch_coordination_events.py # Batch coordination events
-    ├── spellcheck_models.py    # Spellcheck event data
-    └── ai_feedback_events.py   # AI feedback event data
+src/common_core/
+├── __init__.py
+├── config_enums.py             # Configuration-related enumerations
+├── domain_enums.py             # Core business domain enumerations
+├── error_enums.py              # Standardized error codes
+├── event_enums.py              # Enumerations for event types
+├── status_enums.py             # Enumerations for status tracking (e.g., BatchStatus, EssayStatus)
+├── observability_enums.py      # Enums for metrics and tracing
+├── metadata_models.py          # Metadata and reference data models
+├── pipeline_models.py          # Models for pipeline state and configuration
+├── essay_service_models.py     # Request/response models for essay-related services
+├── batch_service_models.py     # Command and data models for batch processing services
+└── events/
+    ├── __init__.py
+    ├── envelope.py             # Canonical EventEnvelope schema
+    ├── base_event_models.py    # Base classes for event data payloads
+    ├── utils.py                # Utility functions for events
+    ├── ai_feedback_events.py   # Events related to AI feedback generation
+    ├── batch_coordination_events.py # Events for coordinating batch processing
+    ├── cj_assessment_events.py # Events for Comparative Judgement assessments
+    ├── class_events.py         # Events related to class and student management
+    ├── client_commands.py      # Inbound commands from clients/gateways
+    ├── els_bos_events.py       # Events for ELS-BOS interaction
+    ├── file_events.py          # Legacy file service domain events
+    ├── file_management_events.py # Events for file upload and content provisioning
+    ├── spellcheck_models.py    # Events and models for spell-checking
+    └── validation_events.py    # Events related to data validation
 ```
 
 ## 3. Core Enums
