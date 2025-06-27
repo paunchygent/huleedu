@@ -98,7 +98,9 @@ async def test_get_batch_status_ownership_failure(client: AsyncClient, respx_moc
 
 
 @pytest.mark.asyncio
-async def test_get_batch_status_not_found_fallback_success(client: AsyncClient, respx_mock: MockRouter):
+async def test_get_batch_status_not_found_fallback_success(
+    client: AsyncClient, respx_mock: MockRouter
+):
     """Test fallback to BOS when batch is not in the aggregator."""
     settings.HANDLE_MISSING_BATCHES = "query_bos"
     aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{BATCH_ID}/status"

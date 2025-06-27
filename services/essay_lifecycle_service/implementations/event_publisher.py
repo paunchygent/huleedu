@@ -89,7 +89,7 @@ class DefaultEventPublisher(EventPublisher):
                     "essay_id": essay_ref.entity_id,
                     "status": status.value,
                     "correlation_id": str(correlation_id) if correlation_id else None,
-                }
+                },
             )
 
             # TODO: Implement user_id lookup from essay batch context
@@ -112,7 +112,7 @@ class DefaultEventPublisher(EventPublisher):
                     "essay_id": essay_ref.entity_id,
                     "correlation_id": str(correlation_id) if correlation_id else None,
                 },
-                exc_info=True
+                exc_info=True,
             )
 
     async def publish_batch_phase_progress(

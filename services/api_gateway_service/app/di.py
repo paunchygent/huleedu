@@ -3,10 +3,12 @@ from typing import cast
 
 import httpx
 from dishka import Provider, Scope, provide
+from prometheus_client import REGISTRY, CollectorRegistry
 
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from services.api_gateway_service.app.metrics import GatewayMetrics
 from services.api_gateway_service.config import Settings, settings
 
 
@@ -42,3 +44,11 @@ class ApiGatewayProvider(Provider):
         await kafka_bus.start()
         yield kafka_bus
         await kafka_bus.stop()
+
+    @provide(scope=Scope.APP)
+    def provide_metrics(self) -> GatewayMetrics:
+        return GatewayMetrics()
+
+    @provide(scope=Scope.APP)
+    def provide_registry(self) -> CollectorRegistry:
+        return REGISTRY

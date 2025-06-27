@@ -25,11 +25,12 @@ Model service: `@batch_orchestrator_service/`
 
 ## 3. Service Types Overview
 
-### 3.1. HTTP Services (Quart-based)
-- **MUST** follow Blueprint pattern architecture → See [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc)
+### 3.1. HTTP Services (Quart-based and FastAPI-based)
+- **MUST** follow Blueprint/Router pattern architecture → See [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc) and [041-fastapi-integration-patterns.mdc](mdc:041-fastapi-integration-patterns.mdc)
 - **MUST** implement standardized `/healthz` and `/metrics` endpoints
-- **MUST** use Dishka DI with `quart-dishka` integration
-- **MUST** separate concerns: lean `app.py` + `startup_setup.py` for DI/metrics initialization
+- **MUST** use Dishka DI with framework-specific integration (`quart-dishka` or `dishka[fastapi]`)
+- **MUST** separate concerns: lean `main.py`/`app.py` + `startup_setup.py` for DI/metrics initialization
+- **Pattern**: Extract DI container creation into `startup_setup.py` with functions like `create_di_container()` and `setup_dependency_injection()`
 
 ### 3.2. Worker Services (Kafka-based)
 - **MUST** follow event processor pattern → See [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc)
@@ -100,16 +101,26 @@ Services with multiple entry points (e.g., HTTP + Worker) **MUST** use a shared 
 - **MUST** fail fast on startup errors with `logger.critical()` and `raise`
 
 ### 4.10. Observability (Prometheus)
-- **Metrics Class**: `MUST` define all service-specific metrics in a dedicated class within `<service>/metrics.py`.
-- **DI Provider**: `MUST` create a [MetricsProvider](cci:2://file:///Users/olofs_mba/Documents/Repos/huledu-reboot/services/class_management_service/di.py:98:0-109:23) in `<service>/di.py` to provide the metrics class and `prometheus_client.REGISTRY` with `Scope.APP`.
-- **Metrics Endpoint**: `MUST` expose metrics at a `/metrics` endpoint, typically in [health_routes.py](cci:7://file:///Users/olofs_mba/Documents/Repos/huledu-reboot/services/class_management_service/api/health_routes.py:0:0-0:0).
-- **Instrumentation**: `MUST` instrument API routes by injecting the metrics provider. Use `.time()` for latency and `.inc()` for counters within handlers.
+- **Metrics Class**: `MUST` define all service-specific metrics in a dedicated class within `<service>/metrics.py` or `<service>/app/metrics.py`.
+- **DI Provider**: `MUST` create a MetricsProvider in `<service>/di.py` to provide the metrics class and `prometheus_client.REGISTRY` with `Scope.APP`.
+- **Metrics Endpoint**: `MUST` expose metrics at a `/metrics` endpoint, typically in `routers/health_routes.py`.
+- **Instrumentation**: `MUST` instrument API routes by injecting the metrics class. Use `.time()` for latency and `.inc()` for counters within handlers.
+- **Exception Handling**: `MUST` use proper exception handling patterns to avoid masking HTTPExceptions:
   ```python
   @inject
-  def my_handler(metrics: MyMetrics = From()):
-      with metrics.my_histogram.time():
-          # ...
-          metrics.my_counter.inc()
+  async def my_handler(metrics: FromDishka[MyMetrics]):
+      endpoint = "/endpoint"
+      with metrics.http_request_duration_seconds.labels(method="POST", endpoint=endpoint).time():
+          try:
+              # ... business logic ...
+              metrics.http_requests_total.labels(method="POST", endpoint=endpoint, http_status="200").inc()
+              return result
+          except HTTPException:
+              raise  # CRITICAL: Re-raise HTTPException without wrapping
+          except Exception as e:
+              metrics.http_requests_total.labels(method="POST", endpoint=endpoint, http_status="500").inc()
+              raise HTTPException(status_code=500, detail="Internal server error") from e
+  ```
 
 ## 5. Implementation Checklist
 Before implementing any service, ensure you have reviewed:

@@ -145,25 +145,136 @@ class AcceptedResponse(BaseModel):
     status: str = "accepted"
 ```
 
-## 4. Testing
+## 4. Observability Integration
 
-Use `TestClient` and override DI providers for isolated testing.
+### 4.1. Metrics Implementation
+**MUST** implement comprehensive metrics following established patterns:
+
+```python
+# app/metrics.py
+from prometheus_client import Counter, Histogram
+
+class ServiceMetrics:
+    def __init__(self) -> None:
+        self.http_requests_total = Counter(
+            "service_http_requests_total",
+            "Total HTTP requests",
+            ["method", "endpoint", "http_status"]
+        )
+        self.http_request_duration_seconds = Histogram(
+            "service_http_request_duration_seconds", 
+            "HTTP request duration",
+            ["method", "endpoint"]
+        )
+
+# di.py
+@provide(scope=Scope.APP)
+def provide_metrics(self) -> ServiceMetrics:
+    return ServiceMetrics()
+
+@provide(scope=Scope.APP) 
+def provide_registry(self) -> CollectorRegistry:
+    return REGISTRY
+```
+
+### 4.2. Health and Metrics Endpoints
+**MUST** provide standard observability endpoints:
+
+```python
+# routers/health_routes.py
+from fastapi import APIRouter
+from fastapi.responses import PlainTextResponse
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
+router = APIRouter(tags=["Health"])
+
+@router.get("/healthz")
+async def health_check() -> dict[str, str]:
+    return {"status": "ok", "message": "Service is healthy"}
+
+@router.get("/metrics")
+@inject
+async def metrics(registry: FromDishka[CollectorRegistry]) -> PlainTextResponse:
+    metrics_data = generate_latest(registry)
+    return PlainTextResponse(content=metrics_data, media_type=CONTENT_TYPE_LATEST)
+```
+
+### 4.3. Route Instrumentation
+**MUST** instrument all routes with metrics:
+
+```python
+@router.post("/endpoint")
+@inject
+async def handler(
+    metrics: FromDishka[ServiceMetrics],
+    # other dependencies
+):
+    endpoint = "/endpoint"
+    with metrics.http_request_duration_seconds.labels(method="POST", endpoint=endpoint).time():
+        try:
+            # ... business logic ...
+            metrics.http_requests_total.labels(method="POST", endpoint=endpoint, http_status="200").inc()
+            return result
+        except HTTPException:
+            raise  # Let FastAPI handle HTTP exceptions
+        except Exception as e:
+            metrics.http_requests_total.labels(method="POST", endpoint=endpoint, http_status="500").inc()
+            raise HTTPException(status_code=500, detail="Internal server error") from e
+```
+
+## 5. Testing
+
+### 5.1. Test Provider Setup
+**MUST** include metrics providers in test setup and clear registry between tests:
 
 ```python
 # tests/test_api.py
 from fastapi.testclient import TestClient
-from dishka import make_container
-from .main import app
+from dishka import make_async_container
+from prometheus_client import CollectorRegistry
 
-def test_endpoint_with_mock_deps():
-    # Create a container with mock providers
-    test_container = make_container(MockProvider())
+class MockProvider(Provider):
+    @provide
+    def provide_metrics(self) -> ServiceMetrics:
+        return ServiceMetrics()
     
-    # Use context manager to override the app's container
-    with app.container_context(test_container):
-        client = TestClient(app)
-        response = client.post("/v1/pipelines", json={...})
-        assert response.status_code == 202
+    @provide
+    def provide_registry(self) -> CollectorRegistry:
+        from prometheus_client import REGISTRY
+        return REGISTRY
+
+@pytest.fixture(autouse=True)
+def _clear_prometheus_registry():
+    """Clear Prometheus registry before each test to avoid collisions."""
+    from prometheus_client import REGISTRY
+    collectors = list(REGISTRY._collector_to_names.keys())
+    for collector in collectors:
+        REGISTRY.unregister(collector)
+    yield
+
+@pytest.fixture
+async def client():
+    container = make_async_container(MockProvider())
+    # ... setup test client with container
+    yield client
+    await container.close()
+```
+
+### 5.2. Integration Testing
+Use `respx` for mocking downstream HTTP services:
+
+```python
+@pytest.mark.asyncio
+async def test_proxy_endpoint(client: AsyncClient, respx_mock: MockRouter):
+    downstream_url = "http://downstream_service:8000/api/endpoint"
+    mock_route = respx_mock.get(downstream_url).mock(
+        return_value=Response(200, json={"result": "success"})
+    )
+    
+    response = await client.get("/v1/proxy/endpoint")
+    
+    assert response.status_code == 200
+    assert mock_route.called
 ```
 
 ## 5. Compliance Summary

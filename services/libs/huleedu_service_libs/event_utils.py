@@ -25,13 +25,13 @@ def extract_user_id_from_event_data(event_data: Any) -> str | None:
     """
     # Common user ID field patterns in order of preference
     user_id_fields = [
-        'user_id',
-        'created_by_user_id',
-        'updated_by_user_id',
-        'created_by_id',
-        'updated_by_id',
-        'owner_id',
-        'author_id',
+        "user_id",
+        "created_by_user_id",
+        "updated_by_user_id",
+        "created_by_id",
+        "updated_by_id",
+        "owner_id",
+        "author_id",
     ]
 
     for field_name in user_id_fields:

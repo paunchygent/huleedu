@@ -78,6 +78,7 @@ def client_with_mocks(container, mock_auth, monkeypatch):
 
     # Set up Dishka with test container
     from dishka.integrations.fastapi import setup_dishka
+
     setup_dishka(container, app)
 
     # Disable rate limiting entirely for tests (official SlowAPI approach)

@@ -14,12 +14,29 @@ alwaysApply: false
 ## 2. Metrics Standards
 
 ### 2.1. Custom Metrics Naming Convention
-**MUST** follow pattern: `huleedu_<service>_<metric>_<unit>`
+**MUST** follow these established patterns based on metric purpose:
 
-Examples:
-- `huleedu_files_uploaded_total` (counter)
-- `huleedu_spellcheck_corrections_made` (histogram)
-- `huleedu_essay_processing_duration_seconds` (histogram)
+#### Service-Level Operational Metrics
+Pattern: `<service_prefix>_<metric>_<unit>`
+- API Gateway: `gateway_` → `gateway_http_requests_total`
+- Class Management: `cms_` → `cms_http_requests_total`
+- Batch Orchestrator: `bos_` → `bos_http_requests_total`
+- Spell Checker: `spell_checker_` → `spell_checker_operations_total`
+- File Service: `file_service_` → `file_service_files_uploaded_total`
+
+#### Business Intelligence Metrics (Cross-Service)
+Pattern: `huleedu_<metric>_<unit>`
+- `huleedu_pipeline_execution_total` (BOS)
+- `huleedu_spellcheck_corrections_made` (Spell Checker)
+- `huleedu_phase_transition_duration_seconds` (BOS)
+
+#### Shared Infrastructure Metrics
+Pattern: `<descriptive_name>_<unit>`
+- `kafka_message_queue_latency_seconds` (used across services)
+
+**Use Service Prefix** for service-specific operational metrics (HTTP, errors, service operations)
+**Use `huleedu_` Prefix** for business intelligence metrics that provide cross-service insights
+**Use Descriptive Names** for shared infrastructure metrics
 
 ### 2.2. Metric Labels Strategy
 - **Service Identification**: Always include service-identifying labels
@@ -91,11 +108,28 @@ Examples:
 ## 6. Container Integration
 
 ### 6.1. Service Library Integration
-**MUST** use huleedu-service-libs patterns:
-- Metrics creation in startup_setup.py
-- DI-provided CollectorRegistry (not metric instances)
-- Access metrics via current_app.extensions["metrics"]
-- **FORBIDDEN**: Creating Counter/Histogram in DI providers
+**MUST** use established patterns:
+- **Metrics Class**: Define all metrics in dedicated `<service>/metrics.py` or `<service>/app/metrics.py`
+- **DI Provider**: Provide both metrics class and `CollectorRegistry` via Dishka with `Scope.APP`
+- **Metrics Instantiation**: Create Counter/Histogram instances in metrics class `__init__()` method
+- **Injection Pattern**: Inject metrics class into route handlers using `FromDishka[MetricsClass]`
+
+```python
+# metrics.py
+class GatewayMetrics:
+    def __init__(self) -> None:
+        self.http_requests_total = Counter(...)
+
+# di.py
+@provide(scope=Scope.APP)
+def provide_metrics(self) -> GatewayMetrics:
+    return GatewayMetrics()
+
+# routes.py
+@router.post("/endpoint")
+async def handler(metrics: FromDishka[GatewayMetrics]):
+    metrics.http_requests_total.inc()
+```
 
 ### 6.2. Docker Compose Patterns
 - Observability stack in separate docker-compose.observability.yml

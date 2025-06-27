@@ -17,6 +17,7 @@ from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from ..app.metrics import GatewayMetrics
 from ..app.rate_limiter import limiter
 from ..auth import get_current_user_id
 
@@ -31,6 +32,7 @@ class BatchPipelineRequest(BaseModel):
     This is separate from ClientBatchPipelineRequestV1 to avoid requiring
     user_id in the client request (it comes from authentication).
     """
+
     batch_id: str | None = Field(
         default=None,
         description="The unique identifier of the target batch (optional, taken from path).",
@@ -60,6 +62,7 @@ async def request_pipeline_execution(
     batch_id: str,
     pipeline_request: BatchPipelineRequest,
     kafka_bus: FromDishka[KafkaBus],
+    metrics: FromDishka[GatewayMetrics],
     user_id: str = Depends(get_current_user_id),  # noqa: B008
 ):
     """
@@ -69,65 +72,94 @@ async def request_pipeline_execution(
     events in EventEnvelope format to the correct Kafka topic.
     """
     correlation_id = uuid4()
+    endpoint = f"/batches/{batch_id}/pipelines"
 
-    # CRITICAL: Validate batch_id consistency
-    if pipeline_request.batch_id and pipeline_request.batch_id != batch_id:
-        logger.warning(
-            f"Batch ID mismatch: path='{batch_id}', body='{pipeline_request.batch_id}', "
-            f"user_id='{user_id}', correlation_id='{correlation_id}'"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Batch ID in path must match batch ID in request body",
-        )
+    # Start request timing
+    with metrics.http_request_duration_seconds.labels(method="POST", endpoint=endpoint).time():
+        try:
+            # CRITICAL: Validate batch_id consistency
+            if pipeline_request.batch_id and pipeline_request.batch_id != batch_id:
+                logger.warning(
+                    f"Batch ID mismatch: path='{batch_id}', body='{pipeline_request.batch_id}', "
+                    f"user_id='{user_id}', correlation_id='{correlation_id}'"
+                )
+                metrics.http_requests_total.labels(
+                    method="POST", endpoint=endpoint, http_status="400"
+                ).inc()
+                metrics.api_errors_total.labels(
+                    endpoint=endpoint, error_type="validation_error"
+                ).inc()
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Batch ID in path must match batch ID in request body",
+                )
 
-    # Construct ClientBatchPipelineRequestV1 with authenticated user_id
-    client_request = ClientBatchPipelineRequestV1(
-        batch_id=batch_id,  # Always use path batch_id
-        requested_pipeline=pipeline_request.requested_pipeline,
-        client_correlation_id=correlation_id,
-        user_id=user_id,  # From authentication
-        is_retry=pipeline_request.is_retry,
-        retry_reason=pipeline_request.retry_reason,
-    )
+            # Construct ClientBatchPipelineRequestV1 with authenticated user_id
+            client_request = ClientBatchPipelineRequestV1(
+                batch_id=batch_id,  # Always use path batch_id
+                requested_pipeline=pipeline_request.requested_pipeline,
+                client_correlation_id=correlation_id,
+                user_id=user_id,  # From authentication
+                is_retry=pipeline_request.is_retry,
+                retry_reason=pipeline_request.retry_reason,
+            )
 
-    try:
-        # Create proper EventEnvelope with ClientBatchPipelineRequestV1 data
-        envelope = EventEnvelope[ClientBatchPipelineRequestV1](
-            event_type="huleedu.commands.batch.pipeline.v1",
-            source_service="api_gateway_service",
-            correlation_id=correlation_id,
-            data=client_request,
-        )
+            # Create proper EventEnvelope with ClientBatchPipelineRequestV1 data
+            envelope = EventEnvelope[ClientBatchPipelineRequestV1](
+                event_type="huleedu.commands.batch.pipeline.v1",
+                source_service="api_gateway_service",
+                correlation_id=correlation_id,
+                data=client_request,
+            )
 
-        # Publish using KafkaBus.publish method with EventEnvelope
-        await kafka_bus.publish(
-            topic="huleedu.commands.batch.pipeline.v1",
-            envelope=envelope,
-            key=batch_id,  # Partition by batch_id for ordering
-        )
+            # Publish using KafkaBus.publish method with EventEnvelope
+            await kafka_bus.publish(
+                topic="huleedu.commands.batch.pipeline.v1",
+                envelope=envelope,
+                key=batch_id,  # Partition by batch_id for ordering
+            )
 
-        # CRITICAL: Comprehensive logging for traceability
-        logger.info(
-            f"Pipeline request published: batch_id='{batch_id}', "
-            f"pipeline='{client_request.requested_pipeline}', "
-            f"user_id='{user_id}', correlation_id='{correlation_id}'"
-        )
+            # Record successful event publication
+            metrics.events_published_total.labels(
+                topic="huleedu.commands.batch.pipeline.v1",
+                event_type="huleedu.commands.batch.pipeline.v1",
+            ).inc()
 
-        return {
-            "status": "accepted",
-            "message": "Pipeline execution request received",
-            "batch_id": batch_id,
-            "correlation_id": str(correlation_id),
-        }
+            # CRITICAL: Comprehensive logging for traceability
+            logger.info(
+                f"Pipeline request published: batch_id='{batch_id}', "
+                f"pipeline='{client_request.requested_pipeline}', "
+                f"user_id='{user_id}', correlation_id='{correlation_id}'"
+            )
 
-    except Exception as e:
-        logger.error(
-            f"Failed to publish pipeline request: batch_id='{batch_id}', "
-            f"user_id='{user_id}', correlation_id='{correlation_id}', error='{e}'",
-            exc_info=True,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Failed to process pipeline request",
-        ) from e
+            # Record successful HTTP response
+            metrics.http_requests_total.labels(
+                method="POST", endpoint=endpoint, http_status="202"
+            ).inc()
+
+            return {
+                "status": "accepted",
+                "message": "Pipeline execution request received",
+                "batch_id": batch_id,
+                "correlation_id": str(correlation_id),
+            }
+
+        except HTTPException:
+            # Re-raise HTTPException without wrapping it
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to publish pipeline request: batch_id='{batch_id}', "
+                f"user_id='{user_id}', correlation_id='{correlation_id}', error='{e}'",
+                exc_info=True,
+            )
+            metrics.http_requests_total.labels(
+                method="POST", endpoint=endpoint, http_status="503"
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint=endpoint, error_type="kafka_publish_error"
+            ).inc()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to process pipeline request",
+            ) from e

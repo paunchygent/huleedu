@@ -27,8 +27,9 @@ alwaysApply: false
 ## Implementation & Coding Standards
 - [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc): High-level service implementation principles and stack requirements
 - [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc): HTTP service architecture patterns and Blueprint implementation
-- [041-fastapi-integration-patterns.mdc](mdc:041-fastapi-integration-patterns.mdc): Concise FastAPI integration patterns for client-facing services
+- [041-fastapi-integration-patterns.mdc](mdc:041-fastapi-integration-patterns.mdc): FastAPI integration patterns with comprehensive observability and testing
 - [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc): Async patterns, protocols, dependency injection, and worker service structure
+- [042-http-proxy-service-patterns.mdc](mdc:042-http-proxy-service-patterns.mdc): HTTP proxy service patterns for request forwarding, error handling, and observability
 - [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc): Configuration management and logging standards
 - [044-service-debugging-and-troubleshooting.mdc](mdc:044-service-debugging-and-troubleshooting.mdc): CRITICAL debugging priority: service configuration over import patterns
 - [045-retry-logic.mdc](mdc:045-retry-logic.mdc): Natural retry via idempotency and user-initiated retry patterns
@@ -39,7 +40,9 @@ alwaysApply: false
 
 ## Quality, Workflow & Documentation
 - [060-data-and-metadata-management.mdc](mdc:060-data-and-metadata-management.mdc): Data models and metadata management standards
-- [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc): Testing strategies (unit, contract, integration, E2E)
+- [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc): Testing strategies (unit, contract, integration, E2E) with Prometheus registry handling
+- [071-observability-rules-and-patterns.mdc](mdc:071-observability-rules-and-patterns.mdc): Prometheus metrics, alerting, dashboards, and logging standards
+- [072-grafana-playbook-rules.mdc](mdc:072-grafana-playbook-rules.mdc): Grafana dashboard and alerting playbook
 - [080-repository-workflow-and-tooling.mdc](mdc:080-repository-workflow-and-tooling.mdc): PDM monorepo usage, version control, CI/CD
 - [081-pdm-dependency-management.mdc](mdc:081-pdm-dependency-management.mdc): PDM configuration and dependency management standards
 - [082-ruff-linting-standards.mdc](mdc:082-ruff-linting-standards.mdc): Ruff linting and formatting configuration

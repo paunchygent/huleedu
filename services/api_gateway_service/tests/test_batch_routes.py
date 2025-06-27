@@ -16,7 +16,9 @@ from fastapi.testclient import TestClient
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.kafka_client import KafkaBus
+from prometheus_client import CollectorRegistry
 from services.api_gateway_service.app.main import create_app
+from services.api_gateway_service.app.metrics import GatewayMetrics
 from services.api_gateway_service.auth import get_current_user_id
 
 
@@ -33,6 +35,25 @@ class MockProvider(Provider):
     @provide
     def get_kafka_bus(self) -> KafkaBus:
         return self.mock_kafka_bus
+
+    @provide
+    def provide_metrics(self) -> GatewayMetrics:
+        return GatewayMetrics()
+
+    @provide
+    def provide_registry(self) -> CollectorRegistry:
+        from prometheus_client import REGISTRY
+        return REGISTRY
+
+
+@pytest.fixture(autouse=True)
+def _clear_prometheus_registry():
+    """Clear Prometheus registry before each test to avoid collisions."""
+    from prometheus_client import REGISTRY
+    collectors = list(REGISTRY._collector_to_names.keys())
+    for collector in collectors:
+        REGISTRY.unregister(collector)
+    yield
 
 
 @pytest.fixture
@@ -75,6 +96,7 @@ def client_with_mocks(container, mock_auth):
 
     # Set up Dishka with test container
     from dishka.integrations.fastapi import setup_dishka
+
     setup_dishka(container, app)
 
     with TestClient(app) as client:

@@ -42,9 +42,7 @@ class TestPipelineProgressionScenarios:
         return AsyncMock()
 
     @pytest.fixture
-    def pipeline_coordinator(
-        self, batch_repository, mock_cj_initiator, mock_redis_client
-    ):
+    def pipeline_coordinator(self, batch_repository, mock_cj_initiator, mock_redis_client):
         """Create real DefaultPipelinePhaseCoordinator with mocked external dependencies."""
         # Create phase initiators map with the mock CJ initiator
         phase_initiators_map = {

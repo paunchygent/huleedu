@@ -18,7 +18,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_prefix="API_GATEWAY_",
         case_sensitive=False,
-        extra="ignore"  # Allow extra environment variables to be ignored
+        extra="ignore",  # Allow extra environment variables to be ignored
     )
 
     # Service identity

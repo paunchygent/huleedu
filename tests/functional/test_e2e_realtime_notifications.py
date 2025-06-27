@@ -36,19 +36,14 @@ class TestEndToEndRealtimeNotifications:
     @pytest.fixture
     async def redis_service_client(self) -> AsyncGenerator[RedisClient, None]:
         """Create service library Redis client."""
-        client = RedisClient(
-            client_id="test-client",
-            redis_url="redis://localhost:6379"
-        )
+        client = RedisClient(client_id="test-client", redis_url="redis://localhost:6379")
         await client.start()
         yield client
         await client.stop()
 
     @pytest.mark.asyncio
     async def test_event_publisher_to_redis_notification(
-        self,
-        redis_client: redis.Redis,
-        redis_service_client: RedisClient
+        self, redis_client: redis.Redis, redis_service_client: RedisClient
     ) -> None:
         """
         Test that events published by backend services appear as Redis notifications.
@@ -97,9 +92,7 @@ class TestEndToEndRealtimeNotifications:
         }
 
         await redis_service_client.publish_user_notification(
-            user_id=test_user_id,
-            event_type="class_created",
-            data=ui_payload
+            user_id=test_user_id, event_type="class_created", data=ui_payload
         )
 
         # Assert - Check that notification was received
@@ -132,16 +125,15 @@ class TestEndToEndRealtimeNotifications:
         assert extracted_id == "user-123"
 
         # Test with mock event that has created_by_user_id
-        mock_event = type('MockEvent', (), {
-            'created_by_user_id': 'user-456',
-            'other_field': 'value'
-        })()
+        mock_event = type(
+            "MockEvent", (), {"created_by_user_id": "user-456", "other_field": "value"}
+        )()
 
         extracted_id = extract_user_id_from_event_data(mock_event)
         assert extracted_id == "user-456"
 
         # Test with event that has no user ID fields
-        empty_event = type('EmptyEvent', (), {'some_field': 'value'})()
+        empty_event = type("EmptyEvent", (), {"some_field": "value"})()
 
         extracted_id = extract_user_id_from_event_data(empty_event)
         assert extracted_id is None
@@ -160,12 +152,10 @@ class TestEndToEndRealtimeNotifications:
             return 1  # Simulate successful publish
 
         # Use unittest.mock to patch the publish method at the class level
-        with patch('huleedu_service_libs.redis_client.RedisClient.publish', new=mock_publish):
+        with patch("huleedu_service_libs.redis_client.RedisClient.publish", new=mock_publish):
             # Act
             await redis_service_client.publish_user_notification(
-                user_id=test_user_id,
-                event_type="test_event",
-                data={"test": "data"}
+                user_id=test_user_id, event_type="test_event", data={"test": "data"}
             )
 
             # Assert
@@ -179,15 +169,15 @@ class TestEndToEndRealtimeNotifications:
 
         # Create a mock Redis client that raises exceptions
         mock_redis_client = AsyncMock()
-        mock_redis_client.publish_user_notification.side_effect = Exception("Redis connection failed")
+        mock_redis_client.publish_user_notification.side_effect = Exception(
+            "Redis connection failed"
+        )
 
         # The event publisher should log the error but not raise
         # This pattern should be implemented in all service event publishers
         try:
             await mock_redis_client.publish_user_notification(
-                user_id="user-123",
-                event_type="test_event",
-                data={"test": "data"}
+                user_id="user-123", event_type="test_event", data={"test": "data"}
             )
         except Exception:
             # Event publishers should catch Redis exceptions and log them

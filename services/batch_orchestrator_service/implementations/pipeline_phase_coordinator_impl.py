@@ -484,7 +484,7 @@ class DefaultPipelinePhaseCoordinator:
                         "status": phase_status.value,
                         "timestamp": datetime.now(UTC).isoformat(),
                         "correlation_id": correlation_id,
-                    }
+                    },
                 )
 
                 logger.info(
@@ -494,12 +494,12 @@ class DefaultPipelinePhaseCoordinator:
                         "phase": completed_phase.value,
                         "user_id": user_id,
                         "correlation_id": correlation_id,
-                    }
+                    },
                 )
             else:
                 logger.warning(
                     "No user_id found in batch context, skipping Redis notification",
-                    extra={"batch_id": batch_id, "correlation_id": correlation_id}
+                    extra={"batch_id": batch_id, "correlation_id": correlation_id},
                 )
 
         except Exception as e:
@@ -510,6 +510,6 @@ class DefaultPipelinePhaseCoordinator:
                     "phase": completed_phase.value,
                     "correlation_id": correlation_id,
                 },
-                exc_info=True
+                exc_info=True,
             )
             # Don't fail the entire phase handling if Redis fails

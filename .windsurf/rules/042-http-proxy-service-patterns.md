@@ -1,0 +1,261 @@
+---
+description: Patterns for implementing HTTP proxy functionality in services
+globs: ["**/routers/*_routes.py", "**/api/*_routes.py"]
+alwaysApply: false
+---
+# 042: HTTP Proxy Service Patterns
+
+## 1. Purpose
+
+Define standardized patterns for implementing HTTP proxy functionality within services, including proper request forwarding, header management, error handling, and observability.
+
+**Reference Implementation**: `services/api_gateway_service/routers/class_routes.py`
+
+## 2. Core Proxy Patterns
+
+### 2.1. Complete Service Proxy
+For proxying entire service APIs:
+
+```python
+@router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def proxy_requests(
+    path: str,
+    request: Request,
+    http_client: FromDishka[AsyncClient],
+    metrics: FromDishka[ServiceMetrics],
+):
+    """Proxies all requests to downstream service."""
+    url = f"{settings.DOWNSTREAM_SERVICE_URL}/v1/{path}"
+    endpoint = f"/{path}"
+    
+    with metrics.http_request_duration_seconds.labels(
+        method=request.method, endpoint=endpoint
+    ).time():
+        try:
+            # Prepare request headers
+            headers = dict(request.headers)
+            headers.pop("host", None)  # Let httpx set the host
+            
+            # Time downstream call
+            with metrics.downstream_service_call_duration_seconds.labels(
+                service="downstream_service", method=request.method, endpoint=f"/v1/{path}"
+            ).time():
+                req = http_client.build_request(
+                    method=request.method,
+                    url=url,
+                    headers=headers,
+                    params=request.query_params,
+                    content=request.stream(),
+                )
+                response = await http_client.send(req, stream=True)
+            
+            # Record metrics
+            metrics.downstream_service_calls_total.labels(
+                service="downstream_service", method=request.method, 
+                endpoint=f"/v1/{path}", status_code=str(response.status_code)
+            ).inc()
+            
+            metrics.http_requests_total.labels(
+                method=request.method, endpoint=endpoint, 
+                http_status=str(response.status_code)
+            ).inc()
+            
+            return StreamingResponse(
+                response.aiter_raw(),
+                status_code=response.status_code,
+                headers=response.headers,
+            )
+            
+        except Exception as e:
+            logger.error(f"Proxy error for {request.method} {endpoint}: {e}", exc_info=True)
+            metrics.http_requests_total.labels(
+                method=request.method, endpoint=endpoint, http_status="500"
+            ).inc()
+            metrics.api_errors_total.labels(endpoint=endpoint, error_type="proxy_error").inc()
+            raise
+```
+
+### 2.2. Selective Endpoint Proxy
+For proxying specific endpoints with transformation:
+
+```python
+@router.post("/specific-endpoint")
+async def proxy_specific_endpoint(
+    request_data: RequestModel,
+    http_client: FromDishka[AsyncClient],
+    metrics: FromDishka[ServiceMetrics],
+):
+    """Proxy specific endpoint with request/response transformation."""
+    endpoint = "/specific-endpoint"
+    
+    with metrics.http_request_duration_seconds.labels(method="POST", endpoint=endpoint).time():
+        try:
+            # Transform request if needed
+            downstream_request = transform_request(request_data)
+            
+            with metrics.downstream_service_call_duration_seconds.labels(
+                service="downstream_service", method="POST", endpoint="/api/endpoint"
+            ).time():
+                response = await http_client.post(
+                    f"{settings.DOWNSTREAM_SERVICE_URL}/api/endpoint",
+                    json=downstream_request.dict(),
+                    headers={"X-Correlation-ID": request.headers.get("x-correlation-id", "")},
+                )
+                response.raise_for_status()
+                downstream_data = response.json()
+            
+            # Record successful downstream call
+            metrics.downstream_service_calls_total.labels(
+                service="downstream_service", method="POST", 
+                endpoint="/api/endpoint", status_code=str(response.status_code)
+            ).inc()
+            
+            # Transform response if needed
+            result = transform_response(downstream_data)
+            
+            metrics.http_requests_total.labels(method="POST", endpoint=endpoint, http_status="200").inc()
+            return result
+            
+        except httpx.HTTPStatusError as e:
+            metrics.downstream_service_calls_total.labels(
+                service="downstream_service", method="POST", 
+                endpoint="/api/endpoint", status_code=str(e.response.status_code)
+            ).inc()
+            metrics.http_requests_total.labels(
+                method="POST", endpoint=endpoint, http_status=str(e.response.status_code)
+            ).inc()
+            raise HTTPException(status_code=e.response.status_code, detail=e.response.text)
+        except Exception as e:
+            metrics.http_requests_total.labels(method="POST", endpoint=endpoint, http_status="500").inc()
+            metrics.api_errors_total.labels(endpoint=endpoint, error_type="proxy_error").inc()
+            raise HTTPException(status_code=500, detail="Proxy service error") from e
+```
+
+## 3. Header Management
+
+### 3.1. Header Forwarding Rules
+- **MUST** remove `host` header to avoid conflicts
+- **SHOULD** forward authentication headers (`Authorization`, `X-User-ID`)
+- **SHOULD** forward correlation headers (`X-Correlation-ID`, `X-Request-ID`)
+- **MAY** add proxy-specific headers for downstream service identification
+
+### 3.2. Header Transformation Pattern
+```python
+def prepare_proxy_headers(original_headers: Headers, correlation_id: str) -> dict[str, str]:
+    """Prepare headers for downstream service call."""
+    headers = dict(original_headers)
+    
+    # Remove problematic headers
+    headers.pop("host", None)
+    headers.pop("content-length", None)  # Let httpx handle this
+    
+    # Add correlation tracking
+    if "x-correlation-id" not in headers:
+        headers["X-Correlation-ID"] = correlation_id
+    
+    # Add proxy identification
+    headers["X-Proxied-By"] = "api-gateway-service"
+    
+    return headers
+```
+
+## 4. Error Handling Patterns
+
+### 4.1. Downstream Service Error Mapping
+- **4xx errors**: Forward to client with minimal transformation
+- **5xx errors**: Log for debugging, return generic service unavailable
+- **Network errors**: Return 503 Service Unavailable
+- **Timeout errors**: Return 504 Gateway Timeout
+
+### 4.2. Error Response Pattern
+```python
+try:
+    response = await http_client.request(...)
+    response.raise_for_status()
+    return response.json()
+except httpx.TimeoutException:
+    metrics.api_errors_total.labels(endpoint=endpoint, error_type="timeout").inc()
+    raise HTTPException(status_code=504, detail="Gateway timeout")
+except httpx.ConnectError:
+    metrics.api_errors_total.labels(endpoint=endpoint, error_type="connection_error").inc()
+    raise HTTPException(status_code=503, detail="Service unavailable")
+except httpx.HTTPStatusError as e:
+    if 400 <= e.response.status_code < 500:
+        # Forward client errors
+        raise HTTPException(status_code=e.response.status_code, detail=e.response.text)
+    else:
+        # Mask server errors
+        metrics.api_errors_total.labels(endpoint=endpoint, error_type="downstream_error").inc()
+        raise HTTPException(status_code=503, detail="Downstream service error")
+```
+
+## 5. Testing Proxy Services
+
+### 5.1. Mock Downstream Services
+**MUST** use `respx` for mocking HTTP calls in tests:
+
+```python
+@pytest.mark.asyncio
+async def test_proxy_endpoint(client: AsyncClient, respx_mock: MockRouter):
+    """Test proxy functionality with mocked downstream service."""
+    downstream_url = f"{settings.DOWNSTREAM_SERVICE_URL}/v1/endpoint"
+    mock_route = respx_mock.get(downstream_url).mock(
+        return_value=Response(200, json={"result": "success"})
+    )
+    
+    response = await client.get("/v1/proxy/endpoint")
+    
+    assert response.status_code == 200
+    assert response.json() == {"result": "success"}
+    assert mock_route.called
+    assert mock_route.calls.last.request.url == downstream_url
+```
+
+### 5.2. Test Coverage Requirements
+- **MUST** test successful proxy calls
+- **MUST** test downstream service error responses (4xx, 5xx)
+- **MUST** test network error scenarios
+- **SHOULD** test header forwarding behavior
+- **SHOULD** test request/response transformation if applicable
+
+## 6. Observability Requirements
+
+### 6.1. Required Metrics
+- `http_requests_total` - Total requests to proxy endpoint
+- `http_request_duration_seconds` - Proxy endpoint latency  
+- `downstream_service_calls_total` - Calls to downstream service
+- `downstream_service_call_duration_seconds` - Downstream service latency
+- `api_errors_total` - Error categorization
+
+### 6.2. Logging Standards
+- **MUST** log proxy request initiation with correlation ID
+- **MUST** log downstream service errors with full context
+- **SHOULD** log successful proxy completion with timing
+- **FORBIDDEN** Logging sensitive data from requests/responses
+
+## 7. Performance Considerations
+
+### 7.1. Connection Pooling
+- **MUST** use shared `httpx.AsyncClient` via DI (connection pooling)
+- **MUST** configure appropriate timeouts for downstream services
+- **SHOULD** implement retry logic for transient failures
+
+### 7.2. Streaming vs Buffering
+- **Use StreamingResponse** for large payloads or when preserving exact responses
+- **Use JSON transformation** for small payloads requiring modification
+- **Consider memory implications** for file upload/download proxying
+
+## 8. Security Considerations
+
+### 8.1. Authorization
+- **MUST** validate authorization before proxying requests
+- **SHOULD** add service-to-service authentication headers
+- **FORBIDDEN** Exposing internal service authentication tokens
+
+### 8.2. Input Validation
+- **MUST** validate proxy path parameters to prevent SSRF
+- **SHOULD** implement allow-lists for downstream URLs
+- **MUST** sanitize headers to prevent header injection
+
+---
+**Best Practice**: Start with complete service proxy pattern, then specialize as needed.

@@ -89,7 +89,7 @@ class TestDefaultEventPublisherFileManagement:
                 "essay_id": "essay-456",
                 "filename": "test_essay.txt",
                 "timestamp": event_data.timestamp.isoformat(),
-            }
+            },
         )
 
     async def test_publish_batch_file_added_v1_with_none_correlation_id(
@@ -181,7 +181,7 @@ class TestDefaultEventPublisherFileManagement:
                 "essay_id": "essay-456",
                 "filename": "test_essay.txt",
                 "timestamp": event_data.timestamp.isoformat(),
-            }
+            },
         )
 
     async def test_publish_batch_file_removed_v1_with_none_correlation_id(

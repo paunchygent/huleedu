@@ -125,7 +125,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                     "essay_id": event_data.essay_id,
                     "filename": event_data.filename,
                     "timestamp": event_data.timestamp.isoformat(),
-                }
+                },
             )
 
         except Exception as e:
@@ -167,7 +167,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                     "essay_id": event_data.essay_id,
                     "filename": event_data.filename,
                     "timestamp": event_data.timestamp.isoformat(),
-                }
+                },
             )
 
         except Exception as e:
@@ -183,20 +183,18 @@ class DefaultEventPublisher(EventPublisherProtocol):
         """Publish file event to Redis for real-time UI notifications."""
         try:
             await self.redis_client.publish_user_notification(
-                user_id=user_id,
-                event_type=event_type,
-                data=data
+                user_id=user_id, event_type=event_type, data=data
             )
 
             logger.info(
                 f"Published {event_type} notification to Redis for user {user_id}",
-                extra={"user_id": user_id, "event_type": event_type}
+                extra={"user_id": user_id, "event_type": event_type},
             )
 
         except Exception as e:
             logger.error(
                 f"Error publishing {event_type} to Redis: {e}",
                 extra={"user_id": user_id, "event_type": event_type},
-                exc_info=True
+                exc_info=True,
             )
             # Don't fail the entire event publishing if Redis fails

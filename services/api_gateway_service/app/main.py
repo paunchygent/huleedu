@@ -1,5 +1,3 @@
-from dishka import make_async_container
-from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
@@ -9,8 +7,9 @@ from starlette.responses import JSONResponse
 
 from ..config import settings
 from ..routers import batch_routes, class_routes, file_routes, status_routes, websocket_routes
-from .di import ApiGatewayProvider
+from ..routers.health_routes import router as health_router
 from .rate_limiter import limiter
+from .startup_setup import create_di_container, setup_dependency_injection
 
 
 def create_app() -> FastAPI:
@@ -40,6 +39,7 @@ def create_app() -> FastAPI:
     )
 
     # Include routers
+    app.include_router(health_router, tags=["Health"])
     app.include_router(class_routes.router, prefix="/v1", tags=["Classes"])
     app.include_router(status_routes.router, prefix="/v1", tags=["Status"])
     app.include_router(batch_routes.router, prefix="/v1", tags=["Batches"])
@@ -47,8 +47,11 @@ def create_app() -> FastAPI:
     app.include_router(websocket_routes.router, prefix="/ws/v1/status", tags=["WebSocket Status"])
 
     # Setup Dishka DI
-    container = make_async_container(ApiGatewayProvider())
-    setup_dishka(container, app)
+    container = create_di_container()
+    setup_dependency_injection(app, container)
+
+    # Store container reference for cleanup
+    app.state.di_container = container
 
     return app
 

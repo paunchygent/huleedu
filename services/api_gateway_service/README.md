@@ -34,18 +34,14 @@ The API Gateway Service is a FastAPI-based microservice that provides client-fac
 
 ### Class Management (Proxy)
 
-- `POST /v1/classes/` - Create new class
-- `GET /v1/classes/{class_id}` - Get class details
-- `PUT /v1/classes/{class_id}` - Update class
-- `DELETE /v1/classes/{class_id}` - Delete class
-- `POST /v1/classes/students` - Add student to class
-- `GET /v1/classes/students/{student_id}` - Get student details
-- `PUT /v1/classes/students/{student_id}` - Update student
-- `DELETE /v1/classes/students/{student_id}` - Remove student
+- `ANY /v1/classes/{path:path}` - Complete proxy to Class Management Service API
+  - Supports all HTTP methods (GET, POST, PUT, DELETE)
+  - Headers and query parameters are forwarded
+  - Authentication headers are passed through
 
 ### Real-time Communication
 
-- `WebSocket /ws` - Real-time batch status updates (requires JWT token in query parameter)
+- `WebSocket /ws/v1/status/{client_id}` - Real-time batch status updates (requires JWT token in query parameter)
 
 ### Service Management
 
