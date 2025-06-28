@@ -6,7 +6,12 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core.status_enums import BatchStatus, ProcessingStage
 
-from ..protocols import BatchRepositoryProtocol, EventProcessorProtocol, StateStoreProtocol
+from ..protocols import (
+    BatchRepositoryProtocol,
+    CacheManagerProtocol,
+    EventProcessorProtocol,
+    StateStoreProtocol,
+)
 
 if TYPE_CHECKING:
     from common_core.events import (
@@ -27,10 +32,12 @@ class EventProcessorImpl(EventProcessorProtocol):
         self,
         batch_repository: BatchRepositoryProtocol,
         state_store: StateStoreProtocol,
+        cache_manager: CacheManagerProtocol,
     ):
         """Initialize the event processor."""
         self.batch_repository = batch_repository
         self.state_store = state_store
+        self.cache_manager = cache_manager
 
     async def process_batch_registered(
         self, envelope: "EventEnvelope[BatchEssaysRegistered]", data: "BatchEssaysRegistered"
@@ -54,8 +61,10 @@ class EventProcessorImpl(EventProcessorProtocol):
                 else None,
             )
 
+            await self.cache_manager.invalidate_user_batches(data.user_id)
+
             logger.info(
-                "Created initial batch record",
+                "Created initial batch record and invalidated user cache",
                 batch_id=data.batch_id,
                 user_id=data.user_id,
             )

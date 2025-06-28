@@ -4,6 +4,7 @@ from typing import Optional
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
+from huleedu_service_libs.redis_set_operations import RedisSetOperations
 
 from ..protocols import CacheManagerProtocol
 
@@ -17,9 +18,15 @@ class CacheManagerImpl(CacheManagerProtocol):
     providing a clean abstraction for caching serialized data.
     """
 
-    def __init__(self, redis_client: RedisClientProtocol, cache_ttl: int = 300):
+    def __init__(
+        self,
+        redis_client: RedisClientProtocol,
+        redis_set_ops: RedisSetOperations,
+        cache_ttl: int = 300,
+    ):
         """Initialize with Redis client."""
         self.redis = redis_client
+        self.redis_set_ops = redis_set_ops
         self.cache_ttl = cache_ttl
 
     async def get_batch_status_json(self, batch_id: str) -> Optional[str]:
@@ -90,9 +97,17 @@ class CacheManagerImpl(CacheManagerProtocol):
         """Cache user batches list as JSON string."""
         try:
             cache_key = self._build_user_batches_key(user_id, limit, offset, status)
-            await self.redis.setex(cache_key, ttl, data_json)
+            tracking_key = f"ras:user:{user_id}:cache_keys"
 
-            logger.debug("Cached user batches", user_id=user_id, ttl=ttl, cache_key=cache_key)
+            async with self.redis_set_ops.pipeline() as pipe:
+                await pipe.setex(cache_key, ttl, data_json)
+                await pipe.sadd(tracking_key, cache_key)
+                await pipe.expire(tracking_key, ttl + 60)
+                await pipe.execute()
+
+            logger.debug(
+                "Cached user batches with tracking", user_id=user_id, ttl=ttl, cache_key=cache_key
+            )
         except Exception as e:
             logger.warning(
                 "Failed to cache user batches",
@@ -113,25 +128,29 @@ class CacheManagerImpl(CacheManagerProtocol):
             )
 
     async def invalidate_user_batches(self, user_id: str) -> None:
-        """Invalidate all cached user batch lists.
-
-        Design Decision: This method intentionally does not perform active cache
-        invalidation. We rely on TTL-based expiration (5 minutes) instead because:
-        1. Pattern-based deletion is expensive at scale
-        2. The short TTL is sufficient for our use case
-        3. Batch data doesn't change frequently enough to require immediate invalidation
-
-        The method exists to maintain the protocol interface and logs a warning
-        to document this limitation.
-        """
+        """Invalidate all cached user batch lists using SET-based tracking."""
         try:
-            pattern = f"ras:user:{user_id}:batches:*"
-            logger.warning(
-                "User cache invalidation not implemented - using TTL-based expiration",
-                user_id=user_id,
-                pattern=pattern,
-                ttl_seconds=self.cache_ttl,
-            )
+            tracking_key = f"ras:user:{user_id}:cache_keys"
+
+            cache_keys = await self.redis_set_ops.smembers(tracking_key)
+
+            if cache_keys:
+                async with self.redis_set_ops.pipeline() as pipe:
+                    for cache_key in cache_keys:
+                        await pipe.delete(cache_key)
+                    await pipe.delete(tracking_key)
+                    await pipe.execute()
+
+                logger.info(
+                    "Invalidated user batch caches",
+                    user_id=user_id,
+                    cache_keys_count=len(cache_keys),
+                )
+            else:
+                logger.debug(
+                    "No cache keys to invalidate",
+                    user_id=user_id,
+                )
         except Exception as e:
             logger.warning(
                 "Failed to invalidate user batches cache",

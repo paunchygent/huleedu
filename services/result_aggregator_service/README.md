@@ -137,8 +137,9 @@ The service exposes Prometheus metrics on port 9096:
 - `ras_api_requests_total` - API request count
 - `ras_api_request_duration_seconds` - Request latency
 - `ras_messages_processed_total` - Kafka messages processed
-- `ras_dlq_messages_sent_total` - DLQ messages
+- `ras_invalid_messages_total` - Invalid/malformed messages by topic and error type
 - `ras_cache_hits_total` / `ras_cache_misses_total` - Cache performance
+- `ras_consumer_errors_total` - Consumer error count
 
 ### Logging
 
@@ -199,12 +200,29 @@ Structured logging with correlation IDs for request tracing.
 1. **Batch Creation**: Now subscribes to `BatchEssaysRegistered` events to create initial records
 2. **Enum Alignment**: Uses `BatchStatus` and `ProcessingStage` from common_core
 3. **Cache Abstraction**: Properly encapsulated caching with JSON string protocol
+4. **Error Handling**: Production-resilient Kafka consumer with poison pill storage and metrics
+5. **Active Cache Invalidation**: Redis SET-based tracking for immediate cache consistency
+6. **Test Organization**: Split test files following <400 LOC rule for maintainability
+
+### Completed Major Enhancements
+
+1. **Kafka Consumer Resilience** (CONSOLIDATION_TASK refactor):
+   - Production-grade error handling with graceful degradation
+   - Poison pill detection and storage in Redis for inspection
+   - Comprehensive metrics for invalid messages by topic and error type
+   - Test-configurable behavior via `RAISE_ON_DESERIALIZATION_ERROR` flag
+   - Fixed integration tests to validate resilient behavior instead of expecting failures
+
+2. **Active Cache Invalidation** (CONSOLIDATION_TASK_2):
+   - Redis SET-based tracking system for user cache keys
+   - Atomic cache operations using Redis pipelines
+   - Immediate invalidation on `BatchEssaysRegistered` events
+   - Performance-optimized (no KEYS/SCAN operations)
+   - Proper TTL management for tracking sets
 
 ### Known Limitations
 
-- User batches caching still uses direct Redis (Task 4 pending)
 - Database migrations not yet implemented (uses auto-create for now)
-- Integration tests pending for new features
 
 ## Future Enhancements
 

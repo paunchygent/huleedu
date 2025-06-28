@@ -104,9 +104,11 @@ class TestBosElsPhaseCoordination:
     @pytest.fixture
     def mock_client_pipeline_request_handler(self):
         """Mock the ClientPipelineRequestHandler external boundary."""
-        from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
-            ClientPipelineRequestHandler,
+        from services.batch_orchestrator_service.implementations import (
+            client_pipeline_request_handler as cprh,
         )
+
+        ClientPipelineRequestHandler = cprh.ClientPipelineRequestHandler
 
         return AsyncMock(spec=ClientPipelineRequestHandler)
 

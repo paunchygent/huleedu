@@ -55,3 +55,10 @@ class ResultAggregatorMetrics:
         self.essays_aggregated = Counter(
             "ras_essays_aggregated_total", "Total essays aggregated", ["phase"]
         )
+
+        # Data quality metrics
+        self.invalid_messages_total = Counter(
+            "ras_invalid_messages_total",
+            "Total messages that failed deserialization or validation",
+            ["topic", "error_type"],  # error_type can be 'JSONDecodeError' or 'ValidationError'
+        )

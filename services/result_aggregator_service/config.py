@@ -52,3 +52,17 @@ class Settings(BaseSettings):
     # Performance Configuration
     API_TIMEOUT_SECONDS: int = Field(default=30)
     CACHE_ENABLED: bool = Field(default=True)
+
+    # Error Handling Configuration
+    RAISE_ON_DESERIALIZATION_ERROR: bool = Field(
+        default=False,
+        description="If True, consumer will raise exceptions on bad data. For testing only.",
+    )
+    STORE_POISON_PILLS: bool = Field(
+        default=True,
+        description="If True, store malformed messages in Redis for manual inspection.",
+    )
+    POISON_PILL_TTL_SECONDS: int = Field(
+        default=86400,  # 24 hours
+        description="How long to keep poison pills in Redis.",
+    )

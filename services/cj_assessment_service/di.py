@@ -27,6 +27,7 @@ from services.cj_assessment_service.implementations.openrouter_provider_impl imp
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
 
 # Import all business logic protocols
+from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
 from services.cj_assessment_service.protocols import (
     CacheProtocol,
     CJEventPublisherProtocol,
@@ -188,3 +189,23 @@ class CJAssessmentServiceProvider(Provider):
     ) -> CJEventPublisherProtocol:
         """Provide event publisher."""
         return CJEventPublisherImpl(kafka_bus, settings)
+
+    @provide(scope=Scope.APP)
+    def provide_kafka_consumer(
+        self,
+        settings: Settings,
+        database: CJRepositoryProtocol,
+        content_client: ContentClientProtocol,
+        event_publisher: CJEventPublisherProtocol,
+        llm_interaction: LLMInteractionProtocol,
+        redis_client: RedisClientProtocol,
+    ) -> CJAssessmentKafkaConsumer:
+        """Provide Kafka consumer for CJ Assessment Service."""
+        return CJAssessmentKafkaConsumer(
+            settings=settings,
+            database=database,
+            content_client=content_client,
+            event_publisher=event_publisher,
+            llm_interaction=llm_interaction,
+            redis_client=redis_client,
+        )

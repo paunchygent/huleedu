@@ -39,5 +39,5 @@ USER appuser
 HEALTHCHECK --interval=15s --timeout=5s --retries=3 --start-period=20s \
     CMD curl -f http://localhost:8002/healthz || exit 1
 
-# Command to run the combined service (HTTP API + Kafka worker)
-CMD ["pdm", "run", "start_service"] 
+# Command to run the integrated service (HTTP API + Kafka worker)
+CMD ["pdm", "run", "start"] 

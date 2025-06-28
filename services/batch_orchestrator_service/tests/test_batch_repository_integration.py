@@ -229,7 +229,8 @@ class TestPostgreSQLBatchRepositoryIntegration:
         success2 = await postgres_repository.update_phase_status_atomically(
             batch_id=batch_id,
             phase_name=phase_name,
-            expected_status=PipelineExecutionStatus.PENDING_DEPENDENCIES,  # Wrong - it's now IN_PROGRESS
+            # Wrong - it's now IN_PROGRESS
+            expected_status=PipelineExecutionStatus.PENDING_DEPENDENCIES,
             new_status=PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
         )
 

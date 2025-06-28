@@ -2,12 +2,14 @@
 
 import asyncio
 import json
-from typing import Any, Dict, List
+from datetime import UTC, datetime
+from typing import Dict, List
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
 from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
+from pydantic import ValidationError
 
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
@@ -152,29 +154,43 @@ class ResultAggregatorKafkaConsumer:
                         await self.consumer.commit()
 
     async def _process_message_impl(self, record: ConsumerRecord) -> bool:
-        """Process a single message implementation."""
+        """Process a single message implementation with specific deserialization."""
         try:
-            # Parse the event envelope
-            envelope_data = json.loads(record.value.decode("utf-8"))
-            envelope: EventEnvelope[Any] = EventEnvelope.model_validate(envelope_data)
+            # Decode the message value once
+            message_value_str = record.value.decode("utf-8")
 
             # Route to appropriate handler based on topic
             if record.topic == topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED):
-                batch_registered_data = BatchEssaysRegistered.model_validate(envelope.data)
-                await self.event_processor.process_batch_registered(envelope, batch_registered_data)
+                # Deserialize with the specific, expected Pydantic model
+                batch_envelope = EventEnvelope[BatchEssaysRegistered].model_validate_json(
+                    message_value_str
+                )
+                await self.event_processor.process_batch_registered(
+                    batch_envelope, batch_envelope.data
+                )
 
             elif record.topic == "huleedu.els.batch_phase.outcome.v1":
-                batch_phase_data = ELSBatchPhaseOutcomeV1.model_validate(envelope.data)
-                await self.event_processor.process_batch_phase_outcome(envelope, batch_phase_data)
+                phase_envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(
+                    message_value_str
+                )
+                await self.event_processor.process_batch_phase_outcome(
+                    phase_envelope, phase_envelope.data
+                )
 
             elif record.topic == "huleedu.essay.spellcheck.completed.v1":
-                spellcheck_data = SpellcheckResultDataV1.model_validate(envelope.data)
-                await self.event_processor.process_spellcheck_completed(envelope, spellcheck_data)
+                spell_envelope = EventEnvelope[SpellcheckResultDataV1].model_validate_json(
+                    message_value_str
+                )
+                await self.event_processor.process_spellcheck_completed(
+                    spell_envelope, spell_envelope.data
+                )
 
             elif record.topic == "huleedu.cj_assessment.completed.v1":
-                cj_assessment_data = CJAssessmentCompletedV1.model_validate(envelope.data)
+                cj_envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(
+                    message_value_str
+                )
                 await self.event_processor.process_cj_assessment_completed(
-                    envelope, cj_assessment_data
+                    cj_envelope, cj_envelope.data
                 )
 
             else:
@@ -182,9 +198,66 @@ class ResultAggregatorKafkaConsumer:
 
             return True  # Successfully processed
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON: {str(e)}")
-            raise
+        except (json.JSONDecodeError, ValidationError) as e:
+            logger.error(
+                "Failed to deserialize or validate message",
+                topic=record.topic,
+                error=str(e),
+                exc_info=True,
+            )
+            # Increment the invalid messages metric
+            self.metrics.invalid_messages_total.labels(
+                topic=record.topic, error_type=e.__class__.__name__
+            ).inc()
+
+            # Store poison pill for inspection if enabled
+            if self.settings.STORE_POISON_PILLS:
+                try:
+                    poison_pill_key = (
+                        f"poison_pill:{record.topic}:{record.partition}:{record.offset}"
+                    )
+                    poison_pill_data = json.dumps(
+                        {
+                            "raw_value": record.value.decode("utf-8", errors="replace"),
+                            "error": str(e),
+                            "error_type": e.__class__.__name__,
+                            "timestamp": datetime.now(UTC).isoformat(),
+                            "topic": record.topic,
+                            "partition": record.partition,
+                            "offset": record.offset,
+                        }
+                    )
+                    await self.redis_client.setex(
+                        poison_pill_key,
+                        self.settings.POISON_PILL_TTL_SECONDS,
+                        poison_pill_data,
+                    )
+                    logger.info(
+                        "Stored poison pill for inspection",
+                        key=poison_pill_key,
+                        ttl=self.settings.POISON_PILL_TTL_SECONDS,
+                    )
+                except Exception as storage_error:
+                    logger.warning(
+                        "Failed to store poison pill",
+                        error=str(storage_error),
+                        topic=record.topic,
+                        offset=record.offset,
+                    )
+
+            # Check if we should raise the error (for testing)
+            if self.settings.RAISE_ON_DESERIALIZATION_ERROR:
+                raise
+
+            # We will not re-raise the error, allowing the consumer to commit the offset
+            # and avoid getting stuck on a poison pill message.
+            # Failures should be monitored via logs and DLQ in a production environment.
+            return True  # Acknowledge message to prevent reprocessing
         except Exception as e:
-            logger.error(f"Processing failed: {str(e)}")
-            raise
+            logger.error(
+                "Processing failed with an unexpected error",
+                topic=record.topic,
+                error=str(e),
+                exc_info=True,
+            )
+            raise  # Re-raise to allow the idempotency decorator to handle it

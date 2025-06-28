@@ -16,17 +16,18 @@ alwaysApply: false
 - **Stack**: Quart (health API), aiokafka, async SQLAlchemy, Dishka DI, aiohttp, Prometheus
 - **Purpose**: Perform Comparative Judgement (CJ) assessments on essay batches using one or more LLM providers, publish rankings/failure events.
 
-## 2. Dual-Component Architecture
+## 2. Integrated Application Architecture
 
-### 2.1. HTTP Health API (`app.py`)
-- **GET /healthz**: JSON health status (200/503)
-- **GET /metrics**: Prometheus exposition
-- **Pattern**: Under 150 LOC, Blueprint-only (`api/health_routes.py`), shared DI container.
+### 2.1. Single Entrypoint (`app.py`)
+- **HTTP Health API**: GET /healthz (JSON health status), GET /metrics (Prometheus)
+- **Kafka Consumer**: Managed via @app.before_serving/@app.after_serving lifecycle hooks
+- **Pattern**: Integrated Quart application following Rule 042 HTTP Service Pattern
+- **Blueprint Registration**: Single health_bp with shared DI container
 
-### 2.2. Kafka Worker (`worker_main.py`)
+### 2.2. Event Processing
 - **Consumes**: `huleedu.els.cj_assessment.requested.v1`
 - **Produces**: `huleedu.cj_assessment.completed.v1`, `huleedu.cj_assessment.failed.v1`
-- **Loop**: Deserialize envelope → `event_processor.process_single_message()` → `run_cj_assessment_workflow()` → publish result/failure.
+- **Flow**: Event deserialization → `event_processor.process_single_message()` → `run_cj_assessment_workflow()` → publish result/failure
 
 ## 3. Core Components
 
@@ -88,10 +89,10 @@ Key vars from `Settings` (env prefix `CJ_ASSESSMENT_SERVICE_`):
 
 ## 11. Deployment
 - **Docker**: `python:3.11-slim`, multi-stage.
-- **Entrypoints**:
-  - `run_service.py` (starts worker + health API concurrently)
-  - `pdm run start-health` / `pdm run start-worker` for separate dev.
-- Ports exposed: 9090 (metrics/health), no external HTTP API.
+- **Entrypoint**: `app.py` (unified Quart application with integrated Kafka consumer)
+- **Commands**: `pdm run start` for production, `pdm run dev` for development
+- **Ports**: 9090 (metrics/health), no external HTTP API.
+- **Lifecycle**: Service manages both HTTP API and Kafka consumer in single process
 
 ## 12. Limitations & Future Work
 - Current DB schema minimal; migrate to dedicated migrations tool (e.g., Alembic).

@@ -23,6 +23,7 @@ alwaysApply: false
   - [020.9-class-management-service.mdc](mdc:020.9-class-management-service.mdc): Class Management Service
   - [020.10-api-gateway-and-websocket-service.mdc](mdc:020.10-api-gateway-and-websocket-service.mdc): API Gateway & WebSocket Service
   - [020.11-service-libraries-architecture.mdc](mdc:020.11-service-libraries-architecture.mdc): Service Libraries (Kafka, Redis, Logging)
+  - [020.12-result-aggregator-service-architecture.mdc](mdc:020.12-result-aggregator-service-architecture.mdc): Result Aggregator Service
 - [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc): Event-driven communication standards
 
 ## Implementation & Coding Standards

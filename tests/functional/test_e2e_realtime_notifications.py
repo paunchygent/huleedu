@@ -66,7 +66,7 @@ class TestEndToEndRealtimeNotifications:
         )
 
         # Create EventEnvelope (simulating what the service would create)
-        event_envelope = EventEnvelope(
+        EventEnvelope(
             event_id=uuid.uuid4(),
             event_type="huleedu.class.class.created.v1",
             event_timestamp=event_data.timestamp,

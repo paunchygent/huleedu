@@ -7,6 +7,7 @@ from dishka import AsyncContainer, Provider, Scope, make_async_container, provid
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from prometheus_client import REGISTRY, CollectorRegistry
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -114,9 +115,6 @@ class ServiceProvider(Provider):
             user_class_type=UserClass,
             student_type=Student,
         )
-
-
-from prometheus_client import REGISTRY, CollectorRegistry
 
 
 class MetricsProvider(Provider):

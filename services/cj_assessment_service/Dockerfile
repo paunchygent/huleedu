@@ -44,5 +44,5 @@ USER cjassessment
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:9090/healthz || exit 1
 
-# Command to run the application from service directory
-CMD ["pdm", "run", "start_service"] 
+# Command to run the integrated service (HTTP API + Kafka worker)
+CMD ["pdm", "run", "start"] 

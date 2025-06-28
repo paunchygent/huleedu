@@ -1,7 +1,9 @@
 """Health check and metrics endpoints."""
 
+from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Blueprint, Response, jsonify
+from quart_dishka import inject
 
 from ..metrics import ResultAggregatorMetrics
 
@@ -19,7 +21,8 @@ async def health_check() -> Response:
 
 
 @health_bp.route("/metrics")
-async def metrics(metrics_instance: ResultAggregatorMetrics) -> Response:
+@inject
+async def metrics(metrics_instance: FromDishka[ResultAggregatorMetrics]) -> Response:
     """Prometheus metrics endpoint."""
     from prometheus_client import generate_latest
 

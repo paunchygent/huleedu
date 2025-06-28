@@ -1,9 +1,9 @@
 """Internal API routes for querying aggregated results."""
 
-from typing import Optional, Protocol, cast
+from typing import Optional
 from uuid import uuid4
 
-from dishka import AsyncContainer, FromDishka
+from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Blueprint, Response, current_app, g, jsonify, request
 from quart_dishka import inject
@@ -18,17 +18,11 @@ logger = create_service_logger("result_aggregator.api.query")
 query_bp = Blueprint("query", __name__, url_prefix="/internal/v1")
 
 
-class DishkaQuart(Protocol):
-    """A Quart app that has a dishka_container attribute."""
-
-    dishka_container: AsyncContainer
-
-
 @query_bp.before_request
 async def authenticate_request() -> Optional[tuple[Response, int]]:
     """Authenticate internal service requests."""
-    dishka_app = cast(DishkaQuart, current_app)
-    dishka = dishka_app.dishka_container
+    # Access Dishka container from extensions
+    dishka = current_app.extensions["QUART_DISHKA"].container
     security = await dishka.get(SecurityServiceProtocol)
     # Extract service credentials
     api_key = request.headers.get("X-Internal-API-Key")

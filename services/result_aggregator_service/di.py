@@ -7,6 +7,7 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from huleedu_service_libs.redis_set_operations import RedisSetOperations
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -151,18 +152,32 @@ class ServiceProvider(Provider):
         return StateStoreRedisImpl(redis_client, settings.REDIS_CACHE_TTL_SECONDS)
 
     @provide
-    def provide_cache_manager(
+    def provide_redis_set_operations(
         self, redis_client: RedisClientProtocol, settings: Settings
+    ) -> RedisSetOperations:
+        """Provide Redis SET operations."""
+        client = cast(RedisClient, redis_client)
+        return RedisSetOperations(client.client, f"ras-{settings.SERVICE_NAME}")
+
+    @provide
+    def provide_cache_manager(
+        self,
+        redis_client: RedisClientProtocol,
+        redis_set_ops: RedisSetOperations,
+        settings: Settings,
     ) -> CacheManagerProtocol:
         """Provide cache manager implementation."""
-        return CacheManagerImpl(redis_client, settings.REDIS_CACHE_TTL_SECONDS)
+        return CacheManagerImpl(redis_client, redis_set_ops, settings.REDIS_CACHE_TTL_SECONDS)
 
     @provide
     def provide_event_processor(
-        self, batch_repository: BatchRepositoryProtocol, state_store: StateStoreProtocol
+        self,
+        batch_repository: BatchRepositoryProtocol,
+        state_store: StateStoreProtocol,
+        cache_manager: CacheManagerProtocol,
     ) -> EventProcessorProtocol:
         """Provide event processor implementation."""
-        return EventProcessorImpl(batch_repository, state_store)
+        return EventProcessorImpl(batch_repository, state_store, cache_manager)
 
     @provide
     def provide_batch_query_service(

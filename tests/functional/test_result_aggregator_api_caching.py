@@ -93,11 +93,19 @@ class FunctionalTestApiProvider(Provider):
         self, redis_client: FromDishka[RedisClientProtocol], settings: FromDishka[Settings]
     ) -> CacheManagerProtocol:
         """Provides the real cache manager implementation."""
+        from typing import cast
+
+        from huleedu_service_libs.redis_client import RedisClient
+        from huleedu_service_libs.redis_set_operations import RedisSetOperations
+
         from services.result_aggregator_service.implementations.cache_manager_impl import (
             CacheManagerImpl,
         )
 
-        return CacheManagerImpl(redis_client, settings.REDIS_CACHE_TTL_SECONDS)
+        # Follow the same pattern as the service DI
+        client = cast(RedisClient, redis_client)
+        redis_set_ops = RedisSetOperations(client.client, f"test-{settings.SERVICE_NAME}")
+        return CacheManagerImpl(redis_client, redis_set_ops, settings.REDIS_CACHE_TTL_SECONDS)
 
     @provide(scope=Scope.APP)
     def provide_event_processor(self) -> EventProcessorProtocol:
@@ -179,11 +187,11 @@ async def test_app(
     )
 
     # Setup Dishka integration
-    dishka = QuartDishka(app=app, container=container)
+    QuartDishka(app=app, container=container)
 
     # Store container reference (both ways for compatibility)
     app.container = container
-    app.dishka_container = container  # For the authenticate_request function
+    app.dishka_container = container  # type: ignore[attr-defined]  # For the authenticate_request function
 
     # Register blueprints
     app.register_blueprint(health_bp)
@@ -227,7 +235,7 @@ async def setup_test_data(test_app: FunctionalTestResultAggregatorApp) -> BatchR
         repo = BatchRepositoryPostgresImpl(session)
 
         # Create test batch
-        batch = await repo.create_batch(
+        await repo.create_batch(
             batch_id="test-batch-001",
             user_id="test-user-123",
             essay_count=2,

@@ -101,8 +101,11 @@ class SpellCheckerKafkaConsumer:
             # Start message processing loop
             await self._process_messages()
 
+        except asyncio.CancelledError:
+            logger.info("Kafka consumer task cancelled")
+            raise
         except Exception as e:
-            logger.error(f"Error starting Spell Checker Kafka consumer: {e}")
+            logger.error(f"Error in Spell Checker Kafka consumer: {e}", exc_info=True)
             raise
         finally:
             await self.stop_consumer()
