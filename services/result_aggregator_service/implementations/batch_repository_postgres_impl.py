@@ -40,7 +40,13 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         offset: int = 0,
     ) -> List[BatchResult]:
         """Get all batches for a user."""
-        query = select(BatchResult).where(BatchResult.user_id == user_id)
+        from sqlalchemy.orm import selectinload
+
+        query = (
+            select(BatchResult)
+            .where(BatchResult.user_id == user_id)
+            .options(selectinload(BatchResult.essays))  # Eagerly load essays
+        )
 
         if status:
             query = query.where(BatchResult.overall_status == BatchStatus(status))
@@ -134,6 +140,10 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         batch.completed_essay_count = completed_count
         batch.failed_essay_count = failed_count
 
+        # Set processing_started_at if not already set
+        if not batch.processing_started_at:
+            batch.processing_started_at = datetime.utcnow()
+
         # Update status based on completion
         if completed_count + failed_count >= batch.essay_count:
             if failed_count == 0:
@@ -143,8 +153,6 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             batch.processing_completed_at = datetime.utcnow()
         else:
             batch.overall_status = BatchStatus.PROCESSING_PIPELINES
-            if not batch.processing_started_at:
-                batch.processing_started_at = datetime.utcnow()
 
         batch.updated_at = datetime.utcnow()
         await self.session.commit()
@@ -159,6 +167,7 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         batch.overall_status = BatchStatus.FAILED_CRITICALLY
         batch.last_error = error_message
         batch.error_count += 1
+        batch.processing_completed_at = datetime.utcnow()
         batch.updated_at = datetime.utcnow()
         await self.session.commit()
 

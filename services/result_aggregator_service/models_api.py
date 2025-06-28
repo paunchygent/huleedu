@@ -60,10 +60,31 @@ class BatchStatusResponse(BaseModel):
     @classmethod
     def from_domain(cls, batch_result: "BatchResult") -> "BatchStatusResponse":
         """Convert from domain model."""
+        # Map database batch status (lowercase) to API batch status (uppercase)
+        status_mapping = {
+            "awaiting_content_validation": BatchStatus.REGISTERED,
+            "content_ingestion_failed": BatchStatus.FAILED,
+            "awaiting_pipeline_configuration": BatchStatus.REGISTERED,
+            "ready_for_pipeline_execution": BatchStatus.REGISTERED,
+            "processing_pipelines": BatchStatus.PROCESSING,
+            "awaiting_student_validation": BatchStatus.PROCESSING,
+            "validation_timeout_processed": BatchStatus.PROCESSING,
+            "guest_class_ready": BatchStatus.PROCESSING,
+            "completed_successfully": BatchStatus.COMPLETED,
+            "completed_with_failures": BatchStatus.PARTIALLY_COMPLETED,
+            "failed_critically": BatchStatus.FAILED,
+            "cancelled": BatchStatus.CANCELLED,
+        }
+
+        api_status = status_mapping.get(
+            batch_result.overall_status.value,
+            BatchStatus.PROCESSING,  # Default fallback
+        )
+
         return cls(
             batch_id=batch_result.batch_id,
             user_id=batch_result.user_id,
-            overall_status=BatchStatus(batch_result.overall_status.value),
+            overall_status=api_status,
             essay_count=batch_result.essay_count,
             completed_essay_count=batch_result.completed_essay_count,
             failed_essay_count=batch_result.failed_essay_count,

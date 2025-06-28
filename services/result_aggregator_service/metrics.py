@@ -43,9 +43,9 @@ class ResultAggregatorMetrics:
         )
 
         # Cache metrics
-        self.cache_hits_total = Counter("ras_cache_hits_total", "Cache hits")
+        self.cache_hits_total = Counter("ras_cache_hits_total", "Cache hits", ["cache_type"])
 
-        self.cache_misses_total = Counter("ras_cache_misses_total", "Cache misses")
+        self.cache_misses_total = Counter("ras_cache_misses_total", "Cache misses", ["cache_type"])
 
         # Business metrics
         self.batches_aggregated = Counter(

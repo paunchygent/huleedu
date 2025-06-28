@@ -114,13 +114,13 @@ class CacheManagerImpl(CacheManagerProtocol):
 
     async def invalidate_user_batches(self, user_id: str) -> None:
         """Invalidate all cached user batch lists.
-        
+
         Design Decision: This method intentionally does not perform active cache
         invalidation. We rely on TTL-based expiration (5 minutes) instead because:
         1. Pattern-based deletion is expensive at scale
         2. The short TTL is sufficient for our use case
         3. Batch data doesn't change frequently enough to require immediate invalidation
-        
+
         The method exists to maintain the protocol interface and logs a warning
         to document this limitation.
         """

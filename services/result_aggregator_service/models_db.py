@@ -3,7 +3,17 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -45,14 +55,14 @@ class BatchResult(Base):
 
     # Audit fields
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow, server_default="CURRENT_TIMESTAMP"
+        DateTime, nullable=False, default=datetime.utcnow, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
-        server_default="CURRENT_TIMESTAMP",
+        server_default=func.now(),
     )
 
     # Error tracking
@@ -135,14 +145,14 @@ class EssayResult(Base):
 
     # Audit fields
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow, server_default="CURRENT_TIMESTAMP"
+        DateTime, nullable=False, default=datetime.utcnow, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
-        server_default="CURRENT_TIMESTAMP",
+        server_default=func.now(),
     )
 
     # Relationships
