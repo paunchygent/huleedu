@@ -72,7 +72,7 @@ class DefaultPipelinePhaseCoordinator:
 
         # Update the phase status in pipeline state
         # COMPLETED_WITH_FAILURES is treated as success for progression purposes
-        # (per common_core/enums.py - it's a terminal success state with partial failures)
+        # (per common_core/status_enums.py - it's a terminal success state with partial failures)
         success_statuses = {BatchStatus.COMPLETED_SUCCESSFULLY, BatchStatus.COMPLETED_WITH_FAILURES}
         if phase_status in success_statuses:
             updated_status = PipelineExecutionStatus.COMPLETED_SUCCESSFULLY

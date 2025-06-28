@@ -154,6 +154,7 @@ ignore = [
 # For now, rely on type system and code review to prevent standard library logging
 
 [tool.mypy]
+mypy_path = "stubs"
 python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
@@ -178,6 +179,7 @@ module = [
     "services.file_service.*",
     "services.cj_assessment_service.*",
     "services.class_management_service.*",
+    "services.result_aggregator_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true
@@ -251,6 +253,7 @@ testpaths = [
     "services/file_service/tests",
     "services/cj_assessment_service/tests",
     "services/class_management_service/tests",
+    "services/result_aggregator_service/tests",
     "tests"
 ]
 pythonpath = [

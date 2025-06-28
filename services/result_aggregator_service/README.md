@@ -183,21 +183,28 @@ Structured logging with correlation IDs for request tracing.
 
 ## Implementation Status
 
-### Phase 2 Complete
+### Completed Features
 
 - ✅ Kafka consumer with idempotency
 - ✅ Event processing for all current services
-- ✅ PostgreSQL repository implementation
-- ✅ Redis state store and caching
-- ✅ Internal API with security
-- ✅ Prometheus metrics
-- ✅ Docker configuration
+- ✅ Batch registration event handling (creates initial batch records)
+- ✅ PostgreSQL repository implementation with common_core enums
+- ✅ Redis state store and caching with proper JSON abstraction
+- ✅ Internal API with service-to-service authentication
+- ✅ Prometheus metrics for all operations
+- ✅ Docker configuration for deployment
+
+### Recent Improvements
+
+1. **Batch Creation**: Now subscribes to `BatchEssaysRegistered` events to create initial records
+2. **Enum Alignment**: Uses `BatchStatus` and `ProcessingStage` from common_core
+3. **Cache Abstraction**: Properly encapsulated caching with JSON string protocol
 
 ### Known Limitations
 
-- Cache serialization for BatchResult is simplified (TODO: implement proper JSON serialization)
+- User batches caching still uses direct Redis (Task 4 pending)
 - Database migrations not yet implemented (uses auto-create for now)
-- Integration tests pending
+- Integration tests pending for new features
 
 ## Future Enhancements
 

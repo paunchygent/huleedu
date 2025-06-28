@@ -6,6 +6,8 @@ Follows testing standards from 110.3-testing-mode and 070-testing-and-quality-as
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from quart.typing import TestClientProtocol as QuartTestClient
 
@@ -22,7 +24,7 @@ class TestHealthAPI:
         test_settings = Settings()
         app = create_app(test_settings)
         app.config.update({"TESTING": True})
-        return app.test_client()
+        return cast(QuartTestClient, app.test_client())
 
     async def test_healthz_endpoint_responds_ok(self, app_client: QuartTestClient) -> None:
         """Test /healthz endpoint returns 200 with correct response."""

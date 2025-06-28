@@ -1,4 +1,5 @@
 """Security service implementation."""
+
 from typing import List
 
 from huleedu_service_libs.logging_utils import create_service_logger

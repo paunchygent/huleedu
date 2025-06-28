@@ -1,77 +1,73 @@
 """Service protocols for Result Aggregator Service."""
+
 from typing import Any, Dict, List, Optional, Protocol
 
 from common_core.events import (
+    BatchEssaysRegistered,
     CJAssessmentCompletedV1,
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
-    SpellcheckResultDataV1
+    SpellcheckResultDataV1,
 )
+from common_core.status_enums import ProcessingStage
 
-from .models_db import BatchResult, ProcessingPhaseStatus
+from .models_db import BatchResult
 
 
 class BatchRepositoryProtocol(Protocol):
     """Protocol for batch result repository operations."""
-    
+
     async def get_batch(self, batch_id: str) -> Optional[BatchResult]:
         """Get batch result by ID."""
         ...
-        
+
     async def create_batch(
-        self, 
-        batch_id: str, 
-        user_id: str, 
+        self,
+        batch_id: str,
+        user_id: str,
         essay_count: int,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> BatchResult:
         """Create a new batch result."""
         ...
-        
+
     async def update_batch_status(
-        self,
-        batch_id: str,
-        status: str,
-        error: Optional[str] = None
+        self, batch_id: str, status: str, error: Optional[str] = None
     ) -> bool:
         """Update batch status."""
         ...
-        
+
     async def get_user_batches(
-        self,
-        user_id: str,
-        status: Optional[str] = None,
-        limit: int = 20,
-        offset: int = 0
+        self, user_id: str, status: Optional[str] = None, limit: int = 20, offset: int = 0
     ) -> List[BatchResult]:
         """Get batches for a user."""
         ...
-        
+
     async def update_essay_spellcheck_result(
         self,
         essay_id: str,
         batch_id: str,
-        status: ProcessingPhaseStatus,
+        status: ProcessingStage,
         correction_count: Optional[int] = None,
         corrected_text_storage_id: Optional[str] = None,
-        error: Optional[str] = None
+        error: Optional[str] = None,
     ) -> None:
         """Update essay spellcheck results."""
         ...
-        
+
     async def update_essay_cj_assessment_result(
         self,
         essay_id: str,
         batch_id: str,
-        status: ProcessingPhaseStatus,
+        status: ProcessingStage,
         rank: Optional[int] = None,
         score: Optional[float] = None,
         comparison_count: Optional[int] = None,
-        error: Optional[str] = None
+        error: Optional[str] = None,
     ) -> None:
         """Update essay CJ assessment results."""
         ...
-        
+
     async def update_batch_phase_completed(
         self,
         batch_id: str,
@@ -81,7 +77,7 @@ class BatchRepositoryProtocol(Protocol):
     ) -> None:
         """Update batch after phase completion."""
         ...
-        
+
     async def update_batch_failed(self, batch_id: str, error_message: str) -> None:
         """Mark batch as failed."""
         ...
@@ -89,20 +85,15 @@ class BatchRepositoryProtocol(Protocol):
 
 class StateStoreProtocol(Protocol):
     """Protocol for state store operations."""
-    
+
     async def get_batch_state(self, batch_id: str) -> Optional[Dict[str, Any]]:
         """Get batch processing state from cache."""
         ...
-        
-    async def set_batch_state(
-        self, 
-        batch_id: str, 
-        state: Dict[str, Any],
-        ttl: int = 300
-    ) -> bool:
+
+    async def set_batch_state(self, batch_id: str, state: Dict[str, Any], ttl: int = 300) -> bool:
         """Set batch processing state in cache."""
         ...
-        
+
     async def invalidate_batch(self, batch_id: str) -> bool:
         """Invalidate cached batch state."""
         ...
@@ -110,27 +101,27 @@ class StateStoreProtocol(Protocol):
 
 class EventProcessorProtocol(Protocol):
     """Protocol for processing events from Kafka."""
-    
+
+    async def process_batch_registered(
+        self, envelope: EventEnvelope[BatchEssaysRegistered], data: BatchEssaysRegistered
+    ) -> None:
+        """Process batch registration event."""
+        ...
+
     async def process_batch_phase_outcome(
-        self,
-        envelope: EventEnvelope,
-        data: ELSBatchPhaseOutcomeV1
+        self, envelope: EventEnvelope[ELSBatchPhaseOutcomeV1], data: ELSBatchPhaseOutcomeV1
     ) -> None:
         """Process batch phase outcome event."""
         ...
-        
+
     async def process_spellcheck_completed(
-        self,
-        envelope: EventEnvelope,
-        data: SpellcheckResultDataV1
+        self, envelope: EventEnvelope[SpellcheckResultDataV1], data: SpellcheckResultDataV1
     ) -> None:
         """Process spellcheck completion event."""
         ...
-        
+
     async def process_cj_assessment_completed(
-        self,
-        envelope: EventEnvelope,
-        data: CJAssessmentCompletedV1
+        self, envelope: EventEnvelope[CJAssessmentCompletedV1], data: CJAssessmentCompletedV1
     ) -> None:
         """Process CJ assessment completion event."""
         ...
@@ -138,17 +129,13 @@ class EventProcessorProtocol(Protocol):
 
 class BatchQueryServiceProtocol(Protocol):
     """Protocol for querying batch results."""
-    
+
     async def get_batch_status(self, batch_id: str) -> Optional[BatchResult]:
         """Get comprehensive batch status."""
         ...
-        
+
     async def get_user_batches(
-        self,
-        user_id: str,
-        status: Optional[str] = None,
-        limit: int = 20,
-        offset: int = 0
+        self, user_id: str, status: Optional[str] = None, limit: int = 20, offset: int = 0
     ) -> List[BatchResult]:
         """Get all batches for a user."""
         ...
@@ -156,32 +143,39 @@ class BatchQueryServiceProtocol(Protocol):
 
 class SecurityServiceProtocol(Protocol):
     """Protocol for security operations."""
-    
-    async def validate_service_credentials(
-        self,
-        api_key: str,
-        service_id: str
-    ) -> bool:
+
+    async def validate_service_credentials(self, api_key: str, service_id: str) -> bool:
         """Validate service-to-service credentials."""
         ...
 
 
 class CacheManagerProtocol(Protocol):
     """Protocol for cache management."""
-    
-    async def get_batch_status(self, batch_id: str) -> Optional[BatchResult]:
-        """Get cached batch status."""
+
+    async def get_batch_status_json(self, batch_id: str) -> Optional[str]:
+        """Get cached batch status as JSON string."""
         ...
-        
-    async def set_batch_status(
-        self,
-        batch_id: str,
-        status: BatchResult,
-        ttl: int = 300
+
+    async def set_batch_status_json(self, batch_id: str, status_json: str, ttl: int = 300) -> None:
+        """Cache batch status as JSON string."""
+        ...
+
+    async def get_user_batches_json(
+        self, user_id: str, limit: int, offset: int, status: Optional[str]
+    ) -> Optional[str]:
+        """Get cached user batches list as JSON string."""
+        ...
+
+    async def set_user_batches_json(
+        self, user_id: str, limit: int, offset: int, status: Optional[str], data_json: str, ttl: int
     ) -> None:
-        """Cache batch status."""
+        """Cache user batches list as JSON string."""
         ...
-        
+
     async def invalidate_batch(self, batch_id: str) -> None:
         """Invalidate cached batch data."""
+        ...
+
+    async def invalidate_user_batches(self, user_id: str) -> None:
+        """Invalidate all cached user batch lists."""
         ...

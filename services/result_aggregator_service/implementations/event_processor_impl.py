@@ -1,8 +1,21 @@
 """Event processor implementation for Result Aggregator Service."""
+
+from typing import TYPE_CHECKING
+
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from ..models_db import ProcessingPhaseStatus
+from common_core.status_enums import BatchStatus, ProcessingStage
+
 from ..protocols import BatchRepositoryProtocol, EventProcessorProtocol, StateStoreProtocol
+
+if TYPE_CHECKING:
+    from common_core.events import (
+        BatchEssaysRegistered,
+        CJAssessmentCompletedV1,
+        ELSBatchPhaseOutcomeV1,
+        EventEnvelope,
+        SpellcheckResultDataV1,
+    )
 
 logger = create_service_logger("result_aggregator.event_processor")
 
@@ -19,30 +32,73 @@ class EventProcessorImpl(EventProcessorProtocol):
         self.batch_repository = batch_repository
         self.state_store = state_store
 
+    async def process_batch_registered(
+        self, envelope: "EventEnvelope[BatchEssaysRegistered]", data: "BatchEssaysRegistered"
+    ) -> None:
+        """Create the initial batch result record upon registration."""
+        try:
+            logger.info(
+                "Processing batch registration",
+                batch_id=data.batch_id,
+                user_id=data.user_id,
+                essay_count=data.expected_essay_count,
+            )
+
+            # Create the initial batch record
+            await self.batch_repository.create_batch(
+                batch_id=data.batch_id,
+                user_id=data.user_id,
+                essay_count=data.expected_essay_count,
+                metadata={"requested_pipelines": data.requested_pipelines}
+                if hasattr(data, "requested_pipelines")
+                else None,
+            )
+
+            logger.info(
+                "Created initial batch record",
+                batch_id=data.batch_id,
+                user_id=data.user_id,
+            )
+
+        except Exception as e:
+            logger.error(
+                "Failed to process batch registration",
+                batch_id=data.batch_id,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
+
     async def process_batch_phase_outcome(
-        self, envelope: "EventEnvelope", data: "ELSBatchPhaseOutcomeV1"
+        self, envelope: "EventEnvelope[ELSBatchPhaseOutcomeV1]", data: "ELSBatchPhaseOutcomeV1"
     ) -> None:
         """Process batch phase outcome from ELS."""
         try:
             logger.info(
                 "Processing batch phase outcome",
                 batch_id=data.batch_id,
-                phase=data.phase,
-                outcome=data.outcome,
+                phase=data.phase_name.value,
+                outcome=data.phase_status.value,
             )
 
             # Update batch status based on phase outcome
-            if data.outcome == "COMPLETED":
+            if data.phase_status in [
+                BatchStatus.COMPLETED_SUCCESSFULLY,
+                BatchStatus.COMPLETED_WITH_FAILURES,
+            ]:
+                completed_count = len(data.processed_essays)
+                failed_count = len(data.failed_essay_ids)
+
                 await self.batch_repository.update_batch_phase_completed(
                     batch_id=data.batch_id,
-                    phase=data.phase,
-                    completed_count=data.metadata.get("completed_essay_count", 0),
-                    failed_count=data.metadata.get("failed_essay_count", 0),
+                    phase=data.phase_name.value,
+                    completed_count=completed_count,
+                    failed_count=failed_count,
                 )
-            elif data.outcome == "FAILED":
+            elif data.phase_status == BatchStatus.FAILED_CRITICALLY:
                 await self.batch_repository.update_batch_failed(
                     batch_id=data.batch_id,
-                    error_message=data.metadata.get("error_message", "Phase failed"),
+                    error_message=f"Phase {data.phase_name.value} failed critically",
                 )
 
             # Invalidate cache
@@ -51,7 +107,7 @@ class EventProcessorImpl(EventProcessorProtocol):
             logger.info(
                 "Batch phase outcome processed successfully",
                 batch_id=data.batch_id,
-                phase=data.phase,
+                phase=data.phase_name.value,
             )
 
         except Exception as e:
@@ -64,36 +120,51 @@ class EventProcessorImpl(EventProcessorProtocol):
             raise
 
     async def process_spellcheck_completed(
-        self, envelope: "EventEnvelope", data: "SpellcheckResultDataV1"
+        self, envelope: "EventEnvelope[SpellcheckResultDataV1]", data: "SpellcheckResultDataV1"
     ) -> None:
         """Process spellcheck completion event."""
         try:
+            # Extract entity reference from system metadata
+            entity_ref = data.system_metadata.entity if data.system_metadata else None
+            if not entity_ref:
+                logger.error("Missing entity reference in spellcheck result")
+                raise ValueError("Missing entity reference")
+
             logger.info(
                 "Processing spellcheck completed",
-                entity_ref=data.entity_ref,
+                entity_id=entity_ref.entity_id,
+                entity_type=entity_ref.entity_type,
+                parent_id=entity_ref.parent_id,
                 status=data.status,
             )
 
-            # Extract essay_id and batch_id from entity_ref
-            # Assuming entity_ref format is "batch_id:essay_id"
-            parts = data.entity_ref.split(":")
-            if len(parts) != 2:
-                logger.error("Invalid entity_ref format", entity_ref=data.entity_ref)
-                raise ValueError(f"Invalid entity_ref format: {data.entity_ref}")
-            
-            batch_id, essay_id = parts
+            # Extract essay_id and batch_id from entity reference
+            essay_id = entity_ref.entity_id
+            batch_id = entity_ref.parent_id
+
+            if not batch_id:
+                logger.error("Missing batch_id in entity reference")
+                raise ValueError("Missing batch_id in entity reference")
 
             # Determine status
             status = (
-                ProcessingPhaseStatus.COMPLETED
+                ProcessingStage.COMPLETED
                 if "SUCCESS" in data.status.upper()
-                else ProcessingPhaseStatus.FAILED
+                else ProcessingStage.FAILED
             )
 
             # Get corrected text storage ID from storage metadata
             corrected_text_storage_id = None
-            if data.storage_metadata and data.storage_metadata.storage_ids:
-                corrected_text_storage_id = data.storage_metadata.storage_ids.get("corrected_text")
+            if data.storage_metadata and hasattr(data.storage_metadata, "references"):
+                # Check if there's a corrected text reference
+                from common_core.domain_enums import ContentType
+
+                corrected_refs = data.storage_metadata.references.get(
+                    ContentType.CORRECTED_TEXT, {}
+                )
+                if corrected_refs:
+                    # Get the first storage ID from the references
+                    corrected_text_storage_id = next(iter(corrected_refs.values()), None)
 
             # Update essay result
             await self.batch_repository.update_essay_spellcheck_result(
@@ -102,7 +173,13 @@ class EventProcessorImpl(EventProcessorProtocol):
                 status=status,
                 correction_count=data.corrections_made,
                 corrected_text_storage_id=corrected_text_storage_id,
-                error=data.system_metadata.error_info if status == ProcessingPhaseStatus.FAILED else None,
+                error=str(data.system_metadata.error_info)
+                if (
+                    status == ProcessingStage.FAILED
+                    and data.system_metadata
+                    and data.system_metadata.error_info
+                )
+                else None,
             )
 
             # Invalidate cache
@@ -117,25 +194,25 @@ class EventProcessorImpl(EventProcessorProtocol):
         except Exception as e:
             logger.error(
                 "Failed to process spellcheck completed",
-                entity_ref=data.entity_ref,
                 error=str(e),
                 exc_info=True,
             )
             raise
 
     async def process_cj_assessment_completed(
-        self, envelope: "EventEnvelope", data: "CJAssessmentCompletedV1"
+        self, envelope: "EventEnvelope[CJAssessmentCompletedV1]", data: "CJAssessmentCompletedV1"
     ) -> None:
         """Process CJ assessment completion event."""
         try:
             logger.info(
                 "Processing CJ assessment completed",
-                entity_ref=data.entity_ref,
+                entity_id=data.entity_ref.entity_id,
+                entity_type=data.entity_ref.entity_type,
                 job_id=data.cj_assessment_job_id,
             )
 
-            # entity_ref is the batch_id for CJ assessment events
-            batch_id = data.entity_ref
+            # entity_ref.entity_id is the batch_id for CJ assessment events
+            batch_id = data.entity_ref.entity_id
 
             # Process each ranking result
             for ranking in data.rankings:
@@ -150,7 +227,7 @@ class EventProcessorImpl(EventProcessorProtocol):
                 await self.batch_repository.update_essay_cj_assessment_result(
                     essay_id=essay_id,
                     batch_id=batch_id,
-                    status=ProcessingPhaseStatus.COMPLETED,
+                    status=ProcessingStage.COMPLETED,
                     rank=rank,
                     score=score,
                     comparison_count=None,  # Not provided in current event

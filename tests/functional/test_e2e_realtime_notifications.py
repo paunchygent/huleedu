@@ -139,37 +139,45 @@ class TestEndToEndRealtimeNotifications:
         assert extracted_id is None
 
     @pytest.mark.asyncio
-    async def test_redis_channel_format(self, redis_service_client: RedisClient) -> None:
+    async def test_redis_channel_format(
+        self, redis_service_client: RedisClient, redis_client: redis.Redis
+    ) -> None:
         """Test that Redis channels follow the expected format for API Gateway WebSocket."""
         test_user_id = "test-user-789"
+        expected_channel = f"ws:{test_user_id}"
 
-        # Mock the publish method to capture the channel name
-        captured_channel = None
+        # Subscribe to the expected channel
+        pubsub = redis_client.pubsub()
+        await pubsub.subscribe(expected_channel)
 
-        async def mock_publish(channel: str, _message: str) -> int:
-            nonlocal captured_channel
-            captured_channel = channel
-            return 1  # Simulate successful publish
+        try:
+            # Wait for subscription to be ready and consume the subscription message
+            sub_message = await pubsub.get_message(timeout=1.0)
+            assert sub_message is not None
+            assert sub_message["type"] == "subscribe"
 
-        # After refactoring, we need to patch the RedisPubSub publish method
-        if redis_service_client._pubsub:
-            # Patch the actual pubsub instance's publish method
-            original_publish = redis_service_client._pubsub.publish
-            redis_service_client._pubsub.publish = mock_publish
-            
-            try:
-                # Act
-                await redis_service_client.publish_user_notification(
-                    user_id=test_user_id, event_type="test_event", data={"test": "data"}
-                )
+            # Act - publish a notification
+            await redis_service_client.publish_user_notification(
+                user_id=test_user_id, event_type="test_event", data={"test": "data"}
+            )
 
-                # Assert
-                assert captured_channel == f"ws:{test_user_id}"
-            finally:
-                # Restore original method
-                redis_service_client._pubsub.publish = original_publish
-        else:
-            pytest.skip("Redis client not properly initialized with pubsub")
+            # Get the actual message with a timeout
+            message = await pubsub.get_message(timeout=5.0)
+
+            # Assert we received a message on the correct channel
+            assert message is not None, "No message received on Redis channel"
+            assert message["channel"].decode() == expected_channel
+            assert message["type"] == "message"
+
+            # Verify the message content
+            message_data = json.loads(message["data"].decode())
+            # The publish_user_notification method wraps the data
+            assert message_data["event"] == "test_event"
+            assert message_data["data"] == {"test": "data"}
+
+        finally:
+            await pubsub.unsubscribe(expected_channel)
+            await pubsub.aclose()
 
     @pytest.mark.asyncio
     async def test_graceful_degradation_on_redis_failure(self) -> None:

@@ -4,8 +4,8 @@ Event models for HuleEdu microservices.
 
 from .base_event_models import BaseEventData, EventTracker, ProcessingUpdate
 from .batch_coordination_events import (
-    BatchEssaysRegistered,
     BatchEssaysReady,
+    BatchEssaysRegistered,
     BatchReadinessTimeout,
     ExcessContentProvisionedV1,
 )

@@ -120,7 +120,7 @@ class TestPipelineFailureHandling:
         Test pipeline handling when a phase completes with partial failures.
 
         COMPLETED_WITH_FAILURES should allow progression to next phase as it indicates
-        successful completion with some non-critical essay failures (per common_core/enums.py).
+        successful completion with some non-critical essay failures (per common_core/status_enums.py).
         """
         batch_id = str(uuid4())
         correlation_id = str(uuid4())
@@ -184,7 +184,7 @@ class TestPipelineFailureHandling:
         Test pipeline handling when a phase completes with partial failures.
 
         COMPLETED_WITH_FAILURES should allow progression to next phase as it indicates
-        successful completion with some non-critical essay failures (per common_core/enums.py).
+        successful completion with some non-critical essay failures (per common_core/status_enums.py).
         """
         batch_id = str(uuid4())
         correlation_id = str(uuid4())

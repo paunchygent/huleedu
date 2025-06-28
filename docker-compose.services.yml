@@ -122,44 +122,6 @@ services:
       retries: 3
       start_period: 20s
 
-  result_aggregator_service:
-    build:
-      context: .
-      dockerfile: services/result_aggregator_service/Dockerfile
-    container_name: huleedu_result_aggregator
-    restart: unless-stopped
-    depends_on:
-      kafka_topic_setup:
-        condition: service_completed_successfully
-      result_aggregator_db:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - huleedu_internal_network
-    ports:
-      - "4003:4003"  # API port
-      - "9096:9096"  # Metrics port
-    environment:
-      - ENV_TYPE=docker
-      - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/result_aggregator
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - REDIS_URL=redis://redis:6379
-      - INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
-      - LOG_LEVEL=INFO
-      - SERVICE_NAME=result-aggregator-service
-      - HOST=0.0.0.0
-      - PORT=4003
-      - METRICS_PORT=9096
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4003/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
 
   spell_checker_service:
     build:
@@ -193,44 +155,6 @@ services:
       retries: 3
       start_period: 20s
 
-  result_aggregator_service:
-    build:
-      context: .
-      dockerfile: services/result_aggregator_service/Dockerfile
-    container_name: huleedu_result_aggregator
-    restart: unless-stopped
-    depends_on:
-      kafka_topic_setup:
-        condition: service_completed_successfully
-      result_aggregator_db:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - huleedu_internal_network
-    ports:
-      - "4003:4003"  # API port
-      - "9096:9096"  # Metrics port
-    environment:
-      - ENV_TYPE=docker
-      - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/result_aggregator
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - REDIS_URL=redis://redis:6379
-      - INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
-      - LOG_LEVEL=INFO
-      - SERVICE_NAME=result-aggregator-service
-      - HOST=0.0.0.0
-      - PORT=4003
-      - METRICS_PORT=9096
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4003/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
 
   batch_orchestrator_service:
     build:
@@ -274,44 +198,6 @@ services:
       retries: 3
       start_period: 20s
 
-  result_aggregator_service:
-    build:
-      context: .
-      dockerfile: services/result_aggregator_service/Dockerfile
-    container_name: huleedu_result_aggregator
-    restart: unless-stopped
-    depends_on:
-      kafka_topic_setup:
-        condition: service_completed_successfully
-      result_aggregator_db:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - huleedu_internal_network
-    ports:
-      - "4003:4003"  # API port
-      - "9096:9096"  # Metrics port
-    environment:
-      - ENV_TYPE=docker
-      - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/result_aggregator
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - REDIS_URL=redis://redis:6379
-      - INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
-      - LOG_LEVEL=INFO
-      - SERVICE_NAME=result-aggregator-service
-      - HOST=0.0.0.0
-      - PORT=4003
-      - METRICS_PORT=9096
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4003/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
 
   essay_lifecycle_api:
     build:
@@ -359,44 +245,6 @@ services:
       retries: 3
       start_period: 20s
 
-  result_aggregator_service:
-    build:
-      context: .
-      dockerfile: services/result_aggregator_service/Dockerfile
-    container_name: huleedu_result_aggregator
-    restart: unless-stopped
-    depends_on:
-      kafka_topic_setup:
-        condition: service_completed_successfully
-      result_aggregator_db:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - huleedu_internal_network
-    ports:
-      - "4003:4003"  # API port
-      - "9096:9096"  # Metrics port
-    environment:
-      - ENV_TYPE=docker
-      - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/result_aggregator
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - REDIS_URL=redis://redis:6379
-      - INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
-      - LOG_LEVEL=INFO
-      - SERVICE_NAME=result-aggregator-service
-      - HOST=0.0.0.0
-      - PORT=4003
-      - METRICS_PORT=9096
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4003/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
 
   essay_lifecycle_worker:
     build:
@@ -468,44 +316,6 @@ services:
       retries: 3
       start_period: 20s
 
-  result_aggregator_service:
-    build:
-      context: .
-      dockerfile: services/result_aggregator_service/Dockerfile
-    container_name: huleedu_result_aggregator
-    restart: unless-stopped
-    depends_on:
-      kafka_topic_setup:
-        condition: service_completed_successfully
-      result_aggregator_db:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - huleedu_internal_network
-    ports:
-      - "4003:4003"  # API port
-      - "9096:9096"  # Metrics port
-    environment:
-      - ENV_TYPE=docker
-      - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/result_aggregator
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - REDIS_URL=redis://redis:6379
-      - INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
-      - LOG_LEVEL=INFO
-      - SERVICE_NAME=result-aggregator-service
-      - HOST=0.0.0.0
-      - PORT=4003
-      - METRICS_PORT=9096
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4003/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
 
   cj_assessment_service:
     build:
@@ -550,44 +360,6 @@ services:
       retries: 3
       start_period: 20s
 
-  result_aggregator_service:
-    build:
-      context: .
-      dockerfile: services/result_aggregator_service/Dockerfile
-    container_name: huleedu_result_aggregator
-    restart: unless-stopped
-    depends_on:
-      kafka_topic_setup:
-        condition: service_completed_successfully
-      result_aggregator_db:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - huleedu_internal_network
-    ports:
-      - "4003:4003"  # API port
-      - "9096:9096"  # Metrics port
-    environment:
-      - ENV_TYPE=docker
-      - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/result_aggregator
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - REDIS_URL=redis://redis:6379
-      - INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
-      - LOG_LEVEL=INFO
-      - SERVICE_NAME=result-aggregator-service
-      - HOST=0.0.0.0
-      - PORT=4003
-      - METRICS_PORT=9096
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4003/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
 
   api_gateway_service:
     build:
@@ -629,44 +401,6 @@ services:
       retries: 3
       start_period: 20s
 
-  result_aggregator_service:
-    build:
-      context: .
-      dockerfile: services/result_aggregator_service/Dockerfile
-    container_name: huleedu_result_aggregator
-    restart: unless-stopped
-    depends_on:
-      kafka_topic_setup:
-        condition: service_completed_successfully
-      result_aggregator_db:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - huleedu_internal_network
-    ports:
-      - "4003:4003"  # API port
-      - "9096:9096"  # Metrics port
-    environment:
-      - ENV_TYPE=docker
-      - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/result_aggregator
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - REDIS_URL=redis://redis:6379
-      - INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
-      - LOG_LEVEL=INFO
-      - SERVICE_NAME=result-aggregator-service
-      - HOST=0.0.0.0
-      - PORT=4003
-      - METRICS_PORT=9096
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4003/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
 
   class_management_service:
     build:
@@ -703,41 +437,3 @@ services:
       retries: 3
       start_period: 20s
 
-  result_aggregator_service:
-    build:
-      context: .
-      dockerfile: services/result_aggregator_service/Dockerfile
-    container_name: huleedu_result_aggregator
-    restart: unless-stopped
-    depends_on:
-      kafka_topic_setup:
-        condition: service_completed_successfully
-      result_aggregator_db:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - huleedu_internal_network
-    ports:
-      - "4003:4003"  # API port
-      - "9096:9096"  # Metrics port
-    environment:
-      - ENV_TYPE=docker
-      - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/result_aggregator
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - REDIS_URL=redis://redis:6379
-      - INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
-      - LOG_LEVEL=INFO
-      - SERVICE_NAME=result-aggregator-service
-      - HOST=0.0.0.0
-      - PORT=4003
-      - METRICS_PORT=9096
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4003/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s

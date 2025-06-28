@@ -1,15 +1,13 @@
 """Main application entry point for Result Aggregator Service."""
+
 import asyncio
-import signal
-from contextlib import asynccontextmanager
+from typing import Optional
 
 import dotenv
-from dishka import make_async_container
-from dishka.integrations.quart import setup_dishka
-from quart import Quart
-from quart_cors import cors
-
+from dishka import AsyncContainer, make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
+from quart import Quart
+from quart_dishka import QuartDishka
 
 # Load environment variables before importing anything else
 dotenv.load_dotenv()
@@ -18,107 +16,90 @@ dotenv.load_dotenv()
 from .api.health_routes import health_bp
 from .api.query_routes import query_bp
 from .config import Settings
-from .di import (
-    CoreInfrastructureProvider,
-    DatabaseProvider,
-    RepositoryProvider,
-    ServiceProvider
-)
+from .di import CoreInfrastructureProvider, DatabaseProvider, RepositoryProvider, ServiceProvider
 from .kafka_consumer import ResultAggregatorKafkaConsumer
 from .startup_setup import setup_metrics_endpoint
-
 
 logger = create_service_logger("result_aggregator.app")
 
 
-async def create_app() -> Quart:
+class ResultAggregatorApp(Quart):
+    """Custom Quart app with typed application-specific attributes."""
+
+    container: AsyncContainer
+    consumer_task: Optional[asyncio.Task[None]]
+
+
+def create_app() -> ResultAggregatorApp:
     """Create and configure the Quart application."""
-    app = Quart(__name__)
-    
-    # Enable CORS for internal services
-    app = cors(app, allow_origin=["http://localhost:*"])
-    
+    app = ResultAggregatorApp(__name__)
+
+    # CORS is handled by API Gateway - internal services don't need it
+
     # Create DI container
     container = make_async_container(
-        CoreInfrastructureProvider(),
-        DatabaseProvider(),
-        RepositoryProvider(),
-        ServiceProvider()
+        CoreInfrastructureProvider(), DatabaseProvider(), RepositoryProvider(), ServiceProvider()
     )
-    
+
     # Setup Dishka integration
-    setup_dishka(container, app)
-    
+    QuartDishka(app=app, container=container)
+
     # Register blueprints
     app.register_blueprint(health_bp)
     app.register_blueprint(query_bp)
-    
+
     # Store container reference
     app.container = container
-    
+
     # Setup metrics endpoint
     setup_metrics_endpoint(app)
-    
+
     return app
 
 
-@asynccontextmanager
-async def managed_kafka_consumer(app: Quart):
-    """Manage Kafka consumer lifecycle."""
-    async with app.container() as request_container:
-        consumer = await request_container.get(ResultAggregatorKafkaConsumer)
-        
-        # Start consumer in background
-        consumer_task = asyncio.create_task(consumer.start())
-        
-        try:
-            yield
-        finally:
-            # Stop consumer gracefully
-            await consumer.stop()
-            await consumer_task
+app = create_app()
 
 
-async def main():
-    """Main entry point for the service."""
+@app.before_serving
+async def startup() -> None:
+    """Initialize services on startup."""
     try:
-        # Create app
-        app = await create_app()
-        
-        # Get settings
+        # Get settings and start Kafka consumer
         async with app.container() as request_container:
             settings = await request_container.get(Settings)
-        
-        # Setup signal handlers
-        shutdown_event = asyncio.Event()
-        
-        def signal_handler(signum, _frame):
-            logger.info(f"Received signal {signum}, initiating shutdown...")
-            shutdown_event.set()
-        
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-        
-        # Start services
-        async with managed_kafka_consumer(app):
-            # Run Quart app
-            config = app.make_config()
-            config.bind = [f"{settings.HOST}:{settings.PORT}"]
-            
-            logger.info(
-                "Result Aggregator Service started",
-                host=settings.HOST,
-                port=settings.PORT,
-                metrics_port=settings.METRICS_PORT
-            )
-            
-            # Run until shutdown
-            await app.run_task(config=config, shutdown_trigger=shutdown_event.wait)
-            
+            consumer = await request_container.get(ResultAggregatorKafkaConsumer)
+
+        # Start consumer in background
+        app.consumer_task = asyncio.create_task(consumer.start())
+
+        logger.info(
+            "Result Aggregator Service started",
+            host=settings.HOST,
+            port=settings.PORT,
+            metrics_port=settings.METRICS_PORT,
+        )
     except Exception as e:
-        logger.critical("Failed to start Result Aggregator Service", error=str(e), exc_info=True)
+        logger.critical("Failed to start services", error=str(e), exc_info=True)
         raise
 
 
+@app.after_serving
+async def shutdown() -> None:
+    """Gracefully shutdown services."""
+    try:
+        # Stop Kafka consumer
+        if hasattr(app, "consumer_task") and app.consumer_task is not None:
+            async with app.container() as request_container:
+                consumer = await request_container.get(ResultAggregatorKafkaConsumer)
+            await consumer.stop()
+            await app.consumer_task
+
+        logger.info("Result Aggregator Service shutdown complete")
+    except Exception as e:
+        logger.error("Error during shutdown", error=str(e), exc_info=True)
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Get settings from container
+    settings = Settings()
+    app.run(debug=False, host=settings.HOST, port=settings.PORT)

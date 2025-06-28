@@ -1,8 +1,10 @@
 """Aggregator service implementation for batch queries."""
-from typing import Any, List, Optional
+
+from typing import List, Optional
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from ..config import Settings
 from ..models_db import BatchResult
 from ..protocols import BatchQueryServiceProtocol, BatchRepositoryProtocol, CacheManagerProtocol
 
@@ -16,7 +18,7 @@ class AggregatorServiceImpl(BatchQueryServiceProtocol):
         self,
         batch_repository: BatchRepositoryProtocol,
         cache_manager: CacheManagerProtocol,
-        settings: Any,  # Settings type
+        settings: Settings,
     ):
         """Initialize the service."""
         self.batch_repository = batch_repository
@@ -26,23 +28,9 @@ class AggregatorServiceImpl(BatchQueryServiceProtocol):
     async def get_batch_status(self, batch_id: str) -> Optional[BatchResult]:
         """Get comprehensive batch status."""
         try:
-            # Try cache first if enabled
-            if self.settings.CACHE_ENABLED:
-                cached = await self.cache_manager.get_batch_status(batch_id)
-                if cached:
-                    logger.debug("Batch status retrieved from cache", batch_id=batch_id)
-                    return cached
-
-            # Get from database
-            batch = await self.batch_repository.get_batch(batch_id)
-            
-            if batch and self.settings.CACHE_ENABLED:
-                # Cache the result
-                await self.cache_manager.set_batch_status(
-                    batch_id, batch, ttl=self.settings.REDIS_CACHE_TTL_SECONDS
-                )
-
-            return batch
+            # Note: Caching is now handled at the API layer since we cache JSON responses
+            # This service method just retrieves from the database
+            return await self.batch_repository.get_batch(batch_id)
 
         except Exception as e:
             logger.error(

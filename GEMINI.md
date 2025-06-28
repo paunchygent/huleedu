@@ -65,8 +65,6 @@ All events transmitted via Kafka **MUST** be wrapped in the standardized `EventE
 
 * **Evidence**: The `EventEnvelope` is a `pydantic.BaseModel` defined in **@common\_core/src/common\_core/events/envelope.py**.
 
-<!-- end list -->
-
 ```python
 # Correct Pydantic Model from @common_core/src/common_core/events/envelope.py
 class EventEnvelope(BaseModel, Generic[T_EventData]):
@@ -76,85 +74,3 @@ class EventEnvelope(BaseModel, Generic[T_EventData]):
     source_service: str
     correlation_id: Optional[UUID] = None
     data: T_EventData
-```
-
-### 2\. Topic Naming Convention
-
-Topic names **MUST** be generated via the `topic_name()` utility function.
-
-* **Evidence**: The `topic_name` function in **@common\_core/src/common\_core/event\_enums.py**.
-
-### 3\. Thin Events
-
-For large data payloads, the event **MUST** contain a `StorageReferenceMetadata` object pointing to the content in the `Content Service`, not the content itself.
-
-## **`050 & 084: Coding & Containerization Standards`**
-
-### 1\. Import Conventions
-
-* **Local Development**: All local execution **MUST** be done through `pdm run ...`.
-* **Docker**: All service `Dockerfile`s **MUST** include `ENV PYTHONPATH=/app`.
-  * **Evidence**: The `Dockerfile` for **@services/file\_service/Dockerfile**.
-
-### 2\. Code Quality
-
-* **File Size Limit**: Python files **MUST NOT** exceed 400 lines of code (LoC).
-* **Linting & Formatting**: All code **MUST** be formatted and linted with Ruff using the configuration in the root **@pyproject.toml**.
-
-## **`070: Testing Architecture`**
-
-### 1\. Protocol-Based Mocking
-
-Tests **MUST** mock the protocol interfaces, not the concrete implementations.
-
-```python
-# Correct testing pattern
-async def test_my_service_logic(
-    # Mocks are of the protocol type
-    mock_repo: AsyncMock(spec=ClassRepositoryProtocol),
-    mock_publisher: AsyncMock(spec=ClassEventPublisherProtocol)
-):
-    # Arrange: Instantiate the service with mocks
-    service = ClassManagementServiceImpl(repo=mock_repo, event_publisher=mock_publisher)
-    
-    # Act
-    await service.register_new_class(...)
-    
-    # Assert
-    mock_repo.create_class.assert_called_once()
-    mock_publisher.publish_class_event.assert_called_once()
-```
-
-### 2\. Contract Testing
-
-Tests for any event-producing or consuming logic **MUST** include a serialization "round-trip" test to ensure the Pydantic models are correctly configured.
-
-### 3\. Test Execution Scope
-
-When validating changes, you **MUST NOT** run the entire test suite (`pdm run test-all`) by default, as this is inefficient. You **MUST** run tests with a targeted scope.
-
-* **For New Features**: Run only the new test files you have created.
-  * **Example**: `pdm run pytest services/class_management_service/tests/api/test_class_routes.py`
-* **For Changes to Existing Code**: Run the tests for the specific service or module that has been affected.
-  * **Example**: `pdm run pytest services/file_service/tests/`
-* The `test-all` command should only be used for final validation before a major merge or when explicitly instructed.
-
-## **`080: Development Workflow & Tooling`**
-
-All standard development tasks are executed via PDM scripts defined in the root **@pyproject.toml**.
-
-### 1\. Code Quality & Formatting
-
-* `pdm run format-all`: Formats all code across the monorepo using Ruff.
-* `pdm run lint-all`: Lints all code using Ruff.
-* `pdm run lint-fix`: Lints and automatically fixes all possible issues with Ruff.
-
-### 2\. Static Analysis
-
-* `pdm run typecheck-all`: Runs MyPy on the entire codebase to perform static type checking.
-
-### 3\. Testing
-
-* `pdm run test-all`: Runs the complete test suite using `pytest`. (See Rule 070.3 for scoping).
-* `pdm run test-parallel`: Runs tests in parallel across multiple CPU cores (`pytest -n auto`).
-* `pdm run -p services/<service_name> test`: Runs the specific test suite for an individual service.
