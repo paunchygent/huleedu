@@ -110,7 +110,7 @@ from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, JSON
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from common_core.database import SQLAlchemyEnum
+from sqlalchemy import Enum as SQLAlchemyEnum
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -292,39 +292,9 @@ class EssayResult(Base):
     )
 ```
 
-#### Event Contracts (common_core additions)
+#### Service-Specific Error Handling
 
-```python
-# common_core/src/common_core/enums.py additions
-class ResultAggregatorErrorCategory(str, Enum):
-    """Error categories for Result Aggregator Service."""
-    DATABASE_ERROR = "DATABASE_ERROR"
-    EVENT_PARSING_ERROR = "EVENT_PARSING_ERROR"
-    INVALID_EVENT_DATA = "INVALID_EVENT_DATA"
-    CACHE_ERROR = "CACHE_ERROR"
-    AUTHENTICATION_ERROR = "AUTHENTICATION_ERROR"
-
-
-# common_core/src/common_core/errors.py additions
-class ResultAggregatorError(ServiceError):
-    """Base error for Result Aggregator Service."""
-    service_name = "result_aggregator_service"
-
-
-class EventProcessingError(ResultAggregatorError):
-    """Error during event processing."""
-    pass
-
-
-class DatabaseOperationError(ResultAggregatorError):
-    """Error during database operations."""
-    pass
-
-
-class CacheOperationError(ResultAggregatorError):
-    """Error during cache operations."""
-    pass
-```
+The Result Aggregator Service defines its own error types internally, following the bounded context principle. These should NOT be added to common_core.
 
 #### Configuration (config.py)
 
@@ -410,16 +380,16 @@ from dishka import AsyncContainer
 from common_core.enums import ServiceName
 from common_core.errors import EventProcessingError
 from common_core.events import (
-    CJAssessmentCompletedDataV1,
+    CJAssessmentCompletedV1,
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
-    SpellcheckCompletedDataV1
+    SpellcheckResultDataV1
 )
-from common_core.kafka import DLQProducer
+# Note: DLQ handling is a BOS responsibility, not individual services
 from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.kafka_bus import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.redis_client import RedisClientProtocol
+from huleedu_service_libs.protocols import RedisClientProtocol
 
 from .metrics import ResultAggregatorMetrics
 from .protocols import (
@@ -433,24 +403,20 @@ logger = create_service_logger("result_aggregator.kafka_consumer")
 
 
 class ResultAggregatorKafkaConsumer:
-    """Kafka consumer with production-grade error handling and DLQ support."""
+    """Kafka consumer with production-grade error handling."""
     
     def __init__(
         self,
         kafka_bus: KafkaBus,
         redis_client: RedisClientProtocol,
-        dlq_producer: DLQProducer,
         container: AsyncContainer,
-        metrics: ResultAggregatorMetrics,
-        dlq_max_retries: int = 3
+        metrics: ResultAggregatorMetrics
     ):
         """Initialize the consumer."""
         self.kafka_bus = kafka_bus
         self.redis_client = redis_client
-        self.dlq_producer = dlq_producer
         self.container = container
         self.metrics = metrics
-        self.dlq_max_retries = dlq_max_retries
         self._running = False
         
         # Topic subscription list - current services only
@@ -522,18 +488,25 @@ class ResultAggregatorKafkaConsumer:
                         exc_info=True
                     )
                     
-                    # Send to DLQ if max retries exceeded
-                    await self._handle_processing_error(record, e)
+                    # Log error - DLQ handling is BOS responsibility
+                    self.metrics.consumer_errors.inc()
                     
                     # Still commit to avoid reprocessing
                     await self.kafka_bus.commit()
                     
-    @idempotent_consumer(redis_client=None, ttl_seconds=86400)  # Will be injected
     async def _process_message(self, record: ConsumerRecord) -> None:
-        """Process a single message with idempotency."""
-        # Inject Redis client for idempotency decorator
-        if not hasattr(self._process_message, '_redis_client'):
-            self._process_message._redis_client = self.redis_client
+        """Process a single message with idempotency check."""
+        # Create idempotent wrapper
+        @idempotent_consumer(redis_client=self.redis_client, ttl_seconds=86400)
+        async def process_message_idempotently(msg: ConsumerRecord) -> bool:
+            await self._process_message_impl(msg)
+            return True  # Indicate successful processing
+        
+        # Call the idempotent wrapper
+        await process_message_idempotently(record)
+    
+    async def _process_message_impl(self, record: ConsumerRecord) -> None:
+        """Actual message processing logic."""
             
         try:
             # Parse the event envelope
@@ -549,11 +522,11 @@ class ResultAggregatorKafkaConsumer:
                     await processor.process_batch_phase_outcome(envelope, data)
                     
                 elif record.topic == "huleedu.essay.spellcheck.completed.v1":
-                    data = SpellcheckCompletedDataV1.model_validate(envelope.data)
+                    data = SpellcheckResultDataV1.model_validate(envelope.data)
                     await processor.process_spellcheck_completed(envelope, data)
                     
                 elif record.topic == "huleedu.cj_assessment.completed.v1":
-                    data = CJAssessmentCompletedDataV1.model_validate(envelope.data)
+                    data = CJAssessmentCompletedV1.model_validate(envelope.data)
                     await processor.process_cj_assessment_completed(envelope, data)
                     
                 else:
@@ -564,38 +537,8 @@ class ResultAggregatorKafkaConsumer:
         except Exception as e:
             raise EventProcessingError(f"Processing failed: {str(e)}")
             
-    async def _handle_processing_error(
-        self, 
-        record: ConsumerRecord, 
-        error: Exception
-    ) -> None:
-        """Handle processing errors with DLQ production."""
-        retry_count = int(record.headers.get(b'retry_count', b'0').decode('utf-8'))
-        
-        if retry_count >= self.dlq_max_retries:
-            # Send to DLQ
-            await self.dlq_producer.send_to_dlq(
-                original_topic=record.topic,
-                original_value=record.value,
-                error_message=str(error),
-                service_name=ServiceName.RESULT_AGGREGATOR,
-                correlation_id=None  # Extract from envelope if available
-            )
-            self.metrics.dlq_messages_sent.inc()
-            logger.error(
-                "Message sent to DLQ after max retries",
-                topic=record.topic,
-                retry_count=retry_count,
-                error=str(error)
-            )
-        else:
-            # Would implement retry logic here in production
-            logger.warning(
-                "Message processing failed, retry logic not implemented",
-                topic=record.topic,
-                retry_count=retry_count,
-                error=str(error)
-            )
+    # Note: DLQ handling removed - this is BOS responsibility
+    # Services should focus on idempotent processing and logging errors
 ```
 
 ### Checkpoint 3: Secured Internal API with Blueprint Pattern
@@ -1128,39 +1071,17 @@ async def publish_batch_phase_outcome(
     )
 ```
 
-### 3. Common Core Event Updates
+### 3. Event Consumption Pattern
 
-Add missing event definitions to common_core:
+The Result Aggregator Service is a pure consumer - it does not emit any events. It maintains its materialized view by consuming events from other services. This follows the CQRS pattern where the read model is updated based on events from the write model.
 
-```python
-# common_core/src/common_core/events/result_aggregator.py
+Note: All event contracts (Pydantic models) used by the service are already defined in common_core/events:
 
-from datetime import datetime
-from typing import Optional
+- `ELSBatchPhaseOutcomeV1` - from Essay Lifecycle Service
+- `SpellcheckResultDataV1` - from Spell Checker Service  
+- `CJAssessmentCompletedV1` - from CJ Assessment Service
 
-from pydantic import BaseModel, Field
-
-
-class ResultAggregationCompletedV1(BaseModel):
-    """Event emitted when result aggregation is completed for a batch."""
-    batch_id: str
-    user_id: str
-    overall_status: str
-    essay_count: int
-    completed_essay_count: int
-    failed_essay_count: int
-    aggregation_duration_ms: int
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-
-class ResultAggregationFailedV1(BaseModel):
-    """Event emitted when result aggregation fails."""
-    batch_id: str
-    error_message: str
-    error_category: str
-    retry_count: int
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-```
+The service consumes these existing event contracts; it does not define new ones.
 
 ## Performance Optimization Strategies
 
@@ -1262,11 +1183,6 @@ class ResultAggregatorMetrics:
             'Total consumer errors'
         )
         
-        self.dlq_messages_sent = Counter(
-            'ras_dlq_messages_sent_total',
-            'Messages sent to DLQ'
-        )
-        
         # Database metrics
         self.db_operations = Counter(
             'ras_db_operations_total',
@@ -1314,7 +1230,7 @@ class ResultAggregatorMetrics:
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from common_core.events import SpellcheckCompletedDataV1, EventEnvelope
+from common_core.events import SpellcheckResultDataV1, EventEnvelope
 from services.result_aggregator_service.implementations import EventProcessorImpl
 
 
@@ -1424,7 +1340,7 @@ This implementation guide provides a comprehensive, production-ready design for 
 1. **Aligns with Architecture**: Follows all established patterns from BOS and CMS
 2. **Ensures Security**: Implements service-to-service authentication
 3. **Maximizes Performance**: Uses normalized schema, caching, and optimization
-4. **Provides Resilience**: Includes DLQ, idempotency, and error handling
+4. **Provides Resilience**: Includes idempotency and comprehensive error handling
 5. **Enables Observability**: Comprehensive metrics and logging
 6. **Supports Growth**: Extensible design for future services
 

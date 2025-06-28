@@ -3,6 +3,12 @@ Event models for HuleEdu microservices.
 """
 
 from .base_event_models import BaseEventData, EventTracker, ProcessingUpdate
+from .batch_coordination_events import (
+    BatchEssaysRegistered,
+    BatchEssaysReady,
+    BatchReadinessTimeout,
+    ExcessContentProvisionedV1,
+)
 from .cj_assessment_events import (
     CJAssessmentCompletedV1,
     CJAssessmentFailedV1,
@@ -14,6 +20,7 @@ from .class_events import (
     StudentCreatedV1,
 )
 from .client_commands import ClientBatchPipelineRequestV1
+from .els_bos_events import ELSBatchPhaseOutcomeV1
 from .envelope import EventEnvelope
 from .file_management_events import (
     BatchFileAddedV1,
@@ -29,16 +36,21 @@ from .validation_events import (
 
 __all__ = [
     "BaseEventData",
+    "BatchEssaysRegistered",
+    "BatchEssaysReady",
     "BatchFileAddedV1",
     "BatchFileRemovedV1",
+    "BatchReadinessTimeout",
     "CJAssessmentCompletedV1",
     "CJAssessmentFailedV1",
     "ClassCreatedV1",
     "ClientBatchPipelineRequestV1",
     "ELS_CJAssessmentRequestV1",
+    "ELSBatchPhaseOutcomeV1",
     "EssayStudentAssociationUpdatedV1",
     "EventEnvelope",
     "EventTracker",
+    "ExcessContentProvisionedV1",
     "ProcessingUpdate",
     "SpellcheckRequestedDataV1",
     "SpellcheckResultDataV1",

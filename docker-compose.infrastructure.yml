@@ -144,3 +144,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # PostgreSQL database for Result Aggregator Service
+  result_aggregator_db:
+    image: postgres:15
+    container_name: huleedu_result_aggregator_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5436:5432"
+    environment:
+      - POSTGRES_DB=result_aggregator
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
+    volumes:
+      - result_aggregator_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d result_aggregator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

@@ -12,6 +12,7 @@ volumes:
   cj_assessment_db_data:
   redis_data:
   class_management_db_data:
+  result_aggregator_db_data:
 
 # Include the separate infrastructure and application service definitions.
 # Docker Compose will merge these files into a single project configuration.

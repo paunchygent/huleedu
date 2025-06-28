@@ -56,7 +56,8 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/file_service",
     "-e file:///${PROJECT_ROOT}/services/cj_assessment_service",
     "-e file:///${PROJECT_ROOT}/services/class_management_service",
-    "-e file:///${PROJECT_ROOT}/services/api_gateway_service"
+    "-e file:///${PROJECT_ROOT}/services/api_gateway_service",
+    "-e file:///${PROJECT_ROOT}/services/result_aggregator_service"
 ]
 
 [tool.pdm.scripts]
@@ -98,6 +99,7 @@ dev-batch = "pdm run -p services/batch_orchestrator_service dev"
 dev-file = "pdm run -p services/file_service dev"
 run-spellchecker = "pdm run -p services/spell_checker_service start_worker"
 dev-gateway = "pdm run -p services/api_gateway_service dev"
+dev-aggregator = "pdm run -p services/result_aggregator_service dev"
 
 # Build common_core wheel
 build-common-core = "pdm build -p common_core"

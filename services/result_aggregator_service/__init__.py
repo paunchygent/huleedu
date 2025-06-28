@@ -1,0 +1,1 @@
+"""Result Aggregator Service package."""

@@ -82,6 +82,14 @@ The HuleEdu ecosystem currently comprises the following services:
   * **Location**: `services/class_management_service/`
   * **API**: `/v1/classes` and `/v1/students` for full CRUD operations.
 
+* **Result Aggregator Service (RAS)** ✅ **IMPLEMENTED**:
+  * **Description**: A hybrid service (Kafka consumer + HTTP API) that aggregates processing results from all services into a materialized view. Provides fast, query-optimized access to batch and essay results for the API Gateway.
+  * **Ports**: 4003 (Internal HTTP API), 9096 (Metrics)
+  * **Location**: `services/result_aggregator_service/`
+  * **API**: `/internal/v1/batches/{batch_id}/status` for comprehensive batch status queries
+  * **Database**: PostgreSQL with normalized schema optimized for read queries
+  * **Architecture**: CQRS pattern with event sourcing, Redis caching, and service-to-service authentication
+
 ## Key Technologies
 
 * **Python**: Version 3.11+
@@ -175,6 +183,8 @@ BOS coordinates with the Batch Conductor Service (BCS) for intelligent pipeline 
   * **Essay Lifecycle Service**: Dual-mode service with slot coordination and command handling
   * **File Service**: Content provisioning service with MD5 validation and event publishing
   * **Batch Conductor Service (BCS)**: ✅ **NEW** - Internal pipeline dependency resolution with event-driven batch state projection, atomic Redis operations, and intelligent dependency analysis
+  * **Class Management Service**: CRUD operations for classes and students with PostgreSQL persistence
+  * **Result Aggregator Service**: ✅ **NEW** - CQRS-based materialized view service aggregating results from all processing services with query-optimized PostgreSQL schema
 * **Essay ID Coordination Architecture** ✅:
   * **Slot Assignment Pattern**: BOS generates internal essay ID slots, ELS assigns content to slots
   * **Content Provisioning Flow**: File Service → ELS slot assignment → BOS essay storage → Client pipeline request → BOS command generation → ELS service dispatch
