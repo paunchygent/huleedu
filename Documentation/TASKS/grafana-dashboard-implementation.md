@@ -7,6 +7,7 @@ Implement a comprehensive three-tier dashboard system for HuleEdu that follows t
 ## Current State
 
 ### ✅ Observability Foundation Complete
+
 - **Standardized Metrics**: All services use consistent naming (`<service_prefix>_<metric>_<unit>`)
 - **Prometheus Integration**: Successfully scraping metrics from all services
 - **Alert Rules**: Updated to use standardized metric patterns
@@ -14,6 +15,7 @@ Implement a comprehensive three-tier dashboard system for HuleEdu that follows t
 - **Loki Integration**: Log aggregation configured via promtail
 
 ### ✅ Available Metrics by Service
+
 ```
 Service-Level Operational Metrics:
 - gateway_http_requests_total, gateway_http_request_duration_seconds
@@ -39,10 +41,12 @@ Infrastructure Metrics:
 ## Implementation Strategy: Progressive Disclosure Playbook
 
 ### Tier 1: System Health Dashboard (10,000-foot view)
+
 **Purpose**: Answer "Is the HuleEdu platform operational right now?"
 **Target Audience**: First responders, daily health checks
 
-#### Required Panels:
+#### Required Panels
+
 1. **Service Availability Stat Panel**
    - Query: `count(up{job=~".*_service"} == 1) / count(up{job=~".*_service"}) * 100`
    - Display: Single large percentage with RED/GREEN thresholds
@@ -64,21 +68,25 @@ Infrastructure Metrics:
    - Redis: Memory usage, connection count
    - Layout: 2x2 stat panel grid
 
-#### Success Criteria:
+#### Success Criteria
+
 - Dashboard loads in <2 seconds
 - All panels show real data
 - Color coding provides immediate visual health status
 - Links to Tier 2 dashboards functional
 
 ### Tier 2: Service Deep Dive Dashboard (1,000-foot view)  
+
 **Purpose**: Answer "What's happening inside a specific service showing problems?"
 **Implementation**: Single template dashboard with `$service` variable
 
-#### Required Variables:
+#### Required Variables
+
 - `$service`: Multi-select dropdown populated from `label_values(up, job)`
 - `$time_range`: Time range selector (1h, 6h, 24h, 7d)
 
-#### Required Panels:
+#### Required Panels
+
 1. **Request Rate & Duration Graphs**
    - Request Rate: `rate({__name__=~"${service}_http_requests_total"}[5m])`
    - Duration P95: `histogram_quantile(0.95, rate({__name__=~"${service}_http_request_duration_seconds_bucket"}[5m]))`
@@ -100,21 +108,25 @@ Infrastructure Metrics:
    - Display: Log stream with correlation ID highlighting
    - Filters: Error level dropdown, endpoint filter
 
-#### Success Criteria:
+#### Success Criteria
+
 - Service selection dynamically updates all panels
 - Business metrics appear only for relevant services
 - Logs correlate with metric spikes
 - Drill-down links to Tier 3 functional
 
 ### Tier 3: Troubleshooting Dashboard (Ground-level view)
+
 **Purpose**: Answer "What happened to a specific user request across all services?"
 **Implementation**: Correlation ID-based distributed tracing
 
-#### Required Variables:
+#### Required Variables
+
 - `$correlation_id`: Text input box for correlation ID
 - `$time_window`: Time range around the correlation ID event
 
-#### Required Panels:
+#### Required Panels
+
 1. **Correlation ID Input Panel**
    - Type: Text box variable
    - Validation: UUID format
@@ -135,7 +147,8 @@ Infrastructure Metrics:
    - Display: Time series overlay showing request volume
    - Purpose: Identify bottlenecks or failures
 
-#### Success Criteria:
+#### Success Criteria
+
 - Correlation ID search returns chronological trace
 - Service involvement clearly visible
 - Logs provide complete request story
@@ -144,12 +157,14 @@ Infrastructure Metrics:
 ## Implementation Tasks
 
 ### Phase 1: Foundation Setup
+
 - [ ] Create Grafana folder structure: `/HuleEdu/System Health`, `/HuleEdu/Service Deep Dive`, `/HuleEdu/Troubleshooting`
 - [ ] Configure Prometheus data source with proper retention settings
 - [ ] Configure Loki data source with correlation ID label extraction
 - [ ] Set up Alertmanager data source for alert panel integration
 
 ### Phase 2: Tier 1 Dashboard
+
 - [ ] Create "HuleEdu System Health" dashboard
 - [ ] Implement service availability stat panel with thresholds
 - [ ] Build global error rate time series with annotations
@@ -159,6 +174,7 @@ Infrastructure Metrics:
 - [ ] Add drill-down links to Tier 2 dashboards
 
 ### Phase 3: Tier 2 Dashboard  
+
 - [ ] Create "HuleEdu Service Deep Dive" template dashboard
 - [ ] Implement `$service` variable with dynamic population
 - [ ] Build request rate and duration panels with service filtering
@@ -168,6 +184,7 @@ Infrastructure Metrics:
 - [ ] Configure drill-down links to Tier 3 dashboard
 
 ### Phase 4: Tier 3 Dashboard
+
 - [ ] Create "HuleEdu Troubleshooting" dashboard
 - [ ] Implement correlation ID input variable
 - [ ] Build distributed trace timeline from Loki
@@ -176,6 +193,7 @@ Infrastructure Metrics:
 - [ ] Configure time range correlation with log events
 
 ### Phase 5: Integration & Polish
+
 - [ ] Update alert rules with dashboard links in annotations
 - [ ] Add dashboard links to runbooks in `01-Grafana-Playbook.md`
 - [ ] Create dashboard screenshots for documentation
@@ -185,11 +203,13 @@ Infrastructure Metrics:
 ## Technical Requirements
 
 ### Data Sources Configuration
+
 - **Prometheus**: `http://prometheus:9090` with 15-day retention
 - **Loki**: `http://loki:3100` with correlation_id label promotion
 - **Alertmanager**: `http://alertmanager:9093` for alert integration
 
 ### Dashboard Standards
+
 - **Refresh Rate**: 30s default, 5s for troubleshooting
 - **Time Ranges**: 1h, 6h, 24h, 7d with custom option
 - **Color Scheme**: Consistent RED/YELLOW/GREEN for health states
@@ -197,6 +217,7 @@ Infrastructure Metrics:
 - **Tooltips**: Include units, calculation methods
 
 ### Performance Targets
+
 - **Load Time**: <3 seconds for any dashboard
 - **Query Performance**: <1 second for individual panels
 - **Resource Usage**: <100MB RAM per active dashboard session
@@ -204,6 +225,7 @@ Infrastructure Metrics:
 ## Success Criteria
 
 ### Functional Requirements
+
 - [ ] All three dashboard tiers operational and interconnected
 - [ ] Service variable correctly filters all relevant panels
 - [ ] Correlation ID tracing provides complete request visibility
@@ -211,6 +233,7 @@ Infrastructure Metrics:
 - [ ] Log integration eliminates context switching
 
 ### Quality Requirements  
+
 - [ ] Dashboards follow industry-standard progressive disclosure
 - [ ] Visual design provides immediate status clarity
 - [ ] Performance meets <3 second load time requirement
@@ -218,6 +241,7 @@ Infrastructure Metrics:
 - [ ] Documentation enables team self-service
 
 ### Business Requirements
+
 - [ ] Solo developer can troubleshoot incidents without escalation
 - [ ] Mean time to detection (MTTD) reduced by 50%
 - [ ] Mean time to resolution (MTTR) reduced by 40%
