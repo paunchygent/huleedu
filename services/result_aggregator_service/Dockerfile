@@ -1,32 +1,41 @@
-# Dockerfile for Result Aggregator Service
 FROM python:3.11-slim
 
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    ENV_TYPE=docker \
+    QUART_APP=app:app \
+    QUART_ENV=production \
+    LOG_LEVEL=INFO \
+    PORT=4003 \
+    KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+    PDM_USE_VENV=false
+
+# Set base WORKDIR for the application
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+# Install curl for health checks and PDM globally in the image
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir pdm
 
-# Copy service files
-COPY pyproject.toml pdm.lock ./
-COPY services/result_aggregator_service ./services/result_aggregator_service
-COPY common_core ./common_core
-COPY services/libs ./services/libs
+# Copy shared local dependencies first
+COPY common_core/ /app/common_core/
+COPY services/libs/ /app/services/libs/
 
-# Install PDM and dependencies
-RUN pip install pdm && \
-    pdm install --prod --no-lock
+# Now, handle the specific service
+COPY services/result_aggregator_service/ /app/services/result_aggregator_service/
 
-# Set Python path
-ENV PYTHONPATH=/app
+# Set working directory to the service
+WORKDIR /app/services/result_aggregator_service
 
-# Expose ports
-EXPOSE 4003 9096
+# Install dependencies for the result_aggregator_service using its own pyproject.toml
+RUN pdm install --prod
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:4003/healthz || exit 1
+RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
+USER appuser
 
-# Run the service
-CMD ["pdm", "run", "python", "-m", "services.result_aggregator_service.app"]
+EXPOSE ${PORT}
+
+# Command to run the application from service directory
+CMD ["pdm", "run", "start"]

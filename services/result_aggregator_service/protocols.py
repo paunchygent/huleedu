@@ -12,7 +12,7 @@ from common_core.events import (
 )
 from common_core.status_enums import ProcessingStage
 
-from .models_db import BatchResult
+from services.result_aggregator_service.models_db import BatchResult
 
 
 class BatchRepositoryProtocol(Protocol):

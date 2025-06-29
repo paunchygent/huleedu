@@ -7,7 +7,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_set_operations import RedisSetOperations
 
-from ..protocols import CacheManagerProtocol
+from services.result_aggregator_service.protocols import CacheManagerProtocol
 
 logger = create_service_logger("result_aggregator.cache_manager")
 

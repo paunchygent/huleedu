@@ -6,7 +6,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
-from ..metrics import ResultAggregatorMetrics
+from services.result_aggregator_service.metrics import ResultAggregatorMetrics
 
 logger = create_service_logger("result_aggregator.api.health")
 

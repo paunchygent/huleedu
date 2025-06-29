@@ -14,12 +14,17 @@ from quart_dishka import QuartDishka
 dotenv.load_dotenv()
 
 # Import after environment is loaded
-from .api.health_routes import health_bp
-from .api.query_routes import query_bp
-from .config import Settings
-from .di import CoreInfrastructureProvider, DatabaseProvider, RepositoryProvider, ServiceProvider
-from .kafka_consumer import ResultAggregatorKafkaConsumer
-from .startup_setup import setup_metrics_endpoint
+from services.result_aggregator_service.api.health_routes import health_bp
+from services.result_aggregator_service.api.query_routes import query_bp
+from services.result_aggregator_service.config import Settings
+from services.result_aggregator_service.di import (
+    CoreInfrastructureProvider,
+    DatabaseProvider,
+    ServiceProvider,
+)
+from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
+from services.result_aggregator_service.protocols import BatchRepositoryProtocol
+from services.result_aggregator_service.startup_setup import setup_metrics_endpoint
 
 logger = create_service_logger("result_aggregator.app")
 
@@ -39,7 +44,7 @@ def create_app() -> ResultAggregatorApp:
 
     # Create DI container
     container = make_async_container(
-        CoreInfrastructureProvider(), DatabaseProvider(), RepositoryProvider(), ServiceProvider()
+        CoreInfrastructureProvider(), DatabaseProvider(), ServiceProvider()
     )
 
     # Setup Dishka integration
@@ -65,9 +70,14 @@ app = create_app()
 async def startup() -> None:
     """Initialize services on startup."""
     try:
-        # Get settings and start Kafka consumer
+        # Initialize database schema
         async with app.container() as request_container:
             settings = await request_container.get(Settings)
+            batch_repository = await request_container.get(BatchRepositoryProtocol)
+            await batch_repository.initialize_schema()
+            logger.info("Database schema initialized")
+
+            # Get Kafka consumer
             consumer = await request_container.get(ResultAggregatorKafkaConsumer)
 
         # Start consumer in background

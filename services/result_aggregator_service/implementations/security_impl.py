@@ -5,7 +5,7 @@ from typing import List
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from ..protocols import SecurityServiceProtocol
+from services.result_aggregator_service.protocols import SecurityServiceProtocol
 
 logger = create_service_logger("result_aggregator.security")
 

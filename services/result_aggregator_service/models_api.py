@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from .enums_api import BatchStatus, ProcessingPhase
+from services.result_aggregator_service.enums_api import BatchStatus, ProcessingPhase
 
 if TYPE_CHECKING:
-    from .models_db import BatchResult
+    from models_db import BatchResult
 
 
 class EssayResultResponse(BaseModel):

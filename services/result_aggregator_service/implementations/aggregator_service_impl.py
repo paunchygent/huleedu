@@ -5,9 +5,13 @@ from typing import List, Optional
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from ..config import Settings
-from ..models_db import BatchResult
-from ..protocols import BatchQueryServiceProtocol, BatchRepositoryProtocol, CacheManagerProtocol
+from services.result_aggregator_service.config import Settings
+from services.result_aggregator_service.models_db import BatchResult
+from services.result_aggregator_service.protocols import (
+    BatchQueryServiceProtocol,
+    BatchRepositoryProtocol,
+    CacheManagerProtocol,
+)
 
 logger = create_service_logger("result_aggregator.aggregator_service")
 

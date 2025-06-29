@@ -8,19 +8,20 @@ authors = [
 requires-python = ">=3.11"
 dependencies = [
     "quart",
+    "hypercorn",
     "pydantic",
+    "pydantic-settings",
     "dishka",
     "quart-dishka",
     "aiokafka",
     "redis",
-    "structlog",
-    "python-json-logger",
-    "opentelemetry-api",
-    "opentelemetry-sdk",
-    "opentelemetry-instrumentation-asgi",
-    "opentelemetry-exporter-otlp-proto-http",
-    "uvicorn",
-    "huleedu-service-libs"
+    "aiohttp",
+    "python-dotenv",
+    "prometheus-client",
+    "huleedu-common-core",
+    "huleedu-service-libs",
+    "SQLAlchemy[asyncio]",
+    "asyncpg",
 ]
 
 [build-system]
@@ -30,8 +31,13 @@ build-backend = "pdm.backend"
 [tool.pdm]
 distribution = false
 
-[tool.pdm.overrides]
-"huleedu-service-libs" = {"path" = "../libs", "editable" = true}
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/common_core"
+huleedu-service-libs = "file:///app/services/libs"
+
+[tool.pdm.scripts]
+start = "python app.py"
+dev = "quart --app app:app --debug run -p 4003"
 
 [project.optional-dependencies]
 development = [

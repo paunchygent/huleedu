@@ -9,10 +9,10 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Blueprint, Response, current_app, g, jsonify, request
 from quart_dishka import inject
 
-from ..config import Settings
-from ..metrics import ResultAggregatorMetrics
-from ..models_api import BatchStatusResponse
-from ..protocols import BatchQueryServiceProtocol, CacheManagerProtocol, SecurityServiceProtocol
+from services.result_aggregator_service.config import Settings
+from services.result_aggregator_service.metrics import ResultAggregatorMetrics
+from services.result_aggregator_service.models_api import BatchStatusResponse
+from services.result_aggregator_service.protocols import BatchQueryServiceProtocol, CacheManagerProtocol, SecurityServiceProtocol
 
 logger = create_service_logger("result_aggregator.api.query")
 

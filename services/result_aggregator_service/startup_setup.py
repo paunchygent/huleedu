@@ -9,7 +9,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import start_http_server
 from quart import Quart
 
-from .config import Settings
+from services.result_aggregator_service.config import Settings
 
 logger = create_service_logger("result_aggregator.startup")
 

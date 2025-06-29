@@ -1,37 +1,75 @@
 """PostgreSQL implementation of batch repository."""
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
 
 from common_core.status_enums import BatchStatus, ProcessingStage
-
-from ..models_db import BatchResult, EssayResult
-from ..protocols import BatchRepositoryProtocol
+from services.result_aggregator_service.config import Settings
+from services.result_aggregator_service.models_db import Base, BatchResult, EssayResult
+from services.result_aggregator_service.protocols import BatchRepositoryProtocol
 
 logger = create_service_logger("result_aggregator.batch_repository")
 
 
 class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
-    """PostgreSQL implementation of batch repository."""
+    """PostgreSQL implementation of batch repository with internal session management."""
 
-    def __init__(self, session: AsyncSession):
-        """Initialize with database session."""
-        self.session = session
+    def __init__(self, settings: Settings):
+        """Initialize with settings and create database engine."""
+        self.settings = settings
+        self.logger = logger
+
+        # Create async engine with connection pooling
+        self.engine = create_async_engine(
+            settings.DATABASE_URL,
+            echo=False,
+            future=True,
+            pool_size=settings.DATABASE_POOL_SIZE,
+            max_overflow=settings.DATABASE_MAX_OVERFLOW,
+            pool_pre_ping=True,
+            pool_recycle=3600,  # Recycle connections after 1 hour
+        )
+
+        # Create session maker
+        self.async_session_maker = async_sessionmaker(
+            self.engine,
+            expire_on_commit=False,
+            class_=AsyncSession,
+        )
+
+    async def initialize_schema(self) -> None:
+        """Create database tables if they don't exist."""
+        async with self.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        self.logger.info("Database schema initialized")
+
+    @asynccontextmanager
+    async def _get_session(self) -> AsyncIterator[AsyncSession]:
+        """Get a database session with proper transaction handling."""
+        async with self.async_session_maker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
 
     async def get_batch(self, batch_id: str) -> Optional[BatchResult]:
         """Get batch with all essay results."""
-        result = await self.session.execute(
-            select(BatchResult)
-            .where(BatchResult.batch_id == batch_id)
-            .options(selectinload(BatchResult.essays))
-        )
-        return result.scalars().first()
+        async with self._get_session() as session:
+            result = await session.execute(
+                select(BatchResult)
+                .where(BatchResult.batch_id == batch_id)
+                .options(selectinload(BatchResult.essays))
+            )
+            return result.scalars().first()
 
     async def get_user_batches(
         self,
@@ -41,21 +79,20 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         offset: int = 0,
     ) -> List[BatchResult]:
         """Get all batches for a user."""
-        from sqlalchemy.orm import selectinload
+        async with self._get_session() as session:
+            query = (
+                select(BatchResult)
+                .where(BatchResult.user_id == user_id)
+                .options(selectinload(BatchResult.essays))  # Eagerly load essays
+            )
 
-        query = (
-            select(BatchResult)
-            .where(BatchResult.user_id == user_id)
-            .options(selectinload(BatchResult.essays))  # Eagerly load essays
-        )
+            if status:
+                query = query.where(BatchResult.status == status)
 
-        if status:
-            query = query.where(BatchResult.overall_status == BatchStatus(status))
+            query = query.order_by(BatchResult.created_at.desc()).limit(limit).offset(offset)
 
-        query = query.order_by(BatchResult.created_at.desc()).limit(limit).offset(offset)
-
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
+            result = await session.execute(query)
+            return list(result.scalars().all())
 
     async def create_batch(
         self,
@@ -65,112 +102,41 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> BatchResult:
         """Create a new batch result."""
-        batch = BatchResult(
-            batch_id=batch_id,
-            user_id=user_id,
-            essay_count=essay_count,
-            batch_metadata=metadata or {},
-            overall_status=BatchStatus.AWAITING_CONTENT_VALIDATION,
-        )
-        self.session.add(batch)
-        await self.session.commit()
-        return batch
+        async with self._get_session() as session:
+            batch = BatchResult(
+                batch_id=batch_id,
+                user_id=user_id,
+                status=BatchStatus.PENDING.value,
+                essay_count=essay_count,
+                completed_count=0,
+                failed_count=0,
+                metadata=metadata or {},
+            )
+            session.add(batch)
+            await session.commit()
+            await session.refresh(batch)
+            return batch
 
     async def update_batch_status(
         self, batch_id: str, status: str, error: Optional[str] = None
     ) -> bool:
         """Update batch status."""
-        batch = await self.get_batch(batch_id)
-        if not batch:
-            logger.warning("Batch not found for status update", batch_id=batch_id)
-            return False
-
-        batch.overall_status = BatchStatus(status)
-        if error:
-            batch.last_error = error
-            batch.error_count += 1
-        batch.updated_at = datetime.utcnow()
-        await self.session.commit()
-        return True
-
-    async def create_or_update_batch(
-        self,
-        batch_id: str,
-        user_id: str,
-        essay_count: int,
-        requested_pipeline: Optional[str] = None,
-    ) -> BatchResult:
-        """Create or update batch entry."""
-        # Try to get existing batch
-        existing = await self.get_batch(batch_id)
-
-        if existing:
-            # Update existing
-            existing.essay_count = essay_count
-            existing.requested_pipeline = requested_pipeline
-            existing.updated_at = datetime.utcnow()
-        else:
-            # Create new
-            batch = BatchResult(
-                batch_id=batch_id,
-                user_id=user_id,
-                essay_count=essay_count,
-                requested_pipeline=requested_pipeline,
-                overall_status=BatchStatus.AWAITING_CONTENT_VALIDATION,
+        async with self._get_session() as session:
+            result = await session.execute(
+                select(BatchResult).where(BatchResult.batch_id == batch_id)
             )
-            self.session.add(batch)
-            existing = batch
+            batch = result.scalars().first()
 
-        await self.session.commit()
-        return existing
+            if not batch:
+                return False
 
-    async def update_batch_phase_completed(
-        self,
-        batch_id: str,
-        phase: str,
-        completed_count: int,
-        failed_count: int,
-    ) -> None:
-        """Update batch after phase completion."""
-        batch = await self.get_batch(batch_id)
-        if not batch:
-            logger.warning("Batch not found for phase update", batch_id=batch_id)
-            return
+            batch.status = status
+            if error:
+                batch.error_message = error
+            batch.updated_at = datetime.now(UTC)
 
-        # Update counts
-        batch.completed_essay_count = completed_count
-        batch.failed_essay_count = failed_count
-
-        # Set processing_started_at if not already set
-        if not batch.processing_started_at:
-            batch.processing_started_at = datetime.utcnow()
-
-        # Update status based on completion
-        if completed_count + failed_count >= batch.essay_count:
-            if failed_count == 0:
-                batch.overall_status = BatchStatus.COMPLETED_SUCCESSFULLY
-            else:
-                batch.overall_status = BatchStatus.COMPLETED_WITH_FAILURES
-            batch.processing_completed_at = datetime.utcnow()
-        else:
-            batch.overall_status = BatchStatus.PROCESSING_PIPELINES
-
-        batch.updated_at = datetime.utcnow()
-        await self.session.commit()
-
-    async def update_batch_failed(self, batch_id: str, error_message: str) -> None:
-        """Mark batch as failed."""
-        batch = await self.get_batch(batch_id)
-        if not batch:
-            logger.warning("Batch not found for failure update", batch_id=batch_id)
-            return
-
-        batch.overall_status = BatchStatus.FAILED_CRITICALLY
-        batch.last_error = error_message
-        batch.error_count += 1
-        batch.processing_completed_at = datetime.utcnow()
-        batch.updated_at = datetime.utcnow()
-        await self.session.commit()
+            await session.commit()
+            return True
 
     async def update_essay_spellcheck_result(
         self,
@@ -181,28 +147,36 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         corrected_text_storage_id: Optional[str] = None,
         error: Optional[str] = None,
     ) -> None:
-        """Update spellcheck results for an essay."""
-        # Get or create essay result
-        result = await self.session.execute(
-            select(EssayResult).where(
-                EssayResult.essay_id == essay_id, EssayResult.batch_id == batch_id
+        """Update essay spellcheck results."""
+        async with self._get_session() as session:
+            # Find or create essay result
+            result = await session.execute(
+                select(EssayResult).where(
+                    EssayResult.essay_id == essay_id, EssayResult.batch_id == batch_id
+                )
             )
-        )
-        essay = result.scalars().first()
+            essay = result.scalars().first()
 
-        if not essay:
-            essay = EssayResult(essay_id=essay_id, batch_id=batch_id)
-            self.session.add(essay)
+            if not essay:
+                essay = EssayResult(
+                    essay_id=essay_id,
+                    batch_id=batch_id,
+                    spellcheck_status=status.value,
+                )
+                session.add(essay)
+            else:
+                essay.spellcheck_status = status.value
 
-        # Update spellcheck fields
-        essay.spellcheck_status = status
-        essay.spellcheck_correction_count = correction_count
-        essay.spellcheck_corrected_text_storage_id = corrected_text_storage_id
-        essay.spellcheck_completed_at = datetime.utcnow()
-        essay.spellcheck_error = error
-        essay.updated_at = datetime.utcnow()
+            # Update spellcheck-specific fields
+            if correction_count is not None:
+                essay.correction_count = correction_count
+            if corrected_text_storage_id:
+                essay.corrected_text_storage_id = corrected_text_storage_id
+            if error:
+                essay.spellcheck_error = error
 
-        await self.session.commit()
+            essay.updated_at = datetime.now(UTC)
+            await session.commit()
 
     async def update_essay_cj_assessment_result(
         self,
@@ -214,26 +188,92 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         comparison_count: Optional[int] = None,
         error: Optional[str] = None,
     ) -> None:
-        """Update CJ assessment results for an essay."""
-        # Get or create essay result
-        result = await self.session.execute(
-            select(EssayResult).where(
-                EssayResult.essay_id == essay_id, EssayResult.batch_id == batch_id
+        """Update essay CJ assessment results."""
+        async with self._get_session() as session:
+            # Find or create essay result
+            result = await session.execute(
+                select(EssayResult).where(
+                    EssayResult.essay_id == essay_id, EssayResult.batch_id == batch_id
+                )
             )
-        )
-        essay = result.scalars().first()
+            essay = result.scalars().first()
 
-        if not essay:
-            essay = EssayResult(essay_id=essay_id, batch_id=batch_id)
-            self.session.add(essay)
+            if not essay:
+                essay = EssayResult(
+                    essay_id=essay_id,
+                    batch_id=batch_id,
+                    cj_assessment_status=status.value,
+                )
+                session.add(essay)
+            else:
+                essay.cj_assessment_status = status.value
 
-        # Update CJ assessment fields
-        essay.cj_assessment_status = status
-        essay.cj_rank = rank
-        essay.cj_score = score
-        essay.cj_comparison_count = comparison_count
-        essay.cj_assessment_completed_at = datetime.utcnow()
-        essay.cj_assessment_error = error
-        essay.updated_at = datetime.utcnow()
+            # Update CJ-specific fields
+            if rank is not None:
+                essay.rank = rank
+            if score is not None:
+                essay.score = score
+            if comparison_count is not None:
+                essay.comparison_count = comparison_count
+            if error:
+                essay.cj_assessment_error = error
 
-        await self.session.commit()
+            essay.updated_at = datetime.now(UTC)
+            await session.commit()
+
+    async def update_batch_phase_completed(
+        self,
+        batch_id: str,
+        phase: str,
+        completed_count: int,
+        failed_count: int,
+    ) -> None:
+        """Update batch after phase completion."""
+        async with self._get_session() as session:
+            result = await session.execute(
+                select(BatchResult).where(BatchResult.batch_id == batch_id)
+            )
+            batch = result.scalars().first()
+
+            if batch:
+                # Update phase-specific completion tracking
+                phases_completed = batch.metadata.get("phases_completed", {})
+                phases_completed[phase] = {
+                    "completed_count": completed_count,
+                    "failed_count": failed_count,
+                    "completed_at": datetime.now(UTC).isoformat(),
+                }
+                batch.metadata["phases_completed"] = phases_completed
+
+                # Update overall counts based on all phases
+                # Note: This assumes phases can have overlapping essays
+                batch.completed_count = max(batch.completed_count, completed_count)
+                batch.failed_count = max(batch.failed_count, failed_count)
+
+                # Check if all processing is complete
+                total_processed = completed_count + failed_count
+                if total_processed >= batch.essay_count:
+                    # Determine overall status
+                    if failed_count == 0:
+                        batch.status = BatchStatus.COMPLETED.value
+                    elif completed_count == 0:
+                        batch.status = BatchStatus.FAILED.value
+                    else:
+                        batch.status = BatchStatus.PARTIALLY_COMPLETED.value
+
+                batch.updated_at = datetime.now(UTC)
+                await session.commit()
+
+    async def update_batch_failed(self, batch_id: str, error_message: str) -> None:
+        """Mark batch as failed."""
+        async with self._get_session() as session:
+            result = await session.execute(
+                select(BatchResult).where(BatchResult.batch_id == batch_id)
+            )
+            batch = result.scalars().first()
+
+            if batch:
+                batch.status = BatchStatus.FAILED.value
+                batch.error_message = error_message
+                batch.updated_at = datetime.now(UTC)
+                await session.commit()

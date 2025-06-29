@@ -9,23 +9,27 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.redis_set_operations import RedisSetOperations
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
 
-from .config import Settings
-from .implementations.aggregator_service_impl import AggregatorServiceImpl
-from .implementations.batch_repository_postgres_impl import BatchRepositoryPostgresImpl
-from .implementations.cache_manager_impl import CacheManagerImpl
-from .implementations.event_processor_impl import EventProcessorImpl
-from .implementations.security_impl import SecurityServiceImpl
-from .implementations.state_store_redis_impl import StateStoreRedisImpl
-from .kafka_consumer import ResultAggregatorKafkaConsumer
-from .metrics import ResultAggregatorMetrics
-from .protocols import (
+from services.result_aggregator_service.config import Settings
+from services.result_aggregator_service.implementations.aggregator_service_impl import (
+    AggregatorServiceImpl,
+)
+from services.result_aggregator_service.implementations.batch_repository_postgres_impl import (
+    BatchRepositoryPostgresImpl,
+)
+from services.result_aggregator_service.implementations.cache_manager_impl import (
+    CacheManagerImpl,
+)
+from services.result_aggregator_service.implementations.event_processor_impl import (
+    EventProcessorImpl,
+)
+from services.result_aggregator_service.implementations.security_impl import SecurityServiceImpl
+from services.result_aggregator_service.implementations.state_store_redis_impl import (
+    StateStoreRedisImpl,
+)
+from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
+from services.result_aggregator_service.metrics import ResultAggregatorMetrics
+from services.result_aggregator_service.protocols import (
     BatchQueryServiceProtocol,
     BatchRepositoryProtocol,
     CacheManagerProtocol,
@@ -93,57 +97,21 @@ class CoreInfrastructureProvider(Provider):
 class DatabaseProvider(Provider):
     """Provider for database components."""
 
-    @provide(scope=Scope.APP)
-    async def provide_engine(self, settings: Settings) -> AsyncIterator[AsyncEngine]:
-        """Provide database engine."""
-        engine = create_async_engine(
-            settings.DATABASE_URL,
-            pool_size=settings.DATABASE_POOL_SIZE,
-            max_overflow=settings.DATABASE_MAX_OVERFLOW,
-            pool_pre_ping=True,
-            echo=False,
-        )
-
-        # Create tables if they don't exist
-        from .models_db import Base
-
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-        try:
-            yield engine
-        finally:
-            await engine.dispose()
-
-    @provide(scope=Scope.APP)
-    def provide_session_factory(self, engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
-        """Provide session factory."""
-        return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-    @provide(scope=Scope.REQUEST)
-    async def provide_session(
-        self, session_factory: async_sessionmaker[AsyncSession]
-    ) -> AsyncIterator[AsyncSession]:
-        """Provide database session."""
-        async with session_factory() as session:
-            yield session
-
-
-class RepositoryProvider(Provider):
-    """Provider for repository implementations."""
-
-    scope = Scope.REQUEST
+    scope = Scope.APP
 
     @provide
-    def provide_batch_repository(self, session: AsyncSession) -> BatchRepositoryProtocol:
+    def provide_batch_repository(self, settings: Settings) -> BatchRepositoryProtocol:
         """Provide batch repository implementation."""
-        return BatchRepositoryPostgresImpl(session)
+        return BatchRepositoryPostgresImpl(settings)
+
+
+# RepositoryProvider removed - batch repository is now provided in DatabaseProvider
 
 
 class ServiceProvider(Provider):
     """Provider for service implementations."""
 
-    scope = Scope.REQUEST
+    scope = Scope.APP
 
     @provide
     def provide_state_store(
@@ -203,6 +171,5 @@ class ServiceProvider(Provider):
 __all__ = [
     "CoreInfrastructureProvider",
     "DatabaseProvider",
-    "RepositoryProvider",
     "ServiceProvider",
 ]

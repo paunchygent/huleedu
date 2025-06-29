@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, cast
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 
-from ..protocols import StateStoreProtocol
+from services.result_aggregator_service.protocols import StateStoreProtocol
 
 logger = create_service_logger("result_aggregator.state_store")
 

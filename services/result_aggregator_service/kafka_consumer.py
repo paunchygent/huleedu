@@ -21,9 +21,9 @@ from common_core.events import (
     SpellcheckResultDataV1,
 )
 
-from .config import Settings
-from .metrics import ResultAggregatorMetrics
-from .protocols import EventProcessorProtocol
+from services.result_aggregator_service.config import Settings
+from services.result_aggregator_service.metrics import ResultAggregatorMetrics
+from services.result_aggregator_service.protocols import EventProcessorProtocol
 
 logger = create_service_logger("result_aggregator.kafka_consumer")
 
