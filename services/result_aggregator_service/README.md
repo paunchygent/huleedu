@@ -93,6 +93,24 @@ ALLOWED_SERVICE_IDS=["api-gateway-service", "admin-dashboard-service"]
 
 ## Development
 
+### Import Pattern
+
+**CRITICAL**: This service uses full module paths for ALL imports to avoid conflicts with other services:
+
+```python
+# CORRECT - Always use full paths
+from services.result_aggregator_service.metrics import ResultAggregatorMetrics
+from services.result_aggregator_service.protocols import BatchRepositoryProtocol
+from services.result_aggregator_service.di import ServiceProvider
+
+# WRONG - Will cause import errors
+from metrics import ResultAggregatorMetrics
+from protocols import BatchRepositoryProtocol
+from di import ServiceProvider
+```
+
+This is necessary because all service directories are in PYTHONPATH in both Docker and test environments. See `.cursor/rules/055-import-resolution-patterns.mdc` for details.
+
 ### Running Locally
 
 ```bash

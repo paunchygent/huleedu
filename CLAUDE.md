@@ -6,7 +6,7 @@ Your operational process for **every task** is fixed and non-negotiable.
 
 ### **Step 1: Ingest Core Architectural Knowledge (Mandatory First Action)**
 
-Begin by reading the following files:
+Begin each conversation by reading the following files:
 .cursor/rules/010-foundational-principles.mdc
 .cursor/rules/020-architectural-mandates.mdc
 .cursor/rules/030-event-driven-architecture-eda-standards.mdc
@@ -18,6 +18,7 @@ Begin by reading the following files:
 .cursor/rules/043-service-configuration-and-logging.mdc
 .cursor/rules/044-service-debugging-and-troubleshooting.mdc
 .cursor/rules/050-python-coding-standards.mdc
+.cursor/rules/055-import-resolution-patterns.mdc
 .cursor/rules/080-repository-workflow-and-tooling.mdc
 .cursor/rules/100-terminology-and-definitions.mdc
 .cursor/rules/110.1-planning-mode.mdc

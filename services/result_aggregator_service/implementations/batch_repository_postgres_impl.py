@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -87,7 +87,7 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             )
 
             if status:
-                query = query.where(BatchResult.status == status)
+                query = query.where(BatchResult.overall_status == status)
 
             query = query.order_by(BatchResult.created_at.desc()).limit(limit).offset(offset)
 
@@ -106,11 +106,11 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             batch = BatchResult(
                 batch_id=batch_id,
                 user_id=user_id,
-                status=BatchStatus.PENDING.value,
+                overall_status=BatchStatus.AWAITING_CONTENT_VALIDATION,
                 essay_count=essay_count,
-                completed_count=0,
-                failed_count=0,
-                metadata=metadata or {},
+                completed_essay_count=0,
+                failed_essay_count=0,
+                batch_metadata=metadata or {},
             )
             session.add(batch)
             await session.commit()
@@ -130,10 +130,10 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             if not batch:
                 return False
 
-            batch.status = status
+            batch.overall_status = status
             if error:
-                batch.error_message = error
-            batch.updated_at = datetime.now(UTC)
+                batch.last_error = error
+            batch.updated_at = datetime.utcnow()
 
             await session.commit()
             return True
@@ -169,13 +169,13 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
 
             # Update spellcheck-specific fields
             if correction_count is not None:
-                essay.correction_count = correction_count
+                essay.spellcheck_correction_count = correction_count
             if corrected_text_storage_id:
-                essay.corrected_text_storage_id = corrected_text_storage_id
+                essay.spellcheck_corrected_text_storage_id = corrected_text_storage_id
             if error:
                 essay.spellcheck_error = error
 
-            essay.updated_at = datetime.now(UTC)
+            essay.updated_at = datetime.utcnow()
             await session.commit()
 
     async def update_essay_cj_assessment_result(
@@ -210,15 +210,15 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
 
             # Update CJ-specific fields
             if rank is not None:
-                essay.rank = rank
+                essay.cj_rank = rank
             if score is not None:
-                essay.score = score
+                essay.cj_score = score
             if comparison_count is not None:
-                essay.comparison_count = comparison_count
+                essay.cj_comparison_count = comparison_count
             if error:
                 essay.cj_assessment_error = error
 
-            essay.updated_at = datetime.now(UTC)
+            essay.updated_at = datetime.utcnow()
             await session.commit()
 
     async def update_batch_phase_completed(
@@ -237,31 +237,33 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
 
             if batch:
                 # Update phase-specific completion tracking
-                phases_completed = batch.metadata.get("phases_completed", {})
+                phases_completed = batch.batch_metadata.get("phases_completed", {}) if batch.batch_metadata else {}
                 phases_completed[phase] = {
                     "completed_count": completed_count,
                     "failed_count": failed_count,
-                    "completed_at": datetime.now(UTC).isoformat(),
+                    "completed_at": datetime.utcnow().isoformat(),
                 }
-                batch.metadata["phases_completed"] = phases_completed
+                if not batch.batch_metadata:
+                    batch.batch_metadata = {}
+                batch.batch_metadata["phases_completed"] = phases_completed
 
                 # Update overall counts based on all phases
                 # Note: This assumes phases can have overlapping essays
-                batch.completed_count = max(batch.completed_count, completed_count)
-                batch.failed_count = max(batch.failed_count, failed_count)
+                batch.completed_essay_count = max(batch.completed_essay_count, completed_count)
+                batch.failed_essay_count = max(batch.failed_essay_count, failed_count)
 
                 # Check if all processing is complete
                 total_processed = completed_count + failed_count
                 if total_processed >= batch.essay_count:
                     # Determine overall status
                     if failed_count == 0:
-                        batch.status = BatchStatus.COMPLETED.value
+                        batch.overall_status = BatchStatus.COMPLETED_SUCCESSFULLY
                     elif completed_count == 0:
-                        batch.status = BatchStatus.FAILED.value
+                        batch.overall_status = BatchStatus.FAILED_CRITICALLY
                     else:
-                        batch.status = BatchStatus.PARTIALLY_COMPLETED.value
+                        batch.overall_status = BatchStatus.COMPLETED_WITH_FAILURES
 
-                batch.updated_at = datetime.now(UTC)
+                batch.updated_at = datetime.utcnow()
                 await session.commit()
 
     async def update_batch_failed(self, batch_id: str, error_message: str) -> None:
@@ -273,7 +275,7 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             batch = result.scalars().first()
 
             if batch:
-                batch.status = BatchStatus.FAILED.value
-                batch.error_message = error_message
-                batch.updated_at = datetime.now(UTC)
+                batch.overall_status = BatchStatus.FAILED_CRITICALLY
+                batch.last_error = error_message
+                batch.updated_at = datetime.utcnow()
                 await session.commit()

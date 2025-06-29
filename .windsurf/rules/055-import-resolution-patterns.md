@@ -1,0 +1,115 @@
+# Import Resolution Patterns in HuleEdu Monorepo
+
+## Context
+In a monorepo with multiple microservices, import conflicts can arise when services have modules with identical names (e.g., `metrics.py`, `di.py`, `protocols.py`). This rule documents the correct import patterns to avoid these conflicts.
+
+## The Problem
+When all service directories are in PYTHONPATH (as they are in Docker containers and test environments), simple imports like `from metrics import MetricsClass` can resolve to the wrong service's module, causing import errors and type mismatches.
+
+## The Solution: Service Import Patterns
+
+### Pattern 1: Full Module Path Imports (Recommended Default)
+Most services should use full module paths for all imports that could potentially conflict:
+
+```python
+# Good - Full path prevents ambiguity
+from services.result_aggregator_service.metrics import ResultAggregatorMetrics
+from services.result_aggregator_service.protocols import BatchRepositoryProtocol
+from services.result_aggregator_service.di import ServiceProvider
+
+# Bad - Can resolve to wrong service's module
+from metrics import ResultAggregatorMetrics
+from protocols import BatchRepositoryProtocol
+from di import ServiceProvider
+```
+
+### Pattern 2: Simple Imports (BOS Exception)
+Batch Orchestrator Service (BOS) uses simple imports because:
+1. It was the first service developed
+2. Its tests also use simple imports (consistency)
+3. It's already established and working
+
+```python
+# BOS can use simple imports
+from metrics import BOSMetrics
+from protocols import BatchRepositoryProtocol
+```
+
+### Pattern 3: Test Import Consistency
+**Critical Rule**: Test imports must match the service's import pattern.
+
+If the service uses full paths, tests must too:
+```python
+# Service code
+from services.result_aggregator_service.protocols import BatchRepositoryProtocol
+
+# Test code - MUST match
+from services.result_aggregator_service.protocols import BatchRepositoryProtocol
+```
+
+## Service-Specific Patterns
+
+### Services Using Full Module Paths:
+- Result Aggregator Service (RAS)
+- Essay Lifecycle Service (ELS)  
+- Content Service
+- File Service
+- CJ Assessment Service
+- Class Management Service
+- API Gateway Service
+- Spell Checker Service
+
+### Services Using Simple Imports:
+- Batch Orchestrator Service (BOS)
+
+## Implementation Guidelines
+
+1. **New Services**: Always use full module paths
+2. **Existing Services**: Check the pattern by looking at the service's `app.py` or `worker_main.py`
+3. **Adding Imports**: Match the existing pattern in the file
+4. **Tests**: Always match the service's import pattern
+
+## Debugging Import Issues
+
+If you encounter import errors like:
+- `ImportError: cannot import name 'X' from 'module'`
+- `AttributeError: module 'X' has no attribute 'Y'`
+
+Check:
+1. Are you using the correct import pattern for this service?
+2. Do your test imports match your service imports?
+3. Is Python finding the wrong module? (Check the error's file path)
+
+## Docker vs Local Execution
+
+The import patterns work the same in both environments because:
+- Docker: `ENV PYTHONPATH=/app` includes all services
+- Local: `pdm run` sets up paths to include all services
+
+## Examples of Correct Patterns
+
+### Result Aggregator Service
+```python
+# In services/result_aggregator_service/app.py
+from services.result_aggregator_service.api.health_routes import health_bp
+from services.result_aggregator_service.api.query_routes import query_bp
+from services.result_aggregator_service.di import (
+    CoreInfrastructureProvider,
+    DatabaseProvider,
+    ServiceProvider,
+)
+```
+
+### Batch Orchestrator Service
+```python
+# In services/batch_orchestrator_service/app.py
+from api.batch_command_routes import batch_command_bp
+from api.health_routes import health_bp
+from di import (
+    CoreInfrastructureProvider,
+    RepositoryAndPublishingProvider,
+)
+```
+
+## Rule Priority
+This rule is marked as `055` because it's a critical pattern that affects all services but comes after core architectural patterns (010-050).

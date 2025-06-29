@@ -22,7 +22,6 @@ from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.di import (
     CoreInfrastructureProvider,
     DatabaseProvider,
-    RepositoryProvider,
 )
 from services.result_aggregator_service.implementations.batch_repository_postgres_impl import (
     BatchRepositoryPostgresImpl,
@@ -181,7 +180,6 @@ async def test_app(
     container = make_async_container(
         CoreInfrastructureProvider(),
         DatabaseProvider(),
-        RepositoryProvider(),
         FunctionalTestApiProvider(),  # Use clean test provider instead of ServiceProvider
         context={Settings: test_settings},
     )
@@ -199,9 +197,10 @@ async def test_app(
 
     # Initialize database schema
     async with app.container() as request_container:
-        engine = await request_container.get(AsyncEngine)
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        batch_repo = await request_container.get(BatchRepositoryProtocol)
+        # Initialize schema using the repository's method
+        if hasattr(batch_repo, 'initialize_schema'):
+            await batch_repo.initialize_schema()
 
     yield app
 
@@ -229,10 +228,9 @@ async def setup_test_data(test_app: FunctionalTestResultAggregatorApp) -> BatchR
     """Setup test batch data in database."""
     container = test_app.container
 
-    # Get database session
+    # Get batch repository from container
     async with container() as request_container:
-        session = await request_container.get(AsyncSession)
-        repo = BatchRepositoryPostgresImpl(session)
+        repo = await request_container.get(BatchRepositoryProtocol)
 
         # Create test batch
         await repo.create_batch(
@@ -281,8 +279,6 @@ async def setup_test_data(test_app: FunctionalTestResultAggregatorApp) -> BatchR
         await repo.update_batch_phase_completed(
             batch_id="test-batch-001", phase="cj_assessment", completed_count=2, failed_count=0
         )
-
-        await session.commit()
 
         # Return fresh batch
         batch_result = await repo.get_batch("test-batch-001")
@@ -373,15 +369,13 @@ class TestAPIWithCaching:
 
         # Create additional batches for pagination testing
         async with test_app.container() as container:
-            session = await container.get(AsyncSession)
-            repo = BatchRepositoryPostgresImpl(session)
+            repo = await container.get(BatchRepositoryProtocol)
 
             # Create more batches
             for i in range(2, 5):
                 await repo.create_batch(
                     batch_id=f"test-batch-{i:03d}", user_id=user_id, essay_count=1
                 )
-            await session.commit()
 
         # Track database queries
         query_count = 0
