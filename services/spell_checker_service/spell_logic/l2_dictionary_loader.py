@@ -4,6 +4,7 @@ L2 Dictionary Loader Module
 This module provides functionality for loading, filtering, and applying L2 error corrections.
 It's used for pre-processing text before spell checking to handle common L2 errors.
 """
+from __future__ import annotations
 
 import os
 import re

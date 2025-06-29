@@ -1,4 +1,5 @@
 """Health and metrics routes for API Gateway Service."""
+from __future__ import annotations
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import inject

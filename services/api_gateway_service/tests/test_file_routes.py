@@ -95,7 +95,7 @@ async def client_with_mocks(mock_auth, mock_http_client, monkeypatch):
     """Create test client with mocked dependencies."""
     # Create container with mock HTTP client
     test_container = make_async_container(MockHttpClientProvider(mock_http_client))
-    
+
     app = create_app()
 
     # Override authentication

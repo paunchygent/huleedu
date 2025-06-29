@@ -4,6 +4,7 @@ Currently contains language-related helpers used by multiple initiator
 implementations. Keep this module minimal and free of dependencies on the
 individual initiators to avoid circular imports.
 """
+from __future__ import annotations
 
 from huleedu_service_libs.logging_utils import create_service_logger
 

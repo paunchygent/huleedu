@@ -1,4 +1,5 @@
 """Health check and metrics endpoints."""
+from __future__ import annotations
 
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger

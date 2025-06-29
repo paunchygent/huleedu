@@ -4,6 +4,7 @@ Test empty file validation using the elegant implementation.
 This test validates that empty files are properly handled through content validation
 rather than being treated as text extraction failures.
 """
+from __future__ import annotations
 
 import uuid
 from unittest.mock import AsyncMock

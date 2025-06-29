@@ -3,6 +3,7 @@ Test atomic Redis operations in BCS repository.
 
 Verifies that the WATCH/MULTI/EXEC pattern works correctly for race condition safety.
 """
+from __future__ import annotations
 
 import asyncio
 from unittest.mock import AsyncMock

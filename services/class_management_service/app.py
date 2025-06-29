@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from quart import Quart
 from quart_dishka import QuartDishka

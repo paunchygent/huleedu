@@ -1,4 +1,5 @@
 """Content management routes for Content Service."""
+from __future__ import annotations
 
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger

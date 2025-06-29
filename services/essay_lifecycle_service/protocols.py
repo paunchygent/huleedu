@@ -347,6 +347,10 @@ class BatchEssayTracker(Protocol):
         """Handle validation failure event for batch coordination."""
         ...
 
+    def get_user_id_for_essay(self, essay_id: str) -> str | None:
+        """Look up user_id for a given essay by searching through batch expectations."""
+        ...
+
 
 class MetricsCollector(Protocol):
     """Protocol for collecting service metrics."""

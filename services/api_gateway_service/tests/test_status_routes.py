@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 from httpx import ASGITransport, AsyncClient, Response
 from respx import MockRouter
@@ -74,7 +76,7 @@ async def test_get_batch_status_not_found_fallback_success(
     bos_url = f"{settings.BOS_URL}/internal/v1/batches/{BATCH_ID}/pipeline-state"
 
     respx_mock.get(aggregator_url).mock(return_value=Response(404))
-    
+
     # Mock realistic BOS ProcessingPipelineState data
     bos_data = {
         "batch_id": BATCH_ID,
@@ -93,7 +95,7 @@ async def test_get_batch_status_not_found_fallback_success(
             "completed_at": None
         }
     }
-    
+
     bos_mock = respx_mock.get(bos_url).mock(
         return_value=Response(200, json=bos_data)
     )
@@ -103,7 +105,7 @@ async def test_get_batch_status_not_found_fallback_success(
     assert response.status_code == 200
     response_data = response.json()
     assert response_data["status"] == "processing"
-    
+
     # Verify transformed data structure
     details = response_data["details"]
     assert details["batch_id"] == BATCH_ID
@@ -116,5 +118,5 @@ async def test_get_batch_status_not_found_fallback_success(
     assert details["current_phase"] == "SPELLCHECK"
     assert details["essays"] == []  # Cannot populate from BOS
     assert details["last_updated"] == "2024-01-15T10:30:00Z"
-    
+
     assert bos_mock.called

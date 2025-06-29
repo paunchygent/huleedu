@@ -138,9 +138,10 @@ class ServiceClientsProvider(Provider):
         kafka_bus: KafkaBus,
         settings: Settings,
         redis_client: AtomicRedisClientProtocol,
+        batch_tracker: BatchEssayTracker,
     ) -> EventPublisher:
-        """Provide event publisher implementation with Redis support."""
-        return DefaultEventPublisher(kafka_bus, settings, redis_client)
+        """Provide event publisher implementation with Redis support and batch tracking."""
+        return DefaultEventPublisher(kafka_bus, settings, redis_client, batch_tracker)
 
     @provide(scope=Scope.APP)
     def provide_metrics_collector(self, registry: CollectorRegistry) -> MetricsCollector:

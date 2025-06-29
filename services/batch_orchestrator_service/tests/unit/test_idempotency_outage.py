@@ -4,6 +4,7 @@ Idempotency Integration Tests for Batch Orchestrator Service (Outage Scenarios)
 Tests idempotency behavior during failures (Redis outage, business logic exceptions).
 Follows boundary mocking pattern - mocks Redis client but uses real handlers.
 """
+from __future__ import annotations
 
 import json
 import uuid

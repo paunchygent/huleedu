@@ -4,6 +4,7 @@ Unit tests for ACL transformation functions.
 Tests the Anti-Corruption Layer transformers following Rule 070 (Testing Standards)
 with protocol-based mocking and contract validation.
 """
+from __future__ import annotations
 
 from typing import Any
 

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from services.essay_lifecycle_service.protocols import EventPublisher
+from services.essay_lifecycle_service.protocols import BatchEssayTracker, EventPublisher
 
 logger = create_service_logger("essay_lifecycle_service.event_publisher")
 
@@ -32,10 +32,12 @@ class DefaultEventPublisher(EventPublisher):
         kafka_bus: KafkaBus,
         settings: Settings,
         redis_client: AtomicRedisClientProtocol,
+        batch_tracker: BatchEssayTracker,
     ) -> None:
         self.kafka_bus = kafka_bus
         self.settings = settings
         self.redis_client = redis_client
+        self.batch_tracker = batch_tracker
 
     async def publish_status_update(
         self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID | None = None
@@ -81,29 +83,42 @@ class DefaultEventPublisher(EventPublisher):
     ) -> None:
         """Publish essay status update to Redis for real-time UI notifications."""
         try:
-            # Note: In ELS, we would need to look up the user_id for this essay
-            # For now, we'll log that Redis publish is not possible without user context
-            logger.debug(
-                "Essay status update ready for Redis, but user_id lookup not implemented",
-                extra={
-                    "essay_id": essay_ref.entity_id,
-                    "status": status.value,
-                    "correlation_id": str(correlation_id) if correlation_id else None,
-                },
-            )
+            from datetime import UTC, datetime
 
-            # TODO: Implement user_id lookup from essay batch context
-            # user_id = await self._get_user_id_for_essay(essay_ref.entity_id)
-            # if user_id:
-            #     await self.redis_client.publish_user_notification(
-            #         user_id=user_id,
-            #         event_type="essay_status_updated",
-            #         data={
-            #             "essay_id": essay_ref.entity_id,
-            #             "status": status.value,
-            #             "timestamp": datetime.now(UTC).isoformat(),
-            #         }
-            #     )
+            # Look up the user_id for this essay from batch context
+            user_id = self.batch_tracker.get_user_id_for_essay(essay_ref.entity_id)
+
+            if user_id:
+                # Publish real-time notification to user-specific Redis channel
+                await self.redis_client.publish_user_notification(
+                    user_id=user_id,
+                    event_type="essay_status_updated",
+                    data={
+                        "essay_id": essay_ref.entity_id,
+                        "status": status.value,
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "correlation_id": str(correlation_id) if correlation_id else None,
+                    }
+                )
+
+                logger.info(
+                    f"Published real-time essay status notification to Redis for user {user_id}",
+                    extra={
+                        "essay_id": essay_ref.entity_id,
+                        "user_id": user_id,
+                        "status": status.value,
+                        "correlation_id": str(correlation_id) if correlation_id else None,
+                    },
+                )
+            else:
+                logger.warning(
+                    "Cannot publish Redis notification: user_id not found for essay",
+                    extra={
+                        "essay_id": essay_ref.entity_id,
+                        "status": status.value,
+                        "correlation_id": str(correlation_id) if correlation_id else None,
+                    },
+                )
 
         except Exception as e:
             logger.error(

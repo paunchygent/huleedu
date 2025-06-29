@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from huleedu_service_libs.event_utils import (
     extract_correlation_id_as_string,
     extract_user_id_from_event_data,

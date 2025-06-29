@@ -223,6 +223,13 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         return None
 
+    def get_user_id_for_essay(self, essay_id: str) -> str | None:
+        """Look up user_id for a given essay by searching through batch expectations."""
+        for expectation in self.batch_expectations.values():
+            if essay_id in expectation.expected_essay_ids:
+                return expectation.user_id
+        return None
+
     def _create_batch_ready_event(
         self, batch_id: str, expectation: BatchExpectation
     ) -> BatchEssaysReady:

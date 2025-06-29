@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, Request
 from httpx import AsyncClient

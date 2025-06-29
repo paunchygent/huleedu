@@ -1,4 +1,5 @@
 """Service-specific metrics for Result Aggregator Service."""
+from __future__ import annotations
 
 from prometheus_client import Counter, Histogram
 

@@ -1,4 +1,5 @@
 """Health and metrics routes for Content Service."""
+from __future__ import annotations
 
 from config import settings
 from dishka import FromDishka

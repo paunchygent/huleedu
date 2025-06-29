@@ -1,6 +1,7 @@
 """
 Loads and provides access to pipeline definitions from a configuration file.
 """
+from __future__ import annotations
 
 from pathlib import Path
 

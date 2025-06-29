@@ -1,4 +1,5 @@
 """Aggregator service implementation for batch queries."""
+from __future__ import annotations
 
 from typing import List, Optional
 

@@ -1,4 +1,5 @@
 """Internal API routes for querying aggregated results."""
+from __future__ import annotations
 
 from typing import Optional
 from uuid import uuid4

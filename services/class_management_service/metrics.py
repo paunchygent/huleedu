@@ -1,4 +1,5 @@
 """Metrics definitions for the Class Management Service."""
+from __future__ import annotations
 
 from prometheus_client import Counter, Histogram
 
