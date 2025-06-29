@@ -7,16 +7,24 @@ and proxy functionality to the File Service.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from io import BytesIO
+from typing import cast
 from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
+from dishka.integrations.fastapi import setup_dishka
 from fastapi.testclient import TestClient
+from prometheus_client import CollectorRegistry
 
+from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from services.api_gateway_service.app.main import create_app
+from services.api_gateway_service.app.metrics import GatewayMetrics
 from services.api_gateway_service.auth import get_current_user_id
+from services.api_gateway_service.config import Settings, settings
 
 
 def create_test_file(filename: str, content: str) -> tuple[str, BytesIO, str]:
@@ -24,38 +32,46 @@ def create_test_file(filename: str, content: str) -> tuple[str, BytesIO, str]:
     return (filename, BytesIO(content.encode()), "text/plain")
 
 
-class MockProvider(Provider):
-    """Test provider with mock dependencies."""
+class MockHttpClientProvider(Provider):
+    """Provider that offers a mocked HTTP client for file upload tests."""
 
     scope = Scope.APP
 
-    def __init__(self):
+    def __init__(self, mock_http_client: AsyncMock):
         super().__init__()
-        self.mock_http_client = AsyncMock()
+        self.mock_http_client = mock_http_client
 
     @provide
-    def get_http_client(self) -> httpx.AsyncClient:
-        return self.mock_http_client
+    def get_config(self) -> Settings:
+        """Provide real settings for test consistency."""
+        return settings
 
+    @provide
+    async def get_http_client(self) -> AsyncIterator[httpx.AsyncClient]:
+        """Provide mocked HTTP client for testing file uploads."""
+        yield cast(httpx.AsyncClient, self.mock_http_client)
 
-@pytest.fixture
-def mock_provider():
-    """Create mock provider for testing."""
-    return MockProvider()
+    @provide
+    async def get_redis_client(self) -> AsyncIterator[AtomicRedisClientProtocol]:
+        """Provide mocked Redis client."""
+        client = AsyncMock()
+        yield cast(AtomicRedisClientProtocol, client)
 
+    @provide
+    async def get_kafka_bus(self) -> AsyncIterator[KafkaBus]:
+        """Provide mocked Kafka bus."""
+        bus = AsyncMock(spec=KafkaBus)
+        yield bus
 
-@pytest.fixture
-def mock_http_client(mock_provider):
-    """Get mock HTTP client from provider."""
-    return mock_provider.mock_http_client
+    @provide(scope=Scope.APP)
+    def provide_registry(self) -> CollectorRegistry:
+        """Provide isolated Prometheus registry for test independence."""
+        return CollectorRegistry()
 
-
-@pytest.fixture
-async def container(mock_provider):
-    """Create test container with mock dependencies."""
-    container = make_async_container(mock_provider)
-    yield container
-    await container.close()
+    @provide(scope=Scope.APP)
+    def provide_metrics(self, registry: CollectorRegistry) -> GatewayMetrics:
+        """Provide GatewayMetrics with isolated registry."""
+        return GatewayMetrics(registry=registry)
 
 
 @pytest.fixture
@@ -69,17 +85,24 @@ def mock_auth():
 
 
 @pytest.fixture
-def client_with_mocks(container, mock_auth, monkeypatch):
+def mock_http_client():
+    """Mock HTTP client for file upload tests."""
+    return AsyncMock()
+
+
+@pytest.fixture
+async def client_with_mocks(mock_auth, mock_http_client, monkeypatch):
     """Create test client with mocked dependencies."""
+    # Create container with mock HTTP client
+    test_container = make_async_container(MockHttpClientProvider(mock_http_client))
+    
     app = create_app()
 
     # Override authentication
     app.dependency_overrides[get_current_user_id] = mock_auth
 
     # Set up Dishka with test container
-    from dishka.integrations.fastapi import setup_dishka
-
-    setup_dishka(container, app)
+    setup_dishka(test_container, app)
 
     # Disable rate limiting entirely for tests (official SlowAPI approach)
     monkeypatch.setattr("services.api_gateway_service.app.rate_limiter.limiter.enabled", False)
@@ -87,8 +110,9 @@ def client_with_mocks(container, mock_auth, monkeypatch):
     with TestClient(app) as client:
         yield client
 
-    # Clean up overrides
+    # Clean up
     app.dependency_overrides.clear()
+    await test_container.close()
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,7 @@ from common_core.status_enums import BatchClientStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from .. import auth
+from ..acl_transformers import transform_bos_state_to_ras_response
 from ..app.metrics import GatewayMetrics
 from ..config import settings
 
@@ -79,6 +80,9 @@ async def get_batch_status(
             ).inc()
             return BatchStatusResponse(status=BatchClientStatus.AVAILABLE, details=data)
 
+        except HTTPException:
+            # Re-raise HTTPException without catching it
+            raise
         except HTTPStatusError as e:
             if e.response.status_code == 404 and settings.HANDLE_MISSING_BATCHES == "query_bos":
                 logger.info(f"Batch not in aggregator, checking BOS: {batch_id}")
@@ -110,12 +114,18 @@ async def get_batch_status(
                         raise HTTPException(
                             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
                         )
+                    # Apply Anti-Corruption Layer transformation (Rule 020.3.1)
+                    transformed_data = transform_bos_state_to_ras_response(bos_data, user_id)
+
                     metrics.http_requests_total.labels(
                         method="GET", endpoint=endpoint, http_status="200"
                     ).inc()
                     return BatchStatusResponse(
-                        status=BatchClientStatus.PROCESSING, details=bos_data
+                        status=BatchClientStatus.PROCESSING, details=transformed_data
                     )
+                except HTTPException:
+                    # Re-raise HTTPException without catching it
+                    raise
                 except HTTPStatusError as bos_e:
                     logger.error(f"BOS fallback failed for batch {batch_id}: {bos_e}")
                     metrics.http_requests_total.labels(

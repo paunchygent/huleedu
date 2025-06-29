@@ -1,46 +1,13 @@
-from collections.abc import AsyncIterator
-from unittest.mock import AsyncMock
-
-import httpx
 import pytest
-from dishka import Provider, Scope, make_async_container, provide
 from httpx import ASGITransport, AsyncClient, Response
 from respx import MockRouter
 
-from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.redis_client import RedisClient
 from services.api_gateway_service.app.main import create_app
 from services.api_gateway_service.auth import get_current_user_id
 from services.api_gateway_service.config import settings
 
 USER_ID = "test-user-123"
 BATCH_ID = "test-batch-abc-123"
-
-
-class MockApiGatewayProvider(Provider):
-    scope = Scope.APP
-
-    @provide
-    async def get_http_client(self) -> AsyncIterator[httpx.AsyncClient]:
-        async with httpx.AsyncClient() as client:
-            yield client
-
-    @provide
-    async def get_redis_client(self) -> AsyncIterator[RedisClient]:
-        client = AsyncMock(spec=RedisClient)
-        yield client
-
-    @provide
-    async def get_kafka_bus(self) -> AsyncIterator[KafkaBus]:
-        bus = AsyncMock(spec=KafkaBus)
-        yield bus
-
-
-@pytest.fixture
-async def container():
-    container = make_async_container(MockApiGatewayProvider())
-    yield container
-    await container.close()
 
 
 @pytest.fixture
@@ -52,12 +19,12 @@ def mock_auth():
 
 
 @pytest.fixture
-async def client(container, mock_auth):
+async def client(unified_container, mock_auth):
     app = create_app()
     app.dependency_overrides[get_current_user_id] = mock_auth
     from dishka.integrations.fastapi import setup_dishka
 
-    setup_dishka(container, app)
+    setup_dishka(unified_container, app)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
@@ -107,15 +74,47 @@ async def test_get_batch_status_not_found_fallback_success(
     bos_url = f"{settings.BOS_URL}/internal/v1/batches/{BATCH_ID}/pipeline-state"
 
     respx_mock.get(aggregator_url).mock(return_value=Response(404))
+    
+    # Mock realistic BOS ProcessingPipelineState data
+    bos_data = {
+        "batch_id": BATCH_ID,
+        "user_id": USER_ID,
+        "requested_pipelines": ["spellcheck"],
+        "last_updated": "2024-01-15T10:30:00Z",
+        "spellcheck": {
+            "status": "in_progress",
+            "essay_counts": {
+                "total": 5,
+                "successful": 2,
+                "failed": 0,
+                "pending_dispatch_or_processing": 3
+            },
+            "started_at": "2024-01-15T10:00:00Z",
+            "completed_at": None
+        }
+    }
+    
     bos_mock = respx_mock.get(bos_url).mock(
-        return_value=Response(200, json={"user_id": USER_ID, "pipeline_status": "running"})
+        return_value=Response(200, json=bos_data)
     )
 
     response = await client.get(f"/v1/batches/{BATCH_ID}/status")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "processing",
-        "details": {"user_id": USER_ID, "pipeline_status": "running"},
-    }
+    response_data = response.json()
+    assert response_data["status"] == "processing"
+    
+    # Verify transformed data structure
+    details = response_data["details"]
+    assert details["batch_id"] == BATCH_ID
+    assert details["user_id"] == USER_ID
+    assert details["overall_status"] == "processing"  # BatchClientStatus.PROCESSING.value
+    assert details["essay_count"] == 5
+    assert details["completed_essay_count"] == 2
+    assert details["failed_essay_count"] == 0
+    assert details["requested_pipeline"] == "spellcheck"
+    assert details["current_phase"] == "SPELLCHECK"
+    assert details["essays"] == []  # Cannot populate from BOS
+    assert details["last_updated"] == "2024-01-15T10:30:00Z"
+    
     assert bos_mock.called
