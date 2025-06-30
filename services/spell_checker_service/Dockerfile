@@ -32,7 +32,10 @@ WORKDIR /app/services/spell_checker_service
 # PDM will use the overrides to find local dependencies at the correct paths
 RUN pdm install --prod
 
-RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
+# Ensure runtime user can write logs/corrections
+RUN mkdir -p /app/services/spell_checker_service/data/corrected_essays \
+    && chown -R 1000:1000 /app/services/spell_checker_service/data \
+    && groupadd -r appuser && useradd --no-log-init -r -g appuser -u 1000 appuser
 USER appuser
 
 # Health check for combined service (HTTP API + Kafka worker)

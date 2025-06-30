@@ -47,6 +47,7 @@ The following utilities are now available in `huleedu_service_libs`:
 ### Import Pattern
 
 Services import the tracing utilities as follows:
+
 ```python
 from huleedu_service_libs import init_tracing, setup_tracing_middleware
 from huleedu_service_libs.observability import trace_operation, get_current_trace_id
@@ -126,6 +127,7 @@ Update `services/batch_orchestrator_service/startup_setup.py`:
 3. Set up middleware with `setup_tracing_middleware(app, tracer)`
 
 Example pattern:
+
 ```python
 from huleedu_service_libs import init_tracing, setup_tracing_middleware
 
@@ -147,6 +149,7 @@ Add tracing to the `handle_spell_check_complete` method to debug storage referen
 #### 3.3 Add Kafka Trace Propagation
 
 Update `common_core/src/common_core/events/envelope.py`:
+
 1. Add `metadata: Optional[Dict[str, Any]]` field to EventEnvelope
 2. Use `inject_trace_context()` when publishing events
 3. Use `extract_trace_context()` when consuming events
@@ -160,6 +163,7 @@ Create `scripts/trace_search.py` for searching traces by correlation ID or batch
 #### 4.2 Grafana Dashboard
 
 Create `observability/grafana-dashboards/distributed-tracing-quickstart.json` with:
+
 - Trace search helper panel
 - Service error rate by operation
 - Recent errors with trace links
@@ -169,6 +173,7 @@ Create `observability/grafana-dashboards/distributed-tracing-quickstart.json` wi
 #### 5.1 E2E Test with Trace Validation
 
 Create tests in `tests/functional/test_tracing_integration.py` to verify:
+
 - Trace propagation across services
 - Expected operations are traced
 - No errors in critical paths
@@ -176,6 +181,7 @@ Create tests in `tests/functional/test_tracing_integration.py` to verify:
 #### 5.2 Verify Debugging Workflow
 
 Test the complete debugging workflow:
+
 1. Run E2E test
 2. Get correlation ID from output
 3. Search in Jaeger UI
@@ -186,7 +192,7 @@ Test the complete debugging workflow:
 ### What's Working Now
 
 1. **Infrastructure** ✅
-   - Jaeger UI: http://localhost:16686
+   - Jaeger UI: <http://localhost:16686>
    - All services configured with OTLP endpoints
    - Grafana datasource for Jaeger configured
 

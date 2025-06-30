@@ -22,7 +22,15 @@ services/libs/huleedu_service_libs/
 ├── logging_utils.py         # Structured JSON logging with service context
 ├── event_utils.py           # Event data extraction utilities
 ├── protocols.py             # Shared protocol definitions
-└── py.typed                 # Type stub marker
+├── middleware/              # Framework-specific middleware
+│   ├── __init__.py         # Framework-agnostic base
+│   └── frameworks/         # Framework implementations
+│       ├── quart_middleware.py    # Quart/async middleware
+│       └── fastapi_middleware.py  # FastAPI/Starlette middleware
+├── observability/           # Distributed tracing utilities
+│   ├── __init__.py
+│   └── tracing.py          # OpenTelemetry integration
+└── py.typed                # Type stub marker
 ```
 
 ## 3. Core Components
@@ -132,6 +140,24 @@ async with redis_client.subscribe("ws:user123") as pubsub:
 - **MUST** include service name in all logs
 - **MUST** support correlation IDs in extra context
 
+### 6.4. Framework-Specific Middleware
+**Pattern for avoiding framework coupling**:
+```python
+# Import only what you need
+# Quart services
+from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
+
+# FastAPI services  
+from huleedu_service_libs.middleware.frameworks.fastapi_middleware import setup_tracing_middleware
+```
+
+### 6.5. Observability Utilities
+- **init_tracing(service_name)**: Initialize OpenTelemetry tracer
+- **trace_operation(tracer, name, attributes)**: Context manager for spans
+- **inject_trace_context(carrier)**: Add trace to event metadata
+- **extract_trace_context(carrier)**: Extract trace from events
+- **get_current_trace_id()**: Get active trace ID for correlation
+
 ## 7. Testing Considerations
 
 ### 7.1. Mock Implementations
@@ -143,3 +169,4 @@ async with redis_client.subscribe("ws:user123") as pubsub:
 - Redis: Use testcontainers or real instance
 - Kafka: Use testcontainers for full integration
 - Verify lifecycle management works correctly
+- Observability: Optional, mock tracer in unit tests

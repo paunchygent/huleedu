@@ -44,7 +44,12 @@ alwaysApply: false
 ## Quality, Workflow & Documentation
 - [060-data-and-metadata-management.mdc](mdc:060-data-and-metadata-management.mdc): Data models and metadata management standards
 - [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc): Testing strategies (unit, contract, integration, E2E) with Prometheus registry handling
-- [071-observability-rules-and-patterns.mdc](mdc:071-observability-rules-and-patterns.mdc): Prometheus metrics, alerting, dashboards, and logging standards
+- **Observability (071.x)**
+  - [071-observability-index.mdc](mdc:071-observability-index.mdc): Observability patterns index
+  - [071-observability-core-patterns.mdc](mdc:071-observability-core-patterns.mdc): Core observability patterns
+  - [071.1-prometheus-metrics-patterns.mdc](mdc:071.1-prometheus-metrics-patterns.mdc): Prometheus metrics patterns
+  - [071.2-jaeger-tracing-patterns.mdc](mdc:071.2-jaeger-tracing-patterns.mdc): Distributed tracing with Jaeger
+  - [071.3-grafana-loki-patterns.mdc](mdc:071.3-grafana-loki-patterns.mdc): Grafana dashboards and Loki logs
 - [072-grafana-playbook-rules.mdc](mdc:072-grafana-playbook-rules.mdc): Grafana dashboard and alerting playbook
 - [080-repository-workflow-and-tooling.mdc](mdc:080-repository-workflow-and-tooling.mdc): PDM monorepo usage, version control, CI/CD
 - [081-pdm-dependency-management.mdc](mdc:081-pdm-dependency-management.mdc): PDM configuration and dependency management standards
