@@ -370,11 +370,13 @@ Improve `test_redis_isolation.py`:
 **Discovery**: After fixing all the above issues, CJ Assessment service was still failing with "Invalid content ID format" errors.
 
 **Root Cause Analysis**:
+
 1. CJ Assessment was receiving `text_storage_id` values like `"original-{essay_id}"` instead of actual storage IDs
 2. This was a fallback value from ELS's `_get_text_storage_id_for_phase` method in `batch_phase_coordinator_impl.py`
 3. The method couldn't find the corrected text storage ID from the spellcheck phase
 
 **Investigation Steps**:
+
 1. Checked CJ Assessment logs - confirmed it was trying to fetch content with invalid IDs like `"original-40843bf8-c472-4adf-a4f7-f48441c7ec5c"`
 2. Traced back to ELS - found it was sending these fallback IDs in the CJ assessment request
 3. Examined database - found that:
@@ -385,6 +387,7 @@ Improve `test_redis_isolation.py`:
 ### Fix Applied: Atomic Storage Reference Updates
 
 **Changes Made**:
+
 1. Extended `EssayRepositoryProtocol` and PostgreSQL implementation to accept optional `storage_reference` parameter
 2. Modified `update_essay_state` and `update_essay_status_via_machine` methods to atomically update storage references
 3. Updated `DefaultServiceResultHandler::handle_spellcheck_result` to:
@@ -395,17 +398,20 @@ Improve `test_redis_isolation.py`:
 ### Why The Fix Still Failed
 
 **After applying the fix and rebuilding**:
+
 1. Ran new test with batch ID `6ec9a2db-e5a9-41f6-9e8c-04fec4d13fd8`
 2. CJ Assessment STILL received `"original-{essay_id}"` values
 3. Database check revealed `storage_references` field was STILL empty `{}`
 
 **Root Cause of Fix Failure**:
 The service result handler looks for the storage ID under the key `"storage_id"`:
+
 ```python
 storage_id = spellchecked_ref.get("storage_id")
 ```
 
 But the spell checker service stores it under the key `"default"`:
+
 ```python
 storage_metadata_for_result = StorageReferenceMetadata(
     references={ContentType.CORRECTED_TEXT: {"default": new_storage_id}},
@@ -413,20 +419,103 @@ storage_metadata_for_result = StorageReferenceMetadata(
 ```
 
 **Actual Database Structure**:
+
 ```json
 {"default": "21bde2369215411faaf1a7fa85b2c03d"}
 ```
 
 **The Bug**: The fix is looking for the wrong key. It should be:
+
 ```python
 storage_id = spellchecked_ref.get("default")  # Not "storage_id"
 ```
 
 This explains why the storage_references field remains empty even after the fix - the code can't find the storage ID because it's looking for the wrong key name.
 
-### Next Steps
+### Resolution: Key Name Fix Applied
 
-1. Fix the key name in `service_result_handler_impl.py` from `"storage_id"` to `"default"`
-2. Rebuild and test again
-3. Verify that `storage_references` field is properly populated
-4. Confirm CJ Assessment receives correct storage IDs instead of fallback values
+**The Fix**:
+Changed line 130 in `service_result_handler_impl.py`:
+
+```python
+# Before (incorrect):
+storage_id = spellchecked_ref.get("storage_id")
+
+# After (correct):
+storage_id = spellchecked_ref.get("default")
+```
+
+**Results**:
+
+1. ✅ Rebuilt ELS services with the fix
+2. ✅ Restarted all services with `docker compose down` then `docker compose up -d`
+3. ✅ E2E test now PASSES in 19.28 seconds (well under 40s timeout)
+4. ✅ Storage references are properly populated in the database
+5. ✅ CJ Assessment receives correct storage IDs
+6. ✅ Complete pipeline processes all 25 real student essays successfully
+
+## Final Summary
+
+### Root Causes Identified and Fixed
+
+1. **Kafka Topic Availability** (Phase 4)
+   - Topics were deleted/recreated but not available when consumers started
+   - Solution: Added topic availability verification before starting tests
+
+2. **Storage Reference Propagation** (Phase 5)
+   - CJ Assessment was receiving fallback IDs like `"original-{essay_id}"`
+   - Root cause: Service result handler looked for wrong key name
+   - The spell checker stores IDs under key `"default"` but handler looked for `"storage_id"`
+   - Solution: Fixed key name in service_result_handler_impl.py
+
+### Test Results After Fixes
+
+The comprehensive E2E test (`test_e2e_comprehensive_real_batch.py`) now:
+
+- ✅ Completes successfully in ~19 seconds
+- ✅ Processes 25 real student essays
+- ✅ All phases complete: upload → spellcheck → CJ assessment
+- ✅ Proper storage IDs are propagated between phases
+- ✅ No timeouts or failures
+
+### Key Learnings
+
+1. **Always verify the actual data structure** - The bug was a simple key mismatch
+2. **Check service logs carefully** - They revealed the invalid content ID format
+3. **Trace data flow through the pipeline** - This helped identify where storage refs were lost
+4. **Database inspection is crucial** - Seeing the actual JSONB structure revealed the issue
+
+## Phase 6: Additional Functional Test Fixes
+
+After fixing the E2E test, three additional issues were resolved to achieve 100% test success:
+
+### 1. Tuple Serialization Error
+
+**Problem**: Client pipeline tests failed with `TypeError: Can not serialize value type: <class 'tuple'>`
+**Cause**: Test setup returned `(batch_id, correlation_id)` tuple but calling code didn't unpack it
+**Fix**: Modified `client_pipeline_test_setup.py` to properly unpack tuples:
+
+```python
+batch_id, correlation_id = await register_comprehensive_batch(...)
+```
+
+### 2. Invalid Kafka Topic Name
+
+**Problem**: Tests couldn't subscribe to `huleedu.els.batch_phase.outcome.v1` (invalid topic)
+**Cause**: Typo - missing dot between "batch" and "phase"
+**Fix**: Corrected to `huleedu.els.batch.phase.outcome.v1` in monitoring functions
+
+### 3. Deterministic Event ID Generation
+
+**Problem**: Idempotency tests failed - same business data produced different IDs
+**Cause**: `generate_deterministic_event_id` included variable envelope metadata in hash
+**Fix**: Modified function to exclude envelope metadata, using only stable business data
+
+### Final Results
+
+✅ **All 54 functional tests now pass**
+
+- No timeouts
+- Proper event serialization
+- Correct topic subscriptions  
+- Idempotency working as designed

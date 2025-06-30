@@ -51,7 +51,7 @@ async def create_test_batch_with_essays(
         print("⏳ Consumer positioned and ready to receive BatchEssaysReady events...")
 
         # Register batch for comprehensive testing
-        batch_id = await register_comprehensive_batch(
+        batch_id, correlation_id = await register_comprehensive_batch(
             service_manager,
             expected_essay_count,
             correlation_id,
@@ -100,7 +100,7 @@ async def create_test_batch_with_essays(
                 continue
 
     if not batch_ready_received:
-        raise Exception(
+        raise RuntimeError(
             "BatchEssaysReady event was not received - essays may not be processed by ELS",
         )
 
@@ -127,22 +127,25 @@ async def create_multiple_test_batches(
     correlation_ids = []
 
     for i in range(batch_count):
-        correlation_id = str(uuid.uuid4())
-        correlation_ids.append(correlation_id)
+        # Generate a correlation ID for the initial request
+        request_correlation_id = str(uuid.uuid4())
 
         essay_files = await load_real_test_essays(max_essays=essays_per_batch)
         expected_essay_count = len(essay_files)
 
-        batch_id = await register_comprehensive_batch(
+        # The service returns the actual correlation ID used for the event stream
+        batch_id, event_correlation_id = await register_comprehensive_batch(
             service_manager,
             expected_essay_count,
-            correlation_id,
+            request_correlation_id,
             test_teacher,
         )
         batch_ids.append(batch_id)
+        # We must use the correlation ID from the service for monitoring
+        correlation_ids.append(event_correlation_id)
 
         await upload_real_essays(
-            service_manager, batch_id, essay_files, correlation_id, test_teacher
+            service_manager, batch_id, essay_files, event_correlation_id, test_teacher
         )
 
         print(f"📦 Created test batch {i + 1}: {batch_id}")
@@ -161,7 +164,7 @@ def get_pipeline_monitoring_topics() -> list[str]:
         "huleedu.batch.ai_feedback.initiate.command.v1",
         "huleedu.batch.nlp.initiate.command.v1",
         "huleedu.batch.cj_assessment.initiate.command.v1",
-        "huleedu.els.batch_phase.outcome.v1",
+        "huleedu.els.batch.phase.outcome.v1",
         "huleedu.events.batch.initiate_command.v1",
     ]
 
@@ -174,20 +177,19 @@ def get_state_aware_monitoring_topics() -> list[str]:
         "huleedu.batch.ai_feedback.initiate.command.v1",
         "huleedu.batch.nlp.initiate.command.v1",
         "huleedu.batch.cj_assessment.initiate.command.v1",
-        "huleedu.els.batch_phase.outcome.v1",
+        "huleedu.els.batch.phase.outcome.v1",
         "huleedu.events.batch.initiate_command.v1",
     ]
 
 
 def get_concurrent_monitoring_topics() -> list[str]:
     """Get topics for concurrent pipeline monitoring."""
-    return [
+    # Use set to ensure uniqueness
+    return list(set([
         "huleedu.commands.batch.pipeline.v1",
         "huleedu.els.spellcheck.initiate.command.v1",
         "huleedu.batch.ai_feedback.initiate.command.v1",
         "huleedu.batch.nlp.initiate.command.v1",
-        "huleedu.batch.ai_feedback.initiate.command.v1",
-        "huleedu.batch.nlp.initiate.command.v1",
         "huleedu.batch.cj_assessment.initiate.command.v1",
-        "huleedu.els.batch_phase.outcome.v1",
-    ]
+        "huleedu.els.batch.phase.outcome.v1",
+    ]))
