@@ -35,9 +35,9 @@ async def mock_http_context_manager(mock_response: AsyncMock) -> Any:
 ```
 
 ### 3.3. Protocol and DI Testing Patterns
-- Mock protocol-based services using test doubles implementing the same `typing.Protocol`.
-- Override Dishka providers in tests to inject mocks/fakes.
-- Unit test all protocol implementations for both success and error; integration tests must cover full orchestration flows.
+- **MUST** override Dishka providers in tests to inject mocks for protocol dependencies.
+- **Pattern**: Use `make_async_container` with a test `Provider` that binds the protocol to a mock.
+- **Example**: `provider.provide(provide(lambda: AsyncMock(spec=MyProtocol), scope=Scope.APP))`
 
 ## 4. Execution Rules
 - **Command**: `pdm run pytest` (always use PDM)
