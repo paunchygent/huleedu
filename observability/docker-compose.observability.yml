@@ -6,6 +6,7 @@ volumes:
   loki_data: {}
   grafana_data: {}
   alertmanager_data: {}
+  jaeger_data: {}
 
 # Networks are defined in the parent docker-compose.yml
 
@@ -77,6 +78,23 @@ services:
       - ./promtail/promtail-config.yml:/etc/promtail/config.yml
     command: -config.file=/etc/promtail/config.yml
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: huleedu_jaeger
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "16686:16686"    # Jaeger UI
+      - "4317:4317"      # OTLP gRPC receiver
+      - "4318:4318"      # OTLP HTTP receiver
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=memory
+      - MEMORY_MAX_TRACES=10000
+    volumes:
+      - jaeger_data:/tmp
+
   grafana:
     image: grafana/grafana:11.0.0
     container_name: huleedu_grafana
@@ -84,12 +102,14 @@ services:
     depends_on:
       - prometheus
       - loki
+      - jaeger
     networks:
       - huleedu_internal_network
     ports:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}

@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
 
+
+    # Database configuration
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost/spellchecker"
+
     # Redis configuration for idempotency
     REDIS_URL: str = "redis://localhost:6379"
 

@@ -16,8 +16,6 @@ from huleedu_service_libs.observability import (
     inject_trace_context,
     extract_trace_context,
 )
-from huleedu_service_libs.middleware import setup_tracing_middleware
-
 __all__ = [
     "KafkaBus",
     "RedisClient",
@@ -26,5 +24,8 @@ __all__ = [
     "get_current_trace_id",
     "inject_trace_context",
     "extract_trace_context",
-    "setup_tracing_middleware",
 ]
+
+# Framework-specific middleware should be imported directly from:
+# - huleedu_service_libs.middleware.frameworks.quart_middleware
+# - huleedu_service_libs.middleware.frameworks.fastapi_middleware

@@ -11,9 +11,9 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any, TYPE_CHECKING, Iterable
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select, update, text
 from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.exc import IntegrityError
 
 from services.spell_checker_service.config import Settings
@@ -55,6 +55,8 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
     async def initialize_db_schema(self) -> None:
         """Create database tables if they don't exist (idempotent)."""
         async with self.engine.begin() as conn:
+            # Ensure pg_trgm extension required for GIN trigram index exists
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
             await conn.run_sync(Base.metadata.create_all)
         _LOGGER.info("Spell-checker DB schema initialised")
 

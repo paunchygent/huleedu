@@ -146,6 +146,31 @@ services:
       start_period: 30s
 
   # PostgreSQL database for Result Aggregator Service
+
+  # PostgreSQL database for Spell Checker Service
+  spellchecker_db:
+    image: postgres:15
+    container_name: huleedu_spellchecker_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5437:5432"
+    environment:
+      - POSTGRES_DB=spellchecker
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
+    volumes:
+      - spell_checker_db_data:/var/lib/postgresql/data
+      - ./services/spell_checker_service/docker/init_pg.sql:/docker-entrypoint-initdb.d/00_pg_trgm.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d spellchecker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # PostgreSQL database for Result Aggregator Service
   result_aggregator_db:
     image: postgres:15
     container_name: huleedu_result_aggregator_db

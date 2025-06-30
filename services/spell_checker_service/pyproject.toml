@@ -23,6 +23,9 @@ dependencies = [
     "hypercorn",
     # Spell checking library for core algorithm
     "pyspellchecker",
+    # Database dependencies
+    "sqlalchemy",
+    "asyncpg",
 ]
 
 [build-system]

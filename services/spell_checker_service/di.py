@@ -30,6 +30,10 @@ from services.spell_checker_service.protocols import (
     SpellcheckEventPublisherProtocol,
     SpellLogicProtocol,
 )
+from services.spell_checker_service.repository_protocol import SpellcheckRepositoryProtocol
+from services.spell_checker_service.implementations.spell_repository_postgres_impl import (
+    PostgreSQLSpellcheckRepository,
+)
 
 
 class SpellCheckerServiceProvider(Provider):
@@ -81,6 +85,14 @@ class SpellCheckerServiceProvider(Provider):
     def provide_result_store(self, app_settings: Settings) -> ResultStoreProtocol:
         """Provide result store implementation."""
         return DefaultResultStore(content_service_url=app_settings.CONTENT_SERVICE_URL)
+
+    @provide(scope=Scope.APP)
+    async def provide_spellcheck_repository(self, settings: Settings) -> SpellcheckRepositoryProtocol:
+        """Provide PostgreSQL-backed spell-check repository."""
+        repo = PostgreSQLSpellcheckRepository(settings)
+        # ensure schema exists (idempotent)
+        await repo.initialize_db_schema()
+        return repo
 
     @provide(scope=Scope.APP)
     def provide_spell_logic(

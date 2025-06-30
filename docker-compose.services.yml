@@ -47,6 +47,10 @@ services:
       - CONTENT_STORE_ROOT_PATH=/data/huleedu_content_store
       - PORT=8000
       - LOG_LEVEL=INFO
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=content_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz || exit 1"]
       interval: 15s
@@ -86,6 +90,10 @@ services:
       - HOST=0.0.0.0
       - PORT=4003
       - METRICS_PORT=9096
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=result_aggregator
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:4003/healthz || exit 1"]
       interval: 15s
@@ -115,6 +123,10 @@ services:
       - LOG_LEVEL=INFO
       - HTTP_PORT=4002
       - BCS_REDIS_URL=redis://redis:6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=batch_conductor_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:4002/healthz || exit 1"]
       interval: 15s
@@ -146,8 +158,14 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - LOG_LEVEL=DEBUG
+      # Database configuration
+      - SPELL_CHECKER_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@spellchecker_db:5432/spellchecker
       - HTTP_PORT=8002
       - SPELL_CHECKER_SERVICE_REDIS_URL=redis://redis:6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=spell_checker_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8002/healthz || exit 1"]
       interval: 15s
@@ -191,6 +209,10 @@ services:
       - BATCH_ORCHESTRATOR_DB_NAME=batch_orchestrator
       - BATCH_ORCHESTRATOR_DB_USER=${HULEEDU_DB_USER}
       - BATCH_ORCHESTRATOR_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=batch_orchestrator_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/healthz || exit 1"]
       interval: 15s
@@ -238,6 +260,10 @@ services:
       - ELS_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - LOG_LEVEL=INFO
       - ESSAY_LIFECYCLE_SERVICE_REDIS_URL=redis://redis:6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=essay_lifecycle_api
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:6000/healthz || exit 1"]
       interval: 15s
@@ -281,6 +307,10 @@ services:
       - ELS_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - LOG_LEVEL=INFO
       - ESSAY_LIFECYCLE_SERVICE_REDIS_URL=redis://redis:6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=essay_lifecycle_worker
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     # Note: essay_lifecycle_worker is a worker service, no health check needed
 
   file_service:
@@ -309,6 +339,10 @@ services:
       - FILE_SERVICE_HOST=0.0.0.0
       - FILE_SERVICE_LOG_LEVEL=INFO
       - FILE_SERVICE_REDIS_URL=redis://redis:6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=file_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:7001/healthz || exit 1"]
       interval: 15s
@@ -353,6 +387,10 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=cj_assessment_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9090/healthz || exit 1"]
       interval: 15s
@@ -394,6 +432,10 @@ services:
       - BATCH_ORCHESTRATOR_SERVICE_URL=http://batch_orchestrator_service:5000
       - CLASS_MANAGEMENT_SERVICE_URL=http://class_management_service:5002
       - FILE_SERVICE_URL=http://file_service:7001
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=api_gateway_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
       interval: 15s
@@ -430,6 +472,10 @@ services:
       - CLASS_MANAGEMENT_SERVICE_DB_USER=${HULEEDU_DB_USER}
       - CLASS_MANAGEMENT_SERVICE_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - CLASS_MANAGEMENT_SERVICE_REDIS_URL=redis://redis:6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=class_management_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5002/healthz || exit 1"]
       interval: 15s

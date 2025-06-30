@@ -1,0 +1,83 @@
+"""Example of how to add tracing to API Gateway Service in the future.
+
+This file demonstrates how to integrate OpenTelemetry tracing with FastAPI.
+When ready to implement, rename this file to startup_setup.py and update main.py.
+"""
+
+from __future__ import annotations
+
+from dishka import make_async_container
+from dishka.integrations.fastapi import setup_dishka
+from fastapi import FastAPI
+
+from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs import init_tracing
+from huleedu_service_libs.middleware.frameworks.fastapi_middleware import setup_tracing_middleware
+from services.api_gateway_service.app.di import ApiGatewayProvider
+
+logger = create_service_logger("api_gateway_service.startup")
+
+
+def create_di_container():
+    """Create and configure the DI container."""
+    try:
+        logger.info("Creating DI container...")
+        container = make_async_container(ApiGatewayProvider())
+        logger.info("DI container created successfully")
+        return container
+    except Exception as e:
+        logger.critical(f"Failed to create DI container: {e}", exc_info=True)
+        raise
+
+
+def setup_dependency_injection(app: FastAPI, container):
+    """Setup Dishka integration with FastAPI."""
+    try:
+        logger.info("Setting up dependency injection...")
+        setup_dishka(container, app)
+        logger.info("Dependency injection setup completed")
+    except Exception as e:
+        logger.critical(f"Failed to setup dependency injection: {e}", exc_info=True)
+        raise
+
+
+def setup_observability(app: FastAPI) -> None:
+    """Setup distributed tracing for the API Gateway.
+    
+    Args:
+        app: The FastAPI application instance
+    """
+    try:
+        logger.info("Initializing distributed tracing...")
+        
+        # Initialize tracer
+        tracer = init_tracing("api_gateway_service")
+        
+        # Store tracer in app state for access in routes if needed
+        app.state.tracer = tracer
+        
+        # Setup automatic HTTP request tracing
+        setup_tracing_middleware(app, tracer)
+        
+        logger.info("Distributed tracing initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize tracing: {e}", exc_info=True)
+        # Don't fail the service if tracing setup fails
+        
+
+async def initialize_services(app: FastAPI) -> None:
+    """Initialize all services during startup.
+    
+    This would be called from a FastAPI lifespan context manager.
+    """
+    # Setup DI
+    container = create_di_container()
+    setup_dependency_injection(app, container)
+    
+    # Setup observability (optional, won't fail service if it fails)
+    setup_observability(app)
+    
+
+async def shutdown_services() -> None:
+    """Gracefully shutdown all services."""
+    logger.info("API Gateway Service shutdown completed")

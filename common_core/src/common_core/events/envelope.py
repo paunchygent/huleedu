@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Generic, TypeVar
+from typing import Any, Dict, Generic, Optional, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -19,6 +19,10 @@ class EventEnvelope(BaseModel, Generic[T_EventData]):
     correlation_id: UUID | None = None
     data_schema_uri: str | None = None
     data: T_EventData
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Optional metadata for tracing and other cross-cutting concerns"
+    )
     model_config = {
         "populate_by_name": True,
         "json_encoders": {Enum: lambda v: v.value},

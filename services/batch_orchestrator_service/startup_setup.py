@@ -18,6 +18,8 @@ from services.batch_orchestrator_service.di import (
 )
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs import init_tracing
+from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
 from services.batch_orchestrator_service.metrics import get_http_metrics
 from quart import Quart
@@ -64,6 +66,11 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         # Store metrics in app context (proper Quart pattern)
         app.extensions = getattr(app, "extensions", {})
         app.extensions["metrics"] = metrics
+
+        # Initialize tracing
+        app.tracer = init_tracing("batch_orchestrator_service")
+        setup_tracing_middleware(app, app.tracer)
+        logger.info("Distributed tracing initialized")
 
         async with container() as request_container:
             # Get Kafka consumer from DI container (properly configured)
