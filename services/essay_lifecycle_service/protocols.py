@@ -44,13 +44,21 @@ class EssayRepositoryProtocol(Protocol):
         ...
 
     async def update_essay_state(
-        self, essay_id: str, new_status: EssayStatus, metadata: dict[str, Any]
+        self,
+        essay_id: str,
+        new_status: EssayStatus,
+        metadata: dict[str, Any],
+        storage_reference: tuple[ContentType, str] | None = None,
     ) -> None:
         """Update essay state with new status and metadata."""
         ...
 
     async def update_essay_status_via_machine(
-        self, essay_id: str, new_status: EssayStatus, metadata: dict[str, Any]
+        self,
+        essay_id: str,
+        new_status: EssayStatus,
+        metadata: dict[str, Any],
+        storage_reference: tuple[ContentType, str] | None = None,
     ) -> None:
         """Update essay state using status from state machine."""
         ...

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from api_models import BatchRegistrationRequestV1
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import (
+from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
     DataValidationError,
     SpellcheckInitiatorProtocol,
@@ -86,7 +86,7 @@ class SpellcheckInitiatorImpl(SpellcheckInitiatorProtocol):
             )
 
             # Publish spellcheck command
-            await self.event_publisher.publish_batch_event(command_envelope)
+            await self.event_publisher.publish_batch_event(command_envelope, key=batch_id)
 
             logger.info(
                 f"Published spellcheck initiate command for batch {batch_id}, "

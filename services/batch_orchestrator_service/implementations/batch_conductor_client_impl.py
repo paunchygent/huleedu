@@ -6,9 +6,9 @@ import json
 from typing import Any
 
 import aiohttp
-from config import Settings
+from services.batch_orchestrator_service.config import Settings
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import BatchConductorClientProtocol
+from services.batch_orchestrator_service.protocols import BatchConductorClientProtocol
 
 from common_core.pipeline_models import PhaseName
 

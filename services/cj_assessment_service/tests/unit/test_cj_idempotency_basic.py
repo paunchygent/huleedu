@@ -226,8 +226,10 @@ async def test_deterministic_event_id_generation(
         "llm_config_overrides": None,
     }
 
+    # Use the same event_id to test true duplicate detection (retry scenario)
+    shared_event_id = str(uuid.uuid4())
     event1 = {
-        "event_id": str(uuid.uuid4()),
+        "event_id": shared_event_id,
         "event_type": "huleedu.els.cj_assessment.requested.v1",
         "event_timestamp": "2024-01-01T12:00:00Z",
         "source_service": "essay_lifecycle_service",
@@ -236,9 +238,9 @@ async def test_deterministic_event_id_generation(
     }
 
     event2 = {
-        "event_id": str(uuid.uuid4()),
+        "event_id": shared_event_id,  # Same event_id = same event (retry)
         "event_type": "huleedu.els.cj_assessment.requested.v1",
-        "event_timestamp": "2024-01-01T13:00:00Z",
+        "event_timestamp": "2024-01-01T13:00:00Z",  # Different timestamp (retry delay)
         "source_service": "essay_lifecycle_service",
         "correlation_id": str(uuid.uuid4()),
         "data": base_event_data,

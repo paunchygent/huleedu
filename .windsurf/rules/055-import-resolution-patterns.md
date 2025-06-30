@@ -6,50 +6,38 @@ In a monorepo with multiple microservices, import conflicts can arise when servi
 ## The Problem
 When all service directories are in PYTHONPATH (as they are in Docker containers and test environments), simple imports like `from metrics import MetricsClass` can resolve to the wrong service's module, causing import errors and type mismatches.
 
-## The Solution: Service Import Patterns
+## The Solution: Full Module Path Imports (Mandatory)
 
-### Pattern 1: Full Module Path Imports (Recommended Default)
-Most services should use full module paths for all imports that could potentially conflict:
+### Standard Pattern: Full Module Path Imports
+**All services MUST use full module paths for all imports that could potentially conflict:**
 
 ```python
-# Good - Full path prevents ambiguity
+# Correct - Full path prevents ambiguity
 from services.result_aggregator_service.metrics import ResultAggregatorMetrics
 from services.result_aggregator_service.protocols import BatchRepositoryProtocol
 from services.result_aggregator_service.di import ServiceProvider
 
-# Bad - Can resolve to wrong service's module
+# Incorrect - Can resolve to wrong service's module
 from metrics import ResultAggregatorMetrics
 from protocols import BatchRepositoryProtocol
 from di import ServiceProvider
 ```
 
-### Pattern 2: Simple Imports (BOS Exception)
-Batch Orchestrator Service (BOS) uses simple imports because:
-1. It was the first service developed
-2. Its tests also use simple imports (consistency)
-3. It's already established and working
-
-```python
-# BOS can use simple imports
-from metrics import BOSMetrics
-from protocols import BatchRepositoryProtocol
-```
-
-### Pattern 3: Test Import Consistency
+### Test Import Consistency
 **Critical Rule**: Test imports must match the service's import pattern.
 
-If the service uses full paths, tests must too:
 ```python
 # Service code
-from services.result_aggregator_service.protocols import BatchRepositoryProtocol
+from services.batch_orchestrator_service.protocols import BatchRepositoryProtocol
 
 # Test code - MUST match
-from services.result_aggregator_service.protocols import BatchRepositoryProtocol
+from services.batch_orchestrator_service.protocols import BatchRepositoryProtocol
 ```
 
 ## Service-Specific Patterns
 
-### Services Using Full Module Paths:
+### All Services Use Full Module Paths:
+- Batch Orchestrator Service (BOS)
 - Result Aggregator Service (RAS)
 - Essay Lifecycle Service (ELS)  
 - Content Service
@@ -58,9 +46,6 @@ from services.result_aggregator_service.protocols import BatchRepositoryProtocol
 - Class Management Service
 - API Gateway Service
 - Spell Checker Service
-
-### Services Using Simple Imports:
-- Batch Orchestrator Service (BOS)
 
 ## Implementation Guidelines
 
@@ -103,9 +88,9 @@ from services.result_aggregator_service.di import (
 ### Batch Orchestrator Service
 ```python
 # In services/batch_orchestrator_service/app.py
-from api.batch_command_routes import batch_command_bp
-from api.health_routes import health_bp
-from di import (
+from services.batch_orchestrator_service.api.batch_routes import batch_command_bp
+from services.batch_orchestrator_service.api.health_routes import health_bp
+from services.batch_orchestrator_service.di import (
     CoreInfrastructureProvider,
     RepositoryAndPublishingProvider,
 )

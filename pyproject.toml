@@ -63,7 +63,8 @@ dev = [
 [tool.pdm.scripts]
 # Monorepo-wide scripts
 format-all = "ruff format --force-exclude ."
-lint-all = "ruff check --force-exclude ."
+check-imports = "python scripts/check_import_patterns.py"
+lint-all = {composite = ["ruff check --force-exclude .", "python scripts/check_import_patterns.py"]}
 lint-fix = "ruff check --fix --force-exclude ."
 typecheck-all = "mypy --config-file pyproject.toml ."
 test-all = "pytest"

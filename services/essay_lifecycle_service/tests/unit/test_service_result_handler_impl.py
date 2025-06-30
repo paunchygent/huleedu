@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
+from common_core.domain_enums import ContentType
 from common_core.metadata_models import StorageReferenceMetadata
 from common_core.status_enums import EssayStatus
 
@@ -63,9 +64,17 @@ class TestDefaultServiceResultHandler:
         result.entity_ref = entity_ref
         result.status = EssayStatus.SPELLCHECKED_SUCCESS
         result.original_text_storage_id = "original-123"
-        # Updated storage_metadata to be a mock that handles model_dump()
+
+        # Mock the storage_metadata with the expected nested structure
         mock_storage_meta = MagicMock(spec=StorageReferenceMetadata)
-        mock_storage_meta.model_dump.return_value = {"corrected_text_id": "corrected-456"}
+        mock_storage_meta.references = {
+            ContentType.CORRECTED_TEXT: {"storage_id": "corrected-456"}
+        }
+        mock_storage_meta.model_dump.return_value = {
+            "references": {
+                ContentType.CORRECTED_TEXT.value: {"storage_id": "corrected-456"}
+            }
+        }
         result.storage_metadata = mock_storage_meta
         result.corrections_made = 5
         result.system_metadata = None
@@ -123,6 +132,10 @@ class TestDefaultServiceResultHandler:
         assert call_args[1]["new_status"] == EssayStatus.SPELLCHECKED_SUCCESS
         assert "spellcheck_result" in call_args[1]["metadata"]
         assert call_args[1]["metadata"]["current_phase"] == "spellcheck"
+        assert call_args[1]["storage_reference"] == (
+            ContentType.CORRECTED_TEXT,
+            "corrected-456",
+        )
 
         mock_batch_coordinator.check_batch_completion.assert_called_once_with(
             essay_state=updated_essay_state, phase_name="spellcheck", correlation_id=correlation_id

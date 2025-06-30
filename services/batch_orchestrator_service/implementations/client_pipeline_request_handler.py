@@ -11,7 +11,7 @@ import json
 from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import (
+from services.batch_orchestrator_service.protocols import (
     BatchConductorClientProtocol,
     BatchRepositoryProtocol,
     PipelinePhaseCoordinatorProtocol,

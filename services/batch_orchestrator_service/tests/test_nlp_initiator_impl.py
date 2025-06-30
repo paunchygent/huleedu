@@ -13,9 +13,12 @@ import uuid
 from unittest.mock import AsyncMock
 
 import pytest
-from api_models import BatchRegistrationRequestV1
-from implementations.nlp_initiator_impl import NLPInitiatorImpl
-from protocols import BatchEventPublisherProtocol, DataValidationError
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
+from services.batch_orchestrator_service.implementations.nlp_initiator_impl import NLPInitiatorImpl
+from services.batch_orchestrator_service.protocols import (
+    BatchEventPublisherProtocol,
+    DataValidationError,
+)
 
 from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
 from common_core.domain_enums import CourseCode

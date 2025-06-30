@@ -6,7 +6,7 @@ import uuid
 from typing import Any, Protocol
 
 # Import the new API model for batch context storage
-from api_models import BatchRegistrationRequestV1
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 
 from common_core.metadata_models import EssayProcessingInputRefV1
 
@@ -24,26 +24,27 @@ from common_core.status_enums import BatchStatus, EssayStatus, OperationStatus, 
 class InitiationError(Exception):
     """Base exception for errors occurring during phase initiation."""
 
-    pass
+
 
 
 class DataValidationError(InitiationError):
     """Raised when critical data is missing or invalid for phase initiation."""
 
-    pass
+
 
 
 class CommandPublishError(InitiationError):
     """Raised when command publishing to event system fails."""
 
-    pass
+
 
 
 # Placeholder for a Pydantic model representing a BatchUpload entity
 # if not directly from common_core
 # If BatchUpload is a Pydantic model defined elsewhere (e.g., common_core.models.batch.BatchUpload)
 # then that should be imported instead.
-class BatchUpload: ...  # Placeholder for actual BatchUpload Pydantic model
+class BatchUpload:  # Placeholder for actual BatchUpload Pydantic model
+    pass
 
 
 class PipelinePhaseInitiatorProtocol(Protocol):
@@ -76,7 +77,7 @@ class PipelinePhaseInitiatorProtocol(Protocol):
         Raises:
             InitiationError: If phase initiation cannot proceed
         """
-        ...
+        pass
 
 
 class SpellcheckInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
@@ -90,28 +91,30 @@ class SpellcheckInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     pass
 
 
+
+
 class BatchRepositoryProtocol(Protocol):
     """Protocol for batch data persistence operations."""
 
     async def get_batch_by_id(self, batch_id: str) -> dict | None:
         """Retrieve batch data by ID."""
-        ...
+        pass
 
     async def create_batch(self, batch_data: dict) -> dict:
         """Create a new batch record."""
-        ...
+        pass
 
     async def update_batch_status(self, batch_id: str, new_status: BatchStatus) -> bool:
         """Update the status of an existing batch."""
-        ...
+        pass
 
     async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
         """Save pipeline processing state for a batch."""
-        ...
+        pass
 
     async def get_processing_pipeline_state(self, batch_id: str) -> dict | None:
         """Retrieve pipeline processing state for a batch."""
-        ...
+        pass
 
     async def store_batch_context(
         self,
@@ -119,19 +122,19 @@ class BatchRepositoryProtocol(Protocol):
         registration_data: BatchRegistrationRequestV1,
     ) -> bool:
         """Store batch context information."""
-        ...
+        pass
 
     async def get_batch_context(self, batch_id: str) -> BatchRegistrationRequestV1 | None:
         """Retrieve batch context information."""
-        ...
+        pass
 
     async def store_batch_essays(self, batch_id: str, essays: list[Any]) -> bool:
         """Store essay data from BatchEssaysReady event for later pipeline processing."""
-        ...
+        pass
 
     async def get_batch_essays(self, batch_id: str) -> list[Any] | None:
         """Retrieve stored essay data for pipeline processing."""
-        ...
+        pass
 
     async def update_phase_status_atomically(
         self,
@@ -151,15 +154,15 @@ class BatchRepositoryProtocol(Protocol):
 
         Note: Uses PipelineExecutionStatus enum for internal pipeline state management.
         """
-        ...
+        pass
 
 
 class BatchEventPublisherProtocol(Protocol):
     """Protocol for publishing batch-related events."""
 
-    async def publish_batch_event(self, event_envelope: Any) -> None:
+    async def publish_batch_event(self, event_envelope: Any, key: str | None = None) -> None:
         """Publish a batch event to the appropriate Kafka topic."""
-        ...
+        pass
 
 
 class EssayLifecycleClientProtocol(Protocol):
@@ -167,11 +170,11 @@ class EssayLifecycleClientProtocol(Protocol):
 
     async def get_essay_status(self, essay_id: str) -> dict | None:
         """Retrieve the current status of an essay from ELS."""
-        ...
+        pass
 
     async def update_essay_status(self, essay_id: str, new_status: EssayStatus) -> bool:
         """Update the status of an essay in ELS."""
-        ...
+        pass
 
 
 class BatchProcessingServiceProtocol(Protocol):
@@ -183,7 +186,7 @@ class BatchProcessingServiceProtocol(Protocol):
         correlation_id: uuid.UUID,
     ) -> str:
         """Register a new batch for processing and return the batch ID."""
-        ...
+        pass
 
 
 class PipelinePhaseCoordinatorProtocol(Protocol):
@@ -198,7 +201,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
         processed_essays_for_next_phase: list[Any] | None = None,
     ) -> None:
         """Handle completion of a pipeline phase and determine next actions."""
-        ...
+        pass
 
     async def update_phase_status(
         self,
@@ -208,7 +211,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
         completion_timestamp: str | None = None,
     ) -> None:
         """Update the status of a specific pipeline phase."""
-        ...
+        pass
 
     async def initiate_resolved_pipeline(
         self,
@@ -233,7 +236,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
             InitiationError: If pipeline initiation fails
             DataValidationError: If resolved pipeline is invalid
         """
-        ...
+        pass
 
 
 class CJAssessmentInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
@@ -244,7 +247,7 @@ class CJAssessmentInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     for consistency with other phase initiators.
     """
 
-    pass
+
 
 
 class AIFeedbackInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
@@ -258,7 +261,7 @@ class AIFeedbackInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     commands that will be consumed once the AI Feedback Service is built.
     """
 
-    pass
+
 
 
 class NLPInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
@@ -272,7 +275,7 @@ class NLPInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     commands that will be consumed once the NLP Service is built.
     """
 
-    pass
+
 
 
 class BatchConductorClientProtocol(Protocol):
@@ -294,7 +297,7 @@ class BatchConductorClientProtocol(Protocol):
         Raises:
             Exception: If BCS communication fails or returns error
         """
-        ...
+        pass
 
 
 class BatchMetricsProtocol(Protocol):
@@ -308,7 +311,7 @@ class BatchMetricsProtocol(Protocol):
         batch_id: str,
     ) -> None:
         """Record pipeline operation metrics with standardized enum types."""
-        ...
+        pass
 
     def record_validation_operation(
         self,
@@ -317,4 +320,4 @@ class BatchMetricsProtocol(Protocol):
         error_details: str | None = None,
     ) -> None:
         """Record validation operation metrics."""
-        ...
+        pass

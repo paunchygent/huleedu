@@ -5,10 +5,10 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from api_models import BatchRegistrationRequestV1
-from config import Settings
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
+from services.batch_orchestrator_service.config import Settings
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import BatchEventPublisherProtocol, BatchRepositoryProtocol
+from services.batch_orchestrator_service.protocols import BatchEventPublisherProtocol, BatchRepositoryProtocol
 
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
@@ -152,7 +152,7 @@ class BatchProcessingServiceImpl:
         )
 
         # 5. Publish event
-        await self.event_publisher.publish_batch_event(envelope)
+        await self.event_publisher.publish_batch_event(envelope, key=batch_id)
 
         self.logger.info(
             f"Published BatchEssaysRegistered event for batch {batch_id} with "

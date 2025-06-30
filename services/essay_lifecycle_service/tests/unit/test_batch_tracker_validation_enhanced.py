@@ -86,7 +86,8 @@ class TestEnhancedBatchEssayTracker:
 
         # Mock the completion method to track calls
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
-            mock_complete.return_value = None
+            # Now returns tuple (BatchEssaysReady, correlation_id)
+            mock_complete.return_value = (None, None)
 
             # Handle validation failure
             await tracker.handle_validation_failure(sample_validation_failure)
@@ -120,7 +121,8 @@ class TestEnhancedBatchEssayTracker:
 
         # Mock the completion method
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
-            mock_complete.return_value = None
+            # Now returns tuple (BatchEssaysReady, correlation_id)
+            mock_complete.return_value = (None, None)
 
             # Assign 3 slots successfully
             for i in range(1, 4):
@@ -165,7 +167,8 @@ class TestEnhancedBatchEssayTracker:
 
         # Mock completion method
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
-            mock_complete.return_value = None
+            # Now returns tuple (BatchEssaysReady, correlation_id)
+            mock_complete.return_value = (None, None)
 
             # Assign 24 slots successfully
             for i in range(1, 25):
@@ -263,7 +266,7 @@ class TestEnhancedBatchEssayTracker:
         tracker.validation_failures["batch_test"].append(failure2)
 
         # Call _create_batch_ready_event directly (no need to mock for this test)
-        ready_event = tracker._create_batch_ready_event("batch_test", expectation)
+        ready_event, correlation_id = tracker._create_batch_ready_event("batch_test", expectation)
 
         # Verify the content of the returned BatchEssaysReady event
         assert isinstance(ready_event, BatchEssaysReady)
@@ -293,7 +296,8 @@ class TestEnhancedBatchEssayTracker:
 
         # Mock completion method
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
-            mock_complete.return_value = None
+            # Now returns tuple (BatchEssaysReady, correlation_id)
+            mock_complete.return_value = (None, None)
 
             # Create 3 validation failures (all essays fail)
             for i in range(1, 4):
@@ -345,7 +349,8 @@ class TestEnhancedBatchEssayTracker:
         await tracker.register_batch(sample_batch_registration)
 
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
-            mock_complete.return_value = None
+            # Now returns tuple (BatchEssaysReady, correlation_id)
+            mock_complete.return_value = (None, None)
 
             # Assign 4 slots (1 short of completion)
             for i in range(1, 5):
@@ -375,7 +380,8 @@ class TestEnhancedBatchEssayTracker:
         await tracker.register_batch(sample_batch_registration)
 
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
-            mock_complete.return_value = None
+            # Now returns tuple (BatchEssaysReady, correlation_id)
+            mock_complete.return_value = (None, None)
 
             # Create 5 validation failures (all essays fail, none assigned)
             for i in range(1, 6):
@@ -447,7 +453,8 @@ class TestEnhancedBatchEssayTracker:
         await tracker.register_batch(sample_batch_registration)
 
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
-            mock_complete.return_value = None
+            # Now returns tuple (BatchEssaysReady, correlation_id)
+            mock_complete.return_value = (None, None)
 
             # Create multiple failures to handle concurrently
             failures = [

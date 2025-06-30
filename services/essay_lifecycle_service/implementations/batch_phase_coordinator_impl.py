@@ -326,7 +326,8 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
         elif phase_name == PhaseName.AI_FEEDBACK:
             result = getattr(essay_state, "ai_feedback_text_storage_id", None)
         elif phase_name == PhaseName.CJ_ASSESSMENT:
-            result = getattr(essay_state, "cj_assessment_text_storage_id", None)
+            # CJ Assessment works on spellchecked content, not original
+            result = getattr(essay_state, "spellchecked_text_storage_id", None)
         elif phase_name == PhaseName.NLP:
             result = getattr(essay_state, "nlp_processed_text_storage_id", None)
 

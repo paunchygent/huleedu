@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from config import Settings
+from services.batch_orchestrator_service.config import Settings
 from huleedu_service_libs.logging_utils import create_service_logger
-from models_db import Base
+from services.batch_orchestrator_service.models_db import Base
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 

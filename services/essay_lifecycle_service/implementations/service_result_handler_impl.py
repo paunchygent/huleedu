@@ -15,6 +15,7 @@ from common_core.events.cj_assessment_events import (
     CJAssessmentFailedV1,
 )
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
+from common_core.domain_enums import ContentType
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -119,10 +120,21 @@ class DefaultServiceResultHandler(ServiceResultHandler):
 
             # Attempt state transition
             if state_machine.trigger(trigger):
-                # Correct call to update_essay_status_via_machine
+                storage_ref_to_add = None
+                if is_success and result_data.storage_metadata:
+                    # Safely access the nested storage_id for the spellchecked essay
+                    spellchecked_ref = result_data.storage_metadata.references.get(
+                        ContentType.CORRECTED_TEXT
+                    )
+                    if spellchecked_ref:
+                        storage_id = spellchecked_ref.get("default")
+                        if storage_id:
+                            storage_ref_to_add = (ContentType.CORRECTED_TEXT, storage_id)
+
                 await self.repository.update_essay_status_via_machine(
                     essay_id=result_data.entity_ref.entity_id,
                     new_status=state_machine.current_status,
+                    storage_reference=storage_ref_to_add,
                     metadata={
                         "spellcheck_result": {
                             "success": is_success,

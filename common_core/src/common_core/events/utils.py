@@ -13,42 +13,66 @@ def generate_deterministic_event_id(msg_value: bytes) -> str:
     """
     Generates a deterministic ID for an event based on its stable content.
 
-    This function ignores transient envelope metadata (like event_id, timestamp)
-    by focusing on the 'data' payload, ensuring that retried events produce
-    the same key. This is critical for idempotency - producer retries due to
-    network issues would generate new event_id UUIDs, but the business data
-    remains the same.
+    This function creates a unique hash by combining:
+    1. The entity identifier (essay_id, batch_id) to prevent collisions between
+       different business entities
+    2. The event_id from the envelope to ensure true duplicates are caught
+    
+    This approach prevents false duplicates where different entities have similar
+    data (e.g., two essays with zero spelling errors), while still catching true
+    duplicates from retries.
 
     Args:
         msg_value: The raw bytes of the Kafka message value.
 
     Returns:
-        A SHA256 hexdigest representing the stable event content.
+        A SHA256 hexdigest representing the unique event.
 
     Examples:
-        >>> event_bytes = b'{"data": {"batch_id": "123", "status": "completed"}}'
-        >>> id1 = generate_deterministic_event_id(event_bytes)
-        >>> id2 = generate_deterministic_event_id(event_bytes)
-        >>> id1 == id2
+        >>> # Two different essays with same result = different hashes
+        >>> event1 = b'{"event_id": "abc", "data": {"entity_ref": {"entity_id": "essay1"}, "corrections_made": 0}}'
+        >>> event2 = b'{"event_id": "def", "data": {"entity_ref": {"entity_id": "essay2"}, "corrections_made": 0}}'
+        >>> generate_deterministic_event_id(event1) != generate_deterministic_event_id(event2)
+        True
+        
+        >>> # Same event retried = same hash
+        >>> event3 = b'{"event_id": "abc", "data": {"entity_ref": {"entity_id": "essay1"}, "corrections_made": 0}}'
+        >>> generate_deterministic_event_id(event1) == generate_deterministic_event_id(event3)
         True
     """
     try:
         event_dict = json.loads(msg_value)
-
-        # The 'data' field contains the business payload, which is stable.
-        # This excludes transient envelope fields like event_id, timestamp.
+        
+        # Use event_id from envelope as primary deduplication key
+        # This handles retries perfectly - same event_id = same event
+        event_id = event_dict.get("event_id", "")
+        
+        if event_id:
+            # For properly formed events with event_id, use it directly
+            # This is the most reliable way to detect true duplicates
+            return hashlib.sha256(f"event:{event_id}".encode("utf-8")).hexdigest()
+        
+        # Fallback for events without event_id (shouldn't happen in practice)
+        # Extract entity identifiers to prevent false collisions
         data_payload = event_dict.get("data", {})
-
-        # Create a canonical representation by sorting keys. This ensures that
-        # {"b": 2, "a": 1} and {"a": 1, "b": 2} produce the same hash.
-        stable_string = json.dumps(data_payload, sort_keys=True, separators=(",", ":"))
-
-        return hashlib.sha256(stable_string.encode("utf-8")).hexdigest()
+        
+        # Try to find entity identifier in common locations
+        entity_id = ""
+        if "entity_ref" in data_payload:
+            entity_id = data_payload["entity_ref"].get("entity_id", "")
+        elif "batch_id" in data_payload:
+            entity_id = data_payload["batch_id"]
+        elif "essay_id" in data_payload:
+            entity_id = data_payload["essay_id"]
+        
+        # Create hash including entity ID to prevent collisions
+        stable_data = json.dumps(data_payload, sort_keys=True, separators=(",", ":"))
+        unique_string = f"{entity_id}:{stable_data}"
+        
+        return hashlib.sha256(unique_string.encode("utf-8")).hexdigest()
 
     except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
-        # Fallback for malformed messages, events without a 'data' field,
-        # or non-UTF8 bytes. Hashing the entire raw message value is a safe default.
-        # This ensures we still get deterministic IDs even for edge cases.
+        # Fallback for malformed messages
         return hashlib.sha256(msg_value).hexdigest()
 
 

@@ -136,7 +136,8 @@ test_bos_registration() {
         "essay_ids": ["essay-001", "essay-002", "essay-003"],
         "course_code": "SV1",
         "class_designation": "Class 9A",
-        "essay_instructions": "Write a 500-word essay about Swedish literature"
+        "essay_instructions": "Write a 500-word essay about Swedish literature",
+        "user_id": "test-user-123"
     }'
     
     log "Sending batch registration request to BOS..."

@@ -13,10 +13,16 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
-from implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
-from implementations.client_pipeline_request_handler import ClientPipelineRequestHandler
-from implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
-from kafka_consumer import BatchKafkaConsumer
+from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
+    BatchEssaysReadyHandler,
+)
+from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
+    ClientPipelineRequestHandler,
+)
+from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import (
+    ELSBatchPhaseOutcomeHandler,
+)
+from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
 
 from common_core.domain_enums import CourseCode
 

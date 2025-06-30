@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from aiohttp import ClientSession
-from config import Settings
-from protocols import EssayLifecycleClientProtocol
+from services.batch_orchestrator_service.config import Settings
+from services.batch_orchestrator_service.protocols import EssayLifecycleClientProtocol
 
 
 class DefaultEssayLifecycleClientImpl(EssayLifecycleClientProtocol):

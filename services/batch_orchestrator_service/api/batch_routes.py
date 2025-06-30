@@ -5,11 +5,11 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from api_models import BatchRegistrationRequestV1
-from config import settings
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
+from services.batch_orchestrator_service.config import settings
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import (
+from services.batch_orchestrator_service.protocols import (
     BatchProcessingServiceProtocol,
     BatchRepositoryProtocol,
     PipelinePhaseCoordinatorProtocol,

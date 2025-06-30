@@ -49,7 +49,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         """Register callback for batch coordination events."""
         self._event_callbacks[event_type] = callback
 
-    async def register_batch(self, event: Any) -> None:  # BatchEssaysRegistered
+    async def register_batch(self, event: Any, correlation_id: str | None = None) -> None:  # BatchEssaysRegistered
         """
         Register batch slot expectations from BOS.
 
@@ -71,6 +71,8 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             course_code=batch_essays_registered.course_code,
             essay_instructions=batch_essays_registered.essay_instructions,
             user_id=batch_essays_registered.user_id,
+            # Store correlation ID for BatchEssaysReady event
+            correlation_id=correlation_id,
         )
 
         self.batch_expectations[batch_id] = expectation
@@ -104,7 +106,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
     def mark_slot_fulfilled(
         self, batch_id: str, internal_essay_id: str, text_storage_id: str
-    ) -> Any | None:  # BatchEssaysReady | None
+    ) -> tuple[Any, str | None] | None:  # (BatchEssaysReady, correlation_id) | None
         """
         Mark a slot as fulfilled and check if batch is complete.
 
@@ -198,7 +200,8 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                     f"Batch {batch_id} completing early: "
                     f"{assigned_count} assigned + {failure_count} failed = {total_processed}"
                 )
-                return self._create_batch_ready_event(batch_id, expectation)
+                event_data, stored_correlation_id = self._create_batch_ready_event(batch_id, expectation)
+                return event_data, stored_correlation_id
 
         return None
 
@@ -219,7 +222,8 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         # Check if batch is complete (either all slots filled OR processed count meets expectation)
         if expectation.is_complete or total_processed >= expectation.expected_count:
-            return self._create_batch_ready_event(batch_id, expectation)
+            event_data, stored_correlation_id = self._create_batch_ready_event(batch_id, expectation)
+            return event_data, stored_correlation_id
 
         return None
 
@@ -232,7 +236,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
     def _create_batch_ready_event(
         self, batch_id: str, expectation: BatchExpectation
-    ) -> BatchEssaysReady:
+    ) -> tuple[BatchEssaysReady, str | None]:
         """Create BatchEssaysReady event and clean up completed batch."""
         # Get validation failures for this batch
         failures: list[EssayValidationFailedV1] = self.validation_failures.get(batch_id, [])
@@ -276,12 +280,15 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         )
         self._logger.info(summary_msg)
 
+        # Store correlation ID before cleanup
+        original_correlation_id = expectation.correlation_id
+        
         # Clean up completed batch
         del self.batch_expectations[batch_id]
         if batch_id in self.validation_failures:
             del self.validation_failures[batch_id]
 
-        return ready_event
+        return ready_event, original_correlation_id
 
     async def _start_timeout_monitoring(self, expectation: BatchExpectation) -> None:
         """Start timeout monitoring for a batch expectation."""

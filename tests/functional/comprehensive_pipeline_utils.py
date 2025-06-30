@@ -73,12 +73,12 @@ async def register_comprehensive_batch(
     expected_essay_count: int,
     correlation_id: str | None = None,
     user=None,
-) -> str:
+) -> tuple[str, str]:
     """
     Register a batch specifically for comprehensive pipeline testing.
 
     CRITICAL: Enables CJ assessment to ensure full pipeline execution.
-    Matches original test logic: uses and keeps the ORIGINAL correlation_id throughout.
+    Returns the actual correlation ID that will be used by the service for events.
 
     Args:
         service_manager: ServiceTestManager instance
@@ -87,13 +87,13 @@ async def register_comprehensive_batch(
         user: Authenticated test user
 
     Returns:
-        batch_id only (original correlation_id continues to be used for events)
+        tuple[str, str]: (batch_id, actual_correlation_id_for_events)
     """
     if correlation_id is None:
         correlation_id = str(uuid.uuid4())
 
     # Use ServiceTestManager's create_batch method for authentication
-    batch_id, _ = await service_manager.create_batch(
+    batch_id, actual_correlation_id = await service_manager.create_batch(
         expected_essay_count=expected_essay_count,
         course_code="ENG5",
         user=user,
@@ -102,7 +102,8 @@ async def register_comprehensive_batch(
     )
 
     logger.info(f"✅ Comprehensive batch registered: {batch_id} (CJ assessment enabled)")
-    return batch_id
+    logger.info(f"🔗 Actual correlation ID for event monitoring: {actual_correlation_id}")
+    return batch_id, actual_correlation_id
 
 
 async def upload_real_essays(

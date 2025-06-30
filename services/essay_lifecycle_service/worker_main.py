@@ -115,11 +115,11 @@ async def run_consumer_loop(
             try:
                 result = await handle_message_idempotently(msg)
 
-                if result is not None:
-                    # Only commit if not a skipped duplicate
+                # A result of `True` means success, `None` means duplicate (which is also a success state for commit)
+                if result is True or result is None:
+                    # Commit offset after successful processing or after skipping a duplicate
+                    await consumer.commit()
                     if result:
-                        # Commit offset only after successful processing (manual commit pattern)
-                        await consumer.commit()
                         logger.debug(
                             "Successfully processed and committed message",
                             extra={
@@ -129,18 +129,17 @@ async def run_consumer_loop(
                             },
                         )
                     else:
-                        logger.warning(
-                            "Failed to process message, not committing offset",
+                        logger.info(
+                            "Duplicate message skipped, offset committed",
                             extra={
                                 "topic": msg.topic,
                                 "partition": msg.partition,
                                 "offset": msg.offset,
                             },
                         )
-                else:
-                    # Message was a duplicate and skipped
-                    logger.info(
-                        "Duplicate message skipped, not committing offset",
+                else:  # result is False
+                    logger.warning(
+                        "Failed to process message, not committing offset",
                         extra={
                             "topic": msg.topic,
                             "partition": msg.partition,

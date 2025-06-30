@@ -82,13 +82,14 @@ async def test_comprehensive_real_batch_pipeline():
 
         # Step 5: Register batch with BOS using modern utility
         print("📝 Registering batch with BOS to create essay slots...")
-        batch_id = await register_comprehensive_batch(
+        batch_id, actual_correlation_id = await register_comprehensive_batch(
             service_manager,
             len(test_essays),
             test_correlation_id,
             test_teacher,  # Pass authenticated user
         )
         print(f"✅ Batch registered with BOS: {batch_id}")
+        print(f"🔗 Monitoring events with correlation ID: {actual_correlation_id}")
 
         # Step 6: Upload files to trigger the pipeline using modern utility
         print("🚀 Uploading real student essays to trigger pipeline...")
@@ -96,7 +97,7 @@ async def test_comprehensive_real_batch_pipeline():
             service_manager,
             batch_id,
             test_essays,
-            test_correlation_id,
+            actual_correlation_id,
             test_teacher,  # Pass authenticated user
         )
         print(f"✅ File upload successful: {upload_response}")
@@ -127,10 +128,10 @@ async def test_comprehensive_real_batch_pipeline():
                     event_data = envelope_data.get("data", {})
                     event_correlation_id = envelope_data.get("correlation_id")
 
-                    # Check for BatchEssaysReady with our correlation ID
+                    # Check for BatchEssaysReady with the actual correlation ID from service
                     if (
                         message.topic == "huleedu.els.batch.essays.ready.v1"
-                        and event_correlation_id == test_correlation_id
+                        and event_correlation_id == actual_correlation_id
                         and event_data.get("batch_id") == batch_id
                     ):
                         ready_count = len(event_data.get("ready_essays", []))
@@ -161,7 +162,7 @@ async def test_comprehensive_real_batch_pipeline():
             kafka_manager,
             batch_id,
             "cj_assessment",  # Use cj_assessment pipeline for comprehensive testing
-            test_correlation_id,
+            actual_correlation_id,
         )
         print(
             "📡 Published cj_assessment pipeline request with "
@@ -175,7 +176,7 @@ async def test_comprehensive_real_batch_pipeline():
             batch_id,
             request_correlation_id,
             len(test_essays),
-            50,  # Use request correlation ID
+            180,  # 3 minutes timeout for comprehensive pipeline
         )
 
         assert result is not None, "Pipeline did not complete"

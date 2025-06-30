@@ -115,9 +115,13 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             return self._db_to_essay_state(db_essay)
 
     async def update_essay_state(
-        self, essay_id: str, new_status: EssayStatus, metadata: dict[str, Any]
+        self,
+        essay_id: str,
+        new_status: EssayStatus,
+        metadata: dict[str, Any],
+        storage_reference: tuple[ContentType, str] | None = None,
     ) -> None:
-        """Update essay state with new status and metadata."""
+        """Update essay state with new status, metadata, and optional storage reference."""
         async with self.session() as session:
             # Get current state for update
             current_state = await self.get_essay_state(essay_id)
@@ -126,10 +130,17 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
             # Update the state object
             current_state.update_status(new_status, metadata)
+            if storage_reference:
+                content_type, storage_id = storage_reference
+                current_state.storage_references[content_type] = storage_id
 
-            # Update in database with optimistic locking
             # Convert timeline to proper format for JSON storage
             timeline_for_db = {k: v.isoformat() for k, v in current_state.timeline.items()}
+
+            # Convert storage_references keys (ContentType enum) to strings for JSONB
+            storage_references_for_db = {
+                k.value: v for k, v in current_state.storage_references.items()
+            }
 
             stmt = (
                 update(EssayStateDB)
@@ -137,6 +148,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 .values(
                     current_status=current_state.current_status,
                     processing_metadata=current_state.processing_metadata,
+                    storage_references=storage_references_for_db,
                     timeline=timeline_for_db,
                     updated_at=datetime.now(UTC).replace(tzinfo=None),
                 )
@@ -149,13 +161,22 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             self.logger.debug(f"Updated essay {essay_id} status to {new_status.value}")
 
     async def update_essay_status_via_machine(
-        self, essay_id: str, new_status: EssayStatus, metadata: dict[str, Any]
+        self,
+        essay_id: str,
+        new_status: EssayStatus,
+        metadata: dict[str, Any],
+        storage_reference: tuple[ContentType, str] | None = None,
     ) -> None:
         """Update essay state using status from state machine."""
-        await self.update_essay_state(essay_id, new_status, metadata)
+        await self.update_essay_state(
+            essay_id, new_status, metadata, storage_reference=storage_reference
+        )
 
     async def create_essay_record(self, essay_ref: EntityReference) -> ConcreteEssayState:
         """Create new essay record from entity reference."""
+        # Debug logging to trace batch_id issue
+        self.logger.info(f"Creating essay {essay_ref.entity_id} with batch_id: {essay_ref.parent_id}")
+        
         essay_state = ConcreteEssayState(
             essay_id=essay_ref.entity_id,
             batch_id=essay_ref.parent_id,
@@ -241,6 +262,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             existing_essay.processing_metadata.update(metadata)
             existing_essay.storage_references[ContentType.ORIGINAL_ESSAY] = text_storage_id
             existing_essay.current_status = initial_status
+            existing_essay.batch_id = batch_id  # Ensure batch_id is set correctly
             existing_essay.updated_at = datetime.now(UTC)
 
             await self.update_essay_state(internal_essay_id, initial_status, metadata)

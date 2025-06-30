@@ -31,6 +31,7 @@ class BatchExpectation:
         course_code: CourseCode,
         essay_instructions: str,
         user_id: str,
+        correlation_id: str | None = None,  # Store original correlation ID from registration
         timeout_seconds: int = 300,  # 5 minutes default
     ) -> None:
         self.batch_id = batch_id
@@ -43,6 +44,9 @@ class BatchExpectation:
         self.course_code = course_code
         self.essay_instructions = essay_instructions
         self.user_id = user_id
+        
+        # Store original correlation ID for event publishing
+        self.correlation_id = correlation_id
 
         self.created_at = datetime.now(UTC)
         self.timeout_seconds = timeout_seconds

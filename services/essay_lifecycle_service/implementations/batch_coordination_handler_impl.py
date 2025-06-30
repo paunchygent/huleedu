@@ -54,8 +54,31 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 },
             )
 
-            # Register batch with tracker
-            await self.batch_tracker.register_batch(event_data)
+            # Register batch with tracker, preserving correlation ID
+            await self.batch_tracker.register_batch(event_data, str(correlation_id) if correlation_id else None)
+
+            # Create initial essay records in the database
+            from common_core.metadata_models import EntityReference
+
+            logger.info(
+                "Creating initial essay records in database for batch",
+                extra={
+                    "batch_id": event_data.batch_id,
+                    "essay_count": len(event_data.essay_ids),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+            for essay_id in event_data.essay_ids:
+                essay_ref = EntityReference(entity_id=essay_id, entity_type="essay", parent_id=event_data.batch_id)
+                await self.repository.create_essay_record(essay_ref)
+
+            logger.info(
+                "Successfully created initial essay records for batch",
+                extra={
+                    "batch_id": event_data.batch_id,
+                    "correlation_id": str(correlation_id),
+                },
+            )
 
             return True
 
@@ -161,24 +184,29 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             )
 
             # **Step 4: Check Batch Completion**
-            batch_ready_event = self.batch_tracker.mark_slot_fulfilled(
+            batch_completion_result = self.batch_tracker.mark_slot_fulfilled(
                 event_data.batch_id, assigned_essay_id, event_data.text_storage_id
             )
 
             # **Step 5: Publish BatchEssaysReady if complete**
-            if batch_ready_event is not None:
+            if batch_completion_result is not None:
+                batch_ready_event, original_correlation_id = batch_completion_result
+                # Use original correlation ID from batch registration, fallback to current if none
+                publish_correlation_id = original_correlation_id or correlation_id
+                
                 logger.info(
                     "Batch is complete, publishing BatchEssaysReady event",
                     extra={
                         "batch_id": batch_ready_event.batch_id,
                         "ready_count": len(batch_ready_event.ready_essays),
-                        "correlation_id": str(correlation_id),
+                        "original_correlation_id": original_correlation_id,
+                        "using_correlation_id": str(publish_correlation_id),
                     },
                 )
 
                 await self.event_publisher.publish_batch_essays_ready(
                     event_data=batch_ready_event,
-                    correlation_id=correlation_id,
+                    correlation_id=publish_correlation_id,
                 )
 
             return True
@@ -208,21 +236,26 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             )
 
             # Handle validation failure in batch tracker
-            batch_ready_event = await self.batch_tracker.handle_validation_failure(event_data)
+            validation_result = await self.batch_tracker.handle_validation_failure(event_data)
 
             # Publish BatchEssaysReady if batch is now complete
-            if batch_ready_event is not None:
+            if validation_result is not None:
+                batch_ready_event, original_correlation_id = validation_result
+                # Use original correlation ID from batch registration, fallback to current if none
+                publish_correlation_id = original_correlation_id or correlation_id
+                
                 logger.info(
                     "Batch is complete after validation failure, publishing BatchEssaysReady event",
                     extra={
                         "batch_id": batch_ready_event.batch_id,
                         "ready_count": len(batch_ready_event.ready_essays),
                         "validation_failures": len(batch_ready_event.validation_failures or []),
-                        "correlation_id": str(correlation_id),
+                        "original_correlation_id": original_correlation_id,
+                        "using_correlation_id": str(publish_correlation_id),
                     },
                 )
                 await self.event_publisher.publish_batch_essays_ready(
-                    batch_ready_event, correlation_id=correlation_id
+                    batch_ready_event, correlation_id=publish_correlation_id
                 )
 
             logger.info(

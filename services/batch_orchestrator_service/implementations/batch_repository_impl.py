@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
-from api_models import BatchRegistrationRequestV1
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from huleedu_service_libs.logging_utils import create_service_logger
-from protocols import BatchRepositoryProtocol
+from services.batch_orchestrator_service.protocols import BatchRepositoryProtocol
 
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 from common_core.status_enums import BatchStatus

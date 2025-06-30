@@ -71,7 +71,7 @@ _TOPIC_MAPPING = {
     ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED: "huleedu.els.cj_assessment.requested.v1",
     ProcessingEvent.CJ_ASSESSMENT_COMPLETED: "huleedu.cj_assessment.completed.v1",
     ProcessingEvent.CJ_ASSESSMENT_FAILED: "huleedu.cj_assessment.failed.v1",
-    ProcessingEvent.ELS_BATCH_PHASE_OUTCOME: "huleedu.els.batch_phase.outcome.v1",
+    ProcessingEvent.ELS_BATCH_PHASE_OUTCOME: "huleedu.els.batch.phase.outcome.v1",
     ProcessingEvent.STUDENT_PARSING_COMPLETED: "huleedu.file.student.parsing.completed.v1",
     ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED: "huleedu.class.essay.association.updated.v1",
     ProcessingEvent.BATCH_FILE_ADDED: "huleedu.file.batch.file.added.v1",

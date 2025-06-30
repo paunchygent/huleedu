@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 
-from config import Settings
-from di import (
+from services.batch_orchestrator_service.config import Settings
+from services.batch_orchestrator_service.di import (
     CoreInfrastructureProvider,
     EventHandlingProvider,
     ExternalClientsProvider,
@@ -18,8 +18,8 @@ from di import (
 )
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
-from kafka_consumer import BatchKafkaConsumer
-from metrics import get_http_metrics
+from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
+from services.batch_orchestrator_service.metrics import get_http_metrics
 from quart import Quart
 from quart_dishka import QuartDishka
 
