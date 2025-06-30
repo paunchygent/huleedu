@@ -164,14 +164,14 @@ class TestBosElsPhaseCoordination:
 
         # Create event envelope following Pydantic v2 standards
         envelope = EventEnvelope[ELSBatchPhaseOutcomeV1](
-            event_type="huleedu.els.batch_phase.outcome.v1",
+            event_type="huleedu.els.batch.phase.outcome.v1",
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=outcome_event,
         )
 
         # Create real Kafka message structure
-        kafka_msg = RealKafkaMessage(envelope=envelope, topic="huleedu.els.batch_phase.outcome.v1")
+        kafka_msg = RealKafkaMessage(envelope=envelope, topic="huleedu.els.batch.phase.outcome.v1")
 
         # Test ACTUAL BatchKafkaConsumer message routing to real ELS handler
         await kafka_consumer._handle_message(kafka_msg)
@@ -194,7 +194,7 @@ class TestBosElsPhaseCoordination:
         # Create malformed Kafka message
         malformed_msg = Mock()
         malformed_msg.value = b"invalid json content"
-        malformed_msg.topic = "huleedu.els.batch_phase.outcome.v1"
+        malformed_msg.topic = "huleedu.els.batch.phase.outcome.v1"
         malformed_msg.partition = 0
         malformed_msg.offset = 456
 
@@ -226,7 +226,7 @@ class TestBosElsPhaseCoordination:
         }
 
         envelope_data = {
-            "event_type": "huleedu.els.batch_phase.outcome.v1",
+            "event_type": "huleedu.els.batch.phase.outcome.v1",
             "source_service": "essay-lifecycle-service",
             "correlation_id": str(correlation_id),
             "data": incomplete_data,
@@ -235,7 +235,7 @@ class TestBosElsPhaseCoordination:
         # Create Kafka message with incomplete event
         incomplete_msg = Mock()
         incomplete_msg.value = json.dumps(envelope_data).encode("utf-8")
-        incomplete_msg.topic = "huleedu.els.batch_phase.outcome.v1"
+        incomplete_msg.topic = "huleedu.els.batch.phase.outcome.v1"
 
         # FIXED: With proper EventEnvelope parsing, missing required fields raise ValidationError
         from pydantic import ValidationError

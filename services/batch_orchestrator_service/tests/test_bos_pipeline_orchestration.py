@@ -76,7 +76,7 @@ class TestBatchKafkaConsumerBusinessLogic:
         """Test that ELS batch phase outcome messages are routed to the correct handler."""
         # Mock Kafka message for ELS batch phase outcome
         mock_message = Mock()
-        mock_message.topic = "huleedu.els.batch_phase.outcome.v1"
+        mock_message.topic = "huleedu.els.batch.phase.outcome.v1"
         mock_message.partition = 0
         mock_message.offset = 123
 
@@ -84,7 +84,7 @@ class TestBatchKafkaConsumerBusinessLogic:
         await kafka_consumer._handle_message(mock_message)
 
         # Verify the correct handler was called
-        mock_els_batch_phase_outcome_handler.handle_els_batch_phase_outcome.assert_called_once_with(
+        kafka_consumer.els_batch_phase_outcome_handler.handle_els_batch_phase_outcome.assert_called_once_with(
             mock_message,
         )
 
@@ -209,7 +209,7 @@ class TestELSBatchPhaseOutcomeHandler:
         # Mock Kafka message
         mock_message = Mock()
         mock_message.value = event_envelope.model_dump_json().encode()
-        mock_message.topic = "huleedu.els.batch_phase.outcome.v1"
+        mock_message.topic = "huleedu.els.batch.phase.outcome.v1"
         mock_message.partition = 0
         mock_message.offset = 123
 

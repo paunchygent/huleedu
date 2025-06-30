@@ -71,8 +71,8 @@ def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
     event_type = event_data.get("event_type", "")
     if "batch.essays.ready" in event_type:
         topic = "huleedu.els.batch.essays.ready.v1"
-    elif "batch_phase.outcome" in event_type:
-        topic = "huleedu.els.batch_phase.outcome.v1"
+    elif "batch.phase.outcome" in event_type:
+        topic = "huleedu.els.batch.phase.outcome.v1"
     else:
         topic = "huleedu.test.unknown"
     return ConsumerRecord(
@@ -134,7 +134,7 @@ def sample_els_phase_outcome_event() -> dict:
 
     return {
         "event_id": str(uuid.uuid4()),
-        "event_type": "huleedu.els.batch_phase.outcome.v1",
+        "event_type": "huleedu.els.batch.phase.outcome.v1",
         "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "essay_lifecycle_service",
         "correlation_id": correlation_id,

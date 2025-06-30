@@ -5,6 +5,7 @@ This document outlines planned enhancements for the Essay Lifecycle Service that
 ## Phase 1: Advanced Validation Features
 
 ### 1.1 Enhanced Validation Workflows
+
 **Timeline**: Post-core validation implementation
 **Priority**: Medium
 
@@ -15,6 +16,7 @@ This document outlines planned enhancements for the Essay Lifecycle Service that
 - **Multi-reviewer workflows** for team teaching scenarios
 
 ### 1.2 Intelligent Timeout Handling
+
 **Timeline**: After timeout processor is stable
 **Priority**: Medium
 
@@ -27,6 +29,7 @@ This document outlines planned enhancements for the Essay Lifecycle Service that
 ## Phase 2: Monitoring and Analytics
 
 ### 2.1 Validation Analytics
+
 **Timeline**: Analytics platform integration
 **Priority**: Medium
 
@@ -37,6 +40,7 @@ This document outlines planned enhancements for the Essay Lifecycle Service that
 - **False positive/negative rates** for parsing accuracy
 
 ### 2.2 Operational Monitoring
+
 **Timeline**: Production readiness phase
 **Priority**: High (for production)
 
@@ -49,6 +53,7 @@ This document outlines planned enhancements for the Essay Lifecycle Service that
 ## Phase 3: Advanced State Management
 
 ### 3.1 Complex State Transitions
+
 **Timeline**: Advanced workflow phase
 **Priority**: Low
 
@@ -59,6 +64,7 @@ This document outlines planned enhancements for the Essay Lifecycle Service that
 - **Workflow versioning** for process improvements
 
 ### 3.2 Cross-Batch Operations
+
 **Timeline**: Enterprise features phase
 **Priority**: Low
 
@@ -71,6 +77,7 @@ This document outlines planned enhancements for the Essay Lifecycle Service that
 ## Phase 4: Integration Enhancements
 
 ### 4.1 External System Integration
+
 **Timeline**: Enterprise integration phase
 **Priority**: Medium
 
@@ -81,6 +88,7 @@ This document outlines planned enhancements for the Essay Lifecycle Service that
 - **Content analysis services** for essay quality assessment
 
 ### 4.2 Advanced Event Patterns
+
 **Timeline**: Event architecture maturity phase
 **Priority**: Low
 
@@ -93,6 +101,7 @@ This document outlines planned enhancements for the Essay Lifecycle Service that
 ## Phase 5: Performance and Scalability
 
 ### 5.1 Performance Optimizations
+
 **Timeline**: Scale-up requirements phase
 **Priority**: High (when scaling)
 
@@ -103,6 +112,7 @@ This document outlines planned enhancements for the Essay Lifecycle Service that
 - **Resource pooling** for database connections and HTTP clients
 
 ### 5.2 Advanced Caching
+
 **Timeline**: Performance optimization phase
 **Priority**: Medium
 
@@ -115,7 +125,9 @@ This document outlines planned enhancements for the Essay Lifecycle Service that
 ## Implementation Notes
 
 ### Deferred Complexity Rationale
+
 These features are intentionally deferred to focus on:
+
 1. **Core validation flow** stability and reliability
 2. **Simple timeout handling** before advanced algorithms
 3. **Basic monitoring** before comprehensive analytics
@@ -123,7 +135,9 @@ These features are intentionally deferred to focus on:
 5. **Functional correctness** before performance optimization
 
 ### Dependencies
+
 Many enhancements depend on:
+
 - **Core validation flow** being thoroughly tested and stable
 - **Class Management Service** providing comprehensive student APIs
 - **Monitoring infrastructure** for observability and metrics
@@ -131,7 +145,9 @@ Many enhancements depend on:
 - **Teacher feedback** on validation workflow effectiveness
 
 ### Success Metrics
+
 Before implementing enhancements, establish baselines for:
+
 - Validation completion rates (target: >95%)
 - Timeout processing accuracy (target: >90% satisfaction)
 - Average validation time per batch
@@ -139,7 +155,9 @@ Before implementing enhancements, establish baselines for:
 - Teacher satisfaction with validation workflow
 
 ### Technical Debt Considerations
+
 Monitor for technical debt in:
+
 - Database schema complexity as features expand
 - Event message size and processing overhead
 - State machine complexity and maintainability
@@ -149,19 +167,64 @@ Monitor for technical debt in:
 ## Risk Mitigation
 
 ### Validation Accuracy Risks
+
 - **Confidence score drift** over time requires recalibration
 - **Edge cases** in name parsing need continuous monitoring
 - **Cultural name variations** may affect parsing accuracy
 - **Data quality issues** from upstream services
 
 ### Performance Risks
+
 - **Database growth** with validation metadata storage
 - **Event volume increases** with enhanced monitoring
 - **Memory usage** with caching implementations
 - **Network latency** with external integrations
 
 ### Operational Risks
+
 - **Complexity creep** making debugging difficult
 - **Configuration management** for advanced features
 - **Deployment coordination** across multiple enhancements
-- **Rollback complexity** for state-dependent features 
+- **Rollback complexity** for state-dependent features
+
+## Phase 6: Storage Reference Management
+
+### 6.1 Storage Reference Integration Tests
+
+**Timeline**: Immediate - Critical Fix Validation
+**Priority**: High
+
+**Issue**: The storage reference propagation fix needs comprehensive integration testing
+**Action Required**:
+
+- Add integration tests that verify storage references are properly propagated through all phases
+- Test edge cases (missing storage IDs, malformed references)
+- Verify atomic updates work correctly under concurrent load
+- Create test scenarios for partial phase completion
+- Add tests for rollback scenarios
+
+### 6.2 Storage Reference Consistency Monitoring
+
+**Timeline**: Short-term
+**Priority**: Medium
+
+**Action Required**:
+
+- Add metrics for storage reference update success/failure rates
+- Implement consistency checks between phases
+- Create alerts for storage reference mismatches
+- Add audit trail for storage reference updates
+- Monitor storage reference propagation latency
+
+### 6.3 Storage Reference Architecture Improvements
+
+**Timeline**: Medium-term
+**Priority**: Medium
+
+**Enhancements**:
+
+- **Event-driven updates** instead of direct DB updates for better auditability
+- **Storage reference versioning** to track changes over time
+- **Batch storage reference operations** for performance
+- **Storage reference validation service** to ensure consistency
+- **Cross-service storage reference tracking** for end-to-end visibility

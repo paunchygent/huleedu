@@ -44,16 +44,41 @@ alwaysApply: true
 
 ### 3.3. Shared Standards and Compliance
 
-## 4. CRITICAL COMPLIANCE CHECKLIST
+## 4. Event ID Generation and Idempotency
 
-### 4.1. Pre-Implementation Checklist
+### 4.1. Deterministic Event ID Generation
+- Event IDs **MUST** be generated deterministically based on business data only
+- **FORBIDDEN**: Including envelope metadata (event_id, timestamp) in ID generation
+- **MUST**: Use only the `data` field contents for deterministic ID calculation
+- **RATIONALE**: Enables true idempotency by generating consistent IDs for identical business events
+
+### 4.2. Idempotency Architecture
+- Services **MUST** implement idempotency for all event processing
+- Idempotency keys **SHALL** be stored in Redis with appropriate TTL
+- **MUST** handle Redis failures gracefully with fallback to processing
+- Event processors **MUST** check for duplicate events before processing
+
+### 4.3. Event ID Generation Implementation
+```python
+# Correct implementation pattern
+def generate_deterministic_event_id(event_type: str, data: BaseModel) -> UUID:
+    """Generate deterministic UUID based on event type and data content only."""
+    # Serialize only the business data, excluding envelope metadata
+    data_dict = data.model_dump(mode="json", exclude_none=True)
+    content = f"{event_type}:{json.dumps(data_dict, sort_keys=True)}"
+    return uuid5(NAMESPACE_OID, content)
+```
+
+## 5. CRITICAL COMPLIANCE CHECKLIST
+
+### 5.1. Pre-Implementation Checklist
 **Before writing any service code, verify:**
 - [ ] Service follows DDD bounded context principles
 - [ ] Service-specific architecture rule exists and is reviewed
 - [ ] Protocol interfaces defined in `protocols.py`
 - [ ] Dependency injection patterns planned with Dishka
 
-### 4.2. Service Library Compliance Checklist
+### 5.2. Service Library Compliance Checklist
 **MANDATORY - Zero tolerance for non-compliance:**
 [ ] huleedu-service-libs declared in pyproject.toml
 [ ] FORBIDDEN: Any import logging or from logging statements
@@ -62,7 +87,7 @@ alwaysApply: true
 [ ] MUST: Kafka producers via the service library's KafkaBus class.
 [ ] MUST: Kafka consumers via a dedicated, service-specific class (e.g., BatchKafkaConsumer) that is constructed and managed by the DI container.
 
-### 4.3. Production Patterns Checklist (Sprint 1 Hardened)
+### 5.3. Production Patterns Checklist (Sprint 1 Hardened)
 **Battle-tested patterns from BOS - MANDATORY:**
 - [ ] Graceful shutdown with proper async resource cleanup
 - [ ] DI-managed `aiohttp.ClientSession` with configured timeouts
@@ -70,21 +95,21 @@ alwaysApply: true
 - [ ] `/healthz` endpoint with consistent JSON response format
 - [ ] Startup errors use `logger.critical()` and `raise` (fail fast)
 
-### 4.4. HTTP Service Checklist
+### 5.4. HTTP Service Checklist
 **For Quart-based services:**
 - [ ] Blueprint pattern with `api/` directory structure
 - [ ] `startup_setup.py` with DI and metrics initialization
 - [ ] Service library metrics middleware configured
 - [ ] Standard health (`/healthz`) and metrics (`/metrics`) endpoints
 
-### 4.5. Worker Service Checklist
+### 5.5. Worker Service Checklist
 **For Kafka consumer services:**
 - [ ] Signal handling for SIGTERM/SIGINT in worker main
 - [ ] Event processor with protocol-based dependencies
 - [ ] Structured logging with correlation ID tracking
 - [ ] Manual offset commits after successful processing
 
-### 4.6. Pre-Deployment Checklist
+### 5.6. Pre-Deployment Checklist
 **Before container deployment:**
 - [ ] All tests pass (`pdm run pytest`)
 - [ ] Linting passes (`pdm run lint-all`)

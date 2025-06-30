@@ -136,8 +136,8 @@ class TestGenerateDeterministicEventId:
         assert isinstance(result_id, str), "Should return a string ID"
         assert len(result_id) == 64, "Should return valid SHA256 hash"
 
-    def test_missing_data_field_fallback(self) -> None:
-        """Test fallback behavior when data field is missing."""
+    def test_missing_data_field_raises_error(self) -> None:
+        """Test that missing data field raises ValueError."""
         # Arrange
         event = {
             "event_id": str(uuid4()),
@@ -147,44 +147,30 @@ class TestGenerateDeterministicEventId:
 
         msg = json.dumps(event).encode("utf-8")
 
-        # Act
-        result_id = generate_deterministic_event_id(msg)
+        # Act & Assert
+        import pytest
+        with pytest.raises(ValueError, match="Event message must contain a 'data' field"):
+            generate_deterministic_event_id(msg)
 
-        # Assert
-        assert isinstance(result_id, str), "Should return a string ID"
-        assert len(result_id) == 64, "Should return valid SHA256 hash"
-
-        # Verify fallback produces consistent results
-        result_id2 = generate_deterministic_event_id(msg)
-        assert result_id == result_id2, "Fallback should be deterministic"
-
-    def test_malformed_json_fallback(self) -> None:
-        """Test fallback behavior with malformed JSON."""
+    def test_malformed_json_raises_error(self) -> None:
+        """Test that malformed JSON raises ValueError."""
         # Arrange
         malformed_msg = b'{"invalid": json syntax'
 
-        # Act
-        result_id = generate_deterministic_event_id(malformed_msg)
+        # Act & Assert
+        import pytest
+        with pytest.raises(ValueError, match="Failed to decode or process event message"):
+            generate_deterministic_event_id(malformed_msg)
 
-        # Assert
-        assert isinstance(result_id, str), "Should return a string ID"
-        assert len(result_id) == 64, "Should return valid SHA256 hash"
-
-        # Verify consistency
-        result_id2 = generate_deterministic_event_id(malformed_msg)
-        assert result_id == result_id2, "Malformed message fallback should be deterministic"
-
-    def test_non_utf8_bytes_fallback(self) -> None:
-        """Test fallback behavior with non-UTF8 bytes."""
+    def test_non_utf8_bytes_raises_error(self) -> None:
+        """Test that non-UTF8 bytes raise ValueError."""
         # Arrange
         non_utf8_msg = b"\xff\xfe\x00\x00invalid_bytes"
 
-        # Act
-        result_id = generate_deterministic_event_id(non_utf8_msg)
-
-        # Assert
-        assert isinstance(result_id, str), "Should return a string ID"
-        assert len(result_id) == 64, "Should return valid SHA256 hash"
+        # Act & Assert
+        import pytest
+        with pytest.raises((ValueError, UnicodeDecodeError)):
+            generate_deterministic_event_id(non_utf8_msg)
 
     def test_real_world_event_structure(self) -> None:
         """Test with realistic HuleEdu event structure."""

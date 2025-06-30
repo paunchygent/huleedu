@@ -85,7 +85,7 @@ class TestTopicNameFunction:
     def test_topic_name_els_batch_phase_outcome(self) -> None:
         """Test specific mapping for ELS_BATCH_PHASE_OUTCOME (Task 1.2 requirement)."""
         result = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
-        assert result == "huleedu.els.batch_phase.outcome.v1"
+        assert result == "huleedu.els.batch.phase.outcome.v1"
 
     def test_all_mapped_events(self) -> None:
         """Test topic_name() for all currently mapped events."""
