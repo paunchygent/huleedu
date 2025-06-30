@@ -7,11 +7,16 @@ injected protocol implementations for all external interactions.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer
 
 import aiohttp
 from aiokafka import ConsumerRecord
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
+from huleedu_service_libs.observability import extract_trace_context, trace_operation, use_trace_context
 from pydantic import ValidationError
 
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
@@ -41,18 +46,75 @@ async def process_single_message(
     event_publisher: SpellcheckEventPublisherProtocol,
     spell_logic: SpellLogicProtocol,
     kafka_bus: KafkaBus,
+    tracer: "Tracer | None" = None,
     consumer_group_id: str = "spell-checker-group",
 ) -> bool:
-    """Process a single Kafka message.
+    """Process a single Kafka message with proper trace context propagation."""
+    # First, parse the message to get the envelope
+    try:
+        raw_message = msg.value.decode("utf-8")
+        request_envelope = EventEnvelope[EssayLifecycleSpellcheckRequestV1].model_validate_json(
+            raw_message,
+        )
+    except Exception as e:
+        logger.error(f"Failed to parse message: {e}", exc_info=True)
+        return False
+
+    # If we have trace context in metadata and a tracer, use the parent context
+    if request_envelope.metadata and tracer:
+        with use_trace_context(request_envelope.metadata):
+            # Create a child span for this Kafka message processing
+            with trace_operation(
+                tracer,
+                "kafka.consume.spellcheck_request",
+                {
+                    "messaging.system": "kafka",
+                    "messaging.destination": msg.topic,
+                    "messaging.operation": "consume",
+                    "kafka.partition": msg.partition,
+                    "kafka.offset": msg.offset,
+                    "correlation_id": str(request_envelope.correlation_id),
+                    "event_id": str(request_envelope.event_id),
+                }
+            ):
+                return await _process_single_message_impl(
+                    msg, request_envelope, http_session, content_client,
+                    result_store, event_publisher, spell_logic, kafka_bus,
+                    tracer, consumer_group_id
+                )
+    else:
+        # No parent context, process without it
+        return await _process_single_message_impl(
+            msg, request_envelope, http_session, content_client,
+            result_store, event_publisher, spell_logic, kafka_bus,
+            tracer, consumer_group_id
+        )
+
+
+async def _process_single_message_impl(
+    msg: ConsumerRecord,
+    request_envelope: EventEnvelope[EssayLifecycleSpellcheckRequestV1],
+    http_session: aiohttp.ClientSession,
+    content_client: ContentClientProtocol,
+    result_store: ResultStoreProtocol,
+    event_publisher: SpellcheckEventPublisherProtocol,
+    spell_logic: SpellLogicProtocol,
+    kafka_bus: KafkaBus,
+    tracer: "Tracer | None" = None,
+    consumer_group_id: str = "spell-checker-group",
+) -> bool:
+    """Implementation of message processing logic.
 
     Args:
         msg: The Kafka message to process
+        request_envelope: Already parsed event envelope
         http_session: HTTP session for content service interaction
         content_client: Client for fetching content
         result_store: Store for saving processed results
         event_publisher: Publisher for result events
         spell_logic: Spell checking logic implementation
         kafka_bus: Kafka bus for publishing events
+        tracer: Optional tracer for distributed tracing
         consumer_group_id: Consumer group ID for metrics
 
     Returns:
@@ -65,15 +127,10 @@ async def process_single_message(
     corrections_metric = business_metrics.get("spellcheck_corrections_made")
     kafka_queue_latency_metric = business_metrics.get("kafka_queue_latency_seconds")
 
-    request_envelope: EventEnvelope[EssayLifecycleSpellcheckRequestV1] | None = None
     # Default if ID not parsed
     essay_id_for_logging: str = f"offset-{msg.offset}-partition-{msg.partition}"
 
     try:
-        raw_message = msg.value.decode("utf-8")
-        request_envelope = EventEnvelope[EssayLifecycleSpellcheckRequestV1].model_validate_json(
-            raw_message,
-        )
         request_data = request_envelope.data
 
         # Record queue latency metric if available
@@ -197,13 +254,31 @@ async def process_single_message(
         language = request_data.language if hasattr(request_data, "language") else "en"
 
         # Perform the spell check using injected spell logic protocol
-        result_data = await spell_logic.perform_spell_check(
-            original_text,
-            essay_id_for_logging,
-            request_data.text_storage_id,
-            request_data.system_metadata,
-            language,
-        )
+        if tracer:
+            with trace_operation(
+                tracer,
+                "perform_spell_check",
+                {
+                    "essay_id": essay_id_for_logging,
+                    "language": language,
+                    "correlation_id": str(request_envelope.correlation_id),
+                }
+            ):
+                result_data = await spell_logic.perform_spell_check(
+                    original_text,
+                    essay_id_for_logging,
+                    request_data.text_storage_id,
+                    request_data.system_metadata,
+                    language,
+                )
+        else:
+            result_data = await spell_logic.perform_spell_check(
+                original_text,
+                essay_id_for_logging,
+                request_data.text_storage_id,
+                request_data.system_metadata,
+                language,
+            )
 
         # Record business metric for corrections made
         if corrections_metric and result_data.corrections_made is not None:

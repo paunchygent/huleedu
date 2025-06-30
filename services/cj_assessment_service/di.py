@@ -7,6 +7,7 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from opentelemetry.trace import Tracer
 from prometheus_client import REGISTRY, CollectorRegistry
 
 from services.cj_assessment_service.config import Settings
@@ -51,6 +52,12 @@ class CJAssessmentServiceProvider(Provider):
     def provide_metrics_registry(self) -> CollectorRegistry:
         """Provide Prometheus metrics registry."""
         return REGISTRY
+
+    @provide(scope=Scope.APP)
+    def provide_tracer(self) -> Tracer:
+        """Provide OpenTelemetry tracer."""
+        from opentelemetry import trace
+        return trace.get_tracer("cj_assessment_service")
 
     @provide(scope=Scope.APP)
     async def provide_http_session(self) -> aiohttp.ClientSession:
@@ -199,6 +206,7 @@ class CJAssessmentServiceProvider(Provider):
         event_publisher: CJEventPublisherProtocol,
         llm_interaction: LLMInteractionProtocol,
         redis_client: RedisClientProtocol,
+        tracer: Tracer,
     ) -> CJAssessmentKafkaConsumer:
         """Provide Kafka consumer for CJ Assessment Service."""
         return CJAssessmentKafkaConsumer(
@@ -208,4 +216,5 @@ class CJAssessmentServiceProvider(Provider):
             event_publisher=event_publisher,
             llm_interaction=llm_interaction,
             redis_client=redis_client,
+            tracer=tracer,
         )

@@ -7,6 +7,7 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from opentelemetry.trace import Tracer
 from prometheus_client import CollectorRegistry
 
 from common_core.event_enums import ProcessingEvent, topic_name
@@ -50,6 +51,12 @@ class SpellCheckerServiceProvider(Provider):
         from prometheus_client import REGISTRY
 
         return REGISTRY
+
+    @provide(scope=Scope.APP)
+    def provide_tracer(self) -> Tracer:
+        """Provide OpenTelemetry tracer."""
+        from opentelemetry import trace
+        return trace.get_tracer("spell_checker_service")
 
     @provide(scope=Scope.APP)
     async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
@@ -126,6 +133,7 @@ class SpellCheckerServiceProvider(Provider):
         kafka_bus: KafkaBus,
         http_session: ClientSession,
         redis_client: RedisClientProtocol,
+        tracer: Tracer,
     ) -> SpellCheckerKafkaConsumer:
         """Provide Kafka consumer with injected dependencies."""
         return SpellCheckerKafkaConsumer(
@@ -139,4 +147,5 @@ class SpellCheckerServiceProvider(Provider):
             kafka_bus=kafka_bus,
             http_session=http_session,
             redis_client=redis_client,
+            tracer=tracer,
         )

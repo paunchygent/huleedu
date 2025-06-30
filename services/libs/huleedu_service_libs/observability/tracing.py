@@ -130,6 +130,36 @@ def extract_trace_context(carrier: Dict[str, Any]) -> Any:
     return extract(carrier)
 
 
+@contextmanager
+def use_trace_context(carrier: Dict[str, Any]):
+    """Extract and use trace context from a carrier as the current context.
+    
+    This context manager extracts trace context and makes it the current context
+    for the duration of the block, allowing child spans to be created.
+    
+    Args:
+        carrier: Dictionary containing trace context
+        
+    Yields:
+        The extracted context
+    """
+    from opentelemetry import trace as otel_trace
+    from opentelemetry.trace import set_span_in_context
+    
+    # Extract the context from the carrier
+    ctx = extract(carrier)
+    
+    # Get the current span from the extracted context
+    span = trace.get_current_span(ctx)
+    
+    # Use the extracted context
+    token = otel_trace.context.attach(ctx)
+    try:
+        yield ctx
+    finally:
+        otel_trace.context.detach(token)
+
+
 def get_current_span() -> Optional[trace.Span]:
     """Get the current active span.
 

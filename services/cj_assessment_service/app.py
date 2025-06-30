@@ -16,11 +16,13 @@ import asyncio
 from typing import Optional
 
 from dishka import AsyncContainer, make_async_container
+from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
     create_service_logger,
 )
 from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
+from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
 from quart import Quart
 from quart_dishka import QuartDishka
 
@@ -75,6 +77,10 @@ def create_app(settings: Settings | None = None) -> CJAssessmentApp:
     app.container = container
     app.consumer_task = None
     app.kafka_consumer = None
+    
+    # Initialize tracing early, before blueprint registration
+    app.tracer = init_tracing("cj_assessment_service")
+    setup_tracing_middleware(app, app.tracer)
 
     # Register mandatory health Blueprint
     app.register_blueprint(health_bp)

@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer
 
 from aiokafka import ConsumerRecord
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.observability import extract_trace_context, inject_trace_context, use_trace_context, trace_operation
 
 from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import (
@@ -37,6 +42,7 @@ async def process_single_message(
     event_publisher: CJEventPublisherProtocol,
     llm_interaction: LLMInteractionProtocol,
     settings_obj: Settings,
+    tracer: "Tracer | None" = None,
 ) -> bool:
     """Process a single Kafka message containing CJ assessment request.
 
@@ -51,6 +57,55 @@ async def process_single_message(
     Returns:
         True if message processed successfully, False otherwise
     """
+    # First, parse the message to get the envelope
+    try:
+        envelope = EventEnvelope[ELS_CJAssessmentRequestV1].model_validate_json(
+            msg.value.decode("utf-8"),
+        )
+    except Exception as e:
+        logger.error(f"Failed to parse CJ assessment message: {e}", exc_info=True)
+        return False
+
+    # If we have trace context in metadata and a tracer, use the parent context
+    if envelope.metadata and tracer:
+        with use_trace_context(envelope.metadata):
+            # Create a child span for this Kafka message processing
+            with trace_operation(
+                tracer,
+                "kafka.consume.cj_assessment_request",
+                {
+                    "messaging.system": "kafka",
+                    "messaging.destination": msg.topic,
+                    "messaging.operation": "consume",
+                    "kafka.partition": msg.partition,
+                    "kafka.offset": msg.offset,
+                    "correlation_id": str(envelope.correlation_id),
+                    "event_id": str(envelope.event_id),
+                }
+            ):
+                return await _process_cj_assessment_impl(
+                    msg, envelope, database, content_client,
+                    event_publisher, llm_interaction, settings_obj, tracer
+                )
+    else:
+        # No parent context, process without it
+        return await _process_cj_assessment_impl(
+            msg, envelope, database, content_client,
+            event_publisher, llm_interaction, settings_obj, tracer
+        )
+
+
+async def _process_cj_assessment_impl(
+    msg: ConsumerRecord,
+    envelope: EventEnvelope[ELS_CJAssessmentRequestV1],
+    database: CJRepositoryProtocol,
+    content_client: ContentClientProtocol,
+    event_publisher: CJEventPublisherProtocol,
+    llm_interaction: LLMInteractionProtocol,
+    settings_obj: Settings,
+    tracer: "Tracer | None" = None,
+) -> bool:
+    """Implementation of CJ Assessment message processing logic."""
     processing_started_at = datetime.now(UTC)
 
     # Get business metrics from shared module
@@ -62,56 +117,42 @@ async def process_single_message(
     try:
         logger.info(f"Processing CJ assessment message: {msg.topic}:{msg.partition}:{msg.offset}")
 
-        # Deserialize to specific EventEnvelope with typed data
-        try:
-            envelope = EventEnvelope[ELS_CJAssessmentRequestV1].model_validate_json(
-                msg.value.decode("utf-8"),
-            )
-            request_event_data: ELS_CJAssessmentRequestV1 = envelope.data
+        request_event_data: ELS_CJAssessmentRequestV1 = envelope.data
 
-            # Record queue latency metric if available
-            if (
-                kafka_queue_latency_metric
-                and hasattr(envelope, "event_timestamp")
-                and envelope.event_timestamp
-            ):
-                queue_latency_seconds = (
-                    processing_started_at - envelope.event_timestamp
-                ).total_seconds()
-                if queue_latency_seconds >= 0:  # Avoid negative values from clock skew
-                    kafka_queue_latency_metric.observe(queue_latency_seconds)
-                    logger.debug(
-                        f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}",
-                    )
+        # Record queue latency metric if available
+        if (
+            kafka_queue_latency_metric
+            and hasattr(envelope, "event_timestamp")
+            and envelope.event_timestamp
+        ):
+            queue_latency_seconds = (
+                processing_started_at - envelope.event_timestamp
+            ).total_seconds()
+            if queue_latency_seconds >= 0:  # Avoid negative values from clock skew
+                kafka_queue_latency_metric.observe(queue_latency_seconds)
+                logger.debug(
+                    f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}",
+                )
 
-            # Use correlation_id from envelope, fall back to system metadata entity reference
-            correlation_id = (
-                envelope.correlation_id or request_event_data.system_metadata.entity.entity_id
-            )
+        # Use correlation_id from envelope, fall back to system metadata entity reference
+        correlation_id = (
+            envelope.correlation_id or request_event_data.system_metadata.entity.entity_id
+        )
 
-            log_extra = {
-                "correlation_id": str(correlation_id),
-                "event_id": str(envelope.event_id),
-                "bos_batch_id": str(request_event_data.entity_ref.entity_id),
-                "essay_count": len(request_event_data.essays_for_cj),
-                "language": request_event_data.language,
-                "course_code": request_event_data.course_code,
-            }
+        log_extra = {
+            "correlation_id": str(correlation_id),
+            "event_id": str(envelope.event_id),
+            "bos_batch_id": str(request_event_data.entity_ref.entity_id),
+            "essay_count": len(request_event_data.essays_for_cj),
+            "language": request_event_data.language,
+            "course_code": request_event_data.course_code,
+        }
 
-            logger.info("Received CJ assessment request from ELS", extra=log_extra)
-            logger.info(
-                f"📚 Processing {len(request_event_data.essays_for_cj)} essays for CJ assessment",
-                extra=log_extra,
-            )
-
-        except (
-            Exception
-        ) as e:  # Catches Pydantic's ValidationError, JSONDecodeError, UnicodeDecodeError
-            logger.error(
-                f"Failed to deserialize or validate ELS_CJAssessmentRequestV1 message: {e}",
-                exc_info=True,
-            )
-            return False  # Do not commit unparseable messages
+        logger.info("Received CJ assessment request from ELS", extra=log_extra)
+        logger.info(
+            f"📚 Processing {len(request_event_data.essays_for_cj)} essays for CJ assessment",
+            extra=log_extra,
+        )
 
         # Convert event data to format expected by core_assessment_logic
         essays_to_process = []
@@ -205,7 +246,10 @@ async def process_single_message(
             source_service=settings_obj.SERVICE_NAME,
             correlation_id=correlation_uuid,
             data=completed_event_data,
+            metadata={},
         )
+        
+        inject_trace_context(completed_envelope.metadata)
 
         logger.info(
             (
@@ -279,7 +323,10 @@ async def process_single_message(
                 source_service=settings_obj.SERVICE_NAME,
                 correlation_id=correlation_uuid,
                 data=failed_event_data,
+                metadata={},
             )
+            
+            inject_trace_context(failed_envelope.metadata)
 
             await event_publisher.publish_assessment_failed(
                 failure_data=failed_envelope,

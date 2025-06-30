@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs import init_tracing
-from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
 from quart import Quart
 from quart_dishka import QuartDishka
 
@@ -53,11 +51,6 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         # Share essay operations metric with routes modules (legacy support)
         set_essay_essay_operations(metrics["essay_operations"])
         set_batch_essay_operations(metrics["essay_operations"])
-
-        # Initialize tracing
-        app.tracer = init_tracing("essay_lifecycle_api")
-        setup_tracing_middleware(app, app.tracer)
-        logger.info("Distributed tracing initialized")
 
         logger.info(
             "Essay Lifecycle Service DI container, quart-dishka integration, "

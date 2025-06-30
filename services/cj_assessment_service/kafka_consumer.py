@@ -8,7 +8,10 @@ Follows clean architecture with DI pattern.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer
 
 from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaConnectionError
@@ -39,6 +42,7 @@ class CJAssessmentKafkaConsumer:
         event_publisher: CJEventPublisherProtocol,
         llm_interaction: LLMInteractionProtocol,
         redis_client: RedisClientProtocol,
+        tracer: "Tracer | None" = None,
     ) -> None:
         """Initialize with injected dependencies."""
         self.settings = settings
@@ -47,6 +51,7 @@ class CJAssessmentKafkaConsumer:
         self.event_publisher = event_publisher
         self.llm_interaction = llm_interaction
         self.redis_client = redis_client
+        self.tracer = tracer
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
 
@@ -60,6 +65,7 @@ class CJAssessmentKafkaConsumer:
                 event_publisher=self.event_publisher,
                 llm_interaction=self.llm_interaction,
                 settings_obj=self.settings,
+                tracer=self.tracer,
             )
 
         self._process_message_idempotently = process_message_idempotently

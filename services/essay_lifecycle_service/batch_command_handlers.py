@@ -15,6 +15,7 @@ from aiokafka import ConsumerRecord
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.observability import extract_trace_context
 
 from services.essay_lifecycle_service.metrics import get_business_metrics
 from services.essay_lifecycle_service.protocols import (
@@ -53,6 +54,9 @@ async def process_single_message(
         envelope = _deserialize_message(msg)
         if envelope is None:
             return False
+
+        if envelope.metadata:
+            extract_trace_context(envelope.metadata)
 
         # Record Kafka queue latency
         business_metrics = get_business_metrics()

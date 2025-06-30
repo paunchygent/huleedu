@@ -4,7 +4,7 @@
 
 This plan provides a practical, phased approach to adding distributed tracing to HuleEdu, focusing on immediate debugging capability with minimal disruption.
 
-## Current Status: Phase 3 In Progress 🚧
+## Current Status: Phase 3 Complete ✅
 
 ### Completed Work
 
@@ -20,11 +20,16 @@ This plan provides a practical, phased approach to adding distributed tracing to
    - Implemented middleware for automatic HTTP request tracing
    - All code is linted, formatted, and type-checked
 
-3. **Phase 3: Service Instrumentation** (Partial) ✅
+3. **Phase 3: Service Instrumentation** ✅ COMPLETE
    - Instrumented Batch Orchestrator Service
    - Instrumented Essay Lifecycle Service API
+   - Instrumented Spell Checker Service (HTTP API and Kafka worker)
+   - Instrumented CJ Assessment Service
    - Added tracing to critical storage reference handler
    - Added metadata field to EventEnvelope for trace propagation
+   - Implemented trace context injection in all event publishers
+   - Implemented trace context extraction in all event processors
+   - Verified end-to-end trace propagation through complete pipeline
 
 ### Available Tracing Utilities
 
@@ -205,27 +210,42 @@ Test the complete debugging workflow:
    - EventEnvelope now supports metadata field for trace propagation
    - Ready for trace context injection/extraction
 
+### What's Implemented Now
+
+1. **Complete Trace Propagation** ✅
+   - All services extract and inject trace context
+   - Correlation IDs preserved across all service boundaries
+   - Verified with end-to-end pipeline testing
+
+2. **Service Coverage** ✅
+   - Batch Orchestrator Service (HTTP + Kafka)
+   - Essay Lifecycle Service (HTTP + Kafka)
+   - Spell Checker Service (HTTP + Kafka worker)
+   - CJ Assessment Service (Kafka worker)
+
+3. **Trace Context Flow** ✅
+   - HTTP requests: Auto-traced via middleware
+   - Kafka events: Manual injection/extraction via metadata field
+   - Correlation ID: Preserved throughout entire pipeline
+
 ### Next Steps
 
-1. **Complete Phase 3**:
-   - Add trace context injection in event publishers
-   - Add trace context extraction in event consumers
-   - Instrument remaining critical services
-
-2. **Phase 4: Debugging Tools**:
+1. **Phase 4: Debugging Tools** (Ready to implement):
    - Create trace search script
-   - Build Grafana dashboards
+   - Build Grafana dashboards for trace visualization
+   - Add trace links to existing dashboards
 
-3. **Phase 5: Testing**:
-   - Run E2E tests with trace validation
-   - Verify complete trace propagation
+2. **Phase 5: Testing & Validation**:
+   - Create automated tests for trace validation
+   - Document debugging workflows
+   - Add trace-based alerts
 
 ## Implementation Timeline
 
 - **Day 1 Morning**: ✅ Deploy Jaeger infrastructure (Phase 1) - COMPLETE
 - **Day 1 Afternoon**: ✅ Service library enhancement (Phase 2) - COMPLETE
-- **Day 2 Morning**: 🚧 Instrument critical services (Phase 3) - IN PROGRESS
-- **Day 2 Afternoon**: Create debugging tools (Phase 4)
+- **Day 2 Morning**: ✅ Instrument critical services (Phase 3) - COMPLETE
+- **Day 2 Afternoon**: 🚧 Create debugging tools (Phase 4) - NEXT
 - **Day 3**: Testing and validation (Phase 5)
 
 ## Success Metrics

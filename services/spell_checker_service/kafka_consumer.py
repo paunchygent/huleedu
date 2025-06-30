@@ -8,6 +8,10 @@ Refactored to follow clean architecture with DI pattern.
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer
 
 import aiohttp
 from aiokafka import AIOKafkaConsumer, TopicPartition
@@ -44,6 +48,7 @@ class SpellCheckerKafkaConsumer:
         kafka_bus: KafkaBus,
         http_session: aiohttp.ClientSession,
         redis_client: RedisClientProtocol,
+        tracer: "Tracer | None" = None,
     ) -> None:
         """Initialize with injected dependencies."""
         self.kafka_bootstrap_servers = kafka_bootstrap_servers
@@ -56,6 +61,7 @@ class SpellCheckerKafkaConsumer:
         self.kafka_bus = kafka_bus
         self.http_session = http_session
         self.redis_client = redis_client
+        self.tracer = tracer
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
 
@@ -70,6 +76,7 @@ class SpellCheckerKafkaConsumer:
                 event_publisher=self.event_publisher,
                 spell_logic=self.spell_logic,
                 kafka_bus=self.kafka_bus,
+                tracer=self.tracer,
                 consumer_group_id=self.consumer_group,
             )
 

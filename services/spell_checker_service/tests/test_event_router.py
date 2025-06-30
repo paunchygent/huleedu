@@ -321,7 +321,7 @@ class TestProcessSingleMessage:
             )
 
             # Assert
-            assert result is True  # Should commit invalid message to avoid reprocessing
+            assert result is False  # Unparseable messages return False (not committed)
 
             # Verify no processing functions/protocol methods were called
             mock_content_client.fetch_content.assert_not_called()

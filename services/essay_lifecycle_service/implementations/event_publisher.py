@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from config import Settings
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.observability import inject_trace_context
 
 from services.essay_lifecycle_service.protocols import BatchEssayTracker, EventPublisher
 
@@ -67,6 +68,13 @@ class DefaultEventPublisher(EventPublisher):
             correlation_id=correlation_id or uuid4(),
             data=event_data,
         )
+
+        # Only inject trace context if we have an active span
+        from huleedu_service_libs.observability import get_current_span
+        if get_current_span():
+            if envelope.metadata is None:
+                envelope.metadata = {}
+            inject_trace_context(envelope.metadata)
 
         # Publish to Kafka using KafkaBus.publish()
         topic = "essay.status.events"
@@ -167,6 +175,13 @@ class DefaultEventPublisher(EventPublisher):
             data=event_data,
         )
 
+        # Only inject trace context if we have an active span
+        from huleedu_service_libs.observability import get_current_span
+        if get_current_span():
+            if envelope.metadata is None:
+                envelope.metadata = {}
+            inject_trace_context(envelope.metadata)
+
         # Publish to Batch Service topic
         topic = "batch.phase.progress.events"
         await self.kafka_bus.publish(topic, envelope)
@@ -206,6 +221,13 @@ class DefaultEventPublisher(EventPublisher):
             data=event_data,
         )
 
+        # Only inject trace context if we have an active span
+        from huleedu_service_libs.observability import get_current_span
+        if get_current_span():
+            if envelope.metadata is None:
+                envelope.metadata = {}
+            inject_trace_context(envelope.metadata)
+
         # Publish to Batch Service topic
         topic = "batch.phase.concluded.events"
         await self.kafka_bus.publish(topic, envelope)
@@ -240,6 +262,13 @@ class DefaultEventPublisher(EventPublisher):
             data=event_data,
         )
 
+        # Only inject trace context if we have an active span
+        from huleedu_service_libs.observability import get_current_span
+        if get_current_span():
+            if envelope.metadata is None:
+                envelope.metadata = {}
+            inject_trace_context(envelope.metadata)
+
         # Publish to the correct topic
         topic = topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
         await self.kafka_bus.publish(topic, envelope)
@@ -263,6 +292,13 @@ class DefaultEventPublisher(EventPublisher):
             data=event_data,
         )
 
+        # Only inject trace context if we have an active span
+        from huleedu_service_libs.observability import get_current_span
+        if get_current_span():
+            if envelope.metadata is None:
+                envelope.metadata = {}
+            inject_trace_context(envelope.metadata)
+
         # Publish to the correct topic
         topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
         await self.kafka_bus.publish(topic, envelope)
@@ -285,6 +321,13 @@ class DefaultEventPublisher(EventPublisher):
             correlation_id=correlation_id or uuid4(),
             data=event_data,
         )
+
+        # Only inject trace context if we have an active span
+        from huleedu_service_libs.observability import get_current_span
+        if get_current_span():
+            if envelope.metadata is None:
+                envelope.metadata = {}
+            inject_trace_context(envelope.metadata)
 
         # Publish to the correct topic
         topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)

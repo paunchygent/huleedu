@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 from common_core.domain_enums import CourseCode, Language
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.observability import inject_trace_context
 
 from services.essay_lifecycle_service.protocols import SpecializedServiceRequestDispatcher
 
@@ -90,7 +91,10 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                     source_service=self.settings.SERVICE_NAME,
                     correlation_id=correlation_id,
                     data=spellcheck_request,
+                    metadata={},
                 )
+
+                inject_trace_context(envelope.metadata)
 
                 # Publish to Spell Checker Service
                 topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
@@ -214,7 +218,11 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 source_service=self.settings.SERVICE_NAME,
                 correlation_id=correlation_id,
                 data=cj_request,
+                metadata={},
             )
+
+            # Inject trace context for distributed tracing
+            inject_trace_context(envelope.metadata)
 
             # Publish to CJ Assessment Service
             topic = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)

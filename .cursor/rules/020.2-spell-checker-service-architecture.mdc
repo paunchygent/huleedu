@@ -5,7 +5,21 @@ alwaysApply: false
 ---
 # 020.2: Spell Checker Service Architecture
 
-## 1. Service Identity
+## Service Snapshot (2025-06-30)
+- Combined worker + health API (Quart) on port 8002
+- Async PostgreSQL persistence via `PostgreSQLSpellcheckRepository`
+- DI with Dishka; `QuartDishka` called before blueprint registration
+- Kafka topics: consume `huleedu.essay.spellcheck.requested.v1`, publish `huleedu.essay.spellcheck.completed.v1`
+- Observability: OTEL env vars + `/metrics` endpoint
+- Container: non-root UID 1000, writable `data/` dir; Postgres sidecar `spellchecker_db` (pg_trgm enabled)
+
+## Key Rules for Agents
+1. Create `pg_trgm` before building GIN indexes.
+2. Call `initialize_db_schema()` once after engine connect.
+3. Always invoke `QuartDishka(app, container)` before registering blueprints.
+4. Integration tests must use Testcontainers-Postgres and patch settings.
+5. Dockerfile must chown writable paths to UID 1000.
+
 - **Package**: `huleedu-spell-checker-service`
 - **Type**: Combined Service (Kafka Consumer Worker + HTTP Health API)
 - **Stack**: aiokafka, aiohttp, quart, quart-dishka, Python asyncio, Dishka (for DI)
