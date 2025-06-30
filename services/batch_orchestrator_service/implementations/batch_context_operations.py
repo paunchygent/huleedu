@@ -6,7 +6,9 @@ from datetime import UTC, datetime
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from huleedu_service_libs.logging_utils import create_service_logger
-from services.batch_orchestrator_service.implementations.batch_database_infrastructure import BatchDatabaseInfrastructure
+from services.batch_orchestrator_service.implementations.batch_database_infrastructure import (
+    BatchDatabaseInfrastructure,
+)
 from services.batch_orchestrator_service.models_db import Batch
 from sqlalchemy import select, update
 

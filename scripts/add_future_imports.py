@@ -26,17 +26,14 @@ FILES_TO_UPDATE = [
     "services/api_gateway_service/tests/test_acl_transformers.py",
     "services/api_gateway_service/tests/test_status_routes.py",
     "services/api_gateway_service/tests/test_class_routes.py",
-
     # batch_conductor_service
     "services/batch_conductor_service/pipeline_definitions.py",
     "services/batch_conductor_service/pipeline_generator.py",
     "services/batch_conductor_service/tests/test_atomic_redis_operations.py",
-
     # batch_orchestrator_service
     "services/batch_orchestrator_service/implementations/utils.py",
     "services/batch_orchestrator_service/tests/unit/test_idempotency_outage.py",
     "services/batch_orchestrator_service/tests/unit/test_idempotency_basic.py",
-
     # class_management_service
     "services/class_management_service/metrics.py",
     "services/class_management_service/config.py",
@@ -44,15 +41,12 @@ FILES_TO_UPDATE = [
     "services/class_management_service/startup_setup.py",
     "services/class_management_service/implementations/event_publisher_impl.py",
     "services/class_management_service/tests/test_core_logic.py",
-
     # content_service
     "services/content_service/api/content_routes.py",
     "services/content_service/api/health_routes.py",
-
     # file_service
     "services/file_service/hypercorn_config.py",
     "services/file_service/tests/unit/test_empty_file_validation.py",
-
     # result_aggregator_service
     "services/result_aggregator_service/metrics.py",
     "services/result_aggregator_service/config.py",
@@ -84,7 +78,6 @@ FILES_TO_UPDATE = [
     "services/result_aggregator_service/tests/integration/test_kafka_consumer_idempotency.py",
     "services/result_aggregator_service/tests/integration/test_kafka_consumer_error_handling.py",
     "services/result_aggregator_service/tests/integration/test_api_endpoints.py",
-
     # spell_checker_service
     "services/spell_checker_service/spell_logic/l2_dictionary_loader.py",
     "services/spell_checker_service/tests/unit/test_spell_idempotency_basic.py",
@@ -92,14 +85,15 @@ FILES_TO_UPDATE = [
     "services/spell_checker_service/tests/spell_logic/test_l2_dictionary_loader.py",
 ]
 
+
 def add_future_import(file_path: str) -> bool:
     """Add future import to a single file if it doesn't already have it."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         # Skip if file already has the future import
-        if any('from __future__ import annotations' in line for line in lines):
+        if any("from __future__ import annotations" in line for line in lines):
             print(f"Skipping (already has future import): {file_path}")
             return False
 
@@ -123,13 +117,15 @@ def add_future_import(file_path: str) -> bool:
                 continue
 
             # Add future import after docstring and before other imports
-            if not future_import_added and (line.strip().startswith('import ') or line.strip().startswith('from ')):
-                new_lines.append('from __future__ import annotations\n\n')
+            if not future_import_added and (
+                line.strip().startswith("import ") or line.strip().startswith("from ")
+            ):
+                new_lines.append("from __future__ import annotations\n\n")
                 future_import_added = True
-            elif not future_import_added and line.strip() == '':
+            elif not future_import_added and line.strip() == "":
                 # If we hit an empty line after docstring, add the import here
                 if i > 0 and any('"""' in l for l in lines[:i]):
-                    new_lines.append('from __future__ import annotations\n\n')
+                    new_lines.append("from __future__ import annotations\n\n")
                     future_import_added = True
                     new_lines.append(line)
                     continue
@@ -140,16 +136,16 @@ def add_future_import(file_path: str) -> bool:
         if not future_import_added:
             if not any('"""' in line for line in lines):
                 # No docstring, add at the very top
-                new_lines = ['from __future__ import annotations\n\n'] + new_lines
+                new_lines = ["from __future__ import annotations\n\n"] + new_lines
             else:
                 # Has docstring, add after it
                 for i, line in enumerate(new_lines):
                     if '"""' in line and not line.strip().startswith('"""'):
-                        new_lines.insert(i + 1, 'from __future__ import annotations\n\n')
+                        new_lines.insert(i + 1, "from __future__ import annotations\n\n")
                         break
 
         # Write the file back
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.writelines(new_lines)
 
         print(f"Updated: {file_path}")
@@ -158,6 +154,7 @@ def add_future_import(file_path: str) -> bool:
     except Exception as e:
         print(f"Error processing {file_path}: {e}")
         return False
+
 
 def main():
     """Main function to process all files."""
@@ -173,6 +170,7 @@ def main():
             print(f"File not found: {file_path}")
 
     print(f"\nProcessing complete. Updated {updated_count} files.")
+
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,5 @@
 """Metrics definitions for the API Gateway Service."""
+
 from __future__ import annotations
 
 from prometheus_client import REGISTRY, CollectorRegistry, Counter, Histogram

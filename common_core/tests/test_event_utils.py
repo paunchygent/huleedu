@@ -149,6 +149,7 @@ class TestGenerateDeterministicEventId:
 
         # Act & Assert
         import pytest
+
         with pytest.raises(ValueError, match="Event message must contain a 'data' field"):
             generate_deterministic_event_id(msg)
 
@@ -159,6 +160,7 @@ class TestGenerateDeterministicEventId:
 
         # Act & Assert
         import pytest
+
         with pytest.raises(ValueError, match="Failed to decode or process event message"):
             generate_deterministic_event_id(malformed_msg)
 
@@ -169,6 +171,7 @@ class TestGenerateDeterministicEventId:
 
         # Act & Assert
         import pytest
+
         with pytest.raises((ValueError, UnicodeDecodeError)):
             generate_deterministic_event_id(non_utf8_msg)
 

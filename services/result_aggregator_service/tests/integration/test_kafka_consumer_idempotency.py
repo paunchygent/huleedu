@@ -1,4 +1,5 @@
 """Integration tests for Kafka consumer idempotency handling."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

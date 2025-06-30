@@ -1,4 +1,5 @@
 """Integration tests for API endpoints."""
+
 from __future__ import annotations
 
 from typing import Dict, Generator, List, Optional

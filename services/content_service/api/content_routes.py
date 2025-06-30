@@ -1,4 +1,5 @@
 """Content management routes for Content Service."""
+
 from __future__ import annotations
 
 from dishka import FromDishka

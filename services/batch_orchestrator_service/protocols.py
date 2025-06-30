@@ -25,18 +25,12 @@ class InitiationError(Exception):
     """Base exception for errors occurring during phase initiation."""
 
 
-
-
 class DataValidationError(InitiationError):
     """Raised when critical data is missing or invalid for phase initiation."""
 
 
-
-
 class CommandPublishError(InitiationError):
     """Raised when command publishing to event system fails."""
-
-
 
 
 # Placeholder for a Pydantic model representing a BatchUpload entity
@@ -89,8 +83,6 @@ class SpellcheckInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     """
 
     pass
-
-
 
 
 class BatchRepositoryProtocol(Protocol):
@@ -248,8 +240,6 @@ class CJAssessmentInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     """
 
 
-
-
 class AIFeedbackInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     """
     Protocol for initiating AI feedback operations.
@@ -262,8 +252,6 @@ class AIFeedbackInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     """
 
 
-
-
 class NLPInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     """
     Protocol for initiating NLP processing operations.
@@ -274,8 +262,6 @@ class NLPInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     Note: NLP Service is not yet implemented - this initiator will publish
     commands that will be consumed once the NLP Service is built.
     """
-
-
 
 
 class BatchConductorClientProtocol(Protocol):

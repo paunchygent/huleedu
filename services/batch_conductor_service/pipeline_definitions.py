@@ -1,6 +1,7 @@
 """
 Defines the Pydantic models for parsing pipeline configurations.
 """
+
 from __future__ import annotations
 
 from pydantic import BaseModel

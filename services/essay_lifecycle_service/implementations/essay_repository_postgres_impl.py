@@ -175,8 +175,10 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
     async def create_essay_record(self, essay_ref: EntityReference) -> ConcreteEssayState:
         """Create new essay record from entity reference."""
         # Debug logging to trace batch_id issue
-        self.logger.info(f"Creating essay {essay_ref.entity_id} with batch_id: {essay_ref.parent_id}")
-        
+        self.logger.info(
+            f"Creating essay {essay_ref.entity_id} with batch_id: {essay_ref.parent_id}"
+        )
+
         essay_state = ConcreteEssayState(
             essay_id=essay_ref.entity_id,
             batch_id=essay_ref.parent_id,

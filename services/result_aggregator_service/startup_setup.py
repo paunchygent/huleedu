@@ -1,4 +1,5 @@
 """Startup setup utilities for Result Aggregator Service."""
+
 from __future__ import annotations
 
 import asyncio

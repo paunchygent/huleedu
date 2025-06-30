@@ -98,7 +98,7 @@ class DefaultEventPublisher(EventPublisher):
                         "status": status.value,
                         "timestamp": datetime.now(UTC).isoformat(),
                         "correlation_id": str(correlation_id) if correlation_id else None,
-                    }
+                    },
                 )
 
                 logger.info(

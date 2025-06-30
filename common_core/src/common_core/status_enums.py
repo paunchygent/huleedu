@@ -128,3 +128,13 @@ class CacheStatus(str, Enum):
     HIT = "hit"
     MISS = "miss"
     ERROR = "error"
+
+
+# --- Spell-checker job status ---
+class SpellcheckJobStatus(str, Enum):
+    """Lifecycle of a spell-checker job handled by spell_checker_service."""
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    SUCCESS = "success"
+    FAILED = "failed"

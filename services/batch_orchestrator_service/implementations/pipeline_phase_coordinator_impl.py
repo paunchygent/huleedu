@@ -8,8 +8,12 @@ from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
-from services.batch_orchestrator_service.implementations.notification_service import NotificationService
-from services.batch_orchestrator_service.implementations.pipeline_state_manager import PipelineStateManager
+from services.batch_orchestrator_service.implementations.notification_service import (
+    NotificationService,
+)
+from services.batch_orchestrator_service.implementations.pipeline_state_manager import (
+    PipelineStateManager,
+)
 from services.batch_orchestrator_service.protocols import (
     BatchRepositoryProtocol,
     DataValidationError,

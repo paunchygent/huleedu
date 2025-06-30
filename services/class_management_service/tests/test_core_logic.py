@@ -1,4 +1,5 @@
 """Unit tests for core logic in the Class Management Service."""
+
 from __future__ import annotations
 
 import pytest

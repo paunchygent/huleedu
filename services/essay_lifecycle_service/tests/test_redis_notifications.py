@@ -151,7 +151,9 @@ class TestRedisNotifications:
 
         essay_ref = EntityReference(entity_id=essay_id, entity_type="essay")
         mock_batch_tracker.get_user_id_for_essay.return_value = user_id
-        mock_redis_client.publish_user_notification.side_effect = Exception("Redis connection failed")
+        mock_redis_client.publish_user_notification.side_effect = Exception(
+            "Redis connection failed"
+        )
 
         # Act - should not raise exception
         await event_publisher.publish_status_update(essay_ref, status)

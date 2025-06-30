@@ -4,6 +4,7 @@ Unit tests for ACL transformation functions.
 Tests the Anti-Corruption Layer transformers following Rule 070 (Testing Standards)
 with protocol-based mocking and contract validation.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -88,7 +89,9 @@ class TestTransformBosStateToRasResponse:
         result = transform_bos_state_to_ras_response(bos_data, user_id)
 
         # Assert
-        assert result["overall_status"] == BatchClientStatus.PROCESSING.value  # CJ still in progress
+        assert (
+            result["overall_status"] == BatchClientStatus.PROCESSING.value
+        )  # CJ still in progress
         assert result["completed_essay_count"] == 7  # 5 + 2
         assert result["failed_essay_count"] == 1
         assert result["requested_pipeline"] == "spellcheck,cj_assessment"
@@ -130,7 +133,7 @@ class TestDeriveBatchStatusFromPipelines:
         # Arrange
         pipeline_states = [
             {"status": PipelineExecutionStatus.IN_PROGRESS.value},
-            {"status": PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value}
+            {"status": PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value},
         ]
 
         # Act
@@ -144,7 +147,7 @@ class TestDeriveBatchStatusFromPipelines:
         # Arrange
         pipeline_states = [
             {"status": PipelineExecutionStatus.FAILED.value},
-            {"status": PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value}
+            {"status": PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value},
         ]
 
         # Act

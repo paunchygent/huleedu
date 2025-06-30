@@ -1,4 +1,5 @@
 """Health check and metrics endpoints."""
+
 from __future__ import annotations
 
 from dishka import FromDishka

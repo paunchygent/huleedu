@@ -4,6 +4,7 @@ Unified test configuration for API Gateway Service.
 Implements Rule 042.2.1 (Protocol-based dependencies) with consistent
 mock provider that mirrors production ApiGatewayProvider interface.
 """
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
@@ -25,7 +26,7 @@ from services.api_gateway_service.config import Settings, settings
 class UnifiedMockApiGatewayProvider(Provider):
     """
     Unified mock provider for API Gateway tests.
-    
+
     Follows Rule 042.3.4 (DI Provider Pattern) by mirroring the production
     ApiGatewayProvider interface exactly, ensuring test/prod consistency.
     """

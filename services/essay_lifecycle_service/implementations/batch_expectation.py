@@ -44,7 +44,7 @@ class BatchExpectation:
         self.course_code = course_code
         self.essay_instructions = essay_instructions
         self.user_id = user_id
-        
+
         # Store original correlation ID for event publishing
         self.correlation_id = correlation_id
 

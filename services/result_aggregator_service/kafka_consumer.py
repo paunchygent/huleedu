@@ -1,4 +1,5 @@
 """Hardened Kafka consumer for Result Aggregator Service."""
+
 from __future__ import annotations
 
 import asyncio

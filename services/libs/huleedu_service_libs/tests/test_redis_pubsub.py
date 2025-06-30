@@ -112,7 +112,7 @@ def mock_redis_client_with_pubsub() -> MockRedisClientWithPubSub:
 def redis_client_with_mock(mock_redis_client_with_pubsub: MockRedisClientWithPubSub) -> RedisClient:
     """Provide RedisClient with mocked Redis connection."""
     from huleedu_service_libs.redis_pubsub import RedisPubSub
-    
+
     client = RedisClient(client_id="test-client", redis_url="redis://localhost:6379")
     client._started = True
     client.client = mock_redis_client_with_pubsub

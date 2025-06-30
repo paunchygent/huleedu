@@ -55,7 +55,9 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             )
 
             # Register batch with tracker, preserving correlation ID
-            await self.batch_tracker.register_batch(event_data, str(correlation_id) if correlation_id else None)
+            await self.batch_tracker.register_batch(
+                event_data, str(correlation_id) if correlation_id else None
+            )
 
             # Create initial essay records in the database
             from common_core.metadata_models import EntityReference
@@ -69,7 +71,9 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 },
             )
             for essay_id in event_data.essay_ids:
-                essay_ref = EntityReference(entity_id=essay_id, entity_type="essay", parent_id=event_data.batch_id)
+                essay_ref = EntityReference(
+                    entity_id=essay_id, entity_type="essay", parent_id=event_data.batch_id
+                )
                 await self.repository.create_essay_record(essay_ref)
 
             logger.info(
@@ -193,7 +197,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 batch_ready_event, original_correlation_id = batch_completion_result
                 # Use original correlation ID from batch registration, fallback to current if none
                 publish_correlation_id = original_correlation_id or correlation_id
-                
+
                 logger.info(
                     "Batch is complete, publishing BatchEssaysReady event",
                     extra={
@@ -243,7 +247,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 batch_ready_event, original_correlation_id = validation_result
                 # Use original correlation ID from batch registration, fallback to current if none
                 publish_correlation_id = original_correlation_id or correlation_id
-                
+
                 logger.info(
                     "Batch is complete after validation failure, publishing BatchEssaysReady event",
                     extra={

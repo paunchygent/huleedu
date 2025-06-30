@@ -5,6 +5,7 @@ This test suite verifies that the apply_specific_corrections function correctly 
 only the specified corrections to text, handles edge cases, and preserves text outside
 of correction boundaries.
 """
+
 from __future__ import annotations
 
 from typing import Any

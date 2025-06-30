@@ -67,13 +67,9 @@ class TestDefaultServiceResultHandler:
 
         # Mock the storage_metadata with the expected nested structure
         mock_storage_meta = MagicMock(spec=StorageReferenceMetadata)
-        mock_storage_meta.references = {
-            ContentType.CORRECTED_TEXT: {"default": "corrected-456"}
-        }
+        mock_storage_meta.references = {ContentType.CORRECTED_TEXT: {"default": "corrected-456"}}
         mock_storage_meta.model_dump.return_value = {
-            "references": {
-                ContentType.CORRECTED_TEXT.value: {"default": "corrected-456"}
-            }
+            "references": {ContentType.CORRECTED_TEXT.value: {"default": "corrected-456"}}
         }
         result.storage_metadata = mock_storage_meta
         result.corrections_made = 5

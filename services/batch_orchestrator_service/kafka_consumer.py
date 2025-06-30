@@ -13,9 +13,15 @@ from typing import Any
 from aiokafka import AIOKafkaConsumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
-from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
-from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import ClientPipelineRequestHandler
-from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
+from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
+    BatchEssaysReadyHandler,
+)
+from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
+    ClientPipelineRequestHandler,
+)
+from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import (
+    ELSBatchPhaseOutcomeHandler,
+)
 from services.batch_orchestrator_service.metrics import get_kafka_consumer_metrics
 
 from common_core.event_enums import ProcessingEvent, topic_name

@@ -4,6 +4,7 @@ Idempotency Integration Tests for Batch Orchestrator Service (Basic Scenarios)
 Tests the idempotency decorator for basic success and duplicate detection.
 Follows boundary mocking pattern - mocks Redis client but uses real handlers.
 """
+
 from __future__ import annotations
 
 import json

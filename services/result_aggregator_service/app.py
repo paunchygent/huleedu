@@ -1,4 +1,5 @@
 """Main application entry point for Result Aggregator Service."""
+
 from __future__ import annotations
 
 import asyncio

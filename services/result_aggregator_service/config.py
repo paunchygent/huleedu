@@ -1,4 +1,5 @@
 """Configuration for Result Aggregator Service."""
+
 from __future__ import annotations
 
 from pydantic import Field

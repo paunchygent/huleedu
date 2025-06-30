@@ -1,4 +1,5 @@
 """Dependency injection configuration for Result Aggregator Service."""
+
 from __future__ import annotations
 
 from typing import AsyncIterator, cast

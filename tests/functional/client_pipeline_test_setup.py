@@ -185,11 +185,15 @@ def get_state_aware_monitoring_topics() -> list[str]:
 def get_concurrent_monitoring_topics() -> list[str]:
     """Get topics for concurrent pipeline monitoring."""
     # Use set to ensure uniqueness
-    return list(set([
-        "huleedu.commands.batch.pipeline.v1",
-        "huleedu.els.spellcheck.initiate.command.v1",
-        "huleedu.batch.ai_feedback.initiate.command.v1",
-        "huleedu.batch.nlp.initiate.command.v1",
-        "huleedu.batch.cj_assessment.initiate.command.v1",
-        "huleedu.els.batch.phase.outcome.v1",
-    ]))
+    return list(
+        set(
+            [
+                "huleedu.commands.batch.pipeline.v1",
+                "huleedu.els.spellcheck.initiate.command.v1",
+                "huleedu.batch.ai_feedback.initiate.command.v1",
+                "huleedu.batch.nlp.initiate.command.v1",
+                "huleedu.batch.cj_assessment.initiate.command.v1",
+                "huleedu.els.batch.phase.outcome.v1",
+            ]
+        )
+    )

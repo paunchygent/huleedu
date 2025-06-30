@@ -12,6 +12,9 @@ dependencies = [
     "structlog",
     "huleedu-common-core",
     "redis[hiredis]>=5.0.0",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp",
 ]
 
 [build-system]

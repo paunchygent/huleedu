@@ -8,7 +8,10 @@ from datetime import UTC, datetime
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.config import Settings
 from huleedu_service_libs.logging_utils import create_service_logger
-from services.batch_orchestrator_service.protocols import BatchEventPublisherProtocol, BatchRepositoryProtocol
+from services.batch_orchestrator_service.protocols import (
+    BatchEventPublisherProtocol,
+    BatchRepositoryProtocol,
+)
 
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchEssaysRegistered

@@ -1,4 +1,5 @@
 """Integration tests for BatchRepositoryPostgresImpl using testcontainers."""
+
 from __future__ import annotations
 
 from typing import AsyncGenerator, Optional
@@ -66,17 +67,19 @@ def test_settings(postgres_container: PostgresContainer) -> Settings:
         connection_url = connection_url.replace("+psycopg2://", "+asyncpg://")
     elif "postgresql://" in connection_url:
         connection_url = connection_url.replace("postgresql://", "postgresql+asyncpg://")
-    
+
     class TestSettings(Settings):
         def __init__(self):
             super().__init__()
             self.DATABASE_URL = connection_url
-    
+
     return TestSettings()
 
 
 @pytest.fixture
-async def batch_repository(test_settings: Settings) -> AsyncGenerator[BatchRepositoryPostgresImpl, None]:
+async def batch_repository(
+    test_settings: Settings,
+) -> AsyncGenerator[BatchRepositoryPostgresImpl, None]:
     """Create batch repository instance."""
     repo = BatchRepositoryPostgresImpl(test_settings)
     await repo.initialize_schema()

@@ -10,22 +10,52 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
-from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import AIFeedbackInitiatorImpl
-from services.batch_orchestrator_service.implementations.batch_conductor_client_impl import BatchConductorClientImpl
-from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import BatchEssaysReadyHandler
-from services.batch_orchestrator_service.implementations.batch_processing_service_impl import BatchProcessingServiceImpl
-from services.batch_orchestrator_service.implementations.batch_repository_impl import MockBatchRepositoryImpl
-from services.batch_orchestrator_service.implementations.batch_repository_postgres_impl import PostgreSQLBatchRepositoryImpl
-from services.batch_orchestrator_service.implementations.cj_assessment_initiator_impl import DefaultCJAssessmentInitiator
-from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import ClientPipelineRequestHandler
-from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import ELSBatchPhaseOutcomeHandler
-from services.batch_orchestrator_service.implementations.essay_lifecycle_client_impl import DefaultEssayLifecycleClientImpl
-from services.batch_orchestrator_service.implementations.event_publisher_impl import DefaultBatchEventPublisherImpl
+from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import (
+    AIFeedbackInitiatorImpl,
+)
+from services.batch_orchestrator_service.implementations.batch_conductor_client_impl import (
+    BatchConductorClientImpl,
+)
+from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
+    BatchEssaysReadyHandler,
+)
+from services.batch_orchestrator_service.implementations.batch_processing_service_impl import (
+    BatchProcessingServiceImpl,
+)
+from services.batch_orchestrator_service.implementations.batch_repository_impl import (
+    MockBatchRepositoryImpl,
+)
+from services.batch_orchestrator_service.implementations.batch_repository_postgres_impl import (
+    PostgreSQLBatchRepositoryImpl,
+)
+from services.batch_orchestrator_service.implementations.cj_assessment_initiator_impl import (
+    DefaultCJAssessmentInitiator,
+)
+from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
+    ClientPipelineRequestHandler,
+)
+from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import (
+    ELSBatchPhaseOutcomeHandler,
+)
+from services.batch_orchestrator_service.implementations.essay_lifecycle_client_impl import (
+    DefaultEssayLifecycleClientImpl,
+)
+from services.batch_orchestrator_service.implementations.event_publisher_impl import (
+    DefaultBatchEventPublisherImpl,
+)
 from services.batch_orchestrator_service.implementations.nlp_initiator_impl import NLPInitiatorImpl
-from services.batch_orchestrator_service.implementations.notification_service import NotificationService
-from services.batch_orchestrator_service.implementations.pipeline_phase_coordinator_impl import DefaultPipelinePhaseCoordinator
-from services.batch_orchestrator_service.implementations.pipeline_state_manager import PipelineStateManager
-from services.batch_orchestrator_service.implementations.spellcheck_initiator_impl import SpellcheckInitiatorImpl
+from services.batch_orchestrator_service.implementations.notification_service import (
+    NotificationService,
+)
+from services.batch_orchestrator_service.implementations.pipeline_phase_coordinator_impl import (
+    DefaultPipelinePhaseCoordinator,
+)
+from services.batch_orchestrator_service.implementations.pipeline_state_manager import (
+    PipelineStateManager,
+)
+from services.batch_orchestrator_service.implementations.spellcheck_initiator_impl import (
+    SpellcheckInitiatorImpl,
+)
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
 from prometheus_client import CollectorRegistry
 from services.batch_orchestrator_service.protocols import (

@@ -199,7 +199,7 @@ async def test_app(
     async with app.container() as request_container:
         batch_repo = await request_container.get(BatchRepositoryProtocol)
         # Initialize schema using the repository's method
-        if hasattr(batch_repo, 'initialize_schema'):
+        if hasattr(batch_repo, "initialize_schema"):
             await batch_repo.initialize_schema()
 
     yield app

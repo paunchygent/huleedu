@@ -89,16 +89,14 @@ async def test_get_batch_status_not_found_fallback_success(
                 "total": 5,
                 "successful": 2,
                 "failed": 0,
-                "pending_dispatch_or_processing": 3
+                "pending_dispatch_or_processing": 3,
             },
             "started_at": "2024-01-15T10:00:00Z",
-            "completed_at": None
-        }
+            "completed_at": None,
+        },
     }
 
-    bos_mock = respx_mock.get(bos_url).mock(
-        return_value=Response(200, json=bos_data)
-    )
+    bos_mock = respx_mock.get(bos_url).mock(return_value=Response(200, json=bos_data))
 
     response = await client.get(f"/v1/batches/{BATCH_ID}/status")
 

@@ -49,7 +49,9 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         """Register callback for batch coordination events."""
         self._event_callbacks[event_type] = callback
 
-    async def register_batch(self, event: Any, correlation_id: str | None = None) -> None:  # BatchEssaysRegistered
+    async def register_batch(
+        self, event: Any, correlation_id: str | None = None
+    ) -> None:  # BatchEssaysRegistered
         """
         Register batch slot expectations from BOS.
 
@@ -200,7 +202,9 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                     f"Batch {batch_id} completing early: "
                     f"{assigned_count} assigned + {failure_count} failed = {total_processed}"
                 )
-                event_data, stored_correlation_id = self._create_batch_ready_event(batch_id, expectation)
+                event_data, stored_correlation_id = self._create_batch_ready_event(
+                    batch_id, expectation
+                )
                 return event_data, stored_correlation_id
 
         return None
@@ -222,7 +226,9 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         # Check if batch is complete (either all slots filled OR processed count meets expectation)
         if expectation.is_complete or total_processed >= expectation.expected_count:
-            event_data, stored_correlation_id = self._create_batch_ready_event(batch_id, expectation)
+            event_data, stored_correlation_id = self._create_batch_ready_event(
+                batch_id, expectation
+            )
             return event_data, stored_correlation_id
 
         return None
@@ -282,7 +288,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         # Store correlation ID before cleanup
         original_correlation_id = expectation.correlation_id
-        
+
         # Clean up completed batch
         del self.batch_expectations[batch_id]
         if batch_id in self.validation_failures:

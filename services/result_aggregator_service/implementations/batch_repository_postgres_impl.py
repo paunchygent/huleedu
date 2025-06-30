@@ -1,4 +1,5 @@
 """PostgreSQL implementation of batch repository."""
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -237,7 +238,9 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
 
             if batch:
                 # Update phase-specific completion tracking
-                phases_completed = batch.batch_metadata.get("phases_completed", {}) if batch.batch_metadata else {}
+                phases_completed = (
+                    batch.batch_metadata.get("phases_completed", {}) if batch.batch_metadata else {}
+                )
                 phases_completed[phase] = {
                     "completed_count": completed_count,
                     "failed_count": failed_count,

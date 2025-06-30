@@ -1,4 +1,5 @@
 """Internal API routes for querying aggregated results."""
+
 from __future__ import annotations
 
 from typing import Optional
@@ -12,7 +13,11 @@ from quart_dishka import inject
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.metrics import ResultAggregatorMetrics
 from services.result_aggregator_service.models_api import BatchStatusResponse
-from services.result_aggregator_service.protocols import BatchQueryServiceProtocol, CacheManagerProtocol, SecurityServiceProtocol
+from services.result_aggregator_service.protocols import (
+    BatchQueryServiceProtocol,
+    CacheManagerProtocol,
+    SecurityServiceProtocol,
+)
 
 logger = create_service_logger("result_aggregator.api.query")
 

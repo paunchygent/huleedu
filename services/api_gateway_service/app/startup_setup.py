@@ -1,4 +1,5 @@
 """Startup setup for API Gateway Service."""
+
 from __future__ import annotations
 
 from dishka import make_async_container
