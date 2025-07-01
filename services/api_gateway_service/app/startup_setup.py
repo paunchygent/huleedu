@@ -7,6 +7,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs import init_tracing
 from services.api_gateway_service.app.di import ApiGatewayProvider
 
 logger = create_service_logger("api_gateway_service.startup")
@@ -33,6 +34,25 @@ def setup_dependency_injection(app: FastAPI, container):
     except Exception as e:
         logger.critical(f"Failed to setup dependency injection: {e}", exc_info=True)
         raise
+
+
+def setup_tracing(app: FastAPI):
+    """Setup distributed tracing for the API Gateway."""
+    try:
+        logger.info("Initializing distributed tracing...")
+        tracer = init_tracing("api_gateway_service")
+        # Store tracer in app state for access in routes
+        app.state.tracer = tracer
+        
+        # TODO: Add FastAPI middleware for tracing when available
+        # For now, tracing will be manual in routes that need it
+        
+        logger.info("Distributed tracing initialized successfully")
+        return tracer
+    except Exception as e:
+        logger.error(f"Failed to initialize tracing: {e}", exc_info=True)
+        # Don't fail startup if tracing fails
+        return None
 
 
 async def shutdown_services() -> None:

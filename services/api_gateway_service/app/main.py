@@ -11,7 +11,7 @@ from ..config import settings
 from ..routers import batch_routes, class_routes, file_routes, status_routes, websocket_routes
 from ..routers.health_routes import router as health_router
 from .rate_limiter import limiter
-from .startup_setup import create_di_container, setup_dependency_injection
+from .startup_setup import create_di_container, setup_dependency_injection, setup_tracing
 
 
 def create_app() -> FastAPI:
@@ -54,6 +54,9 @@ def create_app() -> FastAPI:
 
     # Store container reference for cleanup
     app.state.di_container = container
+    
+    # Setup distributed tracing
+    setup_tracing(app)
 
     return app
 

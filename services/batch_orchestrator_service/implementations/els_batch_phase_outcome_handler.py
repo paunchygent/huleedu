@@ -26,6 +26,8 @@ class ELSBatchPhaseOutcomeHandler:
         phase_coordinator: PipelinePhaseCoordinatorProtocol,
     ) -> None:
         self.phase_coordinator = phase_coordinator
+        self._phase_transition_metric = None  # Will be initialized with actual metric
+        self._commands_metric = None  # Will be initialized with actual metric
 
     async def handle_els_batch_phase_outcome(self, msg: Any) -> None:
         """
@@ -41,6 +43,8 @@ class ELSBatchPhaseOutcomeHandler:
 
         FIXED: Now uses proper EventEnvelope deserialization for architectural compliance.
         """
+        from huleedu_service_libs.observability import use_trace_context, trace_operation, get_tracer
+        
         try:
             # FIXED: Use proper EventEnvelope deserialization like other services
             envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(msg.value)
@@ -53,24 +57,47 @@ class ELSBatchPhaseOutcomeHandler:
             processed_essays_for_next_phase = event_data.processed_essays
             failed_essay_ids = event_data.failed_essay_ids
 
-            # Note: No manual validation needed -
-            # Pydantic EventEnvelope parsing ensures required fields exist
+            # Define async function to process within trace context
+            async def process_phase_outcome() -> None:
+                tracer = get_tracer("batch_orchestrator_service")
+                with trace_operation(
+                    tracer,
+                    "kafka.consume.els_batch_phase_outcome",
+                    {
+                        "messaging.system": "kafka",
+                        "messaging.destination": msg.topic,
+                        "messaging.operation": "consume",
+                        "batch_id": batch_id,
+                        "completed_phase": completed_phase,
+                        "phase_status": phase_status,
+                        "correlation_id": str(correlation_id),
+                    }
+                ):
+                    # Note: No manual validation needed -
+                    # Pydantic EventEnvelope parsing ensures required fields exist
 
-            logger.info(
-                f"Received ELS batch phase outcome: batch={batch_id}, "
-                f"phase={completed_phase}, status={phase_status}, "
-                f"processed={len(processed_essays_for_next_phase)}, failed={len(failed_essay_ids)}",
-                extra={"correlation_id": str(correlation_id)},
-            )
+                    logger.info(
+                        f"Received ELS batch phase outcome: batch={batch_id}, "
+                        f"phase={completed_phase}, status={phase_status}, "
+                        f"processed={len(processed_essays_for_next_phase)}, failed={len(failed_essay_ids)}",
+                        extra={"correlation_id": str(correlation_id)},
+                    )
 
-            # Delegate to phase coordinator for pipeline orchestration with data propagation
-            await self.phase_coordinator.handle_phase_concluded(
-                batch_id=batch_id,
-                completed_phase=completed_phase,
-                phase_status=phase_status,
-                correlation_id=str(correlation_id),
-                processed_essays_for_next_phase=processed_essays_for_next_phase,
-            )
+                    # Delegate to phase coordinator for pipeline orchestration with data propagation
+                    await self.phase_coordinator.handle_phase_concluded(
+                        batch_id=batch_id,
+                        completed_phase=completed_phase,
+                        phase_status=phase_status,
+                        correlation_id=str(correlation_id),
+                        processed_essays_for_next_phase=processed_essays_for_next_phase,
+                    )
+            
+            # Check if envelope has trace context metadata and process accordingly
+            if hasattr(envelope, 'metadata') and envelope.metadata:
+                with use_trace_context(envelope.metadata):
+                    await process_phase_outcome()
+            else:
+                await process_phase_outcome()
 
         except Exception as e:
             logger.error(f"Error handling ELSBatchPhaseOutcomeV1 event: {e}", exc_info=True)

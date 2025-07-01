@@ -6,11 +6,19 @@ for the Quart-based health API component of the combined service.
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 from dishka import AsyncContainer
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
+from opentelemetry.trace import Tracer
 from quart import Quart
+
+class SpellCheckerQuart(Quart):
+    """Custom Quart application class with type hints for custom attributes."""
+    tracer: Tracer
+    extensions: dict[str, Any]
 
 from services.spell_checker_service.config import Settings
 from services.spell_checker_service.metrics import get_http_metrics
@@ -19,6 +27,14 @@ logger = create_service_logger("spell_checker_service.startup_setup")
 
 
 async def initialize_services(app: Quart, settings: Settings, container: AsyncContainer) -> None:
+    """Initialize application services and metrics.
+
+    Args:
+        app: Quart application instance
+        settings: Application settings
+        container: DI container for service dependencies
+    """
+    app = cast(SpellCheckerQuart, app)
     """Initialize application services and metrics.
 
     Args:

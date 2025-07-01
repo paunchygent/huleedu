@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer
+    
+from opentelemetry.trace import Tracer
 
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
@@ -73,6 +78,12 @@ class CoreInfrastructureProvider(Provider):
     def provide_metrics_registry(self) -> CollectorRegistry:
         """Provide Prometheus metrics registry."""
         return CollectorRegistry()
+
+    @provide(scope=Scope.APP)
+    def provide_tracer(self) -> Tracer:
+        """Provide OpenTelemetry tracer."""
+        from opentelemetry import trace
+        return trace.get_tracer("essay_lifecycle_service")
 
     @provide(scope=Scope.APP)
     async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:

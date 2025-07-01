@@ -249,7 +249,8 @@ async def _process_cj_assessment_impl(
             metadata={},
         )
         
-        inject_trace_context(completed_envelope.metadata)
+        if completed_envelope.metadata is not None:
+            inject_trace_context(completed_envelope.metadata)
 
         logger.info(
             (

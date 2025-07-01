@@ -69,7 +69,7 @@ def test_settings(postgres_container: PostgresContainer) -> Settings:
         connection_url = connection_url.replace("postgresql://", "postgresql+asyncpg://")
 
     class TestSettings(Settings):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
             self.DATABASE_URL = connection_url
 

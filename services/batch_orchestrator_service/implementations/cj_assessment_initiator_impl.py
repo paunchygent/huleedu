@@ -87,12 +87,19 @@ class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):
             )
 
             # Create EventEnvelope for CJ command
+            from huleedu_service_libs.observability import inject_trace_context
+            
             command_envelope = EventEnvelope[BatchServiceCJAssessmentInitiateCommandDataV1](
                 event_type=topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
                 source_service="batch-orchestrator-service",
                 correlation_id=correlation_id,
                 data=cj_command,
+                metadata={},
             )
+            
+            # Inject current trace context into the envelope metadata
+            if command_envelope.metadata is not None:
+                inject_trace_context(command_envelope.metadata)
 
             # Publish CJ assessment command
             await self.event_publisher.publish_batch_event(command_envelope)

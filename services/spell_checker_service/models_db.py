@@ -32,8 +32,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID, ARRAY as PG_ARRAY
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
+from sqlalchemy.orm.decl_api import DeclarativeBase
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 
 # Import shared enum to avoid drift across services

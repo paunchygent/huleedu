@@ -10,10 +10,16 @@ from __future__ import annotations
 import asyncio
 import signal
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
+from opentelemetry.trace import Tracer
 from common_core.event_enums import ProcessingEvent, topic_name
 from dishka import make_async_container
+from huleedu_service_libs import init_tracing
 from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
@@ -90,6 +96,7 @@ async def run_consumer_loop(
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
     redis_client: AtomicRedisClientProtocol,
+    tracer: "Tracer | None" = None,
 ) -> None:
     """Main message processing loop with idempotency support."""
     global should_stop
@@ -104,6 +111,7 @@ async def run_consumer_loop(
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
+            tracer=tracer,
         )
 
     try:
@@ -176,6 +184,10 @@ async def main() -> None:
 
     logger.info("Starting Essay Lifecycle Service Kafka Worker")
 
+    # Initialize tracing (this sets up the global tracer provider)
+    tracer = init_tracing("essay_lifecycle_service")
+    logger.info("OpenTelemetry tracing initialized")
+
     # Initialize dependency injection container with all provider classes
     container = make_async_container(
         CoreInfrastructureProvider(),
@@ -192,6 +204,7 @@ async def main() -> None:
             batch_command_handler = await request_container.get(BatchCommandHandler)
             service_result_handler = await request_container.get(ServiceResultHandler)
             redis_client = await request_container.get(AtomicRedisClientProtocol)
+            tracer = await request_container.get(Tracer)
 
             logger.info("Dependencies injected successfully")
 
@@ -205,6 +218,7 @@ async def main() -> None:
                 batch_command_handler=batch_command_handler,
                 service_result_handler=service_result_handler,
                 redis_client=redis_client,
+                tracer=tracer,
             )
 
     except KeyboardInterrupt:

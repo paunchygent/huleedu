@@ -47,6 +47,8 @@ class BatchEssaysReadyHandler:
         2. Store essays in batch repository for later pipeline processing
         3. Log that batch is ready and awaiting client trigger
         """
+        from huleedu_service_libs.observability import use_trace_context, trace_operation, get_tracer
+        
         try:
             # Deserialize the message
             message_data = json.loads(msg.value.decode("utf-8"))
@@ -55,42 +57,63 @@ class BatchEssaysReadyHandler:
             batch_essays_ready_data = envelope.data
             batch_id = batch_essays_ready_data.batch_id
 
-            self.logger.info(
-                f"Received BatchEssaysReady for batch {batch_id}",
-                extra={"correlation_id": str(envelope.correlation_id)},
-            )
+            # Define async function to process within trace context
+            async def process_batch_ready() -> None:
+                tracer = get_tracer("batch_orchestrator_service")
+                with trace_operation(
+                    tracer,
+                    "kafka.consume.batch_essays_ready",
+                    {
+                        "messaging.system": "kafka",
+                        "messaging.destination": msg.topic,
+                        "messaging.operation": "consume",
+                        "batch_id": batch_id,
+                        "correlation_id": str(envelope.correlation_id),
+                    }
+                ):
+                    self.logger.info(
+                        f"Received BatchEssaysReady for batch {batch_id}",
+                        extra={"correlation_id": str(envelope.correlation_id)},
+                    )
 
-            # Store essays from BatchEssaysReady for later client-triggered processing
-            ready_essays = batch_essays_ready_data.ready_essays
-            if not ready_essays:
-                raise DataValidationError(
-                    f"BatchEssaysReady for batch {batch_id} contains no ready_essays",
-                )
+                    # Store essays from BatchEssaysReady for later client-triggered processing
+                    ready_essays = batch_essays_ready_data.ready_essays
+                    if not ready_essays:
+                        raise DataValidationError(
+                            f"BatchEssaysReady for batch {batch_id} contains no ready_essays",
+                        )
 
-            # Store essays for later pipeline processing
-            essays_data = ready_essays
-            self.logger.info(
-                f"Batch {batch_id} ready for processing with "
-                f"{len(essays_data)} essays - awaiting client trigger",
-                extra={"correlation_id": str(envelope.correlation_id)},
-            )
+                    # Store essays for later pipeline processing
+                    essays_data = ready_essays
+                    self.logger.info(
+                        f"Batch {batch_id} ready for processing with "
+                        f"{len(essays_data)} essays - awaiting client trigger",
+                        extra={"correlation_id": str(envelope.correlation_id)},
+                    )
 
-            # Debug logging for essay storage
-            self.logger.debug(f"About to store {len(essays_data)} essays for batch {batch_id}")
+                    # Debug logging for essay storage
+                    self.logger.debug(f"About to store {len(essays_data)} essays for batch {batch_id}")
 
-            # Store essays in repository for client-triggered pipeline processing
-            storage_success = await self.batch_repo.store_batch_essays(batch_id, essays_data)
+                    # Store essays in repository for client-triggered pipeline processing
+                    storage_success = await self.batch_repo.store_batch_essays(batch_id, essays_data)
 
-            if storage_success:
-                self.logger.info(
-                    f"Successfully stored {len(essays_data)} essays for batch {batch_id}",
-                )
+                    if storage_success:
+                        self.logger.info(
+                            f"Successfully stored {len(essays_data)} essays for batch {batch_id}",
+                        )
+                    else:
+                        self.logger.error(f"Failed to store essays for batch {batch_id}")
+
+                    self.logger.debug(
+                        f"Essay storage completed for batch {batch_id}, success: {storage_success}",
+                    )
+            
+            # Check if envelope has trace context metadata and process accordingly
+            if hasattr(envelope, 'metadata') and envelope.metadata:
+                with use_trace_context(envelope.metadata):
+                    await process_batch_ready()
             else:
-                self.logger.error(f"Failed to store essays for batch {batch_id}")
-
-            self.logger.debug(
-                f"Essay storage completed for batch {batch_id}, success: {storage_success}",
-            )
+                await process_batch_ready()
 
         except Exception as e:
             self.logger.error(f"Error handling BatchEssaysReady message: {e}", exc_info=True)

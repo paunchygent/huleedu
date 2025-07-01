@@ -26,12 +26,19 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
         correlation_id: UUID | None,
     ) -> None:
         """Publish spellcheck result event to Kafka."""
+        from huleedu_service_libs.observability import inject_trace_context
+        
         result_envelope = EventEnvelope[SpellcheckResultDataV1](
             event_type=self.kafka_event_type,
             source_service=self.source_service_name,
             correlation_id=correlation_id,
             data=event_data,
+            metadata={},
         )
+        
+        # Inject current trace context into the envelope metadata
+        if result_envelope.metadata is not None:
+            inject_trace_context(result_envelope.metadata)
 
         # Use entity_id as the key for partitioning
         key = str(event_data.entity_ref.entity_id)

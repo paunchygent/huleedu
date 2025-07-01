@@ -94,7 +94,8 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                     metadata={},
                 )
 
-                inject_trace_context(envelope.metadata)
+                if envelope.metadata is not None:
+                    inject_trace_context(envelope.metadata)
 
                 # Publish to Spell Checker Service
                 topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
@@ -222,7 +223,8 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
             )
 
             # Inject trace context for distributed tracing
-            inject_trace_context(envelope.metadata)
+            if envelope.metadata is not None:
+                inject_trace_context(envelope.metadata)
 
             # Publish to CJ Assessment Service
             topic = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)

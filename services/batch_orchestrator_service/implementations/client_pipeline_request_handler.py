@@ -51,6 +51,8 @@ class ClientPipelineRequestHandler:
             ValueError: If message processing fails due to invalid data
             Exception: If BCS communication or pipeline initiation fails
         """
+        from huleedu_service_libs.observability import use_trace_context, trace_operation, get_tracer
+        
         try:
             # Parse and validate message envelope
             envelope = self._parse_message_envelope(msg)
@@ -60,157 +62,181 @@ class ClientPipelineRequestHandler:
             requested_pipeline = request_data.requested_pipeline
             correlation_id = str(envelope.correlation_id or request_data.client_correlation_id)
 
-            logger.info(
-                "Processing client pipeline request",
-                extra={
-                    "batch_id": batch_id,
-                    "requested_pipeline": requested_pipeline,
-                    "correlation_id": correlation_id,
-                    "event_id": str(envelope.event_id),
-                },
-            )
-
-            # Validate batch exists and get context
-            batch_context = await self.batch_repo.get_batch_context(batch_id)
-            if not batch_context:
-                error_msg = f"Batch not found: {batch_id}"
-                logger.error(
-                    error_msg,
-                    extra={
+            # Extract trace context if present and wrap all processing
+            async def process_message() -> None:
+                tracer = get_tracer("batch_orchestrator_service")
+                with trace_operation(
+                    tracer,
+                    "kafka.consume.client_pipeline_request",
+                    {
+                        "messaging.system": "kafka",
+                        "messaging.destination": msg.topic,
+                        "messaging.operation": "consume",
                         "batch_id": batch_id,
                         "requested_pipeline": requested_pipeline,
                         "correlation_id": correlation_id,
-                    },
-                )
-                raise ValueError(error_msg)
-
-            # Check if batch already has a pipeline in progress
-            pipeline_state = await self.batch_repo.get_processing_pipeline_state(batch_id)
-            if pipeline_state and self._has_active_pipeline(pipeline_state):
-                logger.warning(
-                    f"Pipeline already active for batch {batch_id}, skipping request",
-                    extra={
-                        "batch_id": batch_id,
-                        "requested_pipeline": requested_pipeline,
-                        "correlation_id": correlation_id,
-                        "current_pipeline_state": pipeline_state,
-                    },
-                )
-                return
-
-            # Convert string pipeline name to PhaseName enum for BCS client
-            try:
-                requested_pipeline_enum = PhaseName(requested_pipeline)
-            except ValueError:
-                error_msg = f"Invalid pipeline name: {requested_pipeline}"
-                logger.error(
-                    error_msg,
-                    extra={
-                        "batch_id": batch_id,
-                        "requested_pipeline": requested_pipeline,
-                        "correlation_id": correlation_id,
-                    },
-                )
-                raise ValueError(error_msg)
-
-            # Request pipeline resolution from BCS
-            try:
-                bcs_response = await self.bcs_client.resolve_pipeline(
-                    batch_id, requested_pipeline_enum
-                )
-            except Exception as e:
-                error_msg = f"BCS pipeline resolution failed: {e}"
-                logger.error(
-                    error_msg,
-                    extra={
-                        "batch_id": batch_id,
-                        "requested_pipeline": requested_pipeline,
-                        "correlation_id": correlation_id,
-                    },
-                    exc_info=True,
-                )
-                raise Exception(error_msg) from e
-
-            # Extract resolved pipeline from BCS response
-            resolved_pipeline_strings = bcs_response.get("final_pipeline", [])
-            if not resolved_pipeline_strings:
-                error_msg = f"BCS returned empty pipeline for {requested_pipeline}"
-                logger.error(
-                    error_msg,
-                    extra={
-                        "batch_id": batch_id,
-                        "requested_pipeline": requested_pipeline,
-                        "correlation_id": correlation_id,
-                        "bcs_response": bcs_response,
-                    },
-                )
-                raise ValueError(error_msg)
-
-            # Convert string pipeline to PhaseName enums
-            resolved_pipeline = []
-            for phase_str in resolved_pipeline_strings:
-                try:
-                    # Map string values to PhaseName enum
-                    phase_enum = PhaseName(phase_str)
-                    resolved_pipeline.append(phase_enum)
-                except ValueError:
-                    logger.warning(
-                        f"Unknown phase name '{phase_str}' in resolved pipeline, skipping",
-                        extra={"batch_id": batch_id},
+                    }
+                ):
+                    logger.info(
+                        "Processing client pipeline request",
+                        extra={
+                            "batch_id": batch_id,
+                            "requested_pipeline": requested_pipeline,
+                            "correlation_id": correlation_id,
+                            "event_id": str(envelope.event_id),
+                        },
                     )
-                    continue
 
-            logger.info(
-                "BCS resolved pipeline successfully",
-                extra={
-                    "batch_id": batch_id,
-                    "requested_pipeline": requested_pipeline,
-                    "resolved_pipeline": [phase.value for phase in resolved_pipeline],
-                    "pipeline_length": len(resolved_pipeline),
-                    "correlation_id": correlation_id,
-                },
-            )
+                    # Validate batch exists and get context
+                    batch_context = await self.batch_repo.get_batch_context(batch_id)
+                    if not batch_context:
+                        error_msg = f"Batch not found: {batch_id}"
+                        logger.error(
+                            error_msg,
+                            extra={
+                                "batch_id": batch_id,
+                                "requested_pipeline": requested_pipeline,
+                                "correlation_id": correlation_id,
+                            },
+                        )
+                        raise ValueError(error_msg)
 
-            # Update batch with resolved pipeline
-            await self._update_batch_with_resolved_pipeline(
-                batch_id,
-                resolved_pipeline,
-                batch_context,
-            )
+                    # Check if batch already has a pipeline in progress
+                    pipeline_state = await self.batch_repo.get_processing_pipeline_state(batch_id)
+                    if pipeline_state and self._has_active_pipeline(pipeline_state):
+                        logger.warning(
+                            f"Pipeline already active for batch {batch_id}, skipping request",
+                            extra={
+                                "batch_id": batch_id,
+                                "requested_pipeline": requested_pipeline,
+                                "correlation_id": correlation_id,
+                                "current_pipeline_state": pipeline_state,
+                            },
+                        )
+                        return
 
-            # Initiate first phase of resolved pipeline
-            try:
-                await self.phase_coordinator.initiate_resolved_pipeline(
-                    batch_id=batch_id,
-                    resolved_pipeline=resolved_pipeline,
-                    correlation_id=correlation_id,
-                    batch_context=batch_context,
-                )
+                    # Convert string pipeline name to PhaseName enum for BCS client
+                    try:
+                        requested_pipeline_enum = PhaseName(requested_pipeline)
+                    except ValueError:
+                        error_msg = f"Invalid pipeline name: {requested_pipeline}"
+                        logger.error(
+                            error_msg,
+                            extra={
+                                "batch_id": batch_id,
+                                "requested_pipeline": requested_pipeline,
+                                "correlation_id": correlation_id,
+                            },
+                        )
+                        raise ValueError(error_msg)
 
-                logger.info(
-                    f"Pipeline initiation completed for batch {batch_id}",
-                    extra={
-                        "batch_id": batch_id,
-                        "requested_pipeline": requested_pipeline,
-                        "resolved_pipeline": resolved_pipeline,
-                        "first_phase_initiated": resolved_pipeline[0]
-                        if resolved_pipeline
-                        else None,
-                        "correlation_id": correlation_id,
-                    },
-                )
-            except Exception as e:
-                error_msg = f"Failed to initiate resolved pipeline for batch {batch_id}: {e}"
-                logger.error(
-                    error_msg,
-                    extra={
-                        "batch_id": batch_id,
-                        "resolved_pipeline": resolved_pipeline,
-                        "correlation_id": correlation_id,
-                    },
-                    exc_info=True,
-                )
-                raise Exception(error_msg) from e
+                    # Request pipeline resolution from BCS
+                    try:
+                        bcs_response = await self.bcs_client.resolve_pipeline(
+                            batch_id, requested_pipeline_enum
+                        )
+                    except Exception as e:
+                        error_msg = f"BCS pipeline resolution failed: {e}"
+                        logger.error(
+                            error_msg,
+                            extra={
+                                "batch_id": batch_id,
+                                "requested_pipeline": requested_pipeline,
+                                "correlation_id": correlation_id,
+                            },
+                            exc_info=True,
+                        )
+                        raise Exception(error_msg) from e
+
+                    # Extract resolved pipeline from BCS response
+                    resolved_pipeline_strings = bcs_response.get("final_pipeline", [])
+                    if not resolved_pipeline_strings:
+                        error_msg = f"BCS returned empty pipeline for {requested_pipeline}"
+                        logger.error(
+                            error_msg,
+                            extra={
+                                "batch_id": batch_id,
+                                "requested_pipeline": requested_pipeline,
+                                "correlation_id": correlation_id,
+                                "bcs_response": bcs_response,
+                            },
+                        )
+                        raise ValueError(error_msg)
+
+                    # Convert string pipeline to PhaseName enums
+                    resolved_pipeline = []
+                    for phase_str in resolved_pipeline_strings:
+                        try:
+                            # Map string values to PhaseName enum
+                            phase_enum = PhaseName(phase_str)
+                            resolved_pipeline.append(phase_enum)
+                        except ValueError:
+                            logger.warning(
+                                f"Unknown phase name '{phase_str}' in resolved pipeline, skipping",
+                                extra={"batch_id": batch_id},
+                            )
+                            continue
+
+                    logger.info(
+                        "BCS resolved pipeline successfully",
+                        extra={
+                            "batch_id": batch_id,
+                            "requested_pipeline": requested_pipeline,
+                            "resolved_pipeline": [phase.value for phase in resolved_pipeline],
+                            "pipeline_length": len(resolved_pipeline),
+                            "correlation_id": correlation_id,
+                        },
+                    )
+
+                    # Update batch with resolved pipeline
+                    await self._update_batch_with_resolved_pipeline(
+                        batch_id,
+                        resolved_pipeline,
+                        batch_context,
+                    )
+
+                    # Initiate first phase of resolved pipeline
+                    try:
+                        await self.phase_coordinator.initiate_resolved_pipeline(
+                            batch_id=batch_id,
+                            resolved_pipeline=resolved_pipeline,
+                            correlation_id=correlation_id,
+                            batch_context=batch_context,
+                        )
+
+                        logger.info(
+                            f"Pipeline initiation completed for batch {batch_id}",
+                            extra={
+                                "batch_id": batch_id,
+                                "requested_pipeline": requested_pipeline,
+                                "resolved_pipeline": resolved_pipeline,
+                                "first_phase_initiated": resolved_pipeline[0]
+                                if resolved_pipeline
+                                else None,
+                                "correlation_id": correlation_id,
+                            },
+                        )
+                    except Exception as e:
+                        error_msg = f"Failed to initiate resolved pipeline for batch {batch_id}: {e}"
+                        logger.error(
+                            error_msg,
+                            extra={
+                                "batch_id": batch_id,
+                                "resolved_pipeline": resolved_pipeline,
+                                "correlation_id": correlation_id,
+                            },
+                            exc_info=True,
+                        )
+                        raise Exception(error_msg) from e
+
+            # Check if envelope has trace context metadata
+            if hasattr(envelope, 'metadata') and envelope.metadata:
+                # Use the trace context from the envelope
+                with use_trace_context(envelope.metadata):
+                    await process_message()
+            else:
+                # No trace context, process without it
+                await process_message()
 
         except Exception as e:
             logger.error(

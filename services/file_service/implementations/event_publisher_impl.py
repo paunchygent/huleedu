@@ -38,12 +38,19 @@ class DefaultEventPublisher(EventPublisherProtocol):
         """Publish EssayContentProvisionedV1 event to Kafka."""
         try:
             # Construct EventEnvelope
+            from huleedu_service_libs.observability import inject_trace_context
+            
             envelope = EventEnvelope[EssayContentProvisionedV1](
                 event_type=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
                 source_service=self.settings.SERVICE_NAME,
                 correlation_id=correlation_id,
                 data=event_data,
+                metadata={},
             )
+            
+            # Inject current trace context into the envelope metadata
+            if envelope.metadata is not None:
+                inject_trace_context(envelope.metadata)
 
             # Publish to Kafka using KafkaBus
             await self.kafka_bus.publish(
@@ -68,12 +75,19 @@ class DefaultEventPublisher(EventPublisherProtocol):
         """Publish EssayValidationFailedV1 event to Kafka."""
         try:
             # Construct EventEnvelope
+            from huleedu_service_libs.observability import inject_trace_context
+            
             envelope = EventEnvelope[EssayValidationFailedV1](
                 event_type=self.settings.ESSAY_VALIDATION_FAILED_TOPIC,
                 source_service=self.settings.SERVICE_NAME,
                 correlation_id=correlation_id,
                 data=event_data,
+                metadata={},
             )
+            
+            # Inject current trace context into the envelope metadata
+            if envelope.metadata is not None:
+                inject_trace_context(envelope.metadata)
 
             # Publish to Kafka using KafkaBus
             await self.kafka_bus.publish(
@@ -98,12 +112,19 @@ class DefaultEventPublisher(EventPublisherProtocol):
         """Publish BatchFileAddedV1 event to both Kafka and Redis."""
         try:
             # Construct EventEnvelope
+            from huleedu_service_libs.observability import inject_trace_context
+            
             envelope = EventEnvelope[BatchFileAddedV1](
                 event_type=self.settings.BATCH_FILE_ADDED_TOPIC,
                 source_service=self.settings.SERVICE_NAME,
                 correlation_id=correlation_id,
                 data=event_data,
+                metadata={},
             )
+            
+            # Inject current trace context into the envelope metadata
+            if envelope.metadata is not None:
+                inject_trace_context(envelope.metadata)
 
             # Publish to Kafka using KafkaBus
             await self.kafka_bus.publish(

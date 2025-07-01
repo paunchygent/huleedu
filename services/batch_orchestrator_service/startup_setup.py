@@ -68,8 +68,9 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         app.extensions["metrics"] = metrics
 
         # Initialize tracing
-        app.tracer = init_tracing("batch_orchestrator_service")
-        setup_tracing_middleware(app, app.tracer)
+        tracer = init_tracing("batch_orchestrator_service")
+        app.extensions["tracer"] = tracer
+        setup_tracing_middleware(app, tracer)
         logger.info("Distributed tracing initialized")
 
         async with container() as request_container:

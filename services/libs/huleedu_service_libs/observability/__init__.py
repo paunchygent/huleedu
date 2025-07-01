@@ -4,6 +4,7 @@ from huleedu_service_libs.observability.tracing import (
     extract_trace_context,
     get_current_span,
     get_current_trace_id,
+    get_tracer,
     init_tracing,
     inject_trace_context,
     trace_operation,
@@ -12,6 +13,7 @@ from huleedu_service_libs.observability.tracing import (
 
 __all__ = [
     "init_tracing",
+    "get_tracer",
     "trace_operation",
     "get_current_span",
     "get_current_trace_id",

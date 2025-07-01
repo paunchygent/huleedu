@@ -5,10 +5,14 @@ from __future__ import annotations
 import asyncio
 import signal
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer
 
 from aiokafka import AIOKafkaConsumer
 from dishka import make_async_container
+from huleedu_service_libs import init_tracing
 from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
@@ -34,6 +38,10 @@ shutdown_event = asyncio.Event()
 async def main() -> None:
     """Main entry point for CJ Assessment Service worker."""
     logger.info("CJ Assessment Service worker starting...")
+
+    # Initialize tracing (this sets up the global tracer provider)
+    tracer = init_tracing("cj_assessment_service")
+    logger.info("OpenTelemetry tracing initialized")
 
     # Initialize Dishka container
     container = make_async_container(CJAssessmentServiceProvider())
@@ -62,6 +70,7 @@ async def main() -> None:
             event_publisher = await request_container.get(CJEventPublisherProtocol)
             llm_interaction = await request_container.get(LLMInteractionProtocol)
             redis_client = await request_container.get(RedisClientProtocol)
+            tracer = await request_container.get(Tracer)
 
             logger.info("CJ Assessment Service worker ready with idempotency support")
 
@@ -75,6 +84,7 @@ async def main() -> None:
                     event_publisher=event_publisher,
                     llm_interaction=llm_interaction,
                     settings_obj=settings,
+                    tracer=tracer,
                 )
 
             # Message consumption loop with idempotency support

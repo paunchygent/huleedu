@@ -32,8 +32,10 @@ logger = create_service_logger("els.app")
 app = Quart(__name__)
 
 # Initialize tracing early, before blueprint registration
-app.tracer = init_tracing("essay_lifecycle_api")
-setup_tracing_middleware(app, app.tracer)
+tracer = init_tracing("essay_lifecycle_api")
+app.extensions = getattr(app, "extensions", {})
+app.extensions["tracer"] = tracer
+setup_tracing_middleware(app, tracer)
 
 
 class ErrorResponse:

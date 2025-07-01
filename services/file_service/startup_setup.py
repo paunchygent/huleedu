@@ -5,6 +5,8 @@ from __future__ import annotations
 from config import Settings
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs import init_tracing
+from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
 from quart import Quart
 from quart_dishka import QuartDishka
 
@@ -28,10 +30,16 @@ async def initialize_services(app: Quart, _settings: Settings) -> None:
 
         app.extensions = getattr(app, "extensions", {})
         app.extensions["metrics"] = METRICS
+        
+        # Initialize distributed tracing
+        tracer = init_tracing("file_service")
+        app.extensions["tracer"] = tracer
+        setup_tracing_middleware(app, tracer)
+        logger.info("Distributed tracing initialized")
 
         logger.info(
             "File Service DI container, quart-dishka integration, "
-            "and metrics initialized successfully.",
+            "metrics and tracing initialized successfully.",
         )
     except Exception as e:
         logger.critical(f"Failed to initialize File Service: {e}", exc_info=True)

@@ -8,11 +8,12 @@ from typing import Any, Dict, Optional
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.propagate import extract, inject
+from opentelemetry.propagate import extract, inject, set_global_textmap
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import Status, StatusCode
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 
 def init_tracing(service_name: str) -> trace.Tracer:
@@ -50,7 +51,23 @@ def init_tracing(service_name: str) -> trace.Tracer:
 
     # Set global tracer provider
     trace.set_tracer_provider(provider)
+    
+    # Set up W3C Trace Context propagator for distributed tracing
+    # This ensures trace context is properly propagated across service boundaries
+    set_global_textmap(TraceContextTextMapPropagator())
 
+    return trace.get_tracer(service_name)
+
+
+def get_tracer(service_name: str) -> trace.Tracer:
+    """Get a tracer for the service without reinitializing the provider.
+    
+    Args:
+        service_name: Name of the service for tracing
+        
+    Returns:
+        Tracer instance
+    """
     return trace.get_tracer(service_name)
 
 
@@ -143,21 +160,16 @@ def use_trace_context(carrier: Dict[str, Any]):
     Yields:
         The extracted context
     """
-    from opentelemetry import trace as otel_trace
-    from opentelemetry.trace import set_span_in_context
-    
     # Extract the context from the carrier
     ctx = extract(carrier)
     
-    # Get the current span from the extracted context
-    span = trace.get_current_span(ctx)
-    
     # Use the extracted context
-    token = otel_trace.context.attach(ctx)
+    from opentelemetry import context as otel_context
+    token = otel_context.attach(ctx)
     try:
         yield ctx
     finally:
-        otel_trace.context.detach(token)
+        otel_context.detach(token)
 
 
 def get_current_span() -> Optional[trace.Span]:

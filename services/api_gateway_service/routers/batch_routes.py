@@ -104,12 +104,19 @@ async def request_pipeline_execution(
             )
 
             # Create proper EventEnvelope with ClientBatchPipelineRequestV1 data
+            from huleedu_service_libs.observability import inject_trace_context
+            
             envelope = EventEnvelope[ClientBatchPipelineRequestV1](
                 event_type="huleedu.commands.batch.pipeline.v1",
                 source_service="api_gateway_service",
                 correlation_id=correlation_id,
                 data=client_request,
+                metadata={},
             )
+            
+            # Inject current trace context into the envelope metadata
+            if envelope.metadata is not None:
+                inject_trace_context(envelope.metadata)
 
             # Publish using KafkaBus.publish method with EventEnvelope
             await kafka_bus.publish(

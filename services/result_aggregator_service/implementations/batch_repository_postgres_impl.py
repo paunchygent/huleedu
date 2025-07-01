@@ -121,23 +121,40 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
     async def update_batch_status(
         self, batch_id: str, status: str, error: Optional[str] = None
     ) -> bool:
-        """Update batch status."""
-        async with self._get_session() as session:
-            result = await session.execute(
-                select(BatchResult).where(BatchResult.batch_id == batch_id)
-            )
-            batch = result.scalars().first()
+        """Update batch status.
+        
+        Args:
+            batch_id: ID of the batch to update
+            status: Status as string (will be converted to BatchStatus)
+            error: Optional error message
+            
+        Returns:
+            bool: True if update was successful, False if batch not found
+        """
+        try:
+            # Convert string status to BatchStatus enum
+            batch_status = BatchStatus(status) if isinstance(status, str) else status
+            
+            async with self._get_session() as session:
+                result = await session.execute(
+                    select(BatchResult).where(BatchResult.batch_id == batch_id)
+                )
+                batch = result.scalars().first()
 
-            if not batch:
-                return False
+                if not batch:
+                    return False
 
-            batch.overall_status = status
-            if error:
-                batch.last_error = error
-            batch.updated_at = datetime.utcnow()
+                batch.overall_status = batch_status
+                if error:
+                    batch.last_error = error
+                batch.updated_at = datetime.utcnow()
 
-            await session.commit()
-            return True
+                await session.commit()
+                return True
+                
+        except ValueError as e:
+            self.logger.error(f"Invalid status value: {status}. Error: {e}")
+            return False
 
     async def update_essay_spellcheck_result(
         self,
@@ -148,12 +165,22 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         corrected_text_storage_id: Optional[str] = None,
         error: Optional[str] = None,
     ) -> None:
-        """Update essay spellcheck results."""
+        """Update essay spellcheck results.
+        
+        Args:
+            essay_id: ID of the essay to update
+            batch_id: ID of the batch containing the essay
+            status: Processing stage status
+            correction_count: Optional number of corrections made
+            corrected_text_storage_id: Optional storage ID for corrected text
+            error: Optional error message
+        """
         async with self._get_session() as session:
             # Find or create essay result
             result = await session.execute(
                 select(EssayResult).where(
-                    EssayResult.essay_id == essay_id, EssayResult.batch_id == batch_id
+                    EssayResult.essay_id == essay_id, 
+                    EssayResult.batch_id == batch_id
                 )
             )
             essay = result.scalars().first()
@@ -162,11 +189,11 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
                 essay = EssayResult(
                     essay_id=essay_id,
                     batch_id=batch_id,
-                    spellcheck_status=status.value,
+                    spellcheck_status=status,
                 )
                 session.add(essay)
             else:
-                essay.spellcheck_status = status.value
+                essay.spellcheck_status = status
 
             # Update spellcheck-specific fields
             if correction_count is not None:
@@ -189,12 +216,23 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         comparison_count: Optional[int] = None,
         error: Optional[str] = None,
     ) -> None:
-        """Update essay CJ assessment results."""
+        """Update essay CJ assessment results.
+        
+        Args:
+            essay_id: ID of the essay to update
+            batch_id: ID of the batch containing the essay
+            status: Processing stage status
+            rank: Optional rank of the essay
+            score: Optional score of the essay
+            comparison_count: Optional number of comparisons made
+            error: Optional error message
+        """
         async with self._get_session() as session:
             # Find or create essay result
             result = await session.execute(
                 select(EssayResult).where(
-                    EssayResult.essay_id == essay_id, EssayResult.batch_id == batch_id
+                    EssayResult.essay_id == essay_id, 
+                    EssayResult.batch_id == batch_id
                 )
             )
             essay = result.scalars().first()
@@ -203,11 +241,11 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
                 essay = EssayResult(
                     essay_id=essay_id,
                     batch_id=batch_id,
-                    cj_assessment_status=status.value,
+                    cj_assessment_status=status,
                 )
                 session.add(essay)
             else:
-                essay.cj_assessment_status = status.value
+                essay.cj_assessment_status = status
 
             # Update CJ-specific fields
             if rank is not None:

@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer
 
 from aiokafka import ConsumerRecord
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.observability import extract_trace_context
+from huleedu_service_libs.observability import extract_trace_context, use_trace_context, trace_operation
 
 from services.essay_lifecycle_service.metrics import get_business_metrics
 from services.essay_lifecycle_service.protocols import (
@@ -32,6 +35,7 @@ async def process_single_message(
     batch_coordination_handler: BatchCoordinationHandler,
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
+    tracer: "Tracer | None" = None,
 ) -> bool:
     """
     Process a single Kafka message and update essay state accordingly.
@@ -55,44 +59,35 @@ async def process_single_message(
         if envelope is None:
             return False
 
-        if envelope.metadata:
-            extract_trace_context(envelope.metadata)
-
-        # Record Kafka queue latency
-        business_metrics = get_business_metrics()
-        kafka_latency_metric = business_metrics.get("kafka_queue_latency")
-        if kafka_latency_metric and envelope.event_timestamp:
-            queue_latency = time.time() - envelope.event_timestamp.timestamp()
-            kafka_latency_metric.labels(topic=msg.topic, service="essay_lifecycle_service").observe(
-                queue_latency
-            )
-
-        correlation_id = envelope.correlation_id
-        logger.info(
-            "Processing event",
-            extra={
-                "event_type": envelope.event_type,
-                "correlation_id": str(correlation_id),
-                "source_service": envelope.source_service,
-            },
-        )
-
-        # Route to appropriate handler
-        success = await _route_event(
-            envelope=envelope,
-            batch_coordination_handler=batch_coordination_handler,
-            batch_command_handler=batch_command_handler,
-            service_result_handler=service_result_handler,
-        )
-
-        if success:
-            logger.info(
-                "Event processed successfully", extra={"correlation_id": str(correlation_id)}
-            )
+        # If we have trace context in metadata and a tracer, use the parent context
+        if envelope.metadata and tracer:
+            with use_trace_context(envelope.metadata):
+                # Create a child span for this Kafka message processing
+                with trace_operation(
+                    tracer,
+                    f"kafka.consume.{envelope.event_type}",
+                    {
+                        "messaging.system": "kafka",
+                        "messaging.destination": msg.topic,
+                        "messaging.operation": "consume",
+                        "kafka.partition": msg.partition,
+                        "kafka.offset": msg.offset,
+                        "correlation_id": str(envelope.correlation_id),
+                        "event_id": str(envelope.event_id),
+                        "event_type": envelope.event_type,
+                        "source_service": envelope.source_service,
+                    }
+                ):
+                    return await _process_message_impl(
+                        msg, envelope, batch_coordination_handler,
+                        batch_command_handler, service_result_handler
+                    )
         else:
-            logger.error("Event processing failed", extra={"correlation_id": str(correlation_id)})
-
-        return success
+            # No parent context or tracer, process without tracing
+            return await _process_message_impl(
+                msg, envelope, batch_coordination_handler,
+                batch_command_handler, service_result_handler
+            )
 
     except Exception as e:
         logger.error(
@@ -100,6 +95,51 @@ async def process_single_message(
             extra={"error": str(e), "topic": msg.topic, "offset": msg.offset},
         )
         return False
+
+
+async def _process_message_impl(
+    msg: ConsumerRecord,
+    envelope: EventEnvelope[Any],
+    batch_coordination_handler: BatchCoordinationHandler,
+    batch_command_handler: BatchCommandHandler,
+    service_result_handler: ServiceResultHandler,
+) -> bool:
+    """Process the message after tracing context has been set up."""
+    # Record Kafka queue latency
+    business_metrics = get_business_metrics()
+    kafka_latency_metric = business_metrics.get("kafka_queue_latency")
+    if kafka_latency_metric and envelope.event_timestamp:
+        queue_latency = time.time() - envelope.event_timestamp.timestamp()
+        kafka_latency_metric.labels(topic=msg.topic, service="essay_lifecycle_service").observe(
+            queue_latency
+        )
+
+    correlation_id = envelope.correlation_id
+    logger.info(
+        "Processing event",
+        extra={
+            "event_type": envelope.event_type,
+            "correlation_id": str(correlation_id),
+            "source_service": envelope.source_service,
+        },
+    )
+
+    # Route to appropriate handler
+    success = await _route_event(
+        envelope=envelope,
+        batch_coordination_handler=batch_coordination_handler,
+        batch_command_handler=batch_command_handler,
+        service_result_handler=service_result_handler,
+    )
+
+    if success:
+        logger.info(
+            "Event processed successfully", extra={"correlation_id": str(correlation_id)}
+        )
+    else:
+        logger.error("Event processing failed", extra={"correlation_id": str(correlation_id)})
+
+    return success
 
 
 def _deserialize_message(msg: ConsumerRecord) -> EventEnvelope[Any] | None:
@@ -122,6 +162,8 @@ async def _route_event(
     service_result_handler: ServiceResultHandler,
 ) -> bool:
     """Route events to appropriate handlers based on event type."""
+    from huleedu_service_libs.observability import use_trace_context
+    
     event_type = envelope.event_type
     correlation_id = envelope.correlation_id
 
@@ -195,9 +237,16 @@ async def _route_event(
                     event_type="spellcheck_command", batch_id=str(command_data.entity_ref.entity_id)
                 ).inc()
 
-            await batch_command_handler.process_initiate_spellcheck_command(
-                command_data=command_data, correlation_id=correlation_id
-            )
+            # Maintain trace context when calling the handler
+            if envelope.metadata:
+                with use_trace_context(envelope.metadata):
+                    await batch_command_handler.process_initiate_spellcheck_command(
+                        command_data=command_data, correlation_id=correlation_id
+                    )
+            else:
+                await batch_command_handler.process_initiate_spellcheck_command(
+                    command_data=command_data, correlation_id=correlation_id
+                )
             return True
 
         elif event_type == topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND):
@@ -215,9 +264,16 @@ async def _route_event(
                     event_type="cj_command", batch_id=str(cj_command_data.entity_ref.entity_id)
                 ).inc()
 
-            await batch_command_handler.process_initiate_cj_assessment_command(
-                command_data=cj_command_data, correlation_id=correlation_id
-            )
+            # Maintain trace context when calling the handler
+            if envelope.metadata:
+                with use_trace_context(envelope.metadata):
+                    await batch_command_handler.process_initiate_cj_assessment_command(
+                        command_data=cj_command_data, correlation_id=correlation_id
+                    )
+            else:
+                await batch_command_handler.process_initiate_cj_assessment_command(
+                    command_data=cj_command_data, correlation_id=correlation_id
+                )
             return True
 
         # Handle specialized service result events

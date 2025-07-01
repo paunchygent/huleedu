@@ -79,8 +79,10 @@ def create_app(settings: Settings | None = None) -> CJAssessmentApp:
     app.kafka_consumer = None
     
     # Initialize tracing early, before blueprint registration
-    app.tracer = init_tracing("cj_assessment_service")
-    setup_tracing_middleware(app, app.tracer)
+    tracer = init_tracing("cj_assessment_service")
+    app.extensions = getattr(app, "extensions", {})
+    app.extensions["tracer"] = tracer
+    setup_tracing_middleware(app, tracer)
 
     # Register mandatory health Blueprint
     app.register_blueprint(health_bp)

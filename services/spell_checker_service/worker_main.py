@@ -12,6 +12,7 @@ import signal
 import sys
 
 from dishka import make_async_container
+from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 
 from services.spell_checker_service.config import settings
@@ -53,6 +54,10 @@ async def main() -> None:
     setup_signal_handlers()
 
     logger.info("Starting Spell Checker Service Kafka Worker")
+
+    # Initialize tracing (this sets up the global tracer provider)
+    tracer = init_tracing("spell_checker_service")
+    logger.info("OpenTelemetry tracing initialized")
 
     # Initialize dependency injection container
     container = make_async_container(SpellCheckerServiceProvider())
