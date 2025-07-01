@@ -8,14 +8,12 @@ in distributed systems by temporarily blocking calls to failing services.
 import asyncio
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union, cast
-
-from opentelemetry import trace
+from typing import Any, Callable, Dict, Optional, Type, TypeVar, cast
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from opentelemetry import trace
 
-
-logger = create_service_logger(__name__)
+logger = create_service_logger("circuit_breaker")
 
 T = TypeVar("T")
 

@@ -100,11 +100,13 @@ Services with multiple entry points (e.g., HTTP + Worker) **MUST** use a shared 
 - **MUST** implement `/healthz` with consistent JSON response format
 - **MUST** fail fast on startup errors with `logger.critical()` and `raise`
 
-### 4.10. Observability (Prometheus)
+### 4.10. Observability (Prometheus & Distributed Tracing)
 - **Metrics Class**: `MUST` define all service-specific metrics in a dedicated class within `<service>/metrics.py` or `<service>/app/metrics.py`.
 - **DI Provider**: `MUST` create a MetricsProvider in `<service>/di.py` to provide the metrics class and `prometheus_client.REGISTRY` with `Scope.APP`.
 - **Metrics Endpoint**: `MUST` expose metrics at a `/metrics` endpoint, typically in `routers/health_routes.py`.
 - **Instrumentation**: `MUST` instrument API routes by injecting the metrics class. Use `.time()` for latency and `.inc()` for counters within handlers.
+- **Distributed Tracing**: `MUST` use `huleedu_service_libs.observability.tracing` utilities for OpenTelemetry integration
+- **Trace Propagation**: `MUST` extract and inject trace context for all service-to-service communication (HTTP and Kafka)
 - **Exception Handling**: `MUST` use proper exception handling patterns to avoid masking HTTPExceptions:
   ```python
   @inject
@@ -120,6 +122,26 @@ Services with multiple entry points (e.g., HTTP + Worker) **MUST** use a shared 
           except Exception as e:
               metrics.http_requests_total.labels(method="POST", endpoint=endpoint, http_status="500").inc()
               raise HTTPException(status_code=500, detail="Internal server error") from e
+  ```
+
+### 4.11. Resilience Patterns (Circuit Breakers)
+- **HTTP Clients**: `MUST` wrap all service-to-service HTTP clients with circuit breakers using `huleedu_service_libs.resilience`
+- **Kafka Producers**: `SHOULD` protect Kafka publishing with circuit breakers and fallback queues
+- **External APIs**: `MUST` use circuit breakers for all third-party API calls (AI providers, external services)
+- **Configuration**: `MUST` make circuit breaker thresholds configurable via environment variables
+- **DI Integration**: `MUST` integrate circuit breakers through Dishka providers using `make_resilient()` wrapper
+- **Pattern**:
+  ```python
+  @provide(scope=Scope.APP)
+  def provide_external_client(
+      settings: Settings,
+      circuit_breaker_registry: CircuitBreakerRegistry,
+  ) -> ExternalClientProtocol:
+      base_client = ExternalClientImpl(settings)
+      if settings.CIRCUIT_BREAKER_ENABLED:
+          breaker = circuit_breaker_registry.get("external_client")
+          return make_resilient(base_client, breaker)
+      return base_client
   ```
 
 ## 5. Implementation Checklist

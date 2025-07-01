@@ -4,6 +4,28 @@
 
 This document outlines the implementation strategy for adding circuit breaker patterns to critical integration points in the HuleEdu microservices architecture. The circuit breaker pattern will prevent cascading failures and improve system resilience by temporarily blocking calls to failing services.
 
+**Status**: Phase 1 (HTTP Clients) is COMPLETE. This document focuses on implementing the remaining phases.
+
+## Important: What Already Exists
+
+See `Documentation/TASKS/CIRCUIT_BREAKER_REMAINING_PHASES.md` for:
+- Detailed list of completed components
+- File paths for existing implementations
+- Architectural rules to follow
+- Specific implementation patterns
+
+## Quick Reference
+
+### Existing Infrastructure
+- Circuit Breaker: `services/libs/huleedu_service_libs/resilience/circuit_breaker.py`
+- Registry: `services/libs/huleedu_service_libs/resilience/registry.py`
+- Wrapper: `services/libs/huleedu_service_libs/resilience/resilient_client.py`
+- Error Context: `services/libs/huleedu_service_libs/error_handling/context_manager.py`
+
+### Key Architectural Rules
+- `.cursor/rules/040-service-implementation-guidelines.mdc` (Section 4.11)
+- `.cursor/rules/020.11-service-libraries-architecture.mdc` (Section 6.6)
+
 ## Current State Analysis
 
 ### Critical Integration Points Identified

@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import cast
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientError
 from services.batch_orchestrator_service.config import Settings, settings
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
+from huleedu_service_libs.resilience.resilient_client import make_resilient
 from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import (
     AIFeedbackInitiatorImpl,
 )
@@ -104,6 +107,30 @@ class CoreInfrastructureProvider(Provider):
         return ClientSession()
 
     @provide(scope=Scope.APP)
+    def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
+        """Provide centralized circuit breaker registry."""
+        registry = CircuitBreakerRegistry()
+        
+        # Only register circuit breakers if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            # Circuit breaker for Batch Conductor Service
+            registry.register(
+                "batch_conductor",
+                CircuitBreaker(
+                    name="batch_orchestrator.batch_conductor_client",
+                    failure_threshold=settings.BCS_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+                    recovery_timeout=timedelta(seconds=settings.BCS_CIRCUIT_BREAKER_RECOVERY_TIMEOUT),
+                    success_threshold=settings.BCS_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
+                    expected_exception=ClientError,
+                )
+            )
+            
+            # Future: Add more circuit breakers here as needed
+            # e.g., for Essay Lifecycle Service, external APIs, etc.
+        
+        return registry
+
+    @provide(scope=Scope.APP)
     async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
         """Provide Redis client for idempotency and pub/sub operations."""
         redis_client = RedisClient(
@@ -157,9 +184,19 @@ class ExternalClientsProvider(Provider):
         self,
         http_session: ClientSession,
         settings: Settings,
+        circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> BatchConductorClientProtocol:
-        """Provide Batch Conductor Service HTTP client implementation."""
-        return BatchConductorClientImpl(http_session, settings)
+        """Provide Batch Conductor Service HTTP client with optional circuit breaker."""
+        # Create the base implementation
+        base_client = BatchConductorClientImpl(http_session, settings)
+        
+        # Wrap with circuit breaker if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            circuit_breaker = circuit_breaker_registry.get("batch_conductor")
+            if circuit_breaker:
+                return make_resilient(base_client, circuit_breaker)
+        
+        return base_client
 
 
 class PhaseInitiatorsProvider(Provider):

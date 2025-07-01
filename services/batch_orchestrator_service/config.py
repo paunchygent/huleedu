@@ -61,6 +61,26 @@ class Settings(BaseSettings):
     BCS_PIPELINE_ENDPOINT: str = "/internal/v1/pipelines/define"
     BCS_REQUEST_TIMEOUT: int = 30  # Timeout in seconds for BCS HTTP requests
 
+    # Circuit Breaker Configuration
+    CIRCUIT_BREAKER_ENABLED: bool = Field(
+        default=True,
+        description="Enable circuit breaker protection for external service calls"
+    )
+    
+    # Batch Conductor Service Circuit Breaker
+    BCS_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = Field(
+        default=5,
+        description="Number of failures before opening circuit for BCS calls"
+    )
+    BCS_CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = Field(
+        default=60,
+        description="Seconds to wait before attempting recovery for BCS"
+    )
+    BCS_CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = Field(
+        default=2,
+        description="Successful calls needed to close circuit for BCS"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

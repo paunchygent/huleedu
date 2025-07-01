@@ -30,6 +30,14 @@ services/libs/huleedu_service_libs/
 ├── observability/           # Distributed tracing utilities
 │   ├── __init__.py
 │   └── tracing.py          # OpenTelemetry integration
+├── resilience/             # Circuit breaker and resilience patterns
+│   ├── __init__.py
+│   ├── circuit_breaker.py  # Circuit breaker implementation
+│   ├── registry.py         # Circuit breaker registry
+│   └── resilient_client.py # Generic resilient wrapper
+├── error_handling/         # Enhanced error context
+│   ├── __init__.py
+│   └── context_manager.py  # Error context with tracing
 └── py.typed                # Type stub marker
 ```
 
@@ -157,6 +165,13 @@ from huleedu_service_libs.middleware.frameworks.fastapi_middleware import setup_
 - **inject_trace_context(carrier)**: Add trace to event metadata
 - **extract_trace_context(carrier)**: Extract trace from events
 - **get_current_trace_id()**: Get active trace ID for correlation
+
+### 6.6. Resilience Patterns
+- **CircuitBreaker**: Prevent cascading failures with configurable thresholds
+- **CircuitBreakerRegistry**: Centralized management of circuit breakers
+- **make_resilient(impl, breaker)**: Wrap any protocol with circuit breaker
+- **ErrorContext**: Rich error context with trace information
+- **Pattern**: Use with DI to wrap HTTP clients, Kafka producers, external APIs
 
 ## 7. Testing Considerations
 
