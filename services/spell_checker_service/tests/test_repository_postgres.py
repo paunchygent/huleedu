@@ -3,13 +3,18 @@
 The pattern mirrors other service-level repository tests so CI remains
 consistent across the mono-repo.
 """
+
 from __future__ import annotations
 
 from typing import AsyncGenerator
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    async_sessionmaker,
+    create_async_engine,
+)
 from testcontainers.postgres import PostgresContainer
 
 from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
@@ -17,7 +22,7 @@ from services.spell_checker_service.config import Settings
 from services.spell_checker_service.implementations.spell_repository_postgres_impl import (
     PostgreSQLSpellcheckRepository,
 )
-from services.spell_checker_service.models_db import Base, SpellcheckToken
+from services.spell_checker_service.models_db import Base
 
 # ---------------------------------------------------------------------------
 # Test fixtures
@@ -72,9 +77,7 @@ async def repo(async_engine: AsyncEngine) -> AsyncGenerator[PostgreSQLSpellcheck
     repository = PostgreSQLSpellcheckRepository(TestSettings())
     # override the engine created in __init__ with the fixture engine
     repository.engine = async_engine  # type: ignore[assignment]
-    repository.async_session_maker = async_sessionmaker(
-        async_engine, expire_on_commit=False
-    )
+    repository.async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
     yield repository
 
 

@@ -20,8 +20,7 @@ class EventEnvelope(BaseModel, Generic[T_EventData]):
     data_schema_uri: str | None = None
     data: T_EventData
     metadata: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Optional metadata for tracing and other cross-cutting concerns"
+        default=None, description="Optional metadata for tracing and other cross-cutting concerns"
     )
     model_config = {
         "populate_by_name": True,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from uuid import UUID, uuid4
+
 from common_core.observability_enums import OperationType
 from common_core.status_enums import EssayStatus, OperationStatus
 from dishka import FromDishka

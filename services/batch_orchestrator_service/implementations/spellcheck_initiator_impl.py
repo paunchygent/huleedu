@@ -4,19 +4,19 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from huleedu_service_libs.logging_utils import create_service_logger
-from services.batch_orchestrator_service.protocols import (
-    BatchEventPublisherProtocol,
-    DataValidationError,
-    SpellcheckInitiatorProtocol,
-)
 
 from common_core.batch_service_models import BatchServiceSpellcheckInitiateCommandDataV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
+from services.batch_orchestrator_service.protocols import (
+    BatchEventPublisherProtocol,
+    DataValidationError,
+    SpellcheckInitiatorProtocol,
+)
 
 from .utils import _infer_language_from_course_code
 
@@ -79,7 +79,7 @@ class SpellcheckInitiatorImpl(SpellcheckInitiatorProtocol):
 
             # Create EventEnvelope for spellcheck command
             from huleedu_service_libs.observability import inject_trace_context
-            
+
             command_envelope = EventEnvelope[BatchServiceSpellcheckInitiateCommandDataV1](
                 event_type=topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
                 source_service="batch-orchestrator-service",
@@ -87,7 +87,7 @@ class SpellcheckInitiatorImpl(SpellcheckInitiatorProtocol):
                 data=spellcheck_command,
                 metadata={},
             )
-            
+
             # Inject current trace context into the envelope metadata
             if command_envelope.metadata is not None:
                 inject_trace_context(command_envelope.metadata)

@@ -5,12 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+
 from services.batch_orchestrator_service.implementations.batch_database_infrastructure import (
     BatchDatabaseInfrastructure,
 )
 from services.batch_orchestrator_service.models_db import ConfigurationSnapshot, PhaseStatusLog
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 
 class BatchConfigurationManager:

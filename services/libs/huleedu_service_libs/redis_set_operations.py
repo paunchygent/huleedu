@@ -34,7 +34,7 @@ class RedisSetOperations:
         """
         try:
             result = self.client.sadd(key, *members)
-            added_count = await result if hasattr(result, '__await__') else result
+            added_count = await result if hasattr(result, "__await__") else result
             logger.debug(
                 f"Redis SADD by '{self.client_id}': key='{key}' added={added_count} members",
             )
@@ -58,7 +58,7 @@ class RedisSetOperations:
         """
         try:
             result = self.client.smembers(key)
-            members = await result if hasattr(result, '__await__') else result
+            members = await result if hasattr(result, "__await__") else result
             logger.debug(
                 f"Redis SMEMBERS by '{self.client_id}': key='{key}' "
                 f"returned {len(members)} members",
@@ -84,7 +84,7 @@ class RedisSetOperations:
         """
         try:
             result = self.client.srem(key, *members)
-            removed_count = await result if hasattr(result, '__await__') else result
+            removed_count = await result if hasattr(result, "__await__") else result
             logger.debug(
                 f"Redis SREM by '{self.client_id}': key='{key}' removed={removed_count} members",
             )

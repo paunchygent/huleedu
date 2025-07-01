@@ -18,7 +18,10 @@ from aiokafka import ConsumerRecord
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.observability import extract_trace_context, use_trace_context, trace_operation
+from huleedu_service_libs.observability import (
+    trace_operation,
+    use_trace_context,
+)
 
 from services.essay_lifecycle_service.metrics import get_business_metrics
 from services.essay_lifecycle_service.protocols import (
@@ -35,7 +38,7 @@ async def process_single_message(
     batch_coordination_handler: BatchCoordinationHandler,
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
-    tracer: "Tracer | None" = None,
+    tracer: Tracer | None = None,
 ) -> bool:
     """
     Process a single Kafka message and update essay state accordingly.
@@ -76,17 +79,23 @@ async def process_single_message(
                         "event_id": str(envelope.event_id),
                         "event_type": envelope.event_type,
                         "source_service": envelope.source_service,
-                    }
+                    },
                 ):
                     return await _process_message_impl(
-                        msg, envelope, batch_coordination_handler,
-                        batch_command_handler, service_result_handler
+                        msg,
+                        envelope,
+                        batch_coordination_handler,
+                        batch_command_handler,
+                        service_result_handler,
                     )
         else:
             # No parent context or tracer, process without tracing
             return await _process_message_impl(
-                msg, envelope, batch_coordination_handler,
-                batch_command_handler, service_result_handler
+                msg,
+                envelope,
+                batch_coordination_handler,
+                batch_command_handler,
+                service_result_handler,
             )
 
     except Exception as e:
@@ -133,9 +142,7 @@ async def _process_message_impl(
     )
 
     if success:
-        logger.info(
-            "Event processed successfully", extra={"correlation_id": str(correlation_id)}
-        )
+        logger.info("Event processed successfully", extra={"correlation_id": str(correlation_id)})
     else:
         logger.error("Event processing failed", extra={"correlation_id": str(correlation_id)})
 
@@ -163,7 +170,7 @@ async def _route_event(
 ) -> bool:
     """Route events to appropriate handlers based on event type."""
     from huleedu_service_libs.observability import use_trace_context
-    
+
     event_type = envelope.event_type
     correlation_id = envelope.correlation_id
 

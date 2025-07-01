@@ -54,7 +54,7 @@ def create_app() -> FastAPI:
 
     # Store container reference for cleanup
     app.state.di_container = container
-    
+
     # Setup distributed tracing
     setup_tracing(app)
 

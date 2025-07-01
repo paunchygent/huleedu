@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-from typing import Protocol
+# Local model is only for TYPE_CHECKING to avoid runtime circular import
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from aiohttp import ClientSession  # Changed from placeholder
 from huleedu_service_libs.kafka_client import KafkaBus
 
 # Import concrete types instead of placeholders if they are stable
-from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
-
-# Local model is only for TYPE_CHECKING to avoid runtime circular import
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from services.spell_checker_service.models_db import SpellcheckJob
+    pass
 # Assuming common_core models might be used in signatures
 from common_core.domain_enums import ContentType
 from common_core.events.spellcheck_models import SpellcheckResultDataV1

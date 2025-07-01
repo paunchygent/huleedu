@@ -194,10 +194,7 @@ class CircuitBreaker:
         self.state = CircuitState.HALF_OPEN
         self.success_count = 0
         self.failure_count = 0
-        logger.info(
-            f"Circuit breaker '{self.name}' transitioned to HALF_OPEN. "
-            f"Testing recovery..."
-        )
+        logger.info(f"Circuit breaker '{self.name}' transitioned to HALF_OPEN. Testing recovery...")
 
     def _transition_to_closed(self) -> None:
         """Transition to CLOSED state."""

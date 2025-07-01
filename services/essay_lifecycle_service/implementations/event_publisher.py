@@ -71,6 +71,7 @@ class DefaultEventPublisher(EventPublisher):
 
         # Only inject trace context if we have an active span
         from huleedu_service_libs.observability import get_current_span
+
         if get_current_span():
             if envelope.metadata is None:
                 envelope.metadata = {}
@@ -177,6 +178,7 @@ class DefaultEventPublisher(EventPublisher):
 
         # Only inject trace context if we have an active span
         from huleedu_service_libs.observability import get_current_span
+
         if get_current_span():
             if envelope.metadata is None:
                 envelope.metadata = {}
@@ -223,6 +225,7 @@ class DefaultEventPublisher(EventPublisher):
 
         # Only inject trace context if we have an active span
         from huleedu_service_libs.observability import get_current_span
+
         if get_current_span():
             if envelope.metadata is None:
                 envelope.metadata = {}
@@ -264,6 +267,7 @@ class DefaultEventPublisher(EventPublisher):
 
         # Only inject trace context if we have an active span
         from huleedu_service_libs.observability import get_current_span
+
         if get_current_span():
             if envelope.metadata is None:
                 envelope.metadata = {}
@@ -294,6 +298,7 @@ class DefaultEventPublisher(EventPublisher):
 
         # Only inject trace context if we have an active span
         from huleedu_service_libs.observability import get_current_span
+
         if get_current_span():
             if envelope.metadata is None:
                 envelope.metadata = {}
@@ -324,6 +329,7 @@ class DefaultEventPublisher(EventPublisher):
 
         # Only inject trace context if we have an active span
         from huleedu_service_libs.observability import get_current_span
+
         if get_current_span():
             if envelope.metadata is None:
                 envelope.metadata = {}

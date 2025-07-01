@@ -7,15 +7,16 @@ The service acts as the primary orchestrator for batch processing workflows.
 
 from __future__ import annotations
 
+from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
+from quart import Quart
+
 # Import Blueprints
 # Import local modules using absolute imports for containerized deployment
 from services.batch_orchestrator_service import startup_setup
 from services.batch_orchestrator_service.api.batch_routes import batch_bp, internal_bp
 from services.batch_orchestrator_service.api.health_routes import health_bp
 from services.batch_orchestrator_service.config import settings
-from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
-from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
-from quart import Quart
 
 # Configure structured logging for the service
 configure_service_logging("batch-service", log_level=settings.LOG_LEVEL)

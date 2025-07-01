@@ -10,11 +10,12 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
-from services.batch_orchestrator_service.config import Settings
-from services.batch_orchestrator_service.di import CoreInfrastructureProvider
 from dishka import make_async_container
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+
+from services.batch_orchestrator_service.config import Settings
+from services.batch_orchestrator_service.di import CoreInfrastructureProvider
 
 
 @pytest.fixture

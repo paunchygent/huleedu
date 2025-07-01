@@ -4,6 +4,7 @@ This mirrors env.py used by other services: it attaches the service's SQLAlchemy
 Base metadata so that `alembic revision --autogenerate` works. For the initial
 migration we add the file manually, but future ones can be autogen.
 """
+
 from __future__ import annotations
 
 from logging.config import fileConfig

@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from huleedu_service_libs.logging_utils import create_service_logger
+from sqlalchemy import select, update
+
+from common_core.status_enums import BatchStatus
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_database_infrastructure import (
     BatchDatabaseInfrastructure,
 )
 from services.batch_orchestrator_service.models_db import Batch
-from sqlalchemy import select, update
-
-from common_core.status_enums import BatchStatus
 
 
 class BatchContextOperations:
@@ -46,7 +46,8 @@ class BatchContextOperations:
                     # Create new batch record using lean registration model
                     batch = Batch(
                         id=batch_id,
-                        correlation_id=correlation_id or batch_id,  # Use correlation_id or fall back to batch_id
+                        correlation_id=correlation_id
+                        or batch_id,  # Use correlation_id or fall back to batch_id
                         name=f"{registration_data.course_code.value} - {registration_data.user_id}",
                         description=registration_data.essay_instructions,
                         status=BatchStatus.AWAITING_CONTENT_VALIDATION,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -125,6 +125,30 @@ argument quality, and writing mechanics. Always respond with valid JSON.
 
     # Metrics configuration
     METRICS_PORT: int = 9090
+
+    # Circuit Breaker Configuration
+    CIRCUIT_BREAKER_ENABLED: bool = Field(
+        default=True,
+        description="Enable circuit breaker protection for external service calls"
+    )
+
+    # Kafka Circuit Breaker Configuration
+    KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = Field(
+        default=10,
+        description="Number of failures before opening circuit for Kafka publishing"
+    )
+    KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = Field(
+        default=30,
+        description="Seconds to wait before attempting recovery for Kafka"
+    )
+    KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = Field(
+        default=3,
+        description="Successful calls needed to close circuit for Kafka"
+    )
+    KAFKA_FALLBACK_QUEUE_SIZE: int = Field(
+        default=1000,
+        description="Maximum size of fallback queue for failed Kafka messages"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

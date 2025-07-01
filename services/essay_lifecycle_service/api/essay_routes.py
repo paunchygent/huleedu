@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
 from datetime import datetime
+from uuid import UUID, uuid4
 
 from common_core.domain_enums import ContentType
 from common_core.observability_enums import OperationType
@@ -89,7 +89,9 @@ async def get_essay_status(
                 operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
             ).inc()
         error_response = ErrorResponse(
-            error="Essay Not Found", correlation_id=uuid4(), detail=f"Essay with ID {essay_id} does not exist"
+            error="Essay Not Found",
+            correlation_id=uuid4(),
+            detail=f"Essay with ID {essay_id} does not exist",
         )
         return jsonify(error_response.model_dump()), 404
 
@@ -130,7 +132,9 @@ async def get_essay_timeline(
                 operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
             ).inc()
         response = ErrorResponse(
-            error="Essay Not Found", correlation_id=uuid4(), detail=f"Essay with ID {essay_id} does not exist"
+            error="Essay Not Found",
+            correlation_id=uuid4(),
+            detail=f"Essay with ID {essay_id} does not exist",
         )
         return jsonify(response.model_dump()), 404
 

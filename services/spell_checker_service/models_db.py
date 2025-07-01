@@ -12,14 +12,11 @@ services (e.g. essay_lifecycle_service.models_db) to guarantee consistency:
 
 from __future__ import annotations
 
-import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List
 
 from sqlalchemy import (
-    JSON,
-    ARRAY,
     CheckConstraint,
     Enum,
     ForeignKey,
@@ -30,9 +27,11 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID, ARRAY as PG_ARRAY
-from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.decl_api import DeclarativeBase
+
 
 class Base(DeclarativeBase):
     pass
@@ -91,12 +90,14 @@ class SpellcheckToken(Base):
     """Individual misspelling found during a spell-check job."""
 
     __tablename__ = "spellcheck_tokens"
-    __table_args__ = (Index(
-        "ix_spellcheck_tokens_token",
-        "token",
-        postgresql_using="gin",
-        postgresql_ops={"token": "gin_trgm_ops"},
-    ),)
+    __table_args__ = (
+        Index(
+            "ix_spellcheck_tokens_token",
+            "token",
+            postgresql_using="gin",
+            postgresql_ops={"token": "gin_trgm_ops"},
+        ),
+    )
 
     token_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     job_id: Mapped[uuid.UUID] = mapped_column(

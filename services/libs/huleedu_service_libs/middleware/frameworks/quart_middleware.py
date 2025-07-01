@@ -54,12 +54,13 @@ class TracingMiddleware:
         correlation_id = req.headers.get("X-Correlation-ID")
         if not correlation_id and hasattr(g, "request_id"):
             correlation_id = g.request_id
-        
+
         # Ensure we always have a correlation_id for tracing
         if not correlation_id:
             import uuid
+
             correlation_id = str(uuid.uuid4())
-            
+
         span.set_attribute("correlation_id", correlation_id)
         g.correlation_id = correlation_id
 

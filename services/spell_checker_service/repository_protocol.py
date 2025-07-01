@@ -4,15 +4,14 @@ Separated into its own module to avoid circular imports between
 `protocols.py` and `models_db.py` while still providing a clear behavioural
 contract that can be used for typing and mocking in tests.
 """
+
 from __future__ import annotations
 
-from typing import Protocol
+# Import only for typing (avoid runtime cycles)
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
-
-# Import only for typing (avoid runtime cycles)
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
     from services.spell_checker_service.models_db import SpellcheckJob

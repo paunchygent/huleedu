@@ -7,7 +7,6 @@ Usage: python scripts/check_batch_state.py <batch_id>
 import asyncio
 import os
 import sys
-from datetime import datetime
 
 import asyncpg
 from dotenv import load_dotenv
@@ -113,7 +112,7 @@ async def check_batch_state(batch_id: str):
         # Check which essays IDs are stuck
         stuck_essay_ids = [e["essay_id"] for e in stuck_essays]
         if stuck_essay_ids:
-            print(f"\n--- CHECKING EVENTS FOR STUCK ESSAYS ---")
+            print("\n--- CHECKING EVENTS FOR STUCK ESSAYS ---")
             print(f"Stuck essay IDs: {stuck_essay_ids[:5]}...")  # Show first 5
 
         # Check recent processing logs
@@ -129,7 +128,7 @@ async def check_batch_state(batch_id: str):
             batch_id,
         )
 
-        print(f"\n=== Recent Processing Logs (Last 50) ===")
+        print("\n=== Recent Processing Logs (Last 50) ===")
 
         # Look for events for stuck essays
         stuck_events = []
@@ -138,7 +137,7 @@ async def check_batch_state(batch_id: str):
                 stuck_events.append(log)
 
         if stuck_events:
-            print(f"\n--- EVENTS FOR STUCK ESSAYS ---")
+            print("\n--- EVENTS FOR STUCK ESSAYS ---")
             for log in stuck_events[:10]:  # Show first 10
                 print(
                     f"\n{log['created_at']}: {log['event_type']} (Essay: {log.get('essay_id', 'N/A')})"
@@ -146,7 +145,7 @@ async def check_batch_state(batch_id: str):
                 print(f"  {log['previous_status']} -> {log['new_status']}")
 
         # Show general event summary
-        print(f"\n--- EVENT SUMMARY ---")
+        print("\n--- EVENT SUMMARY ---")
         event_counts = {}
         for log in logs:
             event_type = log["event_type"]

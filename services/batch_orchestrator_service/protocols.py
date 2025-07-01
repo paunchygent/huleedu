@@ -5,9 +5,6 @@ from __future__ import annotations
 from typing import Any, Protocol
 from uuid import UUID
 
-# Import the new API model for batch context storage
-from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
-
 from common_core.metadata_models import EssayProcessingInputRefV1
 
 # Import observability enums for metrics collection
@@ -16,6 +13,9 @@ from common_core.observability_enums import OperationType
 # Import common_core models for standardized interfaces
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 from common_core.status_enums import BatchStatus, EssayStatus, OperationStatus, ValidationStatus
+
+# Import the new API model for batch context storage
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 
 # Assuming common_core models might be used in signatures
 

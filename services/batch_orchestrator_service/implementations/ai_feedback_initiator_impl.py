@@ -8,19 +8,19 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from huleedu_service_libs.logging_utils import create_service_logger
-from services.batch_orchestrator_service.protocols import (
-    AIFeedbackInitiatorProtocol,
-    BatchEventPublisherProtocol,
-    DataValidationError,
-)
 
 from common_core.batch_service_models import BatchServiceAIFeedbackInitiateCommandDataV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
+from services.batch_orchestrator_service.protocols import (
+    AIFeedbackInitiatorProtocol,
+    BatchEventPublisherProtocol,
+    DataValidationError,
+)
 
 from .utils import _infer_language_from_course_code
 

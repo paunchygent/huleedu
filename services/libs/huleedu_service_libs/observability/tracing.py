@@ -51,7 +51,7 @@ def init_tracing(service_name: str) -> trace.Tracer:
 
     # Set global tracer provider
     trace.set_tracer_provider(provider)
-    
+
     # Set up W3C Trace Context propagator for distributed tracing
     # This ensures trace context is properly propagated across service boundaries
     set_global_textmap(TraceContextTextMapPropagator())
@@ -61,10 +61,10 @@ def init_tracing(service_name: str) -> trace.Tracer:
 
 def get_tracer(service_name: str) -> trace.Tracer:
     """Get a tracer for the service without reinitializing the provider.
-    
+
     Args:
         service_name: Name of the service for tracing
-        
+
     Returns:
         Tracer instance
     """
@@ -150,21 +150,22 @@ def extract_trace_context(carrier: Dict[str, Any]) -> Any:
 @contextmanager
 def use_trace_context(carrier: Dict[str, Any]):
     """Extract and use trace context from a carrier as the current context.
-    
+
     This context manager extracts trace context and makes it the current context
     for the duration of the block, allowing child spans to be created.
-    
+
     Args:
         carrier: Dictionary containing trace context
-        
+
     Yields:
         The extracted context
     """
     # Extract the context from the carrier
     ctx = extract(carrier)
-    
+
     # Use the extracted context
     from opentelemetry import context as otel_context
+
     token = otel_context.attach(ctx)
     try:
         yield ctx

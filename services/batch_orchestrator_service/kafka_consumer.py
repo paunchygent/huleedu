@@ -13,6 +13,8 @@ from typing import Any
 from aiokafka import AIOKafkaConsumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
+
+from common_core.event_enums import ProcessingEvent, topic_name
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
@@ -23,8 +25,6 @@ from services.batch_orchestrator_service.implementations.els_batch_phase_outcome
     ELSBatchPhaseOutcomeHandler,
 )
 from services.batch_orchestrator_service.metrics import get_kafka_consumer_metrics
-
-from common_core.event_enums import ProcessingEvent, topic_name
 
 logger = create_service_logger("bos.kafka.consumer")
 

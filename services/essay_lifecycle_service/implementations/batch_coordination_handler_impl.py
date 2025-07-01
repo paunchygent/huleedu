@@ -55,9 +55,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             )
 
             # Register batch with tracker, preserving correlation ID
-            await self.batch_tracker.register_batch(
-                event_data, correlation_id
-            )
+            await self.batch_tracker.register_batch(event_data, correlation_id)
 
             # Create initial essay records in the database
             from common_core.metadata_models import EntityReference

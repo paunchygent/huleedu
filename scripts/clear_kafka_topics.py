@@ -52,7 +52,7 @@ def delete_topic(topic: str) -> bool:
         ["kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--delete", "--topic", topic]
     )
     if success:
-        print(f"  ✓ Deleted successfully")
+        print("  ✓ Deleted successfully")
     else:
         print(f"  ✗ Failed to delete: {output}")
     return success
@@ -77,7 +77,7 @@ def create_topic(topic: str, partitions: int = 3, replication_factor: int = 1) -
         ]
     )
     if success:
-        print(f"  ✓ Created successfully")
+        print("  ✓ Created successfully")
     else:
         print(f"  ✗ Failed to create: {output}")
     return success

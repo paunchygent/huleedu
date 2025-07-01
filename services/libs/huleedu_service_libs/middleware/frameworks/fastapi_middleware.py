@@ -12,7 +12,7 @@ from opentelemetry.trace import Status, StatusCode
 from starlette.middleware.base import BaseHTTPMiddleware
 
 if TYPE_CHECKING:
-    from fastapi import FastAPI
+    pass
 
 
 class TracingMiddleware(BaseHTTPMiddleware):
@@ -28,7 +28,9 @@ class TracingMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.tracer = tracer
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """Process the request with tracing.
 
         Args:
@@ -89,11 +91,11 @@ class TracingMiddleware(BaseHTTPMiddleware):
                 # Inject trace context into response headers
                 response_headers = dict(response.headers)
                 inject(response_headers)
-                
+
                 # Add trace ID to response headers for debugging
                 response_headers["X-Trace-ID"] = request.state.trace_id
                 response_headers["X-Span-ID"] = request.state.span_id
-                
+
                 # Update response headers
                 for key, value in response_headers.items():
                     response.headers[key] = value

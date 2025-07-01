@@ -15,6 +15,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
+
+from common_core.domain_enums import CourseCode
+from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
@@ -25,9 +28,6 @@ from services.batch_orchestrator_service.implementations.els_batch_phase_outcome
     ELSBatchPhaseOutcomeHandler,
 )
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
-
-from common_core.domain_enums import CourseCode
-from common_core.pipeline_models import PhaseName
 
 
 class MockRedisClient:

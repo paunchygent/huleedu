@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from services.batch_orchestrator_service.enums_db import PhaseStatusEnum
 from huleedu_service_libs.logging_utils import create_service_logger
+from sqlalchemy import select, update
+
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from services.batch_orchestrator_service.enums_db import PhaseStatusEnum
 from services.batch_orchestrator_service.implementations.batch_database_infrastructure import (
     BatchDatabaseInfrastructure,
 )
 from services.batch_orchestrator_service.models_db import Batch, PhaseStatusLog
-from sqlalchemy import select, update
-
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 
 
 class BatchPipelineStateManager:
@@ -161,7 +161,8 @@ class BatchPipelineStateManager:
                     batch_id=batch_id,
                     phase=phase_name,
                     status=self._map_pipeline_status_to_phase_status(new_status),
-                    correlation_id=correlation_id or batch_id,  # Use correlation_id or fall back to batch_id
+                    correlation_id=correlation_id
+                    or batch_id,  # Use correlation_id or fall back to batch_id
                     phase_completed_at=datetime.fromisoformat(completion_timestamp).replace(
                         tzinfo=None,
                     )

@@ -8,14 +8,15 @@ service infrastructure components.
 
 # HuleEdu Service Libraries Package
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.observability import (
-    init_tracing,
-    trace_operation,
-    get_current_trace_id,
-    inject_trace_context,
     extract_trace_context,
+    get_current_trace_id,
+    init_tracing,
+    inject_trace_context,
+    trace_operation,
 )
+from huleedu_service_libs.redis_client import RedisClient
+
 __all__ = [
     "KafkaBus",
     "RedisClient",

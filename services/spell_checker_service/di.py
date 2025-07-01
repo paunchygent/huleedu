@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from aiohttp import ClientSession
+from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
 from prometheus_client import CollectorRegistry
 
 from common_core.event_enums import ProcessingEvent, topic_name
 from services.spell_checker_service.config import Settings, settings
+from services.spell_checker_service.implementations.spell_repository_postgres_impl import (
+    PostgreSQLSpellcheckRepository,
+)
 from services.spell_checker_service.kafka_consumer import SpellCheckerKafkaConsumer
 from services.spell_checker_service.protocol_implementations.content_client_impl import (
     DefaultContentClient,
@@ -32,9 +40,6 @@ from services.spell_checker_service.protocols import (
     SpellLogicProtocol,
 )
 from services.spell_checker_service.repository_protocol import SpellcheckRepositoryProtocol
-from services.spell_checker_service.implementations.spell_repository_postgres_impl import (
-    PostgreSQLSpellcheckRepository,
-)
 
 
 class SpellCheckerServiceProvider(Provider):
@@ -56,15 +61,55 @@ class SpellCheckerServiceProvider(Provider):
     def provide_tracer(self) -> Tracer:
         """Provide OpenTelemetry tracer."""
         from opentelemetry import trace
+
         return trace.get_tracer("spell_checker_service")
 
     @provide(scope=Scope.APP)
-    async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
-        """Provide Kafka bus for event publishing."""
-        kafka_bus = KafkaBus(
-            client_id=f"{settings.SERVICE_NAME}-producer",
+    def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
+        """Provide centralized circuit breaker registry."""
+        registry = CircuitBreakerRegistry()
+        
+        # Only register circuit breakers if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            # Future: Add more circuit breakers here as needed
+            pass
+        
+        return registry
+
+    @provide(scope=Scope.APP)
+    async def provide_kafka_bus(
+        self,
+        settings: Settings,
+        circuit_breaker_registry: CircuitBreakerRegistry,
+    ) -> KafkaBus:
+        """Provide Kafka bus for event publishing with optional circuit breaker protection."""
+        # Create base KafkaBus instance
+        base_kafka_bus = KafkaBus(
+            client_id=settings.PRODUCER_CLIENT_ID,
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         )
+        
+        # Wrap with circuit breaker protection if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            kafka_circuit_breaker = CircuitBreaker(
+                name=f"{settings.SERVICE_NAME}.kafka_producer",
+                failure_threshold=settings.KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+                recovery_timeout=timedelta(seconds=settings.KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT),
+                success_threshold=settings.KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
+                expected_exception=KafkaError,
+            )
+            circuit_breaker_registry.register("kafka_producer", kafka_circuit_breaker)
+            
+            # Create resilient wrapper using composition
+            kafka_bus = ResilientKafkaPublisher(
+                delegate=base_kafka_bus,
+                circuit_breaker=kafka_circuit_breaker,
+                retry_interval=30,
+            )
+        else:
+            # Use base KafkaBus without circuit breaker
+            kafka_bus = base_kafka_bus
+
         await kafka_bus.start()
         return kafka_bus
 
@@ -94,7 +139,9 @@ class SpellCheckerServiceProvider(Provider):
         return DefaultResultStore(content_service_url=app_settings.CONTENT_SERVICE_URL)
 
     @provide(scope=Scope.APP)
-    async def provide_spellcheck_repository(self, settings: Settings) -> SpellcheckRepositoryProtocol:
+    async def provide_spellcheck_repository(
+        self, settings: Settings
+    ) -> SpellcheckRepositoryProtocol:
         """Provide PostgreSQL-backed spell-check repository."""
         repo = PostgreSQLSpellcheckRepository(settings)
         # ensure schema exists (idempotent)

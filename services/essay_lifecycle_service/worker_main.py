@@ -16,13 +16,13 @@ if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
-from opentelemetry.trace import Tracer
 from common_core.event_enums import ProcessingEvent, topic_name
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from opentelemetry.trace import Tracer
 
 from services.essay_lifecycle_service.batch_command_handlers import process_single_message
 from services.essay_lifecycle_service.config import settings
@@ -96,7 +96,7 @@ async def run_consumer_loop(
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
     redis_client: AtomicRedisClientProtocol,
-    tracer: "Tracer | None" = None,
+    tracer: Tracer | None = None,
 ) -> None:
     """Main message processing loop with idempotency support."""
     global should_stop

@@ -21,7 +21,6 @@ from common_core.events import (
     EventEnvelope,
     SpellcheckResultDataV1,
 )
-
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.metrics import ResultAggregatorMetrics
 from services.result_aggregator_service.protocols import EventProcessorProtocol

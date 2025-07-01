@@ -319,7 +319,9 @@ class SpecializedServiceRequestDispatcher(Protocol):
 class BatchEssayTracker(Protocol):
     """Protocol for tracking batch readiness and coordination."""
 
-    async def register_batch(self, event: Any, correlation_id: UUID) -> None:  # BatchEssaysRegistered
+    async def register_batch(
+        self, event: Any, correlation_id: UUID
+    ) -> None:  # BatchEssaysRegistered
         """Register batch expectations from BOS."""
         ...
 

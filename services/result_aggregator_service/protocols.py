@@ -12,7 +12,6 @@ from common_core.events import (
     SpellcheckResultDataV1,
 )
 from common_core.status_enums import ProcessingStage
-
 from services.result_aggregator_service.models_db import BatchResult
 
 

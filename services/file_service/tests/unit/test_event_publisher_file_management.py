@@ -8,8 +8,8 @@ BatchFileRemovedV1 events with proper mocking of the KafkaBus.
 from __future__ import annotations
 
 import uuid
-from uuid import UUID, uuid4
 from unittest.mock import AsyncMock, Mock
+from uuid import UUID, uuid4
 
 import pytest
 

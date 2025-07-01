@@ -76,9 +76,7 @@ class ResilientClientWrapper:
                 logger.debug(f"Calling {name} through circuit breaker")
                 # For sync methods, we need to run the circuit breaker in a loop
                 loop = asyncio.get_event_loop()
-                return loop.run_until_complete(
-                    self._circuit_breaker.call(attr, *args, **kwargs)
-                )
+                return loop.run_until_complete(self._circuit_breaker.call(attr, *args, **kwargs))
 
             self._wrapped_methods[name] = sync_wrapped
             return sync_wrapped
@@ -88,10 +86,7 @@ class ResilientClientWrapper:
         return f"ResilientClientWrapper({type(self._delegate).__name__})"
 
 
-def make_resilient(
-    implementation: T,
-    circuit_breaker: CircuitBreaker
-) -> T:
+def make_resilient(implementation: T, circuit_breaker: CircuitBreaker) -> T:
     """
     Factory function to create a resilient version of any implementation.
 

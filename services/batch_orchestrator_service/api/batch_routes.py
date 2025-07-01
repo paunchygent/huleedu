@@ -6,15 +6,8 @@ import uuid
 from typing import Any
 from uuid import uuid4
 
-from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
-from services.batch_orchestrator_service.config import settings
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
-from services.batch_orchestrator_service.protocols import (
-    BatchProcessingServiceProtocol,
-    BatchRepositoryProtocol,
-    PipelinePhaseCoordinatorProtocol,
-)
 from pydantic import ValidationError
 from quart import Blueprint, Response, current_app, jsonify, request
 from quart_dishka import inject
@@ -23,6 +16,13 @@ from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 from common_core.status_enums import OperationStatus, ProcessingStatus
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
+from services.batch_orchestrator_service.config import settings
+from services.batch_orchestrator_service.protocols import (
+    BatchProcessingServiceProtocol,
+    BatchRepositoryProtocol,
+    PipelinePhaseCoordinatorProtocol,
+)
 
 logger = create_service_logger("bos.api.batch")
 batch_bp = Blueprint("batch_routes", __name__, url_prefix="/v1/batches")

@@ -15,10 +15,13 @@ from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tr
 from opentelemetry.trace import Tracer
 from quart import Quart
 
+
 class SpellCheckerQuart(Quart):
     """Custom Quart application class with type hints for custom attributes."""
+
     tracer: Tracer
     extensions: dict[str, Any]
+
 
 from services.spell_checker_service.config import Settings
 from services.spell_checker_service.metrics import get_http_metrics

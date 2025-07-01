@@ -122,19 +122,19 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         self, batch_id: str, status: str, error: Optional[str] = None
     ) -> bool:
         """Update batch status.
-        
+
         Args:
             batch_id: ID of the batch to update
             status: Status as string (will be converted to BatchStatus)
             error: Optional error message
-            
+
         Returns:
             bool: True if update was successful, False if batch not found
         """
         try:
             # Convert string status to BatchStatus enum
             batch_status = BatchStatus(status) if isinstance(status, str) else status
-            
+
             async with self._get_session() as session:
                 result = await session.execute(
                     select(BatchResult).where(BatchResult.batch_id == batch_id)
@@ -151,7 +151,7 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
 
                 await session.commit()
                 return True
-                
+
         except ValueError as e:
             self.logger.error(f"Invalid status value: {status}. Error: {e}")
             return False
@@ -166,7 +166,7 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         error: Optional[str] = None,
     ) -> None:
         """Update essay spellcheck results.
-        
+
         Args:
             essay_id: ID of the essay to update
             batch_id: ID of the batch containing the essay
@@ -179,8 +179,7 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             # Find or create essay result
             result = await session.execute(
                 select(EssayResult).where(
-                    EssayResult.essay_id == essay_id, 
-                    EssayResult.batch_id == batch_id
+                    EssayResult.essay_id == essay_id, EssayResult.batch_id == batch_id
                 )
             )
             essay = result.scalars().first()
@@ -217,7 +216,7 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         error: Optional[str] = None,
     ) -> None:
         """Update essay CJ assessment results.
-        
+
         Args:
             essay_id: ID of the essay to update
             batch_id: ID of the batch containing the essay
@@ -231,8 +230,7 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             # Find or create essay result
             result = await session.execute(
                 select(EssayResult).where(
-                    EssayResult.essay_id == essay_id, 
-                    EssayResult.batch_id == batch_id
+                    EssayResult.essay_id == essay_id, EssayResult.batch_id == batch_id
                 )
             )
             essay = result.scalars().first()

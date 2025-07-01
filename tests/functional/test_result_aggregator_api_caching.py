@@ -11,7 +11,6 @@ from huleedu_service_libs.protocols import RedisClientProtocol
 from quart import Quart
 from quart.testing import QuartClient
 from quart_dishka import QuartDishka
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -27,7 +26,7 @@ from services.result_aggregator_service.implementations.batch_repository_postgre
     BatchRepositoryPostgresImpl,
 )
 from services.result_aggregator_service.metrics import ResultAggregatorMetrics
-from services.result_aggregator_service.models_db import Base, BatchResult
+from services.result_aggregator_service.models_db import BatchResult
 from services.result_aggregator_service.protocols import (
     BatchQueryServiceProtocol,
     BatchRepositoryProtocol,

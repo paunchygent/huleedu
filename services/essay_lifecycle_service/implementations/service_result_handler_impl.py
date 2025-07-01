@@ -10,18 +10,18 @@ from __future__ import annotations
 from contextlib import nullcontext
 from typing import TYPE_CHECKING
 from uuid import UUID
-from opentelemetry import trace
 
+from common_core.domain_enums import ContentType
 from common_core.events.cj_assessment_events import (
     CJAssessmentCompletedV1,
     CJAssessmentFailedV1,
 )
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
-from common_core.domain_enums import ContentType
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.observability import trace_operation, get_current_trace_id
+from huleedu_service_libs.observability import get_current_trace_id, trace_operation
+from opentelemetry import trace
 from quart import current_app, has_app_context
 
 # Import event constants from state machine to ensure consistency
@@ -128,19 +128,23 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                 if is_success and result_data.storage_metadata:
                     # Get tracer if available
                     tracer = None
-                    if has_app_context() and hasattr(current_app, 'tracer'):
+                    if has_app_context() and hasattr(current_app, "tracer"):
                         tracer = current_app.tracer
-                    
+
                     # Trace storage reference extraction
-                    with trace_operation(
-                        tracer or trace.get_tracer(__name__),
-                        "extract_storage_reference",
-                        {
-                            "essay_id": str(result_data.entity_ref.entity_id),
-                            "has_storage_metadata": True,
-                            "content_type": ContentType.CORRECTED_TEXT.value
-                        }
-                    ) if tracer else nullcontext():
+                    with (
+                        trace_operation(
+                            tracer or trace.get_tracer(__name__),
+                            "extract_storage_reference",
+                            {
+                                "essay_id": str(result_data.entity_ref.entity_id),
+                                "has_storage_metadata": True,
+                                "content_type": ContentType.CORRECTED_TEXT.value,
+                            },
+                        )
+                        if tracer
+                        else nullcontext()
+                    ):
                         # Safely access the nested storage_id for the spellchecked essay
                         spellchecked_ref = result_data.storage_metadata.references.get(
                             ContentType.CORRECTED_TEXT
@@ -154,8 +158,8 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                     extra={
                                         "storage_id": storage_id,
                                         "content_type": ContentType.CORRECTED_TEXT.value,
-                                        "trace_id": get_current_trace_id()
-                                    }
+                                        "trace_id": get_current_trace_id(),
+                                    },
                                 )
 
                 await self.repository.update_essay_status_via_machine(

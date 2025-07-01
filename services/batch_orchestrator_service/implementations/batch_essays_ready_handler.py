@@ -10,14 +10,14 @@ import json
 from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
+
+from common_core.events.batch_coordination_events import BatchEssaysReady
+from common_core.events.envelope import EventEnvelope
 from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
     BatchRepositoryProtocol,
     DataValidationError,
 )
-
-from common_core.events.batch_coordination_events import BatchEssaysReady
-from common_core.events.envelope import EventEnvelope
 
 logger = create_service_logger("bos.handlers.batch_essays_ready")
 
@@ -47,8 +47,12 @@ class BatchEssaysReadyHandler:
         2. Store essays in batch repository for later pipeline processing
         3. Log that batch is ready and awaiting client trigger
         """
-        from huleedu_service_libs.observability import use_trace_context, trace_operation, get_tracer
-        
+        from huleedu_service_libs.observability import (
+            get_tracer,
+            trace_operation,
+            use_trace_context,
+        )
+
         try:
             # Deserialize the message
             message_data = json.loads(msg.value.decode("utf-8"))
@@ -69,7 +73,7 @@ class BatchEssaysReadyHandler:
                         "messaging.operation": "consume",
                         "batch_id": batch_id,
                         "correlation_id": str(envelope.correlation_id),
-                    }
+                    },
                 ):
                     self.logger.info(
                         f"Received BatchEssaysReady for batch {batch_id}",
@@ -92,10 +96,14 @@ class BatchEssaysReadyHandler:
                     )
 
                     # Debug logging for essay storage
-                    self.logger.debug(f"About to store {len(essays_data)} essays for batch {batch_id}")
+                    self.logger.debug(
+                        f"About to store {len(essays_data)} essays for batch {batch_id}"
+                    )
 
                     # Store essays in repository for client-triggered pipeline processing
-                    storage_success = await self.batch_repo.store_batch_essays(batch_id, essays_data)
+                    storage_success = await self.batch_repo.store_batch_essays(
+                        batch_id, essays_data
+                    )
 
                     if storage_success:
                         self.logger.info(
@@ -107,9 +115,9 @@ class BatchEssaysReadyHandler:
                     self.logger.debug(
                         f"Essay storage completed for batch {batch_id}, success: {storage_success}",
                     )
-            
+
             # Check if envelope has trace context metadata and process accordingly
-            if hasattr(envelope, 'metadata') and envelope.metadata:
+            if hasattr(envelope, "metadata") and envelope.metadata:
                 with use_trace_context(envelope.metadata):
                     await process_batch_ready()
             else:

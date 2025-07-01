@@ -5,14 +5,19 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import cast
 
-from aiohttp import ClientSession, ClientError
-from services.batch_orchestrator_service.config import Settings, settings
+from aiohttp import ClientError, ClientSession
+from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from huleedu_service_libs.resilience.resilient_client import make_resilient
+from prometheus_client import CollectorRegistry
+
+from common_core.pipeline_models import PhaseName
+from services.batch_orchestrator_service.config import Settings, settings
 from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import (
     AIFeedbackInitiatorImpl,
 )
@@ -60,7 +65,6 @@ from services.batch_orchestrator_service.implementations.spellcheck_initiator_im
     SpellcheckInitiatorImpl,
 )
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
-from prometheus_client import CollectorRegistry
 from services.batch_orchestrator_service.protocols import (
     AIFeedbackInitiatorProtocol,
     BatchConductorClientProtocol,
@@ -74,8 +78,6 @@ from services.batch_orchestrator_service.protocols import (
     PipelinePhaseInitiatorProtocol,
     SpellcheckInitiatorProtocol,
 )
-
-from common_core.pipeline_models import PhaseName
 
 
 class CoreInfrastructureProvider(Provider):
@@ -92,12 +94,39 @@ class CoreInfrastructureProvider(Provider):
         return CollectorRegistry()
 
     @provide(scope=Scope.APP)
-    async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
-        """Provide Kafka bus for event publishing."""
-        kafka_bus = KafkaBus(
+    async def provide_kafka_bus(
+        self,
+        settings: Settings,
+        circuit_breaker_registry: CircuitBreakerRegistry,
+    ) -> KafkaBus:
+        """Provide Kafka bus for event publishing with optional circuit breaker protection."""
+        # Create base KafkaBus instance
+        base_kafka_bus = KafkaBus(
             client_id=f"{settings.SERVICE_NAME}-producer",
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         )
+        
+        # Wrap with circuit breaker protection if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            kafka_circuit_breaker = CircuitBreaker(
+                name=f"{settings.SERVICE_NAME}.kafka_producer",
+                failure_threshold=settings.KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+                recovery_timeout=timedelta(seconds=settings.KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT),
+                success_threshold=settings.KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
+                expected_exception=KafkaError,
+            )
+            circuit_breaker_registry.register("kafka_producer", kafka_circuit_breaker)
+            
+            # Create resilient wrapper using composition
+            kafka_bus = ResilientKafkaPublisher(
+                delegate=base_kafka_bus,
+                circuit_breaker=kafka_circuit_breaker,
+                retry_interval=30,
+            )
+        else:
+            # Use base KafkaBus without circuit breaker
+            kafka_bus = base_kafka_bus
+
         await kafka_bus.start()
         return kafka_bus
 
@@ -110,7 +139,7 @@ class CoreInfrastructureProvider(Provider):
     def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
         """Provide centralized circuit breaker registry."""
         registry = CircuitBreakerRegistry()
-        
+
         # Only register circuit breakers if enabled
         if settings.CIRCUIT_BREAKER_ENABLED:
             # Circuit breaker for Batch Conductor Service
@@ -119,15 +148,17 @@ class CoreInfrastructureProvider(Provider):
                 CircuitBreaker(
                     name="batch_orchestrator.batch_conductor_client",
                     failure_threshold=settings.BCS_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
-                    recovery_timeout=timedelta(seconds=settings.BCS_CIRCUIT_BREAKER_RECOVERY_TIMEOUT),
+                    recovery_timeout=timedelta(
+                        seconds=settings.BCS_CIRCUIT_BREAKER_RECOVERY_TIMEOUT
+                    ),
                     success_threshold=settings.BCS_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
                     expected_exception=ClientError,
-                )
+                ),
             )
-            
+
             # Future: Add more circuit breakers here as needed
             # e.g., for Essay Lifecycle Service, external APIs, etc.
-        
+
         return registry
 
     @provide(scope=Scope.APP)
@@ -189,13 +220,13 @@ class ExternalClientsProvider(Provider):
         """Provide Batch Conductor Service HTTP client with optional circuit breaker."""
         # Create the base implementation
         base_client = BatchConductorClientImpl(http_session, settings)
-        
+
         # Wrap with circuit breaker if enabled
         if settings.CIRCUIT_BREAKER_ENABLED:
             circuit_breaker = circuit_breaker_registry.get("batch_conductor")
             if circuit_breaker:
                 return make_resilient(base_client, circuit_breaker)
-        
+
         return base_client
 
 

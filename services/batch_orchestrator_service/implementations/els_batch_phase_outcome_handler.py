@@ -10,10 +10,10 @@ from __future__ import annotations
 from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from services.batch_orchestrator_service.protocols import PipelinePhaseCoordinatorProtocol
 
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
+from services.batch_orchestrator_service.protocols import PipelinePhaseCoordinatorProtocol
 
 logger = create_service_logger("bos.handlers.els_batch_phase_outcome")
 
@@ -43,8 +43,12 @@ class ELSBatchPhaseOutcomeHandler:
 
         FIXED: Now uses proper EventEnvelope deserialization for architectural compliance.
         """
-        from huleedu_service_libs.observability import use_trace_context, trace_operation, get_tracer
-        
+        from huleedu_service_libs.observability import (
+            get_tracer,
+            trace_operation,
+            use_trace_context,
+        )
+
         try:
             # FIXED: Use proper EventEnvelope deserialization like other services
             envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(msg.value)
@@ -71,7 +75,7 @@ class ELSBatchPhaseOutcomeHandler:
                         "completed_phase": completed_phase,
                         "phase_status": phase_status,
                         "correlation_id": str(correlation_id),
-                    }
+                    },
                 ):
                     # Note: No manual validation needed -
                     # Pydantic EventEnvelope parsing ensures required fields exist
@@ -91,9 +95,9 @@ class ELSBatchPhaseOutcomeHandler:
                         correlation_id=correlation_id,
                         processed_essays_for_next_phase=processed_essays_for_next_phase,
                     )
-            
+
             # Check if envelope has trace context metadata and process accordingly
-            if hasattr(envelope, 'metadata') and envelope.metadata:
+            if hasattr(envelope, "metadata") and envelope.metadata:
                 with use_trace_context(envelope.metadata):
                     await process_phase_outcome()
             else:

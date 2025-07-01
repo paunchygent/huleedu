@@ -77,7 +77,7 @@ def create_app(settings: Settings | None = None) -> CJAssessmentApp:
     app.container = container
     app.consumer_task = None
     app.kafka_consumer = None
-    
+
     # Initialize tracing early, before blueprint registration
     tracer = init_tracing("cj_assessment_service")
     app.extensions = getattr(app, "extensions", {})

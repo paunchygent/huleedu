@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,7 +25,6 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "spell-checker-service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
-
 
     # Database configuration
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost/spellchecker"
@@ -55,6 +55,30 @@ class Settings(BaseSettings):
 
     # Environment-specific overrides (for containerized deployments)
     L2_EXTERNAL_DATA_PATH: str | None = None  # Override for mounted volumes
+
+    # Circuit Breaker Configuration
+    CIRCUIT_BREAKER_ENABLED: bool = Field(
+        default=True,
+        description="Enable circuit breaker protection for external service calls"
+    )
+
+    # Kafka Circuit Breaker Configuration
+    KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = Field(
+        default=10,
+        description="Number of failures before opening circuit for Kafka publishing"
+    )
+    KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = Field(
+        default=30,
+        description="Seconds to wait before attempting recovery for Kafka"
+    )
+    KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = Field(
+        default=3,
+        description="Successful calls needed to close circuit for Kafka"
+    )
+    KAFKA_FALLBACK_QUEUE_SIZE: int = Field(
+        default=1000,
+        description="Maximum size of fallback queue for failed Kafka messages"
+    )
 
     @property
     def _service_dir(self) -> Path:

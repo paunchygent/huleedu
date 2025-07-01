@@ -63,22 +63,32 @@ class Settings(BaseSettings):
 
     # Circuit Breaker Configuration
     CIRCUIT_BREAKER_ENABLED: bool = Field(
-        default=True,
-        description="Enable circuit breaker protection for external service calls"
+        default=True, description="Enable circuit breaker protection for external service calls"
     )
-    
+
     # Batch Conductor Service Circuit Breaker
     BCS_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = Field(
-        default=5,
-        description="Number of failures before opening circuit for BCS calls"
+        default=5, description="Number of failures before opening circuit for BCS calls"
     )
     BCS_CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = Field(
-        default=60,
-        description="Seconds to wait before attempting recovery for BCS"
+        default=60, description="Seconds to wait before attempting recovery for BCS"
     )
     BCS_CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = Field(
-        default=2,
-        description="Successful calls needed to close circuit for BCS"
+        default=2, description="Successful calls needed to close circuit for BCS"
+    )
+
+    # Kafka Circuit Breaker Configuration
+    KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = Field(
+        default=10, description="Number of failures before opening circuit for Kafka publishing"
+    )
+    KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = Field(
+        default=30, description="Seconds to wait before attempting recovery for Kafka"
+    )
+    KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = Field(
+        default=3, description="Successful calls needed to close circuit for Kafka"
+    )
+    KAFKA_FALLBACK_QUEUE_SIZE: int = Field(
+        default=1000, description="Maximum size of fallback queue for failed Kafka messages"
     )
 
     model_config = SettingsConfigDict(

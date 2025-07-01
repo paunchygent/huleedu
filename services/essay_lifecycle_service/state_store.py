@@ -59,15 +59,21 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         return await self.crud_ops.get_essay_state(essay_id)
 
     async def update_essay_state(
-        self, essay_id: str, new_status: EssayStatus, metadata: dict[str, Any],
-        storage_reference: tuple[ContentType, str] | None = None
+        self,
+        essay_id: str,
+        new_status: EssayStatus,
+        metadata: dict[str, Any],
+        storage_reference: tuple[ContentType, str] | None = None,
     ) -> None:
         """Update essay state with new status and metadata."""
         await self.crud_ops.update_essay_state(essay_id, new_status, metadata)
 
     async def update_essay_status_via_machine(
-        self, essay_id: str, new_status: EssayStatus, metadata: dict[str, Any],
-        storage_reference: tuple[ContentType, str] | None = None
+        self,
+        essay_id: str,
+        new_status: EssayStatus,
+        metadata: dict[str, Any],
+        storage_reference: tuple[ContentType, str] | None = None,
     ) -> None:
         """Update essay state using status from state machine."""
         await self.crud_ops.update_essay_state(essay_id, new_status, metadata)

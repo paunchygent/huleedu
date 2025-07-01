@@ -4,6 +4,13 @@ from __future__ import annotations
 
 import asyncio
 
+from dishka import make_async_container
+from huleedu_service_libs import init_tracing
+from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
+from quart import Quart
+from quart_dishka import QuartDishka
+
 from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.di import (
     CoreInfrastructureProvider,
@@ -16,18 +23,11 @@ from services.batch_orchestrator_service.di import (
     RepositoryAndPublishingProvider,
     StateManagementProvider,
 )
-from dishka import make_async_container
-from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs import init_tracing
-from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
-from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
-from services.batch_orchestrator_service.metrics import get_http_metrics
-from quart import Quart
-from quart_dishka import QuartDishka
-
 from services.batch_orchestrator_service.implementations.batch_repository_postgres_impl import (
     PostgreSQLBatchRepositoryImpl,
 )
+from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
+from services.batch_orchestrator_service.metrics import get_http_metrics
 
 logger = create_service_logger("bos.startup")
 

@@ -8,6 +8,9 @@ from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from common_core.status_enums import BatchStatus
 from services.batch_orchestrator_service.implementations.notification_service import (
     NotificationService,
 )
@@ -20,9 +23,6 @@ from services.batch_orchestrator_service.protocols import (
     InitiationError,
     PipelinePhaseInitiatorProtocol,
 )
-
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
-from common_core.status_enums import BatchStatus
 
 logger = create_service_logger("bos.pipeline.coordinator")
 
@@ -436,7 +436,7 @@ class DefaultPipelinePhaseCoordinator:
         completion_timestamp: str | None = None,
     ) -> None:
         """Update the status of a specific phase in the pipeline.
-        
+
         Args:
             batch_id: The batch identifier
             phase: The phase to update
@@ -450,7 +450,7 @@ class DefaultPipelinePhaseCoordinator:
             status=status,
             completion_timestamp=completion_timestamp,
         )
-        
+
         logger.info(
             f"Updated phase {phase.value} status to {status.value} for batch {batch_id}",
             extra={"completion_timestamp": completion_timestamp, "correlation_id": correlation_id},

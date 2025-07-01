@@ -15,16 +15,13 @@ Usage:
 import argparse
 import asyncio
 import json
-import sys
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote
 
 import aiohttp
 from rich.console import Console
 from rich.table import Table
 from rich.tree import Tree
-
 
 console = Console()
 
@@ -125,16 +122,18 @@ class JaegerTraceSearcher:
         root_span = next((s for s in spans if not s.get("references")), spans[0])
         service_name = root_span["process"]["serviceName"]
         operation = root_span["operationName"]
-        
+
         # Calculate duration
         start_time = min(s["startTime"] for s in spans)
         end_time = max(s["startTime"] + s["duration"] for s in spans)
         duration_ms = (end_time - start_time) / 1000  # Convert to milliseconds
 
         # Count errors
-        error_count = sum(1 for s in spans if any(
-            t.get("key") == "error" and t.get("value") for t in s.get("tags", [])
-        ))
+        error_count = sum(
+            1
+            for s in spans
+            if any(t.get("key") == "error" and t.get("value") for t in s.get("tags", []))
+        )
 
         # Find correlation ID
         correlation_id = None
@@ -169,65 +168,62 @@ class JaegerTraceSearcher:
             self._print_errors(spans)
 
         # Print Jaeger UI link
-        console.print(
-            f"\n[blue]View in Jaeger UI:[/blue] {self.jaeger_url}/trace/{trace_id}"
-        )
+        console.print(f"\n[blue]View in Jaeger UI:[/blue] {self.jaeger_url}/trace/{trace_id}")
 
     def _print_service_tree(self, spans: List[Dict[str, Any]]) -> None:
         """Print a tree view of service interactions."""
         tree = Tree("Service Flow")
-        
+
         # Build span hierarchy
         span_map = {s["spanID"]: s for s in spans}
         root_spans = [s for s in spans if not s.get("references")]
-        
+
         def add_span_to_tree(span: Dict[str, Any], parent_node: Tree) -> None:
             service = span["process"]["serviceName"]
             operation = span["operationName"]
             duration_ms = span["duration"] / 1000
-            
+
             # Check for errors
             has_error = any(
-                t.get("key") == "error" and t.get("value") 
-                for t in span.get("tags", [])
+                t.get("key") == "error" and t.get("value") for t in span.get("tags", [])
             )
-            
+
             label = f"{service} → {operation} ({duration_ms:.1f}ms)"
             if has_error:
                 label = f"[red]{label} ❌[/red]"
-            
+
             node = parent_node.add(label)
-            
+
             # Find child spans
             for s in spans:
                 for ref in s.get("references", []):
                     if ref.get("spanID") == span["spanID"]:
                         add_span_to_tree(s, node)
-        
+
         for root_span in root_spans:
             add_span_to_tree(root_span, tree)
-        
+
         console.print(tree)
 
     def _print_errors(self, spans: List[Dict[str, Any]]) -> None:
         """Print error details from spans."""
         console.print("\n[red]Errors Found:[/red]")
-        
+
         for span in spans:
             tags = {t["key"]: t["value"] for t in span.get("tags", [])}
             if tags.get("error"):
                 service = span["process"]["serviceName"]
                 operation = span["operationName"]
-                
+
                 console.print(f"\n  Service: {service}")
                 console.print(f"  Operation: {operation}")
-                
+
                 # Look for error message in logs
                 for log in span.get("logs", []):
                     for field in log.get("fields", []):
                         if field.get("key") in ["error", "error.message", "message"]:
                             console.print(f"  Error: {field.get('value')}")
-                
+
                 # Show error-related tags
                 for key, value in tags.items():
                     if "error" in key.lower() or "exception" in key.lower():
@@ -236,60 +232,34 @@ class JaegerTraceSearcher:
 
 async def main():
     """Main entry point for the trace search script."""
-    parser = argparse.ArgumentParser(
-        description="Search and analyze HuleEdu distributed traces"
-    )
-    
+    parser = argparse.ArgumentParser(description="Search and analyze HuleEdu distributed traces")
+
     # Search criteria
-    parser.add_argument(
-        "--correlation-id",
-        help="Search by correlation ID"
-    )
-    parser.add_argument(
-        "--batch-id",
-        help="Search by batch ID"
-    )
-    parser.add_argument(
-        "--service",
-        help="Filter by service name"
-    )
-    parser.add_argument(
-        "--operation",
-        help="Filter by operation name"
-    )
-    parser.add_argument(
-        "--error-only",
-        action="store_true",
-        help="Show only traces with errors"
-    )
-    parser.add_argument(
-        "--last-hour",
-        action="store_true",
-        help="Search only last hour (default)"
-    )
-    parser.add_argument(
-        "--last-day",
-        action="store_true",
-        help="Search last 24 hours"
-    )
+    parser.add_argument("--correlation-id", help="Search by correlation ID")
+    parser.add_argument("--batch-id", help="Search by batch ID")
+    parser.add_argument("--service", help="Filter by service name")
+    parser.add_argument("--operation", help="Filter by operation name")
+    parser.add_argument("--error-only", action="store_true", help="Show only traces with errors")
+    parser.add_argument("--last-hour", action="store_true", help="Search only last hour (default)")
+    parser.add_argument("--last-day", action="store_true", help="Search last 24 hours")
     parser.add_argument(
         "--jaeger-url",
         default="http://localhost:16686",
-        help="Jaeger URL (default: http://localhost:16686)"
+        help="Jaeger URL (default: http://localhost:16686)",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Determine lookback period
     lookback_hours = 1
     if args.last_day:
         lookback_hours = 24
-    
+
     searcher = JaegerTraceSearcher(args.jaeger_url)
-    
+
     # Execute search based on criteria
     traces = []
-    
+
     if args.correlation_id:
         console.print(f"[green]Searching for correlation ID: {args.correlation_id}[/green]")
         traces = await searcher.search_by_correlation_id(args.correlation_id)
@@ -309,21 +279,21 @@ async def main():
             error_only=args.error_only,
             lookback_hours=lookback_hours,
         )
-    
+
     if not traces:
         console.print("[yellow]No traces found matching criteria[/yellow]")
         return
-    
+
     console.print(f"\n[green]Found {len(traces)} trace(s)[/green]\n")
-    
+
     # Display each trace
     for i, trace in enumerate(traces, 1):
         if i > 1:
             console.print("\n" + "=" * 80 + "\n")
-        
+
         console.print(f"[bold]Trace {i} of {len(traces)}[/bold]")
         searcher.format_trace_summary(trace)
-    
+
     # Print search tips
     if len(traces) == 100:
         console.print(

@@ -6,9 +6,9 @@ from typing import Any
 
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.observability import inject_trace_context
-from services.batch_orchestrator_service.protocols import BatchEventPublisherProtocol
 
 from common_core.events.envelope import EventEnvelope
+from services.batch_orchestrator_service.protocols import BatchEventPublisherProtocol
 
 
 class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
@@ -24,10 +24,11 @@ class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
         """Publish batch event to Kafka with trace context propagation."""
         # Only inject trace context if we have an active span
         from huleedu_service_libs.observability import get_current_span
+
         if get_current_span():
             if event_envelope.metadata is None:
                 event_envelope.metadata = {}
             inject_trace_context(event_envelope.metadata)
-        
+
         topic = event_envelope.event_type
         await self.kafka_bus.publish(topic, event_envelope, key=key)

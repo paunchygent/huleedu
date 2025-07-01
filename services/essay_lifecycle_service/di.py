@@ -6,14 +6,18 @@ from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
-    
-from opentelemetry.trace import Tracer
+
+from datetime import timedelta
 
 from aiohttp import ClientSession
+from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
+from opentelemetry.trace import Tracer
 from prometheus_client import CollectorRegistry
 
 from services.essay_lifecycle_service.config import Settings
@@ -83,15 +87,56 @@ class CoreInfrastructureProvider(Provider):
     def provide_tracer(self) -> Tracer:
         """Provide OpenTelemetry tracer."""
         from opentelemetry import trace
+
         return trace.get_tracer("essay_lifecycle_service")
 
     @provide(scope=Scope.APP)
-    async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
-        """Provide Kafka bus for event publishing."""
-        kafka_bus = KafkaBus(
+    def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
+        """Provide centralized circuit breaker registry."""
+        registry = CircuitBreakerRegistry()
+
+        # Only register circuit breakers if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            # Future: Add more circuit breakers here as needed
+            # e.g., for Content Service, external APIs, etc.
+            pass
+
+        return registry
+
+    @provide(scope=Scope.APP)
+    async def provide_kafka_bus(
+        self,
+        settings: Settings,
+        circuit_breaker_registry: CircuitBreakerRegistry,
+    ) -> KafkaBus:
+        """Provide Kafka bus for event publishing with optional circuit breaker protection."""
+        # Create base KafkaBus instance
+        base_kafka_bus = KafkaBus(
             client_id=settings.PRODUCER_CLIENT_ID,
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         )
+
+        # Wrap with circuit breaker protection if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            kafka_circuit_breaker = CircuitBreaker(
+                name=f"{settings.SERVICE_NAME}.kafka_producer",
+                failure_threshold=settings.KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+                recovery_timeout=timedelta(seconds=settings.KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT),
+                success_threshold=settings.KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
+                expected_exception=KafkaError,
+            )
+            circuit_breaker_registry.register("kafka_producer", kafka_circuit_breaker)
+
+            # Create resilient wrapper using composition
+            kafka_bus = ResilientKafkaPublisher(
+                delegate=base_kafka_bus,
+                circuit_breaker=kafka_circuit_breaker,
+                retry_interval=30,
+            )
+        else:
+            # Use base KafkaBus without circuit breaker
+            kafka_bus = base_kafka_bus
+
         await kafka_bus.start()
         return kafka_bus
 

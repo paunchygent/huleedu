@@ -10,7 +10,11 @@ if TYPE_CHECKING:
 
 from aiokafka import ConsumerRecord
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.observability import extract_trace_context, inject_trace_context, use_trace_context, trace_operation
+from huleedu_service_libs.observability import (
+    inject_trace_context,
+    trace_operation,
+    use_trace_context,
+)
 
 from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import (
@@ -80,17 +84,29 @@ async def process_single_message(
                     "kafka.offset": msg.offset,
                     "correlation_id": str(envelope.correlation_id),
                     "event_id": str(envelope.event_id),
-                }
+                },
             ):
                 return await _process_cj_assessment_impl(
-                    msg, envelope, database, content_client,
-                    event_publisher, llm_interaction, settings_obj, tracer
+                    msg,
+                    envelope,
+                    database,
+                    content_client,
+                    event_publisher,
+                    llm_interaction,
+                    settings_obj,
+                    tracer,
                 )
     else:
         # No parent context, process without it
         return await _process_cj_assessment_impl(
-            msg, envelope, database, content_client,
-            event_publisher, llm_interaction, settings_obj, tracer
+            msg,
+            envelope,
+            database,
+            content_client,
+            event_publisher,
+            llm_interaction,
+            settings_obj,
+            tracer,
         )
 
 
@@ -243,7 +259,7 @@ async def _process_cj_assessment_impl(
             data=completed_event_data,
             metadata={},
         )
-        
+
         if completed_envelope.metadata is not None:
             inject_trace_context(completed_envelope.metadata)
 
@@ -317,7 +333,7 @@ async def _process_cj_assessment_impl(
                 data=failed_event_data,
                 metadata={},
             )
-            
+
             if failed_envelope.metadata is not None:
                 inject_trace_context(failed_envelope.metadata)
 

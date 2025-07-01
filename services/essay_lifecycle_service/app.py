@@ -100,7 +100,9 @@ async def handle_value_error(error: ValueError) -> Response | tuple[Response, in
 async def handle_general_error(error: Exception) -> Response | tuple[Response, int]:
     """Handle general exceptions."""
     logger.error(f"Unexpected error: {error}")
-    response = ErrorResponse(error="Internal Server Error", correlation_id=uuid4(), detail="An unexpected error occurred")
+    response = ErrorResponse(
+        error="Internal Server Error", correlation_id=uuid4(), detail="An unexpected error occurred"
+    )
     return jsonify(response.model_dump()), 500
 
 

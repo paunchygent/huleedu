@@ -34,10 +34,7 @@ class CircuitBreakerRegistry:
 
     def get_all_states(self) -> Dict[str, Dict[str, Any]]:
         """Get current state of all circuit breakers."""
-        return {
-            name: breaker.get_state()
-            for name, breaker in self._breakers.items()
-        }
+        return {name: breaker.get_state() for name, breaker in self._breakers.items()}
 
     def reset_all(self) -> None:
         """Reset all circuit breakers to closed state."""

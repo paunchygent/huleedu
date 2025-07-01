@@ -7,10 +7,10 @@ from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
-from services.batch_orchestrator_service.protocols import BatchRepositoryProtocol
 
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus
+from services.batch_orchestrator_service.protocols import BatchRepositoryProtocol
 
 logger = create_service_logger("bos.notification.service")
 

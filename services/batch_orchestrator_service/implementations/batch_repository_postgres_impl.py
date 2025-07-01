@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from huleedu_service_libs.logging_utils import create_service_logger
+from sqlalchemy import delete, select
+
+from common_core.metadata_models import EssayProcessingInputRefV1
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.config import Settings
-from huleedu_service_libs.logging_utils import create_service_logger
 from services.batch_orchestrator_service.implementations.batch_configuration_manager import (
     BatchConfigurationManager,
 )
@@ -22,10 +26,6 @@ from services.batch_orchestrator_service.implementations.batch_pipeline_state_ma
 )
 from services.batch_orchestrator_service.models_db import BatchEssay
 from services.batch_orchestrator_service.protocols import BatchRepositoryProtocol
-from sqlalchemy import delete, select
-
-from common_core.metadata_models import EssayProcessingInputRefV1
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 
 
 class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
@@ -107,7 +107,9 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
         correlation_id: str | None = None,
     ) -> bool:
         """Store batch context information."""
-        result: bool = await self.context_ops.store_batch_context(batch_id, registration_data, correlation_id)
+        result: bool = await self.context_ops.store_batch_context(
+            batch_id, registration_data, correlation_id
+        )
         return result
 
     async def get_batch_context(self, batch_id: str) -> BatchRegistrationRequestV1 | None:

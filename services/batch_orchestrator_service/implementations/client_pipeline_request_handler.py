@@ -11,15 +11,15 @@ import json
 from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
+
+from common_core.events.client_commands import ClientBatchPipelineRequestV1
+from common_core.events.envelope import EventEnvelope
+from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.protocols import (
     BatchConductorClientProtocol,
     BatchRepositoryProtocol,
     PipelinePhaseCoordinatorProtocol,
 )
-
-from common_core.events.client_commands import ClientBatchPipelineRequestV1
-from common_core.events.envelope import EventEnvelope
-from common_core.pipeline_models import PhaseName
 
 logger = create_service_logger("bos.handlers.client_pipeline_request")
 
@@ -51,8 +51,12 @@ class ClientPipelineRequestHandler:
             ValueError: If message processing fails due to invalid data
             Exception: If BCS communication or pipeline initiation fails
         """
-        from huleedu_service_libs.observability import use_trace_context, trace_operation, get_tracer
-        
+        from huleedu_service_libs.observability import (
+            get_tracer,
+            trace_operation,
+            use_trace_context,
+        )
+
         try:
             # Parse and validate message envelope
             envelope = self._parse_message_envelope(msg)
@@ -75,7 +79,7 @@ class ClientPipelineRequestHandler:
                         "batch_id": batch_id,
                         "requested_pipeline": requested_pipeline,
                         "correlation_id": correlation_id,
-                    }
+                    },
                 ):
                     logger.info(
                         "Processing client pipeline request",
@@ -217,7 +221,9 @@ class ClientPipelineRequestHandler:
                             },
                         )
                     except Exception as e:
-                        error_msg = f"Failed to initiate resolved pipeline for batch {batch_id}: {e}"
+                        error_msg = (
+                            f"Failed to initiate resolved pipeline for batch {batch_id}: {e}"
+                        )
                         logger.error(
                             error_msg,
                             extra={
@@ -230,7 +236,7 @@ class ClientPipelineRequestHandler:
                         raise Exception(error_msg) from e
 
             # Check if envelope has trace context metadata
-            if hasattr(envelope, 'metadata') and envelope.metadata:
+            if hasattr(envelope, "metadata") and envelope.metadata:
                 # Use the trace context from the envelope
                 with use_trace_context(envelope.metadata):
                     await process_message()

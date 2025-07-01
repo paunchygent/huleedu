@@ -16,7 +16,10 @@ import aiohttp
 from aiokafka import ConsumerRecord
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
-from huleedu_service_libs.observability import extract_trace_context, trace_operation, use_trace_context
+from huleedu_service_libs.observability import (
+    trace_operation,
+    use_trace_context,
+)
 from pydantic import ValidationError
 
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
@@ -75,19 +78,33 @@ async def process_single_message(
                     "kafka.offset": msg.offset,
                     "correlation_id": str(request_envelope.correlation_id),
                     "event_id": str(request_envelope.event_id),
-                }
+                },
             ):
                 return await _process_single_message_impl(
-                    msg, request_envelope, http_session, content_client,
-                    result_store, event_publisher, spell_logic, kafka_bus,
-                    tracer, consumer_group_id
+                    msg,
+                    request_envelope,
+                    http_session,
+                    content_client,
+                    result_store,
+                    event_publisher,
+                    spell_logic,
+                    kafka_bus,
+                    tracer,
+                    consumer_group_id,
                 )
     else:
         # No parent context, process without it
         return await _process_single_message_impl(
-            msg, request_envelope, http_session, content_client,
-            result_store, event_publisher, spell_logic, kafka_bus,
-            tracer, consumer_group_id
+            msg,
+            request_envelope,
+            http_session,
+            content_client,
+            result_store,
+            event_publisher,
+            spell_logic,
+            kafka_bus,
+            tracer,
+            consumer_group_id,
         )
 
 
@@ -262,7 +279,7 @@ async def _process_single_message_impl(
                     "essay_id": essay_id_for_logging,
                     "language": language,
                     "correlation_id": str(request_envelope.correlation_id),
-                }
+                },
             ):
                 result_data = await spell_logic.perform_spell_check(
                     original_text,

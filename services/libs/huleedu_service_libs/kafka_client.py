@@ -48,16 +48,17 @@ class KafkaBus:
                 raise
 
     async def stop(self) -> None:
-        if self._started:
-            try:
-                await self.producer.stop()
-                self._started = False
-                logger.info(f"KafkaProducer '{self.client_id}' stopped.")
-            except Exception as e:
-                logger.error(
-                    f"Error stopping KafkaProducer '{self.client_id}': {e}",
-                    exc_info=True,
-                )
+        try:
+            # Always stop the producer if it exists, regardless of _started state
+            # This prevents resource leaks when KafkaBus is created but never started
+            await self.producer.stop()
+            self._started = False
+            logger.info(f"KafkaProducer '{self.client_id}' stopped.")
+        except Exception as e:
+            logger.error(
+                f"Error stopping KafkaProducer '{self.client_id}': {e}",
+                exc_info=True,
+            )
 
     async def publish(
         self,

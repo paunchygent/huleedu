@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from services.batch_orchestrator_service.protocols import BatchRepositoryProtocol
 
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from services.batch_orchestrator_service.protocols import BatchRepositoryProtocol
 
 logger = create_service_logger("bos.pipeline.state_manager")
 

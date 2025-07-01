@@ -3,19 +3,24 @@
 Follows patterns used by other services (ELS, BOS) with async SQLAlchemy
 engine, session management, and optional schema initialisation.
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable
 
-from sqlalchemy import delete, select, update, text
+from sqlalchemy import select, text, update
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.exc import IntegrityError
 
+from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
 from services.spell_checker_service.config import Settings
 from services.spell_checker_service.models_db import (
     Base,
@@ -23,10 +28,9 @@ from services.spell_checker_service.models_db import (
     SpellcheckToken,
 )
 from services.spell_checker_service.repository_protocol import SpellcheckRepositoryProtocol
-from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
 
 if TYPE_CHECKING:  # pragma: no cover
-    from uuid import UUID
+    pass
 
 _LOGGER = logging.getLogger("spell_checker.repository.postgres")
 
@@ -138,6 +142,8 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
     async def get_job(self, job_id: uuid.UUID) -> SpellcheckJob | None:  # type: ignore[name-defined]
         async with self.session() as session:
             result = await session.execute(
-                select(SpellcheckJob).options(selectinload(SpellcheckJob.tokens)).where(SpellcheckJob.job_id == job_id)
+                select(SpellcheckJob)
+                .options(selectinload(SpellcheckJob.tokens))
+                .where(SpellcheckJob.job_id == job_id)
             )
             return result.scalars().first()

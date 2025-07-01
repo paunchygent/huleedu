@@ -39,7 +39,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
         try:
             # Construct EventEnvelope
             from huleedu_service_libs.observability import inject_trace_context
-            
+
             envelope = EventEnvelope[EssayContentProvisionedV1](
                 event_type=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
                 source_service=self.settings.SERVICE_NAME,
@@ -47,7 +47,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 data=event_data,
                 metadata={},
             )
-            
+
             # Inject current trace context into the envelope metadata
             if envelope.metadata is not None:
                 inject_trace_context(envelope.metadata)
@@ -76,7 +76,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
         try:
             # Construct EventEnvelope
             from huleedu_service_libs.observability import inject_trace_context
-            
+
             envelope = EventEnvelope[EssayValidationFailedV1](
                 event_type=self.settings.ESSAY_VALIDATION_FAILED_TOPIC,
                 source_service=self.settings.SERVICE_NAME,
@@ -84,7 +84,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 data=event_data,
                 metadata={},
             )
-            
+
             # Inject current trace context into the envelope metadata
             if envelope.metadata is not None:
                 inject_trace_context(envelope.metadata)
@@ -113,7 +113,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
         try:
             # Construct EventEnvelope
             from huleedu_service_libs.observability import inject_trace_context
-            
+
             envelope = EventEnvelope[BatchFileAddedV1](
                 event_type=self.settings.BATCH_FILE_ADDED_TOPIC,
                 source_service=self.settings.SERVICE_NAME,
@@ -121,7 +121,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 data=event_data,
                 metadata={},
             )
-            
+
             # Inject current trace context into the envelope metadata
             if envelope.metadata is not None:
                 inject_trace_context(envelope.metadata)

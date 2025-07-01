@@ -9,11 +9,9 @@ from typing import Any, Optional
 
 import aiohttp
 from aiohttp import ClientError
-
-from huleedu_service_libs.resilience import CircuitBreaker, circuit_breaker
-from huleedu_service_libs.observability import get_tracer
 from huleedu_service_libs.logging_utils import create_service_logger
-
+from huleedu_service_libs.observability import get_tracer
+from huleedu_service_libs.resilience import CircuitBreaker, circuit_breaker
 
 logger = create_service_logger(__name__)
 
@@ -24,7 +22,7 @@ class ResilientHttpClient:
     def __init__(self, service_name: str):
         self.service_name = service_name
         self.tracer = get_tracer(service_name)
-        
+
         # Create circuit breakers for different endpoints
         self.essay_lifecycle_breaker = CircuitBreaker(
             name=f"{service_name}.essay_lifecycle",
@@ -34,7 +32,7 @@ class ResilientHttpClient:
             expected_exception=ClientError,
             tracer=self.tracer,
         )
-        
+
         self.cj_assessment_breaker = CircuitBreaker(
             name=f"{service_name}.cj_assessment",
             failure_threshold=5,
@@ -44,58 +42,55 @@ class ResilientHttpClient:
         )
 
     async def call_essay_lifecycle(
-        self, 
-        session: aiohttp.ClientSession,
-        endpoint: str,
-        **kwargs: Any
+        self, session: aiohttp.ClientSession, endpoint: str, **kwargs: Any
     ) -> dict[str, Any]:
         """Make HTTP call to Essay Lifecycle Service with circuit breaker."""
-        
+
         async def _make_request() -> dict[str, Any]:
-            async with session.get(f"http://essay_lifecycle_service:8080{endpoint}", **kwargs) as response:
+            async with session.get(
+                f"http://essay_lifecycle_service:8080{endpoint}", **kwargs
+            ) as response:
                 response.raise_for_status()
                 return await response.json()  # type: ignore[no-any-return]
-        
+
         # Use circuit breaker to protect the call
         return await self.essay_lifecycle_breaker.call(_make_request)
 
     async def call_cj_assessment(
-        self,
-        session: aiohttp.ClientSession,
-        endpoint: str,
-        **kwargs: Any
+        self, session: aiohttp.ClientSession, endpoint: str, **kwargs: Any
     ) -> dict[str, Any]:
         """Make HTTP call to CJ Assessment Service with circuit breaker."""
-        
+
         async def _make_request() -> dict[str, Any]:
-            async with session.post(f"http://cj_assessment_service:8080{endpoint}", **kwargs) as response:
+            async with session.post(
+                f"http://cj_assessment_service:8080{endpoint}", **kwargs
+            ) as response:
                 response.raise_for_status()
                 return await response.json()  # type: ignore[no-any-return]
-        
+
         return await self.cj_assessment_breaker.call(_make_request)
 
 
 # Alternative: Using decorator pattern
 class ServiceClient:
     """Example using circuit breaker decorator."""
-    
+
     def __init__(self) -> None:
         self.session: Optional[aiohttp.ClientSession] = None
-    
+
     @circuit_breaker(
         failure_threshold=3,
         recovery_timeout=timedelta(seconds=30),
         expected_exception=ClientError,
-        name="spell_checker_service"
+        name="spell_checker_service",
     )
     async def check_spelling(self, text: str) -> dict[str, Any]:
         """Call spell checker service with circuit breaker protection."""
         if not self.session:
             self.session = aiohttp.ClientSession()
-        
+
         async with self.session.post(
-            "http://spell_checker_service:8080/api/v1/check",
-            json={"text": text}
+            "http://spell_checker_service:8080/api/v1/check", json={"text": text}
         ) as response:
             response.raise_for_status()
             return await response.json()  # type: ignore[return-value]
@@ -107,7 +102,7 @@ from typing import Protocol
 
 class EssayLifecycleClientProtocol(Protocol):
     """Protocol for Essay Lifecycle Service client."""
-    
+
     async def get_essay_status(self, essay_id: str) -> dict:
         """Get essay status."""
         ...
@@ -115,17 +110,16 @@ class EssayLifecycleClientProtocol(Protocol):
 
 class ResilientEssayLifecycleClient:
     """Implementation with circuit breaker."""
-    
+
     def __init__(self, http_client: ResilientHttpClient, session: aiohttp.ClientSession):
         self.http_client = http_client
         self.session = session
-    
+
     async def get_essay_status(self, essay_id: str) -> dict:
         """Get essay status with circuit breaker protection."""
         try:
             return await self.http_client.call_essay_lifecycle(
-                self.session,
-                f"/api/v1/essays/{essay_id}/status"
+                self.session, f"/api/v1/essays/{essay_id}/status"
             )
         except Exception as e:
             logger.error(f"Failed to get essay status: {e}")
