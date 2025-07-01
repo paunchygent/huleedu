@@ -5,7 +5,7 @@ This module contains event models for communication between the Essay Lifecycle 
 and the Batch Orchestrator Service (BOS) for dynamic pipeline orchestration.
 """
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
@@ -66,9 +66,9 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
         ),
     )
 
-    correlation_id: UUID | None = Field(
-        None,
-        description="Optional correlation ID for tracking related events across services",
+    correlation_id: UUID = Field(
+        default_factory=uuid4,
+        description="Correlation ID for tracking related events across services",
     )
 
     class Config:

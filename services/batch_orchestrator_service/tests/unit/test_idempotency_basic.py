@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
+from typing import cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -217,7 +218,8 @@ class TestBOSIdempotencyBasic:
         assert set_call[2] == 86400
         # With new architecture, BatchEssaysReadyHandler only stores essays - no pipeline
         # state calls
-        batch_essays_ready_handler.batch_repo.store_batch_essays.assert_called_once()
+        batch_repo_mock = cast(AsyncMock, batch_essays_ready_handler.batch_repo)
+        batch_repo_mock.store_batch_essays.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_duplicate_batch_essays_ready_detection_and_skipping(
@@ -255,7 +257,8 @@ class TestBOSIdempotencyBasic:
         assert len(redis_client.set_calls) == 1
         assert len(redis_client.delete_calls) == 0
         # With duplicate detection, handler should not be called at all
-        batch_essays_ready_handler.batch_repo.store_batch_essays.assert_not_called()
+        batch_repo_mock = cast(AsyncMock, batch_essays_ready_handler.batch_repo)
+        batch_repo_mock.store_batch_essays.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_first_time_els_phase_outcome_processing_success(
@@ -288,4 +291,5 @@ class TestBOSIdempotencyBasic:
         assert result is True
         assert len(redis_client.set_calls) == 1
         assert len(redis_client.delete_calls) == 0
-        els_phase_outcome_handler.phase_coordinator.handle_phase_concluded.assert_called_once()
+        phase_coordinator_mock = cast(AsyncMock, els_phase_outcome_handler.phase_coordinator)
+        phase_coordinator_mock.handle_phase_concluded.assert_called_once()

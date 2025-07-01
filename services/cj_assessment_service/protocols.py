@@ -108,7 +108,7 @@ class CJRepositoryProtocol(Protocol):
         self,
         session: AsyncSession,
         bos_batch_id: str,
-        event_correlation_id: str | None,
+        event_correlation_id: str,
         language: str,
         course_code: str,
         essay_instructions: str,
@@ -193,7 +193,7 @@ class CJEventPublisherProtocol(Protocol):
     async def publish_assessment_completed(
         self,
         completion_data: Any,
-        correlation_id: UUID | None,
+        correlation_id: UUID,
     ) -> None:
         """Publish CJ assessment completion event."""
         ...
@@ -201,7 +201,7 @@ class CJEventPublisherProtocol(Protocol):
     async def publish_assessment_failed(
         self,
         failure_data: Any,
-        correlation_id: UUID | None,
+        correlation_id: UUID,
     ) -> None:
         """Publish CJ assessment failure event."""
         ...

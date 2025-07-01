@@ -82,7 +82,8 @@ class TestEnhancedBatchEssayTracker:
     ) -> None:
         """Test handling a single validation failure."""
         # Register batch first
-        await tracker.register_batch(sample_batch_registration)
+        correlation_id = uuid4()
+        await tracker.register_batch(sample_batch_registration, correlation_id)
 
         # Mock the completion method to track calls
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
@@ -117,7 +118,8 @@ class TestEnhancedBatchEssayTracker:
     ) -> None:
         """Test that early batch completion is triggered when assigned + failed >= expected."""
         # Register batch
-        await tracker.register_batch(sample_batch_registration)
+        correlation_id = uuid4()
+        await tracker.register_batch(sample_batch_registration, correlation_id)
 
         # Mock the completion method
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
@@ -163,7 +165,8 @@ class TestEnhancedBatchEssayTracker:
             essay_instructions="Write about your summer vacation",
             user_id="test_user_25",
         )
-        await tracker.register_batch(batch_registration)
+        correlation_id = uuid4()
+        await tracker.register_batch(batch_registration, correlation_id)
 
         # Mock completion method
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
@@ -204,7 +207,8 @@ class TestEnhancedBatchEssayTracker:
         self, tracker: BatchEssayTracker, sample_batch_registration: BatchEssaysRegistered
     ) -> None:
         """Test handling multiple validation failures for the same batch."""
-        await tracker.register_batch(sample_batch_registration)
+        correlation_id = uuid4()
+        await tracker.register_batch(sample_batch_registration, correlation_id)
 
         # Create multiple validation failures
         failures = [
@@ -234,7 +238,8 @@ class TestEnhancedBatchEssayTracker:
         self, tracker: BatchEssayTracker, sample_batch_registration: BatchEssaysRegistered
     ) -> None:
         """Test the _create_batch_ready_event method implementation."""
-        await tracker.register_batch(sample_batch_registration)
+        correlation_id = uuid4()
+        await tracker.register_batch(sample_batch_registration, correlation_id)
 
         # Assign 3 slots successfully
         for i in range(1, 4):
@@ -292,7 +297,8 @@ class TestEnhancedBatchEssayTracker:
             essay_instructions="Skriv om ditt favoritämne",
             user_id="test_user_failed",
         )
-        await tracker.register_batch(batch_registration)
+        correlation_id = uuid4()
+        await tracker.register_batch(batch_registration, correlation_id)
 
         # Mock completion method
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
@@ -323,7 +329,8 @@ class TestEnhancedBatchEssayTracker:
         self, tracker: BatchEssayTracker, sample_batch_registration: BatchEssaysRegistered
     ) -> None:
         """Test that validation failures preserve correlation IDs for tracing."""
-        await tracker.register_batch(sample_batch_registration)
+        correlation_id = uuid4()
+        await tracker.register_batch(sample_batch_registration, correlation_id)
 
         correlation_id = uuid4()
         failure = EssayValidationFailedV1(
@@ -346,7 +353,8 @@ class TestEnhancedBatchEssayTracker:
         self, tracker: BatchEssayTracker, sample_batch_registration: BatchEssaysRegistered
     ) -> None:
         """Test boundary conditions for validation failure handling."""
-        await tracker.register_batch(sample_batch_registration)
+        correlation_id = uuid4()
+        await tracker.register_batch(sample_batch_registration, correlation_id)
 
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
             # Now returns tuple (BatchEssaysReady, correlation_id)
@@ -377,7 +385,8 @@ class TestEnhancedBatchEssayTracker:
         self, tracker: BatchEssayTracker, sample_batch_registration: BatchEssaysRegistered
     ) -> None:
         """Test that batch completion only occurs if there are assigned essays."""
-        await tracker.register_batch(sample_batch_registration)
+        correlation_id = uuid4()
+        await tracker.register_batch(sample_batch_registration, correlation_id)
 
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
             # Now returns tuple (BatchEssaysReady, correlation_id)
@@ -403,7 +412,8 @@ class TestEnhancedBatchEssayTracker:
         self, tracker: BatchEssayTracker, sample_batch_registration: BatchEssaysRegistered
     ) -> None:
         """Test that validation failure handling includes proper logging and metrics."""
-        await tracker.register_batch(sample_batch_registration)
+        correlation_id = uuid4()
+        await tracker.register_batch(sample_batch_registration, correlation_id)
 
         # Assign 3 essays successfully
         for i in range(1, 4):
@@ -450,7 +460,8 @@ class TestEnhancedBatchEssayTracker:
         self, tracker: BatchEssayTracker, sample_batch_registration: BatchEssaysRegistered
     ) -> None:
         """Test handling of concurrent validation failures."""
-        await tracker.register_batch(sample_batch_registration)
+        correlation_id = uuid4()
+        await tracker.register_batch(sample_batch_registration, correlation_id)
 
         with patch.object(tracker, "_create_batch_ready_event") as mock_complete:
             # Now returns tuple (BatchEssaysReady, correlation_id)

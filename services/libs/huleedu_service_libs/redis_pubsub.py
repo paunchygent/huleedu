@@ -13,7 +13,6 @@ from typing import Any
 
 import redis.asyncio as aioredis
 from huleedu_service_libs.logging_utils import create_service_logger
-from redis.client import PubSub
 
 logger = create_service_logger("redis-pubsub")
 
@@ -59,7 +58,7 @@ class RedisPubSub:
             raise
 
     @asynccontextmanager
-    async def subscribe(self, channel: str) -> AsyncGenerator[PubSub, None]:
+    async def subscribe(self, channel: str) -> AsyncGenerator[Any, None]:
         """
         Subscribe to a Redis channel with proper lifecycle management.
 

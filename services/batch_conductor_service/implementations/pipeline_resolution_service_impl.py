@@ -186,7 +186,7 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
                 event_type="huleedu.batch.pipeline.resolution.failed.v1",
                 event_timestamp=datetime.now(UTC),
                 source_service="batch_conductor_service",
-                correlation_id=None,
+                correlation_id=uuid4(),
                 data={
                     "batch_id": batch_id,
                     "requested_pipeline": requested_pipeline,

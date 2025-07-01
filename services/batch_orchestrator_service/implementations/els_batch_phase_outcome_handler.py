@@ -88,7 +88,7 @@ class ELSBatchPhaseOutcomeHandler:
                         batch_id=batch_id,
                         completed_phase=completed_phase,
                         phase_status=phase_status,
-                        correlation_id=str(correlation_id),
+                        correlation_id=correlation_id,
                         processed_essays_for_next_phase=processed_essays_for_next_phase,
                     )
             

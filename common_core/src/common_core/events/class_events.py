@@ -8,7 +8,7 @@ associations following the thin event principle.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
@@ -23,7 +23,7 @@ class ClassCreatedV1(BaseModel):
     class_designation: str = Field(description="Class designation name")
     course_codes: list[CourseCode] = Field(description="Associated course codes")
     user_id: str = Field(description="Teacher who created the class")
-    correlation_id: UUID | None = Field(default=None)
+    correlation_id: UUID = Field(default_factory=uuid4)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -37,7 +37,7 @@ class StudentCreatedV1(BaseModel):
     student_email: str | None = Field(description="Student email address")
     class_ids: list[str] = Field(description="Associated class identifiers")
     created_by_user_id: str = Field(description="User who created the student")
-    correlation_id: UUID | None = Field(default=None)
+    correlation_id: UUID = Field(default_factory=uuid4)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -51,7 +51,7 @@ class ClassUpdatedV1(BaseModel):
         None, description="Updated associated course codes"
     )
     user_id: str = Field(description="Teacher who owns the class")
-    correlation_id: UUID | None = Field(default=None)
+    correlation_id: UUID = Field(default_factory=uuid4)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -66,7 +66,7 @@ class StudentUpdatedV1(BaseModel):
     add_class_ids: list[str] | None = Field(None, description="Class IDs added to student")
     remove_class_ids: list[str] | None = Field(None, description="Class IDs removed from student")
     updated_by_user_id: str = Field(description="User who updated the student")
-    correlation_id: UUID | None = Field(default=None)
+    correlation_id: UUID = Field(default_factory=uuid4)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -83,5 +83,5 @@ class EssayStudentAssociationUpdatedV1(BaseModel):
     association_method: str = Field(description="Association method: 'parsed' or 'manual'")
     confidence_score: float | None = Field(description="Confidence score for parsed associations")
     created_by_user_id: str = Field(description="User who created the association")
-    correlation_id: UUID | None = Field(default=None)
+    correlation_id: UUID = Field(default_factory=uuid4)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))

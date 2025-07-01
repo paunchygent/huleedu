@@ -60,7 +60,7 @@ class SpellcheckEventPublisherProtocol(Protocol):
         self,
         kafka_bus: KafkaBus,
         event_data: SpellcheckResultDataV1,
-        correlation_id: UUID | None,
+        correlation_id: UUID,
     ) -> None:
         """Publishes a spell check result event to Kafka."""
         ...

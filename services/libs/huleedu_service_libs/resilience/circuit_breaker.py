@@ -8,14 +8,14 @@ in distributed systems by temporarily blocking calls to failing services.
 import asyncio
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union, cast
 
 from opentelemetry import trace
 
-from services.libs.huleedu_service_libs.observability.custom_logger import get_logger
+from huleedu_service_libs.logging_utils import create_service_logger
 
 
-logger = get_logger(__name__)
+logger = create_service_logger(__name__)
 
 T = TypeVar("T")
 
@@ -130,7 +130,7 @@ class CircuitBreaker:
                 # Record success
                 await self._on_success()
                 span.set_attribute("circuit.call_result", "success")
-                return result
+                return cast(T, result)
 
             except self.expected_exception as e:
                 # Record failure

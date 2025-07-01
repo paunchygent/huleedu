@@ -3,31 +3,32 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from fastapi import Request, Response
 from opentelemetry import trace
 from opentelemetry.propagate import extract, inject
 from opentelemetry.trace import Status, StatusCode
+from starlette.middleware.base import BaseHTTPMiddleware
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
 
-class TracingMiddleware:
+class TracingMiddleware(BaseHTTPMiddleware):
     """Middleware to add distributed tracing to FastAPI applications."""
 
-    def __init__(self, app: FastAPI, tracer: trace.Tracer):
+    def __init__(self, app: Any, tracer: trace.Tracer):
         """Initialize tracing middleware.
 
         Args:
             app: FastAPI application instance
             tracer: OpenTelemetry tracer instance
         """
-        self.app = app
+        super().__init__(app)
         self.tracer = tracer
 
-    async def __call__(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         """Process the request with tracing.
 
         Args:
@@ -106,7 +107,7 @@ class TracingMiddleware:
                 raise
 
 
-def setup_tracing_middleware(app: FastAPI, tracer: trace.Tracer) -> None:
+def setup_tracing_middleware(app: Any, tracer: trace.Tracer) -> None:
     """Set up tracing middleware for a FastAPI app.
 
     Args:

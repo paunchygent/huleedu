@@ -5,17 +5,17 @@ This shows how to protect external service calls with circuit breaker pattern.
 """
 
 from datetime import timedelta
-from typing import Optional
+from typing import Any, Optional
 
 import aiohttp
 from aiohttp import ClientError
 
-from services.libs.huleedu_service_libs.resilience import CircuitBreaker, circuit_breaker
-from services.libs.huleedu_service_libs.observability import get_tracer
-from services.libs.huleedu_service_libs.observability.custom_logger import get_logger
+from huleedu_service_libs.resilience import CircuitBreaker, circuit_breaker
+from huleedu_service_libs.observability import get_tracer
+from huleedu_service_libs.logging_utils import create_service_logger
 
 
-logger = get_logger(__name__)
+logger = create_service_logger(__name__)
 
 
 class ResilientHttpClient:
@@ -47,14 +47,14 @@ class ResilientHttpClient:
         self, 
         session: aiohttp.ClientSession,
         endpoint: str,
-        **kwargs
-    ) -> dict:
+        **kwargs: Any
+    ) -> dict[str, Any]:
         """Make HTTP call to Essay Lifecycle Service with circuit breaker."""
         
-        async def _make_request():
+        async def _make_request() -> dict[str, Any]:
             async with session.get(f"http://essay_lifecycle_service:8080{endpoint}", **kwargs) as response:
                 response.raise_for_status()
-                return await response.json()
+                return await response.json()  # type: ignore[no-any-return]
         
         # Use circuit breaker to protect the call
         return await self.essay_lifecycle_breaker.call(_make_request)
@@ -63,14 +63,14 @@ class ResilientHttpClient:
         self,
         session: aiohttp.ClientSession,
         endpoint: str,
-        **kwargs
-    ) -> dict:
+        **kwargs: Any
+    ) -> dict[str, Any]:
         """Make HTTP call to CJ Assessment Service with circuit breaker."""
         
-        async def _make_request():
+        async def _make_request() -> dict[str, Any]:
             async with session.post(f"http://cj_assessment_service:8080{endpoint}", **kwargs) as response:
                 response.raise_for_status()
-                return await response.json()
+                return await response.json()  # type: ignore[no-any-return]
         
         return await self.cj_assessment_breaker.call(_make_request)
 
@@ -79,7 +79,7 @@ class ResilientHttpClient:
 class ServiceClient:
     """Example using circuit breaker decorator."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.session: Optional[aiohttp.ClientSession] = None
     
     @circuit_breaker(
@@ -88,7 +88,7 @@ class ServiceClient:
         expected_exception=ClientError,
         name="spell_checker_service"
     )
-    async def check_spelling(self, text: str) -> dict:
+    async def check_spelling(self, text: str) -> dict[str, Any]:
         """Call spell checker service with circuit breaker protection."""
         if not self.session:
             self.session = aiohttp.ClientSession()
@@ -98,7 +98,7 @@ class ServiceClient:
             json={"text": text}
         ) as response:
             response.raise_for_status()
-            return await response.json()
+            return await response.json()  # type: ignore[return-value]
 
 
 # Usage in a protocol implementation

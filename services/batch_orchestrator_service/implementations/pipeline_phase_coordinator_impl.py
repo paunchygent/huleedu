@@ -49,7 +49,7 @@ class DefaultPipelinePhaseCoordinator:
         batch_id: str,
         completed_phase: PhaseName,
         phase_status: BatchStatus,
-        correlation_id: str,
+        correlation_id: UUID,
         processed_essays_for_next_phase: list[Any] | None = None,
     ) -> None:
         """
@@ -92,7 +92,10 @@ class DefaultPipelinePhaseCoordinator:
 
         # Publish real-time update to Redis for UI notifications
         await self.notification_service.publish_phase_completion(
-            batch_id, completed_phase, phase_status, correlation_id
+            batch_id=batch_id,
+            completed_phase=completed_phase,
+            phase_status=phase_status,
+            correlation_id=correlation_id,
         )
 
         # Allow progression for both COMPLETED_SUCCESSFULLY and COMPLETED_WITH_FAILURES
@@ -129,7 +132,7 @@ class DefaultPipelinePhaseCoordinator:
         self,
         batch_id: str,
         completed_phase: PhaseName,
-        correlation_id: str,
+        correlation_id: UUID,
         processed_essays_from_previous_phase: list[Any] | None = None,
     ) -> None:
         """
@@ -250,12 +253,10 @@ class DefaultPipelinePhaseCoordinator:
 
             # Delegate to phase initiator with standardized interface
             try:
-                # Convert correlation_id from string to UUID if needed
-                correlation_uuid = UUID(correlation_id) if correlation_id else None
                 await initiator.initiate_phase(
                     batch_id=batch_id,
                     phase_to_initiate=next_phase_name,
-                    correlation_id=correlation_uuid,
+                    correlation_id=correlation_id,
                     essays_for_processing=essays_to_process,
                     batch_context=batch_context,
                 )
@@ -334,7 +335,7 @@ class DefaultPipelinePhaseCoordinator:
         self,
         batch_id: str,
         resolved_pipeline: list[PhaseName],
-        correlation_id: str,
+        correlation_id: UUID,
         batch_context: Any,
     ) -> None:
         """Initiate execution of the first phase in a BCS-resolved pipeline."""
@@ -400,11 +401,10 @@ class DefaultPipelinePhaseCoordinator:
 
         # Initiate first phase
         try:
-            correlation_uuid = UUID(correlation_id) if correlation_id else None
             await initiator.initiate_phase(
                 batch_id=batch_id,
                 phase_to_initiate=first_phase_name,
-                correlation_id=correlation_uuid,
+                correlation_id=correlation_id,
                 essays_for_processing=essays_for_processing,
                 batch_context=batch_context,
             )
@@ -432,6 +432,7 @@ class DefaultPipelinePhaseCoordinator:
         batch_id: str,
         phase: PhaseName,
         status: PipelineExecutionStatus,
+        correlation_id: UUID,
         completion_timestamp: str | None = None,
     ) -> None:
         """Update the status of a specific phase in the pipeline.
@@ -450,14 +451,7 @@ class DefaultPipelinePhaseCoordinator:
             completion_timestamp=completion_timestamp,
         )
         
-        # Send real-time notification
-        await self.notification_service.notify_phase_status_change(
-            batch_id=batch_id,
-            phase=phase,
-            status=status,
-        )
-        
         logger.info(
             f"Updated phase {phase.value} status to {status.value} for batch {batch_id}",
-            extra={"completion_timestamp": completion_timestamp},
+            extra={"completion_timestamp": completion_timestamp, "correlation_id": correlation_id},
         )

@@ -30,7 +30,7 @@ logger = create_service_logger("cj_assessment_service.workflow_orchestrator")
 
 async def run_cj_assessment_workflow(
     request_data: dict[str, Any],
-    correlation_id: str | None,
+    correlation_id: str,
     database: CJRepositoryProtocol,
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,

@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from typing import Any, Dict
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -49,7 +49,7 @@ class TestStudentParsingCompletedV1:
         assert model.parsed_count == 1
         assert model.total_count == 5
         assert model.event == "student.parsing.completed"
-        assert model.correlation_id is None
+        assert isinstance(model.correlation_id, UUID)
         assert isinstance(model.timestamp, datetime)
 
     def test_model_with_all_fields(self) -> None:
@@ -191,7 +191,7 @@ class TestBatchFileAddedV1:
         assert model.filename == "new_essay.txt"
         assert model.user_id == "user_789"
         assert model.event == "batch.file.added"
-        assert model.correlation_id is None
+        assert isinstance(model.correlation_id, UUID)
         assert isinstance(model.timestamp, datetime)
 
     def test_model_with_all_fields(self) -> None:
@@ -284,7 +284,7 @@ class TestBatchFileRemovedV1:
         assert model.filename == "removed_essay.txt"
         assert model.user_id == "user_789"
         assert model.event == "batch.file.removed"
-        assert model.correlation_id is None
+        assert isinstance(model.correlation_id, UUID)
         assert isinstance(model.timestamp, datetime)
 
     def test_model_with_all_fields(self) -> None:

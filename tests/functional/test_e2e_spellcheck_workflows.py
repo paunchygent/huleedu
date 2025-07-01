@@ -291,7 +291,7 @@ class TestE2ESpellcheckWorkflows:
             event_type="huleedu.essay.spellcheck.requested.v1",
             event_timestamp=datetime.now(UTC),
             source_service="test_spellcheck_workflows",
-            correlation_id=uuid.UUID(correlation_id) if correlation_id else None,
+            correlation_id=uuid.UUID(correlation_id),
             data=spellcheck_request_data,
         )
 

@@ -35,7 +35,7 @@ async def get_batch_status(
     user_id: str = Depends(auth.get_current_user_id),
 ):
     """Get batch status with strict ownership enforcement."""
-    correlation_id = getattr(request.state, "correlation_id", None) or str(uuid4())
+    correlation_id = getattr(request.state, "correlation_id", str(uuid4()))
     endpoint = f"/batches/{batch_id}/status"
 
     logger.info(

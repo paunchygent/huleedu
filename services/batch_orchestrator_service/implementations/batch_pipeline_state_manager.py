@@ -99,6 +99,7 @@ class BatchPipelineStateManager:
         expected_status: PipelineExecutionStatus,
         new_status: PipelineExecutionStatus,
         completion_timestamp: str | None = None,
+        correlation_id: str | None = None,
     ) -> bool:
         """
         Atomically update phase status if current status matches expected.
@@ -160,6 +161,7 @@ class BatchPipelineStateManager:
                     batch_id=batch_id,
                     phase=phase_name,
                     status=self._map_pipeline_status_to_phase_status(new_status),
+                    correlation_id=correlation_id or batch_id,  # Use correlation_id or fall back to batch_id
                     phase_completed_at=datetime.fromisoformat(completion_timestamp).replace(
                         tzinfo=None,
                     )

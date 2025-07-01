@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from uuid import UUID, uuid4
 from datetime import datetime
 
 from common_core.domain_enums import ContentType
@@ -48,7 +49,7 @@ class ErrorResponse(BaseModel):
 
     error: str
     detail: str | None = None
-    correlation_id: str | None = None
+    correlation_id: UUID
 
 
 def _calculate_processing_progress(current_status: EssayStatus) -> dict[str, bool]:
@@ -88,7 +89,7 @@ async def get_essay_status(
                 operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
             ).inc()
         error_response = ErrorResponse(
-            error="Essay Not Found", detail=f"Essay with ID {essay_id} does not exist"
+            error="Essay Not Found", correlation_id=uuid4(), detail=f"Essay with ID {essay_id} does not exist"
         )
         return jsonify(error_response.model_dump()), 404
 
@@ -129,7 +130,7 @@ async def get_essay_timeline(
                 operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
             ).inc()
         response = ErrorResponse(
-            error="Essay Not Found", detail=f"Essay with ID {essay_id} does not exist"
+            error="Essay Not Found", correlation_id=uuid4(), detail=f"Essay with ID {essay_id} does not exist"
         )
         return jsonify(response.model_dump()), 404
 

@@ -64,7 +64,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
     async def handle_spellcheck_result(
         self,
         result_data: SpellcheckResultDataV1,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle spellcheck result from Spell Checker Service."""
         try:
@@ -233,7 +233,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
     async def handle_cj_assessment_completed(
         self,
         result_data: CJAssessmentCompletedV1,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle CJ assessment completion from CJ Assessment Service."""
         try:
@@ -340,7 +340,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
     async def handle_cj_assessment_failed(
         self,
         result_data: CJAssessmentFailedV1,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle CJ assessment failure from CJ Assessment Service."""
         try:

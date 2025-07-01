@@ -109,7 +109,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
     def mark_slot_fulfilled(
         self, batch_id: str, internal_essay_id: str, text_storage_id: str
-    ) -> tuple[Any, str | None] | None:  # (BatchEssaysReady, correlation_id) | None
+    ) -> tuple[BatchEssaysReady, UUID] | None:  # (BatchEssaysReady, correlation_id) | None
         """
         Mark a slot as fulfilled and check if batch is complete.
 
@@ -243,7 +243,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
     def _create_batch_ready_event(
         self, batch_id: str, expectation: BatchExpectation
-    ) -> tuple[BatchEssaysReady, str | None]:
+    ) -> tuple[BatchEssaysReady, UUID]:
         """Create BatchEssaysReady event and clean up completed batch."""
         # Get validation failures for this batch
         failures: list[EssayValidationFailedV1] = self.validation_failures.get(batch_id, [])

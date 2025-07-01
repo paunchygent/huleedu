@@ -39,7 +39,7 @@ class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):
         self,
         batch_id: str,
         phase_to_initiate: PhaseName,
-        correlation_id: UUID | None,
+        correlation_id: UUID,
         essays_for_processing: list[EssayProcessingInputRefV1],
         batch_context: BatchRegistrationRequestV1,
     ) -> None:

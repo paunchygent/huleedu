@@ -39,7 +39,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
         self,
         essay_state: EssayState,
         phase_name: PhaseName | str,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """
         Check if all essays in a batch phase are complete and publish ELSBatchPhaseOutcomeV1 if so.
@@ -243,7 +243,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
         phase_name: PhaseName,
         completed_essays: list[EssayState],
         failed_essays: list[EssayState],
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Publish ELSBatchPhaseOutcomeV1 event for completed batch phase."""
 

@@ -54,7 +54,7 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
     async def process_initiate_spellcheck_command(
         self,
         command_data: BatchServiceSpellcheckInitiateCommandDataV1,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Process spellcheck initiation command from Batch Orchestrator Service."""
         await self.spellcheck_handler.process_initiate_spellcheck_command(
@@ -62,7 +62,7 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         )
 
     async def process_initiate_nlp_command(
-        self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID | None = None
+        self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID
     ) -> None:
         """Process NLP initiation command from Batch Orchestrator Service."""
         await self.future_services_handler.process_initiate_nlp_command(
@@ -72,7 +72,7 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
     async def process_initiate_ai_feedback_command(
         self,
         command_data: BatchServiceAIFeedbackInitiateCommandDataV1,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Process AI feedback initiation command from Batch Orchestrator Service."""
         await self.future_services_handler.process_initiate_ai_feedback_command(
@@ -82,7 +82,7 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
     async def process_initiate_cj_assessment_command(
         self,
         command_data: BatchServiceCJAssessmentInitiateCommandDataV1,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Process CJ assessment initiation command from Batch Orchestrator Service."""
         await self.cj_assessment_handler.process_initiate_cj_assessment_command(

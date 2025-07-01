@@ -7,7 +7,7 @@ This module defines command events that originate from client-facing services
 
 from __future__ import annotations
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
@@ -32,9 +32,9 @@ class ClientBatchPipelineRequestV1(BaseModel):
         min_length=1,
         max_length=100,
     )
-    client_correlation_id: UUID | None = Field(
-        default=None,
-        description="Optional client-provided correlation ID for request tracking.",
+    client_correlation_id: UUID = Field(
+        default_factory=uuid4,
+        description="Client-provided correlation ID for request tracking.",
     )
     user_id: str = Field(
         description="The ID of the authenticated user who owns this batch.",

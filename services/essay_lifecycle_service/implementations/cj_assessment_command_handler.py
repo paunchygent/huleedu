@@ -46,7 +46,7 @@ class CJAssessmentCommandHandler:
     async def process_initiate_cj_assessment_command(
         self,
         command_data: BatchServiceCJAssessmentInitiateCommandDataV1,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Process CJ assessment initiation command from Batch Orchestrator Service."""
         logger.info(

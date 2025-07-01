@@ -9,7 +9,7 @@ orchestration side works correctly for when the AI Feedback Service is built.
 
 from __future__ import annotations
 
-import uuid
+from uuid import UUID, uuid4
 from unittest.mock import AsyncMock
 
 import pytest
@@ -70,9 +70,9 @@ def sample_essay_refs() -> list[EssayProcessingInputRefV1]:
 
 
 @pytest.fixture
-def sample_correlation_id() -> uuid.UUID:
+def sample_correlation_id() -> UUID:
     """Sample correlation ID for testing."""
-    return uuid.uuid4()
+    return uuid4()
 
 
 class TestAIFeedbackInitiatorImpl:
@@ -84,7 +84,7 @@ class TestAIFeedbackInitiatorImpl:
         mock_event_publisher: AsyncMock,
         sample_batch_context: BatchRegistrationRequestV1,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test successful AI feedback phase initiation."""
         batch_id = "test-batch-456"
@@ -134,7 +134,7 @@ class TestAIFeedbackInitiatorImpl:
         ai_feedback_initiator: AIFeedbackInitiatorImpl,
         sample_batch_context: BatchRegistrationRequestV1,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test that initiator rejects incorrect phase."""
         with pytest.raises(
@@ -153,7 +153,7 @@ class TestAIFeedbackInitiatorImpl:
         self,
         ai_feedback_initiator: AIFeedbackInitiatorImpl,
         sample_batch_context: BatchRegistrationRequestV1,
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test that initiator rejects empty essay list."""
         with pytest.raises(
@@ -173,7 +173,7 @@ class TestAIFeedbackInitiatorImpl:
         ai_feedback_initiator: AIFeedbackInitiatorImpl,
         mock_event_publisher: AsyncMock,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test that educational context uses placeholder values
         until Class Management Service integration."""
@@ -204,7 +204,7 @@ class TestAIFeedbackInitiatorImpl:
         ai_feedback_initiator: AIFeedbackInitiatorImpl,
         mock_event_publisher: AsyncMock,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test language inference for Swedish course code."""
         swedish_context = BatchRegistrationRequestV1(
@@ -232,7 +232,7 @@ class TestAIFeedbackInitiatorImpl:
         ai_feedback_initiator: AIFeedbackInitiatorImpl,
         mock_event_publisher: AsyncMock,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test language inference for English course codes."""
         english_context = BatchRegistrationRequestV1(
@@ -260,7 +260,7 @@ class TestAIFeedbackInitiatorImpl:
         ai_feedback_initiator: AIFeedbackInitiatorImpl,
         mock_event_publisher: AsyncMock,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test that all required context fields are included in the command."""
         comprehensive_context = BatchRegistrationRequestV1(
@@ -300,7 +300,7 @@ class TestAIFeedbackInitiatorImpl:
         mock_event_publisher: AsyncMock,
         sample_batch_context: BatchRegistrationRequestV1,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test that event publisher exceptions are properly propagated."""
         # Configure mock to raise exception
@@ -315,26 +315,27 @@ class TestAIFeedbackInitiatorImpl:
                 batch_context=sample_batch_context,
             )
 
-    async def test_none_correlation_id_handling(
+    async def test_correlation_id_propagation(
         self,
         ai_feedback_initiator: AIFeedbackInitiatorImpl,
         mock_event_publisher: AsyncMock,
         sample_batch_context: BatchRegistrationRequestV1,
         sample_essay_refs: list[EssayProcessingInputRefV1],
     ) -> None:
-        """Test handling of None correlation ID."""
+        """Test correlation ID is properly propagated to published events."""
+        test_correlation_id = uuid4()
         await ai_feedback_initiator.initiate_phase(
             batch_id="test-batch-456",
             phase_to_initiate=PhaseName.AI_FEEDBACK,
-            correlation_id=None,  # None correlation ID
+            correlation_id=test_correlation_id,
             essays_for_processing=sample_essay_refs,
             batch_context=sample_batch_context,
         )
 
-        # Verify event was still published successfully
+        # Verify event was published with correct correlation ID
         mock_event_publisher.publish_batch_event.assert_called_once()
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
-        assert published_envelope.correlation_id is None
+        assert published_envelope.correlation_id == test_correlation_id
 
     async def test_protocol_compliance(
         self,

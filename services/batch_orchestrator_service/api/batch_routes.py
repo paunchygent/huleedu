@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from typing import Any
+from uuid import uuid4
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.config import settings
@@ -242,10 +243,12 @@ async def retry_phase(
             return {"error": "No pipeline state found for batch"}, 404
 
         # Reset phase status to allow retry (simplified approach)
+        correlation_id = uuid4()
         await phase_coordinator.update_phase_status(
             batch_id=batch_id,
             phase=phase_enum,
             status=PipelineExecutionStatus.REQUESTED_BY_USER,
+            correlation_id=correlation_id,
             completion_timestamp=None,
         )
 
@@ -264,15 +267,16 @@ async def retry_phase(
             return {"error": "No essays found for batch"}, 404
 
         # Initiate retry using existing phase coordinator
-        correlation_id = (
-            str(retry_request.client_correlation_id)
+        # Use the correlation_id created earlier or generate a new one
+        retry_correlation_id = (
+            retry_request.client_correlation_id
             if retry_request.client_correlation_id
-            else None
+            else correlation_id  # Use the UUID created earlier
         )
         await phase_coordinator.initiate_resolved_pipeline(
             batch_id=batch_id,
             resolved_pipeline=[phase_enum],  # Single-phase pipeline
-            correlation_id=str(correlation_id) if correlation_id else str(uuid.uuid4()),
+            correlation_id=retry_correlation_id,
             batch_context=batch_context,
         )
 

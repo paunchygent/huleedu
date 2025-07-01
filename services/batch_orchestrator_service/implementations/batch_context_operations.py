@@ -32,6 +32,7 @@ class BatchContextOperations:
         self,
         batch_id: str,
         registration_data: BatchRegistrationRequestV1,
+        correlation_id: str | None = None,
     ) -> bool:
         """Store batch context information."""
         async with self.db.session() as session:
@@ -45,6 +46,7 @@ class BatchContextOperations:
                     # Create new batch record using lean registration model
                     batch = Batch(
                         id=batch_id,
+                        correlation_id=correlation_id or batch_id,  # Use correlation_id or fall back to batch_id
                         name=f"{registration_data.course_code.value} - {registration_data.user_id}",
                         description=registration_data.essay_instructions,
                         status=BatchStatus.AWAITING_CONTENT_VALIDATION,

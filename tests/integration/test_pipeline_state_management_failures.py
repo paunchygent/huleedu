@@ -7,7 +7,7 @@ retry logic, error propagation, and recovery mechanisms.
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -73,7 +73,7 @@ class TestPipelineFailureHandling:
     ):
         """Test pipeline handling when a phase fails - should not proceed to next phase."""
         batch_id = str(uuid4())
-        correlation_id = str(uuid4())
+        correlation_id = uuid4()
 
         # Setup batch context with CJ assessment enabled
         batch_context = BatchRegistrationRequestV1(
@@ -123,7 +123,7 @@ class TestPipelineFailureHandling:
         successful completion with some non-critical essay failures (per status_enums.py).
         """
         batch_id = str(uuid4())
-        correlation_id = str(uuid4())
+        correlation_id = uuid4()
 
         # Setup batch context with CJ assessment enabled
         batch_context = BatchRegistrationRequestV1(
@@ -169,7 +169,7 @@ class TestPipelineFailureHandling:
         mock_cj_initiator.initiate_phase.assert_called_once_with(
             batch_id=batch_id,
             phase_to_initiate=PhaseName.CJ_ASSESSMENT,
-            correlation_id=UUID(correlation_id),
+            correlation_id=correlation_id,
             essays_for_processing=processed_essays,
             batch_context=batch_context,
         )
@@ -187,7 +187,7 @@ class TestPipelineFailureHandling:
         successful completion with some non-critical essay failures (per status_enums.py).
         """
         batch_id = str(uuid4())
-        correlation_id = str(uuid4())
+        correlation_id = uuid4()
 
         # Setup batch context for CJ assessment
         batch_context = BatchRegistrationRequestV1(
@@ -233,7 +233,7 @@ class TestPipelineFailureHandling:
         mock_cj_initiator.initiate_phase.assert_called_once_with(
             batch_id=batch_id,
             phase_to_initiate=PhaseName.CJ_ASSESSMENT,
-            correlation_id=UUID(correlation_id),
+            correlation_id=correlation_id,
             essays_for_processing=processed_essays,
             batch_context=batch_context,
         )

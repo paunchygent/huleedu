@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
+from typing import cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -168,7 +169,8 @@ class TestBOSIdempotencyOutage:
 
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
-        batch_essays_ready_handler.batch_repo.store_batch_essays.side_effect = Exception(
+        batch_repo_mock = cast(AsyncMock, batch_essays_ready_handler.batch_repo)
+        batch_repo_mock.store_batch_essays.side_effect = Exception(
             "Business logic failure",
         )
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
@@ -247,4 +249,5 @@ class TestBOSIdempotencyOutage:
         assert result is True
         assert len(redis_client.set_calls) == 1
         # With new architecture, handler only stores essays
-        batch_essays_ready_handler.batch_repo.store_batch_essays.assert_called_once()
+        batch_repo_mock = cast(AsyncMock, batch_essays_ready_handler.batch_repo)
+        batch_repo_mock.store_batch_essays.assert_called_once()

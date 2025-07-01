@@ -44,7 +44,7 @@ class FutureServicesCommandHandler:
         self.event_publisher = event_publisher
 
     async def process_initiate_nlp_command(
-        self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID | None = None
+        self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID
     ) -> None:
         """Process NLP initiation command from Batch Orchestrator Service."""
         # TODO: Implement when NLP Service is available
@@ -53,7 +53,7 @@ class FutureServicesCommandHandler:
     async def process_initiate_ai_feedback_command(
         self,
         command_data: BatchServiceAIFeedbackInitiateCommandDataV1,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Process AI feedback initiation command from Batch Orchestrator Service."""
         # TODO: Implement when AI Feedback Service is available

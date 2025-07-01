@@ -179,9 +179,9 @@ class TestBosElsPhaseCoordination:
         # Verify phase coordinator called with Phase 3 data propagation
         mock_phase_coordinator.handle_phase_concluded.assert_called_once_with(
             batch_id=batch_id,  # batch_id string
-            completed_phase="spellcheck",  # phase_name string
+            completed_phase=PhaseName.SPELLCHECK,  # phase_name enum
             phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,  # phase_status enum
-            correlation_id=str(correlation_id),  # correlation_id as string
+            correlation_id=correlation_id,  # correlation_id as UUID
             processed_essays_for_next_phase=processed_essays,  # NEW: Phase 3 data propagation
         )
 

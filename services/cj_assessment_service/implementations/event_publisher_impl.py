@@ -26,7 +26,7 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
     async def publish_assessment_completed(
         self,
         completion_data: Any,
-        correlation_id: UUID | None,
+        correlation_id: UUID,
     ) -> None:
         """Publish CJ assessment completion event to Kafka.
 
@@ -39,7 +39,7 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
         """
         # completion_data is already an EventEnvelope from event_processor.py
         # No need to wrap it again - this was causing double-wrapping bug
-        key = str(correlation_id) if correlation_id else None
+        key = str(correlation_id)
 
         try:
             await self.kafka_bus.publish(
@@ -53,7 +53,7 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
     async def publish_assessment_failed(
         self,
         failure_data: Any,
-        correlation_id: UUID | None,
+        correlation_id: UUID,
     ) -> None:
         """Publish CJ assessment failure event to Kafka.
 
@@ -66,7 +66,7 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
         """
         # failure_data is already an EventEnvelope from event_processor.py
         # No need to wrap it again - this was causing double-wrapping bug
-        key = str(correlation_id) if correlation_id else None
+        key = str(correlation_id)
 
         try:
             await self.kafka_bus.publish(

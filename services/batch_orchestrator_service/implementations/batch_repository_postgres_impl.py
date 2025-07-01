@@ -86,6 +86,7 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
         expected_status: PipelineExecutionStatus,
         new_status: PipelineExecutionStatus,
         completion_timestamp: str | None = None,
+        correlation_id: str | None = None,
     ) -> bool:
         """Atomically update phase status if current status matches expected."""
         result: bool = await self.pipeline_manager.update_phase_status_atomically(
@@ -94,6 +95,7 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
             expected_status,
             new_status,
             completion_timestamp,
+            correlation_id,
         )
         return result
 
@@ -102,9 +104,10 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
         self,
         batch_id: str,
         registration_data: BatchRegistrationRequestV1,
+        correlation_id: str | None = None,
     ) -> bool:
         """Store batch context information."""
-        result: bool = await self.context_ops.store_batch_context(batch_id, registration_data)
+        result: bool = await self.context_ops.store_batch_context(batch_id, registration_data, correlation_id)
         return result
 
     async def get_batch_context(self, batch_id: str) -> BatchRegistrationRequestV1 | None:

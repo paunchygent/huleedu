@@ -76,5 +76,3 @@ Lessons Learned
 4. Use Testcontainers for portable integration testing.
 
 ---
-*Created 2025-06-30 – owner: Platform Engineering*
-

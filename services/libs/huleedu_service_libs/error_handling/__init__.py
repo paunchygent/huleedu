@@ -1,6 +1,6 @@
 """Error handling utilities for HuleEdu services."""
 
-from services.libs.huleedu_service_libs.error_handling.context_manager import (
+from huleedu_service_libs.error_handling.context_manager import (
     EnhancedError,
     ErrorContext,
 )

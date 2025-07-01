@@ -63,6 +63,7 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         self,
         batch_id: str,
         registration_data: BatchRegistrationRequestV1,
+        correlation_id: str | None = None,
     ) -> bool:
         """Store the full batch context including course info and essay instructions."""
         self.batch_contexts[batch_id] = registration_data
@@ -79,6 +80,7 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         expected_status: PipelineExecutionStatus,
         new_status: PipelineExecutionStatus,
         completion_timestamp: str | None = None,
+        correlation_id: str | None = None,
     ) -> bool:
         """
         Atomically update phase status if current status matches expected.

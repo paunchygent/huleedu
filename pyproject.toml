@@ -164,8 +164,10 @@ explicit_package_bases = true
 namespace_packages = true
 exclude = [
     "common_core/src/",
-    "services/libs/huleedu_service_libs/",
     "cj_essay_assessment/",
+    "scripts/",
+    "services/libs/",
+    "services/batch_orchestrator_service/implementations/circuit_breaker_example.py",
 ]
 
 # Per-module settings for new microservices (stricter)
@@ -208,6 +210,7 @@ module = [
     "pypandoc.*",   # pypandoc lacks type stubs
     "fastapi.*",
     "starlette.*",
+    "rich.*",       # Rich library for terminal formatting
 ]
 ignore_missing_imports = true
 
@@ -240,6 +243,7 @@ module = [
     "core_assessment_logic",
     "transitions.*",  # State machine library without type stubs
     "essay_state_machine",  # Local module without py.typed marker
+    "services.batch_orchestrator_service.implementations.circuit_breaker_example",  # Example file with complex circuit breaker typing
 ]
 ignore_missing_imports = true
 

@@ -73,7 +73,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         self,
         session: AsyncSession,
         bos_batch_id: str,
-        event_correlation_id: str | None,
+        event_correlation_id: str,
         language: str,
         course_code: str,
         essay_instructions: str,

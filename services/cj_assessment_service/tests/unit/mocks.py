@@ -132,7 +132,7 @@ class MockDatabase(CJRepositoryProtocol):
         self,
         session: AsyncSession,
         bos_batch_id: str,
-        event_correlation_id: str | None,  # Keep as str to match protocol
+        event_correlation_id: str,  # Keep as str to match protocol
         language: str,
         course_code: str,
         essay_instructions: str,

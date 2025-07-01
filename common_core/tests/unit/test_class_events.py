@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -38,7 +38,7 @@ class TestClassCreatedV1:
         assert model.course_codes == [CourseCode.ENG5, CourseCode.ENG6]
         assert model.user_id == "teacher_456"
         assert model.event == "class.created"
-        assert model.correlation_id is None
+        assert isinstance(model.correlation_id, UUID)
         assert isinstance(model.timestamp, datetime)
 
     def test_model_with_all_fields(self) -> None:
@@ -136,7 +136,7 @@ class TestStudentCreatedV1:
         assert model.class_ids == ["class_456"]
         assert model.created_by_user_id == "teacher_789"
         assert model.event == "student.created"
-        assert model.correlation_id is None
+        assert isinstance(model.correlation_id, UUID)
         assert isinstance(model.timestamp, datetime)
 
     def test_model_with_all_fields(self) -> None:
@@ -254,7 +254,7 @@ class TestEssayStudentAssociationUpdatedV1:
         assert model.created_by_user_id == "teacher_012"
         assert model.event == "essay.student.association.updated"
         assert model.confidence_score is None
-        assert model.correlation_id is None
+        assert isinstance(model.correlation_id, UUID)
         assert isinstance(model.timestamp, datetime)
 
     def test_model_with_parsed_association(self) -> None:

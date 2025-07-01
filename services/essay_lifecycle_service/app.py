@@ -7,6 +7,8 @@ essay processing workflows.
 
 from __future__ import annotations
 
+from uuid import UUID, uuid4
+
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
@@ -41,7 +43,7 @@ setup_tracing_middleware(app, tracer)
 class ErrorResponse:
     """Standard error response model."""
 
-    def __init__(self, error: str, detail: str | None = None, correlation_id: str | None = None):
+    def __init__(self, error: str, correlation_id: UUID, detail: str | None = None):
         self.error = error
         self.detail = detail
         self.correlation_id = correlation_id
@@ -52,7 +54,7 @@ class ErrorResponse:
         if self.detail:
             result["detail"] = self.detail
         if self.correlation_id:
-            result["correlation_id"] = self.correlation_id
+            result["correlation_id"] = str(self.correlation_id)
         return result
 
 
@@ -82,7 +84,7 @@ async def shutdown() -> None:
 async def handle_validation_error(error: ValidationError) -> Response | tuple[Response, int]:
     """Handle Pydantic validation errors."""
     logger.warning(f"Validation error: {error}")
-    response = ErrorResponse(error="Validation Error", detail=str(error))
+    response = ErrorResponse(error="Validation Error", correlation_id=uuid4(), detail=str(error))
     return jsonify(response.model_dump()), 400
 
 
@@ -90,7 +92,7 @@ async def handle_validation_error(error: ValidationError) -> Response | tuple[Re
 async def handle_value_error(error: ValueError) -> Response | tuple[Response, int]:
     """Handle value errors."""
     logger.warning(f"Value error: {error}")
-    response = ErrorResponse(error="Invalid Value", detail=str(error))
+    response = ErrorResponse(error="Invalid Value", correlation_id=uuid4(), detail=str(error))
     return jsonify(response.model_dump()), 400
 
 
@@ -98,7 +100,7 @@ async def handle_value_error(error: ValueError) -> Response | tuple[Response, in
 async def handle_general_error(error: Exception) -> Response | tuple[Response, int]:
     """Handle general exceptions."""
     logger.error(f"Unexpected error: {error}")
-    response = ErrorResponse(error="Internal Server Error", detail="An unexpected error occurred")
+    response = ErrorResponse(error="Internal Server Error", correlation_id=uuid4(), detail="An unexpected error occurred")
     return jsonify(response.model_dump()), 500
 
 

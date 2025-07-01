@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import uuid
 from typing import Any, Protocol
+from uuid import UUID
 
 # Import the new API model for batch context storage
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
@@ -54,7 +54,7 @@ class PipelinePhaseInitiatorProtocol(Protocol):
         self,
         batch_id: str,
         phase_to_initiate: PhaseName,
-        correlation_id: uuid.UUID | None,
+        correlation_id: UUID,
         essays_for_processing: list[EssayProcessingInputRefV1],
         batch_context: BatchRegistrationRequestV1,
     ) -> None:
@@ -64,7 +64,7 @@ class PipelinePhaseInitiatorProtocol(Protocol):
         Args:
             batch_id: Unique identifier of the batch
             phase_to_initiate: The phase to initiate (type-safe enum)
-            correlation_id: Optional correlation ID for event tracing
+            correlation_id: Correlation ID for event tracing
             essays_for_processing: List of essays with their content references
             batch_context: Full batch context from registration
 
@@ -112,6 +112,7 @@ class BatchRepositoryProtocol(Protocol):
         self,
         batch_id: str,
         registration_data: BatchRegistrationRequestV1,
+        correlation_id: str | None = None,
     ) -> bool:
         """Store batch context information."""
         pass
@@ -135,6 +136,7 @@ class BatchRepositoryProtocol(Protocol):
         expected_status: PipelineExecutionStatus,
         new_status: PipelineExecutionStatus,
         completion_timestamp: str | None = None,
+        correlation_id: str | None = None,
     ) -> bool:
         """
         Atomically update phase status if current status matches expected.
@@ -175,7 +177,7 @@ class BatchProcessingServiceProtocol(Protocol):
     async def register_new_batch(
         self,
         registration_data: BatchRegistrationRequestV1,
-        correlation_id: uuid.UUID,
+        correlation_id: UUID,
     ) -> str:
         """Register a new batch for processing and return the batch ID."""
         pass
@@ -189,7 +191,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
         batch_id: str,
         completed_phase: PhaseName,
         phase_status: BatchStatus,
-        correlation_id: str,
+        correlation_id: UUID,
         processed_essays_for_next_phase: list[Any] | None = None,
     ) -> None:
         """Handle completion of a pipeline phase and determine next actions."""
@@ -200,6 +202,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
         batch_id: str,
         phase: PhaseName,
         status: PipelineExecutionStatus,
+        correlation_id: UUID,
         completion_timestamp: str | None = None,
     ) -> None:
         """Update the status of a specific pipeline phase."""
@@ -209,7 +212,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
         self,
         batch_id: str,
         resolved_pipeline: list[PhaseName],
-        correlation_id: str,
+        correlation_id: UUID,
         batch_context: Any,
     ) -> None:
         """

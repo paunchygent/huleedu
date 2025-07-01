@@ -159,7 +159,7 @@ class TestEventContractCompliance:
 
         # Extract the correlation_id passed to publisher
         call_args = mock_event_publisher.publish_spellcheck_result.call_args
-        passed_correlation_id: UUID | None = call_args[0][2]  # Third argument
+        passed_correlation_id: UUID = call_args[0][2]  # Third argument
 
         # Extract expected correlation_id from the original kafka message
         request_envelope_dict = json.loads(kafka_message.value.decode("utf-8"))

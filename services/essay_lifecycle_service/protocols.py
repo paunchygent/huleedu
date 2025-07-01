@@ -105,7 +105,7 @@ class EventPublisher(Protocol):
     """Protocol for publishing events to Kafka."""
 
     async def publish_status_update(
-        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID | None = None
+        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID
     ) -> None:
         """Publish essay status update event."""
         ...

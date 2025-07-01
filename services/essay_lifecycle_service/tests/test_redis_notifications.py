@@ -110,7 +110,8 @@ class TestRedisNotifications:
         mock_batch_tracker.get_user_id_for_essay.return_value = None
 
         # Act
-        await event_publisher.publish_status_update(essay_ref, status)
+        correlation_id = uuid4()
+        await event_publisher.publish_status_update(essay_ref, status, correlation_id)
 
         # Assert
         mock_batch_tracker.get_user_id_for_essay.assert_called_once_with(essay_id)
@@ -156,7 +157,8 @@ class TestRedisNotifications:
         )
 
         # Act - should not raise exception
-        await event_publisher.publish_status_update(essay_ref, status)
+        correlation_id = uuid4()
+        await event_publisher.publish_status_update(essay_ref, status, correlation_id)
 
         # Assert - Redis call was attempted
         mock_redis_client.publish_user_notification.assert_called_once()

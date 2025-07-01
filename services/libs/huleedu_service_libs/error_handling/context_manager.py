@@ -8,7 +8,8 @@ including trace information, service context, and structured error data.
 import traceback
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
+from uuid import uuid4
 
 from opentelemetry import trace
 
@@ -21,7 +22,7 @@ class ErrorContext:
     error_message: str
     service_name: str
     operation: str
-    correlation_id: Optional[str] = None
+    correlation_id: str = field(default_factory=lambda: str(uuid4()))
     trace_id: Optional[str] = None
     span_id: Optional[str] = None
     timestamp: datetime = field(default_factory=datetime.utcnow)
@@ -82,7 +83,7 @@ class ErrorContext:
                 # Try to get correlation ID from span attributes
                 if not self.correlation_id:
                     attributes = getattr(current_span, "_attributes", {})
-                    self.correlation_id = attributes.get("correlation_id")
+                    self.correlation_id = str(attributes.get("correlation_id", ""))
 
 
 class EnhancedError(Exception):
@@ -100,7 +101,7 @@ class EnhancedError(Exception):
         exception: Exception,
         service_name: str,
         operation: str,
-        correlation_id: Optional[str] = None,
+        correlation_id: str,
         context_data: Optional[Dict[str, Any]] = None,
     ) -> "EnhancedError":
         """Create EnhancedError from an existing exception."""
@@ -149,8 +150,8 @@ class EnhancedError(Exception):
 def capture_error_context(
     service_name: str,
     operation: str,
-    correlation_id: Optional[str] = None,
-) -> callable:
+    correlation_id: str,
+) -> Callable:
     """
     Decorator to automatically capture error context.
 

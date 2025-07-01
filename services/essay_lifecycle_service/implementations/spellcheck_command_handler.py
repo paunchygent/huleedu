@@ -46,7 +46,7 @@ class SpellcheckCommandHandler:
     async def process_initiate_spellcheck_command(
         self,
         command_data: BatchServiceSpellcheckInitiateCommandDataV1,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Process spellcheck initiation command from Batch Orchestrator Service."""
         logger.info(

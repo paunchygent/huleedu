@@ -9,7 +9,7 @@ orchestration side works correctly for when the NLP Service is built.
 
 from __future__ import annotations
 
-import uuid
+from uuid import UUID, uuid4
 from unittest.mock import AsyncMock
 
 import pytest
@@ -68,9 +68,9 @@ def sample_essay_refs() -> list[EssayProcessingInputRefV1]:
 
 
 @pytest.fixture
-def sample_correlation_id() -> uuid.UUID:
+def sample_correlation_id() -> UUID:
     """Sample correlation ID for testing."""
-    return uuid.uuid4()
+    return uuid4()
 
 
 class TestNLPInitiatorImpl:
@@ -82,7 +82,7 @@ class TestNLPInitiatorImpl:
         mock_event_publisher: AsyncMock,
         sample_batch_context: BatchRegistrationRequestV1,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test successful NLP phase initiation."""
         batch_id = "test-batch-123"
@@ -123,7 +123,7 @@ class TestNLPInitiatorImpl:
         nlp_initiator: NLPInitiatorImpl,
         sample_batch_context: BatchRegistrationRequestV1,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test that initiator rejects incorrect phase."""
         with pytest.raises(DataValidationError, match="NLPInitiatorImpl received incorrect phase"):
@@ -139,7 +139,7 @@ class TestNLPInitiatorImpl:
         self,
         nlp_initiator: NLPInitiatorImpl,
         sample_batch_context: BatchRegistrationRequestV1,
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test that initiator rejects empty essay list."""
         with pytest.raises(DataValidationError, match="No essays provided for NLP initiation"):
@@ -156,7 +156,7 @@ class TestNLPInitiatorImpl:
         nlp_initiator: NLPInitiatorImpl,
         mock_event_publisher: AsyncMock,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test language inference for Swedish course code."""
         swedish_context = BatchRegistrationRequestV1(
@@ -184,7 +184,7 @@ class TestNLPInitiatorImpl:
         nlp_initiator: NLPInitiatorImpl,
         mock_event_publisher: AsyncMock,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test language inference for English course codes."""
         english_context = BatchRegistrationRequestV1(
@@ -213,7 +213,7 @@ class TestNLPInitiatorImpl:
         mock_event_publisher: AsyncMock,
         sample_batch_context: BatchRegistrationRequestV1,
         sample_essay_refs: list[EssayProcessingInputRefV1],
-        sample_correlation_id: uuid.UUID,
+        sample_correlation_id: UUID,
     ) -> None:
         """Test that event publisher exceptions are properly propagated."""
         # Configure mock to raise exception
@@ -228,23 +228,24 @@ class TestNLPInitiatorImpl:
                 batch_context=sample_batch_context,
             )
 
-    async def test_none_correlation_id_handling(
+    async def test_correlation_id_propagation(
         self,
         nlp_initiator: NLPInitiatorImpl,
         mock_event_publisher: AsyncMock,
         sample_batch_context: BatchRegistrationRequestV1,
         sample_essay_refs: list[EssayProcessingInputRefV1],
     ) -> None:
-        """Test handling of None correlation ID."""
+        """Test correlation ID is properly propagated to published events."""
+        test_correlation_id = uuid4()
         await nlp_initiator.initiate_phase(
             batch_id="test-batch-123",
             phase_to_initiate=PhaseName.NLP,
-            correlation_id=None,  # None correlation ID
+            correlation_id=test_correlation_id,
             essays_for_processing=sample_essay_refs,
             batch_context=sample_batch_context,
         )
 
-        # Verify event was still published successfully
+        # Verify event was published with correct correlation ID
         mock_event_publisher.publish_batch_event.assert_called_once()
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
-        assert published_envelope.correlation_id is None
+        assert published_envelope.correlation_id == test_correlation_id

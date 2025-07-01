@@ -126,7 +126,7 @@ class EssayProcessingLog(Base):
 
     # Event metadata
     event_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=True)
-    correlation_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    correlation_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))

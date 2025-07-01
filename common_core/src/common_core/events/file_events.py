@@ -9,7 +9,7 @@ separate from batch coordination concerns.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
@@ -34,7 +34,7 @@ class EssayContentProvisionedV1(BaseModel):
     text_storage_id: str = Field(description="Content Service storage ID for extracted text")
     file_size_bytes: int = Field(description="Size of processed file in bytes")
     content_md5_hash: str | None = Field(default=None, description="MD5 hash of file content")
-    correlation_id: UUID | None = Field(default=None, description="Request correlation ID")
+    correlation_id: UUID = Field(default_factory=uuid4, description="Request correlation ID")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -59,7 +59,7 @@ class EssayValidationFailedV1(BaseModel):
     )
     validation_error_message: str = Field(description="Human-readable error message with context")
     file_size_bytes: int = Field(description="Size of the failed file for metrics and analysis")
-    correlation_id: UUID | None = Field(default=None, description="Request correlation ID")
+    correlation_id: UUID = Field(default_factory=uuid4, description="Request correlation ID")
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="Validation failure timestamp",

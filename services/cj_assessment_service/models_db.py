@@ -32,7 +32,7 @@ class CJBatchUpload(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     bos_batch_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
-    event_correlation_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    event_correlation_id: Mapped[str] = mapped_column(String(36), nullable=False)
     language: Mapped[str] = mapped_column(String(10), nullable=False)
     course_code: Mapped[str] = mapped_column(String(50), nullable=False)
     essay_instructions: Mapped[str] = mapped_column(Text, nullable=False)

@@ -62,7 +62,7 @@ async def test_trace_context_propagation():
 
     with trace_operation(tracer, "parent_operation"):
         # Create a carrier
-        carrier = {}
+        carrier: dict[str, str] = {}
 
         # Inject trace context
         inject_trace_context(carrier)

@@ -23,7 +23,7 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
         self,
         kafka_bus: KafkaBus,
         event_data: SpellcheckResultDataV1,
-        correlation_id: UUID | None,
+        correlation_id: UUID,
     ) -> None:
         """Publish spellcheck result event to Kafka."""
         from huleedu_service_libs.observability import inject_trace_context

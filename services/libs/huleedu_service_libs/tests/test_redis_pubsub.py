@@ -8,9 +8,12 @@ Follows established testing patterns with boundary mocking and real handler func
 import asyncio
 import json
 from collections.abc import AsyncGenerator
+from typing import cast
 
 import pytest
+import redis.asyncio as aioredis
 from huleedu_service_libs.redis_client import RedisClient
+from huleedu_service_libs.redis_pubsub import RedisPubSub
 
 
 class MockPubSub:
@@ -116,7 +119,7 @@ def redis_client_with_mock(mock_redis_client_with_pubsub: MockRedisClientWithPub
     client = RedisClient(client_id="test-client", redis_url="redis://localhost:6379")
     client._started = True
     client.client = mock_redis_client_with_pubsub
-    client._pubsub = RedisPubSub(mock_redis_client_with_pubsub, "test-client")
+    client._pubsub = RedisPubSub(cast(aioredis.Redis, mock_redis_client_with_pubsub), "test-client")
     return client
 
 

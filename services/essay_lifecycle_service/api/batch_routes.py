@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from uuid import UUID, uuid4
 from common_core.observability_enums import OperationType
 from common_core.status_enums import EssayStatus, OperationStatus
 from dishka import FromDishka
@@ -41,7 +42,7 @@ class ErrorResponse(BaseModel):
 
     error: str
     detail: str | None = None
-    correlation_id: str | None = None
+    correlation_id: UUID
 
 
 @batch_bp.route("/<batch_id>/status", methods=["GET"])
@@ -62,6 +63,7 @@ async def get_batch_status(
             ).inc()
         response = ErrorResponse(
             error="Batch Not Found",
+            correlation_id=uuid4(),
             detail=f"Batch with ID {batch_id} does not exist or has no essays",
         )
         return jsonify(response.model_dump()), 404

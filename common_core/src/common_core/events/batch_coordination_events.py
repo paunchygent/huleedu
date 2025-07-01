@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .file_events import EssayValidationFailedV1
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
@@ -117,7 +117,7 @@ class ExcessContentProvisionedV1(BaseModel):
     original_file_name: str = Field(description="Original uploaded file name")
     text_storage_id: str = Field(description="Content Service storage ID")
     reason: str = Field(description="Reason for excess content (e.g., 'NO_AVAILABLE_SLOT')")
-    correlation_id: UUID | None = Field(default=None, description="Request correlation ID")
+    correlation_id: UUID = Field(default_factory=uuid4, description="Request correlation ID")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

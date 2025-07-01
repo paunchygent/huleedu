@@ -60,7 +60,7 @@ class ClientPipelineRequestHandler:
 
             batch_id = request_data.batch_id
             requested_pipeline = request_data.requested_pipeline
-            correlation_id = str(envelope.correlation_id or request_data.client_correlation_id)
+            correlation_id = envelope.correlation_id or request_data.client_correlation_id
 
             # Extract trace context if present and wrap all processing
             async def process_message() -> None:

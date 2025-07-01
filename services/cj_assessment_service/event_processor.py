@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
@@ -134,10 +133,8 @@ async def _process_cj_assessment_impl(
                     f"Recorded queue latency: {queue_latency_seconds:.3f}s for {msg.topic}",
                 )
 
-        # Use correlation_id from envelope, fall back to system metadata entity reference
-        correlation_id = (
-            envelope.correlation_id or request_event_data.system_metadata.entity.entity_id
-        )
+        # Use correlation_id from envelope
+        correlation_id = envelope.correlation_id
 
         log_extra = {
             "correlation_id": str(correlation_id),
@@ -238,9 +235,7 @@ async def _process_cj_assessment_impl(
         )
 
         # The envelope for the outgoing event
-        correlation_uuid = (
-            correlation_id if isinstance(correlation_id, UUID) else UUID(str(correlation_id))
-        )
+        correlation_uuid = correlation_id
         completed_envelope = EventEnvelope[CJAssessmentCompletedV1](
             event_type=settings_obj.CJ_ASSESSMENT_COMPLETED_TOPIC,
             source_service=settings_obj.SERVICE_NAME,
@@ -286,9 +281,7 @@ async def _process_cj_assessment_impl(
                 msg.value.decode("utf-8"),
             )
             request_event_data = envelope.data
-            correlation_id = (
-                envelope.correlation_id or request_event_data.system_metadata.entity.entity_id
-            )
+            correlation_id = envelope.correlation_id
 
             # Create detailed error information including exception type and traceback
             import traceback
@@ -316,9 +309,7 @@ async def _process_cj_assessment_impl(
                 cj_assessment_job_id="unknown",  # No CJ job created due to failure
             )
 
-            correlation_uuid = (
-                correlation_id if isinstance(correlation_id, UUID) else UUID(str(correlation_id))
-            )
+            correlation_uuid = correlation_id
             failed_envelope = EventEnvelope[CJAssessmentFailedV1](
                 event_type=settings_obj.CJ_ASSESSMENT_FAILED_TOPIC,
                 source_service=settings_obj.SERVICE_NAME,

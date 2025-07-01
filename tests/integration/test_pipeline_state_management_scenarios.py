@@ -7,7 +7,7 @@ specific edge cases that have been encountered in production.
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -75,7 +75,7 @@ class TestPipelineRealWorldScenarios:
         This tests the exact issue described in the user's root cause analysis.
         """
         batch_id = str(uuid4())
-        correlation_id = str(uuid4())
+        correlation_id = uuid4()
 
         # Setup batch context for 25 essays with CJ assessment enabled
         batch_context = BatchRegistrationRequestV1(
@@ -125,7 +125,7 @@ class TestPipelineRealWorldScenarios:
         mock_cj_initiator.initiate_phase.assert_called_once_with(
             batch_id=batch_id,
             phase_to_initiate=PhaseName.CJ_ASSESSMENT,
-            correlation_id=UUID(correlation_id),
+            correlation_id=correlation_id,
             essays_for_processing=successful_essays,  # All 24 successful essays proceed
             batch_context=batch_context,
         )

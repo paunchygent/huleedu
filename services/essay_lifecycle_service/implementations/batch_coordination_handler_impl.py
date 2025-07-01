@@ -96,7 +96,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
     async def handle_essay_content_provisioned(
         self,
         event_data: EssayContentProvisionedV1,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle EssayContentProvisionedV1 event for slot assignment."""
         try:
@@ -225,7 +225,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
     async def handle_essay_validation_failed(
         self,
         event_data: EssayValidationFailedV1,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle EssayValidationFailedV1 event for validation coordination."""
         try:

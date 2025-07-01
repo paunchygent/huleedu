@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
@@ -30,7 +31,7 @@ class NotificationService:
         batch_id: str,
         completed_phase: PhaseName,
         phase_status: BatchStatus,
-        correlation_id: str,
+        correlation_id: UUID,
     ) -> None:
         """
         Publish phase completion notification to Redis for real-time UI updates.
@@ -55,7 +56,7 @@ class NotificationService:
                         "phase": completed_phase.value,
                         "status": phase_status.value,
                         "timestamp": datetime.now(UTC).isoformat(),
-                        "correlation_id": correlation_id,
+                        "correlation_id": str(correlation_id),
                     },
                 )
 

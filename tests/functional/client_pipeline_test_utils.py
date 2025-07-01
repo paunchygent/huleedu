@@ -29,7 +29,7 @@ async def create_client_pipeline_request_event(
         event_type="huleedu.commands.batch.pipeline.v1",
         event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
         source_service="api_gateway_service",
-        correlation_id=uuid.UUID(correlation_id) if correlation_id else None,
+        correlation_id=uuid.UUID(correlation_id),
         data=ClientBatchPipelineRequestV1(
             batch_id=batch_id,
             requested_pipeline=requested_pipeline,

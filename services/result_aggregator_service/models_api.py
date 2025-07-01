@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -124,4 +125,4 @@ class ErrorResponse(BaseModel):
 
     error: str
     details: Optional[Dict[str, Any]] = None
-    correlation_id: Optional[str] = None
+    correlation_id: str = Field(default_factory=lambda: str(uuid4()))

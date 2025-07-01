@@ -88,6 +88,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Let's verify we can perform basic operations
         batch_data = {
             "id": "test-schema-batch",
+            "correlation_id": "test-corr-schema",
             "status": BatchStatus.AWAITING_CONTENT_VALIDATION.value,
             "name": "Schema Test Batch",
         }
@@ -142,6 +143,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         store_success = await postgres_repository.store_batch_context(
             batch_id,
             sample_batch_registration,
+            correlation_id="test-context-correlation",
         )
 
         # Act - Retrieve context
@@ -173,6 +175,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         await postgres_repository.create_batch(
             {
                 "id": batch_id,
+                "correlation_id": "test-corr-pipeline",
                 "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
             },
         )
@@ -207,6 +210,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         await postgres_repository.create_batch(
             {
                 "id": batch_id,
+                "correlation_id": "test-corr-atomic",
                 "status": BatchStatus.PROCESSING_PIPELINES.value,
             },
         )
@@ -271,6 +275,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         await postgres_repository.create_batch(
             {
                 "id": batch_id,
+                "correlation_id": "test-corr-concurrent",
                 "status": BatchStatus.PROCESSING_PIPELINES.value,
             },
         )
@@ -331,6 +336,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         await postgres_repository.create_batch(
             {
                 "id": batch_id,
+                "correlation_id": "test-corr-status",
                 "status": BatchStatus.AWAITING_CONTENT_VALIDATION.value,
             },
         )

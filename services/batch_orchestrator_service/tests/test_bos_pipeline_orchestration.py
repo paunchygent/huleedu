@@ -6,6 +6,7 @@ Mocks only external boundaries, not internal business logic.
 
 from __future__ import annotations
 
+from typing import cast
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
@@ -84,7 +85,8 @@ class TestBatchKafkaConsumerBusinessLogic:
         await kafka_consumer._handle_message(mock_message)
 
         # Verify the correct handler was called
-        kafka_consumer.els_batch_phase_outcome_handler.handle_els_batch_phase_outcome.assert_called_once_with(
+        handler_mock = cast(AsyncMock, kafka_consumer.els_batch_phase_outcome_handler)
+        handler_mock.handle_els_batch_phase_outcome.assert_called_once_with(
             mock_message,
         )
 
@@ -221,6 +223,6 @@ class TestELSBatchPhaseOutcomeHandler:
             batch_id=batch_id,
             completed_phase=PhaseName.SPELLCHECK,
             phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
-            correlation_id=str(correlation_id),
+            correlation_id=correlation_id,
             processed_essays_for_next_phase=processed_essays,  # NEW: Phase 3 data propagation
         )

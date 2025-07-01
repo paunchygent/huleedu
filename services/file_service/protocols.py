@@ -43,7 +43,7 @@ class EventPublisherProtocol(Protocol):
     async def publish_essay_content_provisioned(
         self,
         event_data: EssayContentProvisionedV1,
-        correlation_id: uuid.UUID | None,
+        correlation_id: uuid.UUID,
     ) -> None:
         """
         Publish EssayContentProvisionedV1 event to Kafka.
@@ -57,7 +57,7 @@ class EventPublisherProtocol(Protocol):
     async def publish_essay_validation_failed(
         self,
         event_data: EssayValidationFailedV1,
-        correlation_id: uuid.UUID | None,
+        correlation_id: uuid.UUID,
     ) -> None:
         """
         Publish EssayValidationFailedV1 event to Kafka.
@@ -75,7 +75,7 @@ class EventPublisherProtocol(Protocol):
     async def publish_batch_file_added_v1(
         self,
         event_data: BatchFileAddedV1,
-        correlation_id: uuid.UUID | None,
+        correlation_id: uuid.UUID,
     ) -> None:
         """
         Publish BatchFileAddedV1 event to Kafka.
@@ -89,7 +89,7 @@ class EventPublisherProtocol(Protocol):
     async def publish_batch_file_removed_v1(
         self,
         event_data: BatchFileRemovedV1,
-        correlation_id: uuid.UUID | None,
+        correlation_id: uuid.UUID,
     ) -> None:
         """
         Publish BatchFileRemovedV1 event to Kafka.

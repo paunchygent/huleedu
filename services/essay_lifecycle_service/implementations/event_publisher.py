@@ -41,7 +41,7 @@ class DefaultEventPublisher(EventPublisher):
         self.batch_tracker = batch_tracker
 
     async def publish_status_update(
-        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID | None = None
+        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID
     ) -> None:
         """Publish essay status update event to both Kafka and Redis."""
         from datetime import UTC, datetime
@@ -87,7 +87,7 @@ class DefaultEventPublisher(EventPublisher):
         self,
         essay_ref: EntityReference,
         status: EssayStatus,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Publish essay status update to Redis for real-time UI notifications."""
         try:
@@ -105,7 +105,7 @@ class DefaultEventPublisher(EventPublisher):
                         "essay_id": essay_ref.entity_id,
                         "status": status.value,
                         "timestamp": datetime.now(UTC).isoformat(),
-                        "correlation_id": str(correlation_id) if correlation_id else None,
+                        "correlation_id": str(correlation_id),
                     },
                 )
 
@@ -115,7 +115,7 @@ class DefaultEventPublisher(EventPublisher):
                         "essay_id": essay_ref.entity_id,
                         "user_id": user_id,
                         "status": status.value,
-                        "correlation_id": str(correlation_id) if correlation_id else None,
+                        "correlation_id": str(correlation_id),
                     },
                 )
             else:
@@ -124,7 +124,7 @@ class DefaultEventPublisher(EventPublisher):
                     extra={
                         "essay_id": essay_ref.entity_id,
                         "status": status.value,
-                        "correlation_id": str(correlation_id) if correlation_id else None,
+                        "correlation_id": str(correlation_id),
                     },
                 )
 
@@ -133,7 +133,7 @@ class DefaultEventPublisher(EventPublisher):
                 f"Error publishing essay status to Redis: {e}",
                 extra={
                     "essay_id": essay_ref.entity_id,
-                    "correlation_id": str(correlation_id) if correlation_id else None,
+                    "correlation_id": str(correlation_id),
                 },
                 exc_info=True,
             )
@@ -145,7 +145,7 @@ class DefaultEventPublisher(EventPublisher):
         completed_count: int,
         failed_count: int,
         total_essays_in_phase: int,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Report aggregated progress of a specific phase for a batch to BS."""
         from datetime import UTC, datetime
@@ -192,7 +192,7 @@ class DefaultEventPublisher(EventPublisher):
         phase: str,
         status: str,
         details: dict[str, Any],
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Report the final conclusion of a phase for a batch to BS."""
         from datetime import UTC, datetime
@@ -246,7 +246,7 @@ class DefaultEventPublisher(EventPublisher):
     async def publish_excess_content_provisioned(
         self,
         event_data: Any,  # ExcessContentProvisionedV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Publish ExcessContentProvisionedV1 event when no slots are available."""
         from uuid import uuid4
@@ -276,7 +276,7 @@ class DefaultEventPublisher(EventPublisher):
     async def publish_batch_essays_ready(
         self,
         event_data: Any,  # BatchEssaysReady
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Publish BatchEssaysReady event when batch is complete."""
         from uuid import uuid4
@@ -306,7 +306,7 @@ class DefaultEventPublisher(EventPublisher):
     async def publish_els_batch_phase_outcome(
         self,
         event_data: Any,  # ELSBatchPhaseOutcomeV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Publish ELSBatchPhaseOutcomeV1 event when phase is complete."""
         from uuid import uuid4

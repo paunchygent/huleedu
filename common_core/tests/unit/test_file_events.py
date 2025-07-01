@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -36,7 +36,7 @@ class TestEssayContentProvisionedV1:
         assert model.file_size_bytes == 1024
         assert model.event == "essay.content.provisioned"
         assert model.content_md5_hash is None
-        assert model.correlation_id is None
+        assert isinstance(model.correlation_id, UUID)
         assert isinstance(model.timestamp, datetime)
 
     def test_model_serialization(self) -> None:
@@ -76,7 +76,7 @@ class TestEssayValidationFailedV1:
         assert event.validation_error_message == "File content is empty or contains only whitespace"
         assert event.file_size_bytes == 0
         assert event.event == "essay.validation.failed"
-        assert event.correlation_id is None
+        assert isinstance(event.correlation_id, UUID)
         assert isinstance(event.timestamp, datetime)
 
     def test_model_with_all_fields(self) -> None:
@@ -147,7 +147,7 @@ class TestEssayValidationFailedV1:
         assert event.event == "essay.validation.failed"
 
         # Default correlation_id
-        assert event.correlation_id is None
+        assert isinstance(event.correlation_id, UUID)
 
         # Default timestamp (should be recent)
         now = datetime.now(UTC)

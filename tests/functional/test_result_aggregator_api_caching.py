@@ -283,7 +283,7 @@ async def setup_test_data(test_app: FunctionalTestResultAggregatorApp) -> BatchR
         # Return fresh batch
         batch_result = await repo.get_batch("test-batch-001")
         assert batch_result is not None
-        return batch_result
+        return batch_result  # type: ignore[no-any-return]
 
 
 @pytest.mark.functional
