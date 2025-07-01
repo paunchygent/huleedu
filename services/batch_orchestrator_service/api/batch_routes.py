@@ -20,7 +20,7 @@ from quart_dishka import inject
 
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
-from common_core.pipeline_models import PhaseName
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 from common_core.status_enums import OperationStatus, ProcessingStatus
 
 logger = create_service_logger("bos.api.batch")
@@ -244,8 +244,8 @@ async def retry_phase(
         # Reset phase status to allow retry (simplified approach)
         await phase_coordinator.update_phase_status(
             batch_id=batch_id,
-            phase=phase_enum.value,
-            status="REQUESTED_BY_USER",
+            phase=phase_enum,
+            status=PipelineExecutionStatus.REQUESTED_BY_USER,
             completion_timestamp=None,
         )
 
@@ -271,8 +271,8 @@ async def retry_phase(
         )
         await phase_coordinator.initiate_resolved_pipeline(
             batch_id=batch_id,
-            resolved_pipeline=[phase_enum.value],  # Single-phase pipeline
-            correlation_id=correlation_id,
+            resolved_pipeline=[phase_enum],  # Single-phase pipeline
+            correlation_id=str(correlation_id) if correlation_id else str(uuid.uuid4()),
             batch_context=batch_context,
         )
 

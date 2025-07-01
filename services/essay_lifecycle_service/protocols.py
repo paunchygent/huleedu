@@ -117,7 +117,7 @@ class EventPublisher(Protocol):
         completed_count: int,
         failed_count: int,
         total_essays_in_phase: int,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Report aggregated progress of a specific phase for a batch to BS."""
         ...
@@ -128,7 +128,7 @@ class EventPublisher(Protocol):
         phase: str,
         status: str,
         details: dict[str, Any],
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Report the final conclusion of a phase for a batch to BS."""
         ...
@@ -136,7 +136,7 @@ class EventPublisher(Protocol):
     async def publish_excess_content_provisioned(
         self,
         event_data: Any,  # ExcessContentProvisionedV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Publish ExcessContentProvisionedV1 event when no slots are available."""
         ...
@@ -144,7 +144,7 @@ class EventPublisher(Protocol):
     async def publish_batch_essays_ready(
         self,
         event_data: Any,  # BatchEssaysReady
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Publish BatchEssaysReady event when batch is complete."""
         ...
@@ -152,7 +152,7 @@ class EventPublisher(Protocol):
     async def publish_els_batch_phase_outcome(
         self,
         event_data: Any,  # ELSBatchPhaseOutcomeV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Publish ELSBatchPhaseOutcomeV1 event when batch phase is complete."""
         ...
@@ -164,7 +164,7 @@ class BatchCommandHandler(Protocol):
     async def process_initiate_spellcheck_command(
         self,
         command_data: Any,  # BatchServiceSpellcheckInitiateCommandDataV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Process spellcheck phase initiation command from Batch Service."""
         ...
@@ -172,7 +172,7 @@ class BatchCommandHandler(Protocol):
     async def process_initiate_nlp_command(
         self,
         command_data: Any,  # BatchServiceNLPInitiateCommandDataV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Process NLP phase initiation command from Batch Service."""
         ...
@@ -180,7 +180,7 @@ class BatchCommandHandler(Protocol):
     async def process_initiate_ai_feedback_command(
         self,
         command_data: Any,  # BatchServiceAIFeedbackInitiateCommandDataV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Process AI feedback phase initiation command from Batch Service."""
         ...
@@ -188,7 +188,7 @@ class BatchCommandHandler(Protocol):
     async def process_initiate_cj_assessment_command(
         self,
         command_data: Any,  # BatchServiceCJAssessmentInitiateCommandDataV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Process CJ assessment phase initiation command from Batch Service."""
         ...
@@ -200,7 +200,7 @@ class BatchCoordinationHandler(Protocol):
     async def handle_batch_essays_registered(
         self,
         event_data: Any,  # BatchEssaysRegistered
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle batch registration from BOS."""
         ...
@@ -208,7 +208,7 @@ class BatchCoordinationHandler(Protocol):
     async def handle_essay_content_provisioned(
         self,
         event_data: Any,  # EssayContentProvisionedV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle content provisioning and slot assignment."""
         ...
@@ -216,7 +216,7 @@ class BatchCoordinationHandler(Protocol):
     async def handle_essay_validation_failed(
         self,
         event_data: Any,  # EssayValidationFailedV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle validation failure events for coordination."""
         ...
@@ -228,7 +228,7 @@ class ServiceResultHandler(Protocol):
     async def handle_spellcheck_result(
         self,
         result_data: Any,  # SpellcheckResultDataV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle spellcheck result from Spell Checker Service."""
         ...
@@ -236,7 +236,7 @@ class ServiceResultHandler(Protocol):
     async def handle_cj_assessment_completed(
         self,
         result_data: Any,  # CJAssessmentCompletedV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle CJ assessment completion from CJ Assessment Service."""
         ...
@@ -244,7 +244,7 @@ class ServiceResultHandler(Protocol):
     async def handle_cj_assessment_failed(
         self,
         result_data: Any,  # CJAssessmentFailedV1
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle CJ assessment failure from CJ Assessment Service."""
         ...
@@ -257,7 +257,7 @@ class BatchPhaseCoordinator(Protocol):
         self,
         essay_state: EssayState,
         phase_name: PhaseName,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """
         Check if all essays in a batch phase are complete and publish ELSBatchPhaseOutcomeV1 if so.
@@ -268,7 +268,7 @@ class BatchPhaseCoordinator(Protocol):
         Args:
             essay_state: The essay state that was just updated
             phase_name: Name of the processing phase (e.g., 'spellcheck', 'cj_assessment')
-            correlation_id: Optional correlation ID for event tracking
+            correlation_id: Correlation ID for event tracking
         """
         ...
 
@@ -280,7 +280,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Dispatch spellcheck requests to Spellcheck Service."""
         ...
@@ -289,7 +289,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
-        batch_correlation_id: UUID | None = None,
+        batch_correlation_id: UUID,
     ) -> None:
         """Dispatch NLP requests to NLP Service."""
         ...
@@ -298,7 +298,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         context: Any,  # AIFeedbackBatchContextDataV1 (to be defined)
-        batch_correlation_id: UUID | None = None,
+        batch_correlation_id: UUID,
     ) -> None:
         """Dispatch AI feedback requests to AI Feedback Service."""
         ...
@@ -310,7 +310,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         course_code: CourseCode,
         essay_instructions: str,
         batch_id: str,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Dispatch CJ assessment requests to CJ Assessment Service."""
         ...
@@ -319,7 +319,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
 class BatchEssayTracker(Protocol):
     """Protocol for tracking batch readiness and coordination."""
 
-    async def register_batch(self, event: Any) -> None:  # BatchEssaysRegistered
+    async def register_batch(self, event: Any, correlation_id: UUID) -> None:  # BatchEssaysRegistered
         """Register batch expectations from BOS."""
         ...
 

@@ -41,7 +41,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
     async def handle_batch_essays_registered(
         self,
         event_data: BatchEssaysRegistered,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> bool:
         """Handle BatchEssaysRegistered event."""
         try:
@@ -56,7 +56,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
 
             # Register batch with tracker, preserving correlation ID
             await self.batch_tracker.register_batch(
-                event_data, str(correlation_id) if correlation_id else None
+                event_data, correlation_id
             )
 
             # Create initial essay records in the database

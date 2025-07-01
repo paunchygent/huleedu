@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 from common_core.domain_enums import CourseCode
 from common_core.metadata_models import EssayProcessingInputRefV1
@@ -31,7 +32,7 @@ class BatchExpectation:
         course_code: CourseCode,
         essay_instructions: str,
         user_id: str,
-        correlation_id: str | None = None,  # Store original correlation ID from registration
+        correlation_id: UUID,  # Store original correlation ID from registration
         timeout_seconds: int = 300,  # 5 minutes default
     ) -> None:
         self.batch_id = batch_id

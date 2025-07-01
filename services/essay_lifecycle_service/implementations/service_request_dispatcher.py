@@ -35,7 +35,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Dispatch individual spellcheck requests to Spell Checker Service."""
         from datetime import UTC, datetime
@@ -134,7 +134,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
-        batch_correlation_id: UUID | None = None,
+        batch_correlation_id: UUID,
     ) -> None:
         """Dispatch individual NLP requests to NLP Service."""
         # TODO: Implement when NLP Service is available
@@ -145,7 +145,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         context: AIFeedbackInputDataV1,
-        batch_correlation_id: UUID | None = None,
+        batch_correlation_id: UUID,
     ) -> None:
         """Dispatch individual AI feedback requests to AI Feedback Service."""
         # TODO: Implement when AI Feedback Service is available
@@ -159,7 +159,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         course_code: CourseCode,
         essay_instructions: str,
         batch_id: str,
-        correlation_id: UUID | None = None,
+        correlation_id: UUID,
     ) -> None:
         """Dispatch CJ assessment request to CJ Assessment Service."""
         from datetime import UTC, datetime

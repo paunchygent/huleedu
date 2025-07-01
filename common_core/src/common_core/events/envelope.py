@@ -16,7 +16,7 @@ class EventEnvelope(BaseModel, Generic[T_EventData]):
     event_timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     source_service: str
     schema_version: int = 1
-    correlation_id: UUID | None = None
+    correlation_id: UUID = Field(default_factory=uuid4)
     data_schema_uri: str | None = None
     data: T_EventData
     metadata: Optional[Dict[str, Any]] = Field(

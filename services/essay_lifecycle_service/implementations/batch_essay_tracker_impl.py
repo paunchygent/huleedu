@@ -10,6 +10,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from common_core.domain_enums import get_course_language
 from common_core.events.batch_coordination_events import (
@@ -50,7 +51,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         self._event_callbacks[event_type] = callback
 
     async def register_batch(
-        self, event: Any, correlation_id: str | None = None
+        self, event: Any, correlation_id: UUID
     ) -> None:  # BatchEssaysRegistered
         """
         Register batch slot expectations from BOS.

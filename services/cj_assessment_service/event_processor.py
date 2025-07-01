@@ -327,7 +327,8 @@ async def _process_cj_assessment_impl(
                 metadata={},
             )
             
-            inject_trace_context(failed_envelope.metadata)
+            if failed_envelope.metadata is not None:
+                inject_trace_context(failed_envelope.metadata)
 
             await event_publisher.publish_assessment_failed(
                 failure_data=failed_envelope,

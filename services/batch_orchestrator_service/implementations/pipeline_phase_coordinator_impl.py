@@ -426,3 +426,38 @@ class DefaultPipelinePhaseCoordinator:
             f"Successfully initiated first phase {first_phase_name.value} for batch {batch_id}",
             extra={"correlation_id": correlation_id},
         )
+
+    async def update_phase_status(
+        self,
+        batch_id: str,
+        phase: PhaseName,
+        status: PipelineExecutionStatus,
+        completion_timestamp: str | None = None,
+    ) -> None:
+        """Update the status of a specific phase in the pipeline.
+        
+        Args:
+            batch_id: The batch identifier
+            phase: The phase to update
+            status: The new status for the phase
+            completion_timestamp: Optional completion timestamp
+        """
+        # Update the phase status in the pipeline state
+        await self.state_manager.update_phase_status(
+            batch_id=batch_id,
+            phase=phase,
+            status=status,
+            completion_timestamp=completion_timestamp,
+        )
+        
+        # Send real-time notification
+        await self.notification_service.notify_phase_status_change(
+            batch_id=batch_id,
+            phase=phase,
+            status=status,
+        )
+        
+        logger.info(
+            f"Updated phase {phase.value} status to {status.value} for batch {batch_id}",
+            extra={"completion_timestamp": completion_timestamp},
+        )

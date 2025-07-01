@@ -21,4 +21,66 @@ groups:
       summary: "High 5xx error rate for {{ $labels.job }}"
       description: "Service {{ $labels.job }} is experiencing {{ $value }} 5xx errors per second over the last 5 minutes."
       dashboard_url: "http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive?var-service={{ $labels.job }}"
-      runbook_url: "file:///app/Documentation/OPERATIONS/01-Grafana-Playbook.md#high-error-rate" 
+      runbook_url: "file:///app/Documentation/OPERATIONS/01-Grafana-Playbook.md#high-error-rate"
+
+- name: DistributedTracingAlerts
+  rules:
+  - alert: HighTraceErrorRate
+    expr: |
+      (sum(rate(span_errors_total[5m])) by (service_name, operation))
+      / (sum(rate(span_total[5m])) by (service_name, operation)) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High error rate in {{ $labels.service_name }} - {{ $labels.operation }}"
+      description: "Operation {{ $labels.operation }} in service {{ $labels.service_name }} has {{ $value | humanizePercentage }} error rate over the last 5 minutes."
+      trace_search: "http://localhost:16686/search?service={{ $labels.service_name }}&operation={{ $labels.operation }}&lookback=1h&tags=%7B%22error%22%3A%22true%22%7D"
+      dashboard_url: "http://localhost:3000/d/huleedu-distributed-tracing/huleedu-distributed-tracing?var-service={{ $labels.service_name }}"
+  
+  - alert: StorageReferencePropagationFailure
+    expr: |
+      rate(els_storage_reference_failures_total[5m]) > 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Storage reference propagation failures detected"
+      description: "Essay Lifecycle Service is experiencing {{ $value }} storage reference failures per second."
+      dashboard_url: "http://localhost:3000/d/tier2-els/essay-lifecycle-service"
+      trace_search: "http://localhost:16686/search?service=essay_lifecycle_service&lookback=15m&tags=%7B%22error%22%3A%22true%22%7D"
+  
+  - alert: TraceContextLoss
+    expr: |
+      (sum by (service_name) (rate(span_total{parent_span_id=""}[5m])))
+      / (sum by (service_name) (rate(span_total[5m]))) > 0.5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Possible trace context loss in {{ $labels.service_name }}"
+      description: "Service {{ $labels.service_name }} has {{ $value | humanizePercentage }} of spans without parent context, indicating possible trace propagation issues."
+      dashboard_url: "http://localhost:3000/d/huleedu-distributed-tracing/huleedu-distributed-tracing?var-service={{ $labels.service_name }}"
+  
+  - alert: ServiceLatencyHigh
+    expr: |
+      histogram_quantile(0.95, sum(rate(span_duration_bucket[5m])) by (service_name, le)) > 1000
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High P95 latency for {{ $labels.service_name }}"
+      description: "Service {{ $labels.service_name }} has P95 latency of {{ $value }}ms over the last 5 minutes."
+      trace_search: "http://localhost:16686/search?service={{ $labels.service_name }}&lookback=1h&minDuration=1000000"
+      dashboard_url: "http://localhost:3000/d/huleedu-distributed-tracing/huleedu-distributed-tracing?var-service={{ $labels.service_name }}"
+  
+  - alert: CircuitBreakerOpen
+    expr: |
+      circuit_breaker_state{state="open"} == 1
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      summary: "Circuit breaker OPEN for {{ $labels.circuit_name }}"
+      description: "Circuit breaker '{{ $labels.circuit_name }}' in service {{ $labels.service_name }} is OPEN, blocking all requests."
+      dashboard_url: "http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive?var-service={{ $labels.service_name }}" 
