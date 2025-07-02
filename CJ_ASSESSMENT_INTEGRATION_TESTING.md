@@ -41,7 +41,7 @@ The CJ Assessment Service has been updated to use the centralized LLM Provider S
    - DI container updated to use centralized client
    - Configuration added for service URL
    - Docker dependencies configured
-   - Unit tests created
+   - Unit tests created but not confirmed passing.
 
 ### **What Needs Testing**
 

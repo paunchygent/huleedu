@@ -6,6 +6,12 @@ Centralized LLM provider abstraction and management service for HuleEdu platform
 
 The LLM Provider Service provides a unified interface for interacting with multiple LLM providers (Anthropic, OpenAI, Google, OpenRouter) with built-in resilience, caching, and observability.
 
+**Recent Updates (2025-07-02)**:
+- ✅ Fixed response format for CJ Assessment compatibility (`winner`/`justification` format)
+- ✅ All 4 providers fully implemented with real API integrations
+- ✅ Redis resilience with local cache fallback validated in production
+- ✅ Circuit breaker protection on all external calls
+
 ## Key Features
 
 - **Multi-Provider Support**: Anthropic/Claude, OpenAI/GPT, Google/Gemini, OpenRouter
@@ -42,17 +48,28 @@ The LLM Provider Service provides a unified interface for interacting with multi
 - `GET /api/v1/providers` - List available providers and their status
 - `POST /api/v1/providers/{provider}/test` - Test provider connectivity
 
-### Administrative Endpoints
-
-- `GET /api/v1/cache/stats` - Cache performance metrics
-- `POST /api/v1/cache/clear` - Clear cache (admin only)
-- `GET /api/v1/usage/summary` - Usage analytics
-- `GET /api/v1/circuit-breakers` - Circuit breaker states
-
 ### Health & Monitoring
 
-- `GET /healthz` - Service health check
+- `GET /healthz` - Service health check with dependency status
 - `GET /metrics` - Prometheus metrics
+
+### Response Format (CJ Assessment Compatible)
+
+The service returns responses in a format compatible with CJ Assessment Service:
+
+```json
+{
+  "winner": "Essay A",         // or "Essay B"
+  "justification": "...",      // Reasoning for the choice
+  "confidence": 4.5,           // 1-5 scale
+  "provider": "anthropic",     // Actual provider used
+  "model": "claude-3-haiku",   // Actual model used
+  "cached": false,             // Whether from cache
+  "response_time_ms": 1500,    // Response time
+  "correlation_id": "...",     // Request correlation ID
+  "token_usage": {...},        // Token usage details
+  "cost_estimate": 0.002       // Estimated cost in USD
+}
 
 ## Configuration
 
@@ -106,23 +123,47 @@ docker run -p 8080:8080 llm-provider-service
 
 ## Integration
 
-### From CJ Assessment Service
+### Request Format
+
+The service expects requests with the following structure:
+
+```json
+{
+  "user_prompt": "Compare these two essays...",
+  "essay_a": "First essay content...",
+  "essay_b": "Second essay content...",
+  "llm_config_overrides": {
+    "provider_override": "anthropic",        // Required: no default
+    "model_override": "claude-3-haiku",      // Optional
+    "temperature_override": 0.1,             // Optional
+    "system_prompt_override": "...",         // Optional
+    "max_tokens_override": 1000              // Optional
+  },
+  "correlation_id": "uuid-string",           // Optional
+  "metadata": {}                             // Optional
+}
+```
+
+### Integration Example (CJ Assessment Service)
 
 ```python
 # HTTP client call to LLM Provider Service
 async with session.post(
-    "http://llm-provider-service:8080/api/v1/comparison",
+    "http://llm-provider-service:8090/api/v1/comparison",
     json={
-        "provider": "anthropic",
-        "user_prompt": prompt,
+        "user_prompt": "Compare these two essays",
         "essay_a": essay_a_content,
         "essay_b": essay_b_content,
+        "llm_config_overrides": {
+            "provider_override": "anthropic",  # Required
+            "model_override": "claude-3-5-haiku-20241022",
+            "temperature_override": 0.1,
+        },
         "correlation_id": str(correlation_id),
-        "model_override": "claude-3-opus-20240229",
-        "temperature_override": 0.7,
     }
 ) as response:
     result = await response.json()
+    # result contains: winner, justification, confidence (1-5 scale)
 ```
 
 ## Monitoring
@@ -154,9 +195,21 @@ pdm run test-integration
 pdm run test-coverage
 ```
 
-## Migration from CJ Assessment
+## CJ Assessment Integration Status
 
-1. Deploy LLM Provider Service
-2. Update CJ Assessment to use HTTP client instead of direct provider calls
-3. Monitor both services during transition
-4. Remove LLM code from CJ Assessment once stable
+### ✅ Completed (Phase 1)
+1. LLM Provider Service deployed and operational
+2. CJ Assessment HTTP client implemented (`LLMProviderServiceClient`)
+3. Dependency injection updated to route through centralized service
+4. Configuration and Docker dependencies added
+
+### 🚧 Next Steps
+1. Integration testing with both services running together
+2. Verify enum usage (replace string literals with `LLMProviderType`)
+3. Performance testing and monitoring
+4. Remove old provider implementations from CJ Assessment after validation
+
+### Important Notes
+- Provider configuration is now **required** in all requests (no defaults)
+- Response format is CJ Assessment compatible (1-5 confidence scale)
+- All 4 providers (Anthropic, OpenAI, Google, OpenRouter) available
