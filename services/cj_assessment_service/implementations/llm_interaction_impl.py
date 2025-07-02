@@ -11,6 +11,7 @@ from typing import cast
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from common_core import LLMProviderType
 from common_core.observability_enums import CacheOperation
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
@@ -34,7 +35,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
     def __init__(
         self,
         cache_manager: CacheProtocol,
-        providers: dict[str, LLMProviderProtocol],
+        providers: dict[LLMProviderType, LLMProviderProtocol],
         settings: Settings,
     ) -> None:
         """Initialize LLM interaction orchestrator.
@@ -51,7 +52,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
     def _get_provider_for_model(self) -> LLMProviderProtocol:
         """Get the appropriate provider for the configured model."""
         # Use the default provider from structured configuration
-        provider_key = self.settings.DEFAULT_LLM_PROVIDER.lower()
+        provider_key = self.settings.DEFAULT_LLM_PROVIDER
 
         if provider_key not in self.providers:
             available_providers = list(self.providers.keys())
@@ -59,7 +60,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                 f"Default provider '{provider_key}' not available. Available providers: "
                 f"{available_providers}. Using first available provider.",
             )
-            provider_key = available_providers[0] if available_providers else "openai"
+            provider_key = available_providers[0] if available_providers else LLMProviderType.OPENAI
 
         logger.debug(
             f"Using provider '{provider_key}' with model '{self.settings.DEFAULT_LLM_MODEL}'",

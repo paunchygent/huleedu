@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ..implementations.llm_interaction_impl import LLMInteractionImpl
+from common_core import LLMProviderType
 from ..models_api import (
     ComparisonResult,
     ComparisonTask,
@@ -58,7 +59,7 @@ class TestLLMInteractionImplOverrides:
 
         from services.cj_assessment_service.protocols import LLMProviderProtocol
 
-        providers = cast(dict[str, LLMProviderProtocol], {"openai": mock_provider})
+        providers = cast(dict[LLMProviderType, LLMProviderProtocol], {LLMProviderType.OPENAI: mock_provider})
         return LLMInteractionImpl(
             cache_manager=mock_cache_manager,
             providers=providers,

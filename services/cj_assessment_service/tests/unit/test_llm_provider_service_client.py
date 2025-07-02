@@ -16,9 +16,10 @@ from services.cj_assessment_service.implementations.llm_provider_service_client 
 @pytest.fixture
 def mock_settings() -> Settings:
     """Create mock settings for testing."""
+    from common_core import LLMProviderType
     settings = MagicMock(spec=Settings)
     settings.LLM_PROVIDER_SERVICE_URL = "http://test-llm-service:8090/api/v1"
-    settings.DEFAULT_LLM_PROVIDER = "anthropic"
+    settings.DEFAULT_LLM_PROVIDER = LLMProviderType.ANTHROPIC
     settings.DEFAULT_LLM_MODEL = "claude-3-haiku"
     settings.DEFAULT_LLM_TEMPERATURE = 0.1
     return settings
@@ -133,7 +134,8 @@ Please respond with a JSON object."""
         
         # Verify request body
         request_body = call_args[1]["json"]
-        assert request_body["user_prompt"] == "Compare these two essays."
+        # The extraction includes header lines up to essay content
+        assert "Compare these two essays." in request_body["user_prompt"]
         assert request_body["essay_a"] == "Essay A content."
         assert request_body["essay_b"] == "Essay B content."
         assert request_body["llm_config_overrides"]["provider_override"] == "anthropic"

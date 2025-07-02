@@ -5,6 +5,8 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from common_core import LLMProviderType
+
 
 class LLMProviderSettings(BaseModel):
     """Configuration settings for a specific LLM provider."""
@@ -55,33 +57,33 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str | None = None
 
     # Default LLM provider and model
-    DEFAULT_LLM_PROVIDER: str = "openai"
+    DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.OPENAI
     DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
 
     # Structured LLM provider configuration
-    LLM_PROVIDERS_CONFIG: dict[str, LLMProviderSettings] = {
-        "openai": LLMProviderSettings(
+    LLM_PROVIDERS_CONFIG: dict[LLMProviderType, LLMProviderSettings] = {
+        LLMProviderType.OPENAI: LLMProviderSettings(
             api_base="https://api.openai.com/v1",
             default_model="gpt-4o-mini",
             temperature=0.1,
             max_tokens=1000,
             api_key_env_var="OPENAI_API_KEY",
         ),
-        "anthropic": LLMProviderSettings(
+        LLMProviderType.ANTHROPIC: LLMProviderSettings(
             api_base="https://api.anthropic.com/v1",
             default_model="claude-3-haiku-20240307",
             temperature=0.1,
             max_tokens=1000,
             api_key_env_var="ANTHROPIC_API_KEY",
         ),
-        "google": LLMProviderSettings(
+        LLMProviderType.GOOGLE: LLMProviderSettings(
             api_base="https://generativelanguage.googleapis.com/v1",
             default_model="gemini-1.5-flash",
             temperature=0.1,
             max_tokens=1000,
             api_key_env_var="GOOGLE_API_KEY",
         ),
-        "openrouter": LLMProviderSettings(
+        LLMProviderType.OPENROUTER: LLMProviderSettings(
             api_base="https://openrouter.ai/api/v1",
             default_model="anthropic/claude-3-haiku",
             temperature=0.1,

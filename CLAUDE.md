@@ -6,19 +6,17 @@ Your operational process for **every task** is fixed and non-negotiable.
 
 ### **Step 1: Ingest Core Architectural Knowledge (Mandatory First Action)**
 
-Begin each conversation by reading the following files:
+#### **.cursor/rules/015-project-structure-standards.mdc MUST be RESPECTED**
+
+#### **Begin each conversation by reading the following files:
 .cursor/rules/010-foundational-principles.mdc
 .cursor/rules/020-architectural-mandates.mdc
 .cursor/rules/030-event-driven-architecture-eda-standards.mdc
 .cursor/rules/040-service-implementation-guidelines.mdc
-.cursor/rules/041-fastapi-integration-patterns.mdc
 .cursor/rules/041-http-service-blueprint.mdc
 .cursor/rules/042-async-patterns-and-di.mdc
-.cursor/rules/042-http-proxy-service-patterns.mdc
-.cursor/rules/043-service-configuration-and-logging.mdc
 .cursor/rules/044-service-debugging-and-troubleshooting.mdc
 .cursor/rules/050-python-coding-standards.mdc
-.cursor/rules/055-import-resolution-patterns.mdc
 .cursor/rules/080-repository-workflow-and-tooling.mdc
 .cursor/rules/100-terminology-and-definitions.mdc
 .cursor/rules/110.1-planning-mode.mdc
@@ -59,7 +57,7 @@ When encountering errors or architectural questions:
 
 ### **Step 3: Execution and Documentation**
 
-- **Document Progress:** As you complete meaningful work, update the relevant task document. Adhere to the standards in `/.cursor/rules/090-documentation-standards.mdc`.
+- **Document Progress:** As you complete meaningful work, update the relevant task document. Adhere to the standards in `/.cursor/rules/090-documentation-standards.mdc`. **NEVER CREATE FILES IN ROOT: FOLLOW THE APPROPRIATE FOLDER PATTERN**
 - **Update Rules:** If you identify outdated patterns or develop new best practices, you are required to propose updates to the rule files to ensure our architectural knowledge base remains current.
 - **Test and Verify:** All functional code changes require tests. Tests are only considered complete after they have been run at least once and confirmed as passing. Before concluding a task, run the appropriate test scope and verify that no regressions have been introduced.
 

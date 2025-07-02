@@ -15,6 +15,8 @@ from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegist
 from opentelemetry.trace import Tracer
 from prometheus_client import REGISTRY, CollectorRegistry
 
+from common_core import LLMProviderType
+
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.config import settings as service_settings
 from services.cj_assessment_service.implementations.cache_manager_impl import CacheManagerImpl
@@ -151,21 +153,21 @@ class CJAssessmentServiceProvider(Provider):
     def provide_llm_provider_map(
         self,
         llm_service_client: LLMProviderServiceClient,
-    ) -> dict[str, LLMProviderProtocol]:
+    ) -> dict[LLMProviderType, LLMProviderProtocol]:
         """Provide dictionary with LLM service client for all providers."""
         # All providers now route through the centralized service
         return {
-            "openai": llm_service_client,
-            "anthropic": llm_service_client,
-            "google": llm_service_client,
-            "openrouter": llm_service_client,
+            LLMProviderType.OPENAI: llm_service_client,
+            LLMProviderType.ANTHROPIC: llm_service_client,
+            LLMProviderType.GOOGLE: llm_service_client,
+            LLMProviderType.OPENROUTER: llm_service_client,
         }
 
     @provide(scope=Scope.APP)
     def provide_llm_interaction(
         self,
         cache_manager: CacheProtocol,
-        providers: dict[str, LLMProviderProtocol],
+        providers: dict[LLMProviderType, LLMProviderProtocol],
         settings: Settings,
     ) -> LLMInteractionProtocol:
         """Provide LLM interaction orchestrator."""

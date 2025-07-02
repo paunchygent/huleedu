@@ -17,6 +17,7 @@ import pytest
 from aiokafka import AIOKafkaProducer, ConsumerRecord
 
 # CRITICAL: Import ALL enum types FIRST
+from common_core import LLMProviderType
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
 
@@ -241,7 +242,7 @@ def mock_http_session() -> AsyncMock:
 def mock_settings() -> Settings:
     """Provide mock settings for testing."""
     settings = MagicMock()
-    settings.DEFAULT_LLM_PROVIDER = "openai"
+    settings.DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI
     settings.DEFAULT_LLM_MODEL = "gpt-4o-mini"
     settings.TEMPERATURE = 0.7
     settings.MAX_TOKENS_RESPONSE = 4000

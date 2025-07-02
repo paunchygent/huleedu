@@ -55,9 +55,9 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             essay_a_start = essay_b_start = -1
 
             for i, line in enumerate(lines):
-                if line.strip().startswith("Essay A"):
+                if line.strip().startswith("Essay A") and ":" in line:
                     essay_a_start = i + 1
-                elif line.strip().startswith("Essay B"):
+                elif line.strip().startswith("Essay B") and ":" in line:
                     essay_b_start = i + 1
 
             if essay_a_start == -1 or essay_b_start == -1:
@@ -119,7 +119,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             "essay_b": essay_b,
             "llm_config_overrides": {
                 # Provider will be determined by the configured default
-                "provider_override": self.settings.DEFAULT_LLM_PROVIDER.lower(),
+                "provider_override": self.settings.DEFAULT_LLM_PROVIDER.value,
                 "model_override": model_override or self.settings.DEFAULT_LLM_MODEL,
                 "temperature_override": temperature_override
                 or self.settings.DEFAULT_LLM_TEMPERATURE,
