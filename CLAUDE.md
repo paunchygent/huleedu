@@ -8,7 +8,8 @@ Your operational process for **every task** is fixed and non-negotiable.
 
 #### **.cursor/rules/015-project-structure-standards.mdc MUST be RESPECTED**
 
-#### **Begin each conversation by reading the following files:
+#### **Begin each conversation by reading the following files
+
 .cursor/rules/010-foundational-principles.mdc
 .cursor/rules/020-architectural-mandates.mdc
 .cursor/rules/030-event-driven-architecture-eda-standards.mdc

@@ -285,10 +285,9 @@ class LLMProviderServiceProvider(Provider):
     def provide_llm_provider_map(
         self,
         settings: Settings,
-        anthropic_provider: LLMProviderProtocol,
-        openai_provider: LLMProviderProtocol,
-        google_provider: LLMProviderProtocol,
-        openrouter_provider: LLMProviderProtocol,
+        http_session: ClientSession,
+        retry_manager: LLMRetryManagerProtocol,
+        circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> Dict[LLMProviderType, LLMProviderProtocol]:
         """Provide dictionary of available LLM providers."""
         # Use mock provider for testing if enabled
@@ -306,11 +305,21 @@ class LLMProviderServiceProvider(Provider):
                 LLMProviderType.OPENROUTER: mock_provider,
             }
 
+        # Build providers map by calling the individual provider methods
+        # This ensures each provider gets its own instance
         return {
-            LLMProviderType.ANTHROPIC: anthropic_provider,
-            LLMProviderType.OPENAI: openai_provider,
-            LLMProviderType.GOOGLE: google_provider,
-            LLMProviderType.OPENROUTER: openrouter_provider,
+            LLMProviderType.ANTHROPIC: self.provide_anthropic_provider(
+                http_session, settings, retry_manager, circuit_breaker_registry
+            ),
+            LLMProviderType.OPENAI: self.provide_openai_provider(
+                http_session, settings, retry_manager, circuit_breaker_registry
+            ),
+            LLMProviderType.GOOGLE: self.provide_google_provider(
+                http_session, settings, retry_manager, circuit_breaker_registry
+            ),
+            LLMProviderType.OPENROUTER: self.provide_openrouter_provider(
+                http_session, settings, retry_manager, circuit_breaker_registry
+            ),
         }
 
     @provide(scope=Scope.APP)

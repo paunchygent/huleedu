@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import importlib
 from collections.abc import Awaitable, Callable
-from functools import lru_cache
 from typing import Any
 
 import aiohttp
@@ -60,7 +59,6 @@ def _load_exception_class(class_name_str: str) -> type[BaseException] | None:
         return None
 
 
-@lru_cache(maxsize=1)
 def _get_retry_exceptions_tuple(settings: Settings) -> tuple[type[BaseException], ...]:
     """Gets a tuple of exception classes to retry on, based on config.
     Uses lru_cache to avoid reloading/recomputing on every call.
@@ -113,6 +111,8 @@ class RetryManagerImpl(RetryManagerProtocol):
             settings: Application settings for retry configuration.
         """
         self.settings = settings
+        # Cache the retry exceptions tuple at initialization
+        self._retry_exceptions = _get_retry_exceptions_tuple(settings)
 
     async def with_retry(
         self,
@@ -197,9 +197,7 @@ class RetryManagerImpl(RetryManagerProtocol):
                     f"Unexpected API error: {e!s}",
                 )
 
-        retry_exceptions_tuple: tuple[type[BaseException], ...] = _get_retry_exceptions_tuple(
-            self.settings,
-        )
+        retry_exceptions_tuple = self._retry_exceptions
 
         if not retry_exceptions_tuple:
             logger.error(

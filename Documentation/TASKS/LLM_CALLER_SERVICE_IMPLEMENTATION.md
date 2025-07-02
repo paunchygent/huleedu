@@ -622,3 +622,54 @@ Ready for Week 2: Implementing actual LLM provider logic and enhancing the orche
 - **Easier Provider Updates**: Add new providers without touching CJ
 - **Enhanced Observability**: Centralized metrics and monitoring
 - **Improved Resilience**: Circuit breakers and caching in one place
+
+## 🔄 **INTEGRATION TESTING UPDATE (2025-07-02)**
+
+### **Progress Made**
+
+1. **✅ Enum Compliance Fixed**:
+   - All string literals replaced with `LLMProviderType` enum
+   - Type safety enforced across service boundaries
+   - Unit tests updated and passing (7/7)
+
+2. **✅ Service Communication Verified**:
+   - Both services healthy and responding
+   - LLM Provider Service making real API calls
+   - Caching and event publishing working correctly
+
+3. **✅ Integration Test Framework**:
+   - Created `test_llm_provider_service_integration.py`
+   - Created `test_cj_llm_integration.py`
+   - Basic connectivity tests passing
+
+4. **🔧 Configuration Issues Identified**:
+   - Retry manager expects different attribute names
+   - Missing retry-related settings in CJ Assessment config
+   - `@lru_cache` decorator incompatible with Settings object
+
+### **Remaining Work**
+
+1. **Fix Retry Configuration**:
+   - Align setting names between retry manager and config
+   - Remove or refactor `@lru_cache` usage
+   - Add all missing retry attributes
+
+2. **Complete Integration Tests**:
+   - End-to-end CJ Assessment flow
+   - Error handling scenarios
+   - Mock provider testing
+
+3. **Performance Validation**:
+   - Measure service hop overhead
+   - Document acceptable latency ranges
+   - Verify circuit breaker behavior
+
+### **Next Session Starting Point**
+
+Use `CJ_ASSESSMENT_INTEGRATION_TESTING_v2.md` which contains:
+- Current blocker details
+- Exact configuration issues
+- Clear next steps
+- Updated success criteria
+
+**Status**: Integration 70% complete, blocked on configuration alignment

@@ -78,8 +78,15 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         # Use system prompt from override or default comparison prompt
         system_prompt = (
             system_prompt_override
-            or "You are an expert essay evaluator. Compare the two essays and "
-            "return your analysis as JSON."
+            or """You are an expert essay evaluator tasked with comparing two student essays.
+
+Your job is to:
+1. Read both essays carefully
+2. Determine which essay is better written based on clarity, structure, argument quality, and writing mechanics
+3. Provide a clear justification for your choice
+4. Rate your confidence in the decision
+
+You will use the essay_comparison_result tool to provide your analysis."""
         )
 
         # Execute with retry
@@ -142,12 +149,43 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         )
         max_tokens = max_tokens_override or self.settings.LLM_DEFAULT_MAX_TOKENS
 
+        # Define the tool for structured essay comparison response
+        tools = [
+            {
+                "name": "essay_comparison_result",
+                "description": "Return the result of comparing two essays",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "choice": {
+                            "type": "string",
+                            "enum": ["A", "B"],
+                            "description": "Which essay is better: A or B"
+                        },
+                        "reasoning": {
+                            "type": "string",
+                            "description": "Detailed explanation of why this essay was chosen"
+                        },
+                        "confidence": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0,
+                            "description": "Confidence score between 0.0 and 1.0"
+                        }
+                    },
+                    "required": ["choice", "reasoning", "confidence"]
+                }
+            }
+        ]
+
         payload = {
             "model": model,
             "system": system_prompt,
             "messages": [{"role": "user", "content": user_prompt}],
             "max_tokens": max_tokens,
             "temperature": temperature,
+            "tools": tools,
+            "tool_choice": {"type": "tool", "name": "essay_comparison_result"}
         }
 
         try:
@@ -157,25 +195,49 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 json=payload,
             ) as response:
                 if response.status == 200:
-                    response_data = await response.json()
+                    response_text = await response.text()
+                    try:
+                        response_data = json.loads(response_text)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse Anthropic response as JSON: {e}", extra={"response_text": response_text[:500]})
+                        from uuid import uuid4
+                        return None, LLMProviderError(
+                            error_type=ErrorCode.PARSING_ERROR,
+                            error_message=f"Failed to parse Anthropic response: {str(e)}",
+                            provider=LLMProviderType.ANTHROPIC,
+                            correlation_id=uuid4(),
+                            is_retryable=False,
+                        )
 
-                    # Extract text content from Anthropic response
-                    text_content = None
+                    # Log the structure for debugging
+                    logger.debug("Anthropic response structure", extra={
+                        "has_content": "content" in response_data,
+                        "content_type": type(response_data.get("content")).__name__,
+                        "content_length": len(response_data.get("content", [])) if isinstance(response_data.get("content"), list) else 0
+                    })
+
+                    # Extract tool use from Anthropic response
+                    tool_result = None
                     if isinstance(response_data.get("content"), list):
                         for block in response_data["content"]:
-                            if block.get("type") == "text":
-                                text_content = block.get("text")
+                            if block.get("type") == "tool_use" and block.get("name") == "essay_comparison_result":
+                                tool_result = block.get("input", {})
                                 break
 
-                    if text_content:
+                    if tool_result:
                         try:
-                            # Parse the JSON response
-                            parsed_content = json.loads(text_content)
+                            # Extract fields from tool result
+                            choice = tool_result.get("choice", "A")
+                            reasoning = tool_result.get("reasoning", "Analysis provided")
+                            confidence = float(tool_result.get("confidence", 0.5))
 
-                            # Extract required fields with defaults
-                            choice = parsed_content.get("choice", "A")
-                            reasoning = parsed_content.get("reasoning", "Analysis provided")
-                            confidence = float(parsed_content.get("confidence", 0.5))
+                            # Validate choice is A or B
+                            if choice not in ["A", "B"]:
+                                logger.warning(f"Invalid choice '{choice}', defaulting to 'A'")
+                                choice = "A"
+
+                            # Validate confidence is between 0 and 1
+                            confidence = max(0.0, min(1.0, confidence))
 
                             # Get token usage
                             usage = response_data.get("usage", {})
@@ -198,9 +260,9 @@ class AnthropicProviderImpl(LLMProviderProtocol):
 
                             return response_model, None
 
-                        except (json.JSONDecodeError, ValueError, KeyError) as e:
-                            error_msg = f"Failed to parse Anthropic response: {str(e)}"
-                            logger.error(error_msg, extra={"response_text": text_content[:500]})
+                        except (ValueError, KeyError, TypeError) as e:
+                            error_msg = f"Failed to parse Anthropic tool response: {str(e)}"
+                            logger.error(error_msg, extra={"tool_result": str(tool_result)[:500]})
                             from uuid import uuid4
 
                             return None, LLMProviderError(
@@ -211,11 +273,13 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                                 is_retryable=False,
                             )
                     else:
+                        # Log the full response for debugging
+                        logger.error("No tool use found in Anthropic response", extra={"response_data": str(response_data)[:1000]})
                         from uuid import uuid4
 
                         return None, LLMProviderError(
                             error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                            error_message="No text content in Anthropic response",
+                            error_message="No tool use found in Anthropic response",
                             provider=LLMProviderType.ANTHROPIC,
                             correlation_id=uuid4(),
                             is_retryable=False,
