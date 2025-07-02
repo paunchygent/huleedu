@@ -9,6 +9,7 @@ from huleedu_service_libs.resilience import CircuitBreakerError, CircuitBreakerR
 from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
 
+from common_core import LLMProviderType
 from services.llm_provider_service.api_models import (
     LLMComparisonRequest,
     LLMComparisonResponse,
@@ -208,10 +209,13 @@ async def test_provider(
 ) -> Response | tuple[Response, int]:
     """Test a specific LLM provider."""
     try:
-        # Simple test prompt
-        test_prompt = "Complete this sentence in exactly 5 words: The weather today is"
+        # Convert string to enum
+        try:
+            provider_enum = LLMProviderType(provider)
+        except ValueError:
+            return jsonify({"error": f"Invalid provider: {provider}"}), 400
 
-        success, message = await orchestrator.test_provider(provider=provider)
+        success, message = await orchestrator.test_provider(provider=provider_enum)
 
         return jsonify(
             {

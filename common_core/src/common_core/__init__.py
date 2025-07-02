@@ -50,6 +50,14 @@ from .events.file_events import (
     EssayContentProvisionedV1,
     EssayValidationFailedV1,
 )
+from .events.llm_provider_events import (
+    LLMCostAlertV1,
+    LLMCostTrackingV1,
+    LLMProviderFailureV1,
+    LLMRequestCompletedV1,
+    LLMRequestStartedV1,
+    LLMUsageAnalyticsV1,
+)
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .metadata_models import (
     EntityReference,
@@ -135,6 +143,13 @@ __all__ = [
     # File Service Event Models
     "EssayContentProvisionedV1",
     "EssayValidationFailedV1",
+    # LLM Provider Event Models
+    "LLMRequestStartedV1",
+    "LLMRequestCompletedV1", 
+    "LLMProviderFailureV1",
+    "LLMUsageAnalyticsV1",
+    "LLMCostAlertV1",
+    "LLMCostTrackingV1",
     # Batch Service Command Models
     "BatchServiceSpellcheckInitiateCommandDataV1",
     "BatchServiceNLPInitiateCommandDataV1",

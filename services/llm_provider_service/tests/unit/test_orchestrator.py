@@ -60,7 +60,7 @@ def orchestrator(
 
     from services.llm_provider_service.protocols import LLMProviderProtocol
 
-    providers: Dict[str, LLMProviderProtocol] = {"mock": mock_provider, "openai": mock_provider}  # type: ignore
+    providers: Dict[LLMProviderType, LLMProviderProtocol] = {LLMProviderType.MOCK: mock_provider, LLMProviderType.OPENAI: mock_provider}  # type: ignore
     return LLMOrchestratorImpl(
         providers=providers,
         cache_manager=mock_cache_manager,
@@ -121,7 +121,7 @@ async def test_orchestrator_provider_not_found(orchestrator: LLMOrchestratorImpl
 
     # Act
     result, error = await orchestrator.perform_comparison(
-        provider="nonexistent",
+        provider=LLMProviderType.GOOGLE,  # Valid provider type but not configured in test setup
         user_prompt="Compare",
         essay_a="A",
         essay_b="B",
@@ -133,7 +133,7 @@ async def test_orchestrator_provider_not_found(orchestrator: LLMOrchestratorImpl
     assert error is not None
     assert error.error_type == ErrorCode.CONFIGURATION_ERROR
     assert "not found" in error.error_message
-    assert error.provider == "nonexistent"
+    assert error.provider == LLMProviderType.GOOGLE
     assert error.is_retryable is False
 
 
@@ -242,7 +242,7 @@ async def test_orchestrator_test_provider_success(
     mock_provider.generate_comparison.return_value = (mock_response, None)
 
     # Act
-    success, message = await orchestrator.test_provider("mock")
+    success, message = await orchestrator.test_provider(LLMProviderType.MOCK)
 
     # Assert
     assert success is True
@@ -258,7 +258,7 @@ async def test_orchestrator_test_provider_failure(
     mock_provider.generate_comparison.side_effect = Exception("Connection failed")
 
     # Act
-    success, message = await orchestrator.test_provider("mock")
+    success, message = await orchestrator.test_provider(LLMProviderType.MOCK)
 
     # Assert
     assert success is False

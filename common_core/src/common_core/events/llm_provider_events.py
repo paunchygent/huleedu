@@ -88,3 +88,31 @@ class LLMCostAlertV1(BaseModel):
     threshold: float
     period: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class LLMCostTrackingV1(BaseModel):  # TODO: IMPLEMENT IN RESULT AGGREGATOR SERVICE or DEDICATED METRICS/BILLING SERVICE
+    """Event for downstream cost aggregation and billing (Result Aggregator Service)."""
+
+    correlation_id: UUID
+    provider: LLMProviderType
+    model: str
+    request_type: str  # "comparison", "generation", etc.
+    
+    # Cost breakdown
+    cost_estimate_usd: float
+    token_usage: Dict[str, int]  # prompt_tokens, completion_tokens, total_tokens
+    
+    # Request metadata for cost attribution
+    user_id: str | None = None
+    organization_id: str | None = None  # For multi-tenant billing
+    service_name: str  # Which service made the request (e.g., "cj_assessment_service")
+    
+    # Timing for cost analysis
+    request_timestamp: datetime
+    response_time_ms: int
+    
+    # Cache efficiency tracking
+    cached: bool = False
+    cache_cost_savings_usd: float = 0.0  # How much we saved by using cache
+    
+    metadata: Dict[str, Any] = Field(default_factory=dict)

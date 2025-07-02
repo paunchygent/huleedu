@@ -57,6 +57,7 @@ class ProcessingEvent(str, Enum):
     LLM_CACHE_MISS = "llm_provider.cache.miss"
     LLM_USAGE_ANALYTICS = "llm_provider.usage.analytics"
     LLM_COST_ALERT = "llm_provider.cost.alert"
+    LLM_COST_TRACKING = "llm_provider.cost.tracking"
 
 
 # Private mapping for topic_name() function
@@ -98,6 +99,7 @@ _TOPIC_MAPPING = {
     ProcessingEvent.LLM_CACHE_MISS: "huleedu.llm_provider.cache_miss.v1",
     ProcessingEvent.LLM_USAGE_ANALYTICS: "huleedu.llm_provider.usage_analytics.v1",
     ProcessingEvent.LLM_COST_ALERT: "huleedu.llm_provider.cost_alert.v1",
+    ProcessingEvent.LLM_COST_TRACKING: "huleedu.llm_provider.cost_tracking.v1",
 }
 
 

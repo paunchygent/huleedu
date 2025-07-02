@@ -68,7 +68,7 @@ class LLMOrchestratorProtocol(Protocol):
         """
         ...
 
-    async def test_provider(self, provider: str) -> Tuple[bool, str]:
+    async def test_provider(self, provider: LLMProviderType) -> Tuple[bool, str]:
         """Test provider connectivity and availability.
 
         Args:

@@ -28,7 +28,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
     def __init__(
         self,
-        providers: Dict[str, LLMProviderProtocol],
+        providers: Dict[LLMProviderType, LLMProviderProtocol],
         cache_manager: LLMCacheManagerProtocol,
         event_publisher: LLMEventPublisherProtocol,
         settings: Settings,
@@ -47,18 +47,10 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
         self.settings = settings
 
-    def _str_to_provider_type(self, provider: str) -> LLMProviderType:
-        """Convert string provider name to LLMProviderType enum."""
-        try:
-            return LLMProviderType(provider)
-        except ValueError:
-            # If provider string doesn't match enum, default to mock
-            logger.warning(f"Unknown provider '{provider}', defaulting to mock")
-            return LLMProviderType.MOCK
 
     async def perform_comparison(
         self,
-        provider: str,
+        provider: LLMProviderType,
         user_prompt: str,
         essay_a: str,
         essay_b: str,
@@ -82,20 +74,20 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
         # Validate provider
         if provider not in self.providers:
-            available = list(self.providers.keys())
-            error_msg = f"Provider '{provider}' not found. Available: {available}"
+            available = [p.value for p in self.providers.keys()]
+            error_msg = f"Provider '{provider.value}' not found. Available: {available}"
             logger.error(error_msg)
             return None, LLMProviderError(
                 error_type=ErrorCode.CONFIGURATION_ERROR,
                 error_message=error_msg,
-                provider=self._str_to_provider_type(provider),
+                provider=provider,
                 correlation_id=correlation_id,
                 is_retryable=False,
             )
 
         # Generate cache key
         cache_key = self.cache_manager.generate_cache_key(
-            provider=provider,
+            provider=provider.value,
             user_prompt=user_prompt,
             essay_a=essay_a,
             essay_b=essay_b,
@@ -104,7 +96,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
         # Publish request started event
         await self.event_publisher.publish_llm_request_started(
-            provider=provider,
+            provider=provider.value,
             correlation_id=correlation_id,
             metadata={
                 "request_type": "comparison",
@@ -120,7 +112,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
             # Publish completion event for cache hit
             await self.event_publisher.publish_llm_request_completed(
-                provider=provider,
+                provider=provider.value,
                 correlation_id=correlation_id,
                 success=True,
                 response_time_ms=response_time_ms,
@@ -131,14 +123,14 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 },
             )
 
-            logger.info(f"Cache hit for provider {provider}, correlation_id: {correlation_id}")
+            logger.info(f"Cache hit for provider {provider.value}, correlation_id: {correlation_id}")
 
             # Construct response from cached data
             return LLMOrchestratorResponse(
                 choice=cached_response.get("choice", "A"),
                 reasoning=cached_response.get("reasoning", ""),
                 confidence=cached_response.get("confidence", 0.5),
-                provider=self._str_to_provider_type(provider),
+                provider=provider,
                 model=cached_response.get("model", "unknown"),
                 response_time_ms=response_time_ms,
                 cached=True,
@@ -174,7 +166,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                     "completion_tokens": result.completion_tokens,
                     "total_tokens": result.total_tokens,
                 }
-                cost_estimate_value: float = self._estimate_cost(provider, token_usage_dict) or 0.0
+                cost_estimate_value: float = self._estimate_cost(provider.value, token_usage_dict) or 0.0
 
                 cache_data = {
                     "choice": result.choice,
@@ -188,7 +180,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
                 # Publish completion event
                 await self.event_publisher.publish_llm_request_completed(
-                    provider=provider,
+                    provider=provider.value,
                     correlation_id=correlation_id,
                     success=True,
                     response_time_ms=response_time_ms,
@@ -203,7 +195,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 )
 
                 logger.info(
-                    f"LLM request successful for provider {provider}, "
+                    f"LLM request successful for provider {provider.value}, "
                     f"correlation_id: {correlation_id}, "
                     f"response_time: {response_time_ms}ms"
                 )
@@ -213,7 +205,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                     choice=result.choice,
                     reasoning=result.reasoning,
                     confidence=result.confidence,
-                    provider=self._str_to_provider_type(provider),
+                    provider=provider,
                     model=result.model,
                     response_time_ms=response_time_ms,
                     cached=False,
@@ -238,7 +230,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         except Exception as e:
             # Unexpected error
             response_time_ms = int((time.time() - start_time) * 1000)
-            error_msg = f"Unexpected error calling provider {provider}: {str(e)}"
+            error_msg = f"Unexpected error calling provider {provider.value}: {str(e)}"
             logger.error(error_msg, exc_info=True)
 
             await self._handle_provider_failure(
@@ -251,14 +243,14 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             return None, LLMProviderError(
                 error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
                 error_message=error_msg,
-                provider=self._str_to_provider_type(provider),
+                provider=provider,
                 correlation_id=correlation_id,
                 is_retryable=True,
             )
 
     async def _handle_provider_failure(
         self,
-        provider: str,
+        provider: LLMProviderType,
         correlation_id: UUID,
         error: str,
         response_time_ms: int,
@@ -284,7 +276,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
         # Publish failure event
         await self.event_publisher.publish_llm_provider_failure(
-            provider=provider,
+            provider=provider.value,
             failure_type=failure_type,
             correlation_id=correlation_id,
             error_details=error,
@@ -293,7 +285,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
         # Publish completion event with failure
         await self.event_publisher.publish_llm_request_completed(
-            provider=provider,
+            provider=provider.value,
             correlation_id=correlation_id,
             success=False,
             response_time_ms=response_time_ms,
@@ -304,7 +296,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             },
         )
 
-    async def test_provider(self, provider: str) -> Tuple[bool, str]:
+    async def test_provider(self, provider: LLMProviderType) -> Tuple[bool, str]:
         """Test provider connectivity and availability.
 
         Args:
@@ -314,7 +306,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             Tuple of (success, message)
         """
         if provider not in self.providers:
-            return False, f"Provider '{provider}' not found"
+            return False, f"Provider '{provider.value}' not found"
 
         try:
             # Simple test prompt
@@ -329,7 +321,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             if error:
                 return False, f"Provider test failed: {error.error_message}"
 
-            return True, f"Provider '{provider}' is operational"
+            return True, f"Provider '{provider.value}' is operational"
 
         except Exception as e:
             return False, f"Provider test failed with exception: {str(e)}"

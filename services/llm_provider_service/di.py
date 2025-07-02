@@ -296,7 +296,7 @@ class LLMProviderServiceProvider(Provider):
     def provide_llm_orchestrator(
         self,
         settings: Settings,
-        providers: Dict[str, LLMProviderProtocol],
+        providers: Dict[LLMProviderType, LLMProviderProtocol],
         cache_manager: LLMCacheManagerProtocol,
         event_publisher: LLMEventPublisherProtocol,
     ) -> LLMOrchestratorProtocol:

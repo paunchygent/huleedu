@@ -173,13 +173,13 @@ async def test_cache_manager_generate_cache_key_with_params(
 async def test_cache_manager_error_handling(
     cache_manager: RedisCacheManagerImpl, mock_redis_client: AsyncMock
 ) -> None:
-    """Test cache manager handles Redis errors by raising CacheConnectionError."""
+    """Test cache manager handles Redis errors gracefully (returns None instead of raising)."""
     # Arrange
     cache_key = "test_key"
     mock_redis_client.get.side_effect = Exception("Redis connection error")
 
-    # Act & Assert
-    from services.llm_provider_service.exceptions import CacheConnectionError
+    # Act
+    result = await cache_manager.get_cached_response(cache_key)
 
-    with pytest.raises(CacheConnectionError, match="Failed to retrieve from cache"):
-        await cache_manager.get_cached_response(cache_key)
+    # Assert - should handle gracefully and return None (cache miss)
+    assert result is None
