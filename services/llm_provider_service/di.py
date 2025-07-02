@@ -13,6 +13,7 @@ from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
+from huleedu_service_libs.resilience.resilient_client import make_resilient
 
 from common_core import LLMProviderType
 from services.llm_provider_service.config import Settings, settings
@@ -192,16 +193,21 @@ class LLMProviderServiceProvider(Provider):
         retry_manager: LLMRetryManagerProtocol,
         circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> LLMProviderProtocol:
-        """Provide Anthropic/Claude provider."""
-        circuit_breaker = None
-        if settings.CIRCUIT_BREAKER_ENABLED:
-            circuit_breaker = circuit_breaker_registry.get("llm_anthropic")
-
-        return AnthropicProviderImpl(
+        """Provide Anthropic/Claude provider with circuit breaker protection."""
+        # Create base implementation
+        base_provider = AnthropicProviderImpl(
             session=http_session,
             settings=settings,
             retry_manager=retry_manager,
         )
+
+        # Wrap with circuit breaker if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            circuit_breaker = circuit_breaker_registry.get("llm_anthropic")
+            if circuit_breaker:
+                return make_resilient(base_provider, circuit_breaker)
+
+        return base_provider
 
     @provide(scope=Scope.APP)
     def provide_openai_provider(
@@ -211,16 +217,21 @@ class LLMProviderServiceProvider(Provider):
         retry_manager: LLMRetryManagerProtocol,
         circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> LLMProviderProtocol:
-        """Provide OpenAI provider."""
-        circuit_breaker = None
-        if settings.CIRCUIT_BREAKER_ENABLED:
-            circuit_breaker = circuit_breaker_registry.get("llm_openai")
-
-        return OpenAIProviderImpl(
+        """Provide OpenAI provider with circuit breaker protection."""
+        # Create base implementation
+        base_provider = OpenAIProviderImpl(
             session=http_session,
             settings=settings,
             retry_manager=retry_manager,
         )
+
+        # Wrap with circuit breaker if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            circuit_breaker = circuit_breaker_registry.get("llm_openai")
+            if circuit_breaker:
+                return make_resilient(base_provider, circuit_breaker)
+
+        return base_provider
 
     @provide(scope=Scope.APP)
     def provide_google_provider(
@@ -230,16 +241,21 @@ class LLMProviderServiceProvider(Provider):
         retry_manager: LLMRetryManagerProtocol,
         circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> LLMProviderProtocol:
-        """Provide Google Gemini provider."""
-        circuit_breaker = None
-        if settings.CIRCUIT_BREAKER_ENABLED:
-            circuit_breaker = circuit_breaker_registry.get("llm_google")
-
-        return GoogleProviderImpl(
+        """Provide Google Gemini provider with circuit breaker protection."""
+        # Create base implementation
+        base_provider = GoogleProviderImpl(
             session=http_session,
             settings=settings,
             retry_manager=retry_manager,
         )
+
+        # Wrap with circuit breaker if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            circuit_breaker = circuit_breaker_registry.get("llm_google")
+            if circuit_breaker:
+                return make_resilient(base_provider, circuit_breaker)
+
+        return base_provider
 
     @provide(scope=Scope.APP)
     def provide_openrouter_provider(
@@ -249,16 +265,21 @@ class LLMProviderServiceProvider(Provider):
         retry_manager: LLMRetryManagerProtocol,
         circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> LLMProviderProtocol:
-        """Provide OpenRouter provider."""
-        circuit_breaker = None
-        if settings.CIRCUIT_BREAKER_ENABLED:
-            circuit_breaker = circuit_breaker_registry.get("llm_openrouter")
-
-        return OpenRouterProviderImpl(
+        """Provide OpenRouter provider with circuit breaker protection."""
+        # Create base implementation
+        base_provider = OpenRouterProviderImpl(
             session=http_session,
             settings=settings,
             retry_manager=retry_manager,
         )
+
+        # Wrap with circuit breaker if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            circuit_breaker = circuit_breaker_registry.get("llm_openrouter")
+            if circuit_breaker:
+                return make_resilient(base_provider, circuit_breaker)
+
+        return base_provider
 
     @provide(scope=Scope.APP)
     def provide_llm_provider_map(

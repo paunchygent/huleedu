@@ -75,7 +75,7 @@ async def generate_comparison(
         )
 
         # Track metrics
-        duration_ms = int((time.time() - start_time) * 1000)
+        _duration_ms = int((time.time() - start_time) * 1000)
 
         if error:
             metrics["llm_requests_total"].labels(

@@ -78,7 +78,8 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         # Use system prompt from override or default comparison prompt
         system_prompt = (
             system_prompt_override
-            or "You are an expert essay evaluator. Compare the two essays and return your analysis as JSON."
+            or "You are an expert essay evaluator. Compare the two essays and "
+            "return your analysis as JSON."
         )
 
         # Execute with retry
