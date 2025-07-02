@@ -48,6 +48,35 @@
 
 ## 🔄 CRITICAL CACHE REFACTOR REQUIRED
 
+### Executive Summary
+
+**What We're Changing**: Transform the LLM Provider Service from a response-caching system to a queue-based resilience system.
+
+**Why**: Current response caching violates core business requirements:
+- **CJ Assessment**: Needs natural judgment variation for valid Bradley-Tracy scoring
+- **AI Feedback**: Users pay for fresh AI responses, not cached content
+
+**How**: Replace response caching with request queuing:
+- **Production**: Always serve fresh LLM responses, queue during outages
+- **Development**: Use mock provider + optional response recorder for API validation
+- **Resilience**: Use Redis queue with local fallback, explicit capacity limits
+
+### Critical Insight: Redis Role Transformation
+
+**Current Redis Behavior**:
+- Stores LLM **responses** (complete API results)
+- Key pattern: `llm-provider-service:cache:llm:{provider}:{content_hash}`
+- Purpose: Avoid redundant LLM API calls
+- Problem: Returns identical responses, breaking psychometric validity
+
+**New Redis Behavior**:
+- Stores **requests** for processing during outages
+- Key pattern: `llm-provider-service:queue:requests:{queue_id}`
+- Purpose: Resilience during provider outages
+- Solution: Every successful request gets fresh LLM response
+
+**The Fundamental Shift**: Redis moves from being a response cache (wrong) to being a request queue (correct). This is the most critical change.
+
 ### Task Summary
 
 **Problem Statement**:
@@ -128,48 +157,142 @@ The current cache implementation **fundamentally breaks** the psychometric valid
 - Perfect consistency creates artificial "super-rater" that doesn't exist
 - Corrupts the statistical validity of the assessment
 
-### Correct Cache Design
+### Correct Queue-Based Design
 
-**Primary Purposes**:
+**Core Principle**: In production, NEVER serve cached LLM responses. Always provide fresh responses or queue for later processing.
 
-1. **Development/Testing** - Deterministic tests with explicit opt-in (`USE_MOCK_LLM=true`)
-2. **Deduplication** - Last resort to prevent duplicate in-flight requests
-3. **NOT for serving responses** - Never return cached responses in production
-
-**Queue-Based Resilience Pattern**:
+**Production Request Flow**:
 
 ```text
-Request arrives → Provider available? 
-  ├─ YES → Fresh LLM call → Return result
-  └─ NO → Queue request → Return "processing" status → Process when available
+Request arrives → LLM Provider available?
+├─ YES → Fresh LLM call → Return result
+└─ NO → Queue request
+    ├─ Redis up → Queue in Redis (persistent) → Return 202 + queue_id
+    └─ Redis down → Check local queue capacity
+        ├─ Below 80% → Queue locally (volatile) → Return 202 + queue_id
+        └─ At/above 80% → Return 503 "Queue at capacity"
+```
+
+**Key Design Elements**:
+
+1. **NO Response Caching Ever** - Every successful request gets fresh LLM response
+2. **Queue for Resilience** - Outages result in queuing, not cached responses
+3. **Local Queue Fallback** - In-memory queue when Redis unavailable (with capacity limits)
+4. **Explicit Rejection** - Return 503 when queue full, never silently drop requests
+5. **Development Testing** - Use mock provider or lightweight response recorder for API validation
+
+**Queue Capacity Management**:
+
+- **High Watermark (80%)**: Start rejecting new requests
+- **Low Watermark (60%)**: Resume accepting requests
+- **Memory Limits**: Prevent OOM by tracking queue memory usage
+- **No LRU Eviction**: Never silently drop queued requests
+
+### Development Testing Strategy
+
+Instead of maintaining complex cache infrastructure for development:
+
+1. **Primary**: Use existing mock provider for day-to-day development
+2. **API Validation**: Lightweight response recorder for occasional real API testing
+3. **Cost Control**: Only use real providers when validating API changes
+
+**Response Recorder** (Simple file-based logging):
+```python
+class DevelopmentResponseRecorder:
+    """Records LLM responses to files for development only."""
+    
+    async def record_response(self, provider: str, request: Any, response: Any):
+        if not self.enabled:
+            return
+        
+        # Save to ./llm_response_logs/{provider}_{timestamp}.json
+        # Human-readable format for API contract validation
+        # Git-ignored directory
 ```
 
 ### Implementation Plan
 
-#### Phase 1: Add Request Queuing Infrastructure
+#### Phase 1: Transform Redis from Response Cache to Request Queue
 
-- [ ] Create `QueueManagerProtocol` for request queuing
-- [ ] Implement Redis-backed queue for production persistence
-- [ ] Add in-memory queue for development
-- [ ] Environment-aware queue persistence (`ENVIRONMENT` enum from common_core)
+**Critical First Step**: Redis is currently our main handler - we must transform it carefully to maintain service availability.
 
-#### Phase 2: Refactor Cache Behavior
+- [ ] Create new protocols alongside existing cache protocols:
+  - `QueueManagerProtocol` for request queuing operations
+  - Keep `LLMCacheManagerProtocol` temporarily for migration
+- [ ] Transform Redis implementation:
+  - Create `RedisQueueRepositoryImpl` based on current `RedisCacheRepositoryImpl`
+  - Change key pattern: `{service}:queue:requests:{queue_id}` instead of cache keys
+  - Store `QueuedRequest` objects instead of responses
+  - Add queue-specific operations: enqueue, dequeue, get_queue_size
+  - Implement TTL of 4 hours for queued requests
+- [ ] Create local queue implementation:
+  - `LocalQueueManagerImpl` with strict capacity limits
+  - No LRU eviction - explicit rejection when full
+  - High/low watermark circuit breaker (80%/60%)
+  - Memory tracking to prevent OOM
+- [ ] Update `ResilientCacheManagerImpl` → `ResilientQueueManagerImpl`:
+  - Primary: Redis queue for persistence
+  - Fallback: Local queue with capacity management
+  - Consistent behavior across both backends
 
-- [ ] Add `cache_mode` parameter to API: `none`, `development`, `deduplication_only`
-- [ ] Default to `none` for production
-- [ ] Remove response caching from main request flow
-- [ ] Keep cache for development/testing only
+#### Phase 2: Update LLM Orchestrator Request Flow
 
-#### Phase 3: Implement Async Processing
+- [ ] Modify `llm_orchestrator_impl.py` request handling:
+  ```
+  Current: Check cache → Return cached OR call LLM
+  New: Check provider → Call LLM OR queue request
+  ```
+- [ ] Implement new flow:
+  1. Check LLM provider availability (circuit breaker)
+  2. If available → Direct LLM call → Return fresh response
+  3. If unavailable → Queue request → Return 202 with queue_id
+  4. Never check/return cached responses (remove all cache logic)
+- [ ] Add development response recorder:
+  - Simple file-based response logging for API validation
+  - Only active with `RECORD_LLM_RESPONSES=true` in development
+  - Lightweight alternative to complex caching
+- [ ] Remove all response caching code:
+  - Delete cache manager references
+  - Remove cache configuration
+  - Clean up imports
 
-- [ ] Add status endpoint for queued requests
-- [ ] Implement queue processing when provider returns
-- [ ] Add TTL for queued requests:
-  - CJ Assessment: 2-4 hours
-  - AI Feedback: 2-4 hours
-- [ ] Kafka events for queue status changes
+#### Phase 3: Queue Processing & Status Management
 
-#### Phase 4: Update API Contract
+- [ ] Add queue processor background task:
+  - Poll queue for pending requests
+  - Process when LLM providers recover
+  - Respect request TTL (expire after 4 hours)
+  - Update request status throughout lifecycle
+- [ ] Implement status tracking:
+  - Add `/api/v1/status/{queue_id}` endpoint
+  - Track: QUEUED → PROCESSING → COMPLETED/FAILED/EXPIRED
+  - Store results temporarily for client retrieval
+- [ ] Add Kafka events for observability:
+  - Request queued/dequeued
+  - Processing started/completed/failed
+  - Queue capacity warnings
+  - TTL expirations
+
+#### Phase 4: Cleanup - Remove All Cache Infrastructure
+
+- [ ] Delete cache-related files:
+  - `implementations/redis_cache_repository_impl.py`
+  - `implementations/local_cache_manager_impl.py` 
+  - `implementations/resilient_cache_manager_impl.py`
+- [ ] Remove cache protocols from `protocols.py`:
+  - `LLMCacheManagerProtocol`
+  - `CacheRepositoryProtocol`
+- [ ] Clean up `config.py`:
+  - Remove all `CACHE_*` settings
+  - Remove `LLM_CACHE_*` settings
+- [ ] Update `di.py`:
+  - Remove cache provider methods
+  - Remove cache dependencies
+- [ ] Delete cache tests:
+  - All cache-related test files
+  - Cache mocks and fixtures
+
+#### Phase 5: Update API Contract
 
 - [ ] Add `processing_mode` to request: `immediate` or `queue_if_unavailable`
 - [ ] Return `202 Accepted` with queue ID for queued requests
@@ -185,7 +308,7 @@ Request arrives → Provider available?
 
 ### Technical Specifications
 
-**Queue Design**:
+**Queue Data Models**:
 
 ```python
 class QueuedRequest(BaseModel):
@@ -196,26 +319,81 @@ class QueuedRequest(BaseModel):
     priority: int  # Higher for CJ Assessment
     status: QueueStatus  # QUEUED, PROCESSING, COMPLETED, EXPIRED
     retry_count: int = 0
+    size_bytes: int  # For memory tracking
+
+class QueueStatus(str, Enum):
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    EXPIRED = "expired"
+    FAILED = "failed"
 ```
 
-**Environment-Aware Settings**:
+**Queue Manager Protocol**:
+
+```python
+class QueueManagerProtocol(Protocol):
+    async def enqueue(self, request: QueuedRequest) -> bool:
+        """Returns False if queue full"""
+        ...
+    
+    async def dequeue(self) -> Optional[QueuedRequest]:
+        """Get next request to process"""
+        ...
+    
+    async def get_status(self, queue_id: UUID) -> Optional[QueueStatus]:
+        ...
+    
+    async def get_queue_stats(self) -> QueueStats:
+        """Current size, capacity, memory usage"""
+        ...
+```
+
+**Environment-Aware Configuration**:
 
 ```python
 class Settings(BaseSettings):
-    ENVIRONMENT: EnvironmentType  # DEVELOPMENT, STAGING, PRODUCTION
-    ENABLE_QUEUE_PERSISTENCE: bool = Field(
-        default_factory=lambda: settings.ENVIRONMENT == EnvironmentType.PRODUCTION
+    ENVIRONMENT: EnvironmentType  # from common_core.enums
+    
+    # Queue settings
+    QUEUE_MAX_SIZE: int = 1000
+    QUEUE_MAX_MEMORY_MB: int = 100
+    QUEUE_HIGH_WATERMARK: float = 0.8  # Start rejecting at 80%
+    QUEUE_LOW_WATERMARK: float = 0.6   # Resume at 60%
+    
+    # Development response recording
+    RECORD_LLM_RESPONSES: bool = Field(
+        default=False,
+        description="Record LLM responses to files for API validation (dev only)"
     )
-    ENABLE_RESPONSE_CACHE: bool = Field(
-        default_factory=lambda: settings.ENVIRONMENT == EnvironmentType.DEVELOPMENT
+    
+    @field_validator("RECORD_LLM_RESPONSES")
+    def validate_response_recording(cls, v: bool, values: dict) -> bool:
+        """Ensure response recording is only enabled in development."""
+        if v and values.get("ENVIRONMENT") != "development":
+            raise ValueError("Response recording only allowed in development")
+        return v
+    
+    # Queue persistence
+    QUEUE_USE_REDIS: bool = Field(
+        default_factory=lambda: os.getenv("ENVIRONMENT") != "DEVELOPMENT"
     )
 ```
 
-**Deduplication Hierarchy**:
+**Queue Full Response**:
 
-1. Idempotency keys (client-provided)
-2. In-flight request tracking
-3. Recent request cache (last resort)
+```python
+class QueueFullError(BaseModel):
+    error: str = "Queue at capacity"
+    queue_stats: Dict[str, Any] = {
+        "current_size": 950,
+        "max_size": 1000,
+        "usage_percent": 95.0,
+        "estimated_wait_hours": "2-4",
+        "retry_after_seconds": 300
+    }
+    status_code: int = 503
+```
 
 ### Migration Strategy
 
