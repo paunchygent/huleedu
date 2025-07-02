@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from aiohttp import ClientSession  # Changed from placeholder
-from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
 # Import concrete types instead of placeholders if they are stable
 
@@ -55,7 +55,7 @@ class ResultStoreProtocol(Protocol):
 class SpellcheckEventPublisherProtocol(Protocol):
     async def publish_spellcheck_result(
         self,
-        kafka_bus: KafkaBus,
+        kafka_bus: KafkaPublisherProtocol,
         event_data: SpellcheckResultDataV1,
         correlation_id: UUID,
     ) -> None:

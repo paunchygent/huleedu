@@ -6,6 +6,7 @@ This tests the real-world behavior of circuit breakers protecting HTTP calls.
 
 import asyncio
 from datetime import timedelta
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -21,7 +22,7 @@ from services.batch_orchestrator_service.implementations.batch_conductor_client_
 
 
 @pytest.fixture
-def mock_settings():
+def mock_settings() -> Mock:
     """Provide test settings."""
     settings = Mock(spec=Settings)
     settings.BCS_BASE_URL = "http://test-bcs:4002"
@@ -31,19 +32,21 @@ def mock_settings():
 
 
 @pytest.fixture
-def circuit_breaker():
+def circuit_breaker() -> CircuitBreaker:
     """Provide a circuit breaker with low thresholds for testing."""
     return CircuitBreaker(
         name="test_batch_conductor",
         failure_threshold=2,  # Open after 2 failures
         recovery_timeout=timedelta(seconds=1),  # Short recovery for tests
         success_threshold=1,  # Only need 1 success to close
-        expected_exception=(ClientError, ValueError),  # Catch both types
+        expected_exception=Exception,  # Catch all exceptions including ValueError
     )
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_opens_after_failures(mock_settings, circuit_breaker):
+async def test_circuit_breaker_opens_after_failures(
+    mock_settings: Mock, circuit_breaker: CircuitBreaker
+) -> None:
     """Test that circuit breaker opens after reaching failure threshold."""
     # Create a mock HTTP session that always fails
     mock_session = AsyncMock(spec=ClientSession)
@@ -65,23 +68,25 @@ async def test_circuit_breaker_opens_after_failures(mock_settings, circuit_break
         assert "BCS returned error status 500" in str(exc_info.value)
 
     # Third call should be blocked by circuit breaker
-    with pytest.raises(CircuitBreakerError) as exc_info:
+    with pytest.raises(CircuitBreakerError) as cb_exc_info:
         await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK)
-    assert "Circuit breaker" in str(exc_info.value)
-    assert "is OPEN" in str(exc_info.value)
+    assert "Circuit breaker" in str(cb_exc_info.value)
+    assert "is OPEN" in str(cb_exc_info.value)
 
     # Verify the HTTP session was only called twice (not three times)
     assert mock_session.post.call_count == 2
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_recovers_after_timeout(mock_settings, circuit_breaker):
+async def test_circuit_breaker_recovers_after_timeout(
+    mock_settings: Mock, circuit_breaker: CircuitBreaker
+) -> None:
     """Test that circuit breaker attempts recovery after timeout."""
     # Create a mock session that fails initially, then succeeds
     mock_session = AsyncMock(spec=ClientSession)
     call_count = 0
 
-    def mock_post(*args, **kwargs):
+    def mock_post(*args: Any, **kwargs: Any) -> AsyncMock:
         nonlocal call_count
         call_count += 1
 
@@ -132,7 +137,7 @@ async def test_circuit_breaker_recovers_after_timeout(mock_settings, circuit_bre
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_transparent_when_service_healthy(mock_settings):
+async def test_circuit_breaker_transparent_when_service_healthy(mock_settings: Mock) -> None:
     """Test that circuit breaker is transparent when service is healthy."""
     # Create a circuit breaker with normal thresholds
     circuit_breaker = CircuitBreaker(
@@ -176,7 +181,7 @@ async def test_circuit_breaker_transparent_when_service_healthy(mock_settings):
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_handles_different_error_types(mock_settings):
+async def test_circuit_breaker_handles_different_error_types(mock_settings: Mock) -> None:
     """Test that circuit breaker only counts expected exceptions."""
     circuit_breaker = CircuitBreaker(
         name="test_batch_conductor",

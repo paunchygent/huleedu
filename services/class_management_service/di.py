@@ -98,6 +98,7 @@ class ServiceProvider(Provider):
         )
 
         # Wrap with circuit breaker protection if enabled
+        kafka_publisher: KafkaPublisherProtocol
         if settings.CIRCUIT_BREAKER_ENABLED:
             kafka_circuit_breaker = CircuitBreaker(
                 name=f"{settings.SERVICE_NAME}.kafka_producer",
@@ -109,17 +110,17 @@ class ServiceProvider(Provider):
             circuit_breaker_registry.register("kafka_producer", kafka_circuit_breaker)
 
             # Create resilient wrapper using composition
-            kafka_bus = ResilientKafkaPublisher(
+            kafka_publisher = ResilientKafkaPublisher(
                 delegate=base_kafka_bus,
                 circuit_breaker=kafka_circuit_breaker,
                 retry_interval=30,
             )
         else:
             # Use base KafkaBus without circuit breaker
-            kafka_bus = base_kafka_bus
+            kafka_publisher = base_kafka_bus
 
-        await kafka_bus.start()
-        return kafka_bus
+        await kafka_publisher.start()
+        return kafka_publisher
 
     @provide(scope=Scope.APP)
     async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:

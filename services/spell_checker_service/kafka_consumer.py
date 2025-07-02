@@ -17,7 +17,7 @@ import aiohttp
 from aiokafka import AIOKafkaConsumer, TopicPartition
 from aiokafka.errors import KafkaConnectionError
 from huleedu_service_libs.idempotency import idempotent_consumer
-from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 
@@ -45,7 +45,7 @@ class SpellCheckerKafkaConsumer:
         result_store: ResultStoreProtocol,
         spell_logic: SpellLogicProtocol,
         event_publisher: SpellcheckEventPublisherProtocol,
-        kafka_bus: KafkaBus,
+        kafka_bus: KafkaPublisherProtocol,
         http_session: aiohttp.ClientSession,
         redis_client: RedisClientProtocol,
         tracer: "Tracer | None" = None,

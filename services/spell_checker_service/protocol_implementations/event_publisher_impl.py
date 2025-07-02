@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
@@ -21,7 +21,7 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
 
     async def publish_spellcheck_result(
         self,
-        kafka_bus: KafkaBus,
+        kafka_bus: KafkaPublisherProtocol,
         event_data: SpellcheckResultDataV1,
         correlation_id: UUID,
     ) -> None:

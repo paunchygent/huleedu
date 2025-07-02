@@ -13,7 +13,7 @@ from uuid import UUID
 if TYPE_CHECKING:
     from common_core.events.ai_feedback_events import AIFeedbackInputDataV1
     from common_core.metadata_models import EssayProcessingInputRefV1
-    from huleedu_service_libs.kafka_client import KafkaBus
+    from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
     from config import Settings
 
@@ -27,7 +27,7 @@ from services.essay_lifecycle_service.protocols import SpecializedServiceRequest
 class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispatcher):
     """Default implementation of SpecializedServiceRequestDispatcher protocol."""
 
-    def __init__(self, kafka_bus: KafkaBus, settings: Settings) -> None:
+    def __init__(self, kafka_bus: KafkaPublisherProtocol, settings: Settings) -> None:
         self.kafka_bus = kafka_bus
         self.settings = settings
 

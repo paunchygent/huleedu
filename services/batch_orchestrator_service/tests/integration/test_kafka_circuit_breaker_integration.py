@@ -28,7 +28,7 @@ class _TestEventData(BaseModel):
 
 
 @pytest.fixture
-def circuit_breaker():
+def circuit_breaker() -> CircuitBreaker:
     """Circuit breaker for testing."""
     return CircuitBreaker(
         name="test_kafka",
@@ -40,7 +40,7 @@ def circuit_breaker():
 
 
 @pytest.fixture
-def test_envelope():
+def test_envelope() -> EventEnvelope[_TestEventData]:
     """Test event envelope."""
     return EventEnvelope[_TestEventData](
         event_id=uuid4(),
@@ -53,7 +53,9 @@ def test_envelope():
 
 
 @pytest.mark.asyncio
-async def test_resilient_kafka_publisher_normal_operation(circuit_breaker, test_envelope):
+async def test_resilient_kafka_publisher_normal_operation(
+    circuit_breaker: CircuitBreaker, test_envelope: EventEnvelope[_TestEventData]
+) -> None:
     """Test normal operation with circuit breaker closed."""
     # Create mock KafkaBus delegate
     mock_kafka_bus = AsyncMock(spec=KafkaBus)
@@ -83,7 +85,9 @@ async def test_resilient_kafka_publisher_normal_operation(circuit_breaker, test_
 
 
 @pytest.mark.asyncio
-async def test_resilient_kafka_publisher_without_circuit_breaker(test_envelope):
+async def test_resilient_kafka_publisher_without_circuit_breaker(
+    test_envelope: EventEnvelope[_TestEventData]
+) -> None:
     """Test operation without circuit breaker."""
     # Create mock KafkaBus delegate
     mock_kafka_bus = AsyncMock(spec=KafkaBus)
@@ -109,7 +113,9 @@ async def test_resilient_kafka_publisher_without_circuit_breaker(test_envelope):
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_open_queues_messages(circuit_breaker, test_envelope):
+async def test_circuit_breaker_open_queues_messages(
+    circuit_breaker: CircuitBreaker, test_envelope: EventEnvelope[_TestEventData]
+) -> None:
     """Test that messages are queued when circuit breaker is open."""
     # Create mock KafkaBus that always fails (to open circuit)
     mock_kafka_bus = AsyncMock(spec=KafkaBus)
@@ -145,7 +151,7 @@ async def test_circuit_breaker_open_queues_messages(circuit_breaker, test_envelo
     await resilient_publisher.stop()
 
 
-def test_circuit_breaker_state_reporting(circuit_breaker):
+def test_circuit_breaker_state_reporting(circuit_breaker: CircuitBreaker) -> None:
     """Test circuit breaker state reporting."""
     mock_kafka_bus = AsyncMock(spec=KafkaBus)
     mock_kafka_bus.client_id = "test-client"
@@ -164,7 +170,7 @@ def test_circuit_breaker_state_reporting(circuit_breaker):
     assert "fallback_queue_size" in state
 
 
-def test_circuit_breaker_state_without_breaker():
+def test_circuit_breaker_state_without_breaker() -> None:
     """Test state reporting without circuit breaker."""
     mock_kafka_bus = AsyncMock(spec=KafkaBus)
     mock_kafka_bus.client_id = "test-client"
@@ -180,7 +186,7 @@ def test_circuit_breaker_state_without_breaker():
 
 
 @pytest.mark.asyncio
-async def test_fallback_queue_operations():
+async def test_fallback_queue_operations() -> None:
     """Test fallback queue basic operations."""
     from huleedu_service_libs.kafka.fallback_handler import FallbackMessageHandler
 

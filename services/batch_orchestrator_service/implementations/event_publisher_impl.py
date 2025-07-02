@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.observability import inject_trace_context
 
 from common_core.events.envelope import EventEnvelope
@@ -14,7 +14,7 @@ from services.batch_orchestrator_service.protocols import BatchEventPublisherPro
 class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
     """Default implementation of BatchEventPublisherProtocol."""
 
-    def __init__(self, kafka_bus: KafkaBus) -> None:
+    def __init__(self, kafka_bus: KafkaPublisherProtocol) -> None:
         """Initialize with Kafka bus dependency."""
         self.kafka_bus = kafka_bus
 

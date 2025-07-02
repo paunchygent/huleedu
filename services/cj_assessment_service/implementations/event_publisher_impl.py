@@ -10,7 +10,7 @@ from typing import Any
 from uuid import UUID
 
 from config import Settings
-from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol
 
@@ -18,7 +18,7 @@ from services.cj_assessment_service.protocols import CJEventPublisherProtocol
 class CJEventPublisherImpl(CJEventPublisherProtocol):
     """Implementation of CJEventPublisherProtocol for publishing CJ events."""
 
-    def __init__(self, kafka_bus: KafkaBus, settings: Settings) -> None:
+    def __init__(self, kafka_bus: KafkaPublisherProtocol, settings: Settings) -> None:
         """Initialize the event publisher with Kafka bus and settings."""
         self.kafka_bus = kafka_bus
         self.settings = settings

@@ -6,6 +6,7 @@ File Service use cases and publishing patterns.
 """
 
 from datetime import datetime, timedelta, timezone
+from typing import cast
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -100,15 +101,16 @@ async def test_successful_publish(resilient_publisher: ResilientKafkaPublisher, 
     topic = "huleedu.file.essay.validation.success.v1"
 
     # Mock successful publish
-    resilient_publisher.delegate.publish.return_value = None
+    cast(AsyncMock, resilient_publisher.delegate.publish).return_value = None
 
     # Should publish successfully
     await resilient_publisher.publish(topic, sample_file_event)
 
     # Verify delegate was called (note: includes key parameter)
-    resilient_publisher.delegate.publish.assert_called_once_with(topic, sample_file_event, None)
+    cast(AsyncMock, resilient_publisher.delegate.publish).assert_called_once_with(topic, sample_file_event, None)
 
     # Circuit breaker should remain closed
+    assert resilient_publisher.circuit_breaker is not None
     assert resilient_publisher.circuit_breaker.state == CircuitState.CLOSED
 
 
@@ -118,7 +120,7 @@ async def test_circuit_breaker_opens_on_failures(resilient_publisher: ResilientK
     topic = "huleedu.file.essay.validation.success.v1"
 
     # Mock failing publish calls
-    resilient_publisher.delegate.publish.side_effect = KafkaError("Connection failed")
+    cast(AsyncMock, resilient_publisher.delegate.publish).side_effect = KafkaError("Connection failed")
 
     # First few failures should be stored in fallback queue (catch exceptions)
     for _ in range(3):
@@ -128,13 +130,14 @@ async def test_circuit_breaker_opens_on_failures(resilient_publisher: ResilientK
             pass  # Expected during circuit breaker testing
 
     # Circuit breaker should now be open
+    assert resilient_publisher.circuit_breaker is not None
     assert resilient_publisher.circuit_breaker.state == CircuitState.OPEN
 
     # Verify events were queued
     assert resilient_publisher.get_fallback_queue_size() == 3
 
     # Verify delegate was called 3 times before circuit opened
-    assert resilient_publisher.delegate.publish.call_count == 3
+    assert cast(AsyncMock, resilient_publisher.delegate.publish).call_count == 3
 
 
 @pytest.mark.asyncio
@@ -143,6 +146,7 @@ async def test_fallback_queue_behavior(resilient_publisher: ResilientKafkaPublis
     topic = "huleedu.file.essay.validation.success.v1"
 
     # Force circuit breaker open
+    assert resilient_publisher.circuit_breaker is not None
     resilient_publisher.circuit_breaker.state = CircuitState.OPEN
     resilient_publisher.circuit_breaker.last_failure_time = datetime.now()
 
@@ -153,7 +157,7 @@ async def test_fallback_queue_behavior(resilient_publisher: ResilientKafkaPublis
     assert resilient_publisher.get_fallback_queue_size() == 1
 
     # Verify delegate was NOT called (circuit is open)
-    resilient_publisher.delegate.publish.assert_not_called()
+    cast(AsyncMock, resilient_publisher.delegate.publish).assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -162,16 +166,18 @@ async def test_circuit_breaker_recovery(resilient_publisher: ResilientKafkaPubli
     topic = "huleedu.file.essay.validation.success.v1"
 
     # Force circuit breaker to half-open state
+    assert resilient_publisher.circuit_breaker is not None
     resilient_publisher.circuit_breaker.state = CircuitState.HALF_OPEN
 
     # Mock successful publishes
-    resilient_publisher.delegate.publish.return_value = None
+    cast(AsyncMock, resilient_publisher.delegate.publish).return_value = None
 
     # Need 2 successful calls to close circuit (success_threshold=2)
     await resilient_publisher.publish(topic, sample_file_event)
     await resilient_publisher.publish(topic, sample_file_event)
 
     # Circuit should now be closed
+    assert resilient_publisher.circuit_breaker is not None
     assert resilient_publisher.circuit_breaker.state == CircuitState.CLOSED
 
 
@@ -239,7 +245,7 @@ async def test_file_specific_error_scenarios(resilient_publisher: ResilientKafka
     topic = "huleedu.file.essay.validation.failed.v1"
 
     # Mock Kafka timeout (common with large messages)
-    resilient_publisher.delegate.publish.side_effect = KafkaError("Message too large")
+    cast(AsyncMock, resilient_publisher.delegate.publish).side_effect = KafkaError("Message too large")
 
     # Should handle error gracefully
     try:
@@ -262,7 +268,7 @@ async def test_circuit_breaker_state_reporting(resilient_publisher: ResilientKaf
     assert state["failure_count"] == 0
 
     # Force some failures
-    resilient_publisher.delegate.publish.side_effect = KafkaError("Test failure")
+    cast(AsyncMock, resilient_publisher.delegate.publish).side_effect = KafkaError("Test failure")
 
     test_data = SimpleTestData(test="data")
     sample_event = EventEnvelope[SimpleTestData](
@@ -291,10 +297,10 @@ async def test_resource_cleanup(resilient_publisher: ResilientKafkaPublisher) ->
     """Test proper resource cleanup."""
     # Verify start/stop delegation
     await resilient_publisher.start()
-    resilient_publisher.delegate.start.assert_called_once()
+    cast(AsyncMock, resilient_publisher.delegate.start).assert_called_once()
 
     await resilient_publisher.stop()
-    resilient_publisher.delegate.stop.assert_called_once()
+    cast(AsyncMock, resilient_publisher.delegate.stop).assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -318,10 +324,10 @@ async def test_file_batch_management_events(resilient_publisher: ResilientKafkaP
     topic = "huleedu.file.batch.file.added.v1"
 
     # Mock successful publish
-    resilient_publisher.delegate.publish.return_value = None
+    cast(AsyncMock, resilient_publisher.delegate.publish).return_value = None
 
     # Should publish successfully
     await resilient_publisher.publish(topic, batch_file_event)
 
     # Verify correct topic and event (with key parameter)
-    resilient_publisher.delegate.publish.assert_called_once_with(topic, batch_file_event, None)
+    cast(AsyncMock, resilient_publisher.delegate.publish).assert_called_once_with(topic, batch_file_event, None)

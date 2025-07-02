@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 import aiohttp
 from aiokafka import ConsumerRecord
-from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
 from huleedu_service_libs.observability import (
     trace_operation,
@@ -48,7 +48,7 @@ async def process_single_message(
     result_store: ResultStoreProtocol,
     event_publisher: SpellcheckEventPublisherProtocol,
     spell_logic: SpellLogicProtocol,
-    kafka_bus: KafkaBus,
+    kafka_bus: KafkaPublisherProtocol,
     tracer: "Tracer | None" = None,
     consumer_group_id: str = "spell-checker-group",
 ) -> bool:
@@ -116,7 +116,7 @@ async def _process_single_message_impl(
     result_store: ResultStoreProtocol,
     event_publisher: SpellcheckEventPublisherProtocol,
     spell_logic: SpellLogicProtocol,
-    kafka_bus: KafkaBus,
+    kafka_bus: KafkaPublisherProtocol,
     tracer: "Tracer | None" = None,
     consumer_group_id: str = "spell-checker-group",
 ) -> bool:
