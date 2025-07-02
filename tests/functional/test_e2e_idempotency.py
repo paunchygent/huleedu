@@ -217,6 +217,10 @@ class MockRedisClient:
         self.keys[key] = value
         return True
 
+    async def ping(self) -> bool:
+        """Mock PING operation required by RedisClientProtocol."""
+        return True
+
     def simulate_outage(self) -> None:
         """Simulate Redis outage."""
         self.should_fail_operations = True

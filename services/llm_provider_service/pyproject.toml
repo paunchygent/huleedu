@@ -1,0 +1,75 @@
+[project]
+name = "huleedu-llm-provider-service"
+version = "0.1.0"
+description = "HuleEdu LLM Provider Service - Centralized LLM API abstraction"
+authors = [
+    { name = "Olof Larsson", email = "paunchygent@gmail.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "quart",
+    "hypercorn",
+    "python-dotenv",
+    "aiokafka",
+    "aiohttp",
+    "httpx",
+    "huleedu-common-core",
+    "huleedu-service-libs",
+    "pydantic",
+    "pydantic-settings",
+    "prometheus-client",
+    "dishka",
+    "quart-dishka",
+    "cachetools",
+    "diskcache",
+    "tenacity",
+    # LLM provider SDKs
+    "anthropic",
+    "openai",
+    "google-generativeai",
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/common_core"
+huleedu-service-libs = "file:///app/services/libs"
+
+[tool.pdm.scripts]
+start = "python app.py"
+dev = "quart --app app:app --debug run -p 8080"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+ignore_missing_imports = false
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "dishka.*",
+    "anthropic.*",
+    "google.generativeai.*",
+    "diskcache.*",
+    "tenacity.*",
+    "cachetools.*",
+]
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = [
+    "di",
+    "protocols",
+    "config",
+    "metrics",
+    "startup_setup",
+    "api_models",
+    "exceptions",
+    "implementations.*",
+]
+ignore_missing_imports = true

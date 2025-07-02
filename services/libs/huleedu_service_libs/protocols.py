@@ -9,9 +9,19 @@ shared infrastructure components provided by huleedu_service_libs.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
 import redis.client
+from pydantic import BaseModel
+
+T_EventPayload = TypeVar("T_EventPayload", bound=BaseModel)
+
+__all__ = [
+    "RedisClientProtocol",
+    "AtomicRedisClientProtocol", 
+    "KafkaPublisherProtocol",
+    "T_EventPayload",
+]
 
 
 class RedisClientProtocol(Protocol):
@@ -71,6 +81,15 @@ class RedisClientProtocol(Protocol):
 
         Returns:
             True if operation succeeded
+        """
+        pass
+
+    async def ping(self) -> bool:
+        """
+        Health check method to verify Redis connectivity.
+
+        Returns:
+            True if Redis connection is healthy
         """
         pass
 
@@ -169,4 +188,41 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
 
     async def publish_user_notification(self, user_id: str, event_type: str, data: dict) -> int:
         """Convenience method to publish structured notifications to user-specific channels."""
+        pass
+
+
+class KafkaPublisherProtocol(Protocol):
+    """
+    Protocol for Kafka event publishing with lifecycle management.
+    
+    This protocol defines the common interface for both KafkaBus and ResilientKafkaPublisher,
+    enabling proper dependency injection with type safety while supporting resilience patterns.
+    """
+
+    async def start(self) -> None:
+        """Start the Kafka publisher and establish connections."""
+        pass
+
+    async def stop(self) -> None:
+        """Stop the Kafka publisher and clean up resources."""
+        pass
+
+    async def publish(
+        self,
+        topic: str,
+        envelope: "EventEnvelope[T_EventPayload]",
+        key: str | None = None,
+    ) -> None:
+        """
+        Publish an event envelope to a Kafka topic.
+
+        Args:
+            topic: Kafka topic to publish to
+            envelope: Event envelope containing the event data
+            key: Optional message key for partitioning
+
+        Raises:
+            KafkaError: If publishing fails
+            CircuitBreakerError: If circuit breaker is open (for resilient implementations)
+        """
         pass

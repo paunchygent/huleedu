@@ -10,7 +10,7 @@ from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from huleedu_service_libs.resilience.resilient_client import make_resilient
@@ -98,14 +98,14 @@ class CoreInfrastructureProvider(Provider):
         self,
         settings: Settings,
         circuit_breaker_registry: CircuitBreakerRegistry,
-    ) -> KafkaBus:
+    ) -> KafkaPublisherProtocol:
         """Provide Kafka bus for event publishing with optional circuit breaker protection."""
         # Create base KafkaBus instance
         base_kafka_bus = KafkaBus(
             client_id=f"{settings.SERVICE_NAME}-producer",
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         )
-        
+
         # Wrap with circuit breaker protection if enabled
         if settings.CIRCUIT_BREAKER_ENABLED:
             kafka_circuit_breaker = CircuitBreaker(
@@ -116,7 +116,7 @@ class CoreInfrastructureProvider(Provider):
                 expected_exception=KafkaError,
             )
             circuit_breaker_registry.register("kafka_producer", kafka_circuit_breaker)
-            
+
             # Create resilient wrapper using composition
             kafka_bus = ResilientKafkaPublisher(
                 delegate=base_kafka_bus,
@@ -193,7 +193,7 @@ class RepositoryAndPublishingProvider(Provider):
             return PostgreSQLBatchRepositoryImpl(settings)
 
     @provide(scope=Scope.APP)
-    def provide_batch_event_publisher(self, kafka_bus: KafkaBus) -> BatchEventPublisherProtocol:
+    def provide_batch_event_publisher(self, kafka_bus: KafkaPublisherProtocol) -> BatchEventPublisherProtocol:
         """Provide batch event publisher implementation."""
         return DefaultBatchEventPublisherImpl(kafka_bus)
 

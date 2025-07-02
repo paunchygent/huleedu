@@ -55,6 +55,10 @@ class MockRedisClient:
         self.keys[key] = value
         return True
 
+    async def ping(self) -> bool:
+        """Mock PING operation required by RedisClientProtocol."""
+        return True
+
 
 def create_sample_spellcheck_event() -> dict:
     """Create sample spell check request event."""

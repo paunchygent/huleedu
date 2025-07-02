@@ -432,6 +432,7 @@ services:
       - BATCH_ORCHESTRATOR_SERVICE_URL=http://batch_orchestrator_service:5000
       - CLASS_MANAGEMENT_SERVICE_URL=http://class_management_service:5002
       - FILE_SERVICE_URL=http://file_service:7001
+      - LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8080
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=api_gateway_service
       - OTEL_TRACES_EXPORTER=otlp
@@ -478,6 +479,62 @@ services:
       - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5002/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+
+
+
+  llm_provider_service:
+    build:
+      context: .
+      dockerfile: services/llm_provider_service/Dockerfile
+    container_name: huleedu_llm_provider_service
+    restart: unless-stopped
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "8090:8080"
+    environment:
+      - ENV_TYPE=docker
+      - ENVIRONMENT=production
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - LOG_LEVEL=INFO
+      - LLM_PROVIDER_SERVICE_PORT=8080
+      - LLM_PROVIDER_SERVICE_HOST=0.0.0.0
+      - LLM_PROVIDER_SERVICE_REDIS_URL=redis://redis:6379
+      # LLM Provider API Keys (from env)
+      - LLM_PROVIDER_SERVICE_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LLM_PROVIDER_SERVICE_OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_PROVIDER_SERVICE_GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - LLM_PROVIDER_SERVICE_OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      # Provider Selection
+      - LLM_PROVIDER_SERVICE_DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-anthropic}
+      - LLM_PROVIDER_SERVICE_PROVIDER_SELECTION_STRATEGY=${PROVIDER_SELECTION_STRATEGY:-priority}
+      # Circuit Breaker Settings
+      - LLM_PROVIDER_SERVICE_CIRCUIT_BREAKER_ENABLED=true
+      - LLM_PROVIDER_SERVICE_LLM_CIRCUIT_BREAKER_FAILURE_THRESHOLD=3
+      - LLM_PROVIDER_SERVICE_LLM_CIRCUIT_BREAKER_RECOVERY_TIMEOUT=120
+      # Cost Management
+      - LLM_PROVIDER_SERVICE_ENABLE_COST_TRACKING=true
+      - LLM_PROVIDER_SERVICE_COST_ALERT_THRESHOLD_USD=${LLM_COST_ALERT_THRESHOLD:-100.0}
+      # Admin API
+      - LLM_PROVIDER_SERVICE_ADMIN_API_ENABLED=true
+      - LLM_PROVIDER_SERVICE_ADMIN_API_KEY=${LLM_ADMIN_API_KEY}
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=llm_provider_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3

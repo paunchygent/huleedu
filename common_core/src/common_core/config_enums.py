@@ -14,3 +14,13 @@ class Environment(str, Enum):
     STAGING = "staging"
     PRODUCTION = "production"
     TESTING = "testing"
+
+
+class LLMProviderType(str, Enum):
+    """Standardized LLM provider identifiers for HuleEdu platform."""
+
+    ANTHROPIC = "anthropic"
+    OPENAI = "openai"
+    GOOGLE = "google"
+    OPENROUTER = "openrouter"
+    MOCK = "mock"

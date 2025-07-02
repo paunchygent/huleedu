@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
@@ -22,7 +22,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
 
     def __init__(
         self,
-        kafka_bus: KafkaBus,
+        kafka_bus: KafkaPublisherProtocol,
         settings: Settings,
         redis_client: AtomicRedisClientProtocol,
     ):

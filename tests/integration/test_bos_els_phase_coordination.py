@@ -71,6 +71,10 @@ class MockRedisClient:
         self.keys[key] = value
         return True
 
+    async def ping(self) -> bool:
+        """Mock PING operation required by RedisClientProtocol."""
+        return True
+
 
 class RealKafkaMessage:
     """Real Kafka message structure for integration testing."""

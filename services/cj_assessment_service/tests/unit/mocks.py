@@ -61,6 +61,10 @@ class MockRedisClient(RedisClientProtocol):
         self.keys[key] = value
         return True
 
+    async def ping(self) -> bool:
+        """Mock PING operation required by RedisClientProtocol."""
+        return True
+
 
 class MockDatabase(CJRepositoryProtocol):
     """Mock database that simulates real CJ assessment database operations."""

@@ -57,7 +57,8 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/cj_assessment_service",
     "-e file:///${PROJECT_ROOT}/services/class_management_service",
     "-e file:///${PROJECT_ROOT}/services/api_gateway_service",
-    "-e file:///${PROJECT_ROOT}/services/result_aggregator_service"
+    "-e file:///${PROJECT_ROOT}/services/result_aggregator_service",
+    "-e file:///${PROJECT_ROOT}/services/llm_provider_service"
 ]
 
 [tool.pdm.scripts]
@@ -101,6 +102,7 @@ dev-file = "pdm run -p services/file_service dev"
 run-spellchecker = "pdm run -p services/spell_checker_service start_worker"
 dev-gateway = "pdm run -p services/api_gateway_service dev"
 dev-aggregator = "pdm run -p services/result_aggregator_service dev"
+dev-llm = "pdm run -p services/llm_provider_service dev"
 
 # Build common_core wheel
 build-common-core = "pdm build -p common_core"
@@ -183,6 +185,7 @@ module = [
     "services.cj_assessment_service.*",
     "services.class_management_service.*",
     "services.result_aggregator_service.*",
+    "services.llm_provider_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true
@@ -250,6 +253,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 
 testpaths = [
+    "tests",
     "common_core/tests",
     "services/content_service/tests",
     "services/spell_checker_service/tests",
@@ -259,7 +263,7 @@ testpaths = [
     "services/cj_assessment_service/tests",
     "services/class_management_service/tests",
     "services/result_aggregator_service/tests",
-    "tests"
+    "services/llm_provider_service/tests"
 ]
 pythonpath = [
     "."

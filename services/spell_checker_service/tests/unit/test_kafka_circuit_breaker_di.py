@@ -50,7 +50,9 @@ def provider() -> SpellCheckerServiceProvider:
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_registry_creation(provider: SpellCheckerServiceProvider, mock_settings: Settings) -> None:
+async def test_circuit_breaker_registry_creation(
+    provider: SpellCheckerServiceProvider, mock_settings: Settings
+) -> None:
     """Test that circuit breaker registry is created correctly."""
     registry = provider.provide_circuit_breaker_registry(mock_settings)
 
@@ -59,7 +61,9 @@ async def test_circuit_breaker_registry_creation(provider: SpellCheckerServicePr
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_registry_disabled(provider: SpellCheckerServiceProvider, mock_settings_disabled: Settings) -> None:
+async def test_circuit_breaker_registry_disabled(
+    provider: SpellCheckerServiceProvider, mock_settings_disabled: Settings
+) -> None:
     """Test that circuit breaker registry works when disabled."""
     registry = provider.provide_circuit_breaker_registry(mock_settings_disabled)
 
@@ -68,15 +72,18 @@ async def test_circuit_breaker_registry_disabled(provider: SpellCheckerServicePr
 
 
 @pytest.mark.asyncio
-async def test_kafka_bus_with_circuit_breaker(provider: SpellCheckerServiceProvider, mock_settings: Settings) -> None:
+async def test_kafka_bus_with_circuit_breaker(
+    provider: SpellCheckerServiceProvider, mock_settings: Settings
+) -> None:
     """Test that KafkaBus is wrapped with circuit breaker when enabled."""
     # Create registry first
     registry = provider.provide_circuit_breaker_registry(mock_settings)
 
     # Mock the KafkaBus.start method to avoid actual Kafka connection
-    with patch.object(KafkaBus, 'start', new_callable=AsyncMock) as mock_start, \
-         patch.object(KafkaBus, 'stop', new_callable=AsyncMock):
-
+    with (
+        patch.object(KafkaBus, "start", new_callable=AsyncMock) as mock_start,
+        patch.object(KafkaBus, "stop", new_callable=AsyncMock),
+    ):
         kafka_bus = await provider.provide_kafka_bus(mock_settings, registry)
 
         try:
@@ -107,13 +114,15 @@ async def test_kafka_bus_with_circuit_breaker(provider: SpellCheckerServiceProvi
 
 
 @pytest.mark.asyncio
-async def test_kafka_bus_without_circuit_breaker(provider: SpellCheckerServiceProvider, mock_settings_disabled: Settings) -> None:
+async def test_kafka_bus_without_circuit_breaker(
+    provider: SpellCheckerServiceProvider, mock_settings_disabled: Settings
+) -> None:
     """Test that base KafkaBus is returned when circuit breaker is disabled."""
     # Create registry first
     registry = provider.provide_circuit_breaker_registry(mock_settings_disabled)
 
     # Mock the KafkaBus.start method to avoid actual Kafka connection
-    with patch.object(KafkaBus, 'start', new_callable=AsyncMock) as mock_start:
+    with patch.object(KafkaBus, "start", new_callable=AsyncMock) as mock_start:
         kafka_bus = await provider.provide_kafka_bus(mock_settings_disabled, registry)
 
         # Should return base KafkaBus when circuit breaker is disabled
@@ -127,11 +136,13 @@ async def test_kafka_bus_without_circuit_breaker(provider: SpellCheckerServicePr
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_configuration(provider: SpellCheckerServiceProvider, mock_settings: Settings) -> None:
+async def test_circuit_breaker_configuration(
+    provider: SpellCheckerServiceProvider, mock_settings: Settings
+) -> None:
     """Test that circuit breaker is configured with correct settings."""
     registry = provider.provide_circuit_breaker_registry(mock_settings)
 
-    with patch.object(KafkaBus, 'start', new_callable=AsyncMock):
+    with patch.object(KafkaBus, "start", new_callable=AsyncMock):
         await provider.provide_kafka_bus(mock_settings, registry)
 
         # Get the circuit breaker from registry
@@ -152,30 +163,33 @@ async def test_settings_configuration() -> None:
     settings = Settings()
 
     # Verify all circuit breaker settings are present with correct defaults
-    assert hasattr(settings, 'CIRCUIT_BREAKER_ENABLED')
+    assert hasattr(settings, "CIRCUIT_BREAKER_ENABLED")
     assert settings.CIRCUIT_BREAKER_ENABLED is True
 
-    assert hasattr(settings, 'KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD')
+    assert hasattr(settings, "KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD")
     assert settings.KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD == 10
 
-    assert hasattr(settings, 'KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT')
+    assert hasattr(settings, "KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT")
     assert settings.KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT == 30
 
-    assert hasattr(settings, 'KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD')
+    assert hasattr(settings, "KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD")
     assert settings.KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD == 3
 
-    assert hasattr(settings, 'KAFKA_FALLBACK_QUEUE_SIZE')
+    assert hasattr(settings, "KAFKA_FALLBACK_QUEUE_SIZE")
     assert settings.KAFKA_FALLBACK_QUEUE_SIZE == 1000
 
 
 @pytest.mark.asyncio
-async def test_lifecycle_cleanup(provider: SpellCheckerServiceProvider, mock_settings: Settings) -> None:
+async def test_lifecycle_cleanup(
+    provider: SpellCheckerServiceProvider, mock_settings: Settings
+) -> None:
     """Test that resources are properly cleaned up."""
     registry = provider.provide_circuit_breaker_registry(mock_settings)
 
-    with patch.object(KafkaBus, 'start', new_callable=AsyncMock), \
-         patch.object(KafkaBus, 'stop', new_callable=AsyncMock) as mock_stop:
-
+    with (
+        patch.object(KafkaBus, "start", new_callable=AsyncMock),
+        patch.object(KafkaBus, "stop", new_callable=AsyncMock) as mock_stop,
+    ):
         kafka_bus = await provider.provide_kafka_bus(mock_settings, registry)
 
         # Test cleanup
@@ -190,7 +204,9 @@ def test_env_prefix() -> None:
 
 
 @pytest.mark.asyncio
-async def test_integration_with_existing_providers(provider: SpellCheckerServiceProvider, mock_settings: Settings) -> None:
+async def test_integration_with_existing_providers(
+    provider: SpellCheckerServiceProvider, mock_settings: Settings
+) -> None:
     """Test that circuit breaker integration doesn't break existing DI flow."""
     # Test that other providers can still be created
     settings_instance = provider.provide_settings()
@@ -201,8 +217,10 @@ async def test_integration_with_existing_providers(provider: SpellCheckerService
     assert cb_registry is not None
 
     # All providers should work together
-    with patch.object(KafkaBus, 'start', new_callable=AsyncMock), \
-         patch.object(KafkaBus, 'stop', new_callable=AsyncMock):
+    with (
+        patch.object(KafkaBus, "start", new_callable=AsyncMock),
+        patch.object(KafkaBus, "stop", new_callable=AsyncMock),
+    ):
         kafka_bus = await provider.provide_kafka_bus(mock_settings, cb_registry)
         try:
             assert kafka_bus is not None

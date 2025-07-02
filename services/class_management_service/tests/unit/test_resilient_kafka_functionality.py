@@ -22,14 +22,40 @@ from common_core.events.envelope import EventEnvelope
 
 class ClassManagementEventData(BaseModel):
     """Test data model for class management events."""
+
     class_id: str
     action: str
     user_id: str
     timestamp: datetime
 
 
+class LargeClassData(BaseModel):
+    """Test data model for large class events."""
+
+    class_id: str
+    class_name: str
+    student_count: int
+    metadata: dict
+
+
+class SimpleTestData(BaseModel):
+    """Simple test data model for basic events."""
+    
+    test: str
+
+
+class EnrollmentData(BaseModel):
+    """Test data model for enrollment events."""
+    
+    class_id: str
+    student_id: str
+    enrolled_by: str
+    enrollment_date: str
+    status: str
+
+
 @pytest.fixture
-def mock_kafka_bus():
+def mock_kafka_bus() -> AsyncMock:
     """Mock KafkaBus for testing."""
     mock_bus = AsyncMock(spec=KafkaBus)
     mock_bus.client_id = "class_management_service-test-producer"
@@ -38,7 +64,7 @@ def mock_kafka_bus():
 
 
 @pytest.fixture
-def circuit_breaker():
+def circuit_breaker() -> CircuitBreaker:
     """Circuit breaker configured for Class Management Service."""
     return CircuitBreaker(
         name="class_management_service.kafka_producer",
@@ -50,7 +76,7 @@ def circuit_breaker():
 
 
 @pytest.fixture
-def resilient_publisher(mock_kafka_bus, circuit_breaker):
+def resilient_publisher(mock_kafka_bus: AsyncMock, circuit_breaker: CircuitBreaker) -> ResilientKafkaPublisher:
     """ResilientKafkaPublisher for testing."""
     return ResilientKafkaPublisher(
         delegate=mock_kafka_bus,
@@ -60,9 +86,9 @@ def resilient_publisher(mock_kafka_bus, circuit_breaker):
 
 
 @pytest.fixture
-def sample_class_event():
+def sample_class_event() -> EventEnvelope[ClassManagementEventData]:
     """Sample class management event for testing."""
-    return EventEnvelope(
+    return EventEnvelope[ClassManagementEventData](
         event_type="huleedu.class.student.added.v1",
         event_timestamp=datetime.now(timezone.utc),
         source_service="class_management_service",
@@ -77,7 +103,7 @@ def sample_class_event():
 
 
 @pytest.mark.asyncio
-async def test_successful_publish(resilient_publisher, sample_class_event):
+async def test_successful_publish(resilient_publisher: ResilientKafkaPublisher, sample_class_event: EventEnvelope[ClassManagementEventData]) -> None:
     """Test successful event publishing through circuit breaker."""
     topic = "huleedu.class.student.added.v1"
 
@@ -95,7 +121,7 @@ async def test_successful_publish(resilient_publisher, sample_class_event):
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_opens_on_failures(resilient_publisher, sample_class_event):
+async def test_circuit_breaker_opens_on_failures(resilient_publisher: ResilientKafkaPublisher, sample_class_event: EventEnvelope[ClassManagementEventData]) -> None:
     """Test that circuit breaker opens after repeated failures."""
     topic = "huleedu.class.student.added.v1"
 
@@ -120,7 +146,7 @@ async def test_circuit_breaker_opens_on_failures(resilient_publisher, sample_cla
 
 
 @pytest.mark.asyncio
-async def test_fallback_queue_behavior(resilient_publisher, sample_class_event):
+async def test_fallback_queue_behavior(resilient_publisher: ResilientKafkaPublisher, sample_class_event: EventEnvelope[ClassManagementEventData]) -> None:
     """Test fallback queue stores failed messages correctly."""
     topic = "huleedu.class.student.added.v1"
 
@@ -139,7 +165,7 @@ async def test_fallback_queue_behavior(resilient_publisher, sample_class_event):
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_recovery(resilient_publisher, sample_class_event):
+async def test_circuit_breaker_recovery(resilient_publisher: ResilientKafkaPublisher, sample_class_event: EventEnvelope[ClassManagementEventData]) -> None:
     """Test circuit breaker recovery after successful publishes."""
     topic = "huleedu.class.student.added.v1"
 
@@ -158,12 +184,12 @@ async def test_circuit_breaker_recovery(resilient_publisher, sample_class_event)
 
 
 @pytest.mark.asyncio
-async def test_fallback_queue_retry_mechanism(resilient_publisher):
+async def test_fallback_queue_retry_mechanism(resilient_publisher: ResilientKafkaPublisher) -> None:
     """Test that fallback queue messages can be queued and retrieved."""
     topic = "huleedu.class.student.added.v1"
 
     # Create test event
-    class_event = EventEnvelope(
+    class_event = EventEnvelope[ClassManagementEventData](
         event_type="huleedu.class.student.added.v1",
         event_timestamp=datetime.now(timezone.utc),
         source_service="class_management_service",
@@ -200,20 +226,21 @@ async def test_fallback_queue_retry_mechanism(resilient_publisher):
 
 
 @pytest.mark.asyncio
-async def test_class_specific_error_scenarios(resilient_publisher):
+async def test_class_specific_error_scenarios(resilient_publisher: ResilientKafkaPublisher) -> None:
     """Test Class Management Service specific error scenarios."""
     # Test class creation event with large payload
-    large_class_event = EventEnvelope(
+    large_class_data = LargeClassData(
+        class_id="large-class-123",
+        class_name="Very Long Class Name" * 100,  # Large payload
+        student_count=500,
+        metadata={"description": "A" * 10000},  # Large metadata
+    )
+    large_class_event = EventEnvelope[LargeClassData](
         event_type="huleedu.class.created.v1",
         event_timestamp=datetime.now(timezone.utc),
         source_service="class_management_service",
         correlation_id=uuid4(),
-        data={
-            "class_id": "large-class-123",
-            "class_name": "Very Long Class Name" * 100,  # Large payload
-            "student_count": 500,
-            "metadata": {"description": "A" * 10000},  # Large metadata
-        },
+        data=large_class_data,
     )
 
     topic = "huleedu.class.created.v1"
@@ -232,7 +259,7 @@ async def test_class_specific_error_scenarios(resilient_publisher):
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_state_reporting(resilient_publisher):
+async def test_circuit_breaker_state_reporting(resilient_publisher: ResilientKafkaPublisher) -> None:
     """Test circuit breaker state reporting functionality."""
     # Initially closed
     state = resilient_publisher.get_circuit_breaker_state()
@@ -244,12 +271,13 @@ async def test_circuit_breaker_state_reporting(resilient_publisher):
     # Force some failures
     resilient_publisher.delegate.publish.side_effect = KafkaError("Test failure")
 
-    sample_event = EventEnvelope(
+    test_data = SimpleTestData(test="data")
+    sample_event = EventEnvelope[SimpleTestData](
         event_type="test.event",
         event_timestamp=datetime.now(timezone.utc),
         source_service="class_management_service",
         correlation_id=uuid4(),
-        data={"test": "data"},
+        data=test_data,
     )
 
     # Cause failures
@@ -266,7 +294,7 @@ async def test_circuit_breaker_state_reporting(resilient_publisher):
 
 
 @pytest.mark.asyncio
-async def test_resource_cleanup(resilient_publisher):
+async def test_resource_cleanup(resilient_publisher: ResilientKafkaPublisher) -> None:
     """Test proper resource cleanup."""
     # Verify start/stop delegation
     await resilient_publisher.start()
@@ -277,21 +305,22 @@ async def test_resource_cleanup(resilient_publisher):
 
 
 @pytest.mark.asyncio
-async def test_class_management_specific_events(resilient_publisher):
+async def test_class_management_specific_events(resilient_publisher: ResilientKafkaPublisher) -> None:
     """Test Class Management Service specific events."""
     # Test student enrollment event
-    enrollment_event = EventEnvelope(
+    enrollment_data = EnrollmentData(
+        class_id="class-789",
+        student_id="student-456",
+        enrolled_by="teacher-123",
+        enrollment_date=datetime.now(timezone.utc).isoformat(),
+        status="active",
+    )
+    enrollment_event = EventEnvelope[EnrollmentData](
         event_type="huleedu.class.student.enrolled.v1",
         event_timestamp=datetime.now(timezone.utc),
         source_service="class_management_service",
         correlation_id=uuid4(),
-        data={
-            "class_id": "class-789",
-            "student_id": "student-456",
-            "enrolled_by": "teacher-123",
-            "enrollment_date": datetime.now(timezone.utc).isoformat(),
-            "status": "active",
-        },
+        data=enrollment_data,
     )
 
     topic = "huleedu.class.student.enrolled.v1"

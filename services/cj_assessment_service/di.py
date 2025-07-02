@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import aiohttp
 from datetime import timedelta
 
+import aiohttp
 from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
-from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
-from huleedu_service_libs.protocols import RedisClientProtocol
+from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.protocols import KafkaPublisherProtocol, RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
@@ -69,12 +69,12 @@ class CJAssessmentServiceProvider(Provider):
     def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
         """Provide centralized circuit breaker registry."""
         registry = CircuitBreakerRegistry()
-        
+
         # Only register circuit breakers if enabled
         if settings.CIRCUIT_BREAKER_ENABLED:
             # Future: Add more circuit breakers here as needed
             pass
-        
+
         return registry
 
     @provide(scope=Scope.APP)
@@ -87,14 +87,14 @@ class CJAssessmentServiceProvider(Provider):
         self,
         settings: Settings,
         circuit_breaker_registry: CircuitBreakerRegistry,
-    ) -> KafkaBus:
+    ) -> KafkaPublisherProtocol:
         """Provide Kafka bus for event publishing with optional circuit breaker protection."""
         # Create base KafkaBus instance
         base_kafka_bus = KafkaBus(
             client_id=settings.PRODUCER_CLIENT_ID_CJ,
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         )
-        
+
         # Wrap with circuit breaker protection if enabled
         if settings.CIRCUIT_BREAKER_ENABLED:
             kafka_circuit_breaker = CircuitBreaker(
@@ -105,7 +105,7 @@ class CJAssessmentServiceProvider(Provider):
                 expected_exception=KafkaError,
             )
             circuit_breaker_registry.register("kafka_producer", kafka_circuit_breaker)
-            
+
             # Create resilient wrapper using composition
             kafka_bus = ResilientKafkaPublisher(
                 delegate=base_kafka_bus,
@@ -236,7 +236,7 @@ class CJAssessmentServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_event_publisher(
         self,
-        kafka_bus: KafkaBus,
+        kafka_bus: KafkaPublisherProtocol,
         settings: Settings,
     ) -> CJEventPublisherProtocol:
         """Provide event publisher."""

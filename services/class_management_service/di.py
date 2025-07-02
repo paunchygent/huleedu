@@ -8,7 +8,7 @@ from config import Settings, settings
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from prometheus_client import REGISTRY, CollectorRegistry
@@ -89,7 +89,7 @@ class ServiceProvider(Provider):
         self,
         settings: Settings,
         circuit_breaker_registry: CircuitBreakerRegistry,
-    ) -> KafkaBus:
+    ) -> KafkaPublisherProtocol:
         """Provide Kafka bus for event publishing with optional circuit breaker protection."""
         # Create base KafkaBus instance
         base_kafka_bus = KafkaBus(
@@ -142,7 +142,7 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_event_publisher(
         self,
-        kafka_bus: KafkaBus,
+        kafka_bus: KafkaPublisherProtocol,
         redis_client: AtomicRedisClientProtocol,
     ) -> ClassEventPublisherProtocol:
         return DefaultClassEventPublisherImpl(kafka_bus, redis_client)

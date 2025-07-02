@@ -49,6 +49,14 @@ class ProcessingEvent(str, Enum):
     PROCESSING_STARTED = "processing.started"
     PROCESSING_CONCLUDED = "processing.concluded"
     PROCESSING_FAILED = "processing.failed"
+    # -------------  LLM Provider events  -------------#
+    LLM_REQUEST_STARTED = "llm_provider.request.started"
+    LLM_REQUEST_COMPLETED = "llm_provider.request.completed"
+    LLM_PROVIDER_FAILURE = "llm_provider.failure"
+    LLM_CACHE_HIT = "llm_provider.cache.hit"
+    LLM_CACHE_MISS = "llm_provider.cache.miss"
+    LLM_USAGE_ANALYTICS = "llm_provider.usage.analytics"
+    LLM_COST_ALERT = "llm_provider.cost.alert"
 
 
 # Private mapping for topic_name() function
@@ -82,6 +90,14 @@ _TOPIC_MAPPING = {
         "huleedu.class.student.associations.confirmed.v1"
     ),
     ProcessingEvent.VALIDATION_TIMEOUT_PROCESSED: "huleedu.class.validation.timeout.processed.v1",
+    # LLM Provider events
+    ProcessingEvent.LLM_REQUEST_STARTED: "huleedu.llm_provider.request_started.v1",
+    ProcessingEvent.LLM_REQUEST_COMPLETED: "huleedu.llm_provider.request_completed.v1",
+    ProcessingEvent.LLM_PROVIDER_FAILURE: "huleedu.llm_provider.failure.v1",
+    ProcessingEvent.LLM_CACHE_HIT: "huleedu.llm_provider.cache_hit.v1",
+    ProcessingEvent.LLM_CACHE_MISS: "huleedu.llm_provider.cache_miss.v1",
+    ProcessingEvent.LLM_USAGE_ANALYTICS: "huleedu.llm_provider.usage_analytics.v1",
+    ProcessingEvent.LLM_COST_ALERT: "huleedu.llm_provider.cost_alert.v1",
 }
 
 

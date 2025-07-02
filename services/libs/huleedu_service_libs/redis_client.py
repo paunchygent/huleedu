@@ -420,3 +420,43 @@ class RedisClient:
         if not self._started or not self._pubsub:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
         return await self._pubsub.publish_user_notification(user_id, event_type, data)
+
+    async def ping(self) -> bool:
+        """
+        Health check method to verify Redis connectivity.
+
+        Returns:
+            True if Redis connection is healthy
+
+        Raises:
+            RuntimeError: If client is not started
+            RedisConnectionError: If Redis is not reachable
+        """
+        if not self._started:
+            logger.warning(f"Redis client '{self.client_id}' not started. Attempting to start.")
+            await self.start()
+            if not self._started:
+                logger.error(
+                    f"Cannot perform ping, Redis client '{self.client_id}' is not running.",
+                )
+                raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            result = await self.client.ping()
+            success = bool(result)
+            logger.debug(
+                f"Redis PING by '{self.client_id}': result={'SUCCESS' if success else 'FAILED'}"
+            )
+            return success
+        except RedisConnectionError:
+            logger.error(f"Redis ping failed - connection error for client '{self.client_id}'")
+            raise
+        except RedisTimeoutError:
+            logger.error(f"Redis ping failed - timeout for client '{self.client_id}'")
+            raise
+        except Exception as e:
+            logger.error(
+                f"Error in Redis ping operation by '{self.client_id}': {e}",
+                exc_info=True,
+            )
+            raise

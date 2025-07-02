@@ -22,6 +22,7 @@ from common_core.events.envelope import EventEnvelope
 
 class FileValidationData(BaseModel):
     """Test data model for file validation events."""
+
     file_id: str
     batch_id: str
     status: str
@@ -29,8 +30,23 @@ class FileValidationData(BaseModel):
     timestamp: datetime
 
 
+class SimpleTestData(BaseModel):
+    """Simple test data model for basic events."""
+
+    test: str
+
+
+class BatchFileData(BaseModel):
+    """Test data model for batch file events."""
+
+    batch_id: str
+    file_id: str
+    added_by: str
+    timestamp: str
+
+
 @pytest.fixture
-def mock_kafka_bus():
+def mock_kafka_bus() -> AsyncMock:
     """Mock KafkaBus for testing."""
     mock_bus = AsyncMock(spec=KafkaBus)
     mock_bus.client_id = "file-service-test-producer"
@@ -39,7 +55,7 @@ def mock_kafka_bus():
 
 
 @pytest.fixture
-def circuit_breaker():
+def circuit_breaker() -> CircuitBreaker:
     """Circuit breaker configured for File Service."""
     return CircuitBreaker(
         name="file-service.kafka_producer",
@@ -51,7 +67,7 @@ def circuit_breaker():
 
 
 @pytest.fixture
-def resilient_publisher(mock_kafka_bus, circuit_breaker):
+def resilient_publisher(mock_kafka_bus: AsyncMock, circuit_breaker: CircuitBreaker) -> ResilientKafkaPublisher:
     """ResilientKafkaPublisher for testing."""
     return ResilientKafkaPublisher(
         delegate=mock_kafka_bus,
@@ -61,9 +77,9 @@ def resilient_publisher(mock_kafka_bus, circuit_breaker):
 
 
 @pytest.fixture
-def sample_file_event():
+def sample_file_event() -> EventEnvelope[FileValidationData]:
     """Sample file validation event for testing."""
-    return EventEnvelope(
+    return EventEnvelope[FileValidationData](
         event_type="huleedu.file.essay.validation.success.v1",
         event_timestamp=datetime.now(timezone.utc),
         source_service="file-service",
@@ -79,7 +95,7 @@ def sample_file_event():
 
 
 @pytest.mark.asyncio
-async def test_successful_publish(resilient_publisher, sample_file_event):
+async def test_successful_publish(resilient_publisher: ResilientKafkaPublisher, sample_file_event: EventEnvelope[FileValidationData]) -> None:
     """Test successful event publishing through circuit breaker."""
     topic = "huleedu.file.essay.validation.success.v1"
 
@@ -97,7 +113,7 @@ async def test_successful_publish(resilient_publisher, sample_file_event):
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_opens_on_failures(resilient_publisher, sample_file_event):
+async def test_circuit_breaker_opens_on_failures(resilient_publisher: ResilientKafkaPublisher, sample_file_event: EventEnvelope[FileValidationData]) -> None:
     """Test that circuit breaker opens after repeated failures."""
     topic = "huleedu.file.essay.validation.success.v1"
 
@@ -122,7 +138,7 @@ async def test_circuit_breaker_opens_on_failures(resilient_publisher, sample_fil
 
 
 @pytest.mark.asyncio
-async def test_fallback_queue_behavior(resilient_publisher, sample_file_event):
+async def test_fallback_queue_behavior(resilient_publisher: ResilientKafkaPublisher, sample_file_event: EventEnvelope[FileValidationData]) -> None:
     """Test fallback queue stores failed messages correctly."""
     topic = "huleedu.file.essay.validation.success.v1"
 
@@ -141,7 +157,7 @@ async def test_fallback_queue_behavior(resilient_publisher, sample_file_event):
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_recovery(resilient_publisher, sample_file_event):
+async def test_circuit_breaker_recovery(resilient_publisher: ResilientKafkaPublisher, sample_file_event: EventEnvelope[FileValidationData]) -> None:
     """Test circuit breaker recovery after successful publishes."""
     topic = "huleedu.file.essay.validation.success.v1"
 
@@ -160,12 +176,12 @@ async def test_circuit_breaker_recovery(resilient_publisher, sample_file_event):
 
 
 @pytest.mark.asyncio
-async def test_fallback_queue_retry_mechanism(resilient_publisher):
+async def test_fallback_queue_retry_mechanism(resilient_publisher: ResilientKafkaPublisher) -> None:
     """Test that fallback queue messages can be queued and retrieved."""
     topic = "huleedu.file.essay.validation.success.v1"
 
     # Create test event
-    file_event = EventEnvelope(
+    file_event = EventEnvelope[FileValidationData](
         event_type="huleedu.file.essay.validation.success.v1",
         event_timestamp=datetime.now(timezone.utc),
         source_service="file-service",
@@ -203,10 +219,10 @@ async def test_fallback_queue_retry_mechanism(resilient_publisher):
 
 
 @pytest.mark.asyncio
-async def test_file_specific_error_scenarios(resilient_publisher):
+async def test_file_specific_error_scenarios(resilient_publisher: ResilientKafkaPublisher) -> None:
     """Test File Service specific error scenarios."""
     # Test large file validation event
-    large_file_event = EventEnvelope(
+    large_file_event = EventEnvelope[FileValidationData](
         event_type="huleedu.file.essay.validation.failed.v1",
         event_timestamp=datetime.now(timezone.utc),
         source_service="file-service",
@@ -236,7 +252,7 @@ async def test_file_specific_error_scenarios(resilient_publisher):
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_state_reporting(resilient_publisher):
+async def test_circuit_breaker_state_reporting(resilient_publisher: ResilientKafkaPublisher) -> None:
     """Test circuit breaker state reporting functionality."""
     # Initially closed
     state = resilient_publisher.get_circuit_breaker_state()
@@ -248,12 +264,13 @@ async def test_circuit_breaker_state_reporting(resilient_publisher):
     # Force some failures
     resilient_publisher.delegate.publish.side_effect = KafkaError("Test failure")
 
-    sample_event = EventEnvelope(
+    test_data = SimpleTestData(test="data")
+    sample_event = EventEnvelope[SimpleTestData](
         event_type="test.event",
         event_timestamp=datetime.now(timezone.utc),
         source_service="file-service",
         correlation_id=uuid4(),
-        data={"test": "data"},
+        data=test_data,
     )
 
     # Cause failures
@@ -270,7 +287,7 @@ async def test_circuit_breaker_state_reporting(resilient_publisher):
 
 
 @pytest.mark.asyncio
-async def test_resource_cleanup(resilient_publisher):
+async def test_resource_cleanup(resilient_publisher: ResilientKafkaPublisher) -> None:
     """Test proper resource cleanup."""
     # Verify start/stop delegation
     await resilient_publisher.start()
@@ -281,20 +298,21 @@ async def test_resource_cleanup(resilient_publisher):
 
 
 @pytest.mark.asyncio
-async def test_file_batch_management_events(resilient_publisher):
+async def test_file_batch_management_events(resilient_publisher: ResilientKafkaPublisher) -> None:
     """Test File Service specific batch management events."""
     # Test batch file added event
-    batch_file_event = EventEnvelope(
+    batch_data = BatchFileData(
+        batch_id="batch-789",
+        file_id="file-456",
+        added_by="user-123",
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
+    batch_file_event = EventEnvelope[BatchFileData](
         event_type="huleedu.file.batch.file.added.v1",
         event_timestamp=datetime.now(timezone.utc),
         source_service="file-service",
         correlation_id=uuid4(),
-        data={
-            "batch_id": "batch-789",
-            "file_id": "file-456",
-            "added_by": "user-123",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        },
+        data=batch_data,
     )
 
     topic = "huleedu.file.batch.file.added.v1"
@@ -307,4 +325,3 @@ async def test_file_batch_management_events(resilient_publisher):
 
     # Verify correct topic and event (with key parameter)
     resilient_publisher.delegate.publish.assert_called_once_with(topic, batch_file_event, None)
-

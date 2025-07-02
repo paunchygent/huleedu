@@ -172,6 +172,12 @@ class MockRedisClient:
         self.key_tracker.keys[key] = value
         return True
 
+    async def ping(self) -> bool:
+        """Mock PING operation required by RedisClientProtocol."""
+        if not self.is_connected or self.fail_mode == "all":
+            return False
+        return True
+
 
 class RedisTestManager:
     """

@@ -12,7 +12,7 @@ from .batch_service_models import (
     BatchServiceNLPInitiateCommandDataV1,
     BatchServiceSpellcheckInitiateCommandDataV1,
 )
-from .config_enums import Environment
+from .config_enums import Environment, LLMProviderType
 from .domain_enums import (
     ContentType,
     CourseCode,
@@ -103,6 +103,7 @@ __all__ = [
     "FileValidationErrorCode",
     # Config Enums
     "Environment",
+    "LLMProviderType",
     # Metadata Models
     "EntityReference",
     "SystemProcessingMetadata",

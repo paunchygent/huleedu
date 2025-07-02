@@ -52,6 +52,10 @@ class MockRedisClient:
         self.keys[key] = value
         return True
 
+    async def ping(self) -> bool:
+        """Mock PING operation required by RedisClientProtocol."""
+        return True
+
 
 @pytest.fixture
 def settings() -> Settings:
