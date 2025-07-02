@@ -40,9 +40,9 @@ class LLMComparisonResponse(BaseModel):
     """Response model for LLM essay comparison."""
 
     # Core result fields (matching CJ Assessment expectations)
-    choice: str = Field(description="Selected essay (A or B)")
-    reasoning: str = Field(description="Reasoning for the choice")
-    confidence: float = Field(description="Confidence score (0-1)")
+    winner: str = Field(description="Selected essay (Essay A or Essay B)")
+    justification: str = Field(description="Justification for the choice")
+    confidence: float = Field(description="Confidence score (1-5)")
 
     # Provider information
     provider: str = Field(description="Actual provider used")

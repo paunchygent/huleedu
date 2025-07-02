@@ -12,8 +12,7 @@ from uuid import UUID
 if TYPE_CHECKING:
     from common_core.metadata_models import EntityReference
     from common_core.status_enums import EssayStatus
-    from huleedu_service_libs.protocols import KafkaPublisherProtocol
-    from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+    from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
     from config import Settings
 

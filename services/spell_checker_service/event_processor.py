@@ -14,12 +14,12 @@ if TYPE_CHECKING:
 
 import aiohttp
 from aiokafka import ConsumerRecord
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
 from huleedu_service_libs.observability import (
     trace_operation,
     use_trace_context,
 )
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from pydantic import ValidationError
 
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1

@@ -90,10 +90,17 @@ class Settings(BaseSettings):
         ),
     }
 
+    # LLM Provider Service configuration
+    LLM_PROVIDER_SERVICE_URL: str = Field(
+        default="http://llm_provider_service:8090/api/v1",
+        description="Base URL for centralized LLM Provider Service",
+    )
+
     # Global LLM configuration defaults (used as fallbacks)
     LLM_REQUEST_TIMEOUT_SECONDS: int = 30
     MAX_TOKENS_RESPONSE: int = 1000
     TEMPERATURE: float = 0.1
+    DEFAULT_LLM_TEMPERATURE: float = 0.1  # Add this for compatibility
 
     # CJ assessment parameters
     MAX_PAIRWISE_COMPARISONS: int = 1000

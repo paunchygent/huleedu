@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import uuid
 
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
 from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1

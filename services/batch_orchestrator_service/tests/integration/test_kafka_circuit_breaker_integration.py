@@ -86,7 +86,7 @@ async def test_resilient_kafka_publisher_normal_operation(
 
 @pytest.mark.asyncio
 async def test_resilient_kafka_publisher_without_circuit_breaker(
-    test_envelope: EventEnvelope[_TestEventData]
+    test_envelope: EventEnvelope[_TestEventData],
 ) -> None:
     """Test operation without circuit breaker."""
     # Create mock KafkaBus delegate

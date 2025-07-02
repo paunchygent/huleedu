@@ -17,18 +17,13 @@ from prometheus_client import REGISTRY, CollectorRegistry
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.config import settings as service_settings
-from services.cj_assessment_service.implementations.anthropic_provider_impl import (
-    AnthropicProviderImpl,
-)
 from services.cj_assessment_service.implementations.cache_manager_impl import CacheManagerImpl
 from services.cj_assessment_service.implementations.content_client_impl import ContentClientImpl
 from services.cj_assessment_service.implementations.db_access_impl import PostgreSQLCJRepositoryImpl
 from services.cj_assessment_service.implementations.event_publisher_impl import CJEventPublisherImpl
-from services.cj_assessment_service.implementations.google_provider_impl import GoogleProviderImpl
 from services.cj_assessment_service.implementations.llm_interaction_impl import LLMInteractionImpl
-from services.cj_assessment_service.implementations.openai_provider_impl import OpenAIProviderImpl
-from services.cj_assessment_service.implementations.openrouter_provider_impl import (
-    OpenRouterProviderImpl,
+from services.cj_assessment_service.implementations.llm_provider_service_client import (
+    LLMProviderServiceClient,
 )
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
 
@@ -140,62 +135,30 @@ class CJAssessmentServiceProvider(Provider):
         """Provide retry manager for LLM API calls."""
         return RetryManagerImpl(settings)
 
-    # Individual LLM Providers
+    # LLM Provider Service Client
     @provide(scope=Scope.APP)
-    def provide_openai_llm_provider(
+    def provide_llm_provider_service_client(
         self,
         session: aiohttp.ClientSession,
         settings: Settings,
         retry_manager: RetryManagerProtocol,
-    ) -> OpenAIProviderImpl:
-        """Provide OpenAI LLM provider."""
-        return OpenAIProviderImpl(session, settings, retry_manager)
+    ) -> LLMProviderServiceClient:
+        """Provide LLM Provider Service HTTP client."""
+        return LLMProviderServiceClient(session, settings, retry_manager)
 
-    @provide(scope=Scope.APP)
-    def provide_anthropic_llm_provider(
-        self,
-        session: aiohttp.ClientSession,
-        settings: Settings,
-        retry_manager: RetryManagerProtocol,
-    ) -> AnthropicProviderImpl:
-        """Provide Anthropic LLM provider."""
-        return AnthropicProviderImpl(session, settings, retry_manager)
-
-    @provide(scope=Scope.APP)
-    def provide_google_llm_provider(
-        self,
-        session: aiohttp.ClientSession,
-        settings: Settings,
-        retry_manager: RetryManagerProtocol,
-    ) -> GoogleProviderImpl:
-        """Provide Google LLM provider."""
-        return GoogleProviderImpl(session, settings, retry_manager)
-
-    @provide(scope=Scope.APP)
-    def provide_openrouter_llm_provider(
-        self,
-        session: aiohttp.ClientSession,
-        settings: Settings,
-        retry_manager: RetryManagerProtocol,
-    ) -> OpenRouterProviderImpl:
-        """Provide OpenRouter LLM provider."""
-        return OpenRouterProviderImpl(session, settings, retry_manager)
-
-    # Map of providers
+    # Map of providers - all route through the centralized service
     @provide(scope=Scope.APP)
     def provide_llm_provider_map(
         self,
-        openai: OpenAIProviderImpl,
-        anthropic: AnthropicProviderImpl,
-        google: GoogleProviderImpl,
-        openrouter: OpenRouterProviderImpl,
+        llm_service_client: LLMProviderServiceClient,
     ) -> dict[str, LLMProviderProtocol]:
-        """Provide dictionary of available LLM providers."""
+        """Provide dictionary with LLM service client for all providers."""
+        # All providers now route through the centralized service
         return {
-            "openai": openai,
-            "anthropic": anthropic,
-            "google": google,
-            "openrouter": openrouter,
+            "openai": llm_service_client,
+            "anthropic": llm_service_client,
+            "google": llm_service_client,
+            "openrouter": llm_service_client,
         }
 
     @provide(scope=Scope.APP)

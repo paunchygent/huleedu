@@ -62,9 +62,22 @@ async def generate_comparison(
             temperature_override = comparison_request.llm_config_overrides.temperature_override
             system_prompt_override = comparison_request.llm_config_overrides.system_prompt_override
 
+        # Require explicit provider configuration
+        if not provider_override:
+            logger.warning(
+                f"Request missing required provider configuration, correlation_id: {correlation_id}"
+            )
+            return jsonify(
+                {
+                    "error": "Provider configuration required",
+                    "details": "llm_config_overrides.provider_override must be specified",
+                    "correlation_id": str(correlation_id),
+                }
+            ), 400
+
         # Call orchestrator
         result, error = await orchestrator.perform_comparison(
-            provider=provider_override or settings.DEFAULT_LLM_PROVIDER,
+            provider=provider_override,
             user_prompt=comparison_request.user_prompt,
             essay_a=comparison_request.essay_a,
             essay_b=comparison_request.essay_b,
@@ -112,10 +125,18 @@ async def generate_comparison(
         ).inc()
 
         # Build response - map internal model to API response model
+        # Transform choice value: "A" -> "Essay A", "B" -> "Essay B"
+        winner = f"Essay {result.choice}" if result.choice in ["A", "B"] else result.choice
+
+        # Convert confidence scale from 0-1 to 1-5
+        confidence_scaled = 1.0 + (result.confidence * 4.0)
+        # Ensure confidence is within valid range
+        confidence_scaled = max(1.0, min(5.0, confidence_scaled))
+
         response = LLMComparisonResponse(
-            choice=result.choice,
-            reasoning=result.reasoning,
-            confidence=result.confidence,
+            winner=winner,
+            justification=result.reasoning,
+            confidence=confidence_scaled,
             provider=result.provider,
             model=result.model,
             cached=result.cached,

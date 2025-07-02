@@ -47,7 +47,6 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
         self.settings = settings
 
-
     async def perform_comparison(
         self,
         provider: LLMProviderType,
@@ -123,7 +122,9 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 },
             )
 
-            logger.info(f"Cache hit for provider {provider.value}, correlation_id: {correlation_id}")
+            logger.info(
+                f"Cache hit for provider {provider.value}, correlation_id: {correlation_id}"
+            )
 
             # Construct response from cached data
             return LLMOrchestratorResponse(
@@ -166,7 +167,9 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                     "completion_tokens": result.completion_tokens,
                     "total_tokens": result.total_tokens,
                 }
-                cost_estimate_value: float = self._estimate_cost(provider.value, token_usage_dict) or 0.0
+                cost_estimate_value: float = (
+                    self._estimate_cost(provider.value, token_usage_dict) or 0.0
+                )
 
                 cache_data = {
                     "choice": result.choice,

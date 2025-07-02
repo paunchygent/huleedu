@@ -77,7 +77,8 @@ class GoogleProviderImpl(LLMProviderProtocol):
         # Use system prompt from override or default comparison prompt
         system_prompt = (
             system_prompt_override
-            or "You are an expert essay evaluator. Compare the two essays and return your analysis as JSON."
+            or "You are an expert essay evaluator. "
+            "Compare the two essays and return your analysis as JSON."
         )
 
         # Execute with retry
@@ -139,7 +140,11 @@ class GoogleProviderImpl(LLMProviderProtocol):
         }
 
         # Use systemInstruction for better prompt handling
-        user_prompt_with_json = f"{user_prompt}\n\nPlease respond with a valid JSON object containing 'choice' (A or B), 'reasoning' (explanation), and 'confidence' (0.0-1.0)."
+        user_prompt_with_json = (
+            f"{user_prompt}\n\n"
+            "Please respond with a valid JSON object containing "
+            "'choice' (A or B), 'reasoning' (explanation), and 'confidence' (0.0-1.0)."
+        )
 
         payload = {
             "contents": [{"parts": [{"text": user_prompt_with_json}]}],

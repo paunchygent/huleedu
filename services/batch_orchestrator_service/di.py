@@ -194,7 +194,9 @@ class RepositoryAndPublishingProvider(Provider):
             return PostgreSQLBatchRepositoryImpl(settings)
 
     @provide(scope=Scope.APP)
-    def provide_batch_event_publisher(self, kafka_bus: KafkaPublisherProtocol) -> BatchEventPublisherProtocol:
+    def provide_batch_event_publisher(
+        self, kafka_bus: KafkaPublisherProtocol
+    ) -> BatchEventPublisherProtocol:
         """Provide batch event publisher implementation."""
         return DefaultBatchEventPublisherImpl(kafka_bus)
 

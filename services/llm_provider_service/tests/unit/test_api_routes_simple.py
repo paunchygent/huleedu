@@ -22,9 +22,9 @@ async def test_comparison_response_model_validation() -> None:
 
     # Act - Valid response
     response = LLMComparisonResponse(
-        choice="A",
-        reasoning="Essay A is better",
-        confidence=0.85,
+        winner="Essay A",
+        justification="Essay A is better",
+        confidence=4.4,  # 1-5 scale
         provider="openai",
         model="gpt-4",
         response_time_ms=150,
@@ -36,8 +36,8 @@ async def test_comparison_response_model_validation() -> None:
     )
 
     # Assert
-    assert response.choice == "A"
-    assert response.confidence == 0.85
+    assert response.winner == "Essay A"
+    assert response.confidence == 4.4
     assert response.token_usage is not None
     assert response.token_usage["total_tokens"] == 150
 
@@ -120,11 +120,19 @@ def test_orchestrator_response_to_api_response_mapping() -> None:
         trace_id="trace-456",
     )
 
-    # Act - Map to API response
+    # Act - Map to API response (simulating the transformation logic)
+    winner = (
+        f"Essay {orchestrator_response.choice}"
+        if orchestrator_response.choice in ["A", "B"]
+        else orchestrator_response.choice
+    )
+    confidence_scaled = 1.0 + (orchestrator_response.confidence * 4.0)
+    confidence_scaled = max(1.0, min(5.0, confidence_scaled))
+
     api_response = LLMComparisonResponse(
-        choice=orchestrator_response.choice,
-        reasoning=orchestrator_response.reasoning,
-        confidence=orchestrator_response.confidence,
+        winner=winner,
+        justification=orchestrator_response.reasoning,
+        confidence=confidence_scaled,
         provider=orchestrator_response.provider,
         model=orchestrator_response.model,
         response_time_ms=orchestrator_response.response_time_ms,
@@ -136,7 +144,9 @@ def test_orchestrator_response_to_api_response_mapping() -> None:
     )
 
     # Assert
-    assert api_response.choice == "B"
+    assert api_response.winner == "Essay B"
+    assert api_response.justification == "Better argumentation"
+    assert api_response.confidence == 4.6  # 1.0 + (0.9 * 4.0) = 4.6
     assert api_response.cached is True
     assert api_response.cost_estimate == 0.008
 

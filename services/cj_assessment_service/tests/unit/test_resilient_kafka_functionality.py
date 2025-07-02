@@ -36,7 +36,7 @@ class CJAssessmentResultData(BaseModel):
 
 class SimpleTestData(BaseModel):
     """Simple test data for basic circuit breaker tests."""
-    
+
     test: str
 
 

@@ -48,7 +48,9 @@ def provider() -> ServiceProvider:
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_registry_creation(provider: ServiceProvider, mock_settings: Settings) -> None:
+async def test_circuit_breaker_registry_creation(
+    provider: ServiceProvider, mock_settings: Settings
+) -> None:
     """Test that circuit breaker registry is created correctly."""
     registry = provider.provide_circuit_breaker_registry(mock_settings)
 
@@ -57,7 +59,9 @@ async def test_circuit_breaker_registry_creation(provider: ServiceProvider, mock
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_registry_disabled(provider: ServiceProvider, mock_settings_disabled: Settings) -> None:
+async def test_circuit_breaker_registry_disabled(
+    provider: ServiceProvider, mock_settings_disabled: Settings
+) -> None:
     """Test that circuit breaker registry works when disabled."""
     registry = provider.provide_circuit_breaker_registry(mock_settings_disabled)
 
@@ -66,7 +70,9 @@ async def test_circuit_breaker_registry_disabled(provider: ServiceProvider, mock
 
 
 @pytest.mark.asyncio
-async def test_kafka_bus_with_circuit_breaker(provider: ServiceProvider, mock_settings: Settings) -> None:
+async def test_kafka_bus_with_circuit_breaker(
+    provider: ServiceProvider, mock_settings: Settings
+) -> None:
     """Test that KafkaBus is wrapped with circuit breaker when enabled."""
     # Create registry first
     registry = provider.provide_circuit_breaker_registry(mock_settings)
@@ -106,7 +112,9 @@ async def test_kafka_bus_with_circuit_breaker(provider: ServiceProvider, mock_se
 
 
 @pytest.mark.asyncio
-async def test_kafka_bus_without_circuit_breaker(provider: ServiceProvider, mock_settings_disabled: Settings) -> None:
+async def test_kafka_bus_without_circuit_breaker(
+    provider: ServiceProvider, mock_settings_disabled: Settings
+) -> None:
     """Test that base KafkaBus is returned when circuit breaker is disabled."""
     # Create registry first
     registry = provider.provide_circuit_breaker_registry(mock_settings_disabled)
@@ -126,7 +134,9 @@ async def test_kafka_bus_without_circuit_breaker(provider: ServiceProvider, mock
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_configuration(provider: ServiceProvider, mock_settings: Settings) -> None:
+async def test_circuit_breaker_configuration(
+    provider: ServiceProvider, mock_settings: Settings
+) -> None:
     """Test that circuit breaker is configured with correct settings."""
     registry = provider.provide_circuit_breaker_registry(mock_settings)
 
@@ -190,7 +200,9 @@ def test_env_prefix() -> None:
 
 
 @pytest.mark.asyncio
-async def test_integration_with_existing_providers(provider: ServiceProvider, mock_settings: Settings) -> None:
+async def test_integration_with_existing_providers(
+    provider: ServiceProvider, mock_settings: Settings
+) -> None:
     """Test that circuit breaker integration doesn't break existing DI flow."""
     # Test that other providers can still be created
     settings_instance = provider.provide_settings()

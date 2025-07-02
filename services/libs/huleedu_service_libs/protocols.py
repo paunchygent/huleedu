@@ -18,7 +18,7 @@ T_EventPayload = TypeVar("T_EventPayload", bound=BaseModel)
 
 __all__ = [
     "RedisClientProtocol",
-    "AtomicRedisClientProtocol", 
+    "AtomicRedisClientProtocol",
     "KafkaPublisherProtocol",
     "T_EventPayload",
 ]
@@ -194,7 +194,7 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
 class KafkaPublisherProtocol(Protocol):
     """
     Protocol for Kafka event publishing with lifecycle management.
-    
+
     This protocol defines the common interface for both KafkaBus and ResilientKafkaPublisher,
     enabling proper dependency injection with type safety while supporting resilience patterns.
     """

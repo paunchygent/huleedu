@@ -60,7 +60,10 @@ def orchestrator(
 
     from services.llm_provider_service.protocols import LLMProviderProtocol
 
-    providers: Dict[LLMProviderType, LLMProviderProtocol] = {LLMProviderType.MOCK: mock_provider, LLMProviderType.OPENAI: mock_provider}  # type: ignore
+    providers: Dict[LLMProviderType, LLMProviderProtocol] = {
+        LLMProviderType.MOCK: mock_provider,
+        LLMProviderType.OPENAI: mock_provider,
+    }  # type: ignore
     return LLMOrchestratorImpl(
         providers=providers,
         cache_manager=mock_cache_manager,

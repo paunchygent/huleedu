@@ -17,9 +17,8 @@ import aiohttp
 from aiokafka import AIOKafkaConsumer, TopicPartition
 from aiokafka.errors import KafkaConnectionError
 from huleedu_service_libs.idempotency import idempotent_consumer
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.protocols import RedisClientProtocol
+from huleedu_service_libs.protocols import KafkaPublisherProtocol, RedisClientProtocol
 
 from common_core.event_enums import ProcessingEvent, topic_name
 from services.spell_checker_service.event_processor import process_single_message

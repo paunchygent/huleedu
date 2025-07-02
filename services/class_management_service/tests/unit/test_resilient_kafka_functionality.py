@@ -41,13 +41,13 @@ class LargeClassData(BaseModel):
 
 class SimpleTestData(BaseModel):
     """Simple test data model for basic events."""
-    
+
     test: str
 
 
 class EnrollmentData(BaseModel):
     """Test data model for enrollment events."""
-    
+
     class_id: str
     student_id: str
     enrolled_by: str
@@ -77,7 +77,9 @@ def circuit_breaker() -> CircuitBreaker:
 
 
 @pytest.fixture
-def resilient_publisher(mock_kafka_bus: AsyncMock, circuit_breaker: CircuitBreaker) -> ResilientKafkaPublisher:
+def resilient_publisher(
+    mock_kafka_bus: AsyncMock, circuit_breaker: CircuitBreaker
+) -> ResilientKafkaPublisher:
     """ResilientKafkaPublisher for testing."""
     return ResilientKafkaPublisher(
         delegate=mock_kafka_bus,
@@ -104,7 +106,10 @@ def sample_class_event() -> EventEnvelope[ClassManagementEventData]:
 
 
 @pytest.mark.asyncio
-async def test_successful_publish(resilient_publisher: ResilientKafkaPublisher, sample_class_event: EventEnvelope[ClassManagementEventData]) -> None:
+async def test_successful_publish(
+    resilient_publisher: ResilientKafkaPublisher,
+    sample_class_event: EventEnvelope[ClassManagementEventData],
+) -> None:
     """Test successful event publishing through circuit breaker."""
     topic = "huleedu.class.student.added.v1"
 
@@ -115,7 +120,9 @@ async def test_successful_publish(resilient_publisher: ResilientKafkaPublisher, 
     await resilient_publisher.publish(topic, sample_class_event)
 
     # Verify delegate was called (note: includes key parameter)
-    cast(AsyncMock, resilient_publisher.delegate.publish).assert_called_once_with(topic, sample_class_event, None)
+    cast(AsyncMock, resilient_publisher.delegate.publish).assert_called_once_with(
+        topic, sample_class_event, None
+    )
 
     # Circuit breaker should remain closed
     assert resilient_publisher.circuit_breaker is not None
@@ -123,12 +130,17 @@ async def test_successful_publish(resilient_publisher: ResilientKafkaPublisher, 
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_opens_on_failures(resilient_publisher: ResilientKafkaPublisher, sample_class_event: EventEnvelope[ClassManagementEventData]) -> None:
+async def test_circuit_breaker_opens_on_failures(
+    resilient_publisher: ResilientKafkaPublisher,
+    sample_class_event: EventEnvelope[ClassManagementEventData],
+) -> None:
     """Test that circuit breaker opens after repeated failures."""
     topic = "huleedu.class.student.added.v1"
 
     # Mock failing publish calls
-    cast(AsyncMock, resilient_publisher.delegate.publish).side_effect = KafkaError("Connection failed")
+    cast(AsyncMock, resilient_publisher.delegate.publish).side_effect = KafkaError(
+        "Connection failed"
+    )
 
     # First few failures should be stored in fallback queue (catch exceptions)
     for _ in range(3):
@@ -149,7 +161,10 @@ async def test_circuit_breaker_opens_on_failures(resilient_publisher: ResilientK
 
 
 @pytest.mark.asyncio
-async def test_fallback_queue_behavior(resilient_publisher: ResilientKafkaPublisher, sample_class_event: EventEnvelope[ClassManagementEventData]) -> None:
+async def test_fallback_queue_behavior(
+    resilient_publisher: ResilientKafkaPublisher,
+    sample_class_event: EventEnvelope[ClassManagementEventData],
+) -> None:
     """Test fallback queue stores failed messages correctly."""
     topic = "huleedu.class.student.added.v1"
 
@@ -169,7 +184,10 @@ async def test_fallback_queue_behavior(resilient_publisher: ResilientKafkaPublis
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_recovery(resilient_publisher: ResilientKafkaPublisher, sample_class_event: EventEnvelope[ClassManagementEventData]) -> None:
+async def test_circuit_breaker_recovery(
+    resilient_publisher: ResilientKafkaPublisher,
+    sample_class_event: EventEnvelope[ClassManagementEventData],
+) -> None:
     """Test circuit breaker recovery after successful publishes."""
     topic = "huleedu.class.student.added.v1"
 
@@ -252,7 +270,9 @@ async def test_class_specific_error_scenarios(resilient_publisher: ResilientKafk
     topic = "huleedu.class.created.v1"
 
     # Mock Kafka timeout (common with large messages)
-    cast(AsyncMock, resilient_publisher.delegate.publish).side_effect = KafkaError("Message too large")
+    cast(AsyncMock, resilient_publisher.delegate.publish).side_effect = KafkaError(
+        "Message too large"
+    )
 
     # Should handle error gracefully
     try:
@@ -265,7 +285,9 @@ async def test_class_specific_error_scenarios(resilient_publisher: ResilientKafk
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_state_reporting(resilient_publisher: ResilientKafkaPublisher) -> None:
+async def test_circuit_breaker_state_reporting(
+    resilient_publisher: ResilientKafkaPublisher,
+) -> None:
     """Test circuit breaker state reporting functionality."""
     # Initially closed
     state = resilient_publisher.get_circuit_breaker_state()
@@ -311,7 +333,9 @@ async def test_resource_cleanup(resilient_publisher: ResilientKafkaPublisher) ->
 
 
 @pytest.mark.asyncio
-async def test_class_management_specific_events(resilient_publisher: ResilientKafkaPublisher) -> None:
+async def test_class_management_specific_events(
+    resilient_publisher: ResilientKafkaPublisher,
+) -> None:
     """Test Class Management Service specific events."""
     # Test student enrollment event
     enrollment_data = EnrollmentData(
@@ -338,4 +362,6 @@ async def test_class_management_specific_events(resilient_publisher: ResilientKa
     await resilient_publisher.publish(topic, enrollment_event)
 
     # Verify correct topic and event (with key parameter)
-    cast(AsyncMock, resilient_publisher.delegate.publish).assert_called_once_with(topic, enrollment_event, None)
+    cast(AsyncMock, resilient_publisher.delegate.publish).assert_called_once_with(
+        topic, enrollment_event, None
+    )

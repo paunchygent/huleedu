@@ -145,7 +145,7 @@ __all__ = [
     "EssayValidationFailedV1",
     # LLM Provider Event Models
     "LLMRequestStartedV1",
-    "LLMRequestCompletedV1", 
+    "LLMRequestCompletedV1",
     "LLMProviderFailureV1",
     "LLMUsageAnalyticsV1",
     "LLMCostAlertV1",
