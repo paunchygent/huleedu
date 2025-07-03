@@ -40,4 +40,7 @@ services/*/tmp/
 *.log
 *.pid
 
+# LLM Response Recorder logs (development only)
+llm_response_logs/
+
 .DS_Store

@@ -138,3 +138,13 @@ class SpellcheckJobStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     SUCCESS = "success"
     FAILED = "failed"
+
+
+class QueueStatus(str, Enum):
+    """Status codes for queued LLM requests."""
+    
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    EXPIRED = "expired"
+    FAILED = "failed"

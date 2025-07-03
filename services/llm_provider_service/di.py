@@ -47,12 +47,22 @@ from services.llm_provider_service.implementations.resilient_cache_manager_impl 
 from services.llm_provider_service.implementations.retry_manager_impl import (
     RetryManagerImpl,
 )
+from services.llm_provider_service.implementations.redis_queue_repository_impl import (
+    RedisQueueRepositoryImpl,
+)
+from services.llm_provider_service.implementations.local_queue_manager_impl import (
+    LocalQueueManagerImpl as LocalQueueManagerQueue,
+)
+from services.llm_provider_service.implementations.resilient_queue_manager_impl import (
+    ResilientQueueManagerImpl,
+)
 from services.llm_provider_service.protocols import (
     LLMCacheManagerProtocol,
     LLMEventPublisherProtocol,
     LLMOrchestratorProtocol,
     LLMProviderProtocol,
     LLMRetryManagerProtocol,
+    QueueManagerProtocol,
 )
 
 
@@ -168,6 +178,41 @@ class LLMProviderServiceProvider(Provider):
         return ResilientCacheManagerImpl(
             redis_cache=redis_cache,
             local_cache=local_cache,
+            settings=settings,
+        )
+
+    # Queue Provider Methods
+    @provide(scope=Scope.APP)
+    def provide_redis_queue_repository(
+        self,
+        redis_client: RedisClientProtocol,
+        settings: Settings,
+    ) -> RedisQueueRepositoryImpl:
+        """Provide Redis queue repository."""
+        return RedisQueueRepositoryImpl(
+            redis_client=cast(RedisClient, redis_client),
+            settings=settings,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_local_queue_manager(
+        self,
+        settings: Settings,
+    ) -> LocalQueueManagerQueue:
+        """Provide local queue manager."""
+        return LocalQueueManagerQueue(settings=settings)
+
+    @provide(scope=Scope.APP)
+    def provide_queue_manager(
+        self,
+        redis_queue: RedisQueueRepositoryImpl,
+        local_queue: LocalQueueManagerQueue,
+        settings: Settings,
+    ) -> QueueManagerProtocol:
+        """Provide resilient queue manager."""
+        return ResilientQueueManagerImpl(
+            redis_queue=redis_queue,
+            local_queue=local_queue,
             settings=settings,
         )
 

@@ -212,28 +212,39 @@ class DevelopmentResponseRecorder:
 
 ### Implementation Plan
 
-#### Phase 1: Transform Redis from Response Cache to Request Queue
+#### ✅ Phase 1: Transform Redis from Response Cache to Request Queue (COMPLETED)
 
 **Critical First Step**: Redis is currently our main handler - we must transform it carefully to maintain service availability.
 
-- [ ] Create new protocols alongside existing cache protocols:
-  - `QueueManagerProtocol` for request queuing operations
+- [x] Create new protocols alongside existing cache protocols:
+  - `QueueManagerProtocol` for request queuing operations (added to `protocols.py`)
+  - `QueueRepositoryProtocol` for storage operations (added to `protocols.py`)
   - Keep `LLMCacheManagerProtocol` temporarily for migration
-- [ ] Transform Redis implementation:
-  - Create `RedisQueueRepositoryImpl` based on current `RedisCacheRepositoryImpl`
-  - Change key pattern: `{service}:queue:requests:{queue_id}` instead of cache keys
-  - Store `QueuedRequest` objects instead of responses
-  - Add queue-specific operations: enqueue, dequeue, get_queue_size
-  - Implement TTL of 4 hours for queued requests
-- [ ] Create local queue implementation:
-  - `LocalQueueManagerImpl` with strict capacity limits
+- [x] Transform Redis implementation:
+  - Created `RedisQueueRepositoryImpl` (`implementations/redis_queue_repository_impl.py`)
+  - Changed key pattern: `{service}:queue:requests:{queue_id}` instead of cache keys
+  - Stores `QueuedRequest` objects instead of responses
+  - Added queue-specific operations: enqueue, dequeue, get_queue_size
+  - Implemented TTL of 4 hours for queued requests
+- [x] Create local queue implementation:
+  - Created `LocalQueueManagerImpl` (`implementations/local_queue_manager_impl.py`)
   - No LRU eviction - explicit rejection when full
   - High/low watermark circuit breaker (80%/60%)
   - Memory tracking to prevent OOM
-- [ ] Update `ResilientCacheManagerImpl` → `ResilientQueueManagerImpl`:
+- [x] Created `ResilientQueueManagerImpl` (`implementations/resilient_queue_manager_impl.py`):
   - Primary: Redis queue for persistence
   - Fallback: Local queue with capacity management
   - Consistent behavior across both backends
+- [x] Added queue configuration to `config.py`:
+  - `QUEUE_MAX_SIZE`, `QUEUE_MAX_MEMORY_MB`
+  - `QUEUE_HIGH_WATERMARK`, `QUEUE_LOW_WATERMARK`
+  - `QUEUE_REQUEST_TTL_HOURS`
+- [x] Wired up DI in `di.py`:
+  - Added providers for queue components
+  - Maintained cache providers for migration
+- [x] Created `DevelopmentResponseRecorder` (`implementations/response_recorder_impl.py`):
+  - Simple file-based logging for API validation
+  - Added `llm_response_logs/` to `.gitignore`
 
 #### Phase 2: Update LLM Orchestrator Request Flow
 
@@ -482,26 +493,180 @@ After the cache refactor is complete, these remaining tasks should be addressed:
 
 ## Current Status
 
-**Working**:
+**✅ Completed (Phase 1)**:
 
-- All 4 LLM providers implemented with structured responses
+- Queue infrastructure deployed alongside cache
+- Redis transformed to store requests (not responses)
+- Local queue with capacity management
+- Development response recorder
+- All 4 LLM providers with structured responses
 - Mock provider for testing
 - Health monitoring and metrics
-- Redis resilience validated
 - CJ Assessment integration functional
 
-**Critical Issues**:
+**⚠️ Critical Issues (Still Present)**:
 
-- Response caching breaks psychometric validity
-- No queue-based resilience for outages
-- Cache design conflicts with service purpose
+- Response caching still active in orchestrator
+- Cache checked before provider availability
+- No queue processing when providers unavailable
+- Dead code: entire cache infrastructure
 
-**Next Steps**:
+**📋 Remaining Work**:
 
-1. **PRIORITY**: Implement cache refactor plan above
-2. Complete performance benchmarking
-3. Remove old provider implementations from CJ Assessment
-4. Document queue-based resilience pattern
+### Phase 2: Orchestrator Update (PRIORITY)
+- Update `llm_orchestrator_impl.py` to use queue
+- Remove cache checks from main flow
+- Implement provider availability check first
+- Add queue logic for unavailable providers
+
+### Phase 3: Queue Processing
+- Background task for processing queued requests
+- Status tracking and updates
+- TTL enforcement
+- Result storage and retrieval
+
+### Phase 4: Dead Code Removal
+**Files to Delete**:
+- `implementations/redis_cache_repository_impl.py`
+- `implementations/local_cache_manager_impl.py`
+- `implementations/resilient_cache_manager_impl.py`
+
+**Code to Remove**:
+- Cache protocols in `protocols.py`
+- Cache configuration in `config.py`
+- Cache providers in `di.py`
+- Cache references in `llm_orchestrator_impl.py`
+
+### Phase 5: API Updates
+- Add `/api/v1/status/{queue_id}` endpoint
+- Update response models for 202 Accepted
+- Add queue statistics endpoint
+
+### Phase 6: Integration
+- Update consuming services for async responses
+- Add retry logic for queue status checks
+
+## Test Categories for Full Refactor
+
+### 1. **Queue Infrastructure Tests** (Phase 1 - Ready to Write)
+```python
+# test_redis_queue_repository.py
+- test_enqueue_dequeue_priority_order()
+- test_ttl_expiration()
+- test_memory_tracking()
+- test_concurrent_access()
+- test_queue_persistence()
+
+# test_local_queue_manager.py
+- test_capacity_limits()
+- test_watermark_behavior()
+- test_memory_limits()
+- test_no_silent_eviction()
+- test_thread_safety()
+
+# test_resilient_queue_manager.py
+- test_redis_fallback_to_local()
+- test_recovery_when_redis_returns()
+- test_combined_statistics()
+- test_migration_tracking()
+```
+
+### 2. **Orchestrator Tests** (Phase 2)
+```python
+# test_llm_orchestrator_queue.py
+- test_provider_check_before_queue()
+- test_queue_when_provider_unavailable()
+- test_no_cache_check_in_production()
+- test_fresh_responses_always()
+- test_queue_full_handling()
+```
+
+### 3. **Queue Processing Tests** (Phase 3)
+```python
+# test_queue_processor.py
+- test_background_processing()
+- test_ttl_enforcement()
+- test_status_transitions()
+- test_result_storage()
+- test_retry_logic()
+```
+
+### 4. **API Integration Tests** (Phase 5)
+```python
+# test_queue_api.py
+- test_202_accepted_response()
+- test_queue_status_endpoint()
+- test_queue_stats_endpoint()
+- test_invalid_queue_id()
+```
+
+### 5. **End-to-End Tests**
+```python
+# test_e2e_queue_flow.py
+- test_full_queue_lifecycle()
+- test_provider_outage_scenario()
+- test_redis_outage_scenario()
+- test_both_outages_scenario()
+```
+
+### 6. **Performance Tests**
+```python
+# test_queue_performance.py
+- test_high_volume_queuing()
+- test_memory_usage_under_load()
+- test_priority_ordering_performance()
+- test_concurrent_queue_operations()
+```
+
+## Dead Code to Remove
+
+### Cache Infrastructure (After Phase 2 Completion)
+```
+implementations/
+├── redis_cache_repository_impl.py      # DELETE
+├── local_cache_manager_impl.py         # DELETE  
+├── resilient_cache_manager_impl.py     # DELETE
+```
+
+### Cache Configuration
+- `config.py`: Remove `LLM_CACHE_*` settings
+- `protocols.py`: Remove `LLMCacheManagerProtocol`, `LLMCacheRepositoryProtocol`
+- `di.py`: Remove cache provider methods
+
+## Implementation Roadmap
+
+### Current Reality
+- ✅ **Phase 1 Complete**: Queue infrastructure exists alongside cache
+- ❌ **Cache Still Active**: `llm_orchestrator_impl.py` checks cache first (line ~108)
+- ⚠️ **No Queue Usage**: Queue components created but not integrated
+
+### What Actually Needs to Happen
+
+**Phase 2: Fix Orchestrator (CRITICAL)**
+```python
+# Remove this (line ~108):
+cached_response = await self.cache_manager.get_cached_response(cache_key)
+if cached_response:
+    return cached_response
+
+# Replace with:
+if not self._is_provider_available(provider):
+    queued_request = await self.queue_manager.enqueue(request)
+    if queued_request:
+        return 202, queue_id
+    else:
+        return 503, "Queue at capacity"
+```
+
+**Phase 3: Add Queue Processing**
+- Background task to process queued requests
+- Check provider availability periodically
+- Process queue when providers recover
+
+**Phase 4: Remove Dead Code**
+- Delete all cache implementations
+- Remove cache from DI
+- Clean up imports
 
 ## Technical Decisions
 

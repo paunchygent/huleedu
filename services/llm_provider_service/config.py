@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, Optional
 
 from pydantic import Field, field_validator
@@ -138,6 +139,54 @@ class Settings(BaseSettings):
     LOCAL_CACHE_MAX_ENTRIES: int = Field(
         default=1000, description="Maximum number of entries in local cache"
     )
+
+    # Queue Configuration
+    QUEUE_MAX_SIZE: int = Field(
+        default=1000,
+        description="Maximum number of requests in queue",
+    )
+    QUEUE_MAX_MEMORY_MB: int = Field(
+        default=100,
+        description="Maximum memory usage for queue in MB",
+    )
+    QUEUE_HIGH_WATERMARK: float = Field(
+        default=0.8,
+        ge=0.5,
+        le=1.0,
+        description="Start rejecting requests at this usage percent",
+    )
+    QUEUE_LOW_WATERMARK: float = Field(
+        default=0.6,
+        ge=0.0,
+        lt=0.8,
+        description="Resume accepting requests at this usage percent",
+    )
+    QUEUE_REQUEST_TTL_HOURS: int = Field(
+        default=4,
+        description="How long requests stay in queue before expiring",
+    )
+
+    # Development Response Recording
+    RECORD_LLM_RESPONSES: bool = Field(
+        default=False,
+        description="Record LLM responses to files for API validation (dev only)",
+    )
+
+    @field_validator("QUEUE_LOW_WATERMARK")
+    @classmethod
+    def validate_watermarks(cls, v: float, info) -> float:
+        """Ensure low watermark is less than high watermark."""
+        if "QUEUE_HIGH_WATERMARK" in info.data and v >= info.data["QUEUE_HIGH_WATERMARK"]:
+            raise ValueError("QUEUE_LOW_WATERMARK must be less than QUEUE_HIGH_WATERMARK")
+        return v
+
+    @field_validator("RECORD_LLM_RESPONSES")
+    @classmethod
+    def validate_response_recording(cls, v: bool, info) -> bool:
+        """Ensure response recording is only enabled in development."""
+        if v and info.data.get("ENVIRONMENT", "development") != "development":
+            raise ValueError("Response recording only allowed in development environment")
+        return v
 
     # Event Publishing
     PUBLISH_LLM_USAGE_EVENTS: bool = True
