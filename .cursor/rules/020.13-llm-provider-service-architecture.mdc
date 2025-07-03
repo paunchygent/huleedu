@@ -1,0 +1,118 @@
+---
+description: LLM Provider Service critical patterns - queue-based resilience, 200/202 response handling, and client integration patterns
+globs: 
+  - "services/llm_provider_service/**"
+alwaysApply: false
+---
+
+# 020.13: LLM Provider Service Architecture
+
+## 1. Service Identity
+- **Purpose**: Centralized LLM provider abstraction with queue-based resilience
+- **Port**: 8090, **Stack**: Quart + Redis + Circuit Breakers
+- **Critical**: NO response caching - preserves psychometric validity
+
+## 2. Response Pattern (200/202)
+
+### 2.1. Request Flow
+```text
+POST /api/v1/comparison → Provider Available?
+├─ YES → Fresh LLM call → 200 + result
+└─ NO → Queue request → 202 + queue_id
+```
+
+### 2.2. Queue Endpoints
+- **Status**: `GET /api/v1/status/{queue_id}` → processing state
+- **Results**: `GET /api/v1/results/{queue_id}` → completed result or 410 expired
+
+## 3. Queue Resilience Architecture
+
+### 3.1. Fallback Chain
+```text
+Redis Queue (persistent) → Local Queue (80% capacity) → 503 Rejection
+```
+
+### 3.2. Circuit Breaker Integration
+- **Provider Check**: Circuit breaker state checked BEFORE processing
+- **Queue Trigger**: Unavailable providers → automatic queuing
+- **Recovery**: Background processor handles queued requests when providers recover
+
+## 4. Client Integration Pattern
+
+### 4.1. Polling Implementation (Required for Consumers)
+```python
+async def generate_comparison(self, request):
+    response = await self.session.post(url, json=request)
+    
+    if response.status == 200:
+        return await self._handle_immediate_response(response_text)
+    elif response.status == 202:
+        return await self._handle_queued_response(response_text)  # Polls until complete
+    else:
+        return await self._handle_error_response(response.status, response_text)
+```
+
+### 4.2. Polling Configuration (Client-Side)
+```python
+LLM_QUEUE_POLLING_ENABLED: bool = True
+LLM_QUEUE_POLLING_INITIAL_DELAY_SECONDS: float = 2.0
+LLM_QUEUE_POLLING_MAX_DELAY_SECONDS: float = 60.0
+LLM_QUEUE_POLLING_EXPONENTIAL_BASE: float = 1.5
+LLM_QUEUE_POLLING_MAX_ATTEMPTS: int = 30
+LLM_QUEUE_TOTAL_TIMEOUT_SECONDS: int = 900  # 15 minutes
+```
+
+## 5. Provider Protocol Requirements
+
+### 5.1. Structured Output (ALL Providers)
+```python
+# Required response format
+{
+    "winner": "Essay A" | "Essay B",  
+    "justification": "string (50-500 chars)",
+    "confidence": 1.0-5.0  # float, not integer
+}
+```
+
+### 5.2. Provider Implementation Pattern
+- **Anthropic**: Tool use/function calling for structured responses
+- **OpenAI**: `response_format={"type": "json_object"}` with schema
+- **Google**: `response_mime_type="application/json"` with generation config
+- **OpenRouter**: Conditional logic based on model capabilities
+
+## 6. Critical Configuration
+
+### 6.1. Queue Settings
+```bash
+LLM_PROVIDER_SERVICE_QUEUE_MAX_SIZE=1000
+LLM_PROVIDER_SERVICE_QUEUE_MAX_MEMORY_MB=100
+LLM_PROVIDER_SERVICE_QUEUE_REQUEST_TTL_HOURS=4
+```
+
+### 6.2. Development Settings
+```bash
+LLM_PROVIDER_SERVICE_USE_MOCK_LLM=false
+LLM_PROVIDER_SERVICE_RECORD_LLM_RESPONSES=false  # Dev only, never cache
+```
+
+## 7. Key Implementation Rules
+
+### 7.1. NO Caching
+- **FORBIDDEN**: Response caching that returns identical results
+- **Required**: Fresh LLM response for every request
+- **Development**: Use response recorder for API validation, not caching
+
+### 7.2. Queue Processing
+- **TTL Enforcement**: 4-hour expiration with automatic cleanup
+- **Retry Logic**: Up to 3 attempts with exponential backoff
+- **Status Tracking**: QUEUED → PROCESSING → COMPLETED/FAILED/EXPIRED
+
+### 7.3. Error Handling
+- **503**: Queue at capacity or service unavailable
+- **410**: Queue result expired
+- **404**: Queue ID not found
+- **202**: Request queued (from comparison) or not ready (from results)
+
+---
+
+**CRITICAL**: All consumers MUST implement 202 response handling with polling logic. Service preserves psychometric validity by never caching responses.

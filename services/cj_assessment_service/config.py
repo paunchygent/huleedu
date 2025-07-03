@@ -98,6 +98,32 @@ class Settings(BaseSettings):
         description="Base URL for centralized LLM Provider Service",
     )
 
+    # Queue-based polling configuration for LLM Provider Service
+    LLM_QUEUE_POLLING_ENABLED: bool = Field(
+        default=True,
+        description="Enable polling for queued LLM requests (202 responses)",
+    )
+    LLM_QUEUE_POLLING_INITIAL_DELAY_SECONDS: float = Field(
+        default=2.0,
+        description="Initial delay before first queue status check in seconds",
+    )
+    LLM_QUEUE_POLLING_MAX_DELAY_SECONDS: float = Field(
+        default=60.0,
+        description="Maximum delay between queue status checks in seconds",
+    )
+    LLM_QUEUE_POLLING_EXPONENTIAL_BASE: float = Field(
+        default=1.5,
+        description="Exponential backoff base for queue polling delays",
+    )
+    LLM_QUEUE_POLLING_MAX_ATTEMPTS: int = Field(
+        default=30,
+        description="Maximum number of queue status polling attempts",
+    )
+    LLM_QUEUE_TOTAL_TIMEOUT_SECONDS: int = Field(
+        default=900,
+        description="Total timeout for queue processing in seconds (15 minutes)",
+    )
+
     # Global LLM configuration defaults (used as fallbacks)
     LLM_REQUEST_TIMEOUT_SECONDS: int = 30
     MAX_TOKENS_RESPONSE: int = 1000

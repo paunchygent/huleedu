@@ -50,7 +50,6 @@ class LLMComparisonResponse(BaseModel):
 
     # Performance metrics
     response_time_ms: int = Field(description="Response time in milliseconds")
-    cached: bool = Field(default=False, description="Whether response was cached")
     token_usage: Dict[str, int] | None = Field(description="Token usage stats")
     cost_estimate: float | None = Field(description="Estimated cost in USD")
 
@@ -97,17 +96,6 @@ class HealthCheckResponse(BaseModel):
     )
 
 
-class CacheStatsResponse(BaseModel):
-    """Cache statistics response model."""
-
-    total_keys: int = Field(description="Total number of cached keys")
-    memory_usage_mb: float = Field(description="Memory usage in MB")
-    hit_rate: float = Field(description="Cache hit rate percentage")
-    miss_rate: float = Field(description="Cache miss rate percentage")
-    evictions: int = Field(description="Number of evictions")
-    backend: str = Field(description="Cache backend type")
-
-
 class UsageSummaryResponse(BaseModel):
     """Usage summary response model."""
 
@@ -118,4 +106,23 @@ class UsageSummaryResponse(BaseModel):
     total_tokens: Dict[str, int] = Field(description="Total tokens by type")
     total_cost: float = Field(description="Total cost in USD")
     provider_breakdown: Dict[str, Dict[str, Any]] = Field(description="Usage breakdown by provider")
-    cache_hit_rate: float = Field(description="Cache hit rate percentage")
+
+
+class LLMQueuedResponse(BaseModel):
+    """Response model when LLM request is queued."""
+
+    queue_id: UUID = Field(description="Unique queue identifier for tracking")
+    status: str = Field(default="queued", description="Request status")
+    message: str = Field(
+        default="Request queued for processing",
+        description="User-friendly status message"
+    )
+    estimated_wait_minutes: int | None = Field(
+        default=None,
+        description="Estimated wait time in minutes"
+    )
+    status_url: str = Field(description="URL to check request status")
+    retry_after: int = Field(
+        default=60,
+        description="Seconds before client should check status"
+    )

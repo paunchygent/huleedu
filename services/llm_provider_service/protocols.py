@@ -8,6 +8,7 @@ from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
     LLMProviderError,
     LLMProviderResponse,
+    LLMQueuedResult,
 )
 
 
@@ -52,7 +53,7 @@ class LLMOrchestratorProtocol(Protocol):
         essay_b: str,
         correlation_id: UUID,
         **overrides: Any,
-    ) -> Tuple[LLMOrchestratorResponse | None, LLMProviderError | None]:
+    ) -> Tuple[LLMOrchestratorResponse | LLMQueuedResult | None, LLMProviderError | None]:
         """Perform LLM comparison with provider selection.
 
         Args:
@@ -64,7 +65,10 @@ class LLMOrchestratorProtocol(Protocol):
             **overrides: Additional parameter overrides
 
         Returns:
-            Tuple of (response_model, error_model)
+            Tuple of (response, error):
+            - Success: (LLMOrchestratorResponse, None)
+            - Queued: (LLMQueuedResult, None)
+            - Error: (None, LLMProviderError)
         """
         ...
 
@@ -76,58 +80,6 @@ class LLMOrchestratorProtocol(Protocol):
 
         Returns:
             Tuple of (success, message)
-        """
-        ...
-
-
-class LLMCacheManagerProtocol(Protocol):
-    """Protocol for LLM response caching."""
-
-    async def get_cached_response(self, cache_key: str) -> Dict[str, Any] | None:
-        """Get cached LLM response.
-
-        Args:
-            cache_key: Cache key for the response
-
-        Returns:
-            Cached response dict or None if not found
-        """
-        ...
-
-    async def cache_response(
-        self, cache_key: str, response: Dict[str, Any], ttl: int = 3600
-    ) -> None:
-        """Cache LLM response.
-
-        Args:
-            cache_key: Cache key for the response
-            response: Response to cache
-            ttl: Time to live in seconds
-        """
-        ...
-
-    def generate_cache_key(
-        self, provider: str, user_prompt: str, essay_a: str, essay_b: str, **params: Any
-    ) -> str:
-        """Generate consistent cache key for LLM request.
-
-        Args:
-            provider: LLM provider name
-            user_prompt: The comparison prompt
-            essay_a: First essay to compare
-            essay_b: Second essay to compare
-            **params: Additional parameters affecting the response
-
-        Returns:
-            Cache key string
-        """
-        ...
-
-    async def is_cache_healthy(self) -> Dict[str, Any]:
-        """Check cache health status for monitoring.
-
-        Returns:
-            Dict containing cache health information
         """
         ...
 
@@ -208,30 +160,6 @@ class LLMRetryManagerProtocol(Protocol):
         Returns:
             Result from operation
         """
-        ...
-
-
-class LLMCacheRepositoryProtocol(Protocol):
-    """Protocol for cache repository implementations."""
-
-    async def get(self, key: str) -> Dict[str, Any] | None:
-        """Get value from cache."""
-        ...
-
-    async def set(self, key: str, value: Dict[str, Any], ttl: int) -> None:
-        """Set value in cache with TTL."""
-        ...
-
-    async def delete(self, key: str) -> None:
-        """Delete value from cache."""
-        ...
-
-    async def clear(self) -> None:
-        """Clear all cached values."""
-        ...
-
-    async def get_stats(self) -> Dict[str, Any]:
-        """Get cache statistics."""
         ...
 
 

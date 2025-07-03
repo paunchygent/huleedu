@@ -31,7 +31,10 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
 ### Dependencies
 
 - **Content Service**: HTTP client for fetching spellchecked essay content
-- **LLM Providers**: Multiple provider support (OpenAI, Anthropic, Google, OpenRouter)
+- **LLM Provider Service**: Centralized LLM provider abstraction with queue-based resilience
+  - **Immediate Responses (200)**: Direct LLM results when providers available
+  - **Queued Responses (202)**: Automatic polling when providers unavailable
+  - **Configurable Timeouts**: Customizable polling behavior for different environments
 - **Database**: Async SQLAlchemy (SQLite by default for development; **PostgreSQL recommended for production deployments**)
 - **Kafka**: Event consumption and publishing via EventEnvelope pattern
 
@@ -109,7 +112,16 @@ CJ_ASSESSMENT_FAILED_TOPIC=huleedu.cj_assessment.failed.v1
 
 # External Services
 CONTENT_SERVICE_URL=http://localhost:8002
+LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8090/api/v1
 DATABASE_URL_CJ=sqlite+aiosqlite:///./cj_assessment.db
+
+# LLM Queue Polling Configuration
+LLM_QUEUE_POLLING_ENABLED=true                    # Enable queue polling for 202 responses
+LLM_QUEUE_POLLING_INITIAL_DELAY_SECONDS=2.0       # Initial delay before first poll
+LLM_QUEUE_POLLING_MAX_DELAY_SECONDS=60.0          # Maximum delay between polls
+LLM_QUEUE_POLLING_EXPONENTIAL_BASE=1.5            # Backoff multiplier
+LLM_QUEUE_POLLING_MAX_ATTEMPTS=30                 # Maximum polling attempts
+LLM_QUEUE_TOTAL_TIMEOUT_SECONDS=900               # Total timeout (15 minutes)
 
 # LLM Provider API Keys
 OPENAI_API_KEY=sk-...

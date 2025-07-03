@@ -10,7 +10,6 @@ from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
 from services.llm_provider_service.config import Settings
-from services.llm_provider_service.protocols import LLMCacheManagerProtocol
 
 logger = create_service_logger("llm_provider_service.health")
 
@@ -22,7 +21,6 @@ health_bp = Blueprint("health", __name__)
 async def health_check(
     settings: FromDishka[Settings],
     redis_client: FromDishka[RedisClientProtocol],
-    cache_manager: FromDishka[LLMCacheManagerProtocol],
 ) -> Response | tuple[Response, int]:
     """Health check endpoint."""
     health_status = {
@@ -42,23 +40,6 @@ async def health_check(
         dependencies["redis"] = "unhealthy"
         health_status["status"] = "degraded"
 
-    # Check Cache System (including graceful degradation status)
-    try:
-        cache_health = await cache_manager.is_cache_healthy()
-        dependencies["cache"] = cache_health
-
-        # If cache is degraded, mark overall status as degraded but still functional
-        if cache_health.get("cache_mode") == "degraded":
-            health_status["status"] = "degraded"
-            warnings = health_status.get("warnings", [])
-            if not isinstance(warnings, list):
-                warnings = []
-            warnings.append("Cache operating in degraded mode - Redis unavailable")
-            health_status["warnings"] = warnings
-    except Exception as e:
-        logger.error(f"Cache health check failed: {e}")
-        dependencies["cache"] = {"error": str(e), "cache_mode": "unhealthy"}
-        health_status["status"] = "degraded"
 
     health_status["dependencies"] = dependencies
 

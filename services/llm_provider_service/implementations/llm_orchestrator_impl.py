@@ -1,6 +1,7 @@
 """LLM orchestrator implementation for provider selection and request handling."""
 
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Tuple
 from uuid import UUID
 
@@ -8,43 +9,45 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core import LLMProviderType
 from common_core.error_enums import ErrorCode
+from services.llm_provider_service.api_models import LLMComparisonRequest
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
     LLMProviderError,
+    LLMQueuedResult,
 )
 from services.llm_provider_service.protocols import (
-    LLMCacheManagerProtocol,
     LLMEventPublisherProtocol,
     LLMOrchestratorProtocol,
     LLMProviderProtocol,
+    QueueManagerProtocol,
 )
+from services.llm_provider_service.queue_models import QueuedRequest
 
 logger = create_service_logger("llm_provider_service.orchestrator")
 
 
 class LLMOrchestratorImpl(LLMOrchestratorProtocol):
-    """Orchestrates LLM requests across providers with caching and events."""
+    """Orchestrates LLM requests across providers with queuing for resilience."""
 
     def __init__(
         self,
         providers: Dict[LLMProviderType, LLMProviderProtocol],
-        cache_manager: LLMCacheManagerProtocol,
         event_publisher: LLMEventPublisherProtocol,
+        queue_manager: QueueManagerProtocol,
         settings: Settings,
     ):
         """Initialize LLM orchestrator.
 
         Args:
             providers: Dictionary of available LLM providers
-            cache_manager: Cache manager for responses
             event_publisher: Event publisher for usage tracking
+            queue_manager: Queue manager for resilient request handling
             settings: Service settings
         """
         self.providers = providers
-        self.cache_manager = cache_manager
         self.event_publisher = event_publisher
-
+        self.queue_manager = queue_manager
         self.settings = settings
 
     async def perform_comparison(
@@ -55,8 +58,8 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         essay_b: str,
         correlation_id: UUID,
         **overrides: Any,
-    ) -> Tuple[LLMOrchestratorResponse | None, LLMProviderError | None]:
-        """Perform LLM comparison with provider selection.
+    ) -> Tuple[LLMOrchestratorResponse | LLMQueuedResult | None, LLMProviderError | None]:
+        """Perform LLM comparison with provider-first logic and queuing fallback.
 
         Args:
             provider: LLM provider to use
@@ -67,11 +70,14 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             **overrides: Additional parameter overrides
 
         Returns:
-            Tuple of (response_dict, error_message)
+            Tuple of (response, error):
+            - Success: (LLMOrchestratorResponse, None)
+            - Queued: (LLMQueuedResult, None)
+            - Error: (None, LLMProviderError)
         """
         start_time = time.time()
 
-        # Validate provider
+        # Validate provider exists
         if provider not in self.providers:
             available = [p.value for p in self.providers.keys()]
             error_msg = f"Provider '{provider.value}' not found. Available: {available}"
@@ -84,66 +90,139 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 is_retryable=False,
             )
 
-        # Generate cache key
-        cache_key = self.cache_manager.generate_cache_key(
-            provider=provider.value,
-            user_prompt=user_prompt,
-            essay_a=essay_a,
-            essay_b=essay_b,
-            **overrides,
-        )
-
         # Publish request started event
         await self.event_publisher.publish_llm_request_started(
             provider=provider.value,
             correlation_id=correlation_id,
             metadata={
                 "request_type": "comparison",
-                "cache_key": cache_key,
                 **overrides,
             },
         )
 
-        # Check cache first
-        cached_response = await self.cache_manager.get_cached_response(cache_key)
-        if cached_response:
-            response_time_ms = int((time.time() - start_time) * 1000)
+        # Check provider availability FIRST
+        is_available = await self._is_provider_available(provider)
 
-            # Publish completion event for cache hit
+        if not is_available:
+            # Provider unavailable - queue the request
+            return await self._queue_request(
+                provider=provider,
+                user_prompt=user_prompt,
+                essay_a=essay_a,
+                essay_b=essay_b,
+                correlation_id=correlation_id,
+                overrides=overrides,
+                start_time=start_time,
+            )
+
+        # Provider is available - make direct LLM request
+        return await self._make_llm_request(
+            provider=provider,
+            user_prompt=user_prompt,
+            essay_a=essay_a,
+            essay_b=essay_b,
+            correlation_id=correlation_id,
+            overrides=overrides,
+            start_time=start_time,
+        )
+
+    async def _queue_request(
+        self,
+        provider: LLMProviderType,
+        user_prompt: str,
+        essay_a: str,
+        essay_b: str,
+        correlation_id: UUID,
+        overrides: Dict[str, Any],
+        start_time: float,
+    ) -> Tuple[LLMQueuedResult | None, LLMProviderError | None]:
+        """Queue a request when provider is unavailable."""
+        logger.warning(
+            f"Provider {provider.value} is unavailable, queuing request. "
+            f"correlation_id: {correlation_id}"
+        )
+
+        # Create queued request
+        request_data = LLMComparisonRequest(
+            user_prompt=user_prompt,
+            essay_a=essay_a,
+            essay_b=essay_b,
+            correlation_id=correlation_id,
+            metadata=overrides,
+        )
+
+        queued_request = QueuedRequest(
+            request_data=request_data,
+            priority=self._get_request_priority(overrides),
+            ttl=timedelta(hours=self.settings.QUEUE_REQUEST_TTL_HOURS),
+            correlation_id=correlation_id,
+            size_bytes=0,  # Will be calculated
+        )
+        queued_request.size_bytes = queued_request.calculate_size()
+
+        # Try to enqueue
+        success = await self.queue_manager.enqueue(queued_request)
+
+        if success:
+            # Get queue stats for estimated wait time
+            queue_stats = await self.queue_manager.get_queue_stats()
+
+            # Publish queued event
             await self.event_publisher.publish_llm_request_completed(
                 provider=provider.value,
                 correlation_id=correlation_id,
                 success=True,
-                response_time_ms=response_time_ms,
+                response_time_ms=int((time.time() - start_time) * 1000),
                 metadata={
                     "request_type": "comparison",
-                    "cached": True,
-                    "cache_key": cache_key,
+                    "queued": True,
+                    "queue_id": str(queued_request.queue_id),
+                    "priority": queued_request.priority,
                 },
             )
 
-            logger.info(
-                f"Cache hit for provider {provider.value}, correlation_id: {correlation_id}"
+            # Return queued result
+            return LLMQueuedResult(
+                queue_id=queued_request.queue_id,
+                correlation_id=correlation_id,
+                provider=provider,
+                status="queued",
+                estimated_wait_minutes=queue_stats.estimated_wait_minutes,
+                priority=queued_request.priority,
+                queued_at=datetime.now(timezone.utc).isoformat(),
+            ), None
+        else:
+            # Queue is full
+            queue_stats = await self.queue_manager.get_queue_stats()
+
+            await self.event_publisher.publish_llm_provider_failure(
+                provider=provider.value,
+                failure_type="queue_full",
+                correlation_id=correlation_id,
+                error_details=f"Queue at capacity: {queue_stats.usage_percent:.1f}%",
+                circuit_breaker_opened=True,
             )
 
-            # Construct response from cached data
-            return LLMOrchestratorResponse(
-                choice=cached_response.get("choice", "A"),
-                reasoning=cached_response.get("reasoning", ""),
-                confidence=cached_response.get("confidence", 0.5),
+            return None, LLMProviderError(
+                error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
+                error_message="Service temporarily at capacity. Please try again later.",
                 provider=provider,
-                model=cached_response.get("model", "unknown"),
-                response_time_ms=response_time_ms,
-                cached=True,
-                token_usage=cached_response.get(
-                    "token_usage", {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-                ),
-                cost_estimate=cached_response.get("cost_estimate", 0.0),
                 correlation_id=correlation_id,
-                trace_id=cached_response.get("trace_id"),
-            ), None
+                is_retryable=True,
+                retry_after=300,  # 5 minutes
+            )
 
-        # Make actual LLM request
+    async def _make_llm_request(
+        self,
+        provider: LLMProviderType,
+        user_prompt: str,
+        essay_a: str,
+        essay_b: str,
+        correlation_id: UUID,
+        overrides: Dict[str, Any],
+        start_time: float,
+    ) -> Tuple[LLMOrchestratorResponse | None, LLMProviderError | None]:
+        """Make direct LLM request when provider is available."""
         try:
             provider_impl = self.providers[provider]
 
@@ -161,7 +240,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             response_time_ms = int((time.time() - start_time) * 1000)
 
             if result:
-                # Success - cache the provider response
+                # Success - fresh LLM response
                 token_usage_dict: Dict[str, int] = {
                     "prompt_tokens": result.prompt_tokens,
                     "completion_tokens": result.completion_tokens,
@@ -171,16 +250,6 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                     self._estimate_cost(provider.value, token_usage_dict) or 0.0
                 )
 
-                cache_data = {
-                    "choice": result.choice,
-                    "reasoning": result.reasoning,
-                    "confidence": result.confidence,
-                    "model": result.model,
-                    "token_usage": token_usage_dict,
-                    "cost_estimate": cost_estimate_value,
-                }
-                await self.cache_manager.cache_response(cache_key, cache_data)
-
                 # Publish completion event
                 await self.event_publisher.publish_llm_request_completed(
                     provider=provider.value,
@@ -189,10 +258,8 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                     response_time_ms=response_time_ms,
                     metadata={
                         "request_type": "comparison",
-                        "cached": False,
-                        "cache_key": cache_key,
-                        "token_usage": cache_data["token_usage"],
-                        "cost_estimate": cache_data["cost_estimate"],
+                        "token_usage": token_usage_dict,
+                        "cost_estimate": cost_estimate_value,
                         "model_used": result.model,
                     },
                 )
@@ -203,7 +270,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                     f"response_time: {response_time_ms}ms"
                 )
 
-                # Return orchestrator response
+                # Return fresh orchestrator response
                 return LLMOrchestratorResponse(
                     choice=result.choice,
                     reasoning=result.reasoning,
@@ -211,7 +278,6 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                     provider=provider,
                     model=result.model,
                     response_time_ms=response_time_ms,
-                    cached=False,
                     token_usage=token_usage_dict,
                     cost_estimate=cost_estimate_value,
                     correlation_id=correlation_id,
@@ -315,7 +381,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             # Simple test prompt
             test_prompt = "Complete this sentence in exactly 5 words: The weather today is"
 
-            result, error = await self.providers[provider].generate_comparison(
+            _, error = await self.providers[provider].generate_comparison(
                 user_prompt=test_prompt,
                 essay_a="Test essay A",
                 essay_b="Test essay B",
@@ -363,3 +429,48 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         ) * provider_costs["completion"]
 
         return round(cost, 6)  # 6 decimal places for USD
+
+    async def _is_provider_available(self, provider: LLMProviderType) -> bool:
+        """Check if a provider is available for requests.
+
+        Args:
+            provider: The provider to check
+
+        Returns:
+            True if provider is available, False otherwise
+        """
+        # Check if provider exists
+        if provider not in self.providers:
+            return False
+
+        # Check circuit breaker state if available
+        provider_impl = self.providers[provider]
+        if hasattr(provider_impl, "__wrapped__"):
+            # Provider is wrapped with circuit breaker
+            original = provider_impl
+            if hasattr(original, "_circuit_breaker"):
+                circuit_breaker = original._circuit_breaker
+                return bool(circuit_breaker.state != "open")
+
+        # No circuit breaker or not wrapped - assume available
+        return True
+
+    def _get_request_priority(self, overrides: Dict[str, Any]) -> int:
+        """Determine request priority based on metadata.
+
+        Args:
+            overrides: Request metadata
+
+        Returns:
+            Priority level (0-10, higher = more urgent)
+        """
+        # CJ Assessment requests get higher priority
+        if overrides.get("service_type") == "cj_assessment":
+            return 8
+
+        # User-specified priority
+        if "priority" in overrides:
+            return max(0, min(10, int(overrides["priority"])))
+
+        # Default priority
+        return 5

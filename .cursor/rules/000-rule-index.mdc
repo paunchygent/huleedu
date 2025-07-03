@@ -24,6 +24,7 @@ alwaysApply: false
   - [020.10-api-gateway-and-websocket-service.mdc](mdc:020.10-api-gateway-and-websocket-service.mdc): API Gateway & WebSocket Service
   - [020.11-service-libraries-architecture.mdc](mdc:020.11-service-libraries-architecture.mdc): Service Libraries (Kafka, Redis, Logging)
   - [020.12-result-aggregator-service-architecture.mdc](mdc:020.12-result-aggregator-service-architecture.mdc): Result Aggregator Service
+  - [020.13-llm-provider-service-architecture.mdc](mdc:020.13-llm-provider-service-architecture.mdc): LLM Provider Service (Centralized provider abstraction with queue resilience)
 - [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc): Event-driven communication standards
 
 ## Implementation & Coding Standards

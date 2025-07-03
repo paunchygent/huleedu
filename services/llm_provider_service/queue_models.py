@@ -6,13 +6,28 @@ LLM requests during provider outages.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TypedDict
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from common_core import QueueStatus
 from services.llm_provider_service.api_models import LLMComparisonRequest
+
+
+class QueueHealthMetrics(TypedDict):
+    """Type definition for queue health metrics."""
+    type: str
+    is_accepting: bool
+    current_size: int
+    max_size: int
+    size_percent: float
+    memory_usage_mb: float
+    max_memory_mb: float
+    memory_percent: float
+    at_capacity: bool
+    high_watermark: float
+    low_watermark: float
 
 
 class QueuedRequest(BaseModel):

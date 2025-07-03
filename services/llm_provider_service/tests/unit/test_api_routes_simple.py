@@ -28,7 +28,6 @@ async def test_comparison_response_model_validation() -> None:
         provider="openai",
         model="gpt-4",
         response_time_ms=150,
-        cached=False,
         token_usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
         cost_estimate=0.005,
         correlation_id=correlation_id,
@@ -113,7 +112,6 @@ def test_orchestrator_response_to_api_response_mapping() -> None:
         provider=LLMProviderType.ANTHROPIC,
         model="claude-3",
         response_time_ms=200,
-        cached=True,
         token_usage={"prompt_tokens": 150, "completion_tokens": 75, "total_tokens": 225},
         cost_estimate=0.008,
         correlation_id=correlation_id,
@@ -136,7 +134,6 @@ def test_orchestrator_response_to_api_response_mapping() -> None:
         provider=orchestrator_response.provider,
         model=orchestrator_response.model,
         response_time_ms=orchestrator_response.response_time_ms,
-        cached=orchestrator_response.cached,
         token_usage=orchestrator_response.token_usage,
         cost_estimate=orchestrator_response.cost_estimate,
         correlation_id=orchestrator_response.correlation_id,
@@ -147,7 +144,6 @@ def test_orchestrator_response_to_api_response_mapping() -> None:
     assert api_response.winner == "Essay B"
     assert api_response.justification == "Better argumentation"
     assert api_response.confidence == 4.6  # 1.0 + (0.9 * 4.0) = 4.6
-    assert api_response.cached is True
     assert api_response.cost_estimate == 0.008
 
 

@@ -63,11 +63,18 @@ The HuleEdu ecosystem currently comprises the following services:
   * **Status**: Fully implemented and integrated into the walking skeleton
 
 * **CJ Assessment Service** ✅ **IMPLEMENTED**:
-  * **Description**: A hybrid Kafka worker + HTTP API service for Comparative Judgment assessment of essays using Large Language Model (LLM) based pairwise comparisons. Features dynamic LLM configuration support with multi-provider capabilities (OpenAI, Anthropic, Google, OpenRouter).
+  * **Description**: A hybrid Kafka worker + HTTP API service for Comparative Judgment assessment of essays using Large Language Model (LLM) based pairwise comparisons. Integrates with centralized LLM Provider Service for queue-based resilience.
   * **Port**: 9095 (Health API & Metrics)
   * **Location**: `services/cj_assessment_service/`
   * **API**: `/healthz` and `/metrics` endpoints for health checks and observability
   * **Database**: The primary implementation uses **PostgreSQL**, provisioned via `docker-compose.yml` and configured in the service's DI provider.
+
+* **LLM Provider Service** ✅ **IMPLEMENTED**:
+  * **Description**: A centralized Quart-based HTTP service providing queue-based resilience for LLM provider interactions. Features circuit breakers, Redis primary/local fallback queuing, and multi-provider abstraction (Anthropic, OpenAI, Google, OpenRouter).
+  * **Port**: 8090 (HTTP API)
+  * **Location**: `services/llm_provider_service/`
+  * **API**: `/api/v1/comparison` (200/202 responses), `/api/v1/status/{queue_id}`, `/api/v1/results/{queue_id}`
+  * **Key Feature**: NO response caching - preserves psychometric validity with fresh responses
 
 * **Batch Conductor Service (BCS)** ✅ **IMPLEMENTED**:
   * **Description**: An internal Quart-based microservice responsible for intelligent pipeline dependency resolution and batch state analysis. Features event-driven batch state projection via Kafka, atomic Redis operations for race condition safety, and comprehensive error handling with DLQ production.

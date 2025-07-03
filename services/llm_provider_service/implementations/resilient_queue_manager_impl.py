@@ -48,7 +48,7 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
         self._redis_check_interval = 30  # seconds
 
         # Migration tracking
-        self._migrated_to_local = set()  # Track items migrated to local
+        self._migrated_to_local: set[UUID] = set()  # Track items migrated to local
 
     async def _check_redis_health(self, force: bool = False) -> bool:
         """Check if Redis is available."""
@@ -109,7 +109,7 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
         result = await self.local_queue.add(request)
 
         if result:
-            self._migrated_to_local.add(str(request.queue_id))
+            self._migrated_to_local.add(request.queue_id)
 
         return result
 
@@ -129,16 +129,14 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
         request = await self.local_queue.get_next()
         if request:
             # Mark as migrated so we know to update in local
-            self._migrated_to_local.add(str(request.queue_id))
+            self._migrated_to_local.add(request.queue_id)
 
         return request
 
     async def get_status(self, queue_id: UUID) -> Optional[QueuedRequest]:
         """Get status from either backend."""
-        queue_id_str = str(queue_id)
-
         # Check if we know it's in local
-        if queue_id_str in self._migrated_to_local:
+        if queue_id in self._migrated_to_local:
             request = await self.local_queue.get_by_id(queue_id)
             if request:
                 return request
@@ -181,10 +179,8 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
         elif status in (QueueStatus.COMPLETED, QueueStatus.FAILED):
             request.completed_at = datetime.now(timezone.utc)
 
-        queue_id_str = str(queue_id)
-
         # Update in local if migrated
-        if queue_id_str in self._migrated_to_local:
+        if queue_id in self._migrated_to_local:
             return await self.local_queue.update(request)
 
         # Try to update in Redis first
@@ -198,7 +194,7 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
         # Fallback to local
         result = await self.local_queue.update(request)
         if result:
-            self._migrated_to_local.add(queue_id_str)
+            self._migrated_to_local.add(queue_id)
 
         return result
 
@@ -263,19 +259,19 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
 
         # Clean up migration tracking for expired items
         if total_cleaned > 0:
-            # This is a simple cleanup - in production might want more sophisticated tracking
-            current_ids = set()
+            # TODO This is a simple cleanup - in production might want more sophisticated tracking
+            current_ids: set[UUID] = set()
 
             # Get all current IDs
             if self._redis_healthy:
                 try:
                     redis_requests = await self.redis_queue.get_all_queued()
-                    current_ids.update(str(r.queue_id) for r in redis_requests)
+                    current_ids.update(r.queue_id for r in redis_requests)
                 except Exception:
                     pass
 
             local_requests = await self.local_queue.get_all_queued()
-            current_ids.update(str(r.queue_id) for r in local_requests)
+            current_ids.update(r.queue_id for r in local_requests)
 
             # Remove IDs no longer in any queue
             self._migrated_to_local = self._migrated_to_local.intersection(current_ids)

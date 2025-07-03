@@ -29,20 +29,11 @@ from services.llm_provider_service.implementations.google_provider_impl import (
 from services.llm_provider_service.implementations.llm_orchestrator_impl import (
     LLMOrchestratorImpl,
 )
-from services.llm_provider_service.implementations.local_cache_manager_impl import (
-    LocalCacheManagerImpl,
-)
 from services.llm_provider_service.implementations.openai_provider_impl import (
     OpenAIProviderImpl,
 )
 from services.llm_provider_service.implementations.openrouter_provider_impl import (
     OpenRouterProviderImpl,
-)
-from services.llm_provider_service.implementations.redis_cache_repository_impl import (
-    RedisCacheRepositoryImpl,
-)
-from services.llm_provider_service.implementations.resilient_cache_manager_impl import (
-    ResilientCacheManagerImpl,
 )
 from services.llm_provider_service.implementations.retry_manager_impl import (
     RetryManagerImpl,
@@ -56,8 +47,10 @@ from services.llm_provider_service.implementations.local_queue_manager_impl impo
 from services.llm_provider_service.implementations.resilient_queue_manager_impl import (
     ResilientQueueManagerImpl,
 )
+from services.llm_provider_service.implementations.queue_processor_impl import (
+    QueueProcessorImpl,
+)
 from services.llm_provider_service.protocols import (
-    LLMCacheManagerProtocol,
     LLMEventPublisherProtocol,
     LLMOrchestratorProtocol,
     LLMProviderProtocol,
@@ -149,37 +142,6 @@ class LLMProviderServiceProvider(Provider):
     async def provide_http_session(self) -> ClientSession:
         """Provide HTTP client session."""
         return ClientSession()
-
-    @provide(scope=Scope.APP)
-    def provide_redis_cache_repository(
-        self,
-        redis_client: RedisClientProtocol,
-        settings: Settings,
-    ) -> RedisCacheRepositoryImpl:
-        """Provide Redis cache repository."""
-        return RedisCacheRepositoryImpl(
-            redis_client=cast(RedisClient, redis_client),
-            settings=settings,
-        )
-
-    @provide(scope=Scope.APP)
-    def provide_local_cache_manager(self, settings: Settings) -> LocalCacheManagerImpl:
-        """Provide local cache manager."""
-        return LocalCacheManagerImpl(settings=settings)
-
-    @provide(scope=Scope.APP)
-    def provide_cache_manager(
-        self,
-        redis_cache: RedisCacheRepositoryImpl,
-        local_cache: LocalCacheManagerImpl,
-        settings: Settings,
-    ) -> LLMCacheManagerProtocol:
-        """Provide resilient cache manager with Redis primary and local fallback."""
-        return ResilientCacheManagerImpl(
-            redis_cache=redis_cache,
-            local_cache=local_cache,
-            settings=settings,
-        )
 
     # Queue Provider Methods
     @provide(scope=Scope.APP)
@@ -372,13 +334,29 @@ class LLMProviderServiceProvider(Provider):
         self,
         settings: Settings,
         providers: Dict[LLMProviderType, LLMProviderProtocol],
-        cache_manager: LLMCacheManagerProtocol,
         event_publisher: LLMEventPublisherProtocol,
+        queue_manager: QueueManagerProtocol,
     ) -> LLMOrchestratorProtocol:
         """Provide LLM orchestrator implementation."""
         return LLMOrchestratorImpl(
             providers=providers,
-            cache_manager=cache_manager,
+            event_publisher=event_publisher,
+            queue_manager=queue_manager,
+            settings=settings,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_queue_processor(
+        self,
+        orchestrator: LLMOrchestratorProtocol,
+        queue_manager: QueueManagerProtocol,
+        event_publisher: LLMEventPublisherProtocol,
+        settings: Settings,
+    ) -> QueueProcessorImpl:
+        """Provide queue processor for background request processing."""
+        return QueueProcessorImpl(
+            orchestrator=orchestrator,
+            queue_manager=queue_manager,
             event_publisher=event_publisher,
             settings=settings,
         )

@@ -8,7 +8,6 @@ capacity limits and no silent eviction of requests.
 import asyncio
 import heapq
 import time
-from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -17,7 +16,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from common_core import QueueStatus
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.protocols import QueueRepositoryProtocol
-from services.llm_provider_service.queue_models import QueuedRequest
+from services.llm_provider_service.queue_models import QueuedRequest, QueueHealthMetrics
 
 logger = create_service_logger("llm_provider_service.local_queue")
 
@@ -236,7 +235,7 @@ class LocalQueueManagerImpl(QueueRepositoryProtocol):
 
         return len(expired_ids)
 
-    def get_queue_health(self) -> Dict[str, any]:
+    def get_queue_health(self) -> QueueHealthMetrics:
         """Get queue health metrics for monitoring."""
         size_percent = (len(self._data) / self.max_size) * 100 if self.max_size > 0 else 0
         memory_mb = self._memory_bytes / (1024 * 1024)

@@ -197,7 +197,7 @@ class DevelopmentResponseRecorder:
             total_size = sum(f.stat().st_size for f in log_files)
 
             # Count by provider
-            provider_counts = {}
+            provider_counts: Dict[str, int] = {}
             error_count = 0
             for f in log_files:
                 if "_error_" in f.name:

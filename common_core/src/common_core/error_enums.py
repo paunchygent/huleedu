@@ -34,6 +34,8 @@ class ErrorCode(str, Enum):
     INVALID_RESPONSE = "INVALID_RESPONSE"
     PARSING_ERROR = "PARSING_ERROR"
     CIRCUIT_BREAKER_OPEN = "CIRCUIT_BREAKER_OPEN"
+    REQUEST_QUEUED = "REQUEST_QUEUED"
+    PROCESSING_ERROR = "PROCESSING_ERROR"  # Internal processing failures
 
 
 class FileValidationErrorCode(str, Enum):

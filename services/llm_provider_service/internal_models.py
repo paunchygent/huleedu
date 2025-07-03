@@ -45,7 +45,6 @@ class LLMOrchestratorResponse(BaseModel):
 
     # Performance metrics
     response_time_ms: int = Field(ge=0, description="Total response time in milliseconds")
-    cached: bool = Field(default=False, description="Whether response was from cache")
 
     # Token usage and cost
     token_usage: Dict[str, int] = Field(
@@ -71,3 +70,15 @@ class LLMProviderError(BaseModel):
     correlation_id: UUID = Field(description="Request correlation ID")
     retry_after: int | None = Field(default=None, description="Seconds to wait before retry")
     is_retryable: bool = Field(default=True, description="Whether error is retryable")
+
+
+class LLMQueuedResult(BaseModel):
+    """Model for queued LLM request result."""
+
+    queue_id: UUID = Field(description="Unique queue identifier")
+    correlation_id: UUID = Field(description="Request correlation ID")
+    provider: LLMProviderType = Field(description="Requested provider")
+    status: str = Field(default="queued", description="Request status")
+    estimated_wait_minutes: int | None = Field(default=None, description="Estimated wait time")
+    priority: int = Field(description="Request priority")
+    queued_at: str = Field(description="ISO timestamp when queued")

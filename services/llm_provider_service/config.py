@@ -124,21 +124,6 @@ class Settings(BaseSettings):
     INTERNAL_MODEL_NAME: Optional[str] = None
     INTERNAL_MODEL_GPU_LAYERS: int = -1
 
-    # Caching Configuration
-    LLM_CACHE_ENABLED: bool = True
-    LLM_CACHE_TTL: int = 3600
-    CACHE_BACKEND: str = "redis"
-    CACHE_KEY_PREFIX: str = "llm_cache"
-    CACHE_COMPRESSION_ENABLED: bool = True
-
-    # Local Cache Configuration (Redis Fallback)
-    LOCAL_CACHE_SIZE_MB: int = Field(default=100, description="Maximum size of local cache in MB")
-    LOCAL_CACHE_TTL_SECONDS: int = Field(
-        default=300, description="Default TTL for local cache entries in seconds"
-    )
-    LOCAL_CACHE_MAX_ENTRIES: int = Field(
-        default=1000, description="Maximum number of entries in local cache"
-    )
 
     # Queue Configuration
     QUEUE_MAX_SIZE: int = Field(
@@ -165,6 +150,14 @@ class Settings(BaseSettings):
         default=4,
         description="How long requests stay in queue before expiring",
     )
+    QUEUE_POLL_INTERVAL_SECONDS: float = Field(
+        default=1.0,
+        description="How often to check for new requests in queue",
+    )
+    QUEUE_MAX_RETRIES: int = Field(
+        default=3,
+        description="Maximum number of retries for failed requests",
+    )
 
     # Development Response Recording
     RECORD_LLM_RESPONSES: bool = Field(
@@ -174,7 +167,7 @@ class Settings(BaseSettings):
 
     @field_validator("QUEUE_LOW_WATERMARK")
     @classmethod
-    def validate_watermarks(cls, v: float, info) -> float:
+    def validate_watermarks(cls, v: float, info: Any) -> float:
         """Ensure low watermark is less than high watermark."""
         if "QUEUE_HIGH_WATERMARK" in info.data and v >= info.data["QUEUE_HIGH_WATERMARK"]:
             raise ValueError("QUEUE_LOW_WATERMARK must be less than QUEUE_HIGH_WATERMARK")
@@ -182,7 +175,7 @@ class Settings(BaseSettings):
 
     @field_validator("RECORD_LLM_RESPONSES")
     @classmethod
-    def validate_response_recording(cls, v: bool, info) -> bool:
+    def validate_response_recording(cls, v: bool, info: Any) -> bool:
         """Ensure response recording is only enabled in development."""
         if v and info.data.get("ENVIRONMENT", "development") != "development":
             raise ValueError("Response recording only allowed in development environment")

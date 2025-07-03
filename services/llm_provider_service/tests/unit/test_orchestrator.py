@@ -18,17 +18,10 @@ def mock_settings() -> MagicMock:
     settings = MagicMock(spec=Settings)
     settings.DEFAULT_LLM_PROVIDER = "mock"
     settings.CACHE_TTL = 3600
+    settings.QUEUE_REQUEST_TTL_HOURS = 4
+    settings.QUEUE_MAX_SIZE = 1000
+    settings.QUEUE_MAX_MEMORY_MB = 100
     return settings
-
-
-@pytest.fixture
-def mock_cache_manager() -> AsyncMock:
-    """Mock cache manager."""
-    cache_manager = AsyncMock()
-    cache_manager.generate_cache_key = MagicMock(return_value="test_cache_key")
-    cache_manager.get_cached_response = AsyncMock(return_value=None)
-    cache_manager.cache_response = AsyncMock()
-    return cache_manager
 
 
 @pytest.fixture
@@ -42,6 +35,19 @@ def mock_event_publisher() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_queue_manager() -> AsyncMock:
+    """Mock queue manager."""
+    queue_manager = AsyncMock()
+    queue_manager.enqueue = AsyncMock(return_value=True)
+    queue_manager.dequeue = AsyncMock(return_value=None)
+    queue_manager.get_status = AsyncMock(return_value=None)
+    queue_manager.update_status = AsyncMock(return_value=True)
+    queue_manager.get_queue_stats = AsyncMock()
+    queue_manager.cleanup_expired = AsyncMock(return_value=0)
+    return queue_manager
+
+
+@pytest.fixture
 def mock_provider() -> AsyncMock:
     """Mock LLM provider."""
     provider = AsyncMock()
@@ -51,8 +57,8 @@ def mock_provider() -> AsyncMock:
 @pytest.fixture
 def orchestrator(
     mock_settings: MagicMock,
-    mock_cache_manager: AsyncMock,
     mock_event_publisher: AsyncMock,
+    mock_queue_manager: AsyncMock,
     mock_provider: AsyncMock,
 ) -> LLMOrchestratorImpl:
     """Create orchestrator with mocked dependencies."""
@@ -63,11 +69,11 @@ def orchestrator(
     providers: Dict[LLMProviderType, LLMProviderProtocol] = {
         LLMProviderType.MOCK: mock_provider,
         LLMProviderType.OPENAI: mock_provider,
-    }  # type: ignore
+    }
     return LLMOrchestratorImpl(
         providers=providers,
-        cache_manager=mock_cache_manager,
         event_publisher=mock_event_publisher,
+        queue_manager=mock_queue_manager,
         settings=mock_settings,
     )
 
@@ -103,12 +109,14 @@ async def test_orchestrator_successful_comparison(
     # Assert
     assert error is None
     assert result is not None
+    # Result should be an LLMOrchestratorResponse for successful case
+    from services.llm_provider_service.internal_models import LLMOrchestratorResponse
+    assert isinstance(result, LLMOrchestratorResponse)
     assert result.choice == "B"
     assert result.reasoning == "Essay B is better structured"
     assert result.confidence == 0.85
-    assert result.provider == "mock"
+    assert result.provider == LLMProviderType.MOCK
     assert result.model == "mock-model-v1"
-    assert result.cached is False
     assert result.correlation_id == correlation_id
 
     # Verify events were published
@@ -141,23 +149,39 @@ async def test_orchestrator_provider_not_found(orchestrator: LLMOrchestratorImpl
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_cache_hit(
+async def test_orchestrator_queues_when_provider_unavailable(
     orchestrator: LLMOrchestratorImpl,
-    mock_cache_manager: AsyncMock,
+    mock_queue_manager: AsyncMock,
     mock_event_publisher: AsyncMock,
 ) -> None:
-    """Test orchestrator returns cached response."""
+    """Test orchestrator queues requests when provider unavailable."""
     # Arrange
     correlation_id = uuid4()
-    cached_data = {
-        "choice": "A",
-        "reasoning": "Cached reasoning",
-        "confidence": 0.9,
-        "model": "cached-model",
-        "token_usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
-        "cost_estimate": 0.001,
-    }
-    mock_cache_manager.get_cached_response.return_value = cached_data
+
+    # Mock provider as unavailable (circuit breaker open)
+    mock_provider = orchestrator.providers[LLMProviderType.MOCK]
+
+    # Create a proper circuit breaker mock
+    mock_circuit_breaker = MagicMock()
+    mock_circuit_breaker.state = "open"
+
+    # Set up the wrapped provider structure to simulate make_resilient wrapper
+    # The resilient wrapper sets __wrapped__ attribute and _circuit_breaker on the wrapper itself
+    setattr(mock_provider, "__wrapped__", MagicMock())
+    setattr(mock_provider, "_circuit_breaker", mock_circuit_breaker)
+
+    # Mock queue stats
+    from services.llm_provider_service.queue_models import QueueStats
+    mock_queue_stats = QueueStats(
+        current_size=10,
+        max_size=1000,
+        memory_usage_mb=5.0,
+        max_memory_mb=100.0,
+        usage_percent=1.0,
+        estimated_wait_minutes=5,
+        is_accepting_requests=True,
+    )
+    mock_queue_manager.get_queue_stats.return_value = mock_queue_stats
 
     # Act
     result, error = await orchestrator.perform_comparison(
@@ -171,12 +195,18 @@ async def test_orchestrator_cache_hit(
     # Assert
     assert error is None
     assert result is not None
-    assert result.choice == "A"
-    assert result.reasoning == "Cached reasoning"
-    assert result.cached is True
-    assert result.provider == "mock"
+    # Result should be an LLMQueuedResult for queued case
+    from services.llm_provider_service.internal_models import LLMQueuedResult
+    assert isinstance(result, LLMQueuedResult)
+    assert result.provider == LLMProviderType.MOCK
+    assert result.status == "queued"
+    assert result.correlation_id == correlation_id
+    assert result.estimated_wait_minutes == 5
 
-    # Verify only cache hit event was published
+    # Verify queue was called
+    mock_queue_manager.enqueue.assert_called_once()
+    
+    # Verify events were published
     mock_event_publisher.publish_llm_request_started.assert_called_once()
     mock_event_publisher.publish_llm_request_completed.assert_called_once()
 
