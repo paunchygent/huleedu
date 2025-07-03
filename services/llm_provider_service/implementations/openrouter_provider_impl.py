@@ -12,6 +12,10 @@ from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.internal_models import LLMProviderError, LLMProviderResponse
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
+from services.llm_provider_service.response_validator import (
+    convert_to_internal_format,
+    validate_and_normalize_response,
+)
 
 logger = create_service_logger("llm_provider_service.openrouter_provider")
 
@@ -78,7 +82,11 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
         system_prompt = (
             system_prompt_override
             or "You are an expert essay evaluator. "
-            "Compare the two essays and return your analysis as JSON."
+            "Compare the two essays and return your analysis as JSON. "
+            "You MUST respond with a JSON object containing exactly these fields: "
+            '{"winner": "Essay A" or "Essay B", "justification": "string (50-500 chars)", "confidence": 1.0-5.0}. '
+            "The winner must be either 'Essay A' or 'Essay B', justification must be 50-500 characters, "
+            "and confidence must be a float between 1.0 and 5.0."
         )
 
         # Execute with retry
@@ -140,7 +148,8 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
         )
         max_tokens = max_tokens_override or self.settings.LLM_DEFAULT_MAX_TOKENS
 
-        # OpenRouter uses OpenAI-compatible API
+        # OpenRouter uses OpenAI-compatible API with JSON mode
+        # Note: Only JSON-capable models should be configured for CJ Assessment
         payload = {
             "model": model,
             "messages": [
@@ -166,13 +175,23 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                         text_content = response_data["choices"][0]["message"]["content"]
 
                         try:
-                            # Parse the JSON response
-                            parsed_content = json.loads(text_content)
+                            # Validate and normalize response using centralized validator
+                            validated_response, validation_error = validate_and_normalize_response(text_content)
+                            
+                            if validation_error:
+                                error_msg = f"Response validation failed: {validation_error}"
+                                logger.error(error_msg, extra={"response_text": text_content[:500]})
+                                return None, LLMProviderError(
+                                    error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
+                                    error_message=error_msg,
+                                    provider=LLMProviderType.OPENROUTER,
+                                    correlation_id=uuid4(),
+                                    is_retryable=False,
+                                )
 
-                            # Extract required fields with defaults
-                            choice = parsed_content.get("choice", "A")
-                            reasoning = parsed_content.get("reasoning", "Analysis provided")
-                            confidence = float(parsed_content.get("confidence", 0.5))
+                            # Convert to internal format
+                            assert validated_response is not None  # Type assertion for mypy
+                            choice, reasoning, confidence = convert_to_internal_format(validated_response)
 
                             # Get token usage
                             usage = response_data.get("usage", {})

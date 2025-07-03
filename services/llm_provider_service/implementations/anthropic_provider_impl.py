@@ -11,6 +11,10 @@ from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.internal_models import LLMProviderError, LLMProviderResponse
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
+from services.llm_provider_service.response_validator import (
+    convert_to_internal_format,
+    validate_and_normalize_response,
+)
 
 logger = create_service_logger("llm_provider_service.anthropic_provider")
 
@@ -157,23 +161,25 @@ You will use the essay_comparison_result tool to provide your analysis."""
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "choice": {
+                        "winner": {
                             "type": "string",
-                            "enum": ["A", "B"],
-                            "description": "Which essay is better: A or B"
+                            "enum": ["Essay A", "Essay B"],
+                            "description": "Which essay is better: 'Essay A' or 'Essay B'"
                         },
-                        "reasoning": {
+                        "justification": {
                             "type": "string",
-                            "description": "Detailed explanation of why this essay was chosen"
+                            "minLength": 50,
+                            "maxLength": 500,
+                            "description": "Detailed explanation of why this essay was chosen (50-500 characters)"
                         },
                         "confidence": {
                             "type": "number",
-                            "minimum": 0.0,
-                            "maximum": 1.0,
-                            "description": "Confidence score between 0.0 and 1.0"
+                            "minimum": 1.0,
+                            "maximum": 5.0,
+                            "description": "Confidence score between 1.0 and 5.0"
                         }
                     },
-                    "required": ["choice", "reasoning", "confidence"]
+                    "required": ["winner", "justification", "confidence"]
                 }
             }
         ]
@@ -226,18 +232,25 @@ You will use the essay_comparison_result tool to provide your analysis."""
 
                     if tool_result:
                         try:
-                            # Extract fields from tool result
-                            choice = tool_result.get("choice", "A")
-                            reasoning = tool_result.get("reasoning", "Analysis provided")
-                            confidence = float(tool_result.get("confidence", 0.5))
+                            # Validate and normalize response using centralized validator
+                            validated_response, validation_error = validate_and_normalize_response(tool_result)
+                            
+                            if validation_error:
+                                error_msg = f"Response validation failed: {validation_error}"
+                                logger.error(error_msg, extra={"tool_result": str(tool_result)[:500]})
+                                from uuid import uuid4
 
-                            # Validate choice is A or B
-                            if choice not in ["A", "B"]:
-                                logger.warning(f"Invalid choice '{choice}', defaulting to 'A'")
-                                choice = "A"
+                                return None, LLMProviderError(
+                                    error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
+                                    error_message=error_msg,
+                                    provider=LLMProviderType.ANTHROPIC,
+                                    correlation_id=uuid4(),
+                                    is_retryable=False,
+                                )
 
-                            # Validate confidence is between 0 and 1
-                            confidence = max(0.0, min(1.0, confidence))
+                            # Convert to internal format
+                            assert validated_response is not None  # Type assertion for mypy
+                            choice, reasoning, confidence = convert_to_internal_format(validated_response)
 
                             # Get token usage
                             usage = response_data.get("usage", {})

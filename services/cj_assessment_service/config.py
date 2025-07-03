@@ -8,16 +8,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from common_core import LLMProviderType
 
 
-class LLMProviderSettings(BaseModel):
-    """Configuration settings for a specific LLM provider."""
-
-    api_base: str
-    default_model: str
-    temperature: float | None = None
-    max_tokens: int | None = None
-    api_key_env_var: str  # Environment variable name for API key
-
-
 class Settings(BaseSettings):
     """Configuration settings for the CJ Assessment Service."""
 
@@ -51,46 +41,8 @@ class Settings(BaseSettings):
     DATABASE_POOL_PRE_PING: bool = True
     DATABASE_POOL_RECYCLE: int = 3600  # 1 hour
 
-    # Legacy LLM provider API keys (maintained for backward compatibility)
-    ANTHROPIC_API_KEY: str | None = None
-    OPENAI_API_KEY: str | None = None
-    GOOGLE_API_KEY: str | None = None
-
-    # Default LLM provider and model
+    # Default LLM provider for centralized service requests
     DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.OPENAI
-    DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
-
-    # Structured LLM provider configuration
-    LLM_PROVIDERS_CONFIG: dict[LLMProviderType, LLMProviderSettings] = {
-        LLMProviderType.OPENAI: LLMProviderSettings(
-            api_base="https://api.openai.com/v1",
-            default_model="gpt-4o-mini",
-            temperature=0.1,
-            max_tokens=1000,
-            api_key_env_var="OPENAI_API_KEY",
-        ),
-        LLMProviderType.ANTHROPIC: LLMProviderSettings(
-            api_base="https://api.anthropic.com/v1",
-            default_model="claude-3-haiku-20240307",
-            temperature=0.1,
-            max_tokens=1000,
-            api_key_env_var="ANTHROPIC_API_KEY",
-        ),
-        LLMProviderType.GOOGLE: LLMProviderSettings(
-            api_base="https://generativelanguage.googleapis.com/v1",
-            default_model="gemini-1.5-flash",
-            temperature=0.1,
-            max_tokens=1000,
-            api_key_env_var="GOOGLE_API_KEY",
-        ),
-        LLMProviderType.OPENROUTER: LLMProviderSettings(
-            api_base="https://openrouter.ai/api/v1",
-            default_model="anthropic/claude-3-haiku",
-            temperature=0.1,
-            max_tokens=1000,
-            api_key_env_var="OPENROUTER_API_KEY",
-        ),
-    }
 
     # LLM Provider Service configuration
     LLM_PROVIDER_SERVICE_URL: str = Field(

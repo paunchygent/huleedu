@@ -12,6 +12,10 @@ from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.internal_models import LLMProviderError, LLMProviderResponse
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
+from services.llm_provider_service.response_validator import (
+    convert_to_internal_format,
+    validate_and_normalize_response,
+)
 
 logger = create_service_logger("llm_provider_service.google_provider")
 
@@ -78,7 +82,11 @@ class GoogleProviderImpl(LLMProviderProtocol):
         system_prompt = (
             system_prompt_override
             or "You are an expert essay evaluator. "
-            "Compare the two essays and return your analysis as JSON."
+            "Compare the two essays and return your analysis as JSON. "
+            "You MUST respond with a JSON object containing exactly these fields: "
+            '{"winner": "Essay A" or "Essay B", "justification": "string (50-500 chars)", "confidence": 1.0-5.0}. '
+            "The winner must be either 'Essay A' or 'Essay B', justification must be 50-500 characters, "
+            "and confidence must be a float between 1.0 and 5.0."
         )
 
         # Execute with retry
@@ -139,20 +147,36 @@ class GoogleProviderImpl(LLMProviderProtocol):
             "Content-Type": "application/json",
         }
 
-        # Use systemInstruction for better prompt handling
-        user_prompt_with_json = (
-            f"{user_prompt}\n\n"
-            "Please respond with a valid JSON object containing "
-            "'choice' (A or B), 'reasoning' (explanation), and 'confidence' (0.0-1.0)."
-        )
-
+        # Use structured output with JSON schema
         payload = {
-            "contents": [{"parts": [{"text": user_prompt_with_json}]}],
+            "contents": [{"parts": [{"text": user_prompt}]}],
             "systemInstruction": {"parts": [{"text": system_prompt}]},
             "generationConfig": {
                 "temperature": temperature,
                 "maxOutputTokens": max_tokens,
                 "candidateCount": 1,
+                "responseMimeType": "application/json",
+                "responseSchema": {
+                    "type": "object",
+                    "properties": {
+                        "winner": {
+                            "type": "string",
+                            "enum": ["Essay A", "Essay B"],
+                            "description": "Which essay is better: 'Essay A' or 'Essay B'"
+                        },
+                        "justification": {
+                            "type": "string",
+                            "description": "Detailed explanation of why this essay was chosen (50-500 characters)"
+                        },
+                        "confidence": {
+                            "type": "number",
+                            "minimum": 1.0,
+                            "maximum": 5.0,
+                            "description": "Confidence score between 1.0 and 5.0"
+                        }
+                    },
+                    "required": ["winner", "justification", "confidence"]
+                }
             },
         }
 
@@ -180,18 +204,28 @@ class GoogleProviderImpl(LLMProviderProtocol):
                             text_content = content["parts"][0].get("text", "")
 
                             try:
-                                # Parse the JSON response
-                                parsed_content = json.loads(text_content)
+                                # Validate and normalize response using centralized validator
+                                validated_response, validation_error = validate_and_normalize_response(text_content)
+                                
+                                if validation_error:
+                                    error_msg = f"Response validation failed: {validation_error}"
+                                    logger.error(error_msg, extra={"response_text": text_content[:500]})
+                                    return None, LLMProviderError(
+                                        error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
+                                        error_message=error_msg,
+                                        provider=LLMProviderType.GOOGLE,
+                                        correlation_id=uuid4(),
+                                        is_retryable=False,
+                                    )
 
-                                # Extract required fields with defaults
-                                choice = parsed_content.get("choice", "A")
-                                reasoning = parsed_content.get("reasoning", "Analysis provided")
-                                confidence = float(parsed_content.get("confidence", 0.5))
+                                # Convert to internal format
+                                assert validated_response is not None  # Type assertion for mypy
+                                choice, reasoning, confidence = convert_to_internal_format(validated_response)
 
                                 # Google doesn't provide detailed token usage like others
                                 # Estimate based on input/output length
                                 prompt_tokens = len(
-                                    f"{system_prompt} {user_prompt_with_json}".split()
+                                    f"{system_prompt} {user_prompt}".split()
                                 )
                                 completion_tokens = len(text_content.split())
                                 total_tokens = prompt_tokens + completion_tokens
