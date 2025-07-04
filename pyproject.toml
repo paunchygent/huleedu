@@ -71,13 +71,15 @@ typecheck-all = "mypy --config-file pyproject.toml ."
 test-all = "pytest"
 test-parallel = "pytest -n auto"
 test-sequential = "pytest -n 0"
+test-expensive = "pytest -m expensive -v --tb=short"
+test-providers = "pytest services/*/tests/integration/ -m expensive -v"
 
 # Docker convenience scripts - Development workflow
 # Quick commands
 dc-up = "docker compose up -d"  # Start services (uses existing images)
 dc-build = "docker compose up -d --build"  # Rebuild and start services
 dc-down = "docker compose down --remove-orphans"  # Stop and clean up
-dc-logs = "docker compose logs -f --tail=100"  # Follow logs with last 100 lines
+dc-logs = "docker compose logs --tail=100"  # Get logs with last 100 lines
 dc-ps = "docker compose ps"  # Show running services
 
 # Service-specific commands (use service names as arguments)
@@ -271,7 +273,7 @@ pythonpath = [
 python_files = "test_*.py *_test.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-s -v --durations=10 --log-cli-level=INFO"
+addopts = "-s -v --durations=10 --log-cli-level=INFO -m 'not expensive'"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s:%(filename)s:%(lineno)s %(message)s"
@@ -279,6 +281,7 @@ log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 asyncio_mode = "auto"
 
 markers = [
+    "expensive: marks tests that make real API calls and incur costs",
     "slow: marks tests as slow running",
     "integration: marks tests requiring external services like Kafka",
     "docker: marks tests that need docker-compose setup",

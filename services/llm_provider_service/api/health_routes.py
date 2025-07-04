@@ -40,7 +40,6 @@ async def health_check(
         dependencies["redis"] = "unhealthy"
         health_status["status"] = "degraded"
 
-
     health_status["dependencies"] = dependencies
 
     # Add provider status

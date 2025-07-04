@@ -76,46 +76,95 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
             return False
 
     async def get_next(self) -> Optional[QueuedRequest]:
-        """Get highest priority queued request."""
+        """Get highest priority queued request with optimized pipeline operations."""
         try:
-            # Get the highest priority item (lowest score)
+            # Get top N items to reduce recursive calls and use batch operations
             items = await self.redis.client.zrange(
-                self.queue_key, 0, 0, withscores=False
+                self.queue_key,
+                0,
+                9,
+                withscores=False,  # Get top 10 for batch processing
             )
 
             if not items:
                 return None
 
-            queue_id_str = items[0]
+            # Batch get request data for all top items
+            request_jsons = await self.redis.client.hmget(self.data_key, *items)
 
-            # Get the request data
-            request_json = await self.redis.client.hget(self.data_key, queue_id_str)
-            if not request_json:
-                # Data missing, remove from queue
-                await self.redis.client.zrem(self.queue_key, queue_id_str)
-                logger.warning(f"Removed orphaned queue entry: {queue_id_str}")
-                return None
+            # Process in priority order to find first valid request
+            orphaned_ids = []
+            expired_ids = []
 
-            # Parse the request
-            request = QueuedRequest.model_validate_json(request_json)
+            for queue_id_str, request_json in zip(items, request_jsons):
+                if not request_json:
+                    # Data missing, mark for cleanup
+                    orphaned_ids.append(queue_id_str)
+                    continue
 
-            # Check if expired
-            if request.is_expired():
-                await self.delete(request.queue_id)
-                logger.info(f"Removed expired request: {queue_id_str}")
-                # Recursively get next non-expired request
+                try:
+                    # Parse the request
+                    request = QueuedRequest.model_validate_json(request_json)
+
+                    # Check if expired
+                    if request.is_expired():
+                        expired_ids.append(queue_id_str)
+                        continue
+
+                    # Only return if status is QUEUED
+                    if request.status == QueueStatus.QUEUED:
+                        # Clean up any orphaned/expired items we found using pipeline
+                        if orphaned_ids or expired_ids:
+                            await self._batch_cleanup_invalid_requests(orphaned_ids, expired_ids)
+
+                        return request
+
+                except Exception as e:
+                    logger.warning(f"Failed to parse request {queue_id_str}: {e}")
+                    orphaned_ids.append(queue_id_str)
+                    continue
+
+            # Clean up invalid requests we found
+            if orphaned_ids or expired_ids:
+                await self._batch_cleanup_invalid_requests(orphaned_ids, expired_ids)
+                # Recursively try again after cleanup (but limit recursion)
                 return await self.get_next()
 
-            # Only return if status is QUEUED
-            if request.status == QueueStatus.QUEUED:
-                return request
-
-            # If not QUEUED, try next item
-            return await self.get_next()
+            return None
 
         except Exception as e:
             logger.error(f"Failed to get next request: {e}")
             return None
+
+    async def _batch_cleanup_invalid_requests(
+        self, orphaned_ids: List[str], expired_ids: List[str]
+    ) -> None:
+        """Batch cleanup orphaned and expired requests using pipeline."""
+        try:
+            if not orphaned_ids and not expired_ids:
+                return
+
+            pipe = self.redis.client.pipeline()
+
+            # Clean up orphaned entries (missing data)
+            for queue_id_str in orphaned_ids:
+                pipe.zrem(self.queue_key, queue_id_str)
+
+            # Clean up expired entries (full cleanup)
+            for queue_id_str in expired_ids:
+                pipe.zrem(self.queue_key, queue_id_str)
+                pipe.hdel(self.data_key, queue_id_str)
+                pipe.delete(f"{self.data_key}:{queue_id_str}")
+
+            await pipe.execute()
+
+            if orphaned_ids:
+                logger.info(f"Cleaned up {len(orphaned_ids)} orphaned queue entries")
+            if expired_ids:
+                logger.info(f"Cleaned up {len(expired_ids)} expired requests")
+
+        except Exception as e:
+            logger.error(f"Failed to batch cleanup invalid requests: {e}")
 
     async def get_by_id(self, queue_id: UUID) -> Optional[QueuedRequest]:
         """Get specific request by ID."""
@@ -185,7 +234,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
             return False
 
     async def get_all_queued(self) -> List[QueuedRequest]:
-        """Get all QUEUED status requests."""
+        """Get all QUEUED status requests using optimized batch operations."""
         try:
             # Get all queue IDs from sorted set
             queue_ids = await self.redis.client.zrange(self.queue_key, 0, -1)
@@ -193,10 +242,11 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
             if not queue_ids:
                 return []
 
-            # Get all data in batch
+            # Batch get all data using hmget (single Redis call instead of N calls)
+            request_jsons = await self.redis.client.hmget(self.data_key, *queue_ids)
+
             requests = []
-            for queue_id_str in queue_ids:
-                request_json = await self.redis.client.hget(self.data_key, queue_id_str)
+            for queue_id_str, request_json in zip(queue_ids, request_jsons):
                 if request_json:
                     try:
                         request = QueuedRequest.model_validate_json(request_json)
@@ -205,6 +255,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
                     except Exception as e:
                         logger.warning(f"Failed to parse request {queue_id_str}: {e}")
 
+            logger.debug(f"Retrieved {len(requests)} queued requests using batch operation")
             return requests
 
         except Exception as e:
@@ -221,14 +272,19 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
             return 0
 
     async def get_memory_usage(self) -> int:
-        """Get approximate memory usage in bytes."""
+        """Get approximate memory usage in bytes using optimized batch operations."""
         try:
             # Get all queue IDs
             queue_ids = await self.redis.client.hkeys(self.data_key)
 
+            if not queue_ids:
+                return 0
+
+            # Batch get all data using hmget (single Redis call)
+            request_jsons = await self.redis.client.hmget(self.data_key, *queue_ids)
+
             total_bytes = 0
-            for queue_id_str in queue_ids:
-                request_json = await self.redis.client.hget(self.data_key, queue_id_str)
+            for request_json in request_jsons:
                 if request_json:
                     try:
                         request = QueuedRequest.model_validate_json(request_json)
@@ -237,10 +293,111 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
                         # If we can't parse, estimate from JSON size
                         total_bytes += len(request_json)
 
+            logger.debug(f"Calculated memory usage: {total_bytes} bytes using batch operation")
             return total_bytes
 
         except Exception as e:
             logger.error(f"Failed to calculate memory usage: {e}")
+            return 0
+
+    async def batch_update_status(self, status_updates: List[tuple[UUID, QueueStatus]]) -> int:
+        """Batch update multiple request statuses using Redis pipeline.
+
+        Args:
+            status_updates: List of (queue_id, new_status) tuples
+
+        Returns:
+            Number of successful updates
+        """
+        if not status_updates:
+            return 0
+
+        try:
+            # Use pipeline for batch operations
+            pipe = self.redis.client.pipeline()
+
+            # First, get all current request data in batch
+            queue_id_strs = [str(queue_id) for queue_id, _ in status_updates]
+            current_data = await self.redis.client.hmget(self.data_key, *queue_id_strs)
+
+            # Prepare updates
+            successful_updates = 0
+            for (queue_id, new_status), request_json in zip(status_updates, current_data):
+                if request_json:
+                    try:
+                        # Parse current request
+                        request = QueuedRequest.model_validate_json(request_json)
+
+                        # Update status
+                        request.status = new_status
+
+                        # Queue the update in pipeline
+                        pipe.hset(self.data_key, str(queue_id), request.model_dump_json())
+                        successful_updates += 1
+
+                    except Exception as e:
+                        logger.warning(f"Failed to prepare status update for {queue_id}: {e}")
+
+            # Execute all updates atomically
+            if successful_updates > 0:
+                await pipe.execute()
+                logger.debug(f"Batch updated {successful_updates} request statuses")
+
+            return successful_updates
+
+        except Exception as e:
+            logger.error(f"Failed to batch update statuses: {e}")
+            return 0
+
+    async def batch_delete_expired(self) -> int:
+        """Batch delete all expired requests using Redis pipeline.
+
+        Returns:
+            Number of requests deleted
+        """
+        try:
+            # Get all queue IDs and their data in batch
+            queue_ids = await self.redis.client.zrange(self.queue_key, 0, -1)
+
+            if not queue_ids:
+                return 0
+
+            # Get all request data in batch
+            request_jsons = await self.redis.client.hmget(self.data_key, *queue_ids)
+
+            # Identify expired requests
+            expired_ids = []
+            for queue_id_str, request_json in zip(queue_ids, request_jsons):
+                if request_json:
+                    try:
+                        request = QueuedRequest.model_validate_json(request_json)
+                        if request.is_expired():
+                            expired_ids.append(queue_id_str)
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to parse request {queue_id_str} for expiration check: {e}"
+                        )
+                        # Consider malformed requests as expired
+                        expired_ids.append(queue_id_str)
+
+            if not expired_ids:
+                return 0
+
+            # Batch delete using pipeline
+            pipe = self.redis.client.pipeline()
+
+            for queue_id_str in expired_ids:
+                pipe.zrem(self.queue_key, queue_id_str)
+                pipe.hdel(self.data_key, queue_id_str)
+                pipe.delete(f"{self.data_key}:{queue_id_str}")  # Remove expiration marker
+
+            await pipe.execute()
+
+            logger.info(f"Batch deleted {len(expired_ids)} expired requests")
+            return len(expired_ids)
+
+        except Exception as e:
+            logger.error(f"Failed to batch delete expired requests: {e}")
             return 0
 
     async def cleanup_expired(self) -> int:
@@ -255,9 +412,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
             expired_count = 0
             for queue_id_str in queue_ids:
                 # Check if expiration marker exists
-                marker_exists = await self.redis.client.exists(
-                    f"{self.data_key}:{queue_id_str}"
-                )
+                marker_exists = await self.redis.client.exists(f"{self.data_key}:{queue_id_str}")
 
                 if not marker_exists:
                     # Marker expired, remove the request

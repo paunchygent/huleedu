@@ -82,6 +82,71 @@ def _create_metrics() -> dict[str, Any]:
                 ["provider"],
                 registry=REGISTRY,
             ),
+            # Enhanced Performance Metrics - Phase 7
+            "llm_response_time_percentiles": Histogram(
+                "llm_provider_response_time_percentiles",
+                "LLM response time percentiles optimized for sub-500ms tracking",
+                ["provider", "model", "request_type"],
+                buckets=(0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0),
+                registry=REGISTRY,
+            ),
+            "llm_validation_duration_seconds": Histogram(
+                "llm_provider_validation_duration_seconds",
+                "JSON schema validation duration in seconds",
+                ["provider", "validation_type"],
+                buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5),
+                registry=REGISTRY,
+            ),
+            "llm_queue_depth": Gauge(
+                "llm_provider_queue_depth",
+                "Current number of requests in queue",
+                ["queue_type"],
+                registry=REGISTRY,
+            ),
+            "llm_queue_processing_time_seconds": Histogram(
+                "llm_provider_queue_processing_time_seconds",
+                "Time spent processing queue requests",
+                ["provider", "status"],
+                buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0),
+                registry=REGISTRY,
+            ),
+            "llm_circuit_breaker_state_changes": Counter(
+                "llm_provider_circuit_breaker_state_changes_total",
+                "Total circuit breaker state changes",
+                ["provider", "from_state", "to_state"],
+                registry=REGISTRY,
+            ),
+            "llm_provider_connection_pool_size": Gauge(
+                "llm_provider_connection_pool_size",
+                "Current connection pool size per provider",
+                ["provider"],
+                registry=REGISTRY,
+            ),
+            "llm_provider_connection_pool_active": Gauge(
+                "llm_provider_connection_pool_active",
+                "Active connections in pool per provider",
+                ["provider"],
+                registry=REGISTRY,
+            ),
+            "llm_queue_overflow_total": Counter(
+                "llm_provider_queue_overflow_total",
+                "Total queue overflow events",
+                ["queue_type"],
+                registry=REGISTRY,
+            ),
+            "llm_request_lifecycle_duration_seconds": Histogram(
+                "llm_provider_request_lifecycle_duration_seconds",
+                "Complete request lifecycle duration (queue -> processing -> response)",
+                ["provider", "lifecycle_stage"],
+                buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0),
+                registry=REGISTRY,
+            ),
+            "llm_provider_availability_percentage": Gauge(
+                "llm_provider_availability_percentage",
+                "Provider availability percentage (0-100)",
+                ["provider"],
+                registry=REGISTRY,
+            ),
         }
         return metrics
     except ValueError as e:
@@ -113,6 +178,33 @@ def get_llm_metrics() -> dict[str, Any]:
         "llm_cache_hits_total": all_metrics.get("llm_cache_hits_total"),
         "llm_circuit_breaker_state": all_metrics.get("llm_circuit_breaker_state"),
         "llm_concurrent_requests": all_metrics.get("llm_concurrent_requests"),
+        # Enhanced Performance Metrics - Phase 7
+        "llm_response_time_percentiles": all_metrics.get("llm_response_time_percentiles"),
+        "llm_validation_duration_seconds": all_metrics.get("llm_validation_duration_seconds"),
+        "llm_circuit_breaker_state_changes": all_metrics.get("llm_circuit_breaker_state_changes"),
+        "llm_provider_connection_pool_size": all_metrics.get("llm_provider_connection_pool_size"),
+        "llm_provider_connection_pool_active": all_metrics.get(
+            "llm_provider_connection_pool_active"
+        ),
+        "llm_request_lifecycle_duration_seconds": all_metrics.get(
+            "llm_request_lifecycle_duration_seconds"
+        ),
+        "llm_provider_availability_percentage": all_metrics.get(
+            "llm_provider_availability_percentage"
+        ),
+    }
+
+
+def get_queue_metrics() -> dict[str, Any]:
+    """Get metrics required by queue operations."""
+    all_metrics = get_metrics()
+    return {
+        "llm_queue_depth": all_metrics.get("llm_queue_depth"),
+        "llm_queue_processing_time_seconds": all_metrics.get("llm_queue_processing_time_seconds"),
+        "llm_queue_overflow_total": all_metrics.get("llm_queue_overflow_total"),
+        "llm_request_lifecycle_duration_seconds": all_metrics.get(
+            "llm_request_lifecycle_duration_seconds"
+        ),
     }
 
 
@@ -135,6 +227,17 @@ def _get_existing_metrics() -> dict[str, Any]:
         "llm_cache_hits_total": "llm_provider_cache_hits_total",
         "llm_circuit_breaker_state": "llm_provider_circuit_breaker_state",
         "llm_concurrent_requests": "llm_provider_concurrent_requests",
+        # Enhanced Performance Metrics - Phase 7
+        "llm_response_time_percentiles": "llm_provider_response_time_percentiles",
+        "llm_validation_duration_seconds": "llm_provider_validation_duration_seconds",
+        "llm_queue_depth": "llm_provider_queue_depth",
+        "llm_queue_processing_time_seconds": "llm_provider_queue_processing_time_seconds",
+        "llm_circuit_breaker_state_changes": "llm_provider_circuit_breaker_state_changes_total",
+        "llm_provider_connection_pool_size": "llm_provider_connection_pool_size",
+        "llm_provider_connection_pool_active": "llm_provider_connection_pool_active",
+        "llm_queue_overflow_total": "llm_provider_queue_overflow_total",
+        "llm_request_lifecycle_duration_seconds": "llm_provider_request_lifecycle_duration_seconds",
+        "llm_provider_availability_percentage": "llm_provider_availability_percentage",
     }
 
     existing: dict[str, Any] = {}

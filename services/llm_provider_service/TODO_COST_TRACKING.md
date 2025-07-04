@@ -124,10 +124,10 @@ from common_core.events.llm_provider_events import LLMCostTrackingV1
 from common_core.event_enums import ProcessingEvent
 ```
 
-## Result Aggregator Service Integration (Future)
+## Planned Metrics Service Integration (Future)
 
 ### TODO: Add Cost Tracking Consumer
-**File:** `services/result_aggregator_service/`
+**File:** `services/system_metrics_service/`
 ```python
 # Add Kafka consumer for LLMCostTrackingV1 events
 # Store cost data in PostgreSQL with:
@@ -167,7 +167,7 @@ CREATE INDEX idx_llm_cost_provider_date ON llm_cost_tracking(provider, request_t
 
 ## Benefits
 
-1. **Separation of Concerns**: LLM Provider handles infrastructure, Result Aggregator handles persistence
+1. **Separation of Concerns**: LLM Provider handles infrastructure, System Metrics Service handles persistence
 2. **Real-time + Historical**: Redis for live limits, PostgreSQL for billing/analytics  
 3. **Multi-tenant Ready**: Organization-level cost tracking built-in
 4. **Cache ROI Analysis**: Track cost savings from caching strategy

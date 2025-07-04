@@ -114,15 +114,10 @@ class LLMQueuedResponse(BaseModel):
     queue_id: UUID = Field(description="Unique queue identifier for tracking")
     status: str = Field(default="queued", description="Request status")
     message: str = Field(
-        default="Request queued for processing",
-        description="User-friendly status message"
+        default="Request queued for processing", description="User-friendly status message"
     )
     estimated_wait_minutes: int | None = Field(
-        default=None,
-        description="Estimated wait time in minutes"
+        default=None, description="Estimated wait time in minutes"
     )
     status_url: str = Field(description="URL to check request status")
-    retry_after: int = Field(
-        default=60,
-        description="Seconds before client should check status"
-    )
+    retry_after: int = Field(default=60, description="Seconds before client should check status")

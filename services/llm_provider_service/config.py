@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, Optional
 
 from pydantic import Field, field_validator
@@ -96,22 +95,23 @@ class Settings(BaseSettings):
     # These can be overridden via environment variables or API calls
     ANTHROPIC_API_KEY: str = ""
     ANTHROPIC_BASE_URL: Optional[str] = None
-    ANTHROPIC_DEFAULT_MODEL: str = "claude-3-sonnet-20240229"
+    ANTHROPIC_DEFAULT_MODEL: str = "claude-sonnet-4-20250514"
     ANTHROPIC_ENABLED: bool = True
 
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: Optional[str] = None
-    OPENAI_DEFAULT_MODEL: str = "gpt-4-turbo-preview"
+    OPENAI_DEFAULT_MODEL: str = "gpt-4.1"
     OPENAI_ORG_ID: Optional[str] = None
     OPENAI_ENABLED: bool = True
 
     GOOGLE_API_KEY: str = ""
-    GOOGLE_DEFAULT_MODEL: str = "gemini-pro"
+    GOOGLE_PROJECT_ID: str = ""
+    GOOGLE_DEFAULT_MODEL: str = "gemini-2.5-flash"
     GOOGLE_ENABLED: bool = True
 
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    OPENROUTER_DEFAULT_MODEL: str = "anthropic/claude-3-sonnet"
+    OPENROUTER_DEFAULT_MODEL: str = "anthropic/claude-sonnet-4"
     OPENROUTER_ENABLED: bool = True
 
     # Internal/Self-hosted Model Support
@@ -123,7 +123,6 @@ class Settings(BaseSettings):
     )
     INTERNAL_MODEL_NAME: Optional[str] = None
     INTERNAL_MODEL_GPU_LAYERS: int = -1
-
 
     # Queue Configuration
     QUEUE_MAX_SIZE: int = Field(

@@ -16,6 +16,9 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from common_core import LLMProviderType, QueueStatus
 from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
+from services.llm_provider_service.implementations.trace_context_manager_impl import (
+    TraceContextManagerImpl,
+)
 from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
     LLMProviderError,
@@ -38,6 +41,7 @@ class QueueProcessorImpl:
         orchestrator: LLMOrchestratorProtocol,
         queue_manager: QueueManagerProtocol,
         event_publisher: LLMEventPublisherProtocol,
+        trace_context_manager: TraceContextManagerImpl,
         settings: Settings,
     ):
         """Initialize queue processor.
@@ -46,11 +50,13 @@ class QueueProcessorImpl:
             orchestrator: LLM orchestrator for making requests
             queue_manager: Queue manager for request handling
             event_publisher: Event publisher for notifications
+            trace_context_manager: Trace context manager for distributed tracing
             settings: Service settings
         """
         self.orchestrator = orchestrator
         self.queue_manager = queue_manager
         self.event_publisher = event_publisher
+        self.trace_context_manager = trace_context_manager
         self.settings = settings
 
         # Processing state
@@ -140,11 +146,11 @@ class QueueProcessorImpl:
         try:
             # Extract request data
             req_data = request.request_data
-            
+
             # Extract provider and overrides
             provider = LLMProviderType.OPENAI  # Default provider
             overrides: Dict[str, Any] = {}
-            
+
             if req_data.llm_config_overrides:
                 config = req_data.llm_config_overrides
                 if config.provider_override:
@@ -158,16 +164,31 @@ class QueueProcessorImpl:
                 if config.max_tokens_override:
                     overrides["max_tokens_override"] = config.max_tokens_override
 
-            # Call orchestrator to process the request
-            # Note: This will check provider availability and make the actual LLM call
-            result, error = await self.orchestrator.perform_comparison(
-                provider=provider,
-                user_prompt=req_data.user_prompt,
-                essay_a=req_data.essay_a,
-                essay_b=req_data.essay_b,
-                correlation_id=req_data.correlation_id or request.queue_id,
-                **overrides,
-            )
+            # Restore trace context for queue processing to maintain unbroken spans
+            trace_context = request.trace_context or {}
+
+            # Call orchestrator within restored trace context
+            with self.trace_context_manager.restore_trace_context_for_queue_processing(
+                trace_context, request.queue_id
+            ) as span:
+                span.add_event(
+                    "queue_request_processing_started",
+                    {
+                        "queue_id": str(request.queue_id),
+                        "correlation_id": str(req_data.correlation_id or request.queue_id),
+                        "provider": provider.value,
+                    },
+                )
+
+                # Note: This will check provider availability and make the actual LLM call
+                result, error = await self.orchestrator.perform_comparison(
+                    provider=provider,
+                    user_prompt=req_data.user_prompt,
+                    essay_a=req_data.essay_a,
+                    essay_b=req_data.essay_b,
+                    correlation_id=req_data.correlation_id or request.queue_id,
+                    **overrides,
+                )
 
             if error:
                 await self._handle_request_error(request, error)
@@ -193,9 +214,12 @@ class QueueProcessorImpl:
             logger.error(f"Error processing request {request.queue_id}: {e}", exc_info=True)
             # Get provider from config or use default
             req_provider = LLMProviderType.OPENAI
-            if request.request_data.llm_config_overrides and request.request_data.llm_config_overrides.provider_override:
+            if (
+                request.request_data.llm_config_overrides
+                and request.request_data.llm_config_overrides.provider_override
+            ):
                 req_provider = request.request_data.llm_config_overrides.provider_override
-            
+
             await self._handle_request_error(
                 request,
                 LLMProviderError(
@@ -250,9 +274,7 @@ class QueueProcessorImpl:
 
         self._requests_processed += 1
 
-    async def _handle_request_error(
-        self, request: QueuedRequest, error: LLMProviderError
-    ) -> None:
+    async def _handle_request_error(self, request: QueuedRequest, error: LLMProviderError) -> None:
         """Handle request processing error.
 
         Args:

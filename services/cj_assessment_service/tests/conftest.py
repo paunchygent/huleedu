@@ -93,7 +93,7 @@ def llm_config_overrides() -> LLMConfigOverrides:
 @pytest.fixture
 def llm_config_overrides_minimal() -> LLMConfigOverrides:
     """Provide minimal LLM configuration overrides with only model."""
-    return LLMConfigOverrides(model_override="claude-3-sonnet-20240229")
+    return LLMConfigOverrides(model_override="claude-sonnet-4-20250514")
 
 
 @pytest.fixture

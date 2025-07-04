@@ -88,7 +88,7 @@ class LocalQueueManagerImpl(QueueRepositoryProtocol):
             if not self._check_capacity():
                 logger.warning(
                     f"Queue full: {len(self._data)}/{self.max_size} items, "
-                    f"{self._memory_bytes/1024/1024:.1f}/{self.max_memory_mb}MB"
+                    f"{self._memory_bytes / 1024 / 1024:.1f}/{self.max_memory_mb}MB"
                 )
                 return False
 
@@ -198,9 +198,7 @@ class LocalQueueManagerImpl(QueueRepositoryProtocol):
                     requests.append(request)
 
             # Sort by priority and queued time
-            requests.sort(
-                key=lambda r: (-r.priority, r.queued_at.timestamp())
-            )
+            requests.sort(key=lambda r: (-r.priority, r.queued_at.timestamp()))
 
             return requests
 

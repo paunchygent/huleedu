@@ -87,10 +87,10 @@ class AnthropicProviderImpl(LLMProviderProtocol):
 Your job is to:
 1. Read both essays carefully
 2. Determine which essay is better written based on clarity, structure, argument quality, and writing mechanics
-3. Provide a clear justification for your choice
+3. Provide a brief justification for your choice (max 50 characters)
 4. Rate your confidence in the decision
 
-You will use the essay_comparison_result tool to provide your analysis."""
+You will use the comparison_result tool to provide your analysis."""
         )
 
         # Execute with retry
@@ -153,34 +153,20 @@ You will use the essay_comparison_result tool to provide your analysis."""
         )
         max_tokens = max_tokens_override or self.settings.LLM_DEFAULT_MAX_TOKENS
 
-        # Define the tool for structured essay comparison response
+        # Define tool for structured comparison response
         tools = [
             {
-                "name": "essay_comparison_result",
-                "description": "Return the result of comparing two essays",
+                "name": "comparison_result",
+                "description": "Essay comparison result",
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "winner": {
-                            "type": "string",
-                            "enum": ["Essay A", "Essay B"],
-                            "description": "Which essay is better: 'Essay A' or 'Essay B'"
-                        },
-                        "justification": {
-                            "type": "string",
-                            "minLength": 50,
-                            "maxLength": 500,
-                            "description": "Detailed explanation of why this essay was chosen (50-500 characters)"
-                        },
-                        "confidence": {
-                            "type": "number",
-                            "minimum": 1.0,
-                            "maximum": 5.0,
-                            "description": "Confidence score between 1.0 and 5.0"
-                        }
+                        "winner": {"type": "string", "enum": ["Essay A", "Essay B"]},
+                        "justification": {"type": "string", "maxLength": 50, "description": "Brief explanation (max 50 chars)"},
+                        "confidence": {"type": "number", "minimum": 1, "maximum": 5},
                     },
-                    "required": ["winner", "justification", "confidence"]
-                }
+                    "required": ["winner", "justification", "confidence"],
+                },
             }
         ]
 
@@ -191,7 +177,7 @@ You will use the essay_comparison_result tool to provide your analysis."""
             "max_tokens": max_tokens,
             "temperature": temperature,
             "tools": tools,
-            "tool_choice": {"type": "tool", "name": "essay_comparison_result"}
+            "tool_choice": {"type": "tool", "name": "comparison_result"},
         }
 
         try:
@@ -205,8 +191,12 @@ You will use the essay_comparison_result tool to provide your analysis."""
                     try:
                         response_data = json.loads(response_text)
                     except json.JSONDecodeError as e:
-                        logger.error(f"Failed to parse Anthropic response as JSON: {e}", extra={"response_text": response_text[:500]})
+                        logger.error(
+                            f"Failed to parse Anthropic response as JSON: {e}",
+                            extra={"response_text": response_text[:500]},
+                        )
                         from uuid import uuid4
+
                         return None, LLMProviderError(
                             error_type=ErrorCode.PARSING_ERROR,
                             error_message=f"Failed to parse Anthropic response: {str(e)}",
@@ -216,28 +206,40 @@ You will use the essay_comparison_result tool to provide your analysis."""
                         )
 
                     # Log the structure for debugging
-                    logger.debug("Anthropic response structure", extra={
-                        "has_content": "content" in response_data,
-                        "content_type": type(response_data.get("content")).__name__,
-                        "content_length": len(response_data.get("content", [])) if isinstance(response_data.get("content"), list) else 0
-                    })
+                    logger.debug(
+                        "Anthropic response structure",
+                        extra={
+                            "has_content": "content" in response_data,
+                            "content_type": type(response_data.get("content")).__name__,
+                            "content_length": len(response_data.get("content", []))
+                            if isinstance(response_data.get("content"), list)
+                            else 0,
+                        },
+                    )
 
                     # Extract tool use from Anthropic response
                     tool_result = None
                     if isinstance(response_data.get("content"), list):
                         for block in response_data["content"]:
-                            if block.get("type") == "tool_use" and block.get("name") == "essay_comparison_result":
+                            if (
+                                block.get("type") == "tool_use"
+                                and block.get("name") == "comparison_result"
+                            ):
                                 tool_result = block.get("input", {})
                                 break
 
                     if tool_result:
                         try:
                             # Validate and normalize response using centralized validator
-                            validated_response, validation_error = validate_and_normalize_response(tool_result)
-                            
+                            validated_response, validation_error = validate_and_normalize_response(
+                                tool_result
+                            )
+
                             if validation_error:
                                 error_msg = f"Response validation failed: {validation_error}"
-                                logger.error(error_msg, extra={"tool_result": str(tool_result)[:500]})
+                                logger.error(
+                                    error_msg, extra={"tool_result": str(tool_result)[:500]}
+                                )
                                 from uuid import uuid4
 
                                 return None, LLMProviderError(
@@ -250,7 +252,9 @@ You will use the essay_comparison_result tool to provide your analysis."""
 
                             # Convert to internal format
                             assert validated_response is not None  # Type assertion for mypy
-                            choice, reasoning, confidence = convert_to_internal_format(validated_response)
+                            choice, reasoning, confidence = convert_to_internal_format(
+                                validated_response
+                            )
 
                             # Get token usage
                             usage = response_data.get("usage", {})
@@ -287,7 +291,10 @@ You will use the essay_comparison_result tool to provide your analysis."""
                             )
                     else:
                         # Log the full response for debugging
-                        logger.error("No tool use found in Anthropic response", extra={"response_data": str(response_data)[:1000]})
+                        logger.error(
+                            "No tool use found in Anthropic response",
+                            extra={"response_data": str(response_data)[:1000]},
+                        )
                         from uuid import uuid4
 
                         return None, LLMProviderError(

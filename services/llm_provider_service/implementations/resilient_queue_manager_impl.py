@@ -5,7 +5,6 @@ Provides seamless failover between Redis and local queue implementations
 to ensure queue functionality during Redis outages.
 """
 
-import asyncio
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -238,9 +237,7 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
             usage_percent=usage_percent,
             queued_count=total_queued,
             is_accepting_requests=is_accepting,
-            rejection_reason=(
-                "Queue at capacity" if not is_accepting else None
-            ),
+            rejection_reason=("Queue at capacity" if not is_accepting else None),
         )
 
     async def cleanup_expired(self) -> int:

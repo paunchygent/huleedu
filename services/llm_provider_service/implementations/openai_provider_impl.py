@@ -85,8 +85,8 @@ class OpenAIProviderImpl(LLMProviderProtocol):
             or "You are an expert essay evaluator. "
             "Compare the two essays and return your analysis as JSON. "
             "You MUST respond with a JSON object containing exactly these fields: "
-            '{"winner": "Essay A" or "Essay B", "justification": "string (50-500 chars)", "confidence": 1.0-5.0}. '
-            "The winner must be either 'Essay A' or 'Essay B', justification must be 50-500 characters, "
+            '{"winner": "Essay A" or "Essay B", "justification": "brief explanation (max 50 chars)", "confidence": 1.0-5.0}. '
+            "The winner must be either 'Essay A' or 'Essay B', justification must be brief (max 50 characters), "
             "and confidence must be a float between 1.0 and 5.0."
         )
 
@@ -149,7 +149,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         )
         max_tokens = max_tokens_override or self.settings.LLM_DEFAULT_MAX_TOKENS
 
-        # Add structured output with JSON schema
+        # Configure structured output with simplified JSON schema
         payload = {
             "model": model,
             "messages": [
@@ -161,32 +161,19 @@ class OpenAIProviderImpl(LLMProviderProtocol):
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": "essay_comparison_result",
-                    "strict": True,
+                    "name": "comparison",
+                    "strict": False,  # Allow flexible parsing for faster processing
                     "schema": {
                         "type": "object",
                         "properties": {
-                            "winner": {
-                                "type": "string",
-                                "enum": ["Essay A", "Essay B"],
-                                "description": "Which essay is better: 'Essay A' or 'Essay B'"
-                            },
-                            "justification": {
-                                "type": "string",
-                                "description": "Detailed explanation of why this essay was chosen (50-500 characters)"
-                            },
-                            "confidence": {
-                                "type": "number",
-                                "minimum": 1.0,
-                                "maximum": 5.0,
-                                "description": "Confidence score between 1.0 and 5.0"
-                            }
+                            "winner": {"type": "string", "enum": ["Essay A", "Essay B"]},
+                            "justification": {"type": "string", "maxLength": 50, "description": "Brief explanation (max 50 chars)"},
+                            "confidence": {"type": "number", "minimum": 1, "maximum": 5},
                         },
                         "required": ["winner", "justification", "confidence"],
-                        "additionalProperties": False
-                    }
-                }
-            }
+                    },
+                },
+            },
         }
 
         try:
@@ -204,8 +191,10 @@ class OpenAIProviderImpl(LLMProviderProtocol):
 
                         try:
                             # Validate and normalize response using centralized validator
-                            validated_response, validation_error = validate_and_normalize_response(text_content)
-                            
+                            validated_response, validation_error = validate_and_normalize_response(
+                                text_content
+                            )
+
                             if validation_error:
                                 error_msg = f"Response validation failed: {validation_error}"
                                 logger.error(error_msg, extra={"response_text": text_content[:500]})
@@ -221,7 +210,9 @@ class OpenAIProviderImpl(LLMProviderProtocol):
 
                             # Convert to internal format
                             assert validated_response is not None  # Type assertion for mypy
-                            choice, reasoning, confidence = convert_to_internal_format(validated_response)
+                            choice, reasoning, confidence = convert_to_internal_format(
+                                validated_response
+                            )
 
                             # Get token usage
                             usage = response_data.get("usage", {})

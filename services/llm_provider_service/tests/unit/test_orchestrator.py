@@ -55,11 +55,25 @@ def mock_provider() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_trace_context_manager() -> MagicMock:
+    """Mock trace context manager."""
+    trace_manager = MagicMock()
+    trace_manager.capture_trace_context_for_queue.return_value = {
+        "traceparent": "00-trace123-span456-01",
+        "_huledu_trace_id": "trace123",
+    }
+    trace_manager.start_api_request_span.return_value.__enter__.return_value = MagicMock()
+    trace_manager.start_provider_call_span.return_value.__enter__.return_value = MagicMock()
+    return trace_manager
+
+
+@pytest.fixture
 def orchestrator(
     mock_settings: MagicMock,
     mock_event_publisher: AsyncMock,
     mock_queue_manager: AsyncMock,
     mock_provider: AsyncMock,
+    mock_trace_context_manager: MagicMock,
 ) -> LLMOrchestratorImpl:
     """Create orchestrator with mocked dependencies."""
     from typing import Dict
@@ -75,6 +89,7 @@ def orchestrator(
         event_publisher=mock_event_publisher,
         queue_manager=mock_queue_manager,
         settings=mock_settings,
+        trace_context_manager=mock_trace_context_manager,
     )
 
 
@@ -111,6 +126,7 @@ async def test_orchestrator_successful_comparison(
     assert result is not None
     # Result should be an LLMOrchestratorResponse for successful case
     from services.llm_provider_service.internal_models import LLMOrchestratorResponse
+
     assert isinstance(result, LLMOrchestratorResponse)
     assert result.choice == "B"
     assert result.reasoning == "Essay B is better structured"
@@ -172,6 +188,7 @@ async def test_orchestrator_queues_when_provider_unavailable(
 
     # Mock queue stats
     from services.llm_provider_service.queue_models import QueueStats
+
     mock_queue_stats = QueueStats(
         current_size=10,
         max_size=1000,
@@ -197,6 +214,7 @@ async def test_orchestrator_queues_when_provider_unavailable(
     assert result is not None
     # Result should be an LLMQueuedResult for queued case
     from services.llm_provider_service.internal_models import LLMQueuedResult
+
     assert isinstance(result, LLMQueuedResult)
     assert result.provider == LLMProviderType.MOCK
     assert result.status == "queued"
@@ -205,7 +223,7 @@ async def test_orchestrator_queues_when_provider_unavailable(
 
     # Verify queue was called
     mock_queue_manager.enqueue.assert_called_once()
-    
+
     # Verify events were published
     mock_event_publisher.publish_llm_request_started.assert_called_once()
     mock_event_publisher.publish_llm_request_completed.assert_called_once()

@@ -4,11 +4,11 @@
 
 Your operational process for **every task** is fixed and non-negotiable.
 
-### **Step 1: Ingest Core Architectural Knowledge (Mandatory First Action)**
+### **Step 1: Build Core Architectural Knowledge**
 
 #### **.cursor/rules/015-project-structure-standards.mdc MUST be RESPECTED**
 
-#### **Begin each conversation by reading the following files
+#### **Begin each conversation by the files referenced below, as they provide a good overview of the project structure and architecture. You can use the index in the .cursor/rules/000-rule-index.mdc to navigate to the relevant files here and any other files you need to understand the project.**
 
 .cursor/rules/010-foundational-principles.mdc
 .cursor/rules/020-architectural-mandates.mdc

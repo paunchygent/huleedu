@@ -1,11 +1,24 @@
-"""Response validation utilities for LLM Provider Service."""
+"""Response validation utilities for LLM Provider Service.
+
+Performance optimized for sub-500ms response times - Phase 7 enhancement.
+"""
 
 from __future__ import annotations
 
 import json
+import re
+import time
 from typing import Any, Dict, Tuple
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from huleedu_service_libs.logging_utils import create_service_logger
+from pydantic import BaseModel, Field, ValidationError
+
+logger = create_service_logger("llm_provider_service.response_validator")
+
+# Pre-compiled regex patterns for better performance
+WINNER_PATTERN = re.compile(r"^(Essay A|Essay B)$")
+WINNER_KEYWORDS = {"a", "essay a", "option a", "first", "left"}
+WINNER_B_KEYWORDS = {"b", "essay b", "option b", "second", "right"}
 
 
 class StandardizedLLMResponse(BaseModel):
@@ -13,81 +26,125 @@ class StandardizedLLMResponse(BaseModel):
 
     winner: str = Field(description="Which essay is better", pattern="^(Essay A|Essay B)$")
     justification: str = Field(
-        description="Explanation of the choice (50-500 characters)", 
-        min_length=50, 
-        max_length=500
+        description="Brief explanation of the choice (max 50 characters)", max_length=50
     )
-    confidence: float = Field(
-        description="Confidence score between 1.0 and 5.0",
-        ge=1.0,
-        le=5.0
-    )
+    confidence: float = Field(description="Confidence score between 1.0 and 5.0", ge=1.0, le=5.0)
 
 
 def validate_and_normalize_response(
     raw_response: str | Dict[str, Any],
+    provider: str = "unknown",
 ) -> Tuple[StandardizedLLMResponse | None, str | None]:
     """Validate and normalize LLM response to standardized format.
 
+    Performance optimized for sub-500ms response times.
+
     Args:
         raw_response: Raw response from LLM (JSON string or dict)
+        provider: Provider name for metrics tracking
 
     Returns:
         Tuple of (validated_response, error_message)
     """
+    start_time = time.perf_counter()
+
     try:
-        # Parse JSON if string
-        if isinstance(raw_response, str):
+        # Fast path: check if already parsed dict
+        if isinstance(raw_response, dict):
+            parsed_data = raw_response
+        else:
             try:
                 parsed_data = json.loads(raw_response)
             except json.JSONDecodeError as e:
+                _record_validation_metrics(provider, "json_parse", start_time, False)
                 return None, f"Invalid JSON format: {str(e)}"
-        else:
-            parsed_data = raw_response
 
-        # Extract and normalize fields
-        winner = parsed_data.get("winner", "Essay A")
-        justification = parsed_data.get("justification", "Analysis provided")
-        confidence = parsed_data.get("confidence", 3.0)
+        # Fast normalization with minimal string operations
+        normalized_data = _fast_normalize_fields(parsed_data)
 
-        # Normalize winner format
-        if winner not in ["Essay A", "Essay B"]:
-            winner = "Essay A"
+        # Validate against schema with pre-normalized data
+        validated_response = StandardizedLLMResponse.model_validate(normalized_data)
 
-        # Normalize confidence range
-        if isinstance(confidence, (int, float)):
-            confidence = float(max(1.0, min(5.0, confidence)))
-        else:
-            confidence = 3.0
-
-        # Normalize justification length
-        if len(justification) < 50:
-            justification = justification + " - additional analysis provided"
-            justification = justification[:50] if len(justification) > 50 else justification.ljust(50)
-        elif len(justification) > 500:
-            justification = justification[:497] + "..."
-
-        # Create normalized data dict
-        normalized_data = {
-            "winner": winner,
-            "justification": justification,
-            "confidence": confidence
-        }
-
-        # Validate against schema with normalized data
-        validated_response = StandardizedLLMResponse(**normalized_data)
+        _record_validation_metrics(provider, "success", start_time, True)
         return validated_response, None
 
     except ValidationError as e:
-        error_details = []
-        for error in e.errors():
-            field = " -> ".join(str(loc) for loc in error["loc"])
-            error_details.append(f"{field}: {error['msg']}")
-        
-        return None, f"Validation failed: {'; '.join(error_details)}"
+        _record_validation_metrics(provider, "validation_error", start_time, False)
+        error_msg = _format_validation_errors(e)
+        return None, f"Validation failed: {error_msg}"
 
     except Exception as e:
+        _record_validation_metrics(provider, "unexpected_error", start_time, False)
         return None, f"Unexpected validation error: {str(e)}"
+
+
+def _fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Fast field normalization with minimal overhead."""
+    # Extract fields with defaults
+    winner = parsed_data.get("winner", "Essay A")
+    justification = parsed_data.get("justification", "Analysis provided")
+    confidence = parsed_data.get("confidence", 3.0)
+
+    # Fast winner normalization using pre-compiled patterns
+    if not WINNER_PATTERN.match(winner):
+        winner_lower = winner.lower().strip()
+        if winner_lower in WINNER_B_KEYWORDS:
+            winner = "Essay B"
+        else:
+            winner = "Essay A"
+
+    # Fast confidence normalization
+    if isinstance(confidence, (int, float)):
+        confidence = min(5.0, max(1.0, float(confidence)))
+    else:
+        confidence = 3.0
+
+    # Efficient justification normalization - keep brief for cost control
+    justification = str(justification).strip()
+    if len(justification) > 50:
+        justification = justification[:47] + "..."
+    elif len(justification) < 10:
+        justification = justification + " - clear choice"
+
+    return {"winner": winner, "justification": justification, "confidence": confidence}
+
+
+def _format_validation_errors(e: ValidationError) -> str:
+    """Efficiently format validation errors."""
+    if len(e.errors()) == 1:
+        error = e.errors()[0]
+        field = " -> ".join(str(loc) for loc in error["loc"])
+        return f"{field}: {error['msg']}"
+
+    return "; ".join(
+        f"{' -> '.join(str(loc) for loc in error['loc'])}: {error['msg']}" for error in e.errors()
+    )
+
+
+def _record_validation_metrics(
+    provider: str, validation_type: str, start_time: float, success: bool
+) -> None:
+    """Record validation performance metrics."""
+    try:
+        from services.llm_provider_service.metrics import get_llm_metrics
+
+        metrics = get_llm_metrics()
+
+        duration = time.perf_counter() - start_time
+        validation_metric = metrics.get("llm_validation_duration_seconds")
+        if validation_metric:
+            validation_metric.labels(provider=provider, validation_type=validation_type).observe(
+                duration
+            )
+
+        # Log slow validations
+        if duration > 0.01:  # 10ms threshold
+            logger.warning(
+                f"Slow validation detected: {duration:.4f}s for {provider} ({validation_type})"
+            )
+    except Exception:
+        # Don't let metrics recording break validation
+        pass
 
 
 def convert_to_internal_format(
@@ -103,9 +160,101 @@ def convert_to_internal_format(
     """
     choice = "A" if standardized_response.winner == "Essay A" else "B"
     reasoning = standardized_response.justification
-    confidence = standardized_response.confidence
+    # Convert confidence from 1-5 scale to 0-1 scale for internal model
+    confidence = (standardized_response.confidence - 1.0) / 4.0
 
     return choice, reasoning, confidence
+
+
+def validate_and_normalize_response_fast(
+    raw_response: Dict[str, Any],
+    provider: str = "unknown",
+) -> Tuple[StandardizedLLMResponse | None, str | None]:
+    """Ultra-fast validation for pre-parsed dict responses.
+
+    Optimized for scenarios where JSON is already parsed and we need minimal validation.
+    Skips some safety checks for maximum performance.
+
+    Args:
+        raw_response: Pre-parsed response dict
+        provider: Provider name for metrics tracking
+
+    Returns:
+        Tuple of (validated_response, error_message)
+    """
+    start_time = time.perf_counter()
+
+    try:
+        # Fast normalization without extensive error checking
+        normalized_data = _ultra_fast_normalize_fields(raw_response)
+
+        # Direct model creation without extensive validation
+        validated_response = StandardizedLLMResponse.model_construct(**normalized_data)
+
+        _record_validation_metrics(provider, "fast_success", start_time, True)
+        return validated_response, None
+
+    except Exception as e:
+        _record_validation_metrics(provider, "fast_error", start_time, False)
+        return None, f"Fast validation error: {str(e)}"
+
+
+def _ultra_fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Ultra-fast field normalization with minimal safety checks."""
+    # Direct field access with minimal validation
+    winner = parsed_data.get("winner", "Essay A")
+    justification = str(parsed_data.get("justification", "Analysis provided"))
+    confidence = float(parsed_data.get("confidence", 3.0))
+
+    # Minimal winner validation - just check first character
+    if winner and winner[0].upper() == "B":
+        winner = "Essay B"
+    else:
+        winner = "Essay A"
+
+    # Simple confidence clamping
+    confidence = max(1.0, min(5.0, confidence))
+
+    # Simple justification handling - keep brief for cost control
+    justification = justification.strip()
+    if len(justification) > 50:
+        justification = justification[:50]
+    elif len(justification) < 10:
+        justification = justification + " - choice"
+
+    return {"winner": winner, "justification": justification, "confidence": confidence}
+
+
+def batch_validate_responses(
+    responses: list[Dict[str, Any]],
+    provider: str = "unknown",
+) -> list[Tuple[StandardizedLLMResponse | None, str | None]]:
+    """Batch validate multiple responses for improved performance.
+
+    Args:
+        responses: List of response dicts to validate
+        provider: Provider name for metrics tracking
+
+    Returns:
+        List of validation results
+    """
+    start_time = time.perf_counter()
+    results = []
+
+    try:
+        for response in responses:
+            result = validate_and_normalize_response_fast(response, provider)
+            results.append(result)
+
+        _record_validation_metrics(provider, "batch_success", start_time, True)
+        return results
+
+    except Exception as e:
+        _record_validation_metrics(provider, "batch_error", start_time, False)
+        # Return partial results if possible
+        return results + [(None, f"Batch validation error: {str(e)}")] * (
+            len(responses) - len(results)
+        )
 
 
 # JSON Schema for external validation (e.g., in API documentation)
@@ -115,21 +264,20 @@ STANDARDIZED_RESPONSE_SCHEMA = {
         "winner": {
             "type": "string",
             "enum": ["Essay A", "Essay B"],
-            "description": "Which essay is better: 'Essay A' or 'Essay B'"
+            "description": "Which essay is better: 'Essay A' or 'Essay B'",
         },
         "justification": {
             "type": "string",
-            "minLength": 50,
-            "maxLength": 500,
-            "description": "Detailed explanation of why this essay was chosen (50-500 characters)"
+            "maxLength": 50,
+            "description": "Brief explanation of why this essay was chosen (max 50 characters)",
         },
         "confidence": {
             "type": "number",
             "minimum": 1.0,
             "maximum": 5.0,
-            "description": "Confidence score between 1.0 and 5.0"
-        }
+            "description": "Confidence score between 1.0 and 5.0",
+        },
     },
     "required": ["winner", "justification", "confidence"],
-    "additionalProperties": False
+    "additionalProperties": False,
 }

@@ -142,7 +142,7 @@ class SpellcheckJobStatus(str, Enum):
 
 class QueueStatus(str, Enum):
     """Status codes for queued LLM requests."""
-    
+
     QUEUED = "queued"
     PROCESSING = "processing"
     COMPLETED = "completed"

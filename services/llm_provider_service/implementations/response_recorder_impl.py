@@ -23,10 +23,7 @@ class DevelopmentResponseRecorder:
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.enabled = (
-            settings.ENVIRONMENT == "development"
-            and settings.RECORD_LLM_RESPONSES
-        )
+        self.enabled = settings.ENVIRONMENT == "development" and settings.RECORD_LLM_RESPONSES
 
         # Setup output directory
         self.output_dir = Path("./llm_response_logs")
@@ -72,7 +69,7 @@ class DevelopmentResponseRecorder:
 
             # Write to file
             filepath = self.output_dir / filename
-            async with aiofiles.open(filepath, 'w') as f:
+            async with aiofiles.open(filepath, "w") as f:
                 await f.write(json.dumps(record, indent=2, default=str))
 
             logger.debug(f"Recorded response to {filepath}")
@@ -121,7 +118,7 @@ class DevelopmentResponseRecorder:
 
             # Write to file
             filepath = self.output_dir / filename
-            async with aiofiles.open(filepath, 'w') as f:
+            async with aiofiles.open(filepath, "w") as f:
                 await f.write(json.dumps(record, indent=2, default=str))
 
             logger.debug(f"Recorded error to {filepath}")
@@ -131,10 +128,10 @@ class DevelopmentResponseRecorder:
 
     def _serialize_object(self, obj: Any) -> Any:
         """Serialize object for JSON storage."""
-        if hasattr(obj, 'model_dump'):
+        if hasattr(obj, "model_dump"):
             # Pydantic model
             return obj.model_dump()
-        elif hasattr(obj, 'dict'):
+        elif hasattr(obj, "dict"):
             # Older Pydantic or dict-like
             return obj.dict()
         elif isinstance(obj, dict):

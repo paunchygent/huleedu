@@ -93,6 +93,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        provider_override: str | None = None,
     ) -> tuple[dict[str, Any] | None, str | None]:
         """Generate comparison via LLM Provider Service.
 
@@ -105,6 +106,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             model_override: Optional model name override
             temperature_override: Optional temperature override (0.0-2.0)
             max_tokens_override: Optional max tokens override
+            provider_override: Optional provider name override
 
         Returns:
             Tuple of (response_data, error_message)
@@ -123,8 +125,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             "essay_a": essay_a,
             "essay_b": essay_b,
             "llm_config_overrides": {
-                # Provider will be determined by the configured default
-                "provider_override": self.settings.DEFAULT_LLM_PROVIDER.value,
+                "provider_override": provider_override or self.settings.DEFAULT_LLM_PROVIDER.value,
                 "model_override": model_override or self.settings.DEFAULT_LLM_MODEL,
                 "temperature_override": temperature_override
                 or self.settings.DEFAULT_LLM_TEMPERATURE,
@@ -150,11 +151,11 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                     if response.status == 200:
                         # Immediate response - handle as before
                         return await self._handle_immediate_response(response_text)
-                    
+
                     elif response.status == 202:
                         # Queued response - start polling
                         return await self._handle_queued_response(response_text)
-                    
+
                     else:
                         # Handle error responses
                         return await self._handle_error_response(response.status, response_text)
@@ -173,24 +174,29 @@ class LLMProviderServiceClient(LLMProviderProtocol):
 
         return result, error
 
-    async def _handle_immediate_response(self, response_text: str) -> tuple[dict[str, Any] | None, str | None]:
+    async def _handle_immediate_response(
+        self, response_text: str
+    ) -> tuple[dict[str, Any] | None, str | None]:
         """Handle immediate (200) response from LLM Provider Service.
-        
+
         Args:
             response_text: Raw response text from the HTTP response
-            
+
         Returns:
             Tuple of (response_data, error_message)
         """
         try:
             response_data = json.loads(response_text)
 
-            # Extract the comparison result
-            # LLM Provider Service already returns in correct format
+            # Extract the comparison result and convert confidence scale
+            # LLM Provider Service returns 1-5 scale, convert to 0-1 scale for CJ Assessment
+            raw_confidence = response_data.get("confidence", 3.0)
+            normalized_confidence = (raw_confidence - 1.0) / 4.0  # Convert 1-5 to 0-1
+            
             result = {
                 "winner": response_data.get("winner"),
                 "justification": response_data.get("justification"),
-                "confidence": response_data.get("confidence"),
+                "confidence": normalized_confidence,
             }
 
             logger.info(
@@ -207,46 +213,50 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             logger.error(f"{error_msg}, response: {response_text[:200]}")
             return None, error_msg
 
-    async def _handle_queued_response(self, response_text: str) -> tuple[dict[str, Any] | None, str | None]:
+    async def _handle_queued_response(
+        self, response_text: str
+    ) -> tuple[dict[str, Any] | None, str | None]:
         """Handle queued (202) response from LLM Provider Service.
-        
+
         Args:
             response_text: Raw response text from the HTTP response
-            
+
         Returns:
             Tuple of (response_data, error_message)
         """
         try:
             queue_response = json.loads(response_text)
             queue_id = queue_response.get("queue_id")
-            
+
             if not queue_id:
                 return None, "Queue response missing queue_id"
-            
+
             logger.info(
                 f"Request queued for processing, queue_id: {queue_id}, "
                 f"estimated_wait: {queue_response.get('estimated_wait_minutes', 'N/A')} minutes"
             )
-            
+
             # Check if polling is disabled
             if not self.settings.LLM_QUEUE_POLLING_ENABLED:
                 return None, "Request queued but polling is disabled"
-            
+
             # Start polling for results
             return await self._poll_for_results(queue_id)
-            
+
         except json.JSONDecodeError as e:
             error_msg = f"Failed to parse queued response JSON: {str(e)}"
             logger.error(f"{error_msg}, response: {response_text[:200]}")
             return None, error_msg
 
-    async def _handle_error_response(self, status_code: int, response_text: str) -> tuple[dict[str, Any] | None, str | None]:
+    async def _handle_error_response(
+        self, status_code: int, response_text: str
+    ) -> tuple[dict[str, Any] | None, str | None]:
         """Handle error responses from LLM Provider Service.
-        
+
         Args:
             status_code: HTTP status code
             response_text: Raw response text from the HTTP response
-            
+
         Returns:
             Tuple of (response_data, error_message)
         """
@@ -254,9 +264,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             error_data = json.loads(response_text)
             error_msg = error_data.get("error", f"HTTP {status_code}")
             error_details = error_data.get("details", "")
-            full_error = (
-                f"{error_msg}: {error_details}" if error_details else error_msg
-            )
+            full_error = f"{error_msg}: {error_details}" if error_details else error_msg
         except json.JSONDecodeError:
             full_error = f"HTTP {status_code}: {response_text[:200]}"
 
@@ -265,30 +273,32 @@ class LLMProviderServiceClient(LLMProviderProtocol):
 
     async def _poll_for_results(self, queue_id: str) -> tuple[dict[str, Any] | None, str | None]:
         """Poll for results from the queue using exponential backoff.
-        
+
         Args:
             queue_id: Queue identifier to poll for results
-            
+
         Returns:
             Tuple of (response_data, error_message)
         """
         start_time = time.time()
         attempt = 0
         delay = self.settings.LLM_QUEUE_POLLING_INITIAL_DELAY_SECONDS
-        
+
         logger.info(f"Starting queue polling for queue_id: {queue_id}")
-        
+
         while attempt < self.settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS:
             # Check total timeout
             if time.time() - start_time > self.settings.LLM_QUEUE_TOTAL_TIMEOUT_SECONDS:
-                logger.error(f"Queue polling timed out after {self.settings.LLM_QUEUE_TOTAL_TIMEOUT_SECONDS} seconds")
+                logger.error(
+                    f"Queue polling timed out after {self.settings.LLM_QUEUE_TOTAL_TIMEOUT_SECONDS} seconds"
+                )
                 return None, "Queue processing timed out"
-            
+
             # Wait before polling (except first attempt)
             if attempt > 0:
                 logger.debug(f"Waiting {delay:.1f}s before next poll attempt {attempt + 1}")
                 await asyncio.sleep(delay)
-            
+
             # Check queue status
             status_result = await self._check_queue_status(queue_id)
             if status_result is None:
@@ -296,66 +306,68 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 attempt += 1
                 delay = min(
                     delay * self.settings.LLM_QUEUE_POLLING_EXPONENTIAL_BASE,
-                    self.settings.LLM_QUEUE_POLLING_MAX_DELAY_SECONDS
+                    self.settings.LLM_QUEUE_POLLING_MAX_DELAY_SECONDS,
                 )
                 continue
-            
+
             status = status_result.get("status")
-            
+
             if status == "completed":
                 # Result should be available, retrieve it
                 return await self._retrieve_queue_result(queue_id)
-            
+
             elif status == "failed":
                 error_msg = status_result.get("error_message", "Queue processing failed")
                 logger.error(f"Queue processing failed: {error_msg}")
                 return None, f"Queue processing failed: {error_msg}"
-            
+
             elif status == "expired":
                 logger.error(f"Queue request expired for queue_id: {queue_id}")
                 return None, "Queue request expired"
-            
+
             elif status in ["queued", "processing"]:
                 # Continue polling
                 logger.debug(f"Queue status: {status}, continuing to poll")
                 attempt += 1
                 delay = min(
                     delay * self.settings.LLM_QUEUE_POLLING_EXPONENTIAL_BASE,
-                    self.settings.LLM_QUEUE_POLLING_MAX_DELAY_SECONDS
+                    self.settings.LLM_QUEUE_POLLING_MAX_DELAY_SECONDS,
                 )
                 continue
-            
+
             else:
                 logger.warning(f"Unknown queue status: {status}")
                 attempt += 1
                 delay = min(
                     delay * self.settings.LLM_QUEUE_POLLING_EXPONENTIAL_BASE,
-                    self.settings.LLM_QUEUE_POLLING_MAX_DELAY_SECONDS
+                    self.settings.LLM_QUEUE_POLLING_MAX_DELAY_SECONDS,
                 )
                 continue
-        
+
         # Max attempts reached
-        logger.error(f"Max polling attempts ({self.settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS}) reached")
+        logger.error(
+            f"Max polling attempts ({self.settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS}) reached"
+        )
         return None, "Maximum polling attempts reached"
 
     async def _check_queue_status(self, queue_id: str) -> dict[str, Any] | None:
         """Check the status of a queued request.
-        
+
         Args:
             queue_id: Queue identifier to check
-            
+
         Returns:
             Status data dictionary or None on error
         """
         try:
             status_url = f"{self.base_url}/status/{queue_id}"
-            
+
             async with self.session.get(
                 status_url,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 response_text = await response.text()
-                
+
                 if response.status == 200:
                     try:
                         status_data: dict[str, Any] = json.loads(response_text)
@@ -363,15 +375,15 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                     except json.JSONDecodeError as e:
                         logger.error(f"Failed to parse queue status JSON: {e}")
                         return None
-                
+
                 elif response.status == 404:
                     logger.error(f"Queue ID not found: {queue_id}")
                     return None
-                
+
                 else:
                     logger.error(f"Queue status check failed: HTTP {response.status}")
                     return None
-                    
+
         except aiohttp.ClientError as e:
             logger.error(f"Queue status check request failed: {e}")
             return None
@@ -379,35 +391,41 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             logger.error(f"Unexpected error checking queue status: {e}")
             return None
 
-    async def _retrieve_queue_result(self, queue_id: str) -> tuple[dict[str, Any] | None, str | None]:
+    async def _retrieve_queue_result(
+        self, queue_id: str
+    ) -> tuple[dict[str, Any] | None, str | None]:
         """Retrieve the result of a completed queue request.
-        
+
         Args:
             queue_id: Queue identifier to retrieve results for
-            
+
         Returns:
             Tuple of (response_data, error_message)
         """
         try:
             result_url = f"{self.base_url}/results/{queue_id}"
-            
+
             async with self.session.get(
                 result_url,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 response_text = await response.text()
-                
+
                 if response.status == 200:
                     try:
                         response_data = json.loads(response_text)
+
+                        # Extract the comparison result and convert confidence scale
+                        # LLM Provider Service returns 1-5 scale, convert to 0-1 scale for CJ Assessment
+                        raw_confidence = response_data.get("confidence", 3.0)
+                        normalized_confidence = (raw_confidence - 1.0) / 4.0  # Convert 1-5 to 0-1
                         
-                        # Extract the comparison result
                         result = {
                             "winner": response_data.get("winner"),
                             "justification": response_data.get("justification"),
-                            "confidence": response_data.get("confidence"),
+                            "confidence": normalized_confidence,
                         }
-                        
+
                         logger.info(
                             f"Successfully retrieved queued comparison result, "
                             f"queue_id: {queue_id}, "
@@ -415,31 +433,31 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                             f"model: {response_data.get('model')}, "
                             f"response_time: {response_data.get('response_time_ms', 'N/A')}ms"
                         )
-                        
+
                         return result, None
-                        
+
                     except json.JSONDecodeError as e:
                         error_msg = f"Failed to parse queue result JSON: {str(e)}"
                         logger.error(f"{error_msg}, response: {response_text[:200]}")
                         return None, error_msg
-                
+
                 elif response.status == 202:
                     # Result not ready yet (shouldn't happen if status was "completed")
                     logger.warning(f"Queue result not ready yet for queue_id: {queue_id}")
                     return None, "Queue result not ready yet"
-                
+
                 elif response.status == 404:
                     logger.error(f"Queue result not found: {queue_id}")
                     return None, "Queue result not found"
-                
+
                 elif response.status == 410:
                     logger.error(f"Queue result expired: {queue_id}")
                     return None, "Queue result expired"
-                
+
                 else:
                     logger.error(f"Queue result retrieval failed: HTTP {response.status}")
                     return None, f"Queue result retrieval failed: HTTP {response.status}"
-                    
+
         except aiohttp.ClientError as e:
             error_msg = f"Queue result retrieval request failed: {str(e)}"
             logger.error(error_msg)

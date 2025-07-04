@@ -1,7 +1,7 @@
 """LLM provider API routes."""
 
 import time
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -18,11 +18,14 @@ from services.llm_provider_service.api_models import (
     LLMQueuedResponse,
 )
 from services.llm_provider_service.config import Settings
+from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
+from services.llm_provider_service.implementations.trace_context_manager_impl import (
+    TraceContextManagerImpl,
+)
 from services.llm_provider_service.internal_models import LLMQueuedResult
 from services.llm_provider_service.metrics import get_llm_metrics
 from services.llm_provider_service.protocols import LLMOrchestratorProtocol, QueueManagerProtocol
 from services.llm_provider_service.queue_models import QueueStatusResponse
-from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 
 logger = create_service_logger("llm_provider_service.api")
 
@@ -33,149 +36,167 @@ llm_bp = Blueprint("llm", __name__)
 @inject
 async def generate_comparison(
     orchestrator: FromDishka[LLMOrchestratorProtocol],
+    tracer: FromDishka[TraceContextManagerImpl],
 ) -> Response | tuple[Response, int]:
     """Generate essay comparison using configured LLM provider."""
     metrics = get_llm_metrics()
     start_time = time.time()
 
+    # Generate correlation ID if not provided
+    correlation_id = uuid4()
+
     try:
-        # Parse request
-        data = await request.get_json()
-        if not data:
-            return jsonify({"error": "No JSON data provided"}), 400
+        # Start tracing for the API request
+        with tracer.start_api_request_span("comparison", correlation_id) as span:
+            tracer.add_span_event("request_started", {"correlation_id": str(correlation_id)})
 
-        try:
-            comparison_request = LLMComparisonRequest(**data)
-        except Exception as e:
-            return jsonify({"error": f"Invalid request format: {str(e)}"}), 400
+            # Parse request
+            data = await request.get_json()
+            if not data:
+                return jsonify({"error": "No JSON data provided"}), 400
 
-        # Generate correlation ID if not provided
-        correlation_id = uuid4()
-        logger.info(f"Processing comparison request with correlation_id: {correlation_id}")
+            try:
+                comparison_request = LLMComparisonRequest(**data)
+            except Exception as e:
+                return jsonify({"error": f"Invalid request format: {str(e)}"}), 400
 
-        # Extract configuration overrides
-        provider_override = None
-        model_override = None
-        temperature_override = None
-        system_prompt_override = None
+            logger.info(f"Processing comparison request with correlation_id: {correlation_id}")
 
-        if comparison_request.llm_config_overrides:
-            provider_override = comparison_request.llm_config_overrides.provider_override
-            model_override = comparison_request.llm_config_overrides.model_override
-            temperature_override = comparison_request.llm_config_overrides.temperature_override
-            system_prompt_override = comparison_request.llm_config_overrides.system_prompt_override
+            # Extract configuration overrides
+            provider_override = None
+            model_override = None
+            temperature_override = None
+            system_prompt_override = None
 
-        # Require explicit provider configuration
-        if not provider_override:
-            logger.warning(
-                f"Request missing required provider configuration, correlation_id: {correlation_id}"
+            if comparison_request.llm_config_overrides:
+                provider_override = comparison_request.llm_config_overrides.provider_override
+                model_override = comparison_request.llm_config_overrides.model_override
+                temperature_override = comparison_request.llm_config_overrides.temperature_override
+                system_prompt_override = (
+                    comparison_request.llm_config_overrides.system_prompt_override
+                )
+
+            # Require explicit provider configuration
+            if not provider_override:
+                logger.warning(
+                    f"Request missing required provider configuration, correlation_id: {correlation_id}"
+                )
+                return jsonify(
+                    {
+                        "error": "Provider configuration required",
+                        "details": "llm_config_overrides.provider_override must be specified",
+                        "correlation_id": str(correlation_id),
+                    }
+                ), 400
+
+            # Add provider info to span
+            tracer.set_span_attributes(
+                {
+                    "llm.provider": provider_override.value if provider_override else "unknown",
+                    "llm.model": str(model_override) if model_override is not None else "default",
+                }
             )
-            return jsonify(
-                {
-                    "error": "Provider configuration required",
-                    "details": "llm_config_overrides.provider_override must be specified",
-                    "correlation_id": str(correlation_id),
-                }
-            ), 400
 
-        # Call orchestrator
-        result, error = await orchestrator.perform_comparison(
-            provider=provider_override,
-            user_prompt=comparison_request.user_prompt,
-            essay_a=comparison_request.essay_a,
-            essay_b=comparison_request.essay_b,
-            correlation_id=correlation_id,
-            model_override=model_override,
-            temperature_override=temperature_override,
-            system_prompt_override=system_prompt_override,
-        )
+            # Call orchestrator
+            result, error = await orchestrator.perform_comparison(
+                provider=provider_override,
+                user_prompt=comparison_request.user_prompt,
+                essay_a=comparison_request.essay_a,
+                essay_b=comparison_request.essay_b,
+                correlation_id=correlation_id,
+                model_override=model_override,
+                temperature_override=temperature_override,
+                system_prompt_override=system_prompt_override,
+            )
 
-        # Track metrics
-        _duration_ms = int((time.time() - start_time) * 1000)
+            # Track metrics
+            _duration_ms = int((time.time() - start_time) * 1000)
 
-        if error:
-            metrics["llm_requests_total"].labels(
-                provider=error.provider,
-                model=model_override or "default",
-                request_type="comparison",
-                status="failed",
-            ).inc()
-            logger.error(f"Comparison request failed: {error.error_message}")
-            return jsonify(
-                {
-                    "error": error.error_message,
-                    "error_type": error.error_type.value,
-                    "correlation_id": str(error.correlation_id),
-                    "retry_after": error.retry_after,
-                }
-            ), 503 if error.is_retryable else 400
+            if error:
+                tracer.mark_span_error(Exception(error.error_message))
+                metrics["llm_requests_total"].labels(
+                    provider=error.provider,
+                    model=model_override or "default",
+                    request_type="comparison",
+                    status="failed",
+                ).inc()
+                logger.error(f"Comparison request failed: {error.error_message}")
+                return jsonify(
+                    {
+                        "error": error.error_message,
+                        "error_type": error.error_type.value,
+                        "correlation_id": str(error.correlation_id),
+                        "retry_after": error.retry_after,
+                    }
+                ), 503 if error.is_retryable else 400
 
-        # Success - result should not be None if no error
-        if not result:
-            logger.error("Orchestrator returned no result and no error")
-            return jsonify(
-                {
-                    "error": "Internal error: No result from orchestrator",
-                    "correlation_id": str(correlation_id),
-                }
-            ), 500
+            # Success - result should not be None if no error
+            if not result:
+                logger.error("Orchestrator returned no result and no error")
+                return jsonify(
+                    {
+                        "error": "Internal error: No result from orchestrator",
+                        "correlation_id": str(correlation_id),
+                    }
+                ), 500
 
-        # Check if result is a queued response
-        if isinstance(result, LLMQueuedResult):
+            # Check if result is a queued response
+            if isinstance(result, LLMQueuedResult):
+                metrics["llm_requests_total"].labels(
+                    provider=result.provider,
+                    model=model_override or "default",
+                    request_type="comparison",
+                    status="queued",
+                ).inc()
+
+                # Build queued response
+                queued_response = LLMQueuedResponse(
+                    queue_id=result.queue_id,
+                    status=result.status,
+                    message=(
+                        f"Request queued for processing. "
+                        f"Provider {result.provider.value} is currently unavailable."
+                    ),
+                    estimated_wait_minutes=result.estimated_wait_minutes,
+                    status_url=f"/api/v1/status/{result.queue_id}",
+                    retry_after=60,
+                )
+
+                logger.info(f"Request queued with ID: {result.queue_id}")
+                return jsonify(queued_response.model_dump()), 202
+
+            # Regular successful response
             metrics["llm_requests_total"].labels(
                 provider=result.provider,
-                model=model_override or "default",
+                model=result.model,
                 request_type="comparison",
-                status="queued",
+                status="success",
             ).inc()
 
-            # Build queued response
-            queued_response = LLMQueuedResponse(
-                queue_id=result.queue_id,
-                status=result.status,
-                message=(
-                    f"Request queued for processing. "
-                    f"Provider {result.provider.value} is currently unavailable."
-                ),
-                estimated_wait_minutes=result.estimated_wait_minutes,
-                status_url=f"/api/v1/status/{result.queue_id}",
-                retry_after=60,
+            # Build response - map internal model to API response model
+            # Transform choice value: "A" -> "Essay A", "B" -> "Essay B"
+            winner = f"Essay {result.choice}" if result.choice in ["A", "B"] else result.choice
+
+            # Convert confidence scale from 0-1 to 1-5
+            confidence_scaled = 1.0 + (result.confidence * 4.0)
+            # Ensure confidence is within valid range
+            confidence_scaled = max(1.0, min(5.0, confidence_scaled))
+
+            response = LLMComparisonResponse(
+                winner=winner,
+                justification=result.reasoning,
+                confidence=confidence_scaled,
+                provider=result.provider,
+                model=result.model,
+                response_time_ms=result.response_time_ms,
+                correlation_id=result.correlation_id,
+                token_usage=result.token_usage,
+                cost_estimate=result.cost_estimate,
+                trace_id=result.trace_id,
             )
 
-            logger.info(f"Request queued with ID: {result.queue_id}")
-            return jsonify(queued_response.model_dump()), 202
-
-        # Regular successful response
-        metrics["llm_requests_total"].labels(
-            provider=result.provider,
-            model=result.model,
-            request_type="comparison",
-            status="success",
-        ).inc()
-
-        # Build response - map internal model to API response model
-        # Transform choice value: "A" -> "Essay A", "B" -> "Essay B"
-        winner = f"Essay {result.choice}" if result.choice in ["A", "B"] else result.choice
-
-        # Convert confidence scale from 0-1 to 1-5
-        confidence_scaled = 1.0 + (result.confidence * 4.0)
-        # Ensure confidence is within valid range
-        confidence_scaled = max(1.0, min(5.0, confidence_scaled))
-
-        response = LLMComparisonResponse(
-            winner=winner,
-            justification=result.reasoning,
-            confidence=confidence_scaled,
-            provider=result.provider,
-            model=result.model,
-            response_time_ms=result.response_time_ms,
-            correlation_id=result.correlation_id,
-            token_usage=result.token_usage,
-            cost_estimate=result.cost_estimate,
-            trace_id=result.trace_id,
-        )
-
-        return jsonify(response.model_dump()), 200
+            tracer.add_span_event("request_completed", {"status": "success"})
+            return jsonify(response.model_dump()), 200
 
     except CircuitBreakerError as e:
         logger.error(f"Circuit breaker open: {e}")
@@ -287,14 +308,13 @@ async def test_provider(
 @llm_bp.route("/status/<uuid:queue_id>", methods=["GET"])
 @inject
 async def get_queue_status(
-    queue_id: str,
+    queue_id: UUID,
     queue_manager: FromDishka[QueueManagerProtocol],
 ) -> Response | tuple[Response, int]:
     """Get status of a queued request."""
     try:
-        # Convert string to UUID
-        from uuid import UUID
-        queue_uuid = UUID(queue_id)
+        # queue_id is already a UUID object from Quart's converter
+        queue_uuid = queue_id
 
         # Get request status
         queued_request = await queue_manager.get_status(queue_uuid)
@@ -332,15 +352,14 @@ async def get_queue_status(
 @llm_bp.route("/results/<uuid:queue_id>", methods=["GET"])
 @inject
 async def get_queue_result(
-    queue_id: str,
+    queue_id: UUID,
     queue_manager: FromDishka[QueueManagerProtocol],
     queue_processor: FromDishka[QueueProcessorImpl],
 ) -> Response | tuple[Response, int]:
     """Get the result of a completed queued request."""
     try:
-        # Convert string to UUID
-        from uuid import UUID
-        queue_uuid = UUID(queue_id)
+        # queue_id is already a UUID object from Quart's converter
+        queue_uuid = queue_id
 
         # Get request status first
         queued_request = await queue_manager.get_status(queue_uuid)
@@ -349,20 +368,24 @@ async def get_queue_result(
             return jsonify({"error": "Queue request not found"}), 404
 
         if queued_request.status != QueueStatus.COMPLETED:
-            return jsonify({
-                "error": "Result not available",
-                "status": queued_request.status.value,
-                "message": "Request has not completed processing"
-            }), 202
+            return jsonify(
+                {
+                    "error": "Result not available",
+                    "status": queued_request.status.value,
+                    "message": "Request has not completed processing",
+                }
+            ), 202
 
         # Get the actual result from the processor cache
         result = queue_processor.get_result(queue_uuid)
-        
+
         if not result:
-            return jsonify({
-                "error": "Result not found in cache",
-                "message": "Result may have expired or been evicted from cache"
-            }), 410  # Gone
+            return jsonify(
+                {
+                    "error": "Result not found in cache",
+                    "message": "Result may have expired or been evicted from cache",
+                }
+            ), 410  # Gone
 
         # Build response - same as in compare endpoint
         winner = f"Essay {result.choice}" if result.choice in ["A", "B"] else result.choice
@@ -388,7 +411,9 @@ async def get_queue_result(
         return jsonify({"error": "Invalid queue ID format"}), 400
     except Exception as e:
         logger.exception(f"Error getting queue result for {queue_id}")
-        return jsonify({
-            "error": "Failed to get queue result",
-            "details": str(e),
-        }), 500
+        return jsonify(
+            {
+                "error": "Failed to get queue result",
+                "details": str(e),
+            }
+        ), 500

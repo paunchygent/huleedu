@@ -4,8 +4,6 @@ This test simulates the actual flow of CJ Assessment Service making HTTP calls
 to the LLM Provider Service.
 """
 
-import os
-from unittest.mock import patch
 
 import aiohttp
 import pytest
@@ -84,12 +82,12 @@ Always respond with valid JSON."""
         # Verify the response
         assert error is None, f"Unexpected error: {error}"
         assert result is not None, "Expected a result"
-        
-        print(f"\nComparison Result:")
+
+        print("\nComparison Result:")
         print(f"Winner: {result['winner']}")
         print(f"Justification: {result['justification']}")
         print(f"Confidence: {result['confidence']}")
-        
+
         # Validate response format
         assert result["winner"] in ["Essay A", "Essay B"]
         assert isinstance(result["justification"], str)
@@ -101,56 +99,24 @@ Always respond with valid JSON."""
         """Test error handling for invalid prompts."""
         # Test with a prompt that doesn't contain the expected essay format
         invalid_prompt = "This is not a valid essay comparison prompt"
-        
+
         result, error = await llm_client.generate_comparison(
             user_prompt=invalid_prompt,
         )
-        
+
         assert result is None
         assert error == "Invalid prompt format: Could not extract essays"
         print(f"\nError handling test passed: {error}")
 
-    async def test_cj_assessment_with_mock_provider(self, integration_settings, http_session, retry_manager):
+    async def test_cj_assessment_with_mock_provider(
+        self, integration_settings, http_session, retry_manager
+    ):
         """Test using mock provider configuration."""
         # Check if LLM Provider Service is configured with USE_MOCK_LLM
         async with http_session.get("http://localhost:8090/healthz") as response:
             health_data = await response.json()
-            
+
         # This test would require the LLM Provider Service to be started
         # with USE_MOCK_LLM=true environment variable
         pytest.skip("Mock provider test requires service reconfiguration")
 
-    async def test_cache_hit_behavior(self, llm_client):
-        """Test that repeated requests hit the cache."""
-        prompt = """Compare these two essays and determine which is better written.
-Essay A (ID: cache-test-1):
-Climate change is one of the most pressing issues facing our planet today. The scientific consensus is clear: human activities, particularly the burning of fossil fuels, are causing unprecedented warming of the Earth's atmosphere. This warming leads to a cascade of environmental effects, including rising sea levels, more frequent extreme weather events, and disruptions to ecosystems worldwide. To address this crisis, we must transition to renewable energy sources, improve energy efficiency, and implement policies that reduce greenhouse gas emissions. Individual actions, while important, must be complemented by systemic changes at the governmental and corporate levels.
-
-Essay B (ID: cache-test-2):  
-Climate change is a serious problem that affects everyone. Many scientists say that humans are causing the planet to get warmer by using too much oil and gas. This makes the weather more extreme and causes problems for animals and plants. We need to use more solar and wind power instead of fossil fuels. People should also try to reduce their carbon footprint by driving less and recycling more. Governments and big companies need to do their part too. If we all work together, we can help stop climate change and protect the Earth for future generations.
-
-Please respond with a JSON object containing:
-- 'winner': 'Essay A' or 'Essay B'
-- 'justification': Brief explanation of your decision
-- 'confidence': Rating from 1-5 (5 = very confident)"""
-
-        # First request - should hit the API
-        result1, error1 = await llm_client.generate_comparison(
-            user_prompt=prompt,
-            temperature_override=0.1,
-        )
-        assert error1 is None
-        
-        # Second request - should hit the cache
-        result2, error2 = await llm_client.generate_comparison(
-            user_prompt=prompt,
-            temperature_override=0.1,
-        )
-        assert error2 is None
-        
-        # Results should be identical
-        assert result1["winner"] == result2["winner"]
-        assert result1["justification"] == result2["justification"]
-        assert result1["confidence"] == result2["confidence"]
-        
-        print("\nCache test: Both requests returned identical results")

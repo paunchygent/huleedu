@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from common_core import LLMProviderType
@@ -43,6 +43,10 @@ class Settings(BaseSettings):
 
     # Default LLM provider for centralized service requests
     DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.OPENAI
+    DEFAULT_LLM_MODEL: str = Field(
+        default="gpt-4.1",
+        description="Default LLM model to use for comparison requests",
+    )
 
     # LLM Provider Service configuration
     LLM_PROVIDER_SERVICE_URL: str = Field(
@@ -81,7 +85,7 @@ class Settings(BaseSettings):
     MAX_TOKENS_RESPONSE: int = 1000
     TEMPERATURE: float = 0.1
     DEFAULT_LLM_TEMPERATURE: float = 0.1  # Add this for compatibility
-    
+
     # Retry configuration for LLM requests
     llm_retry_enabled: bool = True
     llm_retry_attempts: int = 3  # Changed from llm_retry_max_attempts

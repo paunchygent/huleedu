@@ -16,7 +16,6 @@ from opentelemetry.trace import Tracer
 from prometheus_client import REGISTRY, CollectorRegistry
 
 from common_core import LLMProviderType
-
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.config import settings as service_settings
 from services.cj_assessment_service.implementations.cache_manager_impl import CacheManagerImpl

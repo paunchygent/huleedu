@@ -40,6 +40,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
         self.settings = settings
         self.retry_manager = retry_manager
         self.api_key = settings.GOOGLE_API_KEY
+        self.project_id = settings.GOOGLE_PROJECT_ID
         self.api_base = "https://generativelanguage.googleapis.com/v1beta"
 
     async def generate_comparison(
@@ -75,6 +76,15 @@ class GoogleProviderImpl(LLMProviderProtocol):
                 is_retryable=False,
             )
 
+        if not self.project_id:
+            return None, LLMProviderError(
+                error_type=ErrorCode.CONFIGURATION_ERROR,
+                error_message="Google project ID not configured",
+                provider=LLMProviderType.GOOGLE,
+                correlation_id=uuid4(),
+                is_retryable=False,
+            )
+
         # Prepare the full prompt with essays
         full_prompt = self._format_comparison_prompt(user_prompt, essay_a, essay_b)
 
@@ -84,8 +94,8 @@ class GoogleProviderImpl(LLMProviderProtocol):
             or "You are an expert essay evaluator. "
             "Compare the two essays and return your analysis as JSON. "
             "You MUST respond with a JSON object containing exactly these fields: "
-            '{"winner": "Essay A" or "Essay B", "justification": "string (50-500 chars)", "confidence": 1.0-5.0}. '
-            "The winner must be either 'Essay A' or 'Essay B', justification must be 50-500 characters, "
+            '{"winner": "Essay A" or "Essay B", "justification": "brief explanation (max 50 chars)", "confidence": 1.0-5.0}. '
+            "The winner must be either 'Essay A' or 'Essay B', justification must be brief (max 50 characters), "
             "and confidence must be a float between 1.0 and 5.0."
         )
 
@@ -147,7 +157,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
             "Content-Type": "application/json",
         }
 
-        # Use structured output with JSON schema
+        # Configure structured output with JSON schema
         payload = {
             "contents": [{"parts": [{"text": user_prompt}]}],
             "systemInstruction": {"parts": [{"text": system_prompt}]},
@@ -159,24 +169,12 @@ class GoogleProviderImpl(LLMProviderProtocol):
                 "responseSchema": {
                     "type": "object",
                     "properties": {
-                        "winner": {
-                            "type": "string",
-                            "enum": ["Essay A", "Essay B"],
-                            "description": "Which essay is better: 'Essay A' or 'Essay B'"
-                        },
-                        "justification": {
-                            "type": "string",
-                            "description": "Detailed explanation of why this essay was chosen (50-500 characters)"
-                        },
-                        "confidence": {
-                            "type": "number",
-                            "minimum": 1.0,
-                            "maximum": 5.0,
-                            "description": "Confidence score between 1.0 and 5.0"
-                        }
+                        "winner": {"type": "string", "enum": ["Essay A", "Essay B"]},
+                        "justification": {"type": "string"},
+                        "confidence": {"type": "number", "minimum": 1, "maximum": 5},
                     },
-                    "required": ["winner", "justification", "confidence"]
-                }
+                    "required": ["winner", "justification", "confidence"],
+                },
             },
         }
 
@@ -205,11 +203,15 @@ class GoogleProviderImpl(LLMProviderProtocol):
 
                             try:
                                 # Validate and normalize response using centralized validator
-                                validated_response, validation_error = validate_and_normalize_response(text_content)
-                                
+                                validated_response, validation_error = (
+                                    validate_and_normalize_response(text_content)
+                                )
+
                                 if validation_error:
                                     error_msg = f"Response validation failed: {validation_error}"
-                                    logger.error(error_msg, extra={"response_text": text_content[:500]})
+                                    logger.error(
+                                        error_msg, extra={"response_text": text_content[:500]}
+                                    )
                                     return None, LLMProviderError(
                                         error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
                                         error_message=error_msg,
@@ -220,13 +222,13 @@ class GoogleProviderImpl(LLMProviderProtocol):
 
                                 # Convert to internal format
                                 assert validated_response is not None  # Type assertion for mypy
-                                choice, reasoning, confidence = convert_to_internal_format(validated_response)
+                                choice, reasoning, confidence = convert_to_internal_format(
+                                    validated_response
+                                )
 
                                 # Google doesn't provide detailed token usage like others
                                 # Estimate based on input/output length
-                                prompt_tokens = len(
-                                    f"{system_prompt} {user_prompt}".split()
-                                )
+                                prompt_tokens = len(f"{system_prompt} {user_prompt}".split())
                                 completion_tokens = len(text_content.split())
                                 total_tokens = prompt_tokens + completion_tokens
 

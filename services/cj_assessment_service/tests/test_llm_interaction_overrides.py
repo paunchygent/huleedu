@@ -11,8 +11,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ..implementations.llm_interaction_impl import LLMInteractionImpl
 from common_core import LLMProviderType
+
+from ..implementations.llm_interaction_impl import LLMInteractionImpl
 from ..models_api import (
     ComparisonResult,
     ComparisonTask,
@@ -59,7 +60,9 @@ class TestLLMInteractionImplOverrides:
 
         from services.cj_assessment_service.protocols import LLMProviderProtocol
 
-        providers = cast(dict[LLMProviderType, LLMProviderProtocol], {LLMProviderType.OPENAI: mock_provider})
+        providers = cast(
+            dict[LLMProviderType, LLMProviderProtocol], {LLMProviderType.OPENAI: mock_provider}
+        )
         return LLMInteractionImpl(
             cache_manager=mock_cache_manager,
             providers=providers,
@@ -142,7 +145,7 @@ class TestLLMInteractionImplOverrides:
         # Act
         results = await llm_interaction_impl.perform_comparisons(
             tasks=[sample_comparison_task],
-            model_override="claude-3-sonnet-20240229",
+            model_override="claude-sonnet-4-20250514",
             # temperature_override and max_tokens_override not provided
         )
 
@@ -153,14 +156,14 @@ class TestLLMInteractionImplOverrides:
         mock_provider.generate_comparison.assert_called_once_with(
             user_prompt=sample_comparison_task.prompt,
             system_prompt_override=None,
-            model_override="claude-3-sonnet-20240229",
+            model_override="claude-sonnet-4-20250514",
             temperature_override=None,
             max_tokens_override=None,
         )
 
         # Verify cache key generation includes only provided overrides
         expected_cache_key_input = (
-            f"{sample_comparison_task.prompt}|model:claude-3-sonnet-20240229|temp:None|tokens:None"
+            f"{sample_comparison_task.prompt}|model:claude-sonnet-4-20250514|temp:None|tokens:None"
         )
         mock_cache_manager.generate_hash.assert_called_with(expected_cache_key_input)
 

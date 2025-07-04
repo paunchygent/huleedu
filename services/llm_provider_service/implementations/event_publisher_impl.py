@@ -1,11 +1,12 @@
 """Event publisher implementation for LLM usage events."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 from uuid import UUID
 
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.observability import get_current_span, inject_trace_context
 
 from common_core import LLMProviderType
 from common_core.event_enums import ProcessingEvent, topic_name
@@ -74,6 +75,12 @@ class LLMEventPublisherImpl(LLMEventPublisherProtocol):
                 data=event_data,
             )
 
+            # Inject trace context if we have an active span
+            if get_current_span():
+                if envelope.metadata is None:
+                    envelope.metadata = {}
+                inject_trace_context(envelope.metadata)
+
             topic = topic_name(ProcessingEvent.LLM_REQUEST_STARTED)
             await self.kafka_bus.publish(topic, envelope)
 
@@ -130,6 +137,12 @@ class LLMEventPublisherImpl(LLMEventPublisherProtocol):
                 correlation_id=correlation_id,
                 data=event_data,
             )
+            
+            # Inject trace context if we have an active span
+            if get_current_span():
+                if envelope.metadata is None:
+                    envelope.metadata = {}
+                inject_trace_context(envelope.metadata)
 
             topic = topic_name(ProcessingEvent.LLM_REQUEST_COMPLETED)
             await self.kafka_bus.publish(topic, envelope)
@@ -178,7 +191,7 @@ class LLMEventPublisherImpl(LLMEventPublisherProtocol):
                 error_details=error_details,
                 circuit_breaker_opened=circuit_breaker_opened,
                 metadata={
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 },
             )
 
@@ -188,6 +201,12 @@ class LLMEventPublisherImpl(LLMEventPublisherProtocol):
                 correlation_id=correlation_id,
                 data=event_data,
             )
+            
+            # Inject trace context if we have an active span
+            if get_current_span():
+                if envelope.metadata is None:
+                    envelope.metadata = {}
+                inject_trace_context(envelope.metadata)
 
             topic = topic_name(ProcessingEvent.LLM_PROVIDER_FAILURE)
             await self.kafka_bus.publish(topic, envelope)

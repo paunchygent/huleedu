@@ -41,10 +41,10 @@ class TestLLMConfigOverridesContract:
     def test_llm_config_overrides_minimal_model(self) -> None:
         """Test LLMConfigOverrides with only model override."""
         # Arrange & Act
-        overrides = LLMConfigOverrides(model_override="claude-3-sonnet-20240229")
+        overrides = LLMConfigOverrides(model_override="claude-sonnet-4-20250514")
 
         # Assert
-        assert overrides.model_override == "claude-3-sonnet-20240229"
+        assert overrides.model_override == "claude-sonnet-4-20250514"
         assert overrides.temperature_override is None
         assert overrides.max_tokens_override is None
         assert overrides.provider_override is None

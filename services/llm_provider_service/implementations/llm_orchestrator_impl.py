@@ -6,11 +6,15 @@ from typing import Any, Dict, Tuple
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.observability.tracing import get_current_trace_id
 
 from common_core import LLMProviderType
 from common_core.error_enums import ErrorCode
 from services.llm_provider_service.api_models import LLMComparisonRequest
 from services.llm_provider_service.config import Settings
+from services.llm_provider_service.implementations.trace_context_manager_impl import (
+    TraceContextManagerImpl,
+)
 from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
     LLMProviderError,
@@ -35,6 +39,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         providers: Dict[LLMProviderType, LLMProviderProtocol],
         event_publisher: LLMEventPublisherProtocol,
         queue_manager: QueueManagerProtocol,
+        trace_context_manager: TraceContextManagerImpl,
         settings: Settings,
     ):
         """Initialize LLM orchestrator.
@@ -43,11 +48,13 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             providers: Dictionary of available LLM providers
             event_publisher: Event publisher for usage tracking
             queue_manager: Queue manager for resilient request handling
+            trace_context_manager: Trace context manager for distributed tracing
             settings: Service settings
         """
         self.providers = providers
         self.event_publisher = event_publisher
         self.queue_manager = queue_manager
+        self.trace_context_manager = trace_context_manager
         self.settings = settings
 
     async def perform_comparison(
@@ -151,11 +158,15 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             metadata=overrides,
         )
 
+        # Capture current trace context for queue processing
+        trace_context = self.trace_context_manager.capture_trace_context_for_queue()
+
         queued_request = QueuedRequest(
             request_data=request_data,
             priority=self._get_request_priority(overrides),
             ttl=timedelta(hours=self.settings.QUEUE_REQUEST_TTL_HOURS),
             correlation_id=correlation_id,
+            trace_context=trace_context,
             size_bytes=0,  # Will be calculated
         )
         queued_request.size_bytes = queued_request.calculate_size()
@@ -226,16 +237,22 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         try:
             provider_impl = self.providers[provider]
 
-            # Call the provider
-            result, error = await provider_impl.generate_comparison(
-                user_prompt=user_prompt,
-                essay_a=essay_a,
-                essay_b=essay_b,
-                system_prompt_override=overrides.get("system_prompt_override"),
-                model_override=overrides.get("model_override"),
-                temperature_override=overrides.get("temperature_override"),
-                max_tokens_override=overrides.get("max_tokens_override"),
-            )
+            # Create provider call span for distributed tracing
+            with self.trace_context_manager.start_provider_call_span(
+                provider=provider.value,
+                model=overrides.get("model_override") or "default",
+                correlation_id=correlation_id,
+            ) as provider_span:
+                # Call the provider with tracing context
+                result, error = await provider_impl.generate_comparison(
+                    user_prompt=user_prompt,
+                    essay_a=essay_a,
+                    essay_b=essay_b,
+                    system_prompt_override=overrides.get("system_prompt_override"),
+                    model_override=overrides.get("model_override"),
+                    temperature_override=overrides.get("temperature_override"),
+                    max_tokens_override=overrides.get("max_tokens_override"),
+                )
 
             response_time_ms = int((time.time() - start_time) * 1000)
 
@@ -270,6 +287,9 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                     f"response_time: {response_time_ms}ms"
                 )
 
+                # Capture current trace ID from active span
+                current_trace_id = get_current_trace_id()
+
                 # Return fresh orchestrator response
                 return LLMOrchestratorResponse(
                     choice=result.choice,
@@ -281,7 +301,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                     token_usage=token_usage_dict,
                     cost_estimate=cost_estimate_value,
                     correlation_id=correlation_id,
-                    trace_id=None,  # TODO: Add OpenTelemetry trace ID
+                    trace_id=current_trace_id,
                 ), None
 
             else:

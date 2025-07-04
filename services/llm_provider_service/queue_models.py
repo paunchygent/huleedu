@@ -17,6 +17,7 @@ from services.llm_provider_service.api_models import LLMComparisonRequest
 
 class QueueHealthMetrics(TypedDict):
     """Type definition for queue health metrics."""
+
     type: str
     is_accepting: bool
     current_size: int
@@ -98,6 +99,10 @@ class QueuedRequest(BaseModel):
         default=None,
         description="Optional webhook for completion notification",
     )
+    trace_context: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="OpenTelemetry trace context for request processing",
+    )
 
     def is_expired(self) -> bool:
         """Check if the request has expired based on TTL."""
@@ -117,9 +122,7 @@ class QueueStats(BaseModel):
     max_size: int = Field(gt=0, description="Maximum queue capacity")
     memory_usage_mb: float = Field(ge=0.0, description="Current memory usage in MB")
     max_memory_mb: float = Field(gt=0.0, description="Maximum memory allowed in MB")
-    usage_percent: float = Field(
-        ge=0.0, le=100.0, description="Percentage of capacity used"
-    )
+    usage_percent: float = Field(ge=0.0, le=100.0, description="Percentage of capacity used")
     oldest_item_age_seconds: Optional[int] = Field(
         default=None,
         ge=0,

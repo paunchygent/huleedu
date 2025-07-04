@@ -20,6 +20,9 @@ from services.llm_provider_service.config import Settings, settings
 from services.llm_provider_service.implementations.anthropic_provider_impl import (
     AnthropicProviderImpl,
 )
+from services.llm_provider_service.implementations.connection_pool_manager_impl import (
+    ConnectionPoolManagerImpl,
+)
 from services.llm_provider_service.implementations.event_publisher_impl import (
     LLMEventPublisherImpl,
 )
@@ -29,26 +32,29 @@ from services.llm_provider_service.implementations.google_provider_impl import (
 from services.llm_provider_service.implementations.llm_orchestrator_impl import (
     LLMOrchestratorImpl,
 )
+from services.llm_provider_service.implementations.local_queue_manager_impl import (
+    LocalQueueManagerImpl as LocalQueueManagerQueue,
+)
 from services.llm_provider_service.implementations.openai_provider_impl import (
     OpenAIProviderImpl,
 )
 from services.llm_provider_service.implementations.openrouter_provider_impl import (
     OpenRouterProviderImpl,
 )
-from services.llm_provider_service.implementations.retry_manager_impl import (
-    RetryManagerImpl,
+from services.llm_provider_service.implementations.queue_processor_impl import (
+    QueueProcessorImpl,
 )
 from services.llm_provider_service.implementations.redis_queue_repository_impl import (
     RedisQueueRepositoryImpl,
 )
-from services.llm_provider_service.implementations.local_queue_manager_impl import (
-    LocalQueueManagerImpl as LocalQueueManagerQueue,
-)
 from services.llm_provider_service.implementations.resilient_queue_manager_impl import (
     ResilientQueueManagerImpl,
 )
-from services.llm_provider_service.implementations.queue_processor_impl import (
-    QueueProcessorImpl,
+from services.llm_provider_service.implementations.retry_manager_impl import (
+    RetryManagerImpl,
+)
+from services.llm_provider_service.implementations.trace_context_manager_impl import (
+    TraceContextManagerImpl,
 )
 from services.llm_provider_service.protocols import (
     LLMEventPublisherProtocol,
@@ -139,9 +145,20 @@ class LLMProviderServiceProvider(Provider):
             return base_kafka_bus
 
     @provide(scope=Scope.APP)
-    async def provide_http_session(self) -> ClientSession:
-        """Provide HTTP client session."""
-        return ClientSession()
+    def provide_connection_pool_manager(self, settings: Settings) -> ConnectionPoolManagerImpl:
+        """Provide connection pool manager for optimized HTTP performance."""
+        return ConnectionPoolManagerImpl(settings)
+
+    @provide(scope=Scope.APP)
+    def provide_trace_context_manager(self) -> TraceContextManagerImpl:
+        """Provide trace context manager for distributed tracing."""
+        return TraceContextManagerImpl()
+
+    @provide(scope=Scope.APP)
+    async def provide_http_session(self, pool_manager: ConnectionPoolManagerImpl) -> ClientSession:
+        """Provide HTTP client session (backward compatibility)."""
+        # Default to OpenAI session for backward compatibility
+        return await pool_manager.get_session("openai")
 
     # Queue Provider Methods
     @provide(scope=Scope.APP)
@@ -193,17 +210,20 @@ class LLMProviderServiceProvider(Provider):
         return RetryManagerImpl(settings=settings)
 
     @provide(scope=Scope.APP)
-    def provide_anthropic_provider(
+    async def provide_anthropic_provider(
         self,
-        http_session: ClientSession,
+        pool_manager: ConnectionPoolManagerImpl,
         settings: Settings,
         retry_manager: LLMRetryManagerProtocol,
         circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> LLMProviderProtocol:
-        """Provide Anthropic/Claude provider with circuit breaker protection."""
+        """Provide Anthropic/Claude provider with optimized connection pool."""
+        # Get provider-specific optimized session
+        anthropic_session = await pool_manager.get_session("anthropic")
+
         # Create base implementation
         base_provider = AnthropicProviderImpl(
-            session=http_session,
+            session=anthropic_session,
             settings=settings,
             retry_manager=retry_manager,
         )
@@ -217,17 +237,20 @@ class LLMProviderServiceProvider(Provider):
         return base_provider
 
     @provide(scope=Scope.APP)
-    def provide_openai_provider(
+    async def provide_openai_provider(
         self,
-        http_session: ClientSession,
+        pool_manager: ConnectionPoolManagerImpl,
         settings: Settings,
         retry_manager: LLMRetryManagerProtocol,
         circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> LLMProviderProtocol:
-        """Provide OpenAI provider with circuit breaker protection."""
+        """Provide OpenAI provider with optimized connection pool."""
+        # Get provider-specific optimized session
+        openai_session = await pool_manager.get_session("openai")
+
         # Create base implementation
         base_provider = OpenAIProviderImpl(
-            session=http_session,
+            session=openai_session,
             settings=settings,
             retry_manager=retry_manager,
         )
@@ -241,17 +264,20 @@ class LLMProviderServiceProvider(Provider):
         return base_provider
 
     @provide(scope=Scope.APP)
-    def provide_google_provider(
+    async def provide_google_provider(
         self,
-        http_session: ClientSession,
+        pool_manager: ConnectionPoolManagerImpl,
         settings: Settings,
         retry_manager: LLMRetryManagerProtocol,
         circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> LLMProviderProtocol:
-        """Provide Google Gemini provider with circuit breaker protection."""
+        """Provide Google Gemini provider with optimized connection pool."""
+        # Get provider-specific optimized session
+        google_session = await pool_manager.get_session("google")
+
         # Create base implementation
         base_provider = GoogleProviderImpl(
-            session=http_session,
+            session=google_session,
             settings=settings,
             retry_manager=retry_manager,
         )
@@ -265,17 +291,20 @@ class LLMProviderServiceProvider(Provider):
         return base_provider
 
     @provide(scope=Scope.APP)
-    def provide_openrouter_provider(
+    async def provide_openrouter_provider(
         self,
-        http_session: ClientSession,
+        pool_manager: ConnectionPoolManagerImpl,
         settings: Settings,
         retry_manager: LLMRetryManagerProtocol,
         circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> LLMProviderProtocol:
-        """Provide OpenRouter provider with circuit breaker protection."""
+        """Provide OpenRouter provider with optimized connection pool."""
+        # Get provider-specific optimized session
+        openrouter_session = await pool_manager.get_session("openrouter")
+
         # Create base implementation
         base_provider = OpenRouterProviderImpl(
-            session=http_session,
+            session=openrouter_session,
             settings=settings,
             retry_manager=retry_manager,
         )
@@ -289,14 +318,14 @@ class LLMProviderServiceProvider(Provider):
         return base_provider
 
     @provide(scope=Scope.APP)
-    def provide_llm_provider_map(
+    async def provide_llm_provider_map(
         self,
         settings: Settings,
-        http_session: ClientSession,
+        pool_manager: ConnectionPoolManagerImpl,
         retry_manager: LLMRetryManagerProtocol,
         circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> Dict[LLMProviderType, LLMProviderProtocol]:
-        """Provide dictionary of available LLM providers."""
+        """Provide dictionary of available LLM providers with optimized connection pools."""
         # Use mock provider for testing if enabled
         if settings.USE_MOCK_LLM:
             from services.llm_provider_service.implementations.mock_provider_impl import (
@@ -312,20 +341,20 @@ class LLMProviderServiceProvider(Provider):
                 LLMProviderType.OPENROUTER: mock_provider,
             }
 
-        # Build providers map by calling the individual provider methods
-        # This ensures each provider gets its own instance
+        # Build providers map by calling the individual async provider methods
+        # This ensures each provider gets its own optimized connection pool
         return {
-            LLMProviderType.ANTHROPIC: self.provide_anthropic_provider(
-                http_session, settings, retry_manager, circuit_breaker_registry
+            LLMProviderType.ANTHROPIC: await self.provide_anthropic_provider(
+                pool_manager, settings, retry_manager, circuit_breaker_registry
             ),
-            LLMProviderType.OPENAI: self.provide_openai_provider(
-                http_session, settings, retry_manager, circuit_breaker_registry
+            LLMProviderType.OPENAI: await self.provide_openai_provider(
+                pool_manager, settings, retry_manager, circuit_breaker_registry
             ),
-            LLMProviderType.GOOGLE: self.provide_google_provider(
-                http_session, settings, retry_manager, circuit_breaker_registry
+            LLMProviderType.GOOGLE: await self.provide_google_provider(
+                pool_manager, settings, retry_manager, circuit_breaker_registry
             ),
-            LLMProviderType.OPENROUTER: self.provide_openrouter_provider(
-                http_session, settings, retry_manager, circuit_breaker_registry
+            LLMProviderType.OPENROUTER: await self.provide_openrouter_provider(
+                pool_manager, settings, retry_manager, circuit_breaker_registry
             ),
         }
 
@@ -336,12 +365,14 @@ class LLMProviderServiceProvider(Provider):
         providers: Dict[LLMProviderType, LLMProviderProtocol],
         event_publisher: LLMEventPublisherProtocol,
         queue_manager: QueueManagerProtocol,
+        trace_context_manager: TraceContextManagerImpl,
     ) -> LLMOrchestratorProtocol:
         """Provide LLM orchestrator implementation."""
         return LLMOrchestratorImpl(
             providers=providers,
             event_publisher=event_publisher,
             queue_manager=queue_manager,
+            trace_context_manager=trace_context_manager,
             settings=settings,
         )
 
@@ -351,6 +382,7 @@ class LLMProviderServiceProvider(Provider):
         orchestrator: LLMOrchestratorProtocol,
         queue_manager: QueueManagerProtocol,
         event_publisher: LLMEventPublisherProtocol,
+        trace_context_manager: TraceContextManagerImpl,
         settings: Settings,
     ) -> QueueProcessorImpl:
         """Provide queue processor for background request processing."""
@@ -358,5 +390,6 @@ class LLMProviderServiceProvider(Provider):
             orchestrator=orchestrator,
             queue_manager=queue_manager,
             event_publisher=event_publisher,
+            trace_context_manager=trace_context_manager,
             settings=settings,
         )
