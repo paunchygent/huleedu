@@ -173,7 +173,7 @@ async def test_duplicate_event_skipped(
     sample_batch_registered_event: dict, mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
 ) -> None:
     """Test that duplicate events are skipped without processing business logic."""
-    from common_core.events.utils import generate_deterministic_event_id
+    from huleedu_service_libs.event_utils import generate_deterministic_event_id
     from huleedu_service_libs.idempotency import idempotent_consumer
 
     redis_client = MockRedisClient()

@@ -17,6 +17,7 @@ from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 from pydantic import BaseModel
 
+from common_core import CircuitBreakerState
 from common_core.events.envelope import EventEnvelope
 
 
@@ -136,7 +137,7 @@ async def test_circuit_breaker_opens_on_failures(
                 pass  # Expected
 
         # Circuit should be open now
-        assert circuit_breaker.state.value == "open"
+        assert circuit_breaker.state.value == CircuitBreakerState.OPEN.value
 
         # Clear the queue to get a clean starting point
         await resilient_publisher.fallback_handler.clear_queue()
@@ -183,7 +184,7 @@ async def test_fallback_queue_cj_assessment_events(
                 pass
 
         # Ensure circuit is open
-        assert circuit_breaker.state.value == "open"
+        assert circuit_breaker.state.value == CircuitBreakerState.OPEN.value
 
         # Clear queue before testing CJ assessment events to ensure clean state
         await resilient_publisher.fallback_handler.clear_queue()
@@ -236,7 +237,7 @@ async def test_recovery_after_kafka_returns(
             except KafkaError:
                 pass
 
-        assert circuit_breaker.state.value == "open"
+        assert circuit_breaker.state.value == CircuitBreakerState.OPEN.value
 
         # Clear queue to ensure clean state, then queue exactly one message
         await resilient_publisher.fallback_handler.clear_queue()
@@ -436,7 +437,7 @@ async def test_circuit_breaker_state_reporting(
         # Initially closed
         state = resilient_publisher.get_circuit_breaker_state()
         assert state["enabled"] is True
-        assert state["state"] == "closed"
+        assert state["state"] == CircuitBreakerState.CLOSED.value
         assert state["name"] == "cj_assessment_service.kafka_producer"
         assert state["failure_count"] == 0
 
@@ -460,7 +461,7 @@ async def test_circuit_breaker_state_reporting(
 
         # Check updated state
         state = resilient_publisher.get_circuit_breaker_state()
-        assert state["state"] == "open"
+        assert state["state"] == CircuitBreakerState.OPEN.value
         assert state["failure_count"] >= 3
 
     finally:

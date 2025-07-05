@@ -148,3 +148,11 @@ class QueueStatus(str, Enum):
     COMPLETED = "completed"
     EXPIRED = "expired"
     FAILED = "failed"
+
+
+class CircuitBreakerState(str, Enum):
+    """States of the circuit breaker for resilience patterns."""
+
+    CLOSED = "closed"  # Normal operation, requests allowed
+    OPEN = "open"  # Failure threshold exceeded, requests blocked
+    HALF_OPEN = "half_open"  # Testing if service recovered

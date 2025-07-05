@@ -184,7 +184,7 @@ async def test_duplicate_event_skipped(
     kafka_msg = create_mock_kafka_message(sample_event_data)
 
     # Pre-populate Redis with the event key to simulate duplicate
-    from common_core.events.utils import generate_deterministic_event_id
+    from huleedu_service_libs.event_utils import generate_deterministic_event_id
 
     deterministic_id = generate_deterministic_event_id(kafka_msg.value)
     mock_redis_client.keys[f"huleedu:events:seen:{deterministic_id}"] = "1"

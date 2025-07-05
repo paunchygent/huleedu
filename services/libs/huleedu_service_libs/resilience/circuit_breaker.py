@@ -7,9 +7,9 @@ in distributed systems by temporarily blocking calls to failing services.
 
 import asyncio
 from datetime import datetime, timedelta
-from enum import Enum
 from typing import Any, Callable, Dict, Optional, Type, TypeVar, cast
 
+from common_core import CircuitBreakerState
 from huleedu_service_libs.logging_utils import create_service_logger
 from opentelemetry import trace
 
@@ -18,12 +18,6 @@ logger = create_service_logger("circuit_breaker")
 T = TypeVar("T")
 
 
-class CircuitState(Enum):
-    """States of the circuit breaker."""
-
-    CLOSED = "closed"  # Normal operation, requests allowed
-    OPEN = "open"  # Failure threshold exceeded, requests blocked
-    HALF_OPEN = "half_open"  # Testing if service recovered
 
 
 class CircuitBreakerError(Exception):
@@ -77,7 +71,7 @@ class CircuitBreaker:
         self.failure_count = 0
         self.success_count = 0
         self.last_failure_time: Optional[datetime] = None
-        self.state = CircuitState.CLOSED
+        self.state = CircuitBreakerState.CLOSED
         self._lock = asyncio.Lock()
 
     async def call(self, func: Callable[..., T], *args, **kwargs) -> T:
@@ -98,7 +92,7 @@ class CircuitBreaker:
         """
         # Check circuit state
         async with self._lock:
-            if self.state == CircuitState.OPEN:
+            if self.state == CircuitBreakerState.OPEN:
                 if self._should_attempt_reset():
                     self._transition_to_half_open()
                 else:
@@ -140,7 +134,7 @@ class CircuitBreaker:
     async def _on_success(self) -> None:
         """Handle successful call."""
         async with self._lock:
-            if self.state == CircuitState.HALF_OPEN:
+            if self.state == CircuitBreakerState.HALF_OPEN:
                 self.success_count += 1
                 logger.info(
                     f"Circuit breaker '{self.name}' success in HALF_OPEN "
@@ -149,7 +143,7 @@ class CircuitBreaker:
 
                 if self.success_count >= self.success_threshold:
                     self._transition_to_closed()
-            elif self.state == CircuitState.CLOSED:
+            elif self.state == CircuitBreakerState.CLOSED:
                 # Reset failure count on success in closed state
                 self.failure_count = 0
 
@@ -158,7 +152,7 @@ class CircuitBreaker:
         async with self._lock:
             self.last_failure_time = datetime.utcnow()
 
-            if self.state == CircuitState.CLOSED:
+            if self.state == CircuitBreakerState.CLOSED:
                 self.failure_count += 1
                 logger.warning(
                     f"Circuit breaker '{self.name}' failure "
@@ -168,7 +162,7 @@ class CircuitBreaker:
                 if self.failure_count >= self.failure_threshold:
                     self._transition_to_open()
 
-            elif self.state == CircuitState.HALF_OPEN:
+            elif self.state == CircuitBreakerState.HALF_OPEN:
                 # Single failure in half-open returns to open
                 self._transition_to_open()
 
@@ -182,7 +176,7 @@ class CircuitBreaker:
 
     def _transition_to_open(self) -> None:
         """Transition to OPEN state."""
-        self.state = CircuitState.OPEN
+        self.state = CircuitBreakerState.OPEN
         self.success_count = 0
         logger.error(
             f"Circuit breaker '{self.name}' transitioned to OPEN. "
@@ -191,14 +185,14 @@ class CircuitBreaker:
 
     def _transition_to_half_open(self) -> None:
         """Transition to HALF_OPEN state."""
-        self.state = CircuitState.HALF_OPEN
+        self.state = CircuitBreakerState.HALF_OPEN
         self.success_count = 0
         self.failure_count = 0
         logger.info(f"Circuit breaker '{self.name}' transitioned to HALF_OPEN. Testing recovery...")
 
     def _transition_to_closed(self) -> None:
         """Transition to CLOSED state."""
-        self.state = CircuitState.CLOSED
+        self.state = CircuitBreakerState.CLOSED
         self.failure_count = 0
         self.success_count = 0
         logger.info(f"Circuit breaker '{self.name}' transitioned to CLOSED.")
@@ -224,7 +218,7 @@ class CircuitBreaker:
 
     def reset(self) -> None:
         """Manually reset the circuit breaker to closed state."""
-        self.state = CircuitState.CLOSED
+        self.state = CircuitBreakerState.CLOSED
         self.failure_count = 0
         self.success_count = 0
         self.last_failure_time = None

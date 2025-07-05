@@ -19,7 +19,7 @@ from aiokafka import ConsumerRecord
 from huleedu_service_libs.idempotency import idempotent_consumer
 
 from common_core.domain_enums import CourseCode
-from common_core.events.utils import generate_deterministic_event_id
+from huleedu_service_libs.event_utils import generate_deterministic_event_id
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.models_api import ComparisonResult, LLMAssessmentResponseSchema

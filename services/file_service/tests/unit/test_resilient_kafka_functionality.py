@@ -15,7 +15,8 @@ from aiokafka.errors import KafkaError
 from huleedu_service_libs.kafka.fallback_handler import QueuedMessage
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker, CircuitState
+from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
+from common_core import CircuitBreakerState
 from pydantic import BaseModel
 
 from common_core.events.envelope import EventEnvelope
@@ -118,7 +119,7 @@ async def test_successful_publish(
 
     # Circuit breaker should remain closed
     assert resilient_publisher.circuit_breaker is not None
-    assert resilient_publisher.circuit_breaker.state == CircuitState.CLOSED
+    assert resilient_publisher.circuit_breaker.state == CircuitBreakerState.CLOSED
 
 
 @pytest.mark.asyncio
@@ -143,7 +144,7 @@ async def test_circuit_breaker_opens_on_failures(
 
     # Circuit breaker should now be open
     assert resilient_publisher.circuit_breaker is not None
-    assert resilient_publisher.circuit_breaker.state == CircuitState.OPEN
+    assert resilient_publisher.circuit_breaker.state == CircuitBreakerState.OPEN
 
     # Verify events were queued
     assert resilient_publisher.get_fallback_queue_size() == 3
@@ -162,7 +163,7 @@ async def test_fallback_queue_behavior(
 
     # Force circuit breaker open
     assert resilient_publisher.circuit_breaker is not None
-    resilient_publisher.circuit_breaker.state = CircuitState.OPEN
+    resilient_publisher.circuit_breaker.state = CircuitBreakerState.OPEN
     resilient_publisher.circuit_breaker.last_failure_time = datetime.now()
 
     # Publish should queue message without calling delegate
@@ -185,7 +186,7 @@ async def test_circuit_breaker_recovery(
 
     # Force circuit breaker to half-open state
     assert resilient_publisher.circuit_breaker is not None
-    resilient_publisher.circuit_breaker.state = CircuitState.HALF_OPEN
+    resilient_publisher.circuit_breaker.state = CircuitBreakerState.HALF_OPEN
 
     # Mock successful publishes
     cast(AsyncMock, resilient_publisher.delegate.publish).return_value = None
@@ -196,7 +197,7 @@ async def test_circuit_breaker_recovery(
 
     # Circuit should now be closed
     assert resilient_publisher.circuit_breaker is not None
-    assert resilient_publisher.circuit_breaker.state == CircuitState.CLOSED
+    assert resilient_publisher.circuit_breaker.state == CircuitBreakerState.CLOSED
 
 
 @pytest.mark.asyncio

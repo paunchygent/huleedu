@@ -17,7 +17,7 @@ from typing import Any, TypeVar
 
 from aiokafka import ConsumerRecord
 
-from common_core.events.utils import generate_deterministic_event_id
+from .event_utils import generate_deterministic_event_id
 
 from .logging_utils import create_service_logger
 from .protocols import RedisClientProtocol

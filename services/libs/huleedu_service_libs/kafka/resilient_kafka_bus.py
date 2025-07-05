@@ -17,6 +17,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker, CircuitBreakerError
 from pydantic import BaseModel
 
+from common_core import CircuitBreakerState
 from common_core.events.envelope import EventEnvelope
 
 logger = create_service_logger("resilient_kafka")
@@ -183,7 +184,7 @@ class ResilientKafkaPublisher:
             # Check if circuit is available and process queued messages
             if (
                 self.circuit_breaker
-                and self.circuit_breaker.state.value in ["closed", "half_open"]
+                and self.circuit_breaker.state in [CircuitBreakerState.CLOSED, CircuitBreakerState.HALF_OPEN]
                 and self.fallback_handler.has_queued_messages()
             ):
                 await self._process_queued_messages()

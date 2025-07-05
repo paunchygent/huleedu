@@ -8,7 +8,7 @@ from uuid import UUID
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability.tracing import get_current_trace_id
 
-from common_core import LLMProviderType
+from common_core import CircuitBreakerState, LLMProviderType
 from common_core.error_enums import ErrorCode
 from services.llm_provider_service.api_models import LLMComparisonRequest
 from services.llm_provider_service.config import Settings
@@ -470,7 +470,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             original = provider_impl
             if hasattr(original, "_circuit_breaker"):
                 circuit_breaker = original._circuit_breaker
-                return bool(circuit_breaker.state != "open")
+                return bool(circuit_breaker.state != CircuitBreakerState.OPEN)
 
         # No circuit breaker or not wrapped - assume available
         return True

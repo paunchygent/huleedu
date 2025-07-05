@@ -235,7 +235,7 @@ class TestBOSIdempotencyBasic:
         """Test that duplicate BatchEssaysReady events are skipped."""
         from huleedu_service_libs.idempotency import idempotent_consumer
 
-        from common_core.events.utils import generate_deterministic_event_id
+        from huleedu_service_libs.event_utils import generate_deterministic_event_id
 
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers

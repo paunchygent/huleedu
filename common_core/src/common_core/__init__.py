@@ -77,6 +77,7 @@ from .pipeline_models import (
 from .status_enums import (
     BatchStatus,
     CacheStatus,
+    CircuitBreakerState,
     EssayStatus,
     OperationStatus,
     ProcessingStage,
@@ -94,6 +95,7 @@ __all__ = [
     "ValidationStatus",
     "OperationStatus",
     "CacheStatus",
+    "CircuitBreakerState",
     "QueueStatus",
     # Domain Enums
     "ContentType",

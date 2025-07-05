@@ -9,7 +9,7 @@ from huleedu_service_libs.resilience import CircuitBreakerError, CircuitBreakerR
 from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
 
-from common_core import LLMProviderType, QueueStatus
+from common_core import CircuitBreakerState, LLMProviderType, QueueStatus
 from services.llm_provider_service.api_models import (
     LLMComparisonRequest,
     LLMComparisonResponse,
@@ -234,10 +234,10 @@ async def list_providers(
 
             # Check circuit breaker status
             circuit_breaker = circuit_breaker_registry.get(f"llm_{provider_name}")
-            circuit_breaker_state = "closed"
+            circuit_breaker_state = CircuitBreakerState.CLOSED.value
             if circuit_breaker:
                 state_info = circuit_breaker.get_state()
-                circuit_breaker_state = state_info.get("state", "closed")
+                circuit_breaker_state = state_info.get("state", CircuitBreakerState.CLOSED.value)
 
             # Check if API key is configured
             api_key = getattr(settings, f"{provider_name.upper()}_API_KEY", "")
@@ -247,7 +247,7 @@ async def list_providers(
                 LLMProviderStatus(
                     name=provider_name,
                     enabled=enabled,
-                    available=enabled and configured and circuit_breaker_state == "closed",
+                    available=enabled and configured and circuit_breaker_state == CircuitBreakerState.CLOSED.value,
                     circuit_breaker_state=circuit_breaker_state,
                     default_model=getattr(settings, f"{provider_name.upper()}_DEFAULT_MODEL", None),
                 )

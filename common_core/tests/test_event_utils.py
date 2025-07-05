@@ -8,7 +8,7 @@ for idempotency guarantees in the HuleEdu platform.
 import json
 from uuid import uuid4
 
-from common_core.events.utils import (
+from huleedu_service_libs.event_utils import (
     extract_correlation_id_from_event,
     generate_deterministic_event_id,
 )

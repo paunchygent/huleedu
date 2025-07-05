@@ -71,7 +71,7 @@ async def test_duplicate_event_skipped(
     real_spell_logic: SpellLogicProtocol,
 ) -> None:
     """Test that duplicate events are skipped without processing business logic."""
-    from common_core.events.utils import generate_deterministic_event_id
+    from huleedu_service_libs.event_utils import generate_deterministic_event_id
 
     redis_client = MockRedisClient()
     http_session, content_client, result_store, event_publisher, kafka_bus = mock_boundary_services
