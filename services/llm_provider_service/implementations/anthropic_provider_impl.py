@@ -6,15 +6,12 @@ from typing import Tuple
 import aiohttp
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core import LLMProviderType
+from common_core import EssayComparisonWinner, LLMProviderType
 from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.internal_models import LLMProviderError, LLMProviderResponse
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
-from services.llm_provider_service.response_validator import (
-    convert_to_internal_format,
-    validate_and_normalize_response,
-)
+from services.llm_provider_service.response_validator import validate_and_normalize_response
 
 logger = create_service_logger("llm_provider_service.anthropic_provider")
 
@@ -86,7 +83,8 @@ class AnthropicProviderImpl(LLMProviderProtocol):
 
 Your job is to:
 1. Read both essays carefully
-2. Determine which essay is better written based on clarity, structure, argument quality, and writing mechanics
+2. Determine which essay is better written based on clarity, structure, argument quality,
+   and writing mechanics
 3. Provide a brief justification for your choice (max 50 characters)
 4. Rate your confidence in the decision
 
@@ -162,7 +160,11 @@ You will use the comparison_result tool to provide your analysis."""
                     "type": "object",
                     "properties": {
                         "winner": {"type": "string", "enum": ["Essay A", "Essay B"]},
-                        "justification": {"type": "string", "maxLength": 50, "description": "Brief explanation (max 50 chars)"},
+                        "justification": {
+                            "type": "string",
+                            "maxLength": 50,
+                            "description": "Brief explanation (max 50 chars)",
+                        },
                         "confidence": {"type": "number", "minimum": 1, "maximum": 5},
                     },
                     "required": ["winner", "justification", "confidence"],
@@ -250,11 +252,16 @@ You will use the comparison_result tool to provide your analysis."""
                                     is_retryable=False,
                                 )
 
-                            # Convert to internal format
+                            # Use validated response directly (already in assessment domain language)
                             assert validated_response is not None  # Type assertion for mypy
-                            choice, reasoning, confidence = convert_to_internal_format(
-                                validated_response
-                            )
+                            
+                            # Convert winner string to enum value
+                            if validated_response.winner == "Essay A":
+                                winner = EssayComparisonWinner.ESSAY_A
+                            elif validated_response.winner == "Essay B":
+                                winner = EssayComparisonWinner.ESSAY_B
+                            else:
+                                winner = EssayComparisonWinner.ERROR
 
                             # Get token usage
                             usage = response_data.get("usage", {})
@@ -262,11 +269,14 @@ You will use the comparison_result tool to provide your analysis."""
                             completion_tokens = usage.get("output_tokens", 0)
                             total_tokens = prompt_tokens + completion_tokens
 
+                            # Convert confidence from 1-5 scale to 0-1 scale for internal model
+                            confidence_normalized = (validated_response.confidence - 1.0) / 4.0
+
                             # Create response model
                             response_model = LLMProviderResponse(
-                                choice=choice,
-                                reasoning=reasoning,
-                                confidence=confidence,
+                                winner=winner,
+                                justification=validated_response.justification,
+                                confidence=confidence_normalized,
                                 provider=LLMProviderType.ANTHROPIC,
                                 model=model,
                                 prompt_tokens=prompt_tokens,

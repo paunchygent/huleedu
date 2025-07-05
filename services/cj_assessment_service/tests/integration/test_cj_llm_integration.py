@@ -4,7 +4,6 @@ This test simulates the actual flow of CJ Assessment Service making HTTP calls
 to the LLM Provider Service.
 """
 
-
 import aiohttp
 import pytest
 
@@ -119,4 +118,3 @@ Always respond with valid JSON."""
         # This test would require the LLM Provider Service to be started
         # with USE_MOCK_LLM=true environment variable
         pytest.skip("Mock provider test requires service reconfiguration")
-

@@ -64,3 +64,11 @@ def get_course_name(course_code: CourseCode) -> str:
 def get_course_level(course_code: CourseCode) -> int:
     """Get skill level for a course code."""
     return COURSE_METADATA[course_code][2]
+
+
+class EssayComparisonWinner(str, Enum):
+    """Essay comparison result values using assessment domain language."""
+
+    ESSAY_A = "Essay A"
+    ESSAY_B = "Essay B"
+    ERROR = "Error"

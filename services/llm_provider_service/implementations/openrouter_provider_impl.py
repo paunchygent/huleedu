@@ -8,22 +8,19 @@ from uuid import uuid4
 import aiohttp
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core import LLMProviderType
+from common_core import EssayComparisonWinner, LLMProviderType
 from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.internal_models import LLMProviderError, LLMProviderResponse
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
-from services.llm_provider_service.response_validator import (
-    convert_to_internal_format,
-    validate_and_normalize_response,
-)
+from services.llm_provider_service.response_validator import validate_and_normalize_response
 
 logger = create_service_logger("llm_provider_service.openrouter_provider")
 
 
 class OpenRouterProviderImpl(LLMProviderProtocol):
     """OpenRouter LLM provider implementation."""
-    
+
     # Class-level cache for model capabilities
     _model_cache: Dict[str, Dict] = {}
     _cache_ttl_seconds = 3600  # 1 hour TTL
@@ -90,8 +87,11 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
             or "You are an expert essay evaluator. "
             "Compare the two essays and return your analysis as JSON. "
             "You MUST respond with a JSON object containing exactly these fields: "
-            '{"winner": "Essay A" or "Essay B", "justification": "brief explanation (max 50 chars)", "confidence": 1.0-5.0}. '
-            "The winner must be either 'Essay A' or 'Essay B', justification must be brief (max 50 characters), "
+            '{"winner": "Essay A" or "Essay B", "justification": "brief explanation '
+            '(max 50 chars)", '
+            '"confidence": 1.0-5.0}. '
+            "The winner must be either 'Essay A' or 'Essay B', justification must be brief "
+            "(max 50 characters), "
             "and confidence must be a float between 1.0 and 5.0."
         )
 
@@ -153,7 +153,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
             else self.settings.LLM_DEFAULT_TEMPERATURE
         )
         max_tokens = max_tokens_override or self.settings.LLM_DEFAULT_MAX_TOKENS
-        
+
         # Check model capabilities from cache or fetch if needed
         model_info = self._get_cached_model_info(model)
         if model_info is None:
@@ -163,14 +163,16 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
             except Exception as e:
                 logger.debug(f"Failed to fetch model info for {model}: {e}")
                 model_info = None
-        
+
         if model_info and not model_info.get("supports_json", True):
             logger.warning(f"Model {model} may not support JSON response format")
-        
+
         # Adjust max_tokens based on cached model limits if available
         if model_info and "context_length" in model_info:
             context_limit = model_info["context_length"]
-            estimated_prompt_tokens = len(f"{system_prompt} {user_prompt}".split()) * 1.3  # Rough estimate
+            estimated_prompt_tokens = (
+                len(f"{system_prompt} {user_prompt}".split()) * 1.3
+            )  # Rough estimate
             safe_max_tokens = min(max_tokens, int(context_limit - estimated_prompt_tokens))
             if safe_max_tokens != max_tokens:
                 max_tokens = max(safe_max_tokens, 100)  # Ensure minimum viable response
@@ -218,11 +220,19 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                                     is_retryable=False,
                                 )
 
-                            # Convert to internal format
+                            # Use validated response directly (already in assessment domain language)
                             assert validated_response is not None  # Type assertion for mypy
-                            choice, reasoning, confidence = convert_to_internal_format(
-                                validated_response
-                            )
+                            
+                            # Convert winner string to enum value
+                            if validated_response.winner == "Essay A":
+                                winner = EssayComparisonWinner.ESSAY_A
+                            elif validated_response.winner == "Essay B":
+                                winner = EssayComparisonWinner.ESSAY_B
+                            else:
+                                winner = EssayComparisonWinner.ERROR
+                            
+                            # Convert confidence from 1-5 scale to 0-1 scale for internal model
+                            confidence_normalized = (validated_response.confidence - 1.0) / 4.0
 
                             # Get token usage
                             usage = response_data.get("usage", {})
@@ -232,9 +242,9 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
 
                             # Create response model
                             response_model = LLMProviderResponse(
-                                choice=choice,
-                                reasoning=reasoning,
-                                confidence=confidence,
+                                winner=winner,
+                                justification=validated_response.justification,
+                                confidence=confidence_normalized,
                                 provider=LLMProviderType.OPENROUTER,
                                 model=model,
                                 prompt_tokens=prompt_tokens,
@@ -331,32 +341,32 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
         formatted += "\n\nPlease respond with a valid JSON object."
 
         return formatted
-    
+
     def _get_cached_model_info(self, model: str) -> Optional[Dict]:
         """Get cached model information.
-        
+
         Args:
             model: Model identifier
-            
+
         Returns:
             Cached model info or None if not cached/expired
         """
         if model not in self._model_cache:
             return None
-            
+
         cache_entry = self._model_cache[model]
         cache_time = cache_entry.get("cached_at", 0)
-        
+
         # Check if cache entry is expired
         if time.time() - cache_time > self._cache_ttl_seconds:
             del self._model_cache[model]
             return None
-            
+
         return cache_entry.get("info")
-    
+
     def _cache_model_info(self, model: str, model_info: Dict) -> None:
         """Cache model information with TTL.
-        
+
         Args:
             model: Model identifier
             model_info: Model capability information
@@ -365,35 +375,31 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
         if len(self._model_cache) >= self._cache_max_size:
             # Remove oldest entry (simple approach)
             oldest_model = min(
-                self._model_cache.keys(),
-                key=lambda k: self._model_cache[k].get("cached_at", 0)
+                self._model_cache.keys(), key=lambda k: self._model_cache[k].get("cached_at", 0)
             )
             del self._model_cache[oldest_model]
-        
-        self._model_cache[model] = {
-            "info": model_info,
-            "cached_at": time.time()
-        }
-        
+
+        self._model_cache[model] = {"info": model_info, "cached_at": time.time()}
+
         logger.debug(f"Cached model info for {model}, cache size: {len(self._model_cache)}")
-    
+
     async def _fetch_model_info(self, model: str) -> Optional[Dict]:
         """Fetch model information from OpenRouter API.
-        
+
         Args:
             model: Model identifier
-            
+
         Returns:
             Model information or None if fetch fails
         """
         try:
             models_endpoint = f"{self.api_base}/models"
             headers = {"Authorization": f"Bearer {self.api_key}"}
-            
+
             async with self.session.get(models_endpoint, headers=headers) as response:
                 if response.status == 200:
                     models_data = await response.json()
-                    
+
                     # Find the specific model in the response
                     for model_data in models_data.get("data", []):
                         if model_data.get("id") == model:
@@ -402,20 +408,22 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                                 "supports_json": "json" in model_data.get("name", "").lower(),
                                 "pricing": {
                                     "prompt": model_data.get("pricing", {}).get("prompt", 0),
-                                    "completion": model_data.get("pricing", {}).get("completion", 0)
-                                }
+                                    "completion": model_data.get("pricing", {}).get(
+                                        "completion", 0
+                                    ),
+                                },
                             }
-                            
+
                             # Cache the information
                             self._cache_model_info(model, model_info)
                             return model_info
-                            
+
                     logger.warning(f"Model {model} not found in OpenRouter models list")
                     return None
                 else:
                     logger.warning(f"Failed to fetch models from OpenRouter: {response.status}")
                     return None
-                    
+
         except Exception as e:
             logger.error(f"Error fetching model info for {model}: {e}")
             return None

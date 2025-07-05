@@ -47,7 +47,7 @@ async def generate_comparison(
 
     try:
         # Start tracing for the API request
-        with tracer.start_api_request_span("comparison", correlation_id) as span:
+        with tracer.start_api_request_span("comparison", correlation_id):
             tracer.add_span_event("request_started", {"correlation_id": str(correlation_id)})
 
             # Parse request
@@ -79,7 +79,8 @@ async def generate_comparison(
             # Require explicit provider configuration
             if not provider_override:
                 logger.warning(
-                    f"Request missing required provider configuration, correlation_id: {correlation_id}"
+                    "Request missing required provider configuration, correlation_id: %s",
+                    correlation_id,
                 )
                 return jsonify(
                     {
@@ -173,18 +174,17 @@ async def generate_comparison(
                 status="success",
             ).inc()
 
-            # Build response - map internal model to API response model
-            # Transform choice value: "A" -> "Essay A", "B" -> "Essay B"
-            winner = f"Essay {result.choice}" if result.choice in ["A", "B"] else result.choice
-
+            # Build response - direct mapping from internal model to API response model
+            # No translation needed as both use assessment domain language
+            
             # Convert confidence scale from 0-1 to 1-5
             confidence_scaled = 1.0 + (result.confidence * 4.0)
             # Ensure confidence is within valid range
             confidence_scaled = max(1.0, min(5.0, confidence_scaled))
 
             response = LLMComparisonResponse(
-                winner=winner,
-                justification=result.reasoning,
+                winner=result.winner,
+                justification=result.justification,
                 confidence=confidence_scaled,
                 provider=result.provider,
                 model=result.model,
@@ -387,14 +387,14 @@ async def get_queue_result(
                 }
             ), 410  # Gone
 
-        # Build response - same as in compare endpoint
-        winner = f"Essay {result.choice}" if result.choice in ["A", "B"] else result.choice
+        # Build response - direct mapping from internal model to API response model
+        # No translation needed as both use assessment domain language
         confidence_scaled = 1.0 + (result.confidence * 4.0)
         confidence_scaled = max(1.0, min(5.0, confidence_scaled))
 
         response = LLMComparisonResponse(
-            winner=winner,
-            justification=result.reasoning,
+            winner=result.winner,
+            justification=result.justification,
             confidence=confidence_scaled,
             provider=result.provider,
             model=result.model,

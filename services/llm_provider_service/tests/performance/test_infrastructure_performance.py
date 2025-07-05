@@ -9,12 +9,26 @@ import asyncio
 import statistics
 import time
 from typing import Any, Dict, Tuple
+from uuid import UUID, uuid4
 
 import pytest
-from dishka import make_async_container
+from dishka import make_async_container, provide, Scope
 
+from common_core import EssayComparisonWinner, LLMProviderType
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
+
+
+class TestLLMProviderServiceProvider(LLMProviderServiceProvider):
+    """Test-specific provider that allows settings injection."""
+    
+    def __init__(self, test_settings: Settings):
+        super().__init__()
+        self._test_settings = test_settings
+    
+    @provide(scope=Scope.APP)
+    def provide_settings(self) -> Settings:
+        return self._test_settings
 
 
 class TestInfrastructurePerformance:
@@ -25,11 +39,12 @@ class TestInfrastructurePerformance:
         self, performance_settings_with_containers: Settings
     ) -> None:
         """Test single request performance with real infrastructure.
-        
+
         Uses real Kafka and Redis to measure actual infrastructure overhead.
         """
-        # Create DI container with real infrastructure
-        container = make_async_container(LLMProviderServiceProvider())
+        # Create DI container with test settings
+        provider = TestLLMProviderServiceProvider(performance_settings_with_containers)
+        container = make_async_container(provider)
 
         async with container() as request_container:
             from services.llm_provider_service.protocols import LLMOrchestratorProtocol
@@ -39,12 +54,13 @@ class TestInfrastructurePerformance:
             # Measure single request performance with real infrastructure
             start_time = time.perf_counter()
 
-            result, error = await orchestrator.process_comparison_request(
+            result, error = await orchestrator.perform_comparison(
+                provider=LLMProviderType.MOCK,  # Mock provider to avoid API costs
+                user_prompt="Compare these two essays for infrastructure testing",
                 essay_a="Sample essay A content for infrastructure testing",
                 essay_b="Sample essay B content for infrastructure testing",
-                provider="mock",  # Mock provider to avoid API costs
+                correlation_id=uuid4(),
                 model="mock-model",
-                correlation_id="infra-test-correlation-id",
             )
 
             response_time = time.perf_counter() - start_time
@@ -52,7 +68,7 @@ class TestInfrastructurePerformance:
             # Assertions
             assert error is None, f"Request failed: {error}"
             assert result is not None
-            assert "winner" in result
+            assert result.winner in [EssayComparisonWinner.ESSAY_A, EssayComparisonWinner.ESSAY_B]
 
             # Performance targets (more lenient due to real infrastructure)
             assert response_time < 2.0  # Should be under 2 seconds with real infrastructure
@@ -68,7 +84,8 @@ class TestInfrastructurePerformance:
         """Test concurrent request performance with real infrastructure."""
         concurrent_requests = 20  # Smaller load for real infrastructure
 
-        container = make_async_container(LLMProviderServiceProvider())
+        provider = TestLLMProviderServiceProvider(performance_settings_with_containers)
+        container = make_async_container(provider)
 
         async with container() as request_container:
             from services.llm_provider_service.protocols import LLMOrchestratorProtocol
@@ -80,12 +97,13 @@ class TestInfrastructurePerformance:
                 start_time = time.perf_counter()
 
                 try:
-                    result, error = await orchestrator.process_comparison_request(
+                    result, error = await orchestrator.perform_comparison(
+                        provider=LLMProviderType.MOCK,  # Mock to avoid API costs
+                        user_prompt=f"Compare these essays for infrastructure test {request_id}",
                         essay_a=f"Infrastructure test essay A {request_id}",
                         essay_b=f"Infrastructure test essay B {request_id}",
-                        provider="mock",  # Mock to avoid API costs
+                        correlation_id=uuid4(),
                         model="mock-model",
-                        correlation_id=f"infra-test-{request_id}",
                     )
 
                     response_time = time.perf_counter() - start_time
@@ -128,7 +146,8 @@ class TestInfrastructurePerformance:
         self, performance_settings_with_containers: Settings
     ) -> None:
         """Test queue resilience performance with real Redis."""
-        container = make_async_container(LLMProviderServiceProvider())
+        provider = TestLLMProviderServiceProvider(performance_settings_with_containers)
+        container = make_async_container(provider)
 
         async with container() as request_container:
             from services.llm_provider_service.protocols import QueueManagerProtocol
@@ -139,12 +158,12 @@ class TestInfrastructurePerformance:
             from datetime import datetime, timedelta, timezone
             from uuid import uuid4
 
-            from services.llm_provider_service.queue_models import QueuedRequest
+            from common_core import QueueStatus
 
             # Create test requests
             from services.llm_provider_service.api_models import LLMComparisonRequest
-            from common_core import QueueStatus
-            
+            from services.llm_provider_service.queue_models import QueuedRequest
+
             requests = []
             for i in range(10):
                 request_data = LLMComparisonRequest(
@@ -169,7 +188,7 @@ class TestInfrastructurePerformance:
 
             # Add requests to queue
             for request in requests:
-                success = await queue_manager.add_request(request)
+                success = await queue_manager.enqueue(request)
                 assert success, f"Failed to queue request {request.queue_id}"
 
             queue_add_time = time.perf_counter() - start_time
@@ -179,7 +198,7 @@ class TestInfrastructurePerformance:
 
             retrieved_requests = []
             for _ in range(len(requests)):
-                next_request = await queue_manager.get_next_request()
+                next_request = await queue_manager.dequeue()
                 if next_request:
                     retrieved_requests.append(next_request)
 
@@ -188,8 +207,14 @@ class TestInfrastructurePerformance:
             print("Queue performance with real Redis:")
             print(f"  Queue add time: {queue_add_time:.4f}s for {len(requests)} requests")
             print(f"  Average add time: {queue_add_time / len(requests):.6f}s per request")
-            print(f"  Queue retrieval time: {queue_retrieval_time:.4f}s for {len(retrieved_requests)} requests")
-            print(f"  Average retrieval time: {queue_retrieval_time / len(retrieved_requests):.6f}s per request")
+            print(
+                f"  Queue retrieval time: {queue_retrieval_time:.4f}s "
+                f"for {len(retrieved_requests)} requests"
+            )
+            print(
+                f"  Average retrieval time: "
+                f"{queue_retrieval_time / len(retrieved_requests):.6f}s per request"
+            )
 
             # Assertions
             assert len(retrieved_requests) == len(requests)
@@ -201,7 +226,8 @@ class TestInfrastructurePerformance:
         self, performance_settings_with_containers: Settings
     ) -> None:
         """Test Kafka event publishing performance with real container."""
-        container = make_async_container(LLMProviderServiceProvider())
+        provider = TestLLMProviderServiceProvider(performance_settings_with_containers)
+        container = make_async_container(provider)
 
         async with container() as request_container:
             from services.llm_provider_service.protocols import LLMEventPublisherProtocol
@@ -213,16 +239,20 @@ class TestInfrastructurePerformance:
             start_time = time.perf_counter()
 
             for i in range(event_count):
-                await event_publisher.publish_comparison_result(
-                    correlation_id=f"perf-test-{i}",
-                    provider="mock",
-                    model="mock-model",
-                    result={
-                        "winner": "Essay A",
-                        "justification": f"Performance test justification {i}",
-                        "confidence": 4.0 + (i % 10) / 10,
-                    },
+                await event_publisher.publish_llm_request_completed(
+                    provider=LLMProviderType.MOCK.value,
+                    correlation_id=UUID(f"00000000-0000-0000-0000-{i:012d}"),
+                    success=True,
                     response_time_ms=100 + i,
+                    metadata={
+                        "request_type": "comparison",
+                        "model": "mock-model",
+                        "result": {
+                            "winner": "Essay A",
+                            "justification": f"Performance test justification {i}",
+                            "confidence": 4.0 + (i % 10) / 10,
+                        },
+                    },
                 )
 
             publishing_time = time.perf_counter() - start_time
@@ -242,13 +272,14 @@ class TestInfrastructurePerformance:
         self, performance_settings_with_containers: Settings
     ) -> None:
         """Test complete end-to-end load with real infrastructure.
-        
+
         This is the most realistic performance test - measures the full stack
         with real Kafka and Redis but mock LLM providers.
         """
         request_count = 15  # Moderate load for end-to-end test
 
-        container = make_async_container(LLMProviderServiceProvider())
+        provider = TestLLMProviderServiceProvider(performance_settings_with_containers)
+        container = make_async_container(provider)
 
         async with container() as request_container:
             from services.llm_provider_service.protocols import LLMOrchestratorProtocol
@@ -260,15 +291,17 @@ class TestInfrastructurePerformance:
 
             tasks = []
             for i in range(request_count):
+
                 async def make_e2e_request(request_id: int) -> Tuple[float, bool, Dict[str, Any]]:
                     start = time.perf_counter()
                     try:
-                        result, error = await orchestrator.process_comparison_request(
+                        result, error = await orchestrator.perform_comparison(
+                            provider=LLMProviderType.MOCK,
+                            user_prompt=f"Compare these essays for e2e test {request_id}",
                             essay_a=f"End-to-end test essay A {request_id}",
                             essay_b=f"End-to-end test essay B {request_id}",
-                            provider="mock",
+                            correlation_id=uuid4(),
                             model="mock-model",
-                            correlation_id=f"e2e-test-{request_id}",
                         )
                         duration = time.perf_counter() - start
                         return duration, error is None, result or {}

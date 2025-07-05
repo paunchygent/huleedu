@@ -242,7 +242,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 provider=provider.value,
                 model=overrides.get("model_override") or "default",
                 correlation_id=correlation_id,
-            ) as provider_span:
+            ):
                 # Call the provider with tracing context
                 result, error = await provider_impl.generate_comparison(
                     user_prompt=user_prompt,
@@ -292,8 +292,8 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
                 # Return fresh orchestrator response
                 return LLMOrchestratorResponse(
-                    choice=result.choice,
-                    reasoning=result.reasoning,
+                    winner=result.winner,
+                    justification=result.justification,
                     confidence=result.confidence,
                     provider=provider,
                     model=result.model,

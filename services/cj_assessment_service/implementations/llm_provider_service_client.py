@@ -192,7 +192,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             # LLM Provider Service returns 1-5 scale, convert to 0-1 scale for CJ Assessment
             raw_confidence = response_data.get("confidence", 3.0)
             normalized_confidence = (raw_confidence - 1.0) / 4.0  # Convert 1-5 to 0-1
-            
+
             result = {
                 "winner": response_data.get("winner"),
                 "justification": response_data.get("justification"),
@@ -419,7 +419,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                         # LLM Provider Service returns 1-5 scale, convert to 0-1 scale for CJ Assessment
                         raw_confidence = response_data.get("confidence", 3.0)
                         normalized_confidence = (raw_confidence - 1.0) / 4.0  # Convert 1-5 to 0-1
-                        
+
                         result = {
                             "winner": response_data.get("winner"),
                             "justification": response_data.get("justification"),

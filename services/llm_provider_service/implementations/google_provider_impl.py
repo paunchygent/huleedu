@@ -7,15 +7,12 @@ from uuid import uuid4
 import aiohttp
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core import LLMProviderType
+from common_core import EssayComparisonWinner, LLMProviderType
 from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.internal_models import LLMProviderError, LLMProviderResponse
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
-from services.llm_provider_service.response_validator import (
-    convert_to_internal_format,
-    validate_and_normalize_response,
-)
+from services.llm_provider_service.response_validator import validate_and_normalize_response
 
 logger = create_service_logger("llm_provider_service.google_provider")
 
@@ -94,8 +91,11 @@ class GoogleProviderImpl(LLMProviderProtocol):
             or "You are an expert essay evaluator. "
             "Compare the two essays and return your analysis as JSON. "
             "You MUST respond with a JSON object containing exactly these fields: "
-            '{"winner": "Essay A" or "Essay B", "justification": "brief explanation (max 50 chars)", "confidence": 1.0-5.0}. '
-            "The winner must be either 'Essay A' or 'Essay B', justification must be brief (max 50 characters), "
+            '{"winner": "Essay A" or "Essay B", "justification": "brief explanation '
+            '(max 50 chars)", '
+            '"confidence": 1.0-5.0}. '
+            "The winner must be either 'Essay A' or 'Essay B', justification must be brief "
+            "(max 50 characters), "
             "and confidence must be a float between 1.0 and 5.0."
         )
 
@@ -220,11 +220,19 @@ class GoogleProviderImpl(LLMProviderProtocol):
                                         is_retryable=False,
                                     )
 
-                                # Convert to internal format
+                                # Use validated response directly (already in assessment domain language)
                                 assert validated_response is not None  # Type assertion for mypy
-                                choice, reasoning, confidence = convert_to_internal_format(
-                                    validated_response
-                                )
+                                
+                                # Convert winner string to enum value
+                                if validated_response.winner == "Essay A":
+                                    winner = EssayComparisonWinner.ESSAY_A
+                                elif validated_response.winner == "Essay B":
+                                    winner = EssayComparisonWinner.ESSAY_B
+                                else:
+                                    winner = EssayComparisonWinner.ERROR
+                                
+                                # Convert confidence from 1-5 scale to 0-1 scale for internal model
+                                confidence_normalized = (validated_response.confidence - 1.0) / 4.0
 
                                 # Google doesn't provide detailed token usage like others
                                 # Estimate based on input/output length
@@ -234,9 +242,9 @@ class GoogleProviderImpl(LLMProviderProtocol):
 
                                 # Create response model
                                 response_model = LLMProviderResponse(
-                                    choice=choice,
-                                    reasoning=reasoning,
-                                    confidence=confidence,
+                                    winner=winner,
+                                    justification=validated_response.justification,
+                                    confidence=confidence_normalized,
                                     provider=LLMProviderType.GOOGLE,
                                     model=model,
                                     prompt_tokens=prompt_tokens,

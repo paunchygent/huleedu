@@ -13,10 +13,12 @@ from typing import Any, Dict, Tuple
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field, ValidationError
 
+from common_core import EssayComparisonWinner
+
 logger = create_service_logger("llm_provider_service.response_validator")
 
 # Pre-compiled regex patterns for better performance
-WINNER_PATTERN = re.compile(r"^(Essay A|Essay B)$")
+WINNER_PATTERN = re.compile(rf"^({EssayComparisonWinner.ESSAY_A.value}|{EssayComparisonWinner.ESSAY_B.value})$")
 WINNER_KEYWORDS = {"a", "essay a", "option a", "first", "left"}
 WINNER_B_KEYWORDS = {"b", "essay b", "option b", "second", "right"}
 
@@ -24,7 +26,7 @@ WINNER_B_KEYWORDS = {"b", "essay b", "option b", "second", "right"}
 class StandardizedLLMResponse(BaseModel):
     """Standardized response format for LLM comparison results."""
 
-    winner: str = Field(description="Which essay is better", pattern="^(Essay A|Essay B)$")
+    winner: str = Field(description="Which essay is better", pattern=rf"^({EssayComparisonWinner.ESSAY_A.value}|{EssayComparisonWinner.ESSAY_B.value})$")
     justification: str = Field(
         description="Brief explanation of the choice (max 50 characters)", max_length=50
     )
@@ -81,7 +83,7 @@ def validate_and_normalize_response(
 def _fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     """Fast field normalization with minimal overhead."""
     # Extract fields with defaults
-    winner = parsed_data.get("winner", "Essay A")
+    winner = parsed_data.get("winner", EssayComparisonWinner.ESSAY_A.value)
     justification = parsed_data.get("justification", "Analysis provided")
     confidence = parsed_data.get("confidence", 3.0)
 
@@ -89,9 +91,9 @@ def _fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     if not WINNER_PATTERN.match(winner):
         winner_lower = winner.lower().strip()
         if winner_lower in WINNER_B_KEYWORDS:
-            winner = "Essay B"
+            winner = EssayComparisonWinner.ESSAY_B.value
         else:
-            winner = "Essay A"
+            winner = EssayComparisonWinner.ESSAY_A.value
 
     # Fast confidence normalization
     if isinstance(confidence, (int, float)):
@@ -147,23 +149,8 @@ def _record_validation_metrics(
         pass
 
 
-def convert_to_internal_format(
-    standardized_response: StandardizedLLMResponse,
-) -> Tuple[str, str, float]:
-    """Convert standardized response to internal format.
-
-    Args:
-        standardized_response: Validated standardized response
-
-    Returns:
-        Tuple of (choice, reasoning, confidence) in internal format
-    """
-    choice = "A" if standardized_response.winner == "Essay A" else "B"
-    reasoning = standardized_response.justification
-    # Convert confidence from 1-5 scale to 0-1 scale for internal model
-    confidence = (standardized_response.confidence - 1.0) / 4.0
-
-    return choice, reasoning, confidence
+# NOTE: convert_to_internal_format function removed - no longer needed
+# as internal models now use the same assessment domain language
 
 
 def validate_and_normalize_response_fast(
@@ -202,15 +189,15 @@ def validate_and_normalize_response_fast(
 def _ultra_fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     """Ultra-fast field normalization with minimal safety checks."""
     # Direct field access with minimal validation
-    winner = parsed_data.get("winner", "Essay A")
+    winner = parsed_data.get("winner", EssayComparisonWinner.ESSAY_A.value)
     justification = str(parsed_data.get("justification", "Analysis provided"))
     confidence = float(parsed_data.get("confidence", 3.0))
 
     # Minimal winner validation - just check first character
     if winner and winner[0].upper() == "B":
-        winner = "Essay B"
+        winner = EssayComparisonWinner.ESSAY_B.value
     else:
-        winner = "Essay A"
+        winner = EssayComparisonWinner.ESSAY_A.value
 
     # Simple confidence clamping
     confidence = max(1.0, min(5.0, confidence))
@@ -263,8 +250,8 @@ STANDARDIZED_RESPONSE_SCHEMA = {
     "properties": {
         "winner": {
             "type": "string",
-            "enum": ["Essay A", "Essay B"],
-            "description": "Which essay is better: 'Essay A' or 'Essay B'",
+            "enum": [EssayComparisonWinner.ESSAY_A.value, EssayComparisonWinner.ESSAY_B.value],
+            "description": f"Which essay is better: '{EssayComparisonWinner.ESSAY_A.value}' or '{EssayComparisonWinner.ESSAY_B.value}'",
         },
         "justification": {
             "type": "string",

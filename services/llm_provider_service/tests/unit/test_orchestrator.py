@@ -101,8 +101,8 @@ async def test_orchestrator_successful_comparison(
     # Arrange
     correlation_id = uuid4()
     mock_response = LLMProviderResponse(
-        choice="B",
-        reasoning="Essay B is better structured",
+        winner="Essay B",
+        justification="Essay B is better structured",
         confidence=0.85,
         provider=LLMProviderType.MOCK,
         model="mock-model-v1",
@@ -128,8 +128,8 @@ async def test_orchestrator_successful_comparison(
     from services.llm_provider_service.internal_models import LLMOrchestratorResponse
 
     assert isinstance(result, LLMOrchestratorResponse)
-    assert result.choice == "B"
-    assert result.reasoning == "Essay B is better structured"
+    assert result.winner == "Essay B"
+    assert result.justification == "Essay B is better structured"
     assert result.confidence == 0.85
     assert result.provider == LLMProviderType.MOCK
     assert result.model == "mock-model-v1"
@@ -281,8 +281,8 @@ async def test_orchestrator_test_provider_success(
     """Test provider connectivity check success."""
     # Arrange
     mock_response = LLMProviderResponse(
-        choice="A",
-        reasoning="Test response",
+        winner="Essay A",
+        justification="Test response",
         confidence=0.5,
         provider=LLMProviderType.MOCK,
         model="mock-model",
@@ -325,8 +325,8 @@ async def test_orchestrator_with_overrides(
     # Arrange
     correlation_id = uuid4()
     mock_response = LLMProviderResponse(
-        choice="A",
-        reasoning="Response",
+        winner="Essay A",
+        justification="Response",
         confidence=0.7,
         provider=LLMProviderType.MOCK,
         model="overridden-model",

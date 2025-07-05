@@ -30,7 +30,6 @@ class LLMRequestCompletedV1(BaseModel):
     error_message: str | None = None
     token_usage: Dict[str, int] | None = None  # prompt_tokens, completion_tokens
     cost_estimate: float | None = None
-    cached: bool = False
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -45,24 +44,6 @@ class LLMProviderFailureV1(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
-class LLMCacheHitV1(BaseModel):
-    """Event published when cache hit occurs."""
-
-    provider: LLMProviderType
-    correlation_id: UUID
-    cache_key: str
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-
-
-class LLMCacheMissV1(BaseModel):
-    """Event published when cache miss occurs."""
-
-    provider: LLMProviderType
-    correlation_id: UUID
-    cache_key: str
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-
-
 class LLMUsageAnalyticsV1(BaseModel):
     """Periodic analytics event for LLM usage."""
 
@@ -74,7 +55,6 @@ class LLMUsageAnalyticsV1(BaseModel):
     failed_requests: int
     total_tokens: Dict[str, int]  # By token type
     total_cost: float
-    cache_hit_rate: float
     average_response_time_ms: float
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
@@ -112,9 +92,5 @@ class LLMCostTrackingV1(
     # Timing for cost analysis
     request_timestamp: datetime
     response_time_ms: int
-
-    # Cache efficiency tracking
-    cached: bool = False
-    cache_cost_savings_usd: float = 0.0  # How much we saved by using cache
 
     metadata: Dict[str, Any] = Field(default_factory=dict)

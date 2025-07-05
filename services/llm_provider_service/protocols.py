@@ -10,6 +10,7 @@ from services.llm_provider_service.internal_models import (
     LLMProviderResponse,
     LLMQueuedResult,
 )
+from services.llm_provider_service.queue_models import QueuedRequest, QueueStats
 
 
 class LLMProviderProtocol(Protocol):
@@ -163,8 +164,6 @@ class LLMRetryManagerProtocol(Protocol):
         ...
 
 
-# Import queue models for type hints
-from services.llm_provider_service.queue_models import QueuedRequest, QueueStats
 
 
 class QueueManagerProtocol(Protocol):

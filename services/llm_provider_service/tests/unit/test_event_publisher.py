@@ -83,7 +83,6 @@ async def test_publish_llm_request_completed_success(
     response_time_ms = 250
     metadata = {
         "model_used": "claude-3",
-        "cached": False,
         "token_usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
         "cost_estimate": 0.002,
     }
@@ -108,7 +107,6 @@ async def test_publish_llm_request_completed_success(
     assert event_data.error_message is None
     assert event_data.token_usage == metadata["token_usage"]
     assert event_data.cost_estimate == 0.002
-    assert event_data.cached is False
 
 
 @pytest.mark.asyncio

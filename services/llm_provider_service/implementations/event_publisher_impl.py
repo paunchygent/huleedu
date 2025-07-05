@@ -127,7 +127,6 @@ class LLMEventPublisherImpl(LLMEventPublisherProtocol):
                 error_message=metadata.get("error_message"),
                 token_usage=metadata.get("token_usage"),
                 cost_estimate=metadata.get("cost_estimate"),
-                cached=metadata.get("cached", False),
                 metadata=metadata,
             )
 
@@ -137,7 +136,7 @@ class LLMEventPublisherImpl(LLMEventPublisherProtocol):
                 correlation_id=correlation_id,
                 data=event_data,
             )
-            
+
             # Inject trace context if we have an active span
             if get_current_span():
                 if envelope.metadata is None:
@@ -201,7 +200,7 @@ class LLMEventPublisherImpl(LLMEventPublisherProtocol):
                 correlation_id=correlation_id,
                 data=event_data,
             )
-            
+
             # Inject trace context if we have an active span
             if get_current_span():
                 if envelope.metadata is None:

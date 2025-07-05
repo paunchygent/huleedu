@@ -43,6 +43,7 @@ monorepo-tools = [
     "testcontainers[postgres,kafka]",  # For PostgreSQL and Kafka integration tests
     "kafka-python",
     "respx",
+    "types-psutil",  # Type stubs for psutil
 ]
 
 # Install all services and common_core for unified development

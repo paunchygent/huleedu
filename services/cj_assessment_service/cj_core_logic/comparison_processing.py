@@ -11,6 +11,7 @@ from typing import Any
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common_core import EssayComparisonWinner
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import (
@@ -187,7 +188,7 @@ async def _process_comparison_iteration(
     valid_llm_results = [
         res
         for res in llm_comparison_results
-        if res.llm_assessment and res.llm_assessment.winner != "Error"
+        if res.llm_assessment and res.llm_assessment.winner != EssayComparisonWinner.ERROR
     ]
 
     logger.info(

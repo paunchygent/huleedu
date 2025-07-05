@@ -143,7 +143,9 @@ class ConnectionPoolManagerImpl:
     def _get_provider_headers(self, provider: str) -> Dict[str, str]:
         """Get provider-specific HTTP headers for optimization."""
         common_headers = {
-            "User-Agent": f"HuleEdu-LLM-Service/{getattr(self.settings, 'SERVICE_VERSION', '1.0.0')}",
+            "User-Agent": (
+                f"HuleEdu-LLM-Service/{getattr(self.settings, 'SERVICE_VERSION', '1.0.0')}"
+            ),
             "Accept": "application/json",
             "Content-Type": "application/json",
             "Connection": "keep-alive",  # Ensure keep-alive for connection reuse

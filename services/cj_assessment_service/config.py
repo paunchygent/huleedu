@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     # LLM Provider Service configuration
     LLM_PROVIDER_SERVICE_URL: str = Field(
-        default="http://llm_provider_service:8090/api/v1",
+        default="http://llm_provider_service:8080/api/v1",
         description="Base URL for centralized LLM Provider Service",
     )
 

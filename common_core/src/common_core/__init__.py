@@ -16,6 +16,7 @@ from .config_enums import Environment, LLMProviderType
 from .domain_enums import (
     ContentType,
     CourseCode,
+    EssayComparisonWinner,
     Language,
     get_course_language,
     get_course_level,
@@ -97,6 +98,7 @@ __all__ = [
     # Domain Enums
     "ContentType",
     "CourseCode",
+    "EssayComparisonWinner",
     "Language",
     "get_course_language",
     "get_course_name",

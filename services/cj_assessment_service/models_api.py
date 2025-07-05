@@ -8,9 +8,9 @@ Updated for CJ Assessment Service with string-based essay IDs for ELS integratio
 
 from __future__ import annotations
 
-from typing import Literal
-
 from pydantic import BaseModel, Field
+
+from common_core import EssayComparisonWinner
 
 
 class EssayForComparison(BaseModel):
@@ -27,7 +27,7 @@ class EssayForComparison(BaseModel):
 class LLMAssessmentResponseSchema(BaseModel):
     """Schema for structured LLM responses to essay comparisons."""
 
-    winner: Literal["Essay A", "Essay B", "Error"]
+    winner: EssayComparisonWinner
     justification: str
     confidence: float | None = Field(None, ge=1.0, le=5.0)
 

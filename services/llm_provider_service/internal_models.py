@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from common_core import LLMProviderType
+from common_core import EssayComparisonWinner, LLMProviderType
 from common_core.error_enums import ErrorCode
 from services.llm_provider_service.error_types import LLMProviderErrorType
 
@@ -14,8 +14,8 @@ class LLMProviderResponse(BaseModel):
     """Internal model for LLM provider responses."""
 
     # Core comparison result
-    choice: str = Field(description="Selected essay (A or B)")
-    reasoning: str = Field(description="Reasoning for the choice")
+    winner: EssayComparisonWinner = Field(description="Selected essay")
+    justification: str = Field(description="Justification for the choice")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score")
 
     # Provider metadata
@@ -35,8 +35,8 @@ class LLMOrchestratorResponse(BaseModel):
     """Internal model for orchestrator responses."""
 
     # Core result (from provider)
-    choice: str = Field(description="Selected essay (A or B)")
-    reasoning: str = Field(description="Reasoning for the choice")
+    winner: EssayComparisonWinner = Field(description="Selected essay")
+    justification: str = Field(description="Justification for the choice")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score")
 
     # Provider information

@@ -18,7 +18,11 @@ from common_core.events.cj_assessment_events import (
     LLMConfigOverrides,
 )
 from common_core.events.envelope import EventEnvelope
-from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1, SystemProcessingMetadata
+from common_core.metadata_models import (
+    EntityReference,
+    EssayProcessingInputRefV1,
+    SystemProcessingMetadata,
+)
 
 
 class TestLLMProviderServiceIntegration:
@@ -120,7 +124,7 @@ class TestLLMProviderServiceIntegration:
                     text_storage_id="content/essay-1.txt",
                 ),
                 EssayProcessingInputRefV1(
-                    essay_id="essay-2", 
+                    essay_id="essay-2",
                     text_storage_id="content/essay-2.txt",
                 ),
             ],
@@ -154,9 +158,11 @@ class TestLLMProviderServiceIntegration:
             # Check that the provider is available - providers is a list of objects
             provider_names = [p["name"] for p in providers_data["providers"]]
             assert provider.value in provider_names
-            
+
             # Find the provider object
-            provider_info = next(p for p in providers_data["providers"] if p["name"] == provider.value)
+            provider_info = next(
+                p for p in providers_data["providers"] if p["name"] == provider.value
+            )
             assert provider_info["enabled"] is True
             assert provider_info["available"] is True
             print(f"Provider {provider.value}: {provider_info}")

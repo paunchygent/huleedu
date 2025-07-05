@@ -26,8 +26,8 @@ async def test_mock_provider_successful_comparison() -> None:
     # Assert
     assert error is None
     assert result is not None
-    assert result.choice in ["A", "B"]
-    assert len(result.reasoning) > 0
+    assert result.winner in ["Essay A", "Essay B"]
+    assert len(result.justification) > 0
     assert 0.0 <= result.confidence <= 1.0
     assert result.provider == "mock"
     assert result.model == "mock-model-v1"

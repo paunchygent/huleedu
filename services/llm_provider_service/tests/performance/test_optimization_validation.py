@@ -3,7 +3,7 @@ Performance validation tests for specific optimization components.
 
 Tests the effectiveness of implemented performance optimizations:
 - Connection pool efficiency
-- Response validation performance improvements  
+- Response validation performance improvements
 - Redis pipelining benefits
 - Provider-specific optimizations
 """
@@ -26,7 +26,7 @@ from services.llm_provider_service.response_validator import validate_and_normal
 @pytest.fixture
 def performance_settings() -> Settings:
     """Settings for performance testing.
-    
+
     CRITICAL: Mock providers are enabled to avoid API costs during testing.
     """
     settings = Settings(
@@ -90,7 +90,10 @@ class TestConnectionPoolOptimizations:
 
             print(f"Session creation time: {first_creation_time:.6f}s")
             print(f"Session reuse time: {reuse_time:.6f}s")
-            print(f"Reuse improvement: {((first_creation_time - reuse_time) / first_creation_time * 100):.1f}%")
+            print(
+                f"Reuse improvement: "
+                f"{((first_creation_time - reuse_time) / first_creation_time * 100):.1f}%"
+            )
 
         finally:
             await pool_manager.cleanup()
@@ -101,6 +104,7 @@ class TestConnectionPoolOptimizations:
         pool_manager = ConnectionPoolManagerImpl(performance_settings)
 
         try:
+
             async def get_session_timed(provider: str) -> float:
                 """Get session and return time taken."""
                 start_time = time.perf_counter()
@@ -130,7 +134,7 @@ class TestConnectionPoolOptimizations:
 
             # Verify performance
             assert avg_time < 0.001  # Should be very fast for session reuse
-            assert max_time < 0.01   # Even worst case should be under 10ms
+            assert max_time < 0.01  # Even worst case should be under 10ms
 
         finally:
             await pool_manager.cleanup()
@@ -174,8 +178,10 @@ class TestResponseValidationOptimizations:
         """Test optimized response validation performance."""
         # Test data with various scenarios
         test_responses = [
-            '{"winner": "Essay A", "justification": "Better structure and clarity", "confidence": 4.2}',
-            '{"winner": "Essay B", "justification": "More compelling arguments", "confidence": 3.8}',
+            '{"winner": "Essay A", "justification": "Better structure and clarity", '
+            '"confidence": 4.2}',
+            '{"winner": "Essay B", "justification": "More compelling arguments", '
+            '"confidence": 3.8}',
             '{"winner": "Essay A", "justification": "Superior analysis", "confidence": 4.5}',
             '{"winner": "Essay B", "justification": "Clearer presentation", "confidence": 3.9}',
             '{"winner": "Essay A", "justification": "Better evidence", "confidence": 4.1}',
@@ -224,7 +230,8 @@ class TestResponseValidationOptimizations:
             "confidence": r'"confidence"\s*:\s*(\d+(?:\.\d+)?)',
         }
 
-        test_response = '{"winner": "Essay A", "justification": "Better structure and clarity", "confidence": 4.2}'
+        test_response = ('{"winner": "Essay A", "justification": "Better structure and clarity", '
+                         '"confidence": 4.2}')
 
         # Test compilation time vs usage time
         iterations = 1000
@@ -246,7 +253,9 @@ class TestResponseValidationOptimizations:
                 compiled_pattern.search(test_response)
         time_with_precompilation = time.perf_counter() - start_time
 
-        improvement = ((time_without_precompilation - time_with_precompilation) / time_without_precompilation) * 100
+        improvement = (
+            (time_without_precompilation - time_with_precompilation) / time_without_precompilation
+        ) * 100
 
         print("Regex compilation performance:")
         print(f"  Without pre-compilation: {time_without_precompilation:.4f}s")
@@ -299,7 +308,7 @@ class TestResponseValidationOptimizations:
             elif case["size"] == "medium":
                 assert avg_time < 0.00005  # Under 50 microseconds
             else:  # large
-                assert avg_time < 0.0001   # Under 100 microseconds
+                assert avg_time < 0.0001  # Under 100 microseconds
 
 
 class TestRedisOptimizations:
@@ -337,11 +346,10 @@ class TestRedisOptimizations:
         from datetime import datetime, timedelta, timezone
         from uuid import uuid4
 
+        from common_core import QueueStatus
+        from services.llm_provider_service.api_models import LLMComparisonRequest
         from services.llm_provider_service.queue_models import QueuedRequest
 
-        from services.llm_provider_service.api_models import LLMComparisonRequest
-        from common_core import QueueStatus
-        
         requests = []
         for i in range(10):
             request_data = LLMComparisonRequest(
@@ -390,14 +398,14 @@ class TestRedisOptimizations:
         # Mock request data
         request_data = []
         from datetime import timezone
-        
+
         for i in range(10):
             data = {
                 "queue_id": f"queue-{i}",
                 "status": "QUEUED",
                 "priority": 0,
                 "queued_at": datetime.now(timezone.utc).isoformat(),
-                "request_data": {"essay_a": f"Essay A {i}", "essay_b": f"Essay B {i}"}
+                "request_data": {"essay_a": f"Essay A {i}", "essay_b": f"Essay B {i}"},
             }
             request_data.append(json.dumps(data))
 

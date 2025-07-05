@@ -14,6 +14,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common_core import EssayComparisonWinner
 from services.cj_assessment_service.models_api import ComparisonResult, EssayForComparison
 from services.cj_assessment_service.models_db import ComparisonPair as CJ_ComparisonPair
 from services.cj_assessment_service.models_db import ProcessedEssay as CJ_ProcessedEssay
@@ -47,12 +48,14 @@ async def record_comparisons_and_update_scores(
     # 1. Store new comparison results
     successful_comparisons_this_round = 0
     for result in comparison_results:
-        if result.llm_assessment and result.llm_assessment.winner != "Error":
+        if result.llm_assessment:
             winner_db_val = None
-            if result.llm_assessment.winner == "Essay A":
+            if result.llm_assessment.winner == EssayComparisonWinner.ESSAY_A:
                 winner_db_val = "essay_a"
-            elif result.llm_assessment.winner == "Essay B":
+            elif result.llm_assessment.winner == EssayComparisonWinner.ESSAY_B:
                 winner_db_val = "essay_b"
+            elif result.llm_assessment.winner == EssayComparisonWinner.ERROR:
+                winner_db_val = "error"
 
             new_pair = CJ_ComparisonPair(
                 cj_batch_id=cj_batch_id,
@@ -68,7 +71,10 @@ async def record_comparisons_and_update_scores(
                 from_cache=result.from_cache,
             )
             db_session.add(new_pair)
-            successful_comparisons_this_round += 1
+            
+            # Only count successful comparisons (not errors)
+            if result.llm_assessment.winner != EssayComparisonWinner.ERROR:
+                successful_comparisons_this_round += 1
 
     if successful_comparisons_this_round > 0:
         await db_session.flush()  # Flush to save new pairs before querying all
@@ -82,7 +88,7 @@ async def record_comparisons_and_update_scores(
     stmt_all_comps = select(CJ_ComparisonPair).where(
         CJ_ComparisonPair.cj_batch_id == cj_batch_id,
         CJ_ComparisonPair.winner.isnot(None),  # Ensure there's a winner
-        CJ_ComparisonPair.winner != "Error",
+        CJ_ComparisonPair.winner != "error",
     )
     all_db_comparisons_result = await db_session.execute(stmt_all_comps)
     all_valid_db_comparisons = all_db_comparisons_result.scalars().all()

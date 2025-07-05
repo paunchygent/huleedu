@@ -7,7 +7,6 @@ import pytest
 
 from services.llm_provider_service.response_validator import (
     StandardizedLLMResponse,
-    convert_to_internal_format,
     validate_and_normalize_response,
 )
 
@@ -19,26 +18,26 @@ class TestStandardizedLLMResponse:
         """Test creating a valid standardized response."""
         response = StandardizedLLMResponse(
             winner="Essay A",
-            justification="This essay demonstrates superior clarity and structure in its arguments.",
+            justification="This essay demonstrates superior clarity.",
             confidence=4.2,
         )
 
         assert response.winner == "Essay A"
-        assert len(response.justification) >= 50
+        assert len(response.justification) <= 50
         assert 1.0 <= response.confidence <= 5.0
 
-    def test_justification_too_short_fails(self) -> None:
-        """Test that short justifications fail strict validation."""
-        with pytest.raises(ValueError):
-            StandardizedLLMResponse(
-                winner="Essay B",
-                justification="Short text",  # Less than 50 chars
-                confidence=3.0,
-            )
+    def test_justification_too_short_passes(self) -> None:
+        """Test that short justifications are accepted."""
+        response = StandardizedLLMResponse(
+            winner="Essay B",
+            justification="Short text",  # Less than 50 chars but still valid
+            confidence=3.0,
+        )
+        assert response.justification == "Short text"
 
     def test_justification_too_long_fails(self) -> None:
         """Test that long justifications fail strict validation."""
-        long_text = "A" * 600  # More than 500 chars
+        long_text = "A" * 60  # More than 50 chars
         with pytest.raises(ValueError):
             StandardizedLLMResponse(winner="Essay A", justification=long_text, confidence=2.5)
 
@@ -48,7 +47,7 @@ class TestStandardizedLLMResponse:
         with pytest.raises(ValueError):
             StandardizedLLMResponse(
                 winner="Essay A",
-                justification="This essay has better structure and clearer arguments throughout.",
+                justification="This essay has better structure.",
                 confidence=0.5,  # Below minimum
             )
 
@@ -56,7 +55,7 @@ class TestStandardizedLLMResponse:
         with pytest.raises(ValueError):
             StandardizedLLMResponse(
                 winner="Essay B",
-                justification="This essay demonstrates exceptional writing quality and analysis.",
+                justification="This essay demonstrates exceptional writing.",
                 confidence=6.0,  # Above maximum
             )
 
@@ -65,7 +64,7 @@ class TestStandardizedLLMResponse:
         with pytest.raises(ValueError):
             StandardizedLLMResponse(
                 winner="A",  # Should be "Essay A"
-                justification="This essay is better for various reasons including structure.",
+                justification="This essay is better for various reasons.",
                 confidence=3.0,
             )
 
@@ -78,7 +77,7 @@ class TestValidateAndNormalizeResponse:
         json_response = json.dumps(
             {
                 "winner": "Essay A",
-                "justification": "This essay demonstrates superior clarity and structure.",
+                "justification": "This essay demonstrates superior clarity.",
                 "confidence": 4.2,
             }
         )
@@ -94,7 +93,7 @@ class TestValidateAndNormalizeResponse:
         """Test validation with valid dictionary input."""
         dict_response = {
             "winner": "Essay B",
-            "justification": "This essay has better arguments and clearer presentation.",
+            "justification": "This essay has better arguments.",
             "confidence": 3.5,
         }
 
@@ -128,14 +127,14 @@ class TestValidateAndNormalizeResponse:
         assert validated is not None
         assert error is None
         assert validated.winner == "Essay A"
-        assert len(validated.justification) >= 50
+        assert len(validated.justification) >= 10
         assert validated.confidence == 3.0
 
     def test_invalid_winner_value_gets_normalized(self) -> None:
         """Test validation with invalid winner value gets normalized."""
         invalid_response = {
             "winner": "A",  # Should be "Essay A" or "Essay B" - gets normalized to "Essay A"
-            "justification": "This essay demonstrates better writing quality overall.",
+            "justification": "This essay demonstrates better writing quality.",
             "confidence": 3.0,
         }
 
@@ -149,7 +148,7 @@ class TestValidateAndNormalizeResponse:
         """Test that confidence values are automatically clamped."""
         response_with_high_confidence = {
             "winner": "Essay A",
-            "justification": "This essay shows exceptional quality in all aspects of writing.",
+            "justification": "This essay shows exceptional quality.",
             "confidence": 10.0,  # Will be clamped to 5.0
         }
 
@@ -164,60 +163,29 @@ class TestValidateAndNormalizeResponse:
         # Test short justification gets padded
         short_response = {
             "winner": "Essay A",
-            "justification": "Short",  # Less than 50 chars
+            "justification": "Short",  # Less than 10 chars
             "confidence": 3.0,
         }
 
         validated, error = validate_and_normalize_response(short_response)
         assert validated is not None
         assert error is None
-        assert len(validated.justification) >= 50
-        assert "additional analysis provided" in validated.justification
+        assert len(validated.justification) >= 10
+        assert "clear choice" in validated.justification
 
         # Test long justification gets truncated
         long_response = {
             "winner": "Essay B",
-            "justification": "A" * 600,  # More than 500 chars
+            "justification": "A" * 60,  # More than 50 chars
             "confidence": 4.0,
         }
 
         validated, error = validate_and_normalize_response(long_response)
         assert validated is not None
         assert error is None
-        assert len(validated.justification) == 500
+        assert len(validated.justification) == 50
         assert validated.justification.endswith("...")
 
-
-class TestConvertToInternalFormat:
-    """Test the convert_to_internal_format function."""
-
-    def test_essay_a_conversion(self) -> None:
-        """Test conversion for Essay A winner."""
-        response = StandardizedLLMResponse(
-            winner="Essay A",
-            justification="This essay demonstrates superior clarity and logical structure.",
-            confidence=4.0,
-        )
-
-        choice, reasoning, confidence = convert_to_internal_format(response)
-
-        assert choice == "A"
-        assert reasoning == response.justification
-        assert confidence == 4.0
-
-    def test_essay_b_conversion(self) -> None:
-        """Test conversion for Essay B winner."""
-        response = StandardizedLLMResponse(
-            winner="Essay B",
-            justification="This essay has better arguments and more compelling evidence.",
-            confidence=3.5,
-        )
-
-        choice, reasoning, confidence = convert_to_internal_format(response)
-
-        assert choice == "B"
-        assert reasoning == response.justification
-        assert confidence == 3.5
 
 
 class TestProviderFormatCompatibility:
@@ -227,7 +195,7 @@ class TestProviderFormatCompatibility:
         """Test validation with Anthropic tool response format."""
         anthropic_response = {
             "winner": "Essay A",
-            "justification": "Essay A demonstrates superior organization and clearer argumentation.",
+            "justification": "Essay A demonstrates superior organization.",
             "confidence": 4.3,
         }
 
@@ -235,17 +203,15 @@ class TestProviderFormatCompatibility:
 
         assert validated is not None
         assert error is None
-
-        choice, reasoning, confidence = convert_to_internal_format(validated)
-        assert choice == "A"
-        assert reasoning == anthropic_response["justification"]
+        assert validated.winner == "Essay A"
+        assert validated.justification == anthropic_response["justification"]
 
     def test_openai_json_schema_format(self) -> None:
         """Test validation with OpenAI JSON schema response format."""
         openai_response = json.dumps(
             {
                 "winner": "Essay B",
-                "justification": "Essay B provides more compelling evidence and better structure.",
+                "justification": "Essay B provides more compelling evidence.",
                 "confidence": 2.8,
             }
         )
@@ -254,16 +220,14 @@ class TestProviderFormatCompatibility:
 
         assert validated is not None
         assert error is None
-
-        choice, reasoning, confidence = convert_to_internal_format(validated)
-        assert choice == "B"
+        assert validated.winner == "Essay B"
 
     def test_google_structured_output_format(self) -> None:
         """Test validation with Google structured output format."""
         google_response = json.dumps(
             {
                 "winner": "Essay A",
-                "justification": "Essay A shows better mastery of writing conventions and argumentation.",
+                "justification": "Essay A shows better mastery of writing.",
                 "confidence": 3.7,
             }
         )
@@ -278,7 +242,7 @@ class TestProviderFormatCompatibility:
         openrouter_response = json.dumps(
             {
                 "winner": "Essay B",
-                "justification": "Essay B demonstrates more sophisticated analysis and clearer writing.",
+                "justification": "Essay B demonstrates more sophisticated analysis.",
                 "confidence": 4.1,
             }
         )
@@ -298,7 +262,7 @@ class TestResponseFormatStandardization:
             (
                 {
                     "winner": "Essay A",
-                    "justification": "Essay A is better written with clearer arguments.",
+                    "justification": "Essay A is better written.",
                     "confidence": 3.0,
                 },
                 "A",
@@ -306,7 +270,7 @@ class TestResponseFormatStandardization:
             (
                 {
                     "winner": "Essay B",
-                    "justification": "Essay B demonstrates superior structure and analysis.",
+                    "justification": "Essay B demonstrates superior structure.",
                     "confidence": 4.0,
                 },
                 "B",
@@ -321,8 +285,6 @@ class TestResponseFormatStandardization:
 
         assert validated is not None
         assert error is None
-
-        choice, reasoning, confidence = convert_to_internal_format(validated)
-        assert choice == expected_choice
-        assert len(reasoning) >= 50  # Justification length validation
-        assert 1.0 <= confidence <= 5.0  # Confidence range validation
+        assert validated.winner == f"Essay {expected_choice}"
+        assert len(validated.justification) <= 50  # Justification length validation
+        assert 1.0 <= validated.confidence <= 5.0  # Confidence range validation

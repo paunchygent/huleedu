@@ -8,8 +8,8 @@ avoiding expensive API calls.
 from __future__ import annotations
 
 import random
-from typing import Literal
 
+from common_core import EssayComparisonWinner
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
     ComparisonTask,
@@ -55,20 +55,20 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
 
         for task in tasks:
             # Randomly select winner and generate justification
-            winner: Literal["Essay A", "Essay B", "Error"]
+            winner: EssayComparisonWinner
             if random.random() < 0.05:
                 # 5% chance of error
-                winner = "Error"
+                winner = EssayComparisonWinner.ERROR
                 justification = "The model encountered an error comparing these essays."
                 confidence = None
             else:
                 # Randomly select winner with slight bias towards Essay B
-                winner = "Essay A" if random.random() < 0.45 else "Essay B"
+                winner = EssayComparisonWinner.ESSAY_A if random.random() < 0.45 else EssayComparisonWinner.ESSAY_B
                 confidence = round(random.uniform(1.0, 5.0), 1)
 
                 # Generate realistic justification based on winner
                 justifications = {
-                    "Essay A": [
+                    EssayComparisonWinner.ESSAY_A: [
                         "Essay A demonstrates stronger argumentation and clearer structure.",
                         "Essay A provides more compelling evidence and better analysis.",
                         "Essay A has superior organization and more persuasive language.",
@@ -78,7 +78,7 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
                         ),
                         "Essay A maintains better coherence and has stronger conclusions.",
                     ],
-                    "Essay B": [
+                    EssayComparisonWinner.ESSAY_B: [
                         (
                             "Essay B presents a more convincing argument with better "
                             "supporting evidence."
@@ -86,7 +86,7 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
                         "Essay B demonstrates superior writing quality and clearer expression.",
                         "Essay B shows more sophisticated analysis and deeper understanding.",
                         "Essay B has better paragraph structure and more effective transitions.",
-                        "Essay B provides more relevant examples and stronger reasoning.",
+                        "Essay B provides more relevant examples and stronger justification.",
                     ],
                 }
 

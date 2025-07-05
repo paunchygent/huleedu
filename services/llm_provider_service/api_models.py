@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from common_core import LLMProviderType
+from common_core import EssayComparisonWinner, LLMProviderType
 
 
 class LLMConfigOverrides(BaseModel):
@@ -40,7 +40,7 @@ class LLMComparisonResponse(BaseModel):
     """Response model for LLM essay comparison."""
 
     # Core result fields (matching CJ Assessment expectations)
-    winner: str = Field(description="Selected essay (Essay A or Essay B)")
+    winner: EssayComparisonWinner = Field(description="Selected essay")
     justification: str = Field(description="Justification for the choice")
     confidence: float = Field(description="Confidence score (1-5)")
 

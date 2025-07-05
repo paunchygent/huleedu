@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from common_core import LLMProviderType
+from common_core import EssayComparisonWinner, LLMProviderType
 from services.llm_provider_service.api_models import (
     LLMComparisonRequest,
     LLMComparisonResponse,
@@ -22,10 +22,10 @@ async def test_comparison_response_model_validation() -> None:
 
     # Act - Valid response
     response = LLMComparisonResponse(
-        winner="Essay A",
+        winner=EssayComparisonWinner.ESSAY_A,
         justification="Essay A is better",
         confidence=4.4,  # 1-5 scale
-        provider="openai",
+        provider=LLMProviderType.OPENAI,
         model="gpt-4",
         response_time_ms=150,
         token_usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
@@ -35,7 +35,7 @@ async def test_comparison_response_model_validation() -> None:
     )
 
     # Assert
-    assert response.winner == "Essay A"
+    assert response.winner == EssayComparisonWinner.ESSAY_A
     assert response.confidence == 4.4
     assert response.token_usage is not None
     assert response.token_usage["total_tokens"] == 150
@@ -76,7 +76,7 @@ async def test_comparison_request_with_overrides() -> None:
 
     # Assert
     assert request.llm_config_overrides is not None
-    assert request.llm_config_overrides.provider_override == "anthropic"
+    assert request.llm_config_overrides.provider_override == LLMProviderType.ANTHROPIC
     assert request.llm_config_overrides.temperature_override == 0.3
 
 
@@ -84,7 +84,7 @@ def test_provider_status_model() -> None:
     """Test LLMProviderStatus model."""
     # Act
     status = LLMProviderStatus(
-        name="openai",
+        name=LLMProviderType.OPENAI,
         enabled=True,
         available=True,
         circuit_breaker_state="closed",
@@ -106,8 +106,8 @@ def test_orchestrator_response_to_api_response_mapping() -> None:
     # Arrange
     correlation_id = uuid4()
     orchestrator_response = LLMOrchestratorResponse(
-        choice="B",
-        reasoning="Better argumentation",
+        winner=EssayComparisonWinner.ESSAY_B,
+        justification="Better argumentation",
         confidence=0.9,
         provider=LLMProviderType.ANTHROPIC,
         model="claude-3",
@@ -119,17 +119,13 @@ def test_orchestrator_response_to_api_response_mapping() -> None:
     )
 
     # Act - Map to API response (simulating the transformation logic)
-    winner = (
-        f"Essay {orchestrator_response.choice}"
-        if orchestrator_response.choice in ["A", "B"]
-        else orchestrator_response.choice
-    )
+    winner = orchestrator_response.winner
     confidence_scaled = 1.0 + (orchestrator_response.confidence * 4.0)
     confidence_scaled = max(1.0, min(5.0, confidence_scaled))
 
     api_response = LLMComparisonResponse(
         winner=winner,
-        justification=orchestrator_response.reasoning,
+        justification=orchestrator_response.justification,
         confidence=confidence_scaled,
         provider=orchestrator_response.provider,
         model=orchestrator_response.model,
@@ -141,7 +137,7 @@ def test_orchestrator_response_to_api_response_mapping() -> None:
     )
 
     # Assert
-    assert api_response.winner == "Essay B"
+    assert api_response.winner == EssayComparisonWinner.ESSAY_B
     assert api_response.justification == "Better argumentation"
     assert api_response.confidence == 4.6  # 1.0 + (0.9 * 4.0) = 4.6
     assert api_response.cost_estimate == 0.008

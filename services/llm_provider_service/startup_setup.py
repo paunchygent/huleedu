@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.observability.tracing import init_tracing, get_tracer
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
+from huleedu_service_libs.observability.tracing import init_tracing
 from quart import Quart
 from quart_dishka import QuartDishka
 

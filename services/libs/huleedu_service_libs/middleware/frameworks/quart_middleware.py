@@ -31,12 +31,20 @@ class TracingMiddleware:
         Args:
             req: The incoming request
         """
-        # Extract trace context from headers
-        context = extract(req.headers)
+        from opentelemetry import context as otel_context
 
-        # Start span
+        # Extract trace context from headers
+        extracted_context = extract(req.headers)
+
+        # Attach the extracted context to make it current
+        context_token = otel_context.attach(extracted_context)
+
+        # Start span in the current context
         span_name = f"{req.method} {req.path}"
-        span = self.tracer.start_span(span_name, context=context, kind=trace.SpanKind.SERVER)
+        span = self.tracer.start_span(span_name, kind=trace.SpanKind.SERVER)
+
+        # Make this span the current span
+        span_token = otel_context.attach(trace.set_span_in_context(span))
 
         # Set span attributes
         span.set_attribute("http.method", req.method)
@@ -64,8 +72,10 @@ class TracingMiddleware:
         span.set_attribute("correlation_id", correlation_id)
         g.correlation_id = correlation_id
 
-        # Store span and start time in context
+        # Store span, context tokens and start time for cleanup
         g.current_span = span
+        g.context_token = context_token
+        g.span_token = span_token
         g.trace_start_time = time.time()
 
     async def after_request(self, response: Response) -> Response:
@@ -106,6 +116,17 @@ class TracingMiddleware:
 
             # End span
             span.end()
+
+            # Clean up context tokens in reverse order
+            from opentelemetry import context as otel_context
+
+            # Detach span context first
+            if hasattr(g, "span_token"):
+                otel_context.detach(g.span_token)
+
+            # Then detach the original extracted context
+            if hasattr(g, "context_token"):
+                otel_context.detach(g.context_token)
 
         return response
 

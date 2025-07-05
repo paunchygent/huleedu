@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core import LLMProviderType
+from common_core import EssayComparisonWinner, LLMProviderType
 from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.internal_models import LLMProviderError, LLMProviderResponse
@@ -65,37 +65,37 @@ class MockProviderImpl(LLMProviderProtocol):
             )
 
         # Randomly select winner with slight bias towards Essay B
-        choice = "A" if random.random() < 0.45 else "B"
+        winner = EssayComparisonWinner.ESSAY_A if random.random() < 0.45 else EssayComparisonWinner.ESSAY_B
         confidence = round(random.uniform(0.6, 0.95), 2)
 
-        # Generate realistic reasoning based on winner
-        reasoning_options = {
-            "A": [
+        # Generate realistic justification based on winner
+        justification_options = {
+            EssayComparisonWinner.ESSAY_A: [
                 "Essay A demonstrates stronger argumentation and clearer structure.",
                 "Essay A provides more compelling evidence and better analysis.",
                 "Essay A has superior organization and more persuasive language.",
                 "Essay A shows better understanding of the topic with more detailed examples.",
                 "Essay A maintains better coherence and has stronger conclusions.",
             ],
-            "B": [
+            EssayComparisonWinner.ESSAY_B: [
                 "Essay B presents a more convincing argument with better supporting evidence.",
                 "Essay B demonstrates superior writing quality and clearer expression.",
                 "Essay B shows more sophisticated analysis and deeper understanding.",
                 "Essay B has better paragraph structure and more effective transitions.",
-                "Essay B provides more relevant examples and stronger reasoning.",
+                "Essay B provides more relevant examples and stronger justification.",
             ],
         }
 
-        reasoning = random.choice(reasoning_options[choice])
+        justification = random.choice(justification_options[winner])
 
         # Calculate mock token usage
         prompt_tokens = len(user_prompt.split()) + len(essay_a.split()) + len(essay_b.split())
-        completion_tokens = len(reasoning.split()) + 10  # Add some for structure
+        completion_tokens = len(justification.split()) + 10  # Add some for structure
         total_tokens = prompt_tokens + completion_tokens
 
         response = LLMProviderResponse(
-            choice=choice,
-            reasoning=reasoning,
+            winner=winner,
+            justification=justification,
             confidence=confidence,
             provider=LLMProviderType.MOCK,
             model=model_override or "mock-model-v1",
@@ -110,5 +110,5 @@ class MockProviderImpl(LLMProviderProtocol):
             },
         )
 
-        logger.debug(f"Mock provider generated response: choice={choice}, confidence={confidence}")
+        logger.debug(f"Mock provider generated response: winner={winner.value}, confidence={confidence}")
         return response, None

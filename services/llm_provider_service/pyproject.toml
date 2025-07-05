@@ -27,6 +27,8 @@ dependencies = [
     "anthropic",
     "openai",
     "google-generativeai",
+    # Performance testing dependencies
+    "psutil",
 ]
 
 [build-system]

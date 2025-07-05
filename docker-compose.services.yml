@@ -380,12 +380,11 @@ services:
       - CJ_ASSESSMENT_SERVICE_LOG_LEVEL=INFO
       - CJ_ASSESSMENT_SERVICE_METRICS_PORT=9090
       - CJ_ASSESSMENT_SERVICE_REDIS_URL=redis://redis:6379
+      - CJ_ASSESSMENT_SERVICE_LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8080/api/v1
       # Database configuration
       - CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@cj_assessment_db:5432/cj_assessment
-      # LLM Provider Service configuration
-      - CJ_ASSESSMENT_SERVICE_LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8090/api/v1
       # Testing configuration
-      - CJ_ASSESSMENT_SERVICE_USE_MOCK_LLM=false  # Use LLM Provider Service instead
+      - CJ_ASSESSMENT_SERVICE_USE_MOCK_LLM=${USE_MOCK_LLM:-false}  # Use LLM Provider Service instead
       # Default LLM configuration (passed to LLM Provider Service)
       - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_PROVIDER=anthropic
       - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_MODEL=claude-3-5-haiku-20241022
@@ -512,6 +511,8 @@ services:
       - LLM_PROVIDER_SERVICE_PORT=8080
       - LLM_PROVIDER_SERVICE_HOST=0.0.0.0
       - LLM_PROVIDER_SERVICE_REDIS_URL=redis://redis:6379
+      # Testing configuration
+      - LLM_PROVIDER_SERVICE_USE_MOCK_LLM=${USE_MOCK_LLM:-true}
       # LLM Provider API Keys (from env)
       - LLM_PROVIDER_SERVICE_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - LLM_PROVIDER_SERVICE_OPENAI_API_KEY=${OPENAI_API_KEY}
