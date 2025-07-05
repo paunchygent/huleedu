@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from prometheus_client import CollectorRegistry, Counter, Histogram
+from prometheus_client import REGISTRY, Counter, Histogram
 
 # Global metrics instances (created once, shared by HTTP and worker)
 _metrics: dict[str, Any] | None = None
@@ -57,7 +57,7 @@ def _create_metrics() -> dict[str, Any]:
     Creates both HTTP service metrics and business intelligence metrics
     for Essay Lifecycle Service observability.
     """
-    registry = CollectorRegistry()
+    registry = REGISTRY
 
     return {
         # HTTP Service Metrics (existing functionality)

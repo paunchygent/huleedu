@@ -18,7 +18,7 @@ from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPubli
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
-from prometheus_client import CollectorRegistry
+from prometheus_client import REGISTRY, CollectorRegistry
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.config import settings as app_settings
@@ -81,7 +81,7 @@ class CoreInfrastructureProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_metrics_registry(self) -> CollectorRegistry:
         """Provide Prometheus metrics registry."""
-        return CollectorRegistry()
+        return REGISTRY
 
     @provide(scope=Scope.APP)
     def provide_tracer(self) -> Tracer:

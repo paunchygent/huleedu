@@ -63,6 +63,11 @@ scrape_configs:
     static_configs:
       - targets: ['result_aggregator_service:4003']
     metrics_path: '/metrics'
+    
+  - job_name: 'batch_conductor_service'
+    static_configs:
+      - targets: ['batch_conductor_service:4002']
+    metrics_path: '/metrics'
 
   # Infrastructure exporters for proper monitoring
   - job_name: 'kafka_exporter'

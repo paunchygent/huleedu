@@ -120,7 +120,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "(rate(http_requests_total{job=\"${service}\"}[5m]) or rate(file_service_http_requests_total{job=\"${service}\"}[5m]) or rate(cj_assessment_http_requests_total{job=\"${service}\"}[5m]) or vector(0))",
+          "expr": "huleedu:service_http_requests:rate5m{service=\"${service}\"}",
           "legendFormat": "{{method}} {{status_code}}",
           "range": true,
           "refId": "A"
@@ -225,7 +225,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(up{job=\"${service}\"}[5m])",
+          "expr": "avg_over_time(up{job=\"${service}\"}[5m])",
           "legendFormat": "Service Availability",
           "range": true,
           "refId": "B"
@@ -312,7 +312,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(up{job=\"${service}\"}[5m])",
+          "expr": "avg_over_time(up{job=\"${service}\"}[5m])",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -323,7 +323,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "(rate(http_requests_total{job=\"${service}\"}[5m]) or rate(file_service_http_requests_total{job=\"${service}\"}[5m]) or rate(cj_assessment_http_requests_total{job=\"${service}\"}[5m]) or vector(0))",
+          "expr": "huleedu:service_http_requests:rate5m{service=\"${service}\"}",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -699,7 +699,7 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "expr": "{service=~\"${service}\"} |= \"${log_filter}\" | json | line_format \"{{if .__error__}}{{__line__}}{{else}}{{.timestamp | default .time | default now}} [{{.level | default \"info\"}}] {{.message | default .msg | default __line__}}{{end}}\"",
+          "expr": "{container=~\"huleedu_${service}\"} |= \"${log_filter}\"",
           "queryType": "range",
           "refId": "A"
         }

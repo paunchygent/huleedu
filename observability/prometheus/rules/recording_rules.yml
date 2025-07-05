@@ -19,6 +19,10 @@ groups:
         sum(rate(spell_checker_http_requests_total[5m])) or vector(0)
       ) + (
         sum(rate(llm_provider_http_requests_total[5m])) or vector(0)
+      ) + (
+        sum(rate(gateway_http_requests_total[5m])) or vector(0)
+      ) + (
+        sum(rate(bcs_http_requests_total[5m])) or vector(0)
       )
 
   # Global HTTP 5xx error rates across all services
@@ -29,15 +33,19 @@ groups:
       ) + (
         sum(rate(bos_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
       ) + (
-        sum(rate(file_service_http_requests_total{status=~"5.."}[5m])) or vector(0)
+        sum(rate(file_service_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
       ) + (
-        sum(rate(cms_http_requests_total{http_status=~"5.."}[5m])) or vector(0)
+        sum(rate(cms_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
       ) + (
         sum(rate(cj_assessment_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
       ) + (
         sum(rate(spell_checker_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
       ) + (
         sum(rate(llm_provider_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(gateway_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(bcs_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
       )
 
   # Global HTTP 4xx error rates across all services
@@ -48,15 +56,19 @@ groups:
       ) + (
         sum(rate(bos_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
       ) + (
-        sum(rate(file_service_http_requests_total{status=~"4.."}[5m])) or vector(0)
+        sum(rate(file_service_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
       ) + (
-        sum(rate(cms_http_requests_total{http_status=~"4.."}[5m])) or vector(0)
+        sum(rate(cms_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
       ) + (
         sum(rate(cj_assessment_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
       ) + (
         sum(rate(spell_checker_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
       ) + (
         sum(rate(llm_provider_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(gateway_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(bcs_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
       )
 
   # Service availability calculation
@@ -93,6 +105,14 @@ groups:
       ) or
       label_replace(
         sum(rate(llm_provider_http_requests_total[5m])) by (job), 
+        "service", "$1", "job", "(.*)"
+      ) or
+      label_replace(
+        sum(rate(gateway_http_requests_total[5m])) by (job), 
+        "service", "$1", "job", "(.*)"
+      ) or
+      label_replace(
+        sum(rate(bcs_http_requests_total[5m])) by (job), 
         "service", "$1", "job", "(.*)"
       )
 
