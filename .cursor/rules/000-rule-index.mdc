@@ -35,6 +35,7 @@ alwaysApply: false
 - [042-http-proxy-service-patterns.mdc](mdc:042-http-proxy-service-patterns.mdc): HTTP proxy service patterns for request forwarding, error handling, and observability
 - [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc): Configuration management and logging standards
 - [044-service-debugging-and-troubleshooting.mdc](mdc:044-service-debugging-and-troubleshooting.mdc): CRITICAL debugging priority: service configuration over import patterns
+- [044.1-circuit-breaker-observability.mdc](mdc:044.1-circuit-breaker-observability.mdc): Circuit breaker observability patterns and metrics integration standards
 - [045-retry-logic.mdc](mdc:045-retry-logic.mdc): Natural retry via idempotency and user-initiated retry patterns
 - [050-python-coding-standards.mdc](mdc:050-python-coding-standards.mdc): Python style, formatting, linting, typing, documentation
 - [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc): Pydantic v2 usage patterns, serialization, and configuration standards

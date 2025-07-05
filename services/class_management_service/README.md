@@ -75,3 +75,13 @@ Service configuration is managed by `config.py` using `pydantic-settings`.
 - **Run Service**: `pdm run -p services/class_management_service dev`
 - **Dependencies**: Requires running PostgreSQL, Kafka, and Redis instances, as defined in `docker-compose.infrastructure.yml`.
 - **Testing**: The service includes integration tests in `tests/test_api_integration.py` that use a mocked repository to validate API and service logic.
+
+## 8. Circuit Breaker Observability
+
+Circuit breaker metrics are exposed through the `/metrics` endpoint when enabled:
+
+- **`circuit_breaker_state`**: Current state (0=CLOSED, 1=OPEN, 2=HALF_OPEN) with labels: `service`, `circuit_name`
+- **`circuit_breaker_state_changes`**: State transition counter with labels: `service`, `circuit_name`, `from_state`, `to_state`
+- **`circuit_breaker_calls_total`**: Call result counter with labels: `service`, `circuit_name`, `result` (success/failure/blocked)
+
+Circuit breakers protect Kafka publishing operations and can be configured via environment variables with the `CLASS_MANAGEMENT_SERVICE_CIRCUIT_BREAKER_` prefix.

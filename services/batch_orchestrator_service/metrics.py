@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from prometheus_client import REGISTRY, Counter, Histogram
+from prometheus_client import REGISTRY, Counter, Histogram, Gauge
 
 logger = create_service_logger("bos.metrics")
 
@@ -58,6 +58,25 @@ def _create_metrics() -> dict[str, Any]:
                 ["command_type", "target_service", "batch_id"],
                 registry=REGISTRY,
             ),
+            # Circuit Breaker Metrics
+            "circuit_breaker_state": Gauge(
+                "bos_circuit_breaker_state",
+                "Circuit breaker state (0=closed, 1=open, 2=half_open)",
+                ["service", "circuit_name"],
+                registry=REGISTRY,
+            ),
+            "circuit_breaker_state_changes": Counter(
+                "bos_circuit_breaker_state_changes_total",
+                "Total circuit breaker state changes",
+                ["service", "circuit_name", "from_state", "to_state"],
+                registry=REGISTRY,
+            ),
+            "circuit_breaker_calls_total": Counter(
+                "bos_circuit_breaker_calls_total",
+                "Total circuit breaker calls",
+                ["service", "circuit_name", "result"],
+                registry=REGISTRY,
+            ),
         }
         return metrics
     except ValueError as e:
@@ -97,6 +116,10 @@ def _get_existing_metrics() -> dict[str, Any]:
         "pipeline_execution_total": "huleedu_pipeline_execution_total",
         "phase_transition_duration_seconds": "huleedu_phase_transition_duration_seconds",
         "orchestration_commands_total": "huleedu_orchestration_commands_total",
+        # Circuit Breaker Metrics
+        "circuit_breaker_state": "bos_circuit_breaker_state",
+        "circuit_breaker_state_changes": "bos_circuit_breaker_state_changes_total",
+        "circuit_breaker_calls_total": "bos_circuit_breaker_calls_total",
     }
 
     existing: dict[str, Any] = {}
@@ -122,4 +145,14 @@ def get_kafka_consumer_metrics() -> dict[str, Any]:
     return {
         "phase_transition_duration_seconds": all_metrics.get("phase_transition_duration_seconds"),
         "orchestration_commands_total": all_metrics.get("orchestration_commands_total"),
+    }
+
+
+def get_circuit_breaker_metrics() -> dict[str, Any]:
+    """Get metrics required by circuit breaker components."""
+    all_metrics = get_metrics()
+    return {
+        "circuit_breaker_state": all_metrics.get("circuit_breaker_state"),
+        "circuit_breaker_state_changes": all_metrics.get("circuit_breaker_state_changes"),
+        "circuit_breaker_calls_total": all_metrics.get("circuit_breaker_calls_total"),
     }

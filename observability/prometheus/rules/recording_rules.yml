@@ -136,14 +136,30 @@ groups:
     expr: |
       avg(llm_provider_availability_percentage) or vector(100)
 
-  - record: huleedu:llm_provider:circuit_breaker_status
+  - record: huleedu:circuit_breaker:state_by_service
     expr: |
-      max(llm_provider_circuit_breaker_state) or vector(0)
+      group by (job, service, circuit_name) (
+        llm_provider_circuit_breaker_state or
+        bos_circuit_breaker_state or
+        els_circuit_breaker_state or
+        cj_assessment_circuit_breaker_state or
+        class_management_circuit_breaker_state or
+        file_service_circuit_breaker_state or
+        spell_checker_circuit_breaker_state
+      ) or vector(0)
 
-  # Circuit breaker state change rates
-  - record: huleedu:circuit_breaker:changes_rate5m
+  # Circuit breaker state change rates across all services
+  - record: huleedu:circuit_breaker:changes_rate5m_by_service
     expr: |
-      sum(rate(llm_provider_circuit_breaker_state_changes_total[5m])) or vector(0)
+      sum by (job, service, circuit_name) (
+        rate(llm_provider_circuit_breaker_state_changes_total[5m]) or
+        rate(bos_circuit_breaker_state_changes_total[5m]) or
+        rate(els_circuit_breaker_state_changes_total[5m]) or
+        rate(cj_assessment_circuit_breaker_state_changes_total[5m]) or
+        rate(class_management_circuit_breaker_state_changes_total[5m]) or
+        rate(file_service_circuit_breaker_state_changes_total[5m]) or
+        rate(spell_checker_circuit_breaker_state_changes_total[5m])
+      ) or vector(0)
 
   # Cost tracking (if LLM cost metrics are available)
   - record: huleedu:llm_cost:total_rate5m

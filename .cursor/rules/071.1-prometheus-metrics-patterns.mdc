@@ -85,9 +85,38 @@ async def endpoint(metrics: FromDishka[ServiceMetrics]):
 - Correlation IDs (use logs instead)
 - Request bodies or sensitive data
 
-## 4. Testing Patterns
+## 4. Circuit Breaker Metrics
 
-### 4.1. Direct Access
+### 4.1. Standard Implementation
+```python
+# metrics_bridge.py
+from huleedu_service_libs.resilience.circuit_breaker import StandardCircuitBreakerMetrics
+
+class ServiceMetrics:
+    def __init__(self):
+        self.circuit_breaker = StandardCircuitBreakerMetrics()
+    
+    def get_circuit_breaker_metrics(self) -> dict[str, Any]:
+        return self.circuit_breaker.get_metrics()
+```
+
+### 4.2. Integration Pattern
+```python
+# During circuit breaker state changes
+metrics.circuit_breaker.record_state_change(
+    name="llm_provider", 
+    state="open"
+)
+metrics.circuit_breaker.record_call_result(
+    name="llm_provider",
+    success=False,
+    duration=2.5
+)
+```
+
+## 5. Testing Patterns
+
+### 5.1. Direct Access
 ```bash
 # Inside container
 curl http://localhost:<port>/metrics
@@ -96,7 +125,7 @@ curl http://localhost:<port>/metrics
 curl http://localhost:<external_port>/metrics
 ```
 
-### 4.2. Prometheus Queries
+### 5.2. Prometheus Queries
 ```bash
 # Inside prometheus container
 docker exec huleedu_prometheus wget -qO- "http://localhost:9090/api/v1/query?query=up"

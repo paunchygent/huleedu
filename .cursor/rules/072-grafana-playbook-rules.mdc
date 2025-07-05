@@ -38,9 +38,9 @@ Examples:
 2. Error Rate Trend (Time Series): `huleedu:http_errors_5xx:rate5m`
 3. HTTP Request Rate (Time Series): `huleedu:http_requests:rate5m`
 4. Infrastructure Health (Stat): `huleedu:infrastructure_health:up`
-5. Circuit Breaker Status (Stat): `huleedu:llm_provider:circuit_breaker_status`
+5. Circuit Breaker Status (Stat): `huleedu:circuit_breaker:state_by_service`
 6. Active Alerts (Table): `ALERTS{alertstate="firing"}`
-7. Circuit Breaker State Changes (Time Series): `huleedu:circuit_breaker:changes_rate5m`
+7. Circuit Breaker State Changes (Time Series): `huleedu:circuit_breaker:changes_rate5m_by_service`
 
 **Performance Optimizations**:
 - Uses recording rules for faster query execution
@@ -55,14 +55,14 @@ Examples:
 1. Request Rate by Status (Time Series): `huleedu:service_http_requests:rate5m{service="${service}"}`
 2. Request Duration Percentiles (Time Series): Service-specific latency metrics
 3. Error Rate by Endpoint (Table): Service-specific error tracking
-4. Circuit Breaker State (Stat): `llm_provider_circuit_breaker_state{job="${service}"}`
+4. Circuit Breaker State (Stat): `(${service}_circuit_breaker_state{job="${service}"} or llm_provider_circuit_breaker_state{job="${service}"} or bos_circuit_breaker_state{job="${service}"})`
 5. Business Metrics (Stat): Service-specific KPIs
-6. Circuit Breaker Transitions (Time Series): `llm_provider_circuit_breaker_state_changes_total{job="${service}"}`
-7. Service Logs (Logs): `{service="${service}"} | json`
+6. Circuit Breaker Transitions (Time Series): `rate((${service}_circuit_breaker_state_changes_total{job="${service}"} or llm_provider_circuit_breaker_state_changes_total{job="${service}"} or bos_circuit_breaker_state_changes_total{job="${service}"})[5m])`
+7. Service Logs (Logs): `{container=~"huleedu_${service}"} |= "${log_filter}"`
 
 **Features**:
 - Service variable dropdown for easy switching
-- Circuit breaker integration for LLM services
+- Circuit breaker integration for services with external dependencies
 - Business metrics tailored per service type
 
 ### 2.3. Troubleshooting Dashboard Template
@@ -95,6 +95,16 @@ container_memory_usage_bytes{name=~"huleedu_.*"} / 1024 / 1024 / 1024
 
 # Custom Metrics Pattern
 sum(rate(huleedu_<service>_<metric>[5m])) by (<relevant_labels>)
+
+# Circuit Breaker State (Multi-service pattern)
+(${service}_circuit_breaker_state{job="${service}"} or llm_provider_circuit_breaker_state{job="${service}"} or bos_circuit_breaker_state{job="${service}"})
+
+# Circuit Breaker State Changes Rate
+rate((${service}_circuit_breaker_state_changes_total{job="${service}"} or llm_provider_circuit_breaker_state_changes_total{job="${service}"} or bos_circuit_breaker_state_changes_total{job="${service}"})[5m])
+
+# Circuit Breaker Recording Rules
+huleedu:circuit_breaker:state_by_service
+huleedu:circuit_breaker:changes_rate5m_by_service
 ```
 
 ### 3.2. Standard LogQL Query Patterns
@@ -103,30 +113,36 @@ sum(rate(huleedu_<service>_<metric>[5m])) by (<relevant_labels>)
 # Trace by Correlation ID
 {correlation_id="<correlation-id>"}
 
+# Service-Specific Logs with Filter
+{container=~"huleedu_${service}"} |= "${log_filter}"
+
 # Service-Specific Error Logs
-{service="<service_name>"} | json | level="error"
+{container=~"huleedu_<service_name>"} | json | level="error"
 
 # Cross-Service Event Flow
-{service=~"batch_orchestrator_service|essay_lifecycle_service"} | json | correlation_id="<id>"
+{container=~"huleedu_(batch_orchestrator_service|essay_lifecycle_service)"} | json | correlation_id="<id>"
 
 # Error Pattern Detection
-{service=~".+"} | json | level="error" | pattern "<_> ERROR: <error_pattern> <_>"
+{container=~"huleedu_.+"} | json | level="error" | pattern "<_> ERROR: <error_pattern> <_>"
 
 # Performance Log Analysis
-{service="<service>"} | json | line_format "{{.timestamp}} {{.event}} took {{.duration}}ms"
+{container=~"huleedu_<service>"} | json | line_format "{{.timestamp}} {{.event}} took {{.duration}}ms"
 ```
 
 ### 3.3. Business Intelligence Query Patterns
 
 ```promql
-# File Upload Types Distribution
-sum(rate(huleedu_files_uploaded_total[5m])) by (file_type)
+# Pipeline Execution Rate
+sum(rate(huleedu_pipeline_execution_total{job="${service}"}[5m])) or vector(0)
 
-# Spell Check Corrections Distribution
-histogram_quantile(0.90, sum(rate(huleedu_spellcheck_corrections_made_bucket[5m])) by (le))
+# Spell Check Corrections Rate
+sum(rate(huleedu_spellcheck_corrections_made{job="${service}"}[5m])) or vector(0)
 
-# Essay Processing Pipeline Throughput
-sum(rate(huleedu_essays_processed_total[5m])) by (processing_stage)
+# CJ Assessment Comparisons Rate
+sum(rate(huleedu_cj_comparisons_made{job="${service}"}[5m])) or vector(0)
+
+# File Upload Rate
+sum(rate(file_service_files_uploaded_total{job="${service}"}[5m])) or vector(0)
 ```
 
 ## 4. Variable and Template Standards
@@ -134,6 +150,7 @@ sum(rate(huleedu_essays_processed_total[5m])) by (processing_stage)
 ### 4.1. Standard Dashboard Variables
 **MUST implement these variables where applicable**:
 - `$service`: Service selector for multi-service dashboards
+- `$log_filter`: Log filtering for service deep dive
 - `$correlation_id`: For troubleshooting dashboards
 - `$time_range`: Custom time range selector
 - `$environment`: If multi-environment deployment
@@ -145,8 +162,9 @@ sum(rate(huleedu_essays_processed_total[5m])) by (processing_stage)
   "type": "query",
   "query": "label_values(up, job)",
   "refresh": "on_time_range_change",
-  "multi": true,
-  "includeAll": true
+  "regex": ".*_service",
+  "multi": false,
+  "includeAll": false
 }
 ```
 
@@ -162,8 +180,30 @@ sum(rate(huleedu_essays_processed_total[5m])) by (processing_stage)
 **Configure alert annotations to link to relevant dashboards**:
 ```yaml
 annotations:
-  dashboard_url: "http://grafana:3000/d/<dashboard-id>?var-service={{ $labels.job }}"
-  runbook_url: "https://docs.huledu.com/runbooks/{{ $labels.alertname }}"
+  dashboard_url: "http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive?var-service={{ $labels.job }}"
+  runbook_url: "http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive?var-service={{ $labels.service_name }}"
+```
+
+**Example Alert - Circuit Breaker Open**:
+```yaml
+- alert: CircuitBreakerOpen
+  expr: |
+    (
+      llm_provider_circuit_breaker_state == 1 or
+      bos_circuit_breaker_state == 1 or
+      els_circuit_breaker_state == 1 or
+      cj_assessment_circuit_breaker_state == 1 or
+      class_management_circuit_breaker_state == 1 or
+      file_service_circuit_breaker_state == 1 or
+      spell_checker_circuit_breaker_state == 1
+    )
+  for: 30s
+  labels:
+    severity: critical
+  annotations:
+    summary: "Circuit breaker OPEN for {{ $labels.circuit_name }}"
+    description: "Circuit breaker '{{ $labels.circuit_name }}' in service {{ $labels.service_name }} is OPEN, blocking all requests."
+    dashboard_url: "http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive?var-service={{ $labels.service_name }}"
 ```
 
 ## 6. Dashboard Maintenance Standards

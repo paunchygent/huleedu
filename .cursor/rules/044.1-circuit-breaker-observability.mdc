@@ -1,0 +1,155 @@
+---
+description: Circuit breaker observability patterns and metrics integration standards
+globs: 
+alwaysApply: false
+---
+# 044.1: Circuit Breaker Observability
+
+## 1. Purpose
+
+Standardized observability patterns for circuit breakers in HuleEdu services, including metrics integration and monitoring standards.
+
+## 2. Metrics Integration
+
+### 2.1. Required Metrics
+
+All services with circuit breaker protection **MUST** expose these metrics:
+
+```python
+# Core circuit breaker metrics
+circuit_breaker_state = Gauge(
+    "circuit_breaker_state",
+    "Circuit breaker state (0=CLOSED, 1=OPEN, 2=HALF_OPEN)",
+    ["service", "circuit_name"]
+)
+
+circuit_breaker_state_changes = Counter(
+    "circuit_breaker_state_changes",
+    "Circuit breaker state transitions",
+    ["service", "circuit_name", "from_state", "to_state"]
+)
+
+circuit_breaker_calls_total = Counter(
+    "circuit_breaker_calls_total",
+    "Total circuit breaker calls by result",
+    ["service", "circuit_name", "result"]
+)
+```
+
+### 2.2. Metrics Bridge Integration
+
+Circuit breakers **MUST** use the `PrometheusCircuitBreakerMetrics` bridge:
+
+```python
+from huleedu_service_libs.resilience import create_metrics_bridge
+
+# In DI provider
+@provide(scope=Scope.APP)
+def provide_circuit_breaker_metrics(
+    self, metrics_dict: Dict[str, Any], settings: Settings
+) -> CircuitBreakerMetrics:
+    return create_metrics_bridge(metrics_dict, settings.SERVICE_NAME)
+
+# Circuit breaker with metrics
+circuit_breaker = CircuitBreaker(
+    name=f"{settings.SERVICE_NAME}.kafka_producer",
+    metrics=circuit_breaker_metrics,
+    service_name=settings.SERVICE_NAME,
+    # ... other config
+)
+```
+
+## 3. Configuration Standards
+
+### 3.1. Environment Variables
+
+Circuit breaker configuration **MUST** follow this pattern:
+
+```bash
+# Enable/disable circuit breakers
+{SERVICE_NAME}_CIRCUIT_BREAKER_ENABLED=true
+
+# Kafka circuit breaker configuration
+{SERVICE_NAME}_KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
+{SERVICE_NAME}_KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT=60
+{SERVICE_NAME}_KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD=2
+```
+
+### 3.2. Service Configuration
+
+```python
+class Settings(BaseSettings):
+    CIRCUIT_BREAKER_ENABLED: bool = True
+    KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5
+    KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = 60
+    KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = 2
+```
+
+## 4. Documentation Requirements
+
+### 4.1. Service README Updates
+
+Each service README **MUST** include a circuit breaker observability section:
+
+```markdown
+## Circuit Breaker Observability
+
+Circuit breaker metrics are exposed through the `/metrics` endpoint:
+
+- **`circuit_breaker_state`**: Current state (0=CLOSED, 1=OPEN, 2=HALF_OPEN) with labels: `service`, `circuit_name`
+- **`circuit_breaker_state_changes`**: State transition counter with labels: `service`, `circuit_name`, `from_state`, `to_state`
+- **`circuit_breaker_calls_total`**: Call result counter with labels: `service`, `circuit_name`, `result` (success/failure/blocked)
+
+Circuit breakers protect [operation] and are configured via `{SERVICE_NAME}_CIRCUIT_BREAKER_` environment variables.
+```
+
+## 5. Monitoring Patterns
+
+### 5.1. State Monitoring
+
+- **CLOSED (0)**: Normal operation, monitor for excessive failures
+- **OPEN (1)**: Service protection active, alert on prolonged open state
+- **HALF_OPEN (2)**: Recovery testing, monitor transition success
+
+### 5.2. Alert Thresholds
+
+```yaml
+# Grafana alert examples
+- alert: CircuitBreakerOpen
+  expr: circuit_breaker_state == 1
+  for: 2m
+  annotations:
+    summary: "Circuit breaker {{ $labels.circuit_name }} is OPEN"
+
+- alert: CircuitBreakerHighFailureRate
+  expr: rate(circuit_breaker_calls_total{result="failure"}[5m]) > 0.1
+  for: 1m
+```
+
+## 6. Testing Requirements
+
+### 6.1. Metrics Verification
+
+Circuit breaker tests **MUST** verify metrics recording:
+
+```python
+async def test_circuit_breaker_metrics_integration():
+    # Arrange: Circuit breaker with metrics
+    metrics_dict = create_test_metrics()
+    metrics_bridge = create_metrics_bridge(metrics_dict, "test_service")
+    
+    # Act: Trigger state changes
+    await circuit_breaker.call(failing_operation)
+    
+    # Assert: Metrics recorded correctly
+    assert metrics_dict["circuit_breaker_state_changes"].labels(...).get() == 1
+```
+
+## 7. Implementation Checklist
+
+- [ ] Circuit breaker metrics defined in service `metrics.py`
+- [ ] Metrics bridge integrated in DI provider
+- [ ] Configuration environment variables added
+- [ ] README section documenting observability
+- [ ] Tests covering metrics integration
+- [ ] Grafana dashboard updated (if applicable)

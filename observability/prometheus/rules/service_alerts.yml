@@ -76,7 +76,15 @@ groups:
   
   - alert: CircuitBreakerOpen
     expr: |
-      circuit_breaker_state{state="open"} == 1
+      (
+        llm_provider_circuit_breaker_state == 1 or
+        bos_circuit_breaker_state == 1 or
+        els_circuit_breaker_state == 1 or
+        cj_assessment_circuit_breaker_state == 1 or
+        class_management_circuit_breaker_state == 1 or
+        file_service_circuit_breaker_state == 1 or
+        spell_checker_circuit_breaker_state == 1
+      )
     for: 30s
     labels:
       severity: critical

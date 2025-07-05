@@ -14,9 +14,11 @@ from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from huleedu_service_libs.resilience.resilient_client import make_resilient
+from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
 
 from common_core import LLMProviderType
 from services.llm_provider_service.config import Settings, settings
+from services.llm_provider_service.metrics import get_circuit_breaker_metrics
 from services.llm_provider_service.implementations.anthropic_provider_impl import (
     AnthropicProviderImpl,
 )
@@ -85,22 +87,31 @@ class LLMProviderServiceProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
-        """Provide centralized circuit breaker registry."""
+        """Provide centralized circuit breaker registry with metrics integration."""
         registry = CircuitBreakerRegistry()
 
         if settings.CIRCUIT_BREAKER_ENABLED:
+            # Create metrics bridge for circuit breaker metrics
+            circuit_breaker_metrics = get_circuit_breaker_metrics()
+            metrics_bridge = create_metrics_bridge(
+                circuit_breaker_metrics, 
+                settings.SERVICE_NAME
+            )
+            
             # Register circuit breakers for each LLM provider
             for provider in ["anthropic", "openai", "google", "openrouter"]:
                 registry.register(
                     f"llm_{provider}",
                     CircuitBreaker(
-                        name=f"llm_provider.{provider}",
+                        name=f"llm_{provider}",
                         failure_threshold=settings.LLM_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
                         recovery_timeout=timedelta(
                             seconds=settings.LLM_CIRCUIT_BREAKER_RECOVERY_TIMEOUT
                         ),
                         success_threshold=settings.LLM_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
                         expected_exception=ClientError,
+                        metrics=metrics_bridge,
+                        service_name=settings.SERVICE_NAME,
                     ),
                 )
 
@@ -121,12 +132,21 @@ class LLMProviderServiceProvider(Provider):
 
         # Wrap with circuit breaker protection if enabled
         if settings.CIRCUIT_BREAKER_ENABLED:
+            # Create metrics bridge for kafka circuit breaker
+            circuit_breaker_metrics = get_circuit_breaker_metrics()
+            metrics_bridge = create_metrics_bridge(
+                circuit_breaker_metrics, 
+                settings.SERVICE_NAME
+            )
+            
             kafka_circuit_breaker = CircuitBreaker(
-                name=f"{settings.SERVICE_NAME}.kafka_producer",
+                name="kafka_producer",
                 failure_threshold=settings.KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
                 recovery_timeout=timedelta(seconds=settings.KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT),
                 success_threshold=settings.KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
                 expected_exception=KafkaError,
+                metrics=metrics_bridge,
+                service_name=settings.SERVICE_NAME,
             )
             circuit_breaker_registry.register("kafka_producer", kafka_circuit_breaker)
 

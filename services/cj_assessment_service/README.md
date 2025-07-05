@@ -258,6 +258,16 @@ pdm run python app.py
 - **Health Checks**: Service responsiveness (extensible to database/Kafka connectivity)
 - **Correlation IDs**: Full request tracing across service boundaries
 
+### Circuit Breaker Metrics
+
+Circuit breaker observability is integrated through the service's metrics endpoint:
+
+- **`circuit_breaker_state`**: Current state (0=CLOSED, 1=OPEN, 2=HALF_OPEN) with labels: `service`, `circuit_name`
+- **`circuit_breaker_state_changes`**: State transition counter with labels: `service`, `circuit_name`, `from_state`, `to_state`
+- **`circuit_breaker_calls_total`**: Call result counter with labels: `service`, `circuit_name`, `result` (success/failure/blocked)
+
+Circuit breakers protect Kafka publishing operations when enabled via `CIRCUIT_BREAKER_ENABLED=true`.
+
 ### Docker Health Checks
 
 ```dockerfile

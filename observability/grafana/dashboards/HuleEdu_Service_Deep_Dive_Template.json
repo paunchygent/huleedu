@@ -571,7 +571,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "llm_provider_circuit_breaker_state{job=\"${service}\"}",
+          "expr": "(${service}_circuit_breaker_state{job=\"${service}\"} or llm_provider_circuit_breaker_state{job=\"${service}\"} or bos_circuit_breaker_state{job=\"${service}\"})",
           "legendFormat": "{{provider}}",
           "range": true,
           "refId": "A"
@@ -661,7 +661,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(llm_provider_circuit_breaker_state_changes_total{job=\"${service}\"}[5m])",
+          "expr": "rate(${service}_circuit_breaker_state_changes_total{job=\"${service}\"}[5m]) or rate(llm_provider_circuit_breaker_state_changes_total{job=\"${service}\"}[5m]) or rate(bos_circuit_breaker_state_changes_total{job=\"${service}\"}[5m])",
           "legendFormat": "{{provider}} ({{from_state}} → {{to_state}})",
           "range": true,
           "refId": "A"

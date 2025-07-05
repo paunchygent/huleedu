@@ -126,6 +126,9 @@ services:
   kafka_exporter:
     image: danielqsj/kafka-exporter:latest
     container_name: huleedu_kafka_exporter
+    depends_on:
+      kafka:
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:

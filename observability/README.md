@@ -48,44 +48,51 @@ pdm run obs-down
 
 ## Accessing Services
 
-- **Prometheus**: http://localhost:9091
-- **Grafana**: http://localhost:3000 (admin/admin)
-- **Alertmanager**: http://localhost:9094
-- **Loki**: http://localhost:3100 (API only)
+- **Prometheus**: <http://localhost:9091>
+- **Grafana**: <http://localhost:3000> (admin/admin)
+- **Alertmanager**: <http://localhost:9094>
+- **Loki**: <http://localhost:3100> (API only)
 
 ## Configuration Files
 
 ### Prometheus
+
 - Main config: `prometheus/prometheus.yml`
 - Alert rules: `prometheus/rules/service_alerts.yml`
 - Scrape targets are auto-discovered via Docker labels
 
 ### Promtail
+
 - Active config: `promtail/promtail-config.yml`
 - Collects logs from all Docker containers
 - Parses JSON logs and extracts labels
 
 ### Grafana
+
 - Dashboards: `grafana/dashboards/`
 - Import guide: See [documentation/user_guides/grafana-dashboard-import-guide.md](../documentation/user_guides/grafana-dashboard-import-guide.md)
 
 ### Alertmanager
+
 - Config: `alertmanager/alertmanager.yml`
 - Currently configured for local development (no external notifications)
 
 ## Common Operations
 
 ### View logs
+
 ```bash
 docker compose -f observability/docker-compose.observability.yml logs -f [service]
 ```
 
 ### Restart a service
+
 ```bash
 docker compose -f observability/docker-compose.observability.yml restart [service]
 ```
 
 ### Update configurations
+
 1. Edit the relevant config file
 2. Restart the affected service
 3. Verify changes in the UI

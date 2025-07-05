@@ -131,6 +131,18 @@ async with redis_client.subscribe("ws:user123") as pubsub:
         # Process message
 ```
 
+### 5.4. Circuit Breaker Metrics Integration
+```python
+# Service metrics setup
+class ServiceMetrics:
+    def __init__(self):
+        self.circuit_breaker = StandardCircuitBreakerMetrics()
+
+# During circuit breaker events
+metrics.circuit_breaker.record_state_change(name="external_api", state="open")
+metrics.circuit_breaker.record_call_result(name="external_api", success=False, duration=1.2)
+```
+
 ## 6. Critical Requirements
 
 ### 6.1. Redis Client
@@ -171,6 +183,7 @@ from huleedu_service_libs.middleware.frameworks.fastapi_middleware import setup_
 - **CircuitBreakerRegistry**: Centralized management of circuit breakers
 - **make_resilient(impl, breaker)**: Wrap any protocol with circuit breaker
 - **ErrorContext**: Rich error context with trace information
+- **StandardCircuitBreakerMetrics**: Prometheus metrics bridge for circuit breaker state
 - **Pattern**: Use with DI to wrap HTTP clients, Kafka producers, external APIs
 
 ## 7. Testing Considerations

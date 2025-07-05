@@ -85,3 +85,13 @@ docker build -t huleedu-file-service .
 # Run container
 docker run -p 7001:7001 -p 9094:9094 huleedu-file-service
 ```
+
+## Circuit Breaker Monitoring
+
+Circuit breaker observability is available through the `/metrics` endpoint:
+
+- **`circuit_breaker_state`**: Current state (0=CLOSED, 1=OPEN, 2=HALF_OPEN) with labels: `service`, `circuit_name`
+- **`circuit_breaker_state_changes`**: State transition counter with labels: `service`, `circuit_name`, `from_state`, `to_state`
+- **`circuit_breaker_calls_total`**: Call result counter with labels: `service`, `circuit_name`, `result` (success/failure/blocked)
+
+Circuit breakers protect Kafka publishing operations and are controlled via `FILE_SERVICE_CIRCUIT_BREAKER_` configuration settings.

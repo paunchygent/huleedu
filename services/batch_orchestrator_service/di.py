@@ -14,10 +14,12 @@ from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPubli
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from huleedu_service_libs.resilience.resilient_client import make_resilient
+from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
 from prometheus_client import CollectorRegistry
 
 from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.config import Settings, settings
+from services.batch_orchestrator_service.metrics import get_circuit_breaker_metrics
 from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import (
     AIFeedbackInitiatorImpl,
 )
@@ -109,12 +111,21 @@ class CoreInfrastructureProvider(Provider):
         # Wrap with circuit breaker protection if enabled
         kafka_publisher: KafkaPublisherProtocol
         if settings.CIRCUIT_BREAKER_ENABLED:
+            # Create metrics bridge for kafka circuit breaker
+            circuit_breaker_metrics = get_circuit_breaker_metrics()
+            metrics_bridge = create_metrics_bridge(
+                circuit_breaker_metrics,
+                settings.SERVICE_NAME
+            )
+            
             kafka_circuit_breaker = CircuitBreaker(
-                name=f"{settings.SERVICE_NAME}.kafka_producer",
+                name="kafka_producer",
                 failure_threshold=settings.KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
                 recovery_timeout=timedelta(seconds=settings.KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT),
                 success_threshold=settings.KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
                 expected_exception=KafkaError,
+                metrics=metrics_bridge,
+                service_name=settings.SERVICE_NAME,
             )
             circuit_breaker_registry.register("kafka_producer", kafka_circuit_breaker)
 
@@ -138,22 +149,31 @@ class CoreInfrastructureProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
-        """Provide centralized circuit breaker registry."""
+        """Provide centralized circuit breaker registry with metrics integration."""
         registry = CircuitBreakerRegistry()
 
         # Only register circuit breakers if enabled
         if settings.CIRCUIT_BREAKER_ENABLED:
+            # Create metrics bridge for circuit breaker metrics
+            circuit_breaker_metrics = get_circuit_breaker_metrics()
+            metrics_bridge = create_metrics_bridge(
+                circuit_breaker_metrics,
+                settings.SERVICE_NAME
+            )
+            
             # Circuit breaker for Batch Conductor Service
             registry.register(
                 "batch_conductor",
                 CircuitBreaker(
-                    name="batch_orchestrator.batch_conductor_client",
+                    name="batch_conductor",
                     failure_threshold=settings.BCS_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
                     recovery_timeout=timedelta(
                         seconds=settings.BCS_CIRCUIT_BREAKER_RECOVERY_TIMEOUT
                     ),
                     success_threshold=settings.BCS_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
                     expected_exception=ClientError,
+                    metrics=metrics_bridge,
+                    service_name=settings.SERVICE_NAME,
                 ),
             )
 

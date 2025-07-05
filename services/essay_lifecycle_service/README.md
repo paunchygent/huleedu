@@ -71,3 +71,13 @@ Configuration is managed via `services/essay_lifecycle_service/config.py`.
 ## 🧱 Dependencies
 
 Key dependencies are listed in `services/essay_lifecycle_service/pyproject.toml` and include `quart`, `aiokafka`, `sqlalchemy`, and `asyncpg`.
+
+## 🔧 Circuit Breaker Observability
+
+Circuit breaker metrics are integrated into the service's Prometheus metrics:
+
+- **`circuit_breaker_state`**: Current state (0=CLOSED, 1=OPEN, 2=HALF_OPEN) with labels: `service`, `circuit_name`
+- **`circuit_breaker_state_changes`**: State transition counter with labels: `service`, `circuit_name`, `from_state`, `to_state`
+- **`circuit_breaker_calls_total`**: Call result counter with labels: `service`, `circuit_name`, `result` (success/failure/blocked)
+
+Circuit breakers protect Kafka publishing operations and are configurable via `ESSAY_LIFECYCLE_SERVICE_CIRCUIT_BREAKER_` environment variables.

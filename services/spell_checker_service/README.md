@@ -140,6 +140,16 @@ docker build -f services/spell_checker_service/Dockerfile -t spellchecker-servic
 - **Volumes**:
   - `./data` for correction logs
 
+## Circuit Breaker Observability
+
+Circuit breaker metrics are exposed via the `/metrics` endpoint:
+
+- **`circuit_breaker_state`**: Current state (0=CLOSED, 1=OPEN, 2=HALF_OPEN) with labels: `service`, `circuit_name`
+- **`circuit_breaker_state_changes`**: State transition counter with labels: `service`, `circuit_name`, `from_state`, `to_state`  
+- **`circuit_breaker_calls_total`**: Call result counter with labels: `service`, `circuit_name`, `result` (success/failure/blocked)
+
+Circuit breakers protect Kafka publishing operations and are configured via `SPELL_CHECKER_SERVICE_CIRCUIT_BREAKER_` environment variables.
+
 ## Recent Highlights
 
 - Clean architecture refactor with Dishka DI

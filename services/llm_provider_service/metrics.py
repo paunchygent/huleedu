@@ -70,10 +70,10 @@ def _create_metrics() -> dict[str, Any]:
                 ["provider"],
                 registry=REGISTRY,
             ),
-            "llm_circuit_breaker_state": Gauge(
+            "circuit_breaker_state": Gauge(
                 "llm_provider_circuit_breaker_state",
                 "Circuit breaker state (0=closed, 1=open, 2=half_open)",
-                ["provider"],
+                ["service", "circuit_name"],
                 registry=REGISTRY,
             ),
             "llm_concurrent_requests": Gauge(
@@ -110,10 +110,16 @@ def _create_metrics() -> dict[str, Any]:
                 buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0),
                 registry=REGISTRY,
             ),
-            "llm_circuit_breaker_state_changes": Counter(
+            "circuit_breaker_state_changes": Counter(
                 "llm_provider_circuit_breaker_state_changes_total",
                 "Total circuit breaker state changes",
-                ["provider", "from_state", "to_state"],
+                ["service", "circuit_name", "from_state", "to_state"],
+                registry=REGISTRY,
+            ),
+            "circuit_breaker_calls_total": Counter(
+                "llm_provider_circuit_breaker_calls_total",
+                "Total circuit breaker calls",
+                ["service", "circuit_name", "result"],
                 registry=REGISTRY,
             ),
             "llm_provider_connection_pool_size": Gauge(
@@ -176,12 +182,13 @@ def get_llm_metrics() -> dict[str, Any]:
         "llm_tokens_used_total": all_metrics.get("llm_tokens_used_total"),
         "llm_cost_dollars_total": all_metrics.get("llm_cost_dollars_total"),
         "llm_cache_hits_total": all_metrics.get("llm_cache_hits_total"),
-        "llm_circuit_breaker_state": all_metrics.get("llm_circuit_breaker_state"),
+        "circuit_breaker_state": all_metrics.get("circuit_breaker_state"),
         "llm_concurrent_requests": all_metrics.get("llm_concurrent_requests"),
         # Enhanced Performance Metrics - Phase 7
         "llm_response_time_percentiles": all_metrics.get("llm_response_time_percentiles"),
         "llm_validation_duration_seconds": all_metrics.get("llm_validation_duration_seconds"),
-        "llm_circuit_breaker_state_changes": all_metrics.get("llm_circuit_breaker_state_changes"),
+        "circuit_breaker_state_changes": all_metrics.get("circuit_breaker_state_changes"),
+        "circuit_breaker_calls_total": all_metrics.get("circuit_breaker_calls_total"),
         "llm_provider_connection_pool_size": all_metrics.get("llm_provider_connection_pool_size"),
         "llm_provider_connection_pool_active": all_metrics.get(
             "llm_provider_connection_pool_active"
@@ -225,14 +232,15 @@ def _get_existing_metrics() -> dict[str, Any]:
         "llm_tokens_used_total": "llm_provider_tokens_used_total",
         "llm_cost_dollars_total": "llm_provider_cost_dollars_total",
         "llm_cache_hits_total": "llm_provider_cache_hits_total",
-        "llm_circuit_breaker_state": "llm_provider_circuit_breaker_state",
+        "circuit_breaker_state": "llm_provider_circuit_breaker_state",
         "llm_concurrent_requests": "llm_provider_concurrent_requests",
         # Enhanced Performance Metrics - Phase 7
         "llm_response_time_percentiles": "llm_provider_response_time_percentiles",
         "llm_validation_duration_seconds": "llm_provider_validation_duration_seconds",
         "llm_queue_depth": "llm_provider_queue_depth",
         "llm_queue_processing_time_seconds": "llm_provider_queue_processing_time_seconds",
-        "llm_circuit_breaker_state_changes": "llm_provider_circuit_breaker_state_changes_total",
+        "circuit_breaker_state_changes": "llm_provider_circuit_breaker_state_changes_total",
+        "circuit_breaker_calls_total": "llm_provider_circuit_breaker_calls_total",
         "llm_provider_connection_pool_size": "llm_provider_connection_pool_size",
         "llm_provider_connection_pool_active": "llm_provider_connection_pool_active",
         "llm_queue_overflow_total": "llm_provider_queue_overflow_total",
@@ -255,3 +263,13 @@ def _get_existing_metrics() -> dict[str, Any]:
             logger.error("Error retrieving LLM metric '%s': %s", metric_name, exc)
 
     return existing
+
+
+def get_circuit_breaker_metrics() -> dict[str, Any]:
+    """Get metrics required by circuit breaker components."""
+    all_metrics = get_llm_metrics()
+    return {
+        "circuit_breaker_state": all_metrics.get("circuit_breaker_state"),
+        "circuit_breaker_state_changes": all_metrics.get("circuit_breaker_state_changes"),
+        "circuit_breaker_calls_total": all_metrics.get("circuit_breaker_calls_total"),
+    }

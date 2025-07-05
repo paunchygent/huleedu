@@ -113,11 +113,10 @@ build-common-core = "pdm build -p common_core"
 # Kafka infrastructure
 kafka-setup-topics = "python scripts/kafka_topic_bootstrap.py"
 
-# Observability convenience scripts
-obs-up = {composite = ["docker compose -f observability/docker-compose.observability.yml up -d"]}
-obs-down = {composite = ["docker compose -f observability/docker-compose.observability.yml down"]}
-obs-logs = {composite = ["docker compose -f observability/docker-compose.observability.yml logs -f"]}
-obs-restart = {composite = ["docker compose -f observability/docker-compose.observability.yml restart"]}
+# Observability is integrated into main stack - use standard docker compose commands
+obs-restart = "docker compose restart prometheus grafana loki jaeger promtail alertmanager"
+obs-logs = "docker compose logs -f prometheus grafana loki jaeger promtail alertmanager"
+obs-status = "docker compose ps prometheus grafana loki jaeger promtail alertmanager"
 
 [tool.ruff]
 line-length = 100
