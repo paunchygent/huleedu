@@ -1,0 +1,141 @@
+groups:
+- name: HuleEduRecordingRules
+  interval: 15s
+  rules:
+  # Global HTTP request rates aggregated across all services
+  - record: huleedu:http_requests:rate5m
+    expr: |
+      (
+        sum(rate(http_requests_total[5m])) or vector(0)
+      ) + (
+        sum(rate(bos_http_requests_total[5m])) or vector(0)
+      ) + (
+        sum(rate(file_service_http_requests_total[5m])) or vector(0)
+      ) + (
+        sum(rate(cms_http_requests_total[5m])) or vector(0)
+      ) + (
+        sum(rate(cj_assessment_http_requests_total[5m])) or vector(0)
+      ) + (
+        sum(rate(spell_checker_http_requests_total[5m])) or vector(0)
+      ) + (
+        sum(rate(llm_provider_http_requests_total[5m])) or vector(0)
+      )
+
+  # Global HTTP 5xx error rates across all services
+  - record: huleedu:http_errors_5xx:rate5m
+    expr: |
+      (
+        sum(rate(http_requests_total{status_code=~"5.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(bos_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(file_service_http_requests_total{status=~"5.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(cms_http_requests_total{http_status=~"5.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(cj_assessment_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(spell_checker_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(llm_provider_http_requests_total{status_code=~"5.."}[5m])) or vector(0)
+      )
+
+  # Global HTTP 4xx error rates across all services
+  - record: huleedu:http_errors_4xx:rate5m
+    expr: |
+      (
+        sum(rate(http_requests_total{status_code=~"4.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(bos_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(file_service_http_requests_total{status=~"4.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(cms_http_requests_total{http_status=~"4.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(cj_assessment_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(spell_checker_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
+      ) + (
+        sum(rate(llm_provider_http_requests_total{status_code=~"4.."}[5m])) or vector(0)
+      )
+
+  # Service availability calculation
+  - record: huleedu:service_availability:percent
+    expr: |
+      count(up{job=~".*_service"} == 1) / count(up{job=~".*_service"}) * 100
+
+  # Per-service HTTP request rates (simplified queries)
+  - record: huleedu:service_http_requests:rate5m
+    expr: |
+      label_replace(
+        sum(rate(http_requests_total[5m])) by (job), 
+        "service", "$1", "job", "(.*)"
+      ) or
+      label_replace(
+        sum(rate(bos_http_requests_total[5m])) by (job), 
+        "service", "$1", "job", "(.*)"
+      ) or
+      label_replace(
+        sum(rate(file_service_http_requests_total[5m])) by (job), 
+        "service", "$1", "job", "(.*)"
+      ) or
+      label_replace(
+        sum(rate(cms_http_requests_total[5m])) by (job), 
+        "service", "$1", "job", "(.*)"
+      ) or
+      label_replace(
+        sum(rate(cj_assessment_http_requests_total[5m])) by (job), 
+        "service", "$1", "job", "(.*)"
+      ) or
+      label_replace(
+        sum(rate(spell_checker_http_requests_total[5m])) by (job), 
+        "service", "$1", "job", "(.*)"
+      ) or
+      label_replace(
+        sum(rate(llm_provider_http_requests_total[5m])) by (job), 
+        "service", "$1", "job", "(.*)"
+      )
+
+  # Infrastructure health aggregations
+  - record: huleedu:infrastructure_health:up
+    expr: |
+      sum(up{job="kafka_exporter"}) +
+      sum(up{job="postgres_exporter"}) +
+      sum(up{job="redis_exporter"})
+
+  # Kafka queue latency aggregation
+  - record: huleedu:kafka_latency:mean
+    expr: |
+      avg(kafka_message_queue_latency_seconds) or vector(0)
+
+- name: HuleEduBusinessMetrics
+  interval: 30s
+  rules:
+  # LLM provider health metrics (aggregated)
+  - record: huleedu:llm_provider:availability
+    expr: |
+      avg(llm_provider_availability_percentage) or vector(100)
+
+  - record: huleedu:llm_provider:circuit_breaker_status
+    expr: |
+      max(llm_provider_circuit_breaker_state) or vector(0)
+
+  # Circuit breaker state change rates
+  - record: huleedu:circuit_breaker:changes_rate5m
+    expr: |
+      sum(rate(llm_provider_circuit_breaker_state_changes_total[5m])) or vector(0)
+
+  # Cost tracking (if LLM cost metrics are available)
+  - record: huleedu:llm_cost:total_rate5m
+    expr: |
+      sum(rate(llm_provider_cost_dollars_total[5m])) or vector(0)
+
+  # Pipeline execution rates
+  - record: huleedu:pipeline_executions:rate5m
+    expr: |
+      sum(rate(huleedu_pipeline_execution_total[5m])) or vector(0)
+
+  # Storage operations
+  - record: huleedu:storage_operations:rate5m
+    expr: |
+      sum(rate(file_service_files_uploaded_total[5m])) or vector(0)

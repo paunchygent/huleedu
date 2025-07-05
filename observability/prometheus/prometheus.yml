@@ -19,19 +19,14 @@ scrape_configs:
       - targets: ['content_service:8000']
     metrics_path: '/metrics'
     
-  - job_name: 'batch_conductor_service'
+  - job_name: 'batch_orchestrator_service'
     static_configs:
-      - targets: ['batch_conductor_service:4002']
+      - targets: ['batch_orchestrator_service:5000']
     metrics_path: '/metrics'
     
   - job_name: 'spell_checker_service'
     static_configs:
       - targets: ['spell_checker_service:8002']
-    metrics_path: '/metrics'
-    
-  - job_name: 'batch_orchestrator_service'
-    static_configs:
-      - targets: ['batch_orchestrator_service:5000']
     metrics_path: '/metrics'
     
   - job_name: 'essay_lifecycle_api'
@@ -47,4 +42,46 @@ scrape_configs:
   - job_name: 'cj_assessment_service'
     static_configs:
       - targets: ['cj_assessment_service:9090']  # This service uses dedicated metrics port
+    metrics_path: '/metrics'
+    
+  - job_name: 'class_management_service'
+    static_configs:
+      - targets: ['class_management_service:5002']
+    metrics_path: '/metrics'
+    
+  - job_name: 'llm_provider_service'
+    static_configs:
+      - targets: ['llm_provider_service:8080']
+    metrics_path: '/metrics'
+    
+  - job_name: 'api_gateway_service'
+    static_configs:
+      - targets: ['api_gateway_service:8080']
+    metrics_path: '/metrics'
+    
+  - job_name: 'result_aggregator_service'
+    static_configs:
+      - targets: ['result_aggregator_service:4003']
+    metrics_path: '/metrics'
+
+  # Infrastructure exporters for proper monitoring
+  - job_name: 'kafka_exporter'
+    static_configs:
+      - targets: ['kafka_exporter:9308']
+    metrics_path: '/metrics'
+    
+  - job_name: 'postgres_exporter'
+    static_configs:
+      - targets: ['postgres_exporter:9187']
+    metrics_path: '/metrics'
+    
+  - job_name: 'redis_exporter'
+    static_configs:
+      - targets: ['redis_exporter:9121']
+    metrics_path: '/metrics'
+
+  # Node exporter for system metrics
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['node_exporter:9100']
     metrics_path: '/metrics' 

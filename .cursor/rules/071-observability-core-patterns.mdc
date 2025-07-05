@@ -44,9 +44,34 @@ logger.info("Operation completed", extra={
 
 ### 3.1. Every Service MUST
 - Expose `/metrics` endpoint (Prometheus format)
-- Use structured JSON logging
+- Expose `/healthz` endpoint with dependency checks
+- Use structured JSON logging with correlation_id
 - Include correlation_id in all telemetry
-- Implement health check endpoint
+- Register with Prometheus service discovery
+
+### 3.2. HuleEdu Observability Stack URLs
+
+**External Access (from host machine):**
+- **Grafana Dashboard**: http://localhost:3000 (admin/admin)
+- **Prometheus Metrics**: http://localhost:9091
+- **Alertmanager**: http://localhost:9094/ (note trailing slash)
+- **Jaeger Tracing**: http://localhost:16686
+- **Loki Logs**: http://localhost:3100 ✅ WORKING
+
+**Internal Container Access (for Grafana data sources):**
+- **Prometheus**: `http://prometheus:9090`
+- **Loki**: `http://loki:3100` ✅ CONFIRMED WORKING
+- **Alertmanager**: `http://alertmanager:9093`
+- **Jaeger**: `http://jaeger:16686`
+
+### 3.3. Infrastructure Monitoring Endpoints
+
+| Component | External URL | Metrics |
+|-----------|--------------|----------|
+| Kafka Exporter | http://localhost:9308 | /metrics |
+| PostgreSQL Exporter | http://localhost:9187 | /metrics |
+| Redis Exporter | http://localhost:9121 | /metrics |
+| Node Exporter | http://localhost:9100 | /metrics |
 
 ### 3.2. Observability Stack Location
 - Configuration: `observability/docker-compose.observability.yml`

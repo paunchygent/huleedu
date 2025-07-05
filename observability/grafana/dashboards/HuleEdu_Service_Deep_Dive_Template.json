@@ -120,8 +120,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate({__name__=~\".*_http_requests_total\",job=\"${service}\"}[5m])) by (status_code)",
-          "legendFormat": "{{status_code}}",
+          "expr": "(rate(http_requests_total{job=\"${service}\"}[5m]) or rate(file_service_http_requests_total{job=\"${service}\"}[5m]) or rate(cj_assessment_http_requests_total{job=\"${service}\"}[5m]) or vector(0))",
+          "legendFormat": "{{method}} {{status_code}}",
           "range": true,
           "refId": "A"
         }
@@ -214,8 +214,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate({__name__=~\".*_http_request_duration_seconds_bucket\",job=\"${service}\"}[5m])) by (le))",
-          "legendFormat": "P95",
+          "expr": "avg(up{job=\"${service}\"})",
+          "legendFormat": "Service Status",
           "range": true,
           "refId": "A"
         },
@@ -225,8 +225,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum(rate({__name__=~\".*_http_request_duration_seconds_bucket\",job=\"${service}\"}[5m])) by (le))",
-          "legendFormat": "P50",
+          "expr": "rate(up{job=\"${service}\"}[5m])",
+          "legendFormat": "Service Availability",
           "range": true,
           "refId": "B"
         }
@@ -312,7 +312,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate({__name__=~\".*_http_requests_total\",job=\"${service}\",status_code=~\"5..\"}[5m])) by (endpoint) / sum(rate({__name__=~\".*_http_requests_total\",job=\"${service}\"}[5m])) by (endpoint)",
+          "expr": "rate(up{job=\"${service}\"}[5m])",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -323,7 +323,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate({__name__=~\".*_http_requests_total\",job=\"${service}\"}[5m])) by (endpoint)",
+          "expr": "(rate(http_requests_total{job=\"${service}\"}[5m]) or rate(file_service_http_requests_total{job=\"${service}\"}[5m]) or rate(cj_assessment_http_requests_total{job=\"${service}\"}[5m]) or vector(0))",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -481,6 +481,197 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "dark-green",
+                  "index": 0,
+                  "text": "CLOSED"
+                },
+                "1": {
+                  "color": "dark-red",
+                  "index": 1,
+                  "text": "OPEN"
+                },
+                "2": {
+                  "color": "dark-yellow",
+                  "index": 2,
+                  "text": "HALF_OPEN"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "match": "null",
+                "result": {
+                  "color": "gray",
+                  "index": 3,
+                  "text": "NO DATA"
+                }
+              },
+              "type": "special"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              },
+              {
+                "color": "yellow",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "10.1.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "llm_provider_circuit_breaker_state{job=\"${service}\"}",
+          "legendFormat": "{{provider}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Circuit Breaker State",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 8,
+        "y": 16
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "rate(llm_provider_circuit_breaker_state_changes_total{job=\"${service}\"}[5m])",
+          "legendFormat": "{{provider}} ({{from_state}} → {{to_state}})",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Circuit Breaker State Transitions",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
@@ -488,7 +679,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 24
       },
       "id": 5,
       "options": {

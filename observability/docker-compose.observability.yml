@@ -120,4 +120,78 @@ services:
       - GF_DATASOURCES_0_IS_DEFAULT=true
       - GF_DATASOURCES_1_NAME=Loki
       - GF_DATASOURCES_1_TYPE=loki
-      - GF_DATASOURCES_1_URL=http://loki:3100 
+      - GF_DATASOURCES_1_URL=http://loki:3100
+
+  # Infrastructure exporters for comprehensive monitoring
+  kafka_exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: huleedu_kafka_exporter
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "9308:9308"
+    command:
+      - '--kafka.server=kafka:9092'
+      - '--web.listen-address=0.0.0.0:9308'
+      - '--log.level=info'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9308/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: huleedu_postgres_exporter
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "9187:9187"
+    environment:
+      # Primary database connection - monitors batch_orchestrator_db
+      DATA_SOURCE_NAME: "postgresql://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@batch_orchestrator_db:5432/batch_orchestrator?sslmode=disable"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9187/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  redis_exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: huleedu_redis_exporter
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "9121:9121"
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9121/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: huleedu_node_exporter
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "9100:9100"
+    command:
+      - '--collector.disable-defaults'
+      - '--collector.cpu'
+      - '--collector.loadavg'
+      - '--collector.meminfo'
+    # Removed problematic volume mount for macOS compatibility
+    # volumes:
+    #   - '/:/host:ro,rslave'  # Not supported on macOS/Darwin
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9100/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s 

@@ -7,29 +7,52 @@ This guide walks you through importing and configuring the HuleEdu three-tier da
 Before importing the dashboards, ensure you have:
 
 1. **Grafana Running**: Access Grafana at <http://localhost:3000>
+   - Default credentials: admin/admin
+   - Auto-configured with Prometheus and Loki data sources
 
    ```bash
-   docker compose up -d grafana
+   pdm run obs-up  # Start observability stack
+   # or
+   docker compose -f observability/docker-compose.observability.yml up -d
    ```
 
-2. **Data Sources Configured**:
-   - Prometheus data source connected
-   - Loki data source connected
-   - Alertmanager data source (optional, for alert panels)
+2. **Data Sources Auto-Configured**:
+   - **Prometheus**: <http://localhost:9091> (external) / `http://prometheus:9090` (internal)
+   - **Loki**: <http://localhost:3100> (external) / `http://loki:3100` (internal) ✅ WORKING
+   - **Alertmanager**: <http://localhost:9094/> (external) / `http://alertmanager:9093` (internal)
+   - **Jaeger**: <http://localhost:16686> (distributed tracing UI)
 
-3. **Services Running**: At least some HuleEdu services should be running to see data
+3. **Services Running**: HuleEdu microservices and infrastructure must be running
 
    ```bash
+   pdm run dc-up  # Start all services and infrastructure
+   # or
    docker compose up -d
+   ```
+
+   **Quick Status Check**:
+
+   ```bash
+   pdm run dc-ps  # Check all container status
+   curl http://localhost:9091/api/v1/targets  # Check Prometheus targets
    ```
 
 ## Step 1: Verify Data Sources
 
 1. Log into Grafana (default credentials: admin/admin)
 2. Navigate to **Configuration** → **Data Sources** (or **Connections** → **Data sources** in newer versions)
-3. Verify you have:
-   - **Prometheus** data source pointing to `http://prometheus:9090`
-   - **Loki** data source pointing to `http://loki:3100`
+3. Verify you have (should be auto-configured):
+   - **Prometheus** data source pointing to `http://prometheus:9090` (internal)
+   - **Loki** data source pointing to `http://loki:3100` (internal) ✅ CONFIRMED WORKING
+   - **External Access**: Prometheus UI at <http://localhost:9091>
+   - **External Access**: Loki logs via Grafana Explore
+
+4. **Add AlertManager Data Source (Manual)**:
+   - Click **Add data source** → **AlertManager**
+   - **Name**: `AlertManager`
+   - **URL**: `http://alertmanager:9093` (internal container URL)
+   - **Implementation**: `Prometheus` (default)
+   - Click **Save & Test**
 
 If these don't exist, add them:
 
@@ -152,13 +175,104 @@ Import the dashboards in this specific order to ensure proper navigation links:
 3. Check **Save current time range as dashboard default**
 4. Click **Save**
 
-## Step 5: Create Dashboard Bookmarks
+## Step 5: HuleEdu Service URLs
+
+### **Service Health Endpoints**
+
+| Service | External URL | Health Check | Metrics |
+|---------|--------------|--------------|----------|
+| API Gateway | <http://localhost:8080> | /healthz | /metrics |
+| LLM Provider | <http://localhost:8090> | /healthz | /metrics |
+| Content Service | <http://localhost:8001> | /healthz | /metrics |
+| File Service | <http://localhost:7001> | /healthz | /metrics |
+| Batch Orchestrator | <http://localhost:5001> | /healthz | /metrics |
+| Class Management | <http://localhost:5002> | /healthz | /metrics |
+| CJ Assessment | <http://localhost:9095> | /healthz | /metrics |
+| Spell Checker | <http://localhost:8002> | /healthz | /metrics |
+| Result Aggregator | <http://localhost:4003> | /healthz | /metrics |
+| Essay Lifecycle API | <http://localhost:6001> | /healthz | /metrics |
+
+### **Loki Log Aggregation System**
+
+**Loki is extensively used** for centralized log aggregation across all HuleEdu services:
+
+#### **Loki Access Points**
+
+- **Loki API**: <http://localhost:3100> (direct API access) ✅ WORKING
+- **Grafana Integration**: <http://localhost:3000/explore> (pre-configured data source)
+- **Internal Container**: `http://loki:3100` ✅ CONFIRMED WORKING FOR GRAFANA
+
+#### **Active Log Labels**
+
+Loki automatically extracts these labels from all service logs:
+
+- `container` - Docker container name
+- `correlation_id` - Request correlation UUID
+- `level` - Log level (info, error, warning, debug)
+- `logger_name` - Python logger hierarchy
+- `service` - Service identifier
+- `service_name` - Full service name
+
+#### **Common Loki Queries**
+
+```logql
+# All logs from a specific service
+{service="llm_provider_service"}
+
+# Error logs across all services
+{level="error"}
+
+# Trace a specific request by correlation ID
+{correlation_id="550e8400-e29b-41d4-a716-446655440000"}
+
+# Container-specific logs
+{container="huleedu_batch_orchestrator_service"}
+
+# JSON field extraction
+{service=~".+"} | json | line_format "{{.level}}: {{.event}}"
+```
+
+#### **Troubleshooting Dashboard Integration**
+
+The HuleEdu Troubleshooting dashboard uses Loki extensively for:
+
+- **Correlation ID Tracing**: Complete request timeline across services
+- **Service Log Filtering**: Real-time log streaming by service
+- **Error Context**: Detailed error logs with full context
+- **Performance Analysis**: Request duration and service interaction logs
+
+## Step 6: Create Dashboard Bookmarks
 
 For quick access, bookmark these URLs:
+
+### **Dashboard URLs**
 
 - **System Health**: <http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview>
 - **Service Deep Dive**: <http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive>
 - **Troubleshooting**: <http://localhost:3000/d/huleedu-troubleshooting/huleedu-troubleshooting>
+
+### **Direct Component Access**
+
+- **Grafana**: <http://localhost:3000> (admin/admin)
+- **Prometheus**: <http://localhost:9091> (metrics & queries)
+- **Loki**: <http://localhost:3100> (log aggregation API) ✅ WORKING
+- **Alertmanager**: <http://localhost:9094/> (alert management - note trailing slash)
+- **Jaeger**: <http://localhost:16686> (distributed tracing)
+
+### **Data Source URLs for Grafana Configuration**
+
+**Use these internal URLs when configuring data sources in Grafana:**
+
+- **Prometheus**: `http://prometheus:9090`
+- **Loki**: `http://loki:3100` ✅ CONFIRMED WORKING
+- **AlertManager**: `http://alertmanager:9093` (no trailing slash for data source)
+
+### **Infrastructure Monitoring**
+
+- **Kafka Metrics**: <http://localhost:9308/metrics>
+- **PostgreSQL Metrics**: <http://localhost:9187/metrics>
+- **Redis Metrics**: <http://localhost:9121/metrics>
+- **Node Metrics**: <http://localhost:9100/metrics>
 
 ## Troubleshooting Common Issues
 
@@ -171,12 +285,17 @@ For quick access, bookmark these URLs:
    ```
 
 2. **Verify Prometheus is scraping**:
-   - Go to <http://localhost:9090/targets>
-   - All targets should show as "UP"
+   - Go to <http://localhost:9091/targets> (Note: Port 9091, not 9090)
+   - All 14+ targets should show as "UP"
+   - Services: 10+ microservices
+   - Exporters: kafka_exporter, postgres_exporter, redis_exporter, node_exporter
 
 3. **Check metric names**:
-   - Go to <http://localhost:9090>
-   - Try query: `up{job=~".*_service"}`
+   - Go to <http://localhost:9091> (Prometheus UI)
+   - Try these test queries:
+     - `up{job=~".*_service"}` (should return 10+ services)
+     - `huleedu:service_availability:percent` (should return 100)
+     - `huleedu:http_requests:rate5m` (should return current request rate)
 
 ### Service Dropdown Empty
 
@@ -224,7 +343,7 @@ If you see `JSONParserErr` with successful log messages:
 
 Correlation IDs are UUID values that track a request across all services. Here's how to find and use them:
 
-#### Where to Find Correlation IDs:
+#### Where to Find Correlation IDs
 
 1. **In Service Deep Dive Dashboard**:
    - Navigate to the Live Logs panel
@@ -238,7 +357,7 @@ Correlation IDs are UUID values that track a request across all services. Here's
 3. **In Alert Notifications**:
    - Critical errors often include correlation IDs in alert descriptions
 
-#### How to Use Correlation IDs:
+#### How to Use Correlation IDs
 
 1. **Copy the Correlation ID**:
    - From logs: Click on a log entry to expand it

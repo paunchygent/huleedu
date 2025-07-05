@@ -31,23 +31,39 @@ Examples:
 
 ### 2.1. System Health Overview Template
 **Purpose**: Single pane of glass for operational status
+**Dashboard URL**: http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview
+
 **Required Panels**:
-1. Service Availability (Stat): `count(up{job=~".*_service"} == 1) / count(up{job=~".*_service"}) * 100`
-2. Error Rate Trend (Time Series): `sum(rate(http_requests_total{status_code=~"5.."}[5m])) by (job)`
-3. Response Time P95 (Time Series): `histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job))`
-4. Active Alerts (Table): Alert status from AlertManager
-5. Resource Usage (Time Series): Container memory/CPU utilization
-6. Recent Error Logs (Logs): `{service=~".+"} | json | level="error"`
+1. Service Availability (Stat): `huleedu:service_availability:percent`
+2. Error Rate Trend (Time Series): `huleedu:http_errors_5xx:rate5m`
+3. HTTP Request Rate (Time Series): `huleedu:http_requests:rate5m`
+4. Infrastructure Health (Stat): `huleedu:infrastructure_health:up`
+5. Circuit Breaker Status (Stat): `huleedu:llm_provider:circuit_breaker_status`
+6. Active Alerts (Table): `ALERTS{alertstate="firing"}`
+7. Circuit Breaker State Changes (Time Series): `huleedu:circuit_breaker:changes_rate5m`
+
+**Performance Optimizations**:
+- Uses recording rules for faster query execution
+- No regex patterns in queries
+- 30s refresh interval for operational awareness
 
 ### 2.2. Service Deep Dive Template
 **Purpose**: Detailed analysis of individual service performance
+**Dashboard URL**: http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive
+
 **Required Panels**:
-1. Service Status (Stat): Service-specific health check
-2. Request Rate (Time Series): `rate(http_requests_total{job="<service>"}[5m])`
-3. Error Rate by Endpoint (Bar Chart): `rate(http_requests_total{job="<service>", status_code=~"5.."}[5m]) by (endpoint)`
-4. Response Time Distribution (Heatmap): Request duration histograms
-5. Custom Business Metrics: Service-specific counters/histograms
-6. Service Logs (Logs): `{service="<service>"} | json`
+1. Request Rate by Status (Time Series): `huleedu:service_http_requests:rate5m{service="${service}"}`
+2. Request Duration Percentiles (Time Series): Service-specific latency metrics
+3. Error Rate by Endpoint (Table): Service-specific error tracking
+4. Circuit Breaker State (Stat): `llm_provider_circuit_breaker_state{job="${service}"}`
+5. Business Metrics (Stat): Service-specific KPIs
+6. Circuit Breaker Transitions (Time Series): `llm_provider_circuit_breaker_state_changes_total{job="${service}"}`
+7. Service Logs (Logs): `{service="${service}"} | json`
+
+**Features**:
+- Service variable dropdown for easy switching
+- Circuit breaker integration for LLM services
+- Business metrics tailored per service type
 
 ### 2.3. Troubleshooting Dashboard Template
 **Purpose**: Correlation ID tracking and error investigation

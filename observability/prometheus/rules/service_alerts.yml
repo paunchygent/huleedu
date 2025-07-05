@@ -13,14 +13,14 @@ groups:
       runbook_url: "http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive?var-service={{ $labels.job }}"
       
   - alert: HighErrorRate
-    expr: rate({__name__=~".*_http_requests_total",status_code=~"5.."}[5m]) > 0.1
+    expr: huleedu:http_errors_5xx:rate5m > 0.1
     for: 2m
     labels:
       severity: warning
     annotations:
-      summary: "High 5xx error rate for {{ $labels.job }}"
-      description: "Service {{ $labels.job }} is experiencing {{ $value }} 5xx errors per second over the last 5 minutes."
-      dashboard_url: "http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive?var-service={{ $labels.job }}"
+      summary: "High 5xx error rate across HuleEdu services"
+      description: "HuleEdu services are experiencing {{ $value }} 5xx errors per second over the last 5 minutes."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
       runbook_url: "file:///app/Documentation/OPERATIONS/01-Grafana-Playbook.md#high-error-rate"
 
 - name: DistributedTracingAlerts
@@ -83,4 +83,56 @@ groups:
     annotations:
       summary: "Circuit breaker OPEN for {{ $labels.circuit_name }}"
       description: "Circuit breaker '{{ $labels.circuit_name }}' in service {{ $labels.service_name }} is OPEN, blocking all requests."
-      dashboard_url: "http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive?var-service={{ $labels.service_name }}" 
+      dashboard_url: "http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive?var-service={{ $labels.service_name }}"
+
+- name: InfrastructureAlerts
+  rules:
+  - alert: KafkaExporterDown
+    expr: up{job="kafka_exporter"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Kafka exporter is down"
+      description: "Kafka monitoring is unavailable - exporter has been down for more than 1 minute."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
+
+  - alert: PostgreSQLExporterDown
+    expr: up{job="postgres_exporter"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "PostgreSQL exporter is down"
+      description: "PostgreSQL monitoring is unavailable - exporter has been down for more than 1 minute."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
+
+  - alert: RedisExporterDown
+    expr: up{job="redis_exporter"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis exporter is down"
+      description: "Redis monitoring is unavailable - exporter has been down for more than 1 minute."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
+
+  - alert: LowServiceAvailability
+    expr: huleedu:service_availability:percent < 80
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Low overall service availability"
+      description: "Overall service availability is {{ $value }}% - below 80% threshold."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
+
+  - alert: HighKafkaLatency
+    expr: huleedu:kafka_latency:mean > 1.0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High Kafka message queue latency"
+      description: "Kafka message queue latency is {{ $value }}s - higher than 1s threshold."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview" 

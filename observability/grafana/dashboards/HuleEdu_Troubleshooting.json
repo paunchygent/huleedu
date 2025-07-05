@@ -419,7 +419,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate({__name__=~\".*_http_requests_total\"}[5m])) by (job)",
+          "expr": "huleedu:service_http_requests:rate5m",
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
@@ -429,7 +429,7 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "5s",
+  "refresh": "30s",
   "schemaVersion": 38,
   "style": "dark",
   "tags": ["huleedu", "troubleshooting"],

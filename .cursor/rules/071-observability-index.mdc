@@ -38,21 +38,65 @@ Observability patterns for monitoring, tracing, and debugging HuleEdu services.
 ## Quick Reference
 
 ### Stack Access
-- Prometheus: http://localhost:9091
-- Grafana: http://localhost:3000
-- Jaeger UI: http://localhost:16686
-- Loki: http://localhost:3100 (API only)
+
+**Main Observability Components:**
+- **Grafana Dashboard**: http://localhost:3000 (admin/admin)
+- **Prometheus Metrics**: http://localhost:9091
+- **Alertmanager**: http://localhost:9094/ (note trailing slash for browser)
+- **Jaeger Tracing**: http://localhost:16686
+- **Loki Logs**: http://localhost:3100 ✅ WORKING
+  - **Labels**: container, correlation_id, level, logger_name, service, service_name
+  - **Promtail**: Automatically ingesting from all Docker containers
+  - **JSON Parsing**: Automatic structured log parsing
+
+**Internal Container URLs (for Grafana data sources):**
+- **Prometheus**: `http://prometheus:9090`
+- **Loki**: `http://loki:3100` ✅ CONFIRMED WORKING
+- **AlertManager**: `http://alertmanager:9093`
+
+**Infrastructure Monitoring:**
+- **Kafka Metrics**: http://localhost:9308/metrics
+- **PostgreSQL Metrics**: http://localhost:9187/metrics
+- **Redis Metrics**: http://localhost:9121/metrics
+- **Node Metrics**: http://localhost:9100/metrics
+
+**Quick Dashboard Access:**
+- **System Health**: http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview
+- **Service Deep Dive**: http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive
+- **Troubleshooting**: http://localhost:3000/d/huleedu-troubleshooting/huleedu-troubleshooting
 
 ### Key Commands
 ```bash
 # Start observability stack
 pdm run obs-up
+# or
+docker compose -f observability/docker-compose.observability.yml up -d
 
-# Check metrics
-docker exec <container> curl http://localhost:<port>/metrics
+# Stop observability stack
+pdm run obs-down
 
-# Query Prometheus
-docker exec huleedu_prometheus wget -qO- "http://localhost:9090/api/v1/query?query=up"
+# Check all services status
+pdm run dc-ps
+
+# Check Prometheus targets (should show 14+ UP)
+curl http://localhost:9091/api/v1/targets
+
+# Test recording rules
+curl "http://localhost:9091/api/v1/query?query=huleedu:service_availability:percent"
+
+# Test Loki API (✅ WORKING)
+curl "http://localhost:3100/loki/api/v1/labels"
+
+# Test AlertManager (note trailing slash)
+curl http://localhost:9094/
+
+# Check service metrics
+curl http://localhost:8080/metrics  # API Gateway
+curl http://localhost:8090/metrics  # LLM Provider
+# ... (see service table above for all endpoints)
+
+# View logs for observability components
+pdm run obs-logs
 ```
 
 ### Import Order
