@@ -173,7 +173,6 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             essay_a_id = result.task.essay_a.id
             essay_b_id = result.task.essay_b.id
             prompt_text = result.task.prompt
-            prompt_hash = result.prompt_hash or ""
 
             # Extract LLM assessment data if available
             winner = None
@@ -189,13 +188,11 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
                 essay_a_els_id=essay_a_id,
                 essay_b_els_id=essay_b_id,
                 prompt_text=prompt_text,
-                prompt_hash=prompt_hash,
                 winner=winner,
                 confidence=confidence,
                 justification=justification,
                 raw_llm_response=None,  # Can be added later if needed
                 error_message=result.error_message,
-                from_cache=result.from_cache,
                 processing_metadata={},  # Can be expanded later if needed
             )
             session.add(comparison_pair)

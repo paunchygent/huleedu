@@ -30,29 +30,6 @@ class ContentClientProtocol(Protocol):
         ...
 
 
-class CacheProtocol(Protocol):
-    """Protocol for caching LLM responses."""
-
-    def generate_hash(self, prompt: str) -> str:
-        """Generate a hash key for a given prompt."""
-        ...
-
-    def get_from_cache(self, cache_key: str) -> dict[str, Any] | None:
-        """Retrieve data from cache using the provided key."""
-        ...
-
-    def add_to_cache(self, cache_key: str, data: dict[str, Any]) -> None:
-        """Add data to cache with the provided key."""
-        ...
-
-    def clear_cache(self) -> None:
-        """Clear all cached data."""
-        ...
-
-    def get_cache_stats(self) -> dict[str, Any]:
-        """Get cache statistics."""
-        ...
-
 
 class RetryManagerProtocol(Protocol):
     """Protocol for managing LLM API retry logic."""

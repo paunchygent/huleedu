@@ -383,8 +383,7 @@ services:
       - CJ_ASSESSMENT_SERVICE_LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8080/api/v1
       # Database configuration
       - CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@cj_assessment_db:5432/cj_assessment
-      # Testing configuration
-      - CJ_ASSESSMENT_SERVICE_USE_MOCK_LLM=${USE_MOCK_LLM:-false}  # Use LLM Provider Service instead
+      # Testing configuration handled by LLM Provider Service
       # Default LLM configuration (passed to LLM Provider Service)
       - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_PROVIDER=anthropic
       - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_MODEL=claude-3-5-haiku-20241022

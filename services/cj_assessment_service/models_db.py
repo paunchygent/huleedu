@@ -6,7 +6,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     JSON,
-    Boolean,
     DateTime,
     Float,
     ForeignKey,
@@ -144,7 +143,6 @@ class ComparisonPair(Base):
 
     # Comparison metadata
     prompt_text: Mapped[str] = mapped_column(Text, nullable=False)
-    prompt_hash: Mapped[str] = mapped_column(String(64), nullable=False)
 
     # Comparison results
     winner: Mapped[str | None] = mapped_column(
@@ -155,7 +153,6 @@ class ComparisonPair(Base):
     justification: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_llm_response: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    from_cache: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))

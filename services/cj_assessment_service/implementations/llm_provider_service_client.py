@@ -188,15 +188,14 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         try:
             response_data = json.loads(response_text)
 
-            # Extract the comparison result and convert confidence scale
-            # LLM Provider Service returns 1-5 scale, convert to 0-1 scale for CJ Assessment
-            raw_confidence = response_data.get("confidence", 3.0)
-            normalized_confidence = (raw_confidence - 1.0) / 4.0  # Convert 1-5 to 0-1
+            # Extract the comparison result and preserve 1-5 confidence scale
+            # LLM Provider Service returns 1-5 scale, keep as-is for CJ Assessment
+            confidence = response_data.get("confidence", 3.0)
 
             result = {
                 "winner": response_data.get("winner"),
                 "justification": response_data.get("justification"),
-                "confidence": normalized_confidence,
+                "confidence": confidence,
             }
 
             logger.info(
@@ -414,15 +413,14 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                     try:
                         response_data = json.loads(response_text)
 
-                        # Extract the comparison result and convert confidence scale
-                        # LLM Provider Service returns 1-5 scale, convert to 0-1 scale
-                        raw_confidence = response_data.get("confidence", 3.0)
-                        normalized_confidence = (raw_confidence - 1.0) / 4.0  # Convert 1-5 to 0-1
+                        # Extract the comparison result and preserve 1-5 confidence scale
+                        # LLM Provider Service returns 1-5 scale, keep as-is for CJ Assessment
+                        confidence = response_data.get("confidence", 3.0)
 
                         result = {
                             "winner": response_data.get("winner"),
                             "justification": response_data.get("justification"),
-                            "confidence": normalized_confidence,
+                            "confidence": confidence,
                         }
 
                         logger.info(

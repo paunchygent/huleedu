@@ -14,7 +14,6 @@ class Settings(BaseSettings):
     # Basic service configuration
     LOG_LEVEL: str = "INFO"
     SERVICE_NAME: str = "cj_assessment_service"
-    USE_MOCK_LLM: bool = False  # Enable mock LLM for testing (no API calls)
 
     # Kafka configuration
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"

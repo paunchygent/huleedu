@@ -2,6 +2,8 @@
 
 Extracted and adapted from llm_caller.py process_comparison_tasks_async function
 to follow clean architecture with protocol-based dependency injection.
+
+Cache system removed to preserve CJ Assessment methodology integrity.
 """
 
 from __future__ import annotations
@@ -12,7 +14,6 @@ from typing import cast
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core import LLMProviderType
-from common_core.observability_enums import CacheOperation
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import (
@@ -21,7 +22,6 @@ from services.cj_assessment_service.models_api import (
     LLMAssessmentResponseSchema,
 )
 from services.cj_assessment_service.protocols import (
-    CacheProtocol,
     LLMInteractionProtocol,
     LLMProviderProtocol,
 )
@@ -34,18 +34,15 @@ class LLMInteractionImpl(LLMInteractionProtocol):
 
     def __init__(
         self,
-        cache_manager: CacheProtocol,
         providers: dict[LLMProviderType, LLMProviderProtocol],
         settings: Settings,
     ) -> None:
         """Initialize LLM interaction orchestrator.
 
         Args:
-            cache_manager: Cache implementation for response caching.
             providers: Dictionary of available LLM providers.
             settings: Application settings.
         """
-        self.cache_manager = cache_manager
         self.providers = providers
         self.settings = settings
 
@@ -94,83 +91,22 @@ class LLMInteractionImpl(LLMInteractionProtocol):
         # Get the provider for the current model configuration
         provider = self._get_provider_for_model()
 
-        # Get cache metrics for recording operations
+        # Get business metrics for recording LLM operations
         business_metrics = get_business_metrics()
-        cache_operations_metric = business_metrics.get("cache_operations")
+        llm_api_calls_metric = business_metrics.get("llm_api_calls")
 
         # Create semaphore for concurrency control
         max_concurrent_requests = getattr(self.settings, "max_concurrent_llm_requests", 3)
         semaphore = asyncio.Semaphore(max_concurrent_requests)
 
         async def process_task(task: ComparisonTask) -> ComparisonResult:
-            """Process a single comparison task with caching and error handling."""
+            """Process a single comparison task with direct LLM call."""
             async with semaphore:
-                # Generate cache key from the prompt and override parameters for proper caching
-                cache_key = self.cache_manager.generate_hash(
-                    f"{task.prompt}|model:{model_override}|"
-                    f"temp:{temperature_override}|"
-                    f"tokens:{max_tokens_override}",
-                )
-
-                # Check cache first
-                cached_response = self.cache_manager.get_from_cache(cache_key)
-                if cached_response:
-                    # Record cache hit metric
-                    if cache_operations_metric:
-                        cache_operations_metric.labels(
-                            operation=CacheOperation.GET.value, result="hit"
-                        ).inc()
-
-                    hit_msg = "Cache %s HIT for essays %s vs %s" % (
-                        CacheOperation.GET.value,
-                        task.essay_a.id,
-                        task.essay_b.id,
-                    )
-                    logger.info(
-                        hit_msg,
-                        extra={
-                            "prompt_hash": cache_key,
-                            "cache_operation": CacheOperation.GET.value,
-                            "cache_result": "hit",
-                        },
-                    )
-                    try:
-                        llm_assessment = LLMAssessmentResponseSchema(**cached_response)
-                        return ComparisonResult(
-                            task=task,
-                            llm_assessment=llm_assessment,
-                            from_cache=True,
-                            prompt_hash=cache_key,
-                            error_message=None,
-                            raw_llm_response_content=None,  # TODO: Capture raw response
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to create ComparisonResult from cached data for task "
-                            f"{task.essay_a.id}-{task.essay_b.id}: {e}",
-                        )
-                        # Continue to make fresh request if cache data is invalid
-                else:
-                    # Record cache miss metric
-                    if cache_operations_metric:
-                        cache_operations_metric.labels(
-                            operation=CacheOperation.GET.value, result="miss"
-                        ).inc()
-
-                miss_msg = "Cache %s MISS for essays %s vs %s. Querying LLM." % (
-                    CacheOperation.GET.value,
-                    task.essay_a.id,
-                    task.essay_b.id,
-                )
                 logger.info(
-                    miss_msg,
-                    extra={
-                        "prompt_hash": cache_key,
-                        "cache_operation": CacheOperation.GET.value,
-                        "cache_result": "miss",
-                    },
+                    f"Processing comparison for essays {task.essay_a.id} vs {task.essay_b.id}",
                 )
-                # Make fresh API request
+
+                # Make direct LLM API request - no caching
                 try:
                     response_data, error_message = await provider.generate_comparison(
                         user_prompt=task.prompt,
@@ -181,31 +117,35 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     )
 
                     if response_data:
+                        # Record successful LLM API call metric
+                        if llm_api_calls_metric:
+                            llm_api_calls_metric.labels(
+                                provider=self.settings.DEFAULT_LLM_PROVIDER.value,
+                                model=model_override or self.settings.DEFAULT_LLM_MODEL,
+                                status="success"
+                            ).inc()
+
                         logger.info(
                             f"LLM Response for essays {task.essay_a.id} vs {task.essay_b.id}: "
                             f"Winner -> {response_data.get('winner')}",
-                            extra={"prompt_hash": cache_key},
                         )
-                        # Cache successful response
-                        self.cache_manager.add_to_cache(cache_key, response_data)
-
-                        # Record cache set metric
-                        if cache_operations_metric:
-                            cache_operations_metric.labels(
-                                operation=CacheOperation.SET.value, result="success"
-                            ).inc()
 
                         llm_assessment = LLMAssessmentResponseSchema(**response_data)
                         return ComparisonResult(
                             task=task,
                             llm_assessment=llm_assessment,
-                            from_cache=False,
-                            prompt_hash=cache_key,
                             error_message=None,
                             raw_llm_response_content=None,
-                            # TODO: Capture raw response for debugging
                         )
                     else:
+                        # Record failed LLM API call metric
+                        if llm_api_calls_metric:
+                            llm_api_calls_metric.labels(
+                                provider=self.settings.DEFAULT_LLM_PROVIDER.value,
+                                model=model_override or self.settings.DEFAULT_LLM_MODEL,
+                                status="error"
+                            ).inc()
+
                         logger.error(
                             f"Task with essays {task.essay_a.id}-{task.essay_b.id} "
                             f"failed: {error_message}",
@@ -213,13 +153,19 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         return ComparisonResult(
                             task=task,
                             llm_assessment=None,
-                            from_cache=False,
-                            prompt_hash=cache_key,
                             error_message=error_message,
                             raw_llm_response_content=None,
                         )
 
                 except Exception as e:
+                    # Record failed LLM API call metric
+                    if llm_api_calls_metric:
+                        llm_api_calls_metric.labels(
+                            provider=self.settings.DEFAULT_LLM_PROVIDER.value,
+                            model=model_override or self.settings.DEFAULT_LLM_MODEL,
+                            status="error"
+                        ).inc()
+
                     logger.error(
                         f"Unexpected error processing task {task.essay_a.id}-{task.essay_b.id}: "
                         f"{e}",
@@ -228,8 +174,6 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     return ComparisonResult(
                         task=task,
                         llm_assessment=None,
-                        from_cache=False,
-                        prompt_hash=cache_key,
                         error_message=f"Unexpected error: {e!s}",
                         raw_llm_response_content=None,
                     )
@@ -254,7 +198,6 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         ComparisonResult(
                             task=tasks[i],
                             llm_assessment=None,
-                            from_cache=False,
                             error_message=f"Task execution failed: {result!s}",
                             raw_llm_response_content=None,
                         ),
@@ -283,7 +226,6 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                 ComparisonResult(
                     task=task,
                     llm_assessment=None,
-                    from_cache=False,
                     error_message=f"Critical processing error: {e!s}",
                     raw_llm_response_content=None,
                 )

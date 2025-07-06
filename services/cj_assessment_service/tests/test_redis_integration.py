@@ -11,22 +11,11 @@ from dishka import make_async_container
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 
-from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
 
 
-@pytest.fixture
-def test_settings() -> Settings:
-    """Provide test settings with Redis URL."""
-    return Settings(
-        REDIS_URL="redis://localhost:6379",
-        SERVICE_NAME="cj_assessment_service_test",
-        USE_MOCK_LLM=True,  # Use mock for testing
-    )
-
-
 @pytest.mark.asyncio
-async def test_redis_client_di_injection(test_settings: Settings) -> None:
+async def test_redis_client_di_injection() -> None:
     """Test that RedisClient can be injected via DI container."""
     container = make_async_container(CJAssessmentServiceProvider())
 

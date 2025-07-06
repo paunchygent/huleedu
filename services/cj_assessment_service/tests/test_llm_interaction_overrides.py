@@ -2,7 +2,7 @@
 Unit tests for LLMInteractionImpl override parameter handling.
 
 These tests verify that the LLM interaction layer correctly propagates
-override parameters to providers and includes them in cache key generation.
+override parameters to providers.
 """
 
 from __future__ import annotations
@@ -13,26 +13,17 @@ import pytest
 
 from common_core import LLMProviderType
 
-from ..implementations.llm_interaction_impl import LLMInteractionImpl
-from ..models_api import (
+from services.cj_assessment_service.implementations.llm_interaction_impl import LLMInteractionImpl
+from services.cj_assessment_service.models_api import (
     ComparisonResult,
     ComparisonTask,
     EssayForComparison,
 )
-from ..protocols import CacheProtocol, LLMProviderProtocol
+from services.cj_assessment_service.protocols import LLMProviderProtocol
 
 
 class TestLLMInteractionImplOverrides:
     """Test LLMInteractionImpl override parameter handling."""
-
-    @pytest.fixture
-    def mock_cache_manager(self) -> AsyncMock:
-        """Create mock cache manager."""
-        cache = AsyncMock(spec=CacheProtocol)
-        cache.generate_hash = MagicMock(return_value="test_cache_key")
-        cache.get_from_cache = MagicMock(return_value=None)  # No cache hit
-        cache.add_to_cache = MagicMock()
-        return cache
 
     @pytest.fixture
     def mock_provider(self) -> AsyncMock:
@@ -51,7 +42,6 @@ class TestLLMInteractionImplOverrides:
     @pytest.fixture
     def llm_interaction_impl(
         self,
-        mock_cache_manager: AsyncMock,
         mock_provider: AsyncMock,
         mock_settings: MagicMock,
     ) -> LLMInteractionImpl:
@@ -64,7 +54,6 @@ class TestLLMInteractionImplOverrides:
             dict[LLMProviderType, LLMProviderProtocol], {LLMProviderType.OPENAI: mock_provider}
         )
         return LLMInteractionImpl(
-            cache_manager=mock_cache_manager,
             providers=providers,
             settings=mock_settings,
         )
@@ -72,264 +61,153 @@ class TestLLMInteractionImplOverrides:
     @pytest.fixture
     def sample_comparison_task(
         self,
-        sample_essay_id: str,
-        sample_essay_text: str,
     ) -> ComparisonTask:
         """Create sample comparison task."""
         essay_a = EssayForComparison(
-            id=sample_essay_id,
-            text_content=sample_essay_text,
-            current_bt_score=0.0,
+            id="essay_1",
+            text_content="This is essay A content.",
+            current_bt_score=None,
         )
         essay_b = EssayForComparison(
-            id="essay_b_id",
-            text_content="Another essay text for comparison.",
-            current_bt_score=0.0,
+            id="essay_2", 
+            text_content="This is essay B content.",
+            current_bt_score=None,
         )
 
         return ComparisonTask(
             essay_a=essay_a,
             essay_b=essay_b,
-            prompt=("Compare these two essays and determine which is better."),
+            prompt="Compare these essays and determine which is better.",
         )
 
-    @pytest.mark.asyncio
-    async def test_perform_comparisons_with_all_overrides(
+    @pytest.fixture
+    def mock_settings(self) -> MagicMock:
+        """Create mock settings."""
+        settings = MagicMock()
+        settings.DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI
+        settings.DEFAULT_LLM_MODEL = "gpt-4"
+        settings.max_concurrent_llm_requests = 3
+        return settings
+
+    async def test_perform_comparisons_with_model_override(
         self,
         llm_interaction_impl: LLMInteractionImpl,
         sample_comparison_task: ComparisonTask,
         mock_provider: AsyncMock,
-        mock_cache_manager: AsyncMock,
     ) -> None:
-        """Test perform_comparisons with all override parameters."""
-        # Act
+        """Test that model override is propagated to provider."""
+        model_override = "gpt-4-turbo"
+
         results = await llm_interaction_impl.perform_comparisons(
             tasks=[sample_comparison_task],
-            model_override="gpt-4o",
-            temperature_override=0.3,
-            max_tokens_override=2000,
+            model_override=model_override,
         )
 
-        # Assert
+        # Verify provider was called with override
+        mock_provider.generate_comparison.assert_called_once()
+        call_kwargs = mock_provider.generate_comparison.call_args.kwargs
+        assert call_kwargs["model_override"] == model_override
+
+        # Verify result structure (no cache fields)
         assert len(results) == 1
         result = results[0]
         assert isinstance(result, ComparisonResult)
+        assert result.task == sample_comparison_task
         assert result.llm_assessment is not None
-        assert result.llm_assessment.winner == "Essay A"
-        assert result.from_cache is False
+        assert result.llm_assessment.confidence == 4  # 1-5 scale preserved
+        assert result.error_message is None
 
-        # Verify provider was called with override parameters
-        mock_provider.generate_comparison.assert_called_once_with(
-            user_prompt=sample_comparison_task.prompt,
-            system_prompt_override=None,
-            model_override="gpt-4o",
-            temperature_override=0.3,
-            max_tokens_override=2000,
-        )
-
-        # Verify cache key generation includes override parameters
-        expected_cache_key_input = (
-            f"{sample_comparison_task.prompt}|model:gpt-4o|temp:0.3|tokens:2000"
-        )
-        mock_cache_manager.generate_hash.assert_called_with(expected_cache_key_input)
-
-    @pytest.mark.asyncio
-    async def test_perform_comparisons_with_partial_overrides(
+    async def test_perform_comparisons_with_temperature_override(
         self,
         llm_interaction_impl: LLMInteractionImpl,
         sample_comparison_task: ComparisonTask,
         mock_provider: AsyncMock,
-        mock_cache_manager: AsyncMock,
     ) -> None:
-        """Test perform_comparisons with partial override parameters."""
-        # Act
+        """Test that temperature override is propagated to provider."""
+        temperature_override = 0.8
+
         results = await llm_interaction_impl.perform_comparisons(
             tasks=[sample_comparison_task],
-            model_override="claude-sonnet-4-20250514",
-            # temperature_override and max_tokens_override not provided
+            temperature_override=temperature_override,
         )
 
-        # Assert
+        # Verify provider was called with override
+        mock_provider.generate_comparison.assert_called_once()
+        call_kwargs = mock_provider.generate_comparison.call_args.kwargs
+        assert call_kwargs["temperature_override"] == temperature_override
+
+        # Verify result
         assert len(results) == 1
+        assert results[0].llm_assessment is not None
 
-        # Verify provider was called with only model override
-        mock_provider.generate_comparison.assert_called_once_with(
-            user_prompt=sample_comparison_task.prompt,
-            system_prompt_override=None,
-            model_override="claude-sonnet-4-20250514",
-            temperature_override=None,
-            max_tokens_override=None,
-        )
-
-        # Verify cache key generation includes only provided overrides
-        expected_cache_key_input = (
-            f"{sample_comparison_task.prompt}|model:claude-sonnet-4-20250514|temp:None|tokens:None"
-        )
-        mock_cache_manager.generate_hash.assert_called_with(expected_cache_key_input)
-
-    @pytest.mark.asyncio
-    async def test_perform_comparisons_no_overrides(
+    async def test_perform_comparisons_with_max_tokens_override(
         self,
         llm_interaction_impl: LLMInteractionImpl,
         sample_comparison_task: ComparisonTask,
         mock_provider: AsyncMock,
-        mock_cache_manager: AsyncMock,
     ) -> None:
-        """Test perform_comparisons without override parameters."""
-        # Act
+        """Test that max_tokens override is propagated to provider."""
+        max_tokens_override = 2000
+
         results = await llm_interaction_impl.perform_comparisons(
             tasks=[sample_comparison_task],
+            max_tokens_override=max_tokens_override,
         )
 
-        # Assert
+        # Verify provider was called with override
+        mock_provider.generate_comparison.assert_called_once()
+        call_kwargs = mock_provider.generate_comparison.call_args.kwargs
+        assert call_kwargs["max_tokens_override"] == max_tokens_override
+
+        # Verify result
         assert len(results) == 1
+        assert results[0].llm_assessment is not None
 
-        # Verify provider was called without overrides
-        mock_provider.generate_comparison.assert_called_once_with(
-            user_prompt=sample_comparison_task.prompt,
-            system_prompt_override=None,
-            model_override=None,
-            temperature_override=None,
-            max_tokens_override=None,
-        )
-
-        # Verify cache key generation includes None values
-        expected_cache_key_input = (
-            f"{sample_comparison_task.prompt}|model:None|temp:None|tokens:None"
-        )
-        mock_cache_manager.generate_hash.assert_called_with(expected_cache_key_input)
-
-    @pytest.mark.asyncio
-    async def test_perform_comparisons_cache_hit_with_overrides(
+    async def test_perform_comparisons_handles_provider_errors(
         self,
         llm_interaction_impl: LLMInteractionImpl,
         sample_comparison_task: ComparisonTask,
         mock_provider: AsyncMock,
-        mock_cache_manager: AsyncMock,
     ) -> None:
-        """Test cache hit scenario with override parameters."""
-        # Arrange - Set up cache hit
-        cached_response = {
-            "winner": "Essay B",
-            "justification": "Cached response with overrides",
-            "confidence": 5,
-        }
-        mock_cache_manager.get_from_cache = MagicMock(return_value=cached_response)
+        """Test error handling when provider fails."""
+        # Mock provider error
+        mock_provider.generate_comparison = AsyncMock(return_value=(None, "Provider error"))
 
-        # Act
         results = await llm_interaction_impl.perform_comparisons(
             tasks=[sample_comparison_task],
-            model_override="gpt-4o",
-            temperature_override=0.5,
-            max_tokens_override=1500,
         )
 
-        # Assert
-        assert len(results) == 1
-        result = results[0]
-        assert result.from_cache is True
-        assert result.llm_assessment is not None
-        assert result.llm_assessment.winner == "Essay B"
-
-        # Verify provider was NOT called due to cache hit
-        mock_provider.generate_comparison.assert_not_called()
-
-        # Verify cache was checked with correct key including overrides
-        expected_cache_key_input = (
-            f"{sample_comparison_task.prompt}|model:gpt-4o|temp:0.5|tokens:1500"
-        )
-        mock_cache_manager.generate_hash.assert_called_with(expected_cache_key_input)
-
-    @pytest.mark.asyncio
-    async def test_perform_comparisons_multiple_tasks_with_overrides(
-        self,
-        llm_interaction_impl: LLMInteractionImpl,
-        sample_comparison_task: ComparisonTask,
-        mock_provider: AsyncMock,
-        mock_cache_manager: AsyncMock,
-    ) -> None:
-        """Test perform_comparisons with multiple tasks and overrides."""
-        # Arrange - Create second task
-        essay_c = EssayForComparison(
-            id="essay_c_id",
-            text_content="Third essay for comparison.",
-            current_bt_score=0.0,
-        )
-        essay_d = EssayForComparison(
-            id="essay_d_id",
-            text_content="Fourth essay for comparison.",
-            current_bt_score=0.0,
-        )
-
-        second_task = ComparisonTask(
-            essay_a=essay_c,
-            essay_b=essay_d,
-            prompt="Compare these other two essays.",
-        )
-
-        tasks = [sample_comparison_task, second_task]
-
-        # Act
-        results = await llm_interaction_impl.perform_comparisons(
-            tasks=tasks,
-            model_override="claude-3-haiku-20240307",
-            temperature_override=0.7,
-            max_tokens_override=3000,
-        )
-
-        # Assert
-        assert len(results) == 2
-
-        # Verify provider was called twice with same overrides
-        assert mock_provider.generate_comparison.call_count == 2
-
-        # Check both calls had the same override parameters
-        for call in mock_provider.generate_comparison.call_args_list:
-            args, kwargs = call
-            assert kwargs["model_override"] == "claude-3-haiku-20240307"
-            assert kwargs["temperature_override"] == 0.7
-            assert kwargs["max_tokens_override"] == 3000
-
-        # Verify cache key generation was called for both tasks
-        assert mock_cache_manager.generate_hash.call_count == 2
-
-    @pytest.mark.asyncio
-    async def test_perform_comparisons_provider_error_with_overrides(
-        self,
-        llm_interaction_impl: LLMInteractionImpl,
-        sample_comparison_task: ComparisonTask,
-        mock_provider: AsyncMock,
-        mock_cache_manager: AsyncMock,
-    ) -> None:
-        """Test error handling when provider fails with overrides."""
-        # Arrange - Set up provider error
-        mock_provider.generate_comparison = AsyncMock(
-            return_value=(None, "API rate limit exceeded"),
-        )
-
-        # Act
-        results = await llm_interaction_impl.perform_comparisons(
-            tasks=[sample_comparison_task],
-            model_override="gpt-4o",
-            temperature_override=0.2,
-            max_tokens_override=4000,
-        )
-
-        # Assert
+        # Verify error is handled properly
         assert len(results) == 1
         result = results[0]
         assert result.llm_assessment is None
-        assert result.error_message == "API rate limit exceeded"
-        assert result.from_cache is False
+        assert result.error_message == "Provider error"
 
-        # Verify provider was still called with overrides
-        mock_provider.generate_comparison.assert_called_once_with(
-            user_prompt=sample_comparison_task.prompt,
-            system_prompt_override=None,
-            model_override="gpt-4o",
-            temperature_override=0.2,
-            max_tokens_override=4000,
-        )
+    async def test_perform_comparisons_with_multiple_tasks(
+        self,
+        llm_interaction_impl: LLMInteractionImpl,
+        mock_provider: AsyncMock,
+    ) -> None:
+        """Test processing multiple comparison tasks."""
+        # Create multiple tasks
+        tasks = []
+        for i in range(3):
+            essay_a = EssayForComparison(id=f"essay_{i}a", text_content=f"Essay {i}A content")
+            essay_b = EssayForComparison(id=f"essay_{i}b", text_content=f"Essay {i}B content")
+            task = ComparisonTask(
+                essay_a=essay_a,
+                essay_b=essay_b,
+                prompt=f"Compare essays {i}",
+            )
+            tasks.append(task)
 
-        # Verify cache was NOT updated due to error
-        mock_cache_manager.add_to_cache.assert_not_called()
+        results = await llm_interaction_impl.perform_comparisons(tasks=tasks)
+
+        # Verify all tasks processed
+        assert len(results) == 3
+        assert mock_provider.generate_comparison.call_count == 3
+        
+        # Verify all results successful
+        for result in results:
+            assert result.llm_assessment is not None
+            assert result.error_message is None

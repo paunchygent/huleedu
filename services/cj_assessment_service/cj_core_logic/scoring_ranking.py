@@ -63,12 +63,10 @@ async def record_comparisons_and_update_scores(
                 essay_b_els_id=result.task.essay_b.id,  # This is els_essay_id (string)
                 winner=winner_db_val,
                 prompt_text=result.task.prompt,
-                prompt_hash=result.prompt_hash or "",  # Ensure not None
                 confidence=result.llm_assessment.confidence,
                 justification=result.llm_assessment.justification,
                 raw_llm_response=result.raw_llm_response_content,
                 error_message=result.error_message,
-                from_cache=result.from_cache,
             )
             db_session.add(new_pair)
 

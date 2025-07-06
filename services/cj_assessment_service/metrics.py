@@ -89,13 +89,6 @@ def _create_metrics() -> dict[str, Any]:
                 "Latency between event timestamp and processing start",
                 registry=REGISTRY,
             ),
-            # Cache operation metrics using OperationType enum
-            "cache_operations": Counter(
-                "cj_assessment_cache_operations_total",
-                "Total cache operations",
-                ["operation", "result"],
-                registry=REGISTRY,
-            ),
         }
 
         logger.info("Successfully created all CJ Assessment metrics")
@@ -129,7 +122,6 @@ def _get_existing_metrics() -> dict[str, Any]:
         MetricName.PIPELINE_EXECUTION_TIME.value: "huleedu_cj_comparisons_made",
         "cj_assessment_duration_seconds": "huleedu_cj_assessment_duration_seconds",
         "kafka_queue_latency_seconds": "kafka_message_queue_latency_seconds",
-        "cache_operations": "cj_assessment_cache_operations_total",
     }
 
     existing: dict[str, Any] = {}
@@ -164,7 +156,6 @@ def get_business_metrics() -> dict[str, Any]:
         "cj_assessment_duration_seconds": all_metrics.get("cj_assessment_duration_seconds"),
         "kafka_queue_latency_seconds": all_metrics.get("kafka_queue_latency_seconds"),
         "llm_api_calls": all_metrics.get("llm_api_calls"),
-        "cache_operations": all_metrics.get("cache_operations"),
     }
 
 
@@ -180,5 +171,4 @@ def get_http_metrics() -> dict[str, Any]:
         "request_duration": all_metrics.get("request_duration"),
         "cj_assessment_operations": all_metrics.get("cj_assessment_operations"),
         "llm_api_calls": all_metrics.get("llm_api_calls"),
-        "cache_operations": all_metrics.get("cache_operations"),
     }

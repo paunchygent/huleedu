@@ -18,7 +18,6 @@ from prometheus_client import REGISTRY, CollectorRegistry
 from common_core import LLMProviderType
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.config import settings as service_settings
-from services.cj_assessment_service.implementations.cache_manager_impl import CacheManagerImpl
 from services.cj_assessment_service.implementations.content_client_impl import ContentClientImpl
 from services.cj_assessment_service.implementations.db_access_impl import PostgreSQLCJRepositoryImpl
 from services.cj_assessment_service.implementations.event_publisher_impl import CJEventPublisherImpl
@@ -31,7 +30,6 @@ from services.cj_assessment_service.implementations.retry_manager_impl import Re
 # Import all business logic protocols
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
 from services.cj_assessment_service.protocols import (
-    CacheProtocol,
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
     ContentClientProtocol,
@@ -126,10 +124,6 @@ class CJAssessmentServiceProvider(Provider):
         await redis_client.start()
         return redis_client
 
-    @provide(scope=Scope.APP)
-    def provide_cache_manager(self, settings: Settings) -> CacheProtocol:
-        """Provide cache manager for LLM response caching."""
-        return CacheManagerImpl(settings)
 
     @provide(scope=Scope.APP)
     def provide_retry_manager(self, settings: Settings) -> RetryManagerProtocol:
@@ -165,21 +159,11 @@ class CJAssessmentServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_llm_interaction(
         self,
-        cache_manager: CacheProtocol,
         providers: dict[LLMProviderType, LLMProviderProtocol],
         settings: Settings,
     ) -> LLMInteractionProtocol:
         """Provide LLM interaction orchestrator."""
-        # Use mock LLM for testing if enabled
-        if settings.USE_MOCK_LLM:
-            from services.cj_assessment_service.implementations.mock_llm_interaction_impl import (
-                MockLLMInteractionImpl,
-            )
-
-            return MockLLMInteractionImpl(seed=42)  # Fixed seed for reproducible tests
-
         return LLMInteractionImpl(
-            cache_manager=cache_manager,
             providers=providers,
             settings=settings,
         )

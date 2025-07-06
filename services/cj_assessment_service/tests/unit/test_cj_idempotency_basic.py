@@ -105,10 +105,8 @@ def mock_boundary_services(
                         confidence=3.0,  # Must be >= 1.0 and <= 5.0
                         justification="Mock comparison result",
                     ),
-                    prompt_hash="mock_hash",
                     raw_llm_response_content="Mock LLM response",
                     error_message=None,
-                    from_cache=False,
                 ),
             )
         return results

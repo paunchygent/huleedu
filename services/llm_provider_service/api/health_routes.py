@@ -23,7 +23,7 @@ async def health_check(
     redis_client: FromDishka[RedisClientProtocol],
 ) -> Response | tuple[Response, int]:
     """Health check endpoint."""
-    health_status = {
+    health_status: Dict[str, Any] = {
         "service": settings.SERVICE_NAME,
         "status": "healthy",
         "environment": settings.ENVIRONMENT,
@@ -62,6 +62,7 @@ async def health_check(
         },
     }
     health_status["providers"] = providers
+    health_status["mock_mode"] = settings.USE_MOCK_LLM
 
     # Check if at least one provider is configured
     any_provider_configured = any(p["enabled"] and p["configured"] for p in providers.values())
