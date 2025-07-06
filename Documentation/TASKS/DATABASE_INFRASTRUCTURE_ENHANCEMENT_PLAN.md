@@ -13,16 +13,19 @@ This document outlines a three-phased approach to standardize and enhance databa
 **Problem Statement**: While all services have appropriate persistence strategies, inconsistent patterns across database configuration, migration management, and observability create operational challenges and technical debt.
 
 **Task Assignment**: Implement three-phased database infrastructure enhancement plan
+
 - **Phase 1**: Migration Strategy Standardization (Priority 1)
-- **Phase 2**: Database Observability Enhancement (Priority 2) 
+- **Phase 2**: Database Observability Enhancement (Priority 2)
 - **Phase 3**: Shared Database Infrastructure (Priority 3)
 
 **Affected Components**:
+
 - **PostgreSQL Services (6)**: batch_orchestrator_service, essay_lifecycle_service, cj_assessment_service, class_management_service, result_aggregator_service, spell_checker_service
 - **Infrastructure**: docker-compose.infrastructure.yml, service libraries
 - **Monitoring**: Prometheus metrics, Grafana dashboards
 
 **Architecture Rules (READ THESE FIRST)**:
+
 - `.cursor/rules/000-rule-index.mdc` (navigation guide)
 - `.cursor/rules/053-sqlalchemy-standards.mdc` (database patterns)
 - `.cursor/rules/070-testing-and-quality-assurance.mdc` (testing standards)
@@ -30,16 +33,19 @@ This document outlines a three-phased approach to standardize and enhance databa
 - `.cursor/rules/080-repository-workflow-and-tooling.mdc` (development workflow)
 
 **Project Context**:
+
 - `CLAUDE.md` (development workflow and patterns)
 - `pyproject.toml` (PDM dependency management)
 - `docker-compose.infrastructure.yml` (database configuration)
 
-**Development Environment Requirements**: 
+**Development Environment Requirements**:
+
 - PostgreSQL databases must remain operational during enhancement
 - No breaking changes to existing database schemas
 - Backward compatibility maintained throughout
 
 **Success Criteria**:
+
 1. ✅ Standardized Alembic migration strategy across all PostgreSQL services
 2. ✅ Database observability metrics integrated into Prometheus/Grafana stack
 3. ✅ Shared database utilities library implemented
@@ -47,6 +53,7 @@ This document outlines a three-phased approach to standardize and enhance databa
 5. ✅ Enhanced operational capabilities for database management
 
 **Constraints**:
+
 - NO service downtime during implementation
 - NO database schema changes unless explicitly required
 - FOLLOW established architecture patterns from `.cursor/rules/`
@@ -80,12 +87,14 @@ This document outlines a three-phased approach to standardize and enhance databa
 ### 🎯 Key Findings
 
 **Strengths**:
+
 - ✅ All services have appropriate persistence strategies
 - ✅ Robust async SQLAlchemy patterns throughout
 - ✅ Proper database isolation and security
 - ✅ Production-grade connection management
 
 **Standardization Opportunities**:
+
 - ⚠️ **Migration Strategy**: Only Spell Checker Service uses Alembic migrations
 - ⚠️ **Configuration Patterns**: Inconsistent connection URL assembly
 - ⚠️ **Observability**: Limited database performance monitoring
@@ -93,9 +102,11 @@ This document outlines a three-phased approach to standardize and enhance databa
 ## Phase 1: Migration Strategy Standardization
 
 ### Objective
+
 Implement Alembic migrations across all PostgreSQL services using Spell Checker Service as the gold standard template.
 
 ### Target Services
+
 - batch_orchestrator_service
 - essay_lifecycle_service  
 - cj_assessment_service
@@ -109,6 +120,7 @@ Implement Alembic migrations across all PostgreSQL services using Spell Checker 
 **Template Source**: `services/spell_checker_service/alembic/`
 
 **Per-Service Implementation**:
+
 ```bash
 # For each PostgreSQL service
 services/{service_name}/
@@ -124,6 +136,7 @@ services/{service_name}/
 #### 1.2 Migration Workflow Integration
 
 **PDM Script Integration**:
+
 ```toml
 # Per service pyproject.toml
 [tool.pdm.scripts]
@@ -137,6 +150,7 @@ db-current = "alembic current"
 #### 1.3 Database Schema Baseline
 
 **Strategy**: Create initial migration from current programmatic schema
+
 ```python
 # Initial migration approach
 def upgrade():
@@ -159,6 +173,7 @@ def downgrade():
 6. **Documentation**: Update service READMEs with migration commands
 
 ### Success Criteria
+
 - ✅ All PostgreSQL services have Alembic configuration
 - ✅ Initial baseline migrations created without disruption
 - ✅ Standardized migration commands via PDM scripts
@@ -168,9 +183,11 @@ def downgrade():
 ## Phase 2: Database Observability Enhancement
 
 ### Objective
+
 Implement comprehensive database performance monitoring and observability across all PostgreSQL services.
 
 ### Target Infrastructure
+
 - Prometheus metrics collection
 - Grafana dashboard visualization
 - Connection pool monitoring
@@ -219,6 +236,7 @@ class DatabaseMetrics:
 #### 2.2 SQLAlchemy Integration
 
 **Connection Pool Monitoring**:
+
 ```python
 # Enhanced connection setup with metrics
 async def create_monitored_engine(
@@ -251,6 +269,7 @@ async def create_monitored_engine(
 #### 2.3 Repository Pattern Enhancement
 
 **Query Performance Tracking**:
+
 ```python
 # Enhanced repository with metrics
 class MonitoredAsyncSession:
@@ -290,6 +309,7 @@ class MonitoredAsyncSession:
 #### 2.4 Grafana Dashboard Integration
 
 **Database Performance Dashboard**:
+
 ```json
 {
   "dashboard": {
@@ -330,6 +350,7 @@ class MonitoredAsyncSession:
 6. **Documentation**: Update observability documentation
 
 ### Success Criteria
+
 - ✅ Database metrics integrated across all PostgreSQL services
 - ✅ Connection pool monitoring operational
 - ✅ Query performance tracking implemented
@@ -339,9 +360,11 @@ class MonitoredAsyncSession:
 ## Phase 3: Shared Database Infrastructure
 
 ### Objective
+
 Create reusable database infrastructure components to reduce code duplication and standardize patterns across services.
 
 ### Target Infrastructure
+
 - Common database utilities library
 - Standardized connection management
 - Shared health check implementations
@@ -366,6 +389,7 @@ huleedu_service_libs/database/
 #### 3.2 Standardized Connection Management
 
 **Connection Factory**:
+
 ```python
 # connection.py
 from typing import Optional, Dict, Any
@@ -407,6 +431,7 @@ class DatabaseConnectionFactory:
 #### 3.3 Base Repository Pattern
 
 **Repository Base Class**:
+
 ```python
 # repository.py
 from abc import ABC, abstractmethod
@@ -457,6 +482,7 @@ class BaseAsyncRepository(Generic[T], ABC):
 #### 3.4 Database Health Checks
 
 **Health Check Utilities**:
+
 ```python
 # health.py
 from typing import Dict, Any
@@ -513,6 +539,7 @@ class DatabaseHealthChecker:
 7. **Documentation**: Update architecture documentation and service READMEs
 
 ### Success Criteria
+
 - ✅ Shared database utilities library implemented
 - ✅ Standardized connection management across services
 - ✅ Common repository patterns adopted
@@ -522,33 +549,42 @@ class DatabaseHealthChecker:
 ## Implementation Timeline
 
 ### Phase 1: Migration Strategy Standardization (Week 1-2)
+
 - **Week 1**: Analyze Spell Checker Alembic setup, create templates
 - **Week 2**: Implement Alembic across all PostgreSQL services
 
 ### Phase 2: Database Observability Enhancement (Week 3-4)  
+
 - **Week 3**: Implement database metrics library and integration
 - **Week 4**: Create Grafana dashboards and verify monitoring
 
 ### Phase 3: Shared Database Infrastructure (Week 5-6)
+
 - **Week 5**: Create shared database utilities library
 - **Week 6**: Migrate services and verify functionality
 
 ## Risk Assessment and Mitigation
 
 ### High Risk: Database Schema Disruption
-**Mitigation**: 
+
+**Mitigation**:
+
 - Comprehensive backup strategy before any migration work
 - Incremental implementation with rollback plans
 - Extensive testing in development environment
 
 ### Medium Risk: Performance Impact
+
 **Mitigation**:
+
 - Metrics collection designed for minimal overhead
 - Optional monitoring integration to allow gradual rollout
 - Performance benchmarking before and after implementation
 
 ### Low Risk: Service Integration Complexity
+
 **Mitigation**:
+
 - Backward compatibility maintained throughout
 - Gradual migration approach allows rollback of individual services
 - Comprehensive testing at each phase
@@ -556,12 +592,14 @@ class DatabaseHealthChecker:
 ## Success Metrics
 
 ### Technical Metrics
+
 - **Migration Coverage**: 100% of PostgreSQL services using Alembic
 - **Observability Coverage**: Database metrics available for all services
 - **Code Reduction**: 30%+ reduction in duplicated database code
 - **Performance**: No degradation in database operation performance
 
 ### Operational Metrics
+
 - **Debugging Efficiency**: Reduced time to identify database performance issues
 - **Deployment Reliability**: Enhanced database migration safety
 - **Maintenance Overhead**: Reduced complexity of database management tasks
