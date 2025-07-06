@@ -1,0 +1,6 @@
+# Global pylint configuration - disable all messages
+# We use MyPy as primary typechecker and Ruff for linting/formatting
+
+[MASTER]
+# Disable all pylint messages globally
+disable = all

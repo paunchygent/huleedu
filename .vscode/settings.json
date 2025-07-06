@@ -9,10 +9,7 @@
     },
     "python.defaultInterpreterPath": "./.venv/bin/python",
     "python.terminal.activateEnvironment": true,
-    "pylint.args": [
-        "--disable=W1203,W0718,C0114,C0115,C0116",
-        "--max-line-length=120"
-    ],
+    "pylint.enabled": false,
     "editor.rulers": [100],
     "editor.tabSize": 4,
     "editor.insertSpaces": true,

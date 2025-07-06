@@ -252,11 +252,6 @@ module = [
 ]
 ignore_missing_imports = true
 
-# Pylint configuration - disable all messages since we use MyPy as primary typechecker
-[tool.pylint]
-# Disable all pylint messages - we rely on MyPy + Ruff for code quality
-disable = "all"
-
 [tool.pytest.ini_options]
 
 testpaths = [
