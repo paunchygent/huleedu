@@ -23,6 +23,7 @@ dependencies = [
     "transitions",
     "sqlalchemy[asyncio]",
     "asyncpg",
+    "alembic",
 ]
 
 [build-system]
@@ -52,6 +53,14 @@ dev = "python app.py --reload"
 test = "pytest tests/ -v"
 format = "ruff format . && ruff check --fix ."
 typecheck = "mypy ."
+
+# Alembic database migration commands
+migrate-upgrade = "alembic upgrade head"
+migrate-downgrade = "alembic downgrade -1"
+migrate-history = "alembic history"
+migrate-current = "alembic current"
+migrate-revision = "alembic revision --autogenerate"
+migrate-stamp = "alembic stamp head"
 
 [tool.mypy]
 python_version = "3.11"

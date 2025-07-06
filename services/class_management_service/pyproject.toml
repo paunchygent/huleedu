@@ -38,3 +38,11 @@ huleedu-service-libs = "file:///app/services/libs"
 [tool.pdm.scripts]
 start = "python app.py"
 dev = "quart --app services/class_management_service/app:app --debug run -p 5002"
+
+# Alembic database migration commands
+migrate-upgrade = "alembic upgrade head"
+migrate-downgrade = "alembic downgrade -1"
+migrate-history = "alembic history"
+migrate-current = "alembic current"
+migrate-revision = "alembic revision --autogenerate"
+migrate-stamp = "alembic stamp head"

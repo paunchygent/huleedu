@@ -175,6 +175,21 @@ LOG_LEVEL=INFO
   - `confidence` (float): LLM confidence rating (1-5)
   - `from_cache` (bool): Whether result came from cache
 
+## Database Migrations
+
+This service uses Alembic for PostgreSQL schema management. See `.cursor/rules/053-sqlalchemy-standards.mdc` for complete migration patterns.
+
+```bash
+# Apply migrations
+pdm run migrate-upgrade
+
+# Generate new migration
+pdm run migrate-revision "description"
+
+# View migration history
+pdm run migrate-history
+```
+
 ## Local Development
 
 ### Prerequisites

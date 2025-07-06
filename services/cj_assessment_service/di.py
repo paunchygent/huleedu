@@ -124,7 +124,6 @@ class CJAssessmentServiceProvider(Provider):
         await redis_client.start()
         return redis_client
 
-
     @provide(scope=Scope.APP)
     def provide_retry_manager(self, settings: Settings) -> RetryManagerProtocol:
         """Provide retry manager for LLM API calls."""

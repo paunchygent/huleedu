@@ -23,6 +23,7 @@ dependencies = [
     # Database dependencies for production repository
     "SQLAlchemy[asyncio]",
     "asyncpg",  # PostgreSQL async driver
+    "alembic",  # Database migration tool
 ]
 
 [build-system]
@@ -39,6 +40,14 @@ huleedu-service-libs = "file:///app/services/libs"
 [tool.pdm.scripts]
 start = "python app.py"
 dev = "quart --app app:app --debug run -p 5001"
+
+# Alembic database migration commands
+migrate-upgrade = "alembic upgrade head"
+migrate-downgrade = "alembic downgrade -1"
+migrate-history = "alembic history"
+migrate-current = "alembic current"
+migrate-revision = "alembic revision --autogenerate"
+migrate-stamp = "alembic stamp head"
 
 [tool.mypy]
 python_version = "3.11"

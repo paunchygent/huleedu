@@ -89,6 +89,21 @@ Environment variables with `SPELL_CHECKER_SERVICE_` prefix:
 - **Contracts**: `typing.Protocol`
 - **Provider**: `SpellCheckerServiceProvider`
 
+## Database Migrations
+
+This service uses Alembic for PostgreSQL schema management. See `.cursor/rules/053-sqlalchemy-standards.mdc` for complete migration patterns.
+
+```bash
+# Apply migrations
+pdm run migrate-upgrade
+
+# Generate new migration
+pdm run migrate-revision "description"
+
+# View migration history
+pdm run migrate-history
+```
+
 ## Development
 
 ### Prerequisites

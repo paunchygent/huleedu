@@ -55,7 +55,7 @@ class TestLLMProviderServiceIntegration:
         try:
             async with http_session.get(
                 f"{llm_provider_url.replace('/api/v1', '')}/healthz",
-                timeout=aiohttp.ClientTimeout(total=10)
+                timeout=aiohttp.ClientTimeout(total=10),
             ) as response:
                 assert response.status == 200
                 health_data = await response.json()
@@ -68,8 +68,7 @@ class TestLLMProviderServiceIntegration:
         # Check CJ Assessment Service
         try:
             async with http_session.get(
-                f"{cj_assessment_url}/healthz",
-                timeout=aiohttp.ClientTimeout(total=10)
+                f"{cj_assessment_url}/healthz", timeout=aiohttp.ClientTimeout(total=10)
             ) as response:
                 assert response.status == 200
                 health_data = await response.json()
@@ -126,7 +125,7 @@ class TestLLMProviderServiceIntegration:
         kafka_available = await self._check_kafka_availability()
         if not kafka_available:
             pytest.skip("Kafka not available for integration test")
-        
+
         # Create test event
         event_data = ELS_CJAssessmentRequestV1(
             entity_ref=EntityReference(
@@ -168,10 +167,12 @@ class TestLLMProviderServiceIntegration:
         # Publish to Kafka
         try:
             await self._publish_test_event(envelope)
-            print(f"Successfully published test event to Kafka topic: {topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}")
+            print(
+                f"Successfully published test event to Kafka topic: {topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}"
+            )
         except Exception as e:
             pytest.skip(f"Failed to publish to Kafka: {str(e)}")
-    
+
     async def _check_kafka_availability(self) -> bool:
         """Check if Kafka is available."""
         try:
@@ -184,24 +185,24 @@ class TestLLMProviderServiceIntegration:
             return True
         except Exception:
             return False
-    
+
     async def _publish_test_event(self, envelope: EventEnvelope) -> None:
         """Publish a test event to Kafka."""
         producer = AIOKafkaProducer(
             bootstrap_servers=["localhost:9093"],  # External port
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
-        
+
         try:
             await producer.start()
-            
+
             # Serialize envelope with JSON mode to handle UUIDs
             event_data = envelope.model_dump(mode="json")
-            
+
             # Publish to the correct topic
             topic = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
             await producer.send(topic, event_data)
-            
+
             print(f"Published event to topic: {topic}")
         finally:
             await producer.stop()
@@ -238,12 +239,12 @@ class TestMockProviderIntegration:
         llm_provider_url = "http://localhost:8090/api/v1"
         if not await self._check_service_availability(llm_provider_url):
             pytest.skip("LLM Provider Service not available")
-        
+
         # Check if service is running in mock mode
         is_mock_mode = await self._get_service_mock_mode(llm_provider_url)
         if not is_mock_mode:
             pytest.skip("LLM Provider Service not running in mock mode")
-        
+
         # Test mock provider response
         async with aiohttp.ClientSession() as session:
             request_data = {
@@ -263,7 +264,7 @@ class TestMockProviderIntegration:
             ) as response:
                 assert response.status == 200
                 result = await response.json()
-                
+
                 # Verify mock response format
                 assert "winner" in result
                 assert result["winner"] in ["Essay A", "Essay B"]
@@ -271,25 +272,29 @@ class TestMockProviderIntegration:
                 assert "confidence" in result
                 assert 1 <= result["confidence"] <= 5
                 assert "provider" in result
-                
+
                 print(f"Mock provider response: {result}")
-    
+
     async def _check_service_availability(self, service_url: str) -> bool:
         """Check if a service is available."""
         try:
             async with aiohttp.ClientSession() as session:
                 health_url = service_url.replace("/api/v1", "") + "/healthz"
-                async with session.get(health_url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                async with session.get(
+                    health_url, timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
                     return response.status == 200
         except Exception:
             return False
-    
+
     async def _get_service_mock_mode(self, service_url: str) -> bool:
         """Check if service is running in mock mode."""
         try:
             async with aiohttp.ClientSession() as session:
                 health_url = service_url.replace("/api/v1", "") + "/healthz"
-                async with session.get(health_url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                async with session.get(
+                    health_url, timeout=aiohttp.ClientTimeout(total=5)
+                ) as response:
                     if response.status == 200:
                         health_data = await response.json()
                         mock_mode = health_data.get("mock_mode", False)

@@ -144,6 +144,42 @@ Services with multiple entry points (e.g., HTTP + Worker) **MUST** use a shared 
       return base_client
   ```
 
+### 4.12. PostgreSQL Database Migration Standards
+Services requiring PostgreSQL persistent storage **MUST** implement the consolidated Alembic migration pattern.
+
+**REQUIRED Infrastructure**:
+- `alembic.ini` - Service-specific configuration
+- `alembic/env.py` - Async SQLAlchemy environment with service configuration integration
+- `alembic/versions/` - Migration files following `YYYYMMDD_NNNN_description.py` naming
+- `pyproject.toml` - Must include `alembic` dependency and standardized PDM scripts
+
+**REQUIRED Dependencies**:
+```toml
+dependencies = [
+    "sqlalchemy[asyncio]",
+    "asyncpg",
+    "alembic",  # Required for all PostgreSQL services
+]
+
+[tool.pdm.scripts]
+# Standardized migration commands (identical across all services)
+migrate-upgrade = "alembic upgrade head"
+migrate-downgrade = "alembic downgrade -1"
+migrate-history = "alembic history"
+migrate-current = "alembic current"
+migrate-revision = "alembic revision --autogenerate"
+migrate-stamp = "alembic stamp head"
+```
+
+**REQUIRED Configuration**:
+- Service `config.py` **MUST** include `database_url` property for Alembic integration
+- Migration environment **MUST** use async SQLAlchemy patterns
+- Database URLs **MUST** be dynamically loaded from service configuration
+
+**Implementation Reference**: See [053-sqlalchemy-standards.mdc](mdc:053-sqlalchemy-standards.mdc) for complete migration template patterns.
+
+**Enforcement**: All new PostgreSQL services **MUST** implement this pattern from initial development. Existing services **MUST** be migrated to this pattern during next major database changes.
+
 ## 5. Implementation Checklist
 Before implementing any service, ensure you have reviewed:
 - [ ] This overview for core stack requirements

@@ -144,7 +144,18 @@ pdm run dc-logs-service result_aggregator_service
 
 ## Database Migrations
 
-The service automatically creates tables on startup. For production deployments, use Alembic migrations (to be implemented).
+This service uses Alembic for PostgreSQL schema management. See `.cursor/rules/053-sqlalchemy-standards.mdc` for complete migration patterns.
+
+```bash
+# Apply migrations
+pdm run migrate-upgrade
+
+# Generate new migration
+pdm run migrate-revision "description"
+
+# View migration history
+pdm run migrate-history
+```
 
 ## Monitoring
 

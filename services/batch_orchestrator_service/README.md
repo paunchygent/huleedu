@@ -153,6 +153,21 @@ Environment variables (managed via Pydantic `BaseSettings`):
 * **huleedu-common-core**: Shared models and event schemas.
 * **huledu-service-libs**: Logging and service utilities.
 
+## Database Migrations
+
+This service uses Alembic for PostgreSQL schema management. See `.cursor/rules/053-sqlalchemy-standards.mdc` for complete migration patterns.
+
+```bash
+# Apply migrations
+pdm run migrate-upgrade
+
+# Generate new migration
+pdm run migrate-revision "description"
+
+# View migration history
+pdm run migrate-history
+```
+
 ## Local Development
 
 ### Prerequisites

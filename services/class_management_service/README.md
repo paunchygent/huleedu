@@ -70,6 +70,21 @@ Service configuration is managed by `config.py` using `pydantic-settings`.
 - **Infrastructure**: `KAFKA_BOOTSTRAP_SERVERS`, `REDIS_URL`.
 - **Testing**: A `USE_MOCK_REPOSITORY` flag allows for switching to an in-memory repository for testing purposes.
 
+## Database Migrations
+
+This service uses Alembic for PostgreSQL schema management. See `.cursor/rules/053-sqlalchemy-standards.mdc` for complete migration patterns.
+
+```bash
+# Apply migrations
+pdm run migrate-upgrade
+
+# Generate new migration
+pdm run migrate-revision "description"
+
+# View migration history
+pdm run migrate-history
+```
+
 ## 7. Local Development
 
 - **Run Service**: `pdm run -p services/class_management_service dev`

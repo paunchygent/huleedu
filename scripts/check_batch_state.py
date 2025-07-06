@@ -139,10 +139,8 @@ async def check_batch_state(batch_id: str):
         if stuck_events:
             print("\n--- EVENTS FOR STUCK ESSAYS ---")
             for log in stuck_events[:10]:  # Show first 10
-                essay_id = log.get('essay_id', 'N/A')
-                print(
-                    f"\n{log['created_at']}: {log['event_type']} (Essay: {essay_id})"
-                )
+                essay_id = log.get("essay_id", "N/A")
+                print(f"\n{log['created_at']}: {log['event_type']} (Essay: {essay_id})")
                 print(f"  {log['previous_status']} -> {log['new_status']}")
 
         # Show general event summary

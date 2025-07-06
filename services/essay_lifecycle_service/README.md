@@ -60,6 +60,21 @@ ELS participates in these communication patterns:
 - **`GET /v1/essays/{essay_id}/status`**: Get current status, progress, and timeline for a specific essay.
 - **`GET /v1/batches/{batch_id}/status`**: Get a summary of essay statuses for a batch.
 
+## Database Migrations
+
+This service uses Alembic for PostgreSQL schema management. See `.cursor/rules/053-sqlalchemy-standards.mdc` for complete migration patterns.
+
+```bash
+# Apply migrations
+pdm run migrate-upgrade
+
+# Generate new migration
+pdm run migrate-revision "description"
+
+# View migration history
+pdm run migrate-history
+```
+
 ## ⚙️ Configuration
 
 Configuration is managed via `services/essay_lifecycle_service/config.py`.

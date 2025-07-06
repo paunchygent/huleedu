@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from common_core import LLMProviderType
-
 from services.cj_assessment_service.implementations.llm_interaction_impl import LLMInteractionImpl
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
@@ -69,7 +68,7 @@ class TestLLMInteractionImplOverrides:
             current_bt_score=None,
         )
         essay_b = EssayForComparison(
-            id="essay_2", 
+            id="essay_2",
             text_content="This is essay B content.",
             current_bt_score=None,
         )
@@ -206,7 +205,7 @@ class TestLLMInteractionImplOverrides:
         # Verify all tasks processed
         assert len(results) == 3
         assert mock_provider.generate_comparison.call_count == 3
-        
+
         # Verify all results successful
         for result in results:
             assert result.llm_assessment is not None

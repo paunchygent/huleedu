@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     DATABASE_POOL_PRE_PING: bool = True
     DATABASE_POOL_RECYCLE: int = 3600  # 1 hour
 
+    @property
+    def database_url(self) -> str:
+        """Return the PostgreSQL database URL for migrations.
+
+        For production use, return the PostgreSQL URL from docker-compose.infrastructure.yml
+        configuration (port 5434 for CJ Assessment Service).
+        """
+        return "postgresql+asyncpg://huledu:huledu_password@localhost:5434/cj_assessment"
+
     # Default LLM provider for centralized service requests
     DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.OPENAI
     DEFAULT_LLM_MODEL: str = Field(

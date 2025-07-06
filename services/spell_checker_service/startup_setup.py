@@ -25,6 +25,7 @@ class SpellCheckerQuart(Quart):
     tracer: Tracer
     extensions: dict[str, Any]
 
+
 logger = create_service_logger("spell_checker_service.startup_setup")
 
 

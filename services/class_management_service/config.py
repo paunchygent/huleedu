@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
-from pydantic import Field, model_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,21 +17,16 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "class_management_service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     REDIS_URL: str = "redis://redis:6379"
-    DB_USER: str = "user"
-    DB_PASSWORD: str = "password"
+    DB_USER: str = "huledu"
+    DB_PASSWORD: str = "huledu_password"
     DB_HOST: str = "localhost"
-    DB_PORT: int = 5432
+    DB_PORT: int = 5435  # Class Management Service specific port
     DB_NAME: str = "huledu_class_management"
-    DATABASE_URL: str | None = None
 
-    @model_validator(mode="before")
-    def assemble_db_connection(cls, v: Any) -> Any:
-        if isinstance(v, dict) and v.get("DATABASE_URL") is None:
-            v["DATABASE_URL"] = (
-                f"postgresql+asyncpg://{v.get('DB_USER')}:{v.get('DB_PASSWORD')}"
-                f"@{v.get('DB_HOST')}:{v.get('DB_PORT')}/{v.get('DB_NAME')}"
-            )
-        return v
+    @property
+    def DATABASE_URL(self) -> str:
+        """Construct the PostgreSQL database URL from configuration settings."""
+        return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     PORT: int = 5002
     HOST: str = "0.0.0.0"

@@ -95,6 +95,11 @@ class Settings(BaseSettings):
         env_prefix="ESSAY_LIFECYCLE_SERVICE_",
     )
 
+    @property
+    def database_url(self) -> str:
+        """Construct the PostgreSQL database URL from configuration settings."""
+        return f"postgresql+asyncpg://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_NAME}"
+
 
 # Create a single instance for the application to use
 settings = Settings()

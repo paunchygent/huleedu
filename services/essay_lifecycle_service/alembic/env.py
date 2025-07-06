@@ -1,5 +1,5 @@
 """
-Alembic environment configuration for Class Management Service.
+Alembic environment configuration for Essay Lifecycle Service.
 
 This module provides the async SQLAlchemy environment configuration for Alembic migrations,
 following the HuleEdu consolidated best practice template with service configuration integration.
@@ -9,14 +9,15 @@ import asyncio
 from logging.config import fileConfig
 from typing import TYPE_CHECKING
 
+from sqlalchemy import pool
+from sqlalchemy.engine import Connection
+from sqlalchemy.ext.asyncio import async_engine_from_config
+
 from alembic import context
 
 # Import service configuration and models
 from config import settings
 from models_db import Base
-from sqlalchemy import pool
-from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
 if TYPE_CHECKING:
     pass
@@ -30,7 +31,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Set the SQLAlchemy URL dynamically from service configuration
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Add your model's MetaData object here for 'autogenerate' support
 target_metadata = Base.metadata

@@ -30,7 +30,6 @@ class ContentClientProtocol(Protocol):
         ...
 
 
-
 class RetryManagerProtocol(Protocol):
     """Protocol for managing LLM API retry logic."""
 

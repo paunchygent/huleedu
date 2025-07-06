@@ -19,11 +19,11 @@ from services.cj_assessment_service.implementations.retry_manager_impl import Re
 
 async def check_service_availability(service_url: str, timeout: int = 10) -> bool:
     """Check if a service is available by making a health check request.
-    
+
     Args:
         service_url: Base URL of the service
         timeout: Timeout in seconds
-        
+
     Returns:
         True if service is available, False otherwise
     """
@@ -31,7 +31,9 @@ async def check_service_availability(service_url: str, timeout: int = 10) -> boo
         async with aiohttp.ClientSession() as session:
             # Remove /api/v1 suffix if present for health check
             health_url = service_url.replace("/api/v1", "") + "/healthz"
-            async with session.get(health_url, timeout=aiohttp.ClientTimeout(total=timeout)) as response:
+            async with session.get(
+                health_url, timeout=aiohttp.ClientTimeout(total=timeout)
+            ) as response:
                 return response.status == 200
     except Exception:
         return False
@@ -39,10 +41,10 @@ async def check_service_availability(service_url: str, timeout: int = 10) -> boo
 
 async def get_service_mock_mode(service_url: str) -> bool:
     """Check if service is running in mock mode.
-    
+
     Args:
         service_url: Base URL of the service
-        
+
     Returns:
         True if service is in mock mode, False otherwise
     """
@@ -102,7 +104,7 @@ class TestCJAssessmentLLMIntegration:
         # Check if LLM Provider Service is available
         if not await check_service_availability(integration_settings.LLM_PROVIDER_SERVICE_URL):
             pytest.skip("LLM Provider Service not available")
-        
+
         # Create a prompt in the format CJ Assessment Service uses
         prompt = """Compare these two essays and determine which is better written.
 Essay A (ID: essay-123):
@@ -146,12 +148,14 @@ Always respond with valid JSON."""
         assert isinstance(result["confidence"], (int, float))
         assert 1 <= result["confidence"] <= 5
 
-    async def test_cj_assessment_error_handling(self, llm_client: LLMProviderServiceClient, integration_settings: Settings) -> None:
+    async def test_cj_assessment_error_handling(
+        self, llm_client: LLMProviderServiceClient, integration_settings: Settings
+    ) -> None:
         """Test error handling for invalid prompts."""
         # Check if LLM Provider Service is available
         if not await check_service_availability(integration_settings.LLM_PROVIDER_SERVICE_URL):
             pytest.skip("LLM Provider Service not available")
-        
+
         # Test with a prompt that doesn't contain the expected essay format
         invalid_prompt = "This is not a valid essay comparison prompt"
 
@@ -170,19 +174,19 @@ Always respond with valid JSON."""
         # Check if LLM Provider Service is available
         if not await check_service_availability(integration_settings.LLM_PROVIDER_SERVICE_URL):
             pytest.skip("LLM Provider Service not available")
-        
+
         # Check if service is running in mock mode
         is_mock_mode = await get_service_mock_mode(integration_settings.LLM_PROVIDER_SERVICE_URL)
         if not is_mock_mode:
             pytest.skip("LLM Provider Service not running in mock mode")
-        
+
         # Create LLM client
         llm_client = LLMProviderServiceClient(
             session=http_session,
             settings=integration_settings,
             retry_manager=retry_manager,
         )
-        
+
         # Test with mock provider
         prompt = """Compare these two essays and determine which is better written.
 Essay A (ID: mock-essay-1):
@@ -197,22 +201,22 @@ Please respond with a JSON object containing:
 - 'confidence': Rating from 1-5 (5 = very confident)
 Based on clarity, structure, argument quality, and writing mechanics.
 Always respond with valid JSON."""
-        
+
         result, error = await llm_client.generate_comparison(
             user_prompt=prompt,
             model_override="mock-model",
             temperature_override=0.1,
         )
-        
+
         # Verify mock response
         assert error is None, f"Unexpected error: {error}"
         assert result is not None, "Expected a result from mock provider"
-        
+
         print("\nMock Provider Result:")
         print(f"Winner: {result['winner']}")
         print(f"Justification: {result['justification']}")
         print(f"Confidence: {result['confidence']}")
-        
+
         # Validate response format
         assert result["winner"] in ["Essay A", "Essay B"]
         assert isinstance(result["justification"], str)

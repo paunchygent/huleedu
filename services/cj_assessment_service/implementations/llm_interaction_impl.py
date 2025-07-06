@@ -122,7 +122,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             llm_api_calls_metric.labels(
                                 provider=self.settings.DEFAULT_LLM_PROVIDER.value,
                                 model=model_override or self.settings.DEFAULT_LLM_MODEL,
-                                status="success"
+                                status="success",
                             ).inc()
 
                         logger.info(
@@ -143,7 +143,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             llm_api_calls_metric.labels(
                                 provider=self.settings.DEFAULT_LLM_PROVIDER.value,
                                 model=model_override or self.settings.DEFAULT_LLM_MODEL,
-                                status="error"
+                                status="error",
                             ).inc()
 
                         logger.error(
@@ -163,7 +163,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         llm_api_calls_metric.labels(
                             provider=self.settings.DEFAULT_LLM_PROVIDER.value,
                             model=model_override or self.settings.DEFAULT_LLM_MODEL,
-                            status="error"
+                            status="error",
                         ).inc()
 
                     logger.error(
