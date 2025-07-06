@@ -13,13 +13,12 @@ from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
-from huleedu_service_libs.resilience.resilient_client import make_resilient
 from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
+from huleedu_service_libs.resilience.resilient_client import make_resilient
 from prometheus_client import CollectorRegistry
 
 from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.config import Settings, settings
-from services.batch_orchestrator_service.metrics import get_circuit_breaker_metrics
 from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import (
     AIFeedbackInitiatorImpl,
 )
@@ -67,6 +66,7 @@ from services.batch_orchestrator_service.implementations.spellcheck_initiator_im
     SpellcheckInitiatorImpl,
 )
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
+from services.batch_orchestrator_service.metrics import get_circuit_breaker_metrics
 from services.batch_orchestrator_service.protocols import (
     AIFeedbackInitiatorProtocol,
     BatchConductorClientProtocol,
@@ -113,11 +113,8 @@ class CoreInfrastructureProvider(Provider):
         if settings.CIRCUIT_BREAKER_ENABLED:
             # Create metrics bridge for kafka circuit breaker
             circuit_breaker_metrics = get_circuit_breaker_metrics()
-            metrics_bridge = create_metrics_bridge(
-                circuit_breaker_metrics,
-                settings.SERVICE_NAME
-            )
-            
+            metrics_bridge = create_metrics_bridge(circuit_breaker_metrics, settings.SERVICE_NAME)
+
             kafka_circuit_breaker = CircuitBreaker(
                 name="kafka_producer",
                 failure_threshold=settings.KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
@@ -156,11 +153,8 @@ class CoreInfrastructureProvider(Provider):
         if settings.CIRCUIT_BREAKER_ENABLED:
             # Create metrics bridge for circuit breaker metrics
             circuit_breaker_metrics = get_circuit_breaker_metrics()
-            metrics_bridge = create_metrics_bridge(
-                circuit_breaker_metrics,
-                settings.SERVICE_NAME
-            )
-            
+            metrics_bridge = create_metrics_bridge(circuit_breaker_metrics, settings.SERVICE_NAME)
+
             # Circuit breaker for Batch Conductor Service
             registry.register(
                 "batch_conductor",

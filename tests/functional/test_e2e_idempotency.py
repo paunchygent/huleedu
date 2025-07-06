@@ -18,8 +18,8 @@ from typing import Any
 
 import pytest
 from aiokafka import ConsumerRecord
-
 from huleedu_service_libs.event_utils import generate_deterministic_event_id
+
 from tests.utils.kafka_test_manager import KafkaTestManager, create_kafka_test_config
 from tests.utils.service_test_manager import ServiceTestManager
 

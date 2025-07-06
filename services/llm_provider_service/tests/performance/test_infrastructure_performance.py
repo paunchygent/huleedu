@@ -12,7 +12,7 @@ from typing import Any, Dict, Tuple
 from uuid import UUID, uuid4
 
 import pytest
-from dishka import make_async_container, provide, Scope
+from dishka import Scope, make_async_container, provide
 
 from common_core import EssayComparisonWinner, LLMProviderType
 from services.llm_provider_service.config import Settings
@@ -21,11 +21,11 @@ from services.llm_provider_service.di import LLMProviderServiceProvider
 
 class TestLLMProviderServiceProvider(LLMProviderServiceProvider):
     """Test-specific provider that allows settings injection."""
-    
+
     def __init__(self, test_settings: Settings):
         super().__init__()
         self._test_settings = test_settings
-    
+
     @provide(scope=Scope.APP)
     def provide_settings(self) -> Settings:
         return self._test_settings

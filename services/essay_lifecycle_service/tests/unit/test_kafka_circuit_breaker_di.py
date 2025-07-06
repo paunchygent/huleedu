@@ -80,7 +80,7 @@ async def test_kafka_bus_with_circuit_breaker(
     # Mock the KafkaBus.start method to avoid actual Kafka connection
     with (
         patch.object(KafkaBus, "start", new_callable=AsyncMock) as mock_start,
-        patch.object(KafkaBus, "stop", new_callable=AsyncMock) as mock_stop,
+        patch.object(KafkaBus, "stop", new_callable=AsyncMock),
     ):
         kafka_bus = await provider.provide_kafka_bus(mock_settings, registry)
 
@@ -141,7 +141,7 @@ async def test_circuit_breaker_configuration(
     registry = provider.provide_circuit_breaker_registry(mock_settings)
 
     with patch.object(KafkaBus, "start", new_callable=AsyncMock):
-        kafka_bus = await provider.provide_kafka_bus(mock_settings, registry)
+        await provider.provide_kafka_bus(mock_settings, registry)
 
         # Get the circuit breaker from registry
         circuit_breaker = registry.get("kafka_producer")

@@ -220,9 +220,10 @@ class GoogleProviderImpl(LLMProviderProtocol):
                                         is_retryable=False,
                                     )
 
-                                # Use validated response directly (already in assessment domain language)
+                                # Use validated response directly
+                                # (already in assessment domain language)
                                 assert validated_response is not None  # Type assertion for mypy
-                                
+
                                 # Convert winner string to enum value
                                 if validated_response.winner == "Essay A":
                                     winner = EssayComparisonWinner.ESSAY_A
@@ -230,7 +231,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                                     winner = EssayComparisonWinner.ESSAY_B
                                 else:
                                     winner = EssayComparisonWinner.ERROR
-                                
+
                                 # Convert confidence from 1-5 scale to 0-1 scale for internal model
                                 confidence_normalized = (validated_response.confidence - 1.0) / 4.0
 

@@ -14,6 +14,7 @@ import pytest
 from dishka import make_async_container
 
 from common_core import LLMProviderType
+from common_core.domain_enums import EssayComparisonWinner
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
 
@@ -43,8 +44,8 @@ class TestEndToEndPerformance:
             # Create a mock instance that returns proper response
             mock_provider_instance = AsyncMock()
             mock_response = LLMProviderResponse(
-                choice="A",
-                reasoning="Essay A is better structured",
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="Essay A is better structured",
                 confidence=0.85,
                 provider=LLMProviderType.ANTHROPIC,
                 model="mock-model",
@@ -141,8 +142,9 @@ class TestEndToEndPerformance:
 
                             print("End-to-end load test results:")
                             print(f"  Total requests: {stats['total_requests']}")
-                            success_rate = (stats['successful_requests'] /
-                                          stats['total_requests'] * 100)
+                            success_rate = (
+                                stats["successful_requests"] / stats["total_requests"] * 100
+                            )
                             print(f"  Success rate: {success_rate:.1f}%")
                             print(f"  Error rate: {stats['error_rate']:.1f}%")
                             print("  Response times:")
@@ -178,8 +180,8 @@ class TestEndToEndPerformance:
         ) as MockProviderClass:
             mock_provider_instance = AsyncMock()
             mock_response = LLMProviderResponse(
-                choice="A",
-                reasoning="Essay A is better structured",
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="Essay A is better structured",
                 confidence=0.85,
                 provider=LLMProviderType.ANTHROPIC,
                 model="mock-model",
@@ -275,8 +277,11 @@ class TestEndToEndPerformance:
 
                             print("Mixed workload performance results:")
                             print(f"  Total requests: {overall_stats['total_requests']}")
-                            overall_success_rate = (overall_stats['successful_requests'] /
-                                                   overall_stats['total_requests'] * 100)
+                            overall_success_rate = (
+                                overall_stats["successful_requests"]
+                                / overall_stats["total_requests"]
+                                * 100
+                            )
                             print(f"  Overall success rate: {overall_success_rate:.1f}%")
                             print(f"  Overall P95: {overall_stats['response_times']['p95']:.4f}s")
 
@@ -285,8 +290,9 @@ class TestEndToEndPerformance:
                                 if stats:  # Check if stats is not empty
                                     print(f"  {workload_name.capitalize()} workload:")
                                     print(f"    Requests: {stats['total_requests']}")
-                                    workload_success_rate = (stats['successful_requests'] /
-                                                           stats['total_requests'] * 100)
+                                    workload_success_rate = (
+                                        stats["successful_requests"] / stats["total_requests"] * 100
+                                    )
                                     print(f"    Success rate: {workload_success_rate:.1f}%")
                                     print(f"    Mean time: {stats['response_times']['mean']:.4f}s")
 
@@ -316,8 +322,8 @@ class TestEndToEndPerformance:
         ) as MockProviderClass:
             mock_provider_instance = AsyncMock()
             mock_response = LLMProviderResponse(
-                choice="A",
-                reasoning="Essay A is better structured",
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="Essay A is better structured",
                 confidence=0.85,
                 provider=LLMProviderType.ANTHROPIC,
                 model="mock-model",
@@ -409,10 +415,11 @@ class TestEndToEndPerformance:
                             print(f"  Duration: {duration_seconds}s")
                             print(f"  Target rate: {requests_per_second} req/s")
                             print(f"  Actual requests: {stats['total_requests']}")
-                            actual_rate = stats['total_requests'] / duration_seconds
+                            actual_rate = stats["total_requests"] / duration_seconds
                             print(f"  Actual rate: {actual_rate:.2f} req/s")
-                            sustained_success_rate = (stats['successful_requests'] /
-                                                     stats['total_requests'] * 100)
+                            sustained_success_rate = (
+                                stats["successful_requests"] / stats["total_requests"] * 100
+                            )
                             print(f"  Success rate: {sustained_success_rate:.1f}%")
                             print("  Response times:")
                             print(f"    Mean: {stats['response_times']['mean']:.4f}s")

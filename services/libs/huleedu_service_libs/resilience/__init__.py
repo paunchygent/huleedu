@@ -5,8 +5,9 @@ from huleedu_service_libs.resilience.circuit_breaker import (
     CircuitBreakerError,
     circuit_breaker,
 )
-from common_core import CircuitBreakerState
 from huleedu_service_libs.resilience.registry import CircuitBreakerRegistry
+
+from common_core import CircuitBreakerState
 
 __all__ = [
     "CircuitBreaker",

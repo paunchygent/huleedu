@@ -175,7 +175,7 @@ class JaegerTraceSearcher:
         tree = Tree("Service Flow")
 
         # Build span hierarchy
-        span_map = {s["spanID"]: s for s in spans}
+        {s["spanID"]: s for s in spans}
         root_spans = [s for s in spans if not s.get("references")]
 
         def add_span_to_tree(span: Dict[str, Any], parent_node: Tree) -> None:

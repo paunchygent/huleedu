@@ -54,9 +54,9 @@ async def check_batch_state(batch_id: str):
         # Check essay states
         essays = await conn.fetch(
             """
-            SELECT essay_id, current_status, processing_metadata, 
+            SELECT essay_id, current_status, processing_metadata,
                    timeline, storage_references, version, created_at, updated_at
-            FROM essay_states 
+            FROM essay_states
             WHERE batch_id = $1
             ORDER BY essay_id
             """,
@@ -81,7 +81,7 @@ async def check_batch_state(batch_id: str):
         # Separate essays by status for analysis
         stuck_essays = [e for e in essays if e["current_status"] == "spellchecking_in_progress"]
         completed_essays = [e for e in essays if e["current_status"] == "spellchecked_success"]
-        failed_essays = [e for e in essays if e["current_status"] == "spellcheck_failed"]
+        [e for e in essays if e["current_status"] == "spellcheck_failed"]
 
         if stuck_essays:
             print("\n--- STUCK ESSAYS (spellchecking_in_progress) ---")
@@ -118,7 +118,7 @@ async def check_batch_state(batch_id: str):
         # Check recent processing logs
         logs = await conn.fetch(
             """
-            SELECT event_type, previous_status, new_status, 
+            SELECT event_type, previous_status, new_status,
                    event_metadata, correlation_id, created_at, essay_id
             FROM essay_processing_logs
             WHERE batch_id = $1
@@ -139,8 +139,9 @@ async def check_batch_state(batch_id: str):
         if stuck_events:
             print("\n--- EVENTS FOR STUCK ESSAYS ---")
             for log in stuck_events[:10]:  # Show first 10
+                essay_id = log.get('essay_id', 'N/A')
                 print(
-                    f"\n{log['created_at']}: {log['event_type']} (Essay: {log.get('essay_id', 'N/A')})"
+                    f"\n{log['created_at']}: {log['event_type']} (Essay: {essay_id})"
                 )
                 print(f"  {log['previous_status']} -> {log['new_status']}")
 

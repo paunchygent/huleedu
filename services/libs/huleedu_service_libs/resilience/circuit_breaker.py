@@ -7,22 +7,21 @@ in distributed systems by temporarily blocking calls to failing services.
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, Optional, Type, TypeVar, cast
 
-from common_core import CircuitBreakerState
+# Import TYPE_CHECKING to avoid circular imports
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, cast
+
 from huleedu_service_libs.logging_utils import create_service_logger
 from opentelemetry import trace
 
-# Import TYPE_CHECKING to avoid circular imports
-from typing import TYPE_CHECKING
+from common_core import CircuitBreakerState
+
 if TYPE_CHECKING:
     from huleedu_service_libs.resilience.metrics_bridge import CircuitBreakerMetrics
 
 logger = create_service_logger("circuit_breaker")
 
 T = TypeVar("T")
-
-
 
 
 class CircuitBreakerError(Exception):
@@ -84,7 +83,7 @@ class CircuitBreaker:
         self.last_failure_time: Optional[datetime] = None
         self.state = CircuitBreakerState.CLOSED
         self._lock = asyncio.Lock()
-        
+
         # Initialize metrics with current state
         if self.metrics:
             self.metrics.set_state(self.name, self.state, self.service_name)
@@ -137,11 +136,11 @@ class CircuitBreaker:
                 # Record success
                 await self._on_success()
                 span.set_attribute("circuit.call_result", "success")
-                
+
                 # Record successful call metrics
                 if self.metrics:
                     self.metrics.increment_calls(self.name, "success", self.service_name)
-                
+
                 return cast(T, result)
 
             except self.expected_exception as e:
@@ -149,11 +148,11 @@ class CircuitBreaker:
                 await self._on_failure()
                 span.record_exception(e)
                 span.set_attribute("circuit.call_result", "failure")
-                
+
                 # Record failed call metrics
                 if self.metrics:
                     self.metrics.increment_calls(self.name, "failure", self.service_name)
-                
+
                 raise
 
     async def _on_success(self) -> None:
@@ -204,13 +203,13 @@ class CircuitBreaker:
         previous_state = self.state
         self.state = CircuitBreakerState.OPEN
         self.success_count = 0
-        
+
         # Record metrics for state transition
         if self.metrics:
             self.metrics.record_state_change(
                 self.name, previous_state, self.state, self.service_name
             )
-        
+
         logger.error(
             f"Circuit breaker '{self.name}' transitioned to OPEN. "
             f"Blocking calls for {self.recovery_timeout.total_seconds()}s"
@@ -222,13 +221,13 @@ class CircuitBreaker:
         self.state = CircuitBreakerState.HALF_OPEN
         self.success_count = 0
         self.failure_count = 0
-        
+
         # Record metrics for state transition
         if self.metrics:
             self.metrics.record_state_change(
                 self.name, previous_state, self.state, self.service_name
             )
-        
+
         logger.info(f"Circuit breaker '{self.name}' transitioned to HALF_OPEN. Testing recovery...")
 
     def _transition_to_closed(self) -> None:
@@ -237,13 +236,13 @@ class CircuitBreaker:
         self.state = CircuitBreakerState.CLOSED
         self.failure_count = 0
         self.success_count = 0
-        
+
         # Record metrics for state transition
         if self.metrics:
             self.metrics.record_state_change(
                 self.name, previous_state, self.state, self.service_name
             )
-        
+
         logger.info(f"Circuit breaker '{self.name}' transitioned to CLOSED.")
 
     def _record_blocked_call(self) -> None:
@@ -252,7 +251,7 @@ class CircuitBreaker:
         if current_span and current_span.is_recording():
             current_span.set_attribute("circuit.blocked", True)
             current_span.set_attribute("circuit.state", self.state.value)
-        
+
         # Record blocked call metrics
         if self.metrics:
             self.metrics.record_blocked_call(self.name, self.service_name)
@@ -276,13 +275,13 @@ class CircuitBreaker:
         self.failure_count = 0
         self.success_count = 0
         self.last_failure_time = None
-        
+
         # Record metrics for manual reset
         if self.metrics and previous_state != CircuitBreakerState.CLOSED:
             self.metrics.record_state_change(
                 self.name, previous_state, self.state, self.service_name
             )
-        
+
         logger.info(f"Circuit breaker '{self.name}' manually reset to CLOSED.")
 
 

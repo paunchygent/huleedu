@@ -63,7 +63,11 @@ class MockLLMInteractionImpl(LLMInteractionProtocol):
                 confidence = None
             else:
                 # Randomly select winner with slight bias towards Essay B
-                winner = EssayComparisonWinner.ESSAY_A if random.random() < 0.45 else EssayComparisonWinner.ESSAY_B
+                winner = (
+                    EssayComparisonWinner.ESSAY_A
+                    if random.random() < 0.45
+                    else EssayComparisonWinner.ESSAY_B
+                )
                 confidence = round(random.uniform(1.0, 5.0), 1)
 
                 # Generate realistic justification based on winner

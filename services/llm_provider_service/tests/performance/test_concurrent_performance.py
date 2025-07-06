@@ -16,6 +16,7 @@ import pytest
 from dishka import make_async_container
 
 from common_core import LLMProviderType
+from common_core.domain_enums import EssayComparisonWinner
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
 
@@ -36,8 +37,8 @@ class TestConcurrentPerformance:
             # Create a mock instance that returns proper response
             mock_provider_instance = AsyncMock()
             mock_response = LLMProviderResponse(
-                choice="A",
-                reasoning="Essay A is better structured",
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="Essay A is better structured",
                 confidence=0.85,
                 provider=LLMProviderType.ANTHROPIC,
                 model="mock-model",
@@ -148,8 +149,8 @@ class TestConcurrentPerformance:
         ) as MockProviderClass:
             mock_provider_instance = AsyncMock()
             mock_response = LLMProviderResponse(
-                choice="A",
-                reasoning="Essay A is better structured",
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="Essay A is better structured",
                 confidence=0.85,
                 provider=LLMProviderType.ANTHROPIC,
                 model="mock-model",
@@ -249,8 +250,8 @@ class TestConcurrentPerformance:
         ) as MockProviderClass:
             mock_provider_instance = AsyncMock()
             mock_response = LLMProviderResponse(
-                choice="A",
-                reasoning="Essay A is better structured",
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="Essay A is better structured",
                 confidence=0.85,
                 provider=LLMProviderType.ANTHROPIC,
                 model="mock-model",
@@ -338,7 +339,7 @@ class TestConcurrentPerformance:
 
                                 print(
                                     f"    Burst {burst_id + 1} P95: "
-                    f"{sorted(burst_times)[int(len(burst_times) * 0.95)]:.4f}s"
+                                    f"{sorted(burst_times)[int(len(burst_times) * 0.95)]:.4f}s"
                                 )
 
                                 # Wait before next burst (except for last burst)
@@ -357,7 +358,7 @@ class TestConcurrentPerformance:
                             print("Burst pattern results:")
                             print(
                                 f"  Total requests: {total_requests} "
-                f"({burst_count} bursts of {burst_size})"
+                                f"({burst_count} bursts of {burst_size})"
                             )
                             print(f"  Total time: {total_time:.4f}s")
                             print(f"  Overall success rate: {success_rate:.1f}%")
@@ -386,8 +387,8 @@ class TestConcurrentPerformance:
         ) as MockProviderClass:
             mock_provider_instance = AsyncMock()
             mock_response = LLMProviderResponse(
-                choice="A",
-                reasoning="Essay A is better structured",
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="Essay A is better structured",
                 confidence=0.85,
                 provider=LLMProviderType.ANTHROPIC,  # Will be overridden by orchestrator
                 model="mock-model",
@@ -476,12 +477,11 @@ class TestConcurrentPerformance:
                             print(f"  Total time: {total_time:.4f}s")
                             print(
                                 f"  Overall success rate: "
-                f"{sum(all_successes) / len(all_successes) * 100:.1f}%"
+                                f"{sum(all_successes) / len(all_successes) * 100:.1f}%"
                             )
-                            print(
-                                f"  Overall P95: "
-                f"{sorted(all_response_times)[int(len(all_response_times) * 0.95)]:.4f}s"
-                            )
+                            p95_index = int(len(all_response_times) * 0.95)
+                            p95_time = sorted(all_response_times)[p95_index]
+                            print(f"  Overall P95: {p95_time:.4f}s")
 
                             for provider_name, provider_data in provider_results.items():
                                 provider_times = [r[0] for r in provider_data]
@@ -492,7 +492,7 @@ class TestConcurrentPerformance:
                                 mean_time = statistics.mean(provider_times)
                                 print(
                                     f"  {provider_name}: {success_rate:.1f}% success, "
-                    f"{mean_time:.4f}s mean"
+                                    f"{mean_time:.4f}s mean"
                                 )
 
                             # Assertions

@@ -71,7 +71,7 @@ async def record_comparisons_and_update_scores(
                 from_cache=result.from_cache,
             )
             db_session.add(new_pair)
-            
+
             # Only count successful comparisons (not errors)
             if result.llm_assessment.winner != EssayComparisonWinner.ERROR:
                 successful_comparisons_this_round += 1

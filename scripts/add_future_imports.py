@@ -124,7 +124,7 @@ def add_future_import(file_path: str) -> bool:
                 future_import_added = True
             elif not future_import_added and line.strip() == "":
                 # If we hit an empty line after docstring, add the import here
-                if i > 0 and any('"""' in l for l in lines[:i]):
+                if i > 0 and any('"""' in line_content for line_content in lines[:i]):
                     new_lines.append("from __future__ import annotations\n\n")
                     future_import_added = True
                     new_lines.append(line)

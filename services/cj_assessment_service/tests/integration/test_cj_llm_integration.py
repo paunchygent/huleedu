@@ -4,6 +4,8 @@ This test simulates the actual flow of CJ Assessment Service making HTTP calls
 to the LLM Provider Service.
 """
 
+from typing import Any
+
 import aiohttp
 import pytest
 
@@ -19,7 +21,7 @@ class TestCJAssessmentLLMIntegration:
     """Test CJ Assessment Service client integration with LLM Provider Service."""
 
     @pytest.fixture
-    def integration_settings(self):
+    def integration_settings(self) -> Settings:
         """Create settings for integration testing."""
         settings = Settings()
         # Override to use local services
@@ -30,18 +32,20 @@ class TestCJAssessmentLLMIntegration:
         return settings
 
     @pytest.fixture
-    async def http_session(self):
+    async def http_session(self) -> Any:
         """Create HTTP session for testing."""
         async with aiohttp.ClientSession() as session:
             yield session
 
     @pytest.fixture
-    def retry_manager(self, integration_settings):
+    def retry_manager(self, integration_settings: Settings) -> RetryManagerImpl:
         """Create retry manager."""
         return RetryManagerImpl(integration_settings)
 
     @pytest.fixture
-    def llm_client(self, http_session, integration_settings, retry_manager):
+    def llm_client(
+        self, http_session: Any, integration_settings: Settings, retry_manager: RetryManagerImpl
+    ) -> LLMProviderServiceClient:
         """Create LLM Provider Service client."""
         return LLMProviderServiceClient(
             session=http_session,
@@ -49,18 +53,20 @@ class TestCJAssessmentLLMIntegration:
             retry_manager=retry_manager,
         )
 
-    async def test_cj_assessment_comparison_flow(self, llm_client):
+    async def test_cj_assessment_comparison_flow(
+        self, llm_client: LLMProviderServiceClient
+    ) -> None:
         """Test the full CJ Assessment comparison flow."""
         # Create a prompt in the format CJ Assessment Service uses
         prompt = """Compare these two essays and determine which is better written.
 Essay A (ID: essay-123):
-This essay presents a clear thesis statement followed by well-structured paragraphs. 
-Each paragraph contains a topic sentence and supporting evidence. The conclusion 
+This essay presents a clear thesis statement followed by well-structured paragraphs.
+Each paragraph contains a topic sentence and supporting evidence. The conclusion
 effectively summarizes the main points and reinforces the thesis.
 
 Essay B (ID: essay-456):
-This essay attempts to make several points but lacks clear organization. 
-The ideas jump from one topic to another without clear transitions. 
+This essay attempts to make several points but lacks clear organization.
+The ideas jump from one topic to another without clear transitions.
 The conclusion does not effectively tie back to the introduction.
 
 Please respond with a JSON object containing:
@@ -94,7 +100,7 @@ Always respond with valid JSON."""
         assert isinstance(result["confidence"], (int, float))
         assert 1 <= result["confidence"] <= 5
 
-    async def test_cj_assessment_error_handling(self, llm_client):
+    async def test_cj_assessment_error_handling(self, llm_client: LLMProviderServiceClient) -> None:
         """Test error handling for invalid prompts."""
         # Test with a prompt that doesn't contain the expected essay format
         invalid_prompt = "This is not a valid essay comparison prompt"
@@ -108,12 +114,12 @@ Always respond with valid JSON."""
         print(f"\nError handling test passed: {error}")
 
     async def test_cj_assessment_with_mock_provider(
-        self, integration_settings, http_session, retry_manager
-    ):
+        self, integration_settings: Settings, http_session: Any, retry_manager: RetryManagerImpl
+    ) -> None:
         """Test using mock provider configuration."""
         # Check if LLM Provider Service is configured with USE_MOCK_LLM
         async with http_session.get("http://localhost:8090/healthz") as response:
-            health_data = await response.json()
+            await response.json()
 
         # This test would require the LLM Provider Service to be started
         # with USE_MOCK_LLM=true environment variable

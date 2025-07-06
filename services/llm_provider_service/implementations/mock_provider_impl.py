@@ -65,7 +65,11 @@ class MockProviderImpl(LLMProviderProtocol):
             )
 
         # Randomly select winner with slight bias towards Essay B
-        winner = EssayComparisonWinner.ESSAY_A if random.random() < 0.45 else EssayComparisonWinner.ESSAY_B
+        winner = (
+            EssayComparisonWinner.ESSAY_A
+            if random.random() < 0.45
+            else EssayComparisonWinner.ESSAY_B
+        )
         confidence = round(random.uniform(0.6, 0.95), 2)
 
         # Generate realistic justification based on winner
@@ -110,5 +114,7 @@ class MockProviderImpl(LLMProviderProtocol):
             },
         )
 
-        logger.debug(f"Mock provider generated response: winner={winner.value}, confidence={confidence}")
+        logger.debug(
+            f"Mock provider generated response: winner={winner.value}, confidence={confidence}"
+        )
         return response, None

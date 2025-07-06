@@ -184,7 +184,8 @@ class ResilientKafkaPublisher:
             # Check if circuit is available and process queued messages
             if (
                 self.circuit_breaker
-                and self.circuit_breaker.state in [CircuitBreakerState.CLOSED, CircuitBreakerState.HALF_OPEN]
+                and self.circuit_breaker.state
+                in [CircuitBreakerState.CLOSED, CircuitBreakerState.HALF_OPEN]
                 and self.fallback_handler.has_queued_messages()
             ):
                 await self._process_queued_messages()

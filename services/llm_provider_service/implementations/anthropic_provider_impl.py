@@ -252,9 +252,10 @@ You will use the comparison_result tool to provide your analysis."""
                                     is_retryable=False,
                                 )
 
-                            # Use validated response directly (already in assessment domain language)
+                            # Use validated response directly
+                            # (already in assessment domain language)
                             assert validated_response is not None  # Type assertion for mypy
-                            
+
                             # Convert winner string to enum value
                             if validated_response.winner == "Essay A":
                                 winner = EssayComparisonWinner.ESSAY_A

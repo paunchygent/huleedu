@@ -233,9 +233,8 @@ class TestBOSIdempotencyBasic:
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that duplicate BatchEssaysReady events are skipped."""
-        from huleedu_service_libs.idempotency import idempotent_consumer
-
         from huleedu_service_libs.event_utils import generate_deterministic_event_id
+        from huleedu_service_libs.idempotency import idempotent_consumer
 
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers

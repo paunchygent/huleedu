@@ -114,7 +114,7 @@ async def test_circuit_breaker_opens_on_failures(
         mock_kafka_bus.publish.side_effect = KafkaError("Connection failed")
 
         # Trigger failures to open circuit
-        for i in range(circuit_breaker.failure_threshold):
+        for _i in range(circuit_breaker.failure_threshold):
             try:
                 await resilient_publisher.publish("test.topic", test_event)
             except KafkaError:

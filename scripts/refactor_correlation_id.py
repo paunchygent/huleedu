@@ -199,9 +199,8 @@ def process_files(files: List[Path], dry_run: bool = True) -> None:
         except Exception as e:
             print(f"Error processing {file_path}: {e}", file=sys.stderr)
 
-    print(
-        f"\n{'[DRY RUN] Would modify' if dry_run else 'Modified'} {files_modified} files with {total_changes} changes total"
-    )
+    action = "[DRY RUN] Would modify" if dry_run else "Modified"
+    print(f"\n{action} {files_modified} files with {total_changes} changes total")
 
 
 def find_remaining_optional_correlation_ids(base_dir: Path) -> None:

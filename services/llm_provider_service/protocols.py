@@ -164,8 +164,6 @@ class LLMRetryManagerProtocol(Protocol):
         ...
 
 
-
-
 class QueueManagerProtocol(Protocol):
     """Protocol for request queue management."""
 

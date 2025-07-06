@@ -230,8 +230,10 @@ class TestResponseValidationOptimizations:
             "confidence": r'"confidence"\s*:\s*(\d+(?:\.\d+)?)',
         }
 
-        test_response = ('{"winner": "Essay A", "justification": "Better structure and clarity", '
-                         '"confidence": 4.2}')
+        test_response = (
+            '{"winner": "Essay A", "justification": "Better structure and clarity", '
+            '"confidence": 4.2}'
+        )
 
         # Test compilation time vs usage time
         iterations = 1000

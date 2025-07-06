@@ -5,7 +5,7 @@ This shows how to protect external service calls with circuit breaker pattern.
 """
 
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 
 import aiohttp
 from aiohttp import ClientError
@@ -97,9 +97,6 @@ class ServiceClient:
 
 
 # Usage in a protocol implementation
-from typing import Protocol
-
-
 class EssayLifecycleClientProtocol(Protocol):
     """Protocol for Essay Lifecycle Service client."""
 

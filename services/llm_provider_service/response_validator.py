@@ -18,7 +18,9 @@ from common_core import EssayComparisonWinner
 logger = create_service_logger("llm_provider_service.response_validator")
 
 # Pre-compiled regex patterns for better performance
-WINNER_PATTERN = re.compile(rf"^({EssayComparisonWinner.ESSAY_A.value}|{EssayComparisonWinner.ESSAY_B.value})$")
+WINNER_PATTERN = re.compile(
+    rf"^({EssayComparisonWinner.ESSAY_A.value}|{EssayComparisonWinner.ESSAY_B.value})$"
+)
 WINNER_KEYWORDS = {"a", "essay a", "option a", "first", "left"}
 WINNER_B_KEYWORDS = {"b", "essay b", "option b", "second", "right"}
 
@@ -26,7 +28,10 @@ WINNER_B_KEYWORDS = {"b", "essay b", "option b", "second", "right"}
 class StandardizedLLMResponse(BaseModel):
     """Standardized response format for LLM comparison results."""
 
-    winner: str = Field(description="Which essay is better", pattern=rf"^({EssayComparisonWinner.ESSAY_A.value}|{EssayComparisonWinner.ESSAY_B.value})$")
+    winner: str = Field(
+        description="Which essay is better",
+        pattern=rf"^({EssayComparisonWinner.ESSAY_A.value}|{EssayComparisonWinner.ESSAY_B.value})$",
+    )
     justification: str = Field(
         description="Brief explanation of the choice (max 50 characters)", max_length=50
     )
@@ -251,7 +256,10 @@ STANDARDIZED_RESPONSE_SCHEMA = {
         "winner": {
             "type": "string",
             "enum": [EssayComparisonWinner.ESSAY_A.value, EssayComparisonWinner.ESSAY_B.value],
-            "description": f"Which essay is better: '{EssayComparisonWinner.ESSAY_A.value}' or '{EssayComparisonWinner.ESSAY_B.value}'",
+            "description": (
+                f"Which essay is better: '{EssayComparisonWinner.ESSAY_A.value}' "
+                f"or '{EssayComparisonWinner.ESSAY_B.value}'"
+            ),
         },
         "justification": {
             "type": "string",

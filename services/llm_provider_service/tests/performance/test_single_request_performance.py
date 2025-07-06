@@ -13,6 +13,7 @@ import pytest
 from dishka import make_async_container
 
 from common_core import LLMProviderType
+from common_core.domain_enums import EssayComparisonWinner
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
 
@@ -32,8 +33,8 @@ class TestSingleRequestPerformance:
             # Create a mock instance that returns proper response
             mock_provider_instance = AsyncMock()
             mock_response = LLMProviderResponse(
-                choice="A",
-                reasoning="Essay A is better structured",
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="Essay A is better structured",
                 confidence=0.85,
                 provider=LLMProviderType.ANTHROPIC,
                 model="mock-model",
@@ -115,8 +116,8 @@ class TestSingleRequestPerformance:
         ) as MockProviderClass:
             mock_provider_instance = AsyncMock()
             mock_response = LLMProviderResponse(
-                choice="A",
-                reasoning="Essay A is better structured",
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="Essay A is better structured",
                 confidence=0.85,
                 provider=LLMProviderType.ANTHROPIC,
                 model="mock-model",
@@ -206,8 +207,8 @@ class TestSingleRequestPerformance:
             mock_provider_instance = AsyncMock()
             # Simulate instant response
             mock_response = LLMProviderResponse(
-                choice="A",
-                reasoning="Instant response",
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="Instant response",
                 confidence=0.9,
                 provider=LLMProviderType.ANTHROPIC,
                 model="mock-model",

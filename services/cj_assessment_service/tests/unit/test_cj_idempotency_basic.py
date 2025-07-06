@@ -16,10 +16,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
+from huleedu_service_libs.event_utils import generate_deterministic_event_id
 from huleedu_service_libs.idempotency import idempotent_consumer
 
-from common_core.domain_enums import CourseCode
-from huleedu_service_libs.event_utils import generate_deterministic_event_id
+from common_core.domain_enums import CourseCode, EssayComparisonWinner
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.models_api import ComparisonResult, LLMAssessmentResponseSchema
@@ -101,7 +101,7 @@ def mock_boundary_services(
                 ComparisonResult(
                     task=task,
                     llm_assessment=LLMAssessmentResponseSchema(
-                        winner="Essay A",
+                        winner=EssayComparisonWinner.ESSAY_A,
                         confidence=3.0,  # Must be >= 1.0 and <= 5.0
                         justification="Mock comparison result",
                     ),

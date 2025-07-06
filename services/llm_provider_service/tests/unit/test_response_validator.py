@@ -187,7 +187,6 @@ class TestValidateAndNormalizeResponse:
         assert validated.justification.endswith("...")
 
 
-
 class TestProviderFormatCompatibility:
     """Test compatibility with different provider response formats."""
 

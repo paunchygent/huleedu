@@ -80,10 +80,12 @@ class ELSBatchPhaseOutcomeHandler:
                     # Note: No manual validation needed -
                     # Pydantic EventEnvelope parsing ensures required fields exist
 
+                    processed_count = len(processed_essays_for_next_phase)
+                    failed_count = len(failed_essay_ids)
                     logger.info(
                         f"Received ELS batch phase outcome: batch={batch_id}, "
                         f"phase={completed_phase}, status={phase_status}, "
-                        f"processed={len(processed_essays_for_next_phase)}, failed={len(failed_essay_ids)}",
+                        f"processed={processed_count}, failed={failed_count}",
                         extra={"correlation_id": str(correlation_id)},
                     )
 

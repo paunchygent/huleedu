@@ -14,6 +14,8 @@ from typing import Any, Protocol, TypeVar
 import redis.client
 from pydantic import BaseModel
 
+from common_core.events.envelope import EventEnvelope
+
 T_EventPayload = TypeVar("T_EventPayload", bound=BaseModel)
 
 __all__ = [

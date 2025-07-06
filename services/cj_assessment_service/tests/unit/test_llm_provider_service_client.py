@@ -1,6 +1,7 @@
 """Unit tests for LLM Provider Service client."""
 
 import json
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -45,7 +46,7 @@ def mock_retry_manager() -> AsyncMock:
     retry_manager = AsyncMock()
 
     # Make retry manager pass through the function call
-    async def passthrough(func, *args, **kwargs):
+    async def passthrough(func: Any, *args: Any, **kwargs: Any) -> Any:
         return await func()
 
     retry_manager.with_retry.side_effect = passthrough
@@ -208,7 +209,7 @@ Essay B content."""
         result, error = await client.generate_comparison(user_prompt=prompt)
 
         assert result is None
-        assert "HTTP request failed: Connection failed" in error
+        assert error and "HTTP request failed: Connection failed" in error
 
     async def test_generate_comparison_invalid_prompt(
         self, client: LLMProviderServiceClient
@@ -242,7 +243,7 @@ Essay B content."""
         result, error = await client.generate_comparison(user_prompt=prompt)
 
         assert result is None
-        assert "Failed to parse immediate response JSON" in error
+        assert error and "Failed to parse immediate response JSON" in error
 
     # Queue-based response tests
     async def test_generate_comparison_queued_success(

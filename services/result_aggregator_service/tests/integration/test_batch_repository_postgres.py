@@ -176,7 +176,8 @@ class TestBatchRepositoryIntegration:
         assert final_batch.overall_status == BatchStatus.COMPLETED_SUCCESSFULLY
         assert final_batch.completed_essay_count == 3
         assert final_batch.failed_essay_count == 0
-        # Note: processing_started_at and processing_completed_at are not set by the current implementation
+        # Note: processing_started_at and processing_completed_at are not set
+        # by the current implementation
 
         # Verify all essay data is preserved
         assert len(final_batch.essays) == 3

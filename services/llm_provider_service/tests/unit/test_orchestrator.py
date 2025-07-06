@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 
 from common_core import LLMProviderType
+from common_core.domain_enums import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.implementations.llm_orchestrator_impl import LLMOrchestratorImpl
@@ -101,7 +102,7 @@ async def test_orchestrator_successful_comparison(
     # Arrange
     correlation_id = uuid4()
     mock_response = LLMProviderResponse(
-        winner="Essay B",
+        winner=EssayComparisonWinner.ESSAY_B,
         justification="Essay B is better structured",
         confidence=0.85,
         provider=LLMProviderType.MOCK,
@@ -281,7 +282,7 @@ async def test_orchestrator_test_provider_success(
     """Test provider connectivity check success."""
     # Arrange
     mock_response = LLMProviderResponse(
-        winner="Essay A",
+        winner=EssayComparisonWinner.ESSAY_A,
         justification="Test response",
         confidence=0.5,
         provider=LLMProviderType.MOCK,
@@ -325,7 +326,7 @@ async def test_orchestrator_with_overrides(
     # Arrange
     correlation_id = uuid4()
     mock_response = LLMProviderResponse(
-        winner="Essay A",
+        winner=EssayComparisonWinner.ESSAY_A,
         justification="Response",
         confidence=0.7,
         provider=LLMProviderType.MOCK,

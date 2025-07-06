@@ -13,12 +13,11 @@ from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
-from huleedu_service_libs.resilience.resilient_client import make_resilient
 from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
+from huleedu_service_libs.resilience.resilient_client import make_resilient
 
 from common_core import LLMProviderType
 from services.llm_provider_service.config import Settings, settings
-from services.llm_provider_service.metrics import get_circuit_breaker_metrics
 from services.llm_provider_service.implementations.anthropic_provider_impl import (
     AnthropicProviderImpl,
 )
@@ -58,6 +57,7 @@ from services.llm_provider_service.implementations.retry_manager_impl import (
 from services.llm_provider_service.implementations.trace_context_manager_impl import (
     TraceContextManagerImpl,
 )
+from services.llm_provider_service.metrics import get_circuit_breaker_metrics
 from services.llm_provider_service.protocols import (
     LLMEventPublisherProtocol,
     LLMOrchestratorProtocol,
@@ -93,11 +93,8 @@ class LLMProviderServiceProvider(Provider):
         if settings.CIRCUIT_BREAKER_ENABLED:
             # Create metrics bridge for circuit breaker metrics
             circuit_breaker_metrics = get_circuit_breaker_metrics()
-            metrics_bridge = create_metrics_bridge(
-                circuit_breaker_metrics, 
-                settings.SERVICE_NAME
-            )
-            
+            metrics_bridge = create_metrics_bridge(circuit_breaker_metrics, settings.SERVICE_NAME)
+
             # Register circuit breakers for each LLM provider
             for provider in ["anthropic", "openai", "google", "openrouter"]:
                 registry.register(
@@ -134,11 +131,8 @@ class LLMProviderServiceProvider(Provider):
         if settings.CIRCUIT_BREAKER_ENABLED:
             # Create metrics bridge for kafka circuit breaker
             circuit_breaker_metrics = get_circuit_breaker_metrics()
-            metrics_bridge = create_metrics_bridge(
-                circuit_breaker_metrics, 
-                settings.SERVICE_NAME
-            )
-            
+            metrics_bridge = create_metrics_bridge(circuit_breaker_metrics, settings.SERVICE_NAME)
+
             kafka_circuit_breaker = CircuitBreaker(
                 name="kafka_producer",
                 failure_threshold=settings.KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD,

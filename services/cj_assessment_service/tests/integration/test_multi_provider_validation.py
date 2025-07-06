@@ -7,6 +7,8 @@ IMPORTANT: These tests make REAL API calls and incur costs.
 Run with: pdm run test-expensive
 """
 
+from typing import Any
+
 import aiohttp
 import pytest
 
@@ -23,7 +25,7 @@ class TestMultiProviderValidation:
     """Test all providers with real API calls for comprehensive validation."""
 
     @pytest.fixture
-    def real_api_settings(self):
+    def real_api_settings(self) -> Settings:
         """Settings for real API testing - NO MOCKING."""
         settings = Settings()
         # Use local LLM Provider Service (must be running with USE_MOCK_LLM=False)
@@ -36,18 +38,20 @@ class TestMultiProviderValidation:
         return settings
 
     @pytest.fixture
-    async def http_session(self):
+    async def http_session(self) -> Any:
         """HTTP session for real API calls."""
         async with aiohttp.ClientSession() as session:
             yield session
 
     @pytest.fixture
-    def retry_manager(self, real_api_settings):
+    def retry_manager(self, real_api_settings: Settings) -> RetryManagerImpl:
         """Retry manager for API calls."""
         return RetryManagerImpl(real_api_settings)
 
     @pytest.fixture
-    def llm_client(self, http_session, real_api_settings, retry_manager):
+    def llm_client(
+        self, http_session: Any, real_api_settings: Settings, retry_manager: RetryManagerImpl
+    ) -> LLMProviderServiceClient:
         """LLM client configured for real API calls."""
         return LLMProviderServiceClient(
             session=http_session,
@@ -80,7 +84,9 @@ class TestMultiProviderValidation:
             },
         ],
     )
-    async def test_provider_comparison_flow(self, llm_client, provider_config):
+    async def test_provider_comparison_flow(
+        self, llm_client: LLMProviderServiceClient, provider_config: dict
+    ) -> None:
         """Test each provider with real API calls to validate response format."""
         # Short, focused comparison prompt for cost control
         prompt = """Compare these two essays and determine which is better written.
@@ -88,7 +94,7 @@ class TestMultiProviderValidation:
 Essay A (ID: test-a):
 Climate change requires immediate action. Scientific evidence shows rising temperatures globally. We must reduce emissions through renewable energy and policy changes.
 
-Essay B (ID: test-b):  
+Essay B (ID: test-b):
 Climate change is happening but the evidence is mixed. Some scientists disagree about the causes. More research is needed before making expensive policy changes.
 
 Please respond with a JSON object containing:
@@ -140,7 +146,7 @@ Please respond with a JSON object containing:
         assert result["justification"].strip() != "", "Empty justification"
         assert not result["justification"].startswith("..."), "Justification improperly truncated"
 
-    async def test_provider_service_health_before_tests(self, http_session):
+    async def test_provider_service_health_before_tests(self, http_session: Any) -> None:
         """Verify LLM Provider Service is running and configured for real APIs."""
         try:
             async with http_session.get("http://localhost:8090/healthz") as response:
@@ -156,7 +162,7 @@ Please respond with a JSON object containing:
         except Exception as e:
             pytest.skip(f"LLM Provider Service not available: {e}")
 
-    async def test_response_time_reasonable(self, llm_client):
+    async def test_response_time_reasonable(self, llm_client: LLMProviderServiceClient) -> None:
         """Test that response times are reasonable for real API calls."""
         prompt = """Compare these essays briefly.
 
@@ -174,6 +180,7 @@ JSON response with winner, justification (max 50 chars), confidence 1-5."""
         response_time = time.time() - start_time
 
         if error is None:
+            assert result is not None, "Result should not be None when error is None"
             print(f"\n⏱️  Response time: {response_time:.2f}s")
             # Real API calls should be under 30 seconds for reasonable models
             assert response_time < 30.0, f"Response too slow: {response_time:.2f}s"
@@ -183,7 +190,9 @@ JSON response with winner, justification (max 50 chars), confidence 1-5."""
         else:
             pytest.skip(f"Real API call failed: {error}")
 
-    async def test_justification_length_enforcement(self, llm_client):
+    async def test_justification_length_enforcement(
+        self, llm_client: LLMProviderServiceClient
+    ) -> None:
         """Test that justification length is properly enforced at max 50 characters."""
         # Prompt that might encourage longer responses
         prompt = """Compare these two detailed essays and provide comprehensive analysis.
@@ -197,6 +206,7 @@ Please provide thorough justification for your choice with detailed reasoning.""
         result, error = await llm_client.generate_comparison(user_prompt=prompt)
 
         if error is None:
+            assert result is not None, "Result should not be None when error is None"
             justification_length = len(result["justification"])
             print(f"\n📏 Justification length test: {justification_length} chars")
             print(f"   Text: '{result['justification']}'")

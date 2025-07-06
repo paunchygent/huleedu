@@ -288,10 +288,9 @@ class LLMProviderServiceClient(LLMProviderProtocol):
 
         while attempt < self.settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS:
             # Check total timeout
-            if time.time() - start_time > self.settings.LLM_QUEUE_TOTAL_TIMEOUT_SECONDS:
-                logger.error(
-                    f"Queue polling timed out after {self.settings.LLM_QUEUE_TOTAL_TIMEOUT_SECONDS} seconds"
-                )
+            timeout_seconds = self.settings.LLM_QUEUE_TOTAL_TIMEOUT_SECONDS
+            if time.time() - start_time > timeout_seconds:
+                logger.error(f"Queue polling timed out after {timeout_seconds} seconds")
                 return None, "Queue processing timed out"
 
             # Wait before polling (except first attempt)
@@ -416,7 +415,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                         response_data = json.loads(response_text)
 
                         # Extract the comparison result and convert confidence scale
-                        # LLM Provider Service returns 1-5 scale, convert to 0-1 scale for CJ Assessment
+                        # LLM Provider Service returns 1-5 scale, convert to 0-1 scale
                         raw_confidence = response_data.get("confidence", 3.0)
                         normalized_confidence = (raw_confidence - 1.0) / 4.0  # Convert 1-5 to 0-1
 

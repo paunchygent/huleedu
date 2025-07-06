@@ -5,6 +5,7 @@ and the centralized LLM Provider Service.
 """
 
 import asyncio
+from typing import Any
 from uuid import uuid4
 
 import aiohttp
@@ -29,22 +30,24 @@ class TestLLMProviderServiceIntegration:
     """Test CJ Assessment Service integration with LLM Provider Service."""
 
     @pytest.fixture
-    async def http_session(self):
+    async def http_session(self) -> Any:
         """Create HTTP session for testing."""
         async with aiohttp.ClientSession() as session:
             yield session
 
     @pytest.fixture
-    def llm_provider_url(self):
+    def llm_provider_url(self) -> str:
         """LLM Provider Service URL."""
         return "http://localhost:8090/api/v1"
 
     @pytest.fixture
-    def cj_assessment_url(self):
+    def cj_assessment_url(self) -> str:
         """CJ Assessment Service health URL."""
         return "http://localhost:9095"
 
-    async def test_services_are_healthy(self, http_session, llm_provider_url, cj_assessment_url):
+    async def test_services_are_healthy(
+        self, http_session: Any, llm_provider_url: str, cj_assessment_url: str
+    ) -> None:
         """Test that both services are running and healthy."""
         # Check LLM Provider Service
         async with http_session.get(
@@ -63,7 +66,9 @@ class TestLLMProviderServiceIntegration:
             assert health_data["status"] == "ok"
             print(f"CJ Assessment Service: {health_data}")
 
-    async def test_llm_provider_comparison_endpoint(self, http_session, llm_provider_url):
+    async def test_llm_provider_comparison_endpoint(
+        self, http_session: Any, llm_provider_url: str
+    ) -> None:
         """Test direct call to LLM Provider Service comparison endpoint."""
         request_data = {
             "user_prompt": "Compare these two essays and determine which is better written.",
@@ -100,7 +105,7 @@ class TestLLMProviderServiceIntegration:
                 error_text = await response.text()
                 pytest.skip(f"LLM Provider Service returned {response.status}: {error_text}")
 
-    async def test_cj_assessment_kafka_integration(self):
+    async def test_cj_assessment_kafka_integration(self) -> None:
         """Test CJ Assessment Service processing via Kafka.
 
         This test publishes a CJ assessment request to Kafka and monitors
@@ -138,7 +143,7 @@ class TestLLMProviderServiceIntegration:
         )
 
         # Create event envelope
-        envelope = EventEnvelope(
+        EventEnvelope(
             event_type=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED.value,
             source_service="test-integration",
             data=event_data,
@@ -149,7 +154,9 @@ class TestLLMProviderServiceIntegration:
         pytest.skip("Kafka integration requires running in Docker network")
 
     @pytest.mark.parametrize("provider", [LLMProviderType.ANTHROPIC, LLMProviderType.OPENAI])
-    async def test_provider_configuration(self, http_session, llm_provider_url, provider):
+    async def test_provider_configuration(
+        self, http_session: Any, llm_provider_url: str, provider: LLMProviderType
+    ) -> None:
         """Test that different providers can be configured."""
         async with http_session.get(f"{llm_provider_url}/providers") as response:
             assert response.status == 200
@@ -172,7 +179,7 @@ class TestLLMProviderServiceIntegration:
 class TestMockProviderIntegration:
     """Test integration using mock LLM provider."""
 
-    async def test_mock_provider_response(self):
+    async def test_mock_provider_response(self) -> None:
         """Test that mock provider returns expected format."""
         # This test would need to configure LLM Provider Service
         # to use mock provider via environment variable
@@ -184,17 +191,17 @@ class TestQueueIntegration:
     """Test integration for queue-based LLM processing."""
 
     @pytest.fixture
-    async def http_session(self):
+    async def http_session(self) -> Any:
         """Create HTTP session for testing."""
         async with aiohttp.ClientSession() as session:
             yield session
 
     @pytest.fixture
-    def llm_provider_url(self):
+    def llm_provider_url(self) -> str:
         """LLM Provider Service URL."""
         return "http://localhost:8090/api/v1"
 
-    async def test_queue_status_endpoint(self, http_session, llm_provider_url):
+    async def test_queue_status_endpoint(self, http_session: Any, llm_provider_url: str) -> None:
         """Test queue status endpoint exists and responds appropriately."""
         # Test with a fake queue ID to verify endpoint exists
         fake_queue_id = str(uuid4())
@@ -206,7 +213,7 @@ class TestQueueIntegration:
             assert "error" in error_data
             print(f"Queue status (404): {error_data}")
 
-    async def test_queue_results_endpoint(self, http_session, llm_provider_url):
+    async def test_queue_results_endpoint(self, http_session: Any, llm_provider_url: str) -> None:
         """Test queue results endpoint exists and responds appropriately."""
         # Test with a fake queue ID to verify endpoint exists
         fake_queue_id = str(uuid4())
@@ -219,8 +226,8 @@ class TestQueueIntegration:
             print(f"Queue results (404): {error_data}")
 
     async def test_llm_provider_service_health_with_queue_stats(
-        self, http_session, llm_provider_url
-    ):
+        self, http_session: Any, llm_provider_url: str
+    ) -> None:
         """Test LLM Provider Service health endpoint includes queue stats."""
         async with http_session.get(
             f"{llm_provider_url.replace('/api/v1', '')}/healthz"
@@ -238,7 +245,9 @@ class TestQueueIntegration:
             else:
                 print("Queue stats not included in health response")
 
-    async def test_comparison_endpoint_immediate_response(self, http_session, llm_provider_url):
+    async def test_comparison_endpoint_immediate_response(
+        self, http_session: Any, llm_provider_url: str
+    ) -> None:
         """Test comparison endpoint returns immediate response when providers available."""
         request_data = {
             "user_prompt": "Compare these two essays and determine which is better written.",
@@ -322,7 +331,7 @@ class TestQueueIntegration:
                 error_text = await response.text()
                 print(f"Comparison request failed: {response.status} - {error_text}")
 
-    async def test_cj_assessment_client_queue_handling(self):
+    async def test_cj_assessment_client_queue_handling(self) -> None:
         """Test CJ Assessment Service client handles both immediate and queued responses."""
         from services.cj_assessment_service.config import Settings
         from services.cj_assessment_service.implementations.llm_provider_service_client import (

@@ -176,7 +176,7 @@ async def generate_comparison(
 
             # Build response - direct mapping from internal model to API response model
             # No translation needed as both use assessment domain language
-            
+
             # Convert confidence scale from 0-1 to 1-5
             confidence_scaled = 1.0 + (result.confidence * 4.0)
             # Ensure confidence is within valid range
@@ -247,7 +247,9 @@ async def list_providers(
                 LLMProviderStatus(
                     name=provider_name,
                     enabled=enabled,
-                    available=enabled and configured and circuit_breaker_state == CircuitBreakerState.CLOSED.value,
+                    available=enabled
+                    and configured
+                    and circuit_breaker_state == CircuitBreakerState.CLOSED.value,
                     circuit_breaker_state=circuit_breaker_state,
                     default_model=getattr(settings, f"{provider_name.upper()}_DEFAULT_MODEL", None),
                 )

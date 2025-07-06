@@ -56,7 +56,7 @@ async def main() -> None:
     logger.info("Starting Spell Checker Service Kafka Worker")
 
     # Initialize tracing (this sets up the global tracer provider)
-    tracer = init_tracing("spell_checker_service")
+    init_tracing("spell_checker_service")
     logger.info("OpenTelemetry tracing initialized")
 
     # Initialize dependency injection container

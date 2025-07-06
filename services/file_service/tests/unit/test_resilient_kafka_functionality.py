@@ -16,9 +16,9 @@ from huleedu_service_libs.kafka.fallback_handler import QueuedMessage
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
-from common_core import CircuitBreakerState
 from pydantic import BaseModel
 
+from common_core import CircuitBreakerState
 from common_core.events.envelope import EventEnvelope
 
 
