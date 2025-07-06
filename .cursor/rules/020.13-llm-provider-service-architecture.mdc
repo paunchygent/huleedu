@@ -8,8 +8,10 @@ alwaysApply: false
 # 020.13: LLM Provider Service Architecture
 
 ## 1. Service Identity
-- **Purpose**: Centralized LLM provider abstraction with queue-based resilience
-- **Port**: 8090, **Stack**: Quart + Redis + Circuit Breakers
+- **Package**: `huleedu-llm-provider-service`
+- **Folders**: `services/llm_provider_service/`
+- **Port**: 8080, **Stack**: Quart + Redis + Circuit Breakers + OpenTelemetry + Connection Pools
+- **Purpose**: Centralized LLM provider abstraction with queue-based resilience and connection optimization
 - **Critical**: NO response caching - preserves psychometric validity
 
 ## 2. Response Pattern (200/202)
@@ -27,15 +29,23 @@ POST /api/v1/comparison → Provider Available?
 
 ## 3. Queue Resilience Architecture
 
-### 3.1. Fallback Chain
+### 3.1. Resilient Queue Manager
 ```text
-Redis Queue (persistent) → Local Queue (80% capacity) → 503 Rejection
+Redis Queue (persistent) → Local Queue (fallback) → 503 Rejection
+ResilientQueueManagerImpl: Automatic failover with migration tracking
 ```
 
-### 3.2. Circuit Breaker Integration
+### 3.2. Queue Implementation Details
+- **Primary**: `RedisQueueRepositoryImpl` with persistent storage
+- **Fallback**: `LocalQueueManagerImpl` with 100MB memory limit  
+- **Health Monitoring**: Automatic queue health checks and failover
+- **Migration Tracking**: Request transfer between queue implementations
+
+### 3.3. Circuit Breaker Integration
 - **Provider Check**: Circuit breaker state checked BEFORE processing
 - **Queue Trigger**: Unavailable providers → automatic queuing
-- **Recovery**: Background processor handles queued requests when providers recover
+- **Recovery**: Background `QueueProcessorImpl` handles queued requests when providers recover
+- **Metrics**: Circuit breaker metrics bridge with observability integration
 
 ## 4. Client Integration Pattern
 
@@ -95,19 +105,43 @@ LLM_PROVIDER_SERVICE_USE_MOCK_LLM=false
 LLM_PROVIDER_SERVICE_RECORD_LLM_RESPONSES=false  # Dev only, never cache
 ```
 
-## 7. Key Implementation Rules
+## 7. Performance Optimization
 
-### 7.1. NO Caching
+### 7.1. Connection Pool Management
+```python
+# ConnectionPoolManagerImpl provides optimized HTTP sessions
+- Provider-specific connection pools with keep-alive
+- Automatic connection cleanup and resource management
+- Concurrent request limits per provider
+- Session-level retry and timeout configuration
+```
+
+### 7.2. OpenTelemetry Tracing
+- **Span Creation**: Full span tracking for LLM requests and queue operations
+- **Trace Context**: Preserves trace context across queue processing
+- **Queue Tracing**: Request journey tracking from queue to completion
+- **Provider Tracing**: Individual provider call instrumentation
+
+## 8. Key Implementation Rules
+
+### 8.1. File Structure (Critical)
+- **API Models**: `api_models.py`
+- **Internal Models**: `internal_models.py`
+- **Blueprints**: `health_routes.py`, `llm_routes.py`
+- **Implementations**: Provider-specific classes in `implementations/`
+
+### 8.2. NO Caching Policy
 - **FORBIDDEN**: Response caching that returns identical results
 - **Required**: Fresh LLM response for every request
 - **Development**: Use response recorder for API validation, not caching
 
-### 7.2. Queue Processing
+### 8.3. Queue Processing
 - **TTL Enforcement**: 4-hour expiration with automatic cleanup
 - **Retry Logic**: Up to 3 attempts with exponential backoff
 - **Status Tracking**: QUEUED → PROCESSING → COMPLETED/FAILED/EXPIRED
+- **Watermarks**: High 80%, Low 60% for memory management
 
-### 7.3. Error Handling
+### 8.4. Error Handling
 - **503**: Queue at capacity or service unavailable
 - **410**: Queue result expired
 - **404**: Queue ID not found
@@ -115,4 +149,10 @@ LLM_PROVIDER_SERVICE_RECORD_LLM_RESPONSES=false  # Dev only, never cache
 
 ---
 
-**CRITICAL**: All consumers MUST implement 202 response handling with polling logic. Service preserves psychometric validity by never caching responses.
+**CRITICAL IMPLEMENTATION NOTES**
+- **Port**: Service runs on 8080
+- **Connection Pools**: `ConnectionPoolManagerImpl` provides provider-specific optimized sessions
+- **Queue Resilience**: `ResilientQueueManagerImpl` automatically handles Redis/Local queue failover
+- **202 Pattern**: All consumers MUST implement polling logic with exponential backoff
+- **NO Caching**: Service preserves psychometric validity by never caching LLM responses
+- **Tracing**: Full OpenTelemetry integration maintains trace context across queue operations
