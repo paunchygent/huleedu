@@ -5,7 +5,7 @@ Uses Redis sorted sets for priority-based queue management and
 hashes for request data storage.
 """
 
-from typing import List, Optional
+from typing import List, Optional, cast
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -79,12 +79,12 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
         """Get highest priority queued request with optimized pipeline operations."""
         try:
             # Get top N items to reduce recursive calls and use batch operations
-            items = await self.redis.zrange(
+            items = cast(List[str], await self.redis.zrange(
                 self.queue_key,
                 0,
                 9,
                 withscores=False,  # Get top 10 for batch processing
-            )
+            ))
 
             if not items:
                 return None
@@ -358,7 +358,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
         """
         try:
             # Get all queue IDs and their data in batch
-            queue_ids = await self.redis.zrange(self.queue_key, 0, -1)
+            queue_ids = cast(List[str], await self.redis.zrange(self.queue_key, 0, -1))
 
             if not queue_ids:
                 return 0
@@ -405,7 +405,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
         """Clean up expired requests from queue."""
         try:
             # Get all queue IDs
-            queue_ids = await self.redis.zrange(self.queue_key, 0, -1)
+            queue_ids = cast(List[str], await self.redis.zrange(self.queue_key, 0, -1))
 
             if not queue_ids:
                 return 0

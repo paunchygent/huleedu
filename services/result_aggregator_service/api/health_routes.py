@@ -22,7 +22,7 @@ health_bp = Blueprint("health", __name__)
 async def health_check(
     settings: FromDishka[Settings],
     redis_client: FromDishka[RedisClientProtocol],
-) -> Response:
+) -> Response | tuple[Response, int]:
     """Health check endpoint with dependency checks."""
     try:
         # Check dependencies

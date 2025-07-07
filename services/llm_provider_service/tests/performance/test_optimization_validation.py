@@ -333,7 +333,7 @@ class TestResponseValidationOptimizations:
                 assert avg_time < 0.0001  # Under 100 microseconds
 
 
-class TestLLMProviderServiceProvider(LLMProviderServiceProvider):
+class LLMProviderServiceTestProvider(LLMProviderServiceProvider):
     """Test-specific provider that allows settings injection."""
 
     def __init__(self, test_settings: Settings):
@@ -379,7 +379,7 @@ async def redis_di_container(redis_optimization_settings: Settings) -> AsyncGene
     """DI container with real Redis for optimization testing."""
     from dishka import make_async_container
 
-    test_provider = TestLLMProviderServiceProvider(redis_optimization_settings)
+    test_provider = LLMProviderServiceTestProvider(redis_optimization_settings)
     container = make_async_container(test_provider)
 
     try:

@@ -59,7 +59,7 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
 
         try:
             # Simple ping to check connection
-            await self.redis_queue.redis.client.ping()
+            await self.redis_queue.redis.ping()
 
             # Reset failure count on success
             if self._redis_failure_count > 0:

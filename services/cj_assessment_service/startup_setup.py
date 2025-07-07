@@ -25,7 +25,7 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
 
             # Store database engine for health checks
             if hasattr(database, "engine"):
-                app.database_engine = database.engine
+                setattr(app, "database_engine", database.engine)
                 logger.info("Database engine stored for health checks")
 
             # Get database metrics for integration

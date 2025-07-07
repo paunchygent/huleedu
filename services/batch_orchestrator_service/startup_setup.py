@@ -62,7 +62,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         logger.info("Database schema initialized successfully")
 
         # Store database engine for health checks
-        app.database_engine = db_repository.db_infrastructure.engine
+        setattr(app, "database_engine", db_repository.db_infrastructure.engine)
         logger.info("Database engine stored for health checks")
 
         # Get database metrics from DI container

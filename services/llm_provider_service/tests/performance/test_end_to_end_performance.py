@@ -32,7 +32,7 @@ from services.llm_provider_service.protocols import (
 from .conftest import PerformanceMetrics
 
 
-class TestLLMProviderServiceProvider(LLMProviderServiceProvider):
+class LLMProviderServiceTestProvider(LLMProviderServiceProvider):
     """Test-specific provider that allows settings injection."""
 
     def __init__(self, test_settings: Settings):
@@ -107,7 +107,7 @@ async def infrastructure_di_container(
     infrastructure_settings: Settings,
 ) -> AsyncGenerator[Any, None]:
     """DI container with real infrastructure for end-to-end performance testing."""
-    test_provider = TestLLMProviderServiceProvider(infrastructure_settings)
+    test_provider = LLMProviderServiceTestProvider(infrastructure_settings)
     container = make_async_container(test_provider)
 
     try:

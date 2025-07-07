@@ -25,7 +25,7 @@ from services.llm_provider_service.implementations.redis_queue_repository_impl i
 from services.llm_provider_service.queue_models import QueuedRequest
 
 
-class TestLLMProviderServiceProvider(LLMProviderServiceProvider):
+class LLMProviderServiceTestProvider(LLMProviderServiceProvider):
     """Test-specific provider that allows settings injection."""
 
     def __init__(self, test_settings: Settings):
@@ -64,7 +64,7 @@ def redis_performance_settings(redis_container: RedisContainer) -> Settings:
 @pytest.fixture
 async def redis_di_container(redis_performance_settings: Settings) -> AsyncGenerator[Any, None]:
     """DI container with real Redis for performance testing."""
-    test_provider = TestLLMProviderServiceProvider(redis_performance_settings)
+    test_provider = LLMProviderServiceTestProvider(redis_performance_settings)
     container = make_async_container(test_provider)
 
     try:

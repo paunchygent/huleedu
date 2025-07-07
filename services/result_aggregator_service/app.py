@@ -10,6 +10,7 @@ from dishka import AsyncContainer, make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Quart
 from quart_dishka import QuartDishka
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 # Load environment variables before importing anything else
 dotenv.load_dotenv()
@@ -37,6 +38,7 @@ class ResultAggregatorApp(Quart):
 
     container: AsyncContainer
     consumer_task: Optional[asyncio.Task[None]]
+    database_engine: AsyncEngine
 
 
 def create_app() -> ResultAggregatorApp:

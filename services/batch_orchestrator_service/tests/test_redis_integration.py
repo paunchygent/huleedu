@@ -13,6 +13,7 @@ import pytest
 from dishka import make_async_container
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from common_core.config_enums import Environment
 
 from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.di import CoreInfrastructureProvider
@@ -24,7 +25,7 @@ async def settings_override() -> Settings:
     return Settings(
         REDIS_URL="redis://localhost:6379",
         SERVICE_NAME="test-batch-orchestrator-service",
-        ENVIRONMENT="testing",
+        ENVIRONMENT=Environment.TESTING,
     )
 
 

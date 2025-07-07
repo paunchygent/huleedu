@@ -32,7 +32,7 @@ async def initialize_database_schema(app: Quart, settings: Settings) -> AsyncEng
             await conn.run_sync(Base.metadata.create_all)
 
         # Store engine on app for health checks
-        app.database_engine = engine
+        setattr(app, "database_engine", engine)
 
         logger.info("Database schema initialized successfully")
         return engine

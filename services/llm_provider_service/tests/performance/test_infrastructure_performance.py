@@ -22,7 +22,7 @@ from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
 
 
-class TestLLMProviderServiceProvider(LLMProviderServiceProvider):
+class LLMProviderServiceTestProvider(LLMProviderServiceProvider):
     """Test-specific provider that allows settings injection."""
 
     def __init__(self, test_settings: Settings):
@@ -76,7 +76,7 @@ async def infrastructure_di_container(
 ) -> AsyncGenerator[Any, None]:
     """DI container with proper lifecycle management for infrastructure testing."""
     # Create test provider with infrastructure settings
-    test_provider = TestLLMProviderServiceProvider(infrastructure_settings)
+    test_provider = LLMProviderServiceTestProvider(infrastructure_settings)
 
     # Create container
     container = make_async_container(test_provider)
