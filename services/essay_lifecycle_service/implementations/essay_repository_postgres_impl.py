@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from common_core.domain_enums import ContentType
 from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -31,10 +32,11 @@ if TYPE_CHECKING:
 class PostgreSQLEssayRepository(EssayRepositoryProtocol):
     """Production PostgreSQL implementation of EssayRepositoryProtocol."""
 
-    def __init__(self, settings: Settings) -> None:
-        """Initialize the PostgreSQL repository with connection settings."""
+    def __init__(self, settings: Settings, database_metrics: DatabaseMetrics | None = None) -> None:
+        """Initialize the PostgreSQL repository with connection settings and optional database metrics."""
         self.settings = settings
         self.logger = create_service_logger("els.repository.postgres")
+        self.database_metrics = database_metrics
 
         # Create async engine with connection pooling
         self.engine = create_async_engine(
@@ -46,6 +48,11 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
             pool_recycle=settings.DATABASE_POOL_RECYCLE,
         )
+
+        # Setup database monitoring if metrics are provided
+        if self.database_metrics:
+            setup_database_monitoring(self.engine, "els", self.database_metrics.get_metrics())
+            self.logger.info("Database monitoring enabled for ELS")
 
         # Create session maker
         self.async_session_maker = async_sessionmaker(

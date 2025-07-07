@@ -14,16 +14,43 @@ health_bp = Blueprint("health_routes", __name__)
 
 @health_bp.route("/healthz")
 async def health_check() -> Response | tuple[Response, int]:
-    """Health check endpoint."""
-    return (
-        jsonify(
+    """Standardized health check endpoint."""
+    try:
+        checks = {"service_responsive": True, "dependencies_available": True}
+        dependencies = {}
+
+        # File Service typically doesn't have complex dependencies
+        # Add any filesystem or storage checks here as needed
+        dependencies["storage"] = {
+            "status": "healthy",
+            "note": "Storage availability checked during file operations",
+        }
+
+        overall_status = "healthy"
+
+        health_response = {
+            "service": "file_service",
+            "status": overall_status,
+            "message": f"File Service is {overall_status}",
+            "version": "1.0.0",
+            "checks": checks,
+            "dependencies": dependencies,
+            "environment": "development",
+        }
+
+        return jsonify(health_response), 200
+
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return jsonify(
             {
-                "status": "ok",
-                "message": "File Service is healthy",
-            },
-        ),
-        200,
-    )
+                "service": "file_service",
+                "status": "unhealthy",
+                "message": "Health check failed",
+                "version": "1.0.0",
+                "error": str(e),
+            }
+        ), 503
 
 
 @health_bp.route("/metrics")

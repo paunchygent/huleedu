@@ -10,7 +10,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
+from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import REGISTRY, Counter, Histogram
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+logger = create_service_logger("essay_lifecycle_service.metrics")
 
 # Global metrics instances (created once, shared by HTTP and worker)
 _metrics: dict[str, Any] | None = None
@@ -42,15 +47,15 @@ def get_business_metrics() -> dict[str, Any]:
     }
 
 
-def get_metrics() -> dict[str, Any]:
+def get_metrics(database_metrics: DatabaseMetrics | None = None) -> dict[str, Any]:
     """Thread-safe singleton pattern for metrics initialization."""
     global _metrics
     if _metrics is None:
-        _metrics = _create_metrics()
+        _metrics = _create_metrics(database_metrics)
     return _metrics
 
 
-def _create_metrics() -> dict[str, Any]:
+def _create_metrics(database_metrics: DatabaseMetrics | None = None) -> dict[str, Any]:
     """
     Create all metrics instances with shared registry.
 
@@ -59,7 +64,7 @@ def _create_metrics() -> dict[str, Any]:
     """
     registry = REGISTRY
 
-    return {
+    metrics = {
         # HTTP Service Metrics (existing functionality)
         "request_count": Counter(
             "http_requests_total",
@@ -107,3 +112,30 @@ def _create_metrics() -> dict[str, Any]:
             registry=registry,
         ),
     }
+
+    # Add database metrics if provided
+    if database_metrics:
+        db_metrics = database_metrics.get_metrics()
+        metrics.update(db_metrics)
+        logger.info("Database metrics integrated into Essay Lifecycle Service metrics")
+
+    return metrics
+
+
+def setup_essay_lifecycle_database_monitoring(
+    engine: AsyncEngine,
+    service_name: str = "essay_lifecycle_service",
+    existing_metrics: dict[str, Any] | None = None,
+) -> DatabaseMetrics:
+    """
+    Setup comprehensive database monitoring for Essay Lifecycle Service.
+
+    Args:
+        engine: SQLAlchemy async engine for essay lifecycle database
+        service_name: Service name for metrics labeling
+        existing_metrics: Optional existing metrics dictionary to extend
+
+    Returns:
+        DatabaseMetrics instance configured for essay lifecycle operations
+    """
+    return setup_database_monitoring(engine, service_name, existing_metrics)

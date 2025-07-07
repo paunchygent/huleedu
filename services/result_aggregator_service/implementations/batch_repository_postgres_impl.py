@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncIterator, Dict, List, Optional
 
+from huleedu_service_libs.database import DatabaseMetricsProtocol
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import selectinload
 
 from common_core.status_enums import BatchStatus, ProcessingStage
@@ -20,23 +27,33 @@ logger = create_service_logger("result_aggregator.batch_repository")
 
 
 class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
-    """PostgreSQL implementation of batch repository with internal session management."""
+    """PostgreSQL implementation of batch repository with internal session management and metrics."""
 
-    def __init__(self, settings: Settings):
-        """Initialize with settings and create database engine."""
+    def __init__(
+        self,
+        settings: Settings,
+        metrics: Optional[DatabaseMetricsProtocol] = None,
+        engine: Optional[AsyncEngine] = None,
+    ):
+        """Initialize with settings and database engine."""
         self.settings = settings
         self.logger = logger
+        self.metrics = metrics
 
-        # Create async engine with connection pooling
-        self.engine = create_async_engine(
-            settings.DATABASE_URL,
-            echo=False,
-            future=True,
-            pool_size=settings.DATABASE_POOL_SIZE,
-            max_overflow=settings.DATABASE_MAX_OVERFLOW,
-            pool_pre_ping=True,
-            pool_recycle=3600,  # Recycle connections after 1 hour
-        )
+        # Use provided engine or create new one
+        if engine:
+            self.engine = engine
+        else:
+            # Create async engine with connection pooling
+            self.engine = create_async_engine(
+                settings.DATABASE_URL,
+                echo=False,
+                future=True,
+                pool_size=settings.DATABASE_POOL_SIZE,
+                max_overflow=settings.DATABASE_MAX_OVERFLOW,
+                pool_pre_ping=True,
+                pool_recycle=3600,  # Recycle connections after 1 hour
+            )
 
         # Create session maker
         self.async_session_maker = async_sessionmaker(
@@ -51,6 +68,27 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             await conn.run_sync(Base.metadata.create_all)
         self.logger.info("Database schema initialized")
 
+    def _record_operation_metrics(
+        self,
+        operation: str,
+        table: str,
+        duration: float,
+        success: bool = True,
+    ) -> None:
+        """Record database operation metrics."""
+        if self.metrics:
+            self.metrics.record_query_duration(
+                operation=operation,
+                table=table,
+                duration=duration,
+                success=success,
+            )
+
+    def _record_error_metrics(self, error_type: str, operation: str) -> None:
+        """Record database error metrics."""
+        if self.metrics:
+            self.metrics.record_database_error(error_type, operation)
+
     @asynccontextmanager
     async def _get_session(self) -> AsyncIterator[AsyncSession]:
         """Get a database session with proper transaction handling."""
@@ -64,13 +102,30 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
 
     async def get_batch(self, batch_id: str) -> Optional[BatchResult]:
         """Get batch with all essay results."""
-        async with self._get_session() as session:
-            result = await session.execute(
-                select(BatchResult)
-                .where(BatchResult.batch_id == batch_id)
-                .options(selectinload(BatchResult.essays))
-            )
-            return result.scalars().first()
+        start_time = time.time()
+        operation = "get_batch"
+        table = "batch_results"
+        success = True
+
+        try:
+            async with self._get_session() as session:
+                result = await session.execute(
+                    select(BatchResult)
+                    .where(BatchResult.batch_id == batch_id)
+                    .options(selectinload(BatchResult.essays))
+                )
+                return result.scalars().first()
+
+        except Exception as e:
+            success = False
+            error_type = e.__class__.__name__
+            self._record_error_metrics(error_type, operation)
+            self.logger.error(f"Failed to get batch {batch_id}: {error_type}: {e}")
+            raise
+
+        finally:
+            duration = time.time() - start_time
+            self._record_operation_metrics(operation, table, duration, success)
 
     async def get_user_batches(
         self,

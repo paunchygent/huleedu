@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Service Identity
-    SERVICE_NAME: str = Field(default="result-aggregator-service")
+    SERVICE_NAME: str = Field(default="result_aggregator_service")
     SERVICE_VERSION: str = Field(default="1.0.0")
 
     # HTTP API Configuration
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Kafka Configuration
     KAFKA_BOOTSTRAP_SERVERS: str = Field(default="localhost:9093")
-    KAFKA_CONSUMER_GROUP_ID: str = Field(default="result-aggregator-group")
+    KAFKA_CONSUMER_GROUP_ID: str = Field(default="result_aggregator_group")
     KAFKA_AUTO_OFFSET_RESET: str = Field(default="earliest")
     KAFKA_MAX_POLL_RECORDS: int = Field(default=100)
     KAFKA_SESSION_TIMEOUT_MS: int = Field(default=30000)

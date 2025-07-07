@@ -6,10 +6,12 @@ from typing import AsyncIterator, cast
 
 import aiohttp
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.redis_set_operations import RedisSetOperations
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.implementations.aggregator_service_impl import (
@@ -29,7 +31,10 @@ from services.result_aggregator_service.implementations.state_store_redis_impl i
     StateStoreRedisImpl,
 )
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
-from services.result_aggregator_service.metrics import ResultAggregatorMetrics
+from services.result_aggregator_service.metrics import (
+    ResultAggregatorMetrics,
+    setup_result_aggregator_database_monitoring,
+)
 from services.result_aggregator_service.protocols import (
     BatchQueryServiceProtocol,
     BatchRepositoryProtocol,
@@ -53,9 +58,9 @@ class CoreInfrastructureProvider(Provider):
         return Settings()
 
     @provide
-    def provide_metrics(self) -> ResultAggregatorMetrics:
-        """Provide metrics instance."""
-        return ResultAggregatorMetrics()
+    def provide_metrics(self, database_metrics: DatabaseMetrics) -> ResultAggregatorMetrics:
+        """Provide metrics instance with database metrics integration."""
+        return ResultAggregatorMetrics(database_metrics=database_metrics)
 
     @provide
     async def provide_http_session(self) -> AsyncIterator[aiohttp.ClientSession]:
@@ -101,9 +106,33 @@ class DatabaseProvider(Provider):
     scope = Scope.APP
 
     @provide
-    def provide_batch_repository(self, settings: Settings) -> BatchRepositoryProtocol:
-        """Provide batch repository implementation."""
-        return BatchRepositoryPostgresImpl(settings)
+    def provide_batch_repository(
+        self, settings: Settings, database_metrics: DatabaseMetrics, engine: AsyncEngine
+    ) -> BatchRepositoryProtocol:
+        """Provide batch repository implementation with metrics."""
+        return BatchRepositoryPostgresImpl(settings, database_metrics, engine)
+
+    @provide
+    def provide_database_engine(self, settings: Settings) -> AsyncEngine:
+        """Provide database engine for metrics setup."""
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        return create_async_engine(
+            settings.DATABASE_URL,
+            echo=False,
+            future=True,
+            pool_size=settings.DATABASE_POOL_SIZE,
+            max_overflow=settings.DATABASE_MAX_OVERFLOW,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+        )
+
+    @provide
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics monitoring for result aggregator service."""
+        return setup_result_aggregator_database_monitoring(
+            engine=engine, service_name=settings.SERVICE_NAME
+        )
 
 
 # RepositoryProvider removed - batch repository is now provided in DatabaseProvider

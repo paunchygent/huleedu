@@ -6,10 +6,12 @@ preventing duplicate registration errors while maintaining unified metrics endpo
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict, Optional
 
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import REGISTRY, Counter, Histogram
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = create_service_logger("spell_checker_service.metrics")
 
@@ -17,8 +19,11 @@ logger = create_service_logger("spell_checker_service.metrics")
 _metrics: dict[str, Any] | None = None
 
 
-def get_metrics() -> dict[str, Any]:
+def get_metrics(database_metrics: Optional[DatabaseMetrics] = None) -> dict[str, Any]:
     """Get or create shared metrics instances.
+
+    Args:
+        database_metrics: Optional database metrics instance to include
 
     Returns:
         Dictionary of metric instances keyed by metric name
@@ -28,14 +33,14 @@ def get_metrics() -> dict[str, Any]:
     global _metrics
 
     if _metrics is None:
-        _metrics = _create_metrics()
+        _metrics = _create_metrics(database_metrics)
         logger.info("Shared metrics initialized")
         logger.info(f"Available metrics: {list(_metrics.keys())}")
 
     return _metrics
 
 
-def _create_metrics() -> dict[str, Any]:
+def _create_metrics(database_metrics: Optional[DatabaseMetrics] = None) -> dict[str, Any]:
     """Create Prometheus metrics for the Spell Checker Service.
 
     Returns:
@@ -74,13 +79,24 @@ def _create_metrics() -> dict[str, Any]:
             ),
         }
 
+        # Add database metrics if provided
+        if database_metrics:
+            db_metrics = database_metrics.get_metrics()
+            metrics.update(db_metrics)
+            logger.info("Database metrics integrated into spell checker metrics")
+
         logger.info("Successfully created all metrics")
         return metrics
 
     except ValueError as e:
         if "Duplicated timeseries" in str(e):
             logger.warning(f"Metrics already exist in registry: {e} – reusing existing collectors.")
-            return _get_existing_metrics()
+            existing = _get_existing_metrics()
+            # Add database metrics to existing if provided
+            if database_metrics:
+                db_metrics = database_metrics.get_metrics()
+                existing.update(db_metrics)
+            return existing
         else:
             raise
 
@@ -140,3 +156,22 @@ def get_http_metrics() -> dict[str, Any]:
         "http_requests_total": all_metrics.get("http_requests_total"),
         "http_request_duration_seconds": all_metrics.get("http_request_duration_seconds"),
     }
+
+
+def setup_spell_checker_database_monitoring(
+    engine: AsyncEngine,
+    service_name: str = "spell_checker_service",
+    existing_metrics: Optional[Dict[str, Any]] = None,
+) -> DatabaseMetrics:
+    """
+    Setup comprehensive database monitoring for Spell Checker Service.
+
+    Args:
+        engine: SQLAlchemy async engine for spell checker database
+        service_name: Service name for metrics labeling
+        existing_metrics: Optional existing metrics dictionary to extend
+
+    Returns:
+        DatabaseMetrics instance configured for spell checking operations
+    """
+    return setup_database_monitoring(engine, service_name, existing_metrics)

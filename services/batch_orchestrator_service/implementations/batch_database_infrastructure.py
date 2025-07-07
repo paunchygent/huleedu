@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Optional
 
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -20,10 +22,13 @@ class BatchDatabaseInfrastructure:
     for the PostgreSQL batch repository implementation.
     """
 
-    def __init__(self, settings: Settings) -> None:
-        """Initialize database infrastructure with connection settings."""
+    def __init__(
+        self, settings: Settings, database_metrics: Optional[DatabaseMetrics] = None
+    ) -> None:
+        """Initialize database infrastructure with connection settings and optional metrics."""
         self.settings = settings
         self.logger = create_service_logger("bos.repository.infrastructure")
+        self.database_metrics = database_metrics
 
         # Create async engine with connection pooling
         self.engine = create_async_engine(
@@ -34,6 +39,11 @@ class BatchDatabaseInfrastructure:
             max_overflow=settings.DB_MAX_OVERFLOW,
             pool_pre_ping=True,  # Validate connections before use
         )
+
+        # Setup database monitoring if metrics are provided
+        if self.database_metrics:
+            setup_database_monitoring(self.engine, "bos", self.database_metrics.get_metrics())
+            self.logger.info("Database monitoring enabled for BOS")
 
         # Create session maker
         self.async_session_maker = async_sessionmaker(

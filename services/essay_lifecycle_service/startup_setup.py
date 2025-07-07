@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dishka import make_async_container
+from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Quart
 from quart_dishka import QuartDishka
@@ -19,6 +20,9 @@ from services.essay_lifecycle_service.di import (
     CommandHandlerProvider,
     CoreInfrastructureProvider,
     ServiceClientsProvider,
+)
+from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
+    PostgreSQLEssayRepository,
 )
 from services.essay_lifecycle_service.metrics import get_http_metrics
 
@@ -41,8 +45,15 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         )
         QuartDishka(app=app, container=container)
 
-        # Initialize metrics using shared module and store in app context
+        # Get database metrics from container for integration
+        async with container() as request_container:
+            database_metrics = await request_container.get(DatabaseMetrics)
+        
+        # Initialize metrics using shared module with database metrics and store in app context
         metrics = get_http_metrics()
+        # Update metrics with database metrics
+        from services.essay_lifecycle_service.metrics import get_metrics
+        metrics = get_metrics(database_metrics)
 
         # Store metrics in app context (proper Quart pattern)
         app.extensions = getattr(app, "extensions", {})
@@ -51,6 +62,16 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         # Share essay operations metric with routes modules (legacy support)
         set_essay_essay_operations(metrics["essay_operations"])
         set_batch_essay_operations(metrics["essay_operations"])
+
+        # Initialize database schema and store engine for health checks (production only)
+        if settings.ENVIRONMENT != "testing" and not getattr(
+            settings, "USE_MOCK_REPOSITORY", False
+        ):
+            # Create temporary repository instance to initialize schema and get engine
+            temp_repo = PostgreSQLEssayRepository(settings)
+            await temp_repo.initialize_db_schema()
+            app.database_engine = temp_repo.engine
+            logger.info("Database schema initialized and engine stored for health checks")
 
         logger.info(
             "Essay Lifecycle Service DI container, quart-dishka integration, "

@@ -12,6 +12,7 @@ from datetime import timedelta
 from aiohttp import ClientSession
 from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
@@ -19,6 +20,7 @@ from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
 from prometheus_client import REGISTRY, CollectorRegistry
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.config import settings as app_settings
@@ -56,6 +58,7 @@ from services.essay_lifecycle_service.implementations.service_result_handler_imp
 from services.essay_lifecycle_service.implementations.spellcheck_command_handler import (
     SpellcheckCommandHandler,
 )
+from services.essay_lifecycle_service.metrics import setup_essay_lifecycle_database_monitoring
 from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
     BatchCoordinationHandler,
@@ -165,7 +168,31 @@ class CoreInfrastructureProvider(Provider):
         return cast(AtomicRedisClientProtocol, redis_client)
 
     @provide(scope=Scope.APP)
-    async def provide_essay_repository(self, settings: Settings) -> EssayRepositoryProtocol:
+    def provide_database_engine(self, settings: Settings) -> AsyncEngine:
+        """Provide database engine for metrics setup."""
+        from sqlalchemy.ext.asyncio import create_async_engine
+        
+        return create_async_engine(
+            settings.DATABASE_URL,
+            echo=False,
+            future=True,
+            pool_size=settings.DATABASE_POOL_SIZE,
+            max_overflow=settings.DATABASE_MAX_OVERFLOW,
+            pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+            pool_recycle=settings.DATABASE_POOL_RECYCLE,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics monitoring for essay lifecycle service."""
+        return setup_essay_lifecycle_database_monitoring(
+            engine=engine, service_name=settings.SERVICE_NAME
+        )
+
+    @provide(scope=Scope.APP)
+    async def provide_essay_repository(
+        self, settings: Settings, database_metrics: DatabaseMetrics, engine: AsyncEngine
+    ) -> EssayRepositoryProtocol:
         """
         Provide essay repository implementation with environment-based selection.
 
@@ -180,8 +207,8 @@ class CoreInfrastructureProvider(Provider):
             await store.initialize()
             return store
         else:
-            # Production: use PostgreSQL implementation
-            postgres_repo = PostgreSQLEssayRepository(settings)
+            # Production: use PostgreSQL implementation with database metrics
+            postgres_repo = PostgreSQLEssayRepository(settings, database_metrics, engine)
             await postgres_repo.initialize_db_schema()
             return postgres_repo
 

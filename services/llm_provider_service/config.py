@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     """Configuration settings for the LLM Provider Service."""
 
     # Service Identity
-    SERVICE_NAME: str = "llm-provider-service"
+    SERVICE_NAME: str = "llm_provider_service"
     LOG_LEVEL: str = "INFO"
     ENVIRONMENT: str = "development"
     PORT: int = 8080

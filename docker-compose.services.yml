@@ -86,7 +86,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
       - LOG_LEVEL=INFO
-      - SERVICE_NAME=result-aggregator-service
+      - SERVICE_NAME=result_aggregator_service
       - HOST=0.0.0.0
       - PORT=4003
       - METRICS_PORT=9096

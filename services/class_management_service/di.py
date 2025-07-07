@@ -6,6 +6,7 @@ from typing import AsyncGenerator, cast
 from aiokafka.errors import KafkaError
 from config import Settings, settings
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
+from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
@@ -31,7 +32,10 @@ from services.class_management_service.implementations.class_repository_postgres
 from services.class_management_service.implementations.event_publisher_impl import (
     DefaultClassEventPublisherImpl,
 )
-from services.class_management_service.metrics import CmsMetrics
+from services.class_management_service.metrics import (
+    CmsMetrics,
+    setup_class_management_database_monitoring,
+)
 from services.class_management_service.models_db import Student, UserClass
 from services.class_management_service.protocols import (
     ClassEventPublisherProtocol,
@@ -56,15 +60,25 @@ class DatabaseProvider(Provider):
         async with sessionmaker() as session:
             yield session
 
+    @provide(scope=Scope.APP)
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics monitoring for class management service."""
+        return setup_class_management_database_monitoring(
+            engine=engine, service_name=settings.SERVICE_NAME
+        )
+
 
 class RepositoryProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def provide_class_repository(
-        self, settings: Settings, session: AsyncSession
+        self,
+        settings: Settings,
+        session: AsyncSession,
+        database_metrics: DatabaseMetrics,
     ) -> ClassRepositoryProtocol[UserClass, Student]:
         if settings.ENVIRONMENT == "test" or settings.USE_MOCK_REPOSITORY:
             return MockClassRepositoryImpl[UserClass, Student]()
-        return PostgreSQLClassRepositoryImpl[UserClass, Student](session)
+        return PostgreSQLClassRepositoryImpl[UserClass, Student](session, database_metrics)
 
 
 class ServiceProvider(Provider):
@@ -166,9 +180,9 @@ class MetricsProvider(Provider):
     """Provides Prometheus metrics-related dependencies."""
 
     @provide(scope=Scope.APP)
-    def provide_metrics(self) -> CmsMetrics:
+    def provide_metrics(self, database_metrics: DatabaseMetrics) -> CmsMetrics:
         """Provide an application-scoped instance of the metrics container."""
-        return CmsMetrics()
+        return CmsMetrics(database_metrics=database_metrics)
 
     @provide(scope=Scope.APP)
     def provide_registry(self) -> CollectorRegistry:

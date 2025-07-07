@@ -16,7 +16,7 @@ from opentelemetry.trace import Tracer
 from quart import Quart
 
 from services.spell_checker_service.config import Settings
-from services.spell_checker_service.metrics import get_http_metrics
+from services.spell_checker_service.metrics import get_http_metrics, get_metrics
 
 
 class SpellCheckerQuart(Quart):
@@ -52,15 +52,33 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
     setup_tracing_middleware(app, app.tracer)
     logger.info("OpenTelemetry tracing initialized")
 
-    # Get shared metrics (thread-safe singleton pattern)
-    metrics = get_http_metrics()
+    # Get database metrics from DI container
+    try:
+        from huleedu_service_libs.database import DatabaseMetrics
+        async with container() as request_container:
+            database_metrics = await request_container.get(DatabaseMetrics)
+        logger.info("Database metrics retrieved from DI container")
+    except Exception as e:
+        logger.warning(f"Failed to get database metrics from DI container: {e}")
+        database_metrics = None
+
+    # Get shared metrics with database metrics integration (thread-safe singleton pattern)
+    metrics = get_metrics(database_metrics)
 
     # Store metrics in app context (proper Quart pattern)
     app.extensions = getattr(app, "extensions", {})
     app.extensions["metrics"] = metrics
 
-    logger.info("HTTP metrics initialized and stored in app extensions")
-    logger.info(f"Available HTTP metrics: {list(metrics.keys())}")
+    logger.info("All metrics initialized and stored in app extensions")
+    logger.info(f"Available metrics: {list(metrics.keys())}")
+    
+    # Log database metrics integration status
+    if database_metrics:
+        logger.info("Database metrics successfully integrated")
+        db_metrics = database_metrics.get_metrics()
+        logger.info(f"Database metrics available: {list(db_metrics.keys())}")
+    else:
+        logger.warning("Database metrics not available - running without database monitoring")
 
     # TODO: Add additional service initialization here
     # - Database connections (if needed)

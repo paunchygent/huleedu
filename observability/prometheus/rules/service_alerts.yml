@@ -143,4 +143,101 @@ groups:
     annotations:
       summary: "High Kafka message queue latency"
       description: "Kafka message queue latency is {{ $value }}s - higher than 1s threshold."
-      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview" 
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
+
+- name: DatabaseAlerts
+  rules:
+  - alert: DatabaseConnectionPoolExhaustion
+    expr: |
+      (
+        (batch_orchestrator_service_database_connections_active / batch_orchestrator_service_database_connections_total) > 0.90 or
+        (essay_lifecycle_service_database_connections_active / essay_lifecycle_service_database_connections_total) > 0.90 or
+        (cj_assessment_service_database_connections_active / cj_assessment_service_database_connections_total) > 0.90 or
+        (class_management_service_database_connections_active / class_management_service_database_connections_total) > 0.90 or
+        (result_aggregator_service_database_connections_active / result_aggregator_service_database_connections_total) > 0.90 or
+        (spell_checker_service_database_connections_active / spell_checker_service_database_connections_total) > 0.90
+      )
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Database connection pool near exhaustion"
+      description: "Database connection pool utilization is {{ $value | humanizePercentage }} for service {{ $labels.service_name }}"
+      dashboard_url: "http://localhost:3000/d/huleedu-database-deep-dive/huleedu-database-deep-dive?var-service={{ $labels.service_name }}"
+      runbook_url: "file:///app/Documentation/OPERATIONS/01-Grafana-Playbook.md#database-connection-pool-exhaustion"
+
+  - alert: HighDatabaseQueryLatency
+    expr: |
+      (
+        histogram_quantile(0.95, sum(rate(batch_orchestrator_service_database_query_duration_seconds_bucket[5m])) by (le)) > 1 or
+        histogram_quantile(0.95, sum(rate(essay_lifecycle_service_database_query_duration_seconds_bucket[5m])) by (le)) > 1 or
+        histogram_quantile(0.95, sum(rate(cj_assessment_service_database_query_duration_seconds_bucket[5m])) by (le)) > 1 or
+        histogram_quantile(0.95, sum(rate(class_management_service_database_query_duration_seconds_bucket[5m])) by (le)) > 1 or
+        histogram_quantile(0.95, sum(rate(result_aggregator_service_database_query_duration_seconds_bucket[5m])) by (le)) > 1 or
+        histogram_quantile(0.95, sum(rate(spell_checker_service_database_query_duration_seconds_bucket[5m])) by (le)) > 1
+      )
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High database query latency detected"
+      description: "95th percentile database query duration is {{ $value }}s - higher than 1s threshold"
+      dashboard_url: "http://localhost:3000/d/huleedu-database-troubleshooting/huleedu-database-troubleshooting"
+      runbook_url: "file:///app/Documentation/OPERATIONS/01-Grafana-Playbook.md#high-database-query-latency"
+
+  - alert: DatabaseConnectivityFailure
+    expr: |
+      (
+        sum(rate(batch_orchestrator_service_database_errors_total[5m])) > 0.1 or
+        sum(rate(essay_lifecycle_service_database_errors_total[5m])) > 0.1 or
+        sum(rate(cj_assessment_service_database_errors_total[5m])) > 0.1 or
+        sum(rate(class_management_service_database_errors_total[5m])) > 0.1 or
+        sum(rate(result_aggregator_service_database_errors_total[5m])) > 0.1 or
+        sum(rate(spell_checker_service_database_errors_total[5m])) > 0.1
+      )
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Database connectivity failures detected"
+      description: "Database error rate is {{ $value }} errors per second for service {{ $labels.service_name }}"
+      dashboard_url: "http://localhost:3000/d/huleedu-database-health/huleedu-database-health-overview"
+      runbook_url: "file:///app/Documentation/OPERATIONS/01-Grafana-Playbook.md#database-connectivity-failure"
+
+  - alert: DatabaseTransactionFailureRate
+    expr: |
+      (
+        (rate(batch_orchestrator_service_database_transaction_duration_seconds_count{result="error"}[5m]) / rate(batch_orchestrator_service_database_transaction_duration_seconds_count[5m])) > 0.05 or
+        (rate(essay_lifecycle_service_database_transaction_duration_seconds_count{result="error"}[5m]) / rate(essay_lifecycle_service_database_transaction_duration_seconds_count[5m])) > 0.05 or
+        (rate(cj_assessment_service_database_transaction_duration_seconds_count{result="error"}[5m]) / rate(cj_assessment_service_database_transaction_duration_seconds_count[5m])) > 0.05 or
+        (rate(class_management_service_database_transaction_duration_seconds_count{result="error"}[5m]) / rate(class_management_service_database_transaction_duration_seconds_count[5m])) > 0.05 or
+        (rate(result_aggregator_service_database_transaction_duration_seconds_count{result="error"}[5m]) / rate(result_aggregator_service_database_transaction_duration_seconds_count[5m])) > 0.05 or
+        (rate(spell_checker_service_database_transaction_duration_seconds_count{result="error"}[5m]) / rate(spell_checker_service_database_transaction_duration_seconds_count[5m])) > 0.05
+      )
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High database transaction failure rate"
+      description: "Database transaction failure rate is {{ $value | humanizePercentage }} for service {{ $labels.service_name }}"
+      dashboard_url: "http://localhost:3000/d/huleedu-database-troubleshooting/huleedu-database-troubleshooting"
+      runbook_url: "file:///app/Documentation/OPERATIONS/01-Grafana-Playbook.md#database-transaction-failures"
+
+  - alert: ConnectionPoolLeak
+    expr: |
+      (
+        increase(batch_orchestrator_service_database_connections_acquired_total[10m]) - increase(batch_orchestrator_service_database_connections_released_total[10m]) > 5 or
+        increase(essay_lifecycle_service_database_connections_acquired_total[10m]) - increase(essay_lifecycle_service_database_connections_released_total[10m]) > 5 or
+        increase(cj_assessment_service_database_connections_acquired_total[10m]) - increase(cj_assessment_service_database_connections_released_total[10m]) > 5 or
+        increase(class_management_service_database_connections_acquired_total[10m]) - increase(class_management_service_database_connections_released_total[10m]) > 5 or
+        increase(result_aggregator_service_database_connections_acquired_total[10m]) - increase(result_aggregator_service_database_connections_released_total[10m]) > 5 or
+        increase(spell_checker_service_database_connections_acquired_total[10m]) - increase(spell_checker_service_database_connections_released_total[10m]) > 5
+      )
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Potential database connection pool leak detected"
+      description: "Connection pool leak detected - {{ $value }} more connections acquired than released over 10 minutes for service {{ $labels.service_name }}"
+      dashboard_url: "http://localhost:3000/d/huleedu-database-deep-dive/huleedu-database-deep-dive?var-service={{ $labels.service_name }}"
+      runbook_url: "file:///app/Documentation/OPERATIONS/01-Grafana-Playbook.md#connection-pool-leak" 

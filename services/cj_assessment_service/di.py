@@ -7,6 +7,7 @@ from datetime import timedelta
 import aiohttp
 from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import KafkaPublisherProtocol, RedisClientProtocol
@@ -29,6 +30,8 @@ from services.cj_assessment_service.implementations.retry_manager_impl import Re
 
 # Import all business logic protocols
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
@@ -168,9 +171,31 @@ class CJAssessmentServiceProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    def provide_database_handler(self, settings: Settings) -> CJRepositoryProtocol:
-        """Provide database handler."""
-        return PostgreSQLCJRepositoryImpl(settings)
+    def provide_database_engine(self, settings: Settings) -> AsyncEngine:
+        """Provide database engine for CJ Assessment Service."""
+        return create_async_engine(
+            settings.DATABASE_URL_CJ,
+            echo=False,
+            future=True,
+            pool_size=settings.DATABASE_POOL_SIZE,
+            max_overflow=settings.DATABASE_MAX_OVERFLOW,
+            pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+            pool_recycle=settings.DATABASE_POOL_RECYCLE,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics monitoring for CJ Assessment service."""
+        return setup_database_monitoring(
+            engine=engine, service_name="cj_assessment_service"
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_database_handler(
+        self, settings: Settings, database_metrics: DatabaseMetrics
+    ) -> CJRepositoryProtocol:
+        """Provide database handler with database metrics integration."""
+        return PostgreSQLCJRepositoryImpl(settings, database_metrics)
 
     @provide(scope=Scope.APP)
     def provide_content_client(

@@ -26,19 +26,24 @@ async def health_check(
     health_status: Dict[str, Any] = {
         "service": settings.SERVICE_NAME,
         "status": "healthy",
-        "environment": settings.ENVIRONMENT,
+        "message": "LLM Provider Service is healthy",
+        "version": "1.0.0",
+        "checks": {"service_responsive": True, "dependencies_available": True},
         "dependencies": {},
+        "environment": settings.ENVIRONMENT,
     }
     dependencies: Dict[str, Any] = {}
 
     # Check Redis
     try:
         await redis_client.ping()
-        dependencies["redis"] = "healthy"
+        dependencies["redis"] = {"status": "healthy"}
     except Exception as e:
         logger.error(f"Redis health check failed: {e}")
-        dependencies["redis"] = "unhealthy"
-        health_status["status"] = "degraded"
+        dependencies["redis"] = {"status": "unhealthy", "error": str(e)}
+        health_status["status"] = "unhealthy"
+        health_status["message"] = "LLM Provider Service is unhealthy"
+        health_status["checks"]["dependencies_available"] = False
 
     health_status["dependencies"] = dependencies
 
@@ -68,7 +73,9 @@ async def health_check(
     any_provider_configured = any(p["enabled"] and p["configured"] for p in providers.values())
 
     if not any_provider_configured:
-        health_status["status"] = "degraded"
+        health_status["status"] = "unhealthy"
+        health_status["message"] = "LLM Provider Service is unhealthy"
+        health_status["checks"]["dependencies_available"] = False
         health_status["warnings"] = ["No LLM providers configured"]
 
     status_code = 200 if health_status["status"] == "healthy" else 503

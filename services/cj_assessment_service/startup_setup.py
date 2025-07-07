@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dishka import AsyncContainer
+from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Quart
 
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.metrics import get_http_metrics
+from services.cj_assessment_service.metrics import get_metrics
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
 logger = create_service_logger("cj_assessment_service.startup")
@@ -22,8 +23,16 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
             await database.initialize_db_schema()
             logger.info("Database schema initialized successfully")
 
-            # Get shared metrics (thread-safe singleton pattern)
-            metrics = get_http_metrics()
+            # Store database engine for health checks
+            if hasattr(database, "engine"):
+                app.database_engine = database.engine
+                logger.info("Database engine stored for health checks")
+
+            # Get database metrics for integration
+            database_metrics = await request_container.get(DatabaseMetrics)
+            
+            # Get shared metrics with database metrics integration (thread-safe singleton pattern)
+            metrics = get_metrics(database_metrics)
 
             # Store metrics in app context (proper Quart pattern)
             app.extensions = getattr(app, "extensions", {})

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
+from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import delete, select
 
@@ -31,13 +34,16 @@ from services.batch_orchestrator_service.protocols import BatchRepositoryProtoco
 class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
     """Production PostgreSQL implementation of BatchRepositoryProtocol."""
 
-    def __init__(self, settings: Settings) -> None:
-        """Initialize the PostgreSQL repository with helper modules."""
+    def __init__(
+        self, settings: Settings, database_metrics: Optional[DatabaseMetrics] = None
+    ) -> None:
+        """Initialize the PostgreSQL repository with helper modules and optional metrics."""
         self.settings = settings
         self.logger = create_service_logger("bos.repository.postgres")
+        self.database_metrics = database_metrics
 
-        # Initialize database infrastructure
-        self.db_infrastructure = BatchDatabaseInfrastructure(settings)
+        # Initialize database infrastructure with metrics
+        self.db_infrastructure = BatchDatabaseInfrastructure(settings, database_metrics)
 
         # Initialize helper modules
         self.crud_ops = BatchCrudOperations(self.db_infrastructure)

@@ -7,13 +7,16 @@ engine, session management, and optional schema initialisation.
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable, Optional
 
+from huleedu_service_libs.database import DatabaseMetricsProtocol
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
@@ -36,25 +39,57 @@ _LOGGER = logging.getLogger("spell_checker.repository.postgres")
 
 
 class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
-    """Production PostgreSQL repository for spell-checker jobs/tokens."""
+    """Production PostgreSQL repository for spell-checker jobs/tokens with database metrics."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        metrics: Optional[DatabaseMetricsProtocol] = None,
+        engine: Optional[AsyncEngine] = None,
+    ) -> None:
         self.settings = settings
+        self.metrics = metrics
 
-        self.engine = create_async_engine(
-            settings.DATABASE_URL,
-            echo=False,
-            future=True,
-            pool_size=getattr(settings, "DATABASE_POOL_SIZE", 5),
-            max_overflow=getattr(settings, "DATABASE_MAX_OVERFLOW", 10),
-            pool_pre_ping=getattr(settings, "DATABASE_POOL_PRE_PING", True),
-            pool_recycle=getattr(settings, "DATABASE_POOL_RECYCLE", 1800),
-        )
+        # Use provided engine or create new one
+        if engine:
+            self.engine = engine
+        else:
+            self.engine = create_async_engine(
+                settings.DATABASE_URL,
+                echo=False,
+                future=True,
+                pool_size=getattr(settings, "DATABASE_POOL_SIZE", 5),
+                max_overflow=getattr(settings, "DATABASE_MAX_OVERFLOW", 10),
+                pool_pre_ping=getattr(settings, "DATABASE_POOL_PRE_PING", True),
+                pool_recycle=getattr(settings, "DATABASE_POOL_RECYCLE", 1800),
+            )
+
         self.async_session_maker: async_sessionmaker[AsyncSession] = async_sessionmaker(
             self.engine,
             expire_on_commit=False,
             class_=AsyncSession,
         )
+
+    def _record_operation_metrics(
+        self,
+        operation: str,
+        table: str,
+        duration: float,
+        success: bool = True,
+    ) -> None:
+        """Record database operation metrics."""
+        if self.metrics:
+            self.metrics.record_query_duration(
+                operation=operation,
+                table=table,
+                duration=duration,
+                success=success,
+            )
+
+    def _record_error_metrics(self, error_type: str, operation: str) -> None:
+        """Record database error metrics."""
+        if self.metrics:
+            self.metrics.record_database_error(error_type, operation)
 
     async def initialize_db_schema(self) -> None:
         """Create database tables if they don't exist (idempotent)."""
@@ -87,17 +122,34 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
         *,
         language: str = "en",
     ) -> uuid.UUID:
-        new_job_id = uuid.uuid4()
-        async with self.session() as session:
-            job = SpellcheckJob(
-                job_id=new_job_id,
-                batch_id=batch_id,
-                essay_id=essay_id,
-                language=language,
-            )
-            session.add(job)
-        _LOGGER.debug("Created spellcheck job %s", new_job_id)
-        return new_job_id
+        start_time = time.time()
+        operation = "create_job"
+        table = "spellcheck_jobs"
+        success = True
+
+        try:
+            new_job_id = uuid.uuid4()
+            async with self.session() as session:
+                job = SpellcheckJob(
+                    job_id=new_job_id,
+                    batch_id=batch_id,
+                    essay_id=essay_id,
+                    language=language,
+                )
+                session.add(job)
+            _LOGGER.debug("Created spellcheck job %s", new_job_id)
+            return new_job_id
+
+        except Exception as e:
+            success = False
+            error_type = e.__class__.__name__
+            self._record_error_metrics(error_type, operation)
+            _LOGGER.error(f"Failed to create spellcheck job: {error_type}: {e}")
+            raise
+
+        finally:
+            duration = time.time() - start_time
+            self._record_operation_metrics(operation, table, duration, success)
 
     async def update_status(
         self,

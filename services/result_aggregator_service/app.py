@@ -25,6 +25,7 @@ from services.result_aggregator_service.di import (
 )
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
 from services.result_aggregator_service.protocols import BatchRepositoryProtocol
+from sqlalchemy.ext.asyncio import AsyncEngine
 from services.result_aggregator_service.startup_setup import setup_metrics_endpoint
 
 logger = create_service_logger("result_aggregator.app")
@@ -71,12 +72,15 @@ app = create_app()
 async def startup() -> None:
     """Initialize services on startup."""
     try:
-        # Initialize database schema
+        # Initialize database schema and setup engine
         async with app.container() as request_container:
             settings = await request_container.get(Settings)
             batch_repository = await request_container.get(BatchRepositoryProtocol)
             await batch_repository.initialize_schema()
             logger.info("Database schema initialized")
+
+            # Store database engine for health checks
+            app.database_engine = await request_container.get(AsyncEngine)
 
             # Get Kafka consumer
             consumer = await request_container.get(ResultAggregatorKafkaConsumer)

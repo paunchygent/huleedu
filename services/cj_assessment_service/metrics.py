@@ -6,10 +6,12 @@ preventing duplicate registration errors while maintaining unified metrics endpo
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict, Optional
 
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import REGISTRY, Counter, Histogram
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from common_core.observability_enums import MetricName
 
@@ -19,7 +21,7 @@ logger = create_service_logger("cj_assessment_service.metrics")
 _metrics: dict[str, Any] | None = None
 
 
-def get_metrics() -> dict[str, Any]:
+def get_metrics(database_metrics: Optional[DatabaseMetrics] = None) -> dict[str, Any]:
     """Get or create shared metrics instances.
 
     Returns:
@@ -30,14 +32,14 @@ def get_metrics() -> dict[str, Any]:
     global _metrics
 
     if _metrics is None:
-        _metrics = _create_metrics()
+        _metrics = _create_metrics(database_metrics)
         logger.info("Shared metrics initialized")
         logger.info(f"Available metrics: {list(_metrics.keys())}")
 
     return _metrics
 
 
-def _create_metrics() -> dict[str, Any]:
+def _create_metrics(database_metrics: Optional[DatabaseMetrics] = None) -> dict[str, Any]:
     """Create Prometheus metrics for the CJ Assessment Service.
 
     Returns:
@@ -91,6 +93,12 @@ def _create_metrics() -> dict[str, Any]:
             ),
         }
 
+        # Add database metrics if provided
+        if database_metrics:
+            db_metrics = database_metrics.get_metrics()
+            metrics.update(db_metrics)
+            logger.info("Database metrics integrated into CJ Assessment Service metrics")
+
         logger.info("Successfully created all CJ Assessment metrics")
         return metrics
 
@@ -98,7 +106,12 @@ def _create_metrics() -> dict[str, Any]:
         if "Duplicated timeseries" in str(e):
             logger.warning(f"Metrics already exist in registry: {e}")
             # Return existing metrics from registry
-            return _get_existing_metrics()
+            existing = _get_existing_metrics()
+            # Add database metrics to existing if provided
+            if database_metrics:
+                db_metrics = database_metrics.get_metrics()
+                existing.update(db_metrics)
+            return existing
         else:
             raise
 
@@ -156,6 +169,40 @@ def get_business_metrics() -> dict[str, Any]:
         "cj_assessment_duration_seconds": all_metrics.get("cj_assessment_duration_seconds"),
         "kafka_queue_latency_seconds": all_metrics.get("kafka_queue_latency_seconds"),
         "llm_api_calls": all_metrics.get("llm_api_calls"),
+    }
+
+
+def setup_cj_assessment_database_monitoring(
+    engine: AsyncEngine,
+    service_name: str = "cj_assessment_service",
+    existing_metrics: Optional[Dict[str, Any]] = None,
+) -> DatabaseMetrics:
+    """
+    Setup comprehensive database monitoring for CJ Assessment Service.
+
+    Args:
+        engine: SQLAlchemy async engine for CJ assessment database
+        service_name: Service name for metrics labeling
+        existing_metrics: Optional existing metrics dictionary to extend
+
+    Returns:
+        DatabaseMetrics instance configured for CJ assessment operations
+    """
+    return setup_database_monitoring(engine, service_name, existing_metrics)
+
+
+def get_database_metrics() -> dict[str, Any]:
+    """Get database metrics dictionary for integration with DatabaseMetrics.
+
+    Returns:
+        Dictionary containing database-related metrics from the service
+    """
+    all_metrics = get_metrics()
+    return {
+        "cj_assessment_operations": all_metrics.get("cj_assessment_operations"),
+        "llm_api_calls": all_metrics.get("llm_api_calls"),
+        "cj_assessment_duration_seconds": all_metrics.get("cj_assessment_duration_seconds"),
+        "kafka_queue_latency_seconds": all_metrics.get("kafka_queue_latency_seconds"),
     }
 
 

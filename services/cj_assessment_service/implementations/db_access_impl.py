@@ -8,8 +8,9 @@ and CJ assessment workflow requirements.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Optional
 
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -29,10 +30,13 @@ from services.cj_assessment_service.protocols import CJRepositoryProtocol
 class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
     """PostgreSQL implementation of CJRepositoryProtocol for CJ Assessment Service."""
 
-    def __init__(self, settings: Settings) -> None:
-        """Initialize the database handler with connection settings."""
+    def __init__(
+        self, settings: Settings, database_metrics: Optional[DatabaseMetrics] = None
+    ) -> None:
+        """Initialize the database handler with connection settings and optional metrics."""
         self.settings = settings
         self.logger = create_service_logger("cj_assessment.repository.postgres")
+        self.database_metrics = database_metrics
 
         # Create async engine with enhanced connection pooling (following BOS/ELS pattern)
         self.engine = create_async_engine(
@@ -44,6 +48,14 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
             pool_recycle=settings.DATABASE_POOL_RECYCLE,
         )
+
+        # Setup database monitoring if metrics are provided
+        if self.database_metrics:
+            setup_database_monitoring(
+                self.engine, "cj_assessment", self.database_metrics.get_metrics()
+            )
+            self.logger.info("Database monitoring enabled for CJ Assessment Service")
+
         self.async_session_maker = async_sessionmaker(
             self.engine,
             expire_on_commit=False,

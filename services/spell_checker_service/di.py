@@ -7,6 +7,7 @@ from datetime import timedelta
 from aiohttp import ClientSession
 from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import KafkaPublisherProtocol, RedisClientProtocol
@@ -14,6 +15,7 @@ from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
 from prometheus_client import CollectorRegistry
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from common_core.event_enums import ProcessingEvent, topic_name
 from services.spell_checker_service.config import Settings, settings
@@ -21,6 +23,7 @@ from services.spell_checker_service.implementations.spell_repository_postgres_im
     PostgreSQLSpellcheckRepository,
 )
 from services.spell_checker_service.kafka_consumer import SpellCheckerKafkaConsumer
+from services.spell_checker_service.metrics import setup_spell_checker_database_monitoring
 from services.spell_checker_service.protocol_implementations.content_client_impl import (
     DefaultContentClient,
 )
@@ -140,11 +143,33 @@ class SpellCheckerServiceProvider(Provider):
         return DefaultResultStore(content_service_url=app_settings.CONTENT_SERVICE_URL)
 
     @provide(scope=Scope.APP)
+    def provide_database_engine(self, settings: Settings) -> AsyncEngine:
+        """Provide database engine for metrics setup."""
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        return create_async_engine(
+            settings.DATABASE_URL,
+            echo=False,
+            future=True,
+            pool_size=getattr(settings, "DATABASE_POOL_SIZE", 5),
+            max_overflow=getattr(settings, "DATABASE_MAX_OVERFLOW", 10),
+            pool_pre_ping=getattr(settings, "DATABASE_POOL_PRE_PING", True),
+            pool_recycle=getattr(settings, "DATABASE_POOL_RECYCLE", 1800),
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics monitoring for spell checker service."""
+        return setup_spell_checker_database_monitoring(
+            engine=engine, service_name=settings.SERVICE_NAME
+        )
+
+    @provide(scope=Scope.APP)
     async def provide_spellcheck_repository(
-        self, settings: Settings
+        self, settings: Settings, database_metrics: DatabaseMetrics, engine: AsyncEngine
     ) -> SpellcheckRepositoryProtocol:
-        """Provide PostgreSQL-backed spell-check repository."""
-        repo = PostgreSQLSpellcheckRepository(settings)
+        """Provide PostgreSQL-backed spell-check repository with metrics."""
+        repo = PostgreSQLSpellcheckRepository(settings, database_metrics, engine)
         # ensure schema exists (idempotent)
         await repo.initialize_db_schema()
         return repo

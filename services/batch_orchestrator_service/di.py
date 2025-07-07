@@ -8,6 +8,7 @@ from typing import cast
 from aiohttp import ClientError, ClientSession
 from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
@@ -66,7 +67,10 @@ from services.batch_orchestrator_service.implementations.spellcheck_initiator_im
     SpellcheckInitiatorImpl,
 )
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
-from services.batch_orchestrator_service.metrics import get_circuit_breaker_metrics
+from services.batch_orchestrator_service.metrics import (
+    get_circuit_breaker_metrics,
+    get_database_metrics,
+)
 from services.batch_orchestrator_service.protocols import (
     AIFeedbackInitiatorProtocol,
     BatchConductorClientProtocol,
@@ -200,12 +204,23 @@ class RepositoryAndPublishingProvider(Provider):
     """Provider for data repository and event publishing dependencies."""
 
     @provide(scope=Scope.APP)
-    def provide_batch_repository(self, settings: Settings) -> BatchRepositoryProtocol:
+    def provide_database_metrics(self, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics instance integrated with existing BOS metrics."""
+        # Get existing BOS metrics dictionary to integrate database metrics
+        database_metrics_dict = get_database_metrics()
+
+        # Create database metrics instance with BOS service prefix and existing metrics
+        return DatabaseMetrics(service_name="batch_orchestrator_service", metrics_dict=database_metrics_dict)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_repository(
+        self, settings: Settings, database_metrics: DatabaseMetrics
+    ) -> BatchRepositoryProtocol:
         """Provide batch repository implementation based on environment configuration."""
         if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
             return MockBatchRepositoryImpl()
         else:
-            return PostgreSQLBatchRepositoryImpl(settings)
+            return PostgreSQLBatchRepositoryImpl(settings, database_metrics)
 
     @provide(scope=Scope.APP)
     def provide_batch_event_publisher(

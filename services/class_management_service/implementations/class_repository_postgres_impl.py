@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import time
 import uuid
-from typing import Type, TypeVar, cast
+from typing import Optional, Type, TypeVar, cast
 
+from huleedu_service_libs.database import DatabaseMetricsProtocol
+from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -23,38 +26,81 @@ from services.class_management_service.protocols import (
     ClassRepositoryProtocol,
 )
 
+logger = create_service_logger("class_management_service.repository")
+
 # Define concrete types for this implementation
 T = TypeVar("T", bound=UserClass)
 U = TypeVar("U", bound=Student)
 
 
 class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
-    """PostgreSQL implementation of ClassRepositoryProtocol with generic types."""
+    """PostgreSQL implementation of ClassRepositoryProtocol with generic types and database metrics."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, session: AsyncSession, metrics: Optional[DatabaseMetricsProtocol] = None
+    ) -> None:
         self.session = session
+        self.metrics = metrics
         # Store the actual model classes
         self._user_class_type: Type[T] = cast(Type[T], UserClass)
         self._student_type: Type[U] = cast(Type[U], Student)
 
+    def _record_operation_metrics(
+        self,
+        operation: str,
+        table: str,
+        duration: float,
+        success: bool = True,
+    ) -> None:
+        """Record database operation metrics."""
+        if self.metrics:
+            self.metrics.record_query_duration(
+                operation=operation,
+                table=table,
+                duration=duration,
+                success=success,
+            )
+
+    def _record_error_metrics(self, error_type: str, operation: str) -> None:
+        """Record database error metrics."""
+        if self.metrics:
+            self.metrics.record_database_error(error_type, operation)
+
     async def create_class(
         self, user_id: str, class_data: CreateClassRequest
     ) -> T:  # Returns type T (UserClass or subclass)
-        # In a real app, you'd look up the courses or create them
-        # Here we assume they exist for simplicity
-        stmt = select(Course).where(Course.course_code.in_(class_data.course_codes))
-        result = await self.session.execute(stmt)
-        courses = result.scalars().all()
+        start_time = time.time()
+        operation = "create_class"
+        table = "user_classes"
+        success = True
 
-        new_class = UserClass(
-            name=class_data.name,
-            created_by_user_id=user_id,
-            # For simplicity, associating with the first course found
-            course=courses[0] if courses else None,
-        )
-        self.session.add(new_class)
-        await self.session.flush()
-        return cast(T, new_class)
+        try:
+            # In a real app, you'd look up the courses or create them
+            # Here we assume they exist for simplicity
+            stmt = select(Course).where(Course.course_code.in_(class_data.course_codes))
+            result = await self.session.execute(stmt)
+            courses = result.scalars().all()
+
+            new_class = UserClass(
+                name=class_data.name,
+                created_by_user_id=user_id,
+                # For simplicity, associating with the first course found
+                course=courses[0] if courses else None,
+            )
+            self.session.add(new_class)
+            await self.session.flush()
+            return cast(T, new_class)
+
+        except Exception as e:
+            success = False
+            error_type = e.__class__.__name__
+            self._record_error_metrics(error_type, operation)
+            logger.error(f"Failed to create class: {error_type}: {e}")
+            raise
+
+        finally:
+            duration = time.time() - start_time
+            self._record_operation_metrics(operation, table, duration, success)
 
     async def get_class_by_id(self, class_id: uuid.UUID) -> T | None:  # Returns type T or None
         stmt = (
