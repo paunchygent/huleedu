@@ -87,6 +87,141 @@ def _clear_prometheus_registry():
 
 See [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc) Section 8.2 for Pydantic testing patterns.
 
+## 8. Performance Testing Strategy
+
+### 8.1. Testing Strategy Matrix
+
+| Test Type         | Infrastructure | LLM Provider | Purpose                    | Example Use Case |
+|------------------|----------------|--------------|----------------------------|------------------|
+| Unit Tests       | Mock          | Mock         | Fast feedback             | Business logic validation |
+| Integration      | Real          | Mock         | Infrastructure validation | Database/Queue performance |
+| Performance      | Real          | Mock         | Meaningful metrics        | Redis pipeline benchmarks |
+| E2E             | Real          | Real         | Full system validation    | End-to-end workflows |
+
+### 8.2. Infrastructure vs Mock Testing Guidelines
+
+#### Real Infrastructure Testing
+- **WHEN**: Testing infrastructure performance, reliability, and resource usage
+- **COMPONENTS**: Use real Redis, Kafka, PostgreSQL via testcontainers
+- **BENEFITS**: Realistic performance metrics, actual network latency, real resource consumption
+- **EXAMPLE**: Redis queue performance with 0.3ms operation times
+
+#### Mock LLM Provider Testing
+- **WHEN**: Performance testing that needs meaningful data without API costs
+- **IMPLEMENTATION**: Use `MockProviderImpl` with `performance_mode=True`
+- **BENEFITS**: Avoids API costs while providing realistic response patterns
+- **PATTERN**: Mock errors disabled in performance mode for consistent results
+
+### 8.3. Performance Testing Patterns
+
+#### Testcontainer Configuration
+```python
+@pytest.fixture(scope="class")
+def redis_container() -> Generator[RedisContainer, None, None]:
+    """Provide a Redis container for testing."""
+    with RedisContainer("redis:7-alpine") as container:
+        yield container
+
+@pytest.fixture(scope="class")
+def kafka_container() -> Generator[KafkaContainer, None, None]:
+    """Provide a Kafka container for testing."""
+    with KafkaContainer("confluentinc/cp-kafka:7.4.0") as container:
+        yield container
+```
+
+#### Performance-Optimized Mock Providers
+```python
+@provide(scope=Scope.APP)
+async def provide_llm_provider_map(self, settings: Settings) -> Dict[LLMProviderType, LLMProviderProtocol]:
+    """Provide performance-optimized mock providers."""
+    mock_provider = MockProviderImpl(
+        settings=settings, 
+        seed=42, 
+        performance_mode=True  # Disables error simulation
+    )
+    return {
+        LLMProviderType.MOCK: mock_provider,
+        LLMProviderType.ANTHROPIC: mock_provider,
+        # ... other providers
+    }
+```
+
+#### DI Container Cleanup Pattern
+```python
+@pytest.fixture
+async def infrastructure_di_container(settings: Settings) -> AsyncGenerator[Any, None]:
+    """DI container with real infrastructure cleanup."""
+    container = make_async_container(TestProvider(settings))
+    
+    try:
+        yield container
+    finally:
+        # CRITICAL: Clean up all infrastructure components
+        async with container() as request_container:
+            for client_type in [QueueRedisClientProtocol, RedisClientProtocol]:
+                try:
+                    client = await request_container.get(client_type)
+                    if hasattr(client, 'stop'):
+                        await client.stop()
+                except Exception as e:
+                    print(f"⚠ Failed to stop {client_type.__name__}: {e}")
+```
+
+### 8.4. Performance Benchmarking Standards
+
+#### Realistic Performance Targets
+- **Redis Operations**: < 0.1s per operation (achieved: 0.3ms)
+- **Queue Throughput**: < 0.2s per retrieval  
+- **Batch Operations**: < 0.15s per request
+- **Concurrent Operations**: < 0.2s average response time
+- **E2E Pipeline**: P95 < 5.0s, 90% success rate
+
+#### Performance Metrics Collection
+```python
+class PerformanceMetrics:
+    """Collects and analyzes performance metrics."""
+    
+    def add_measurement(self, response_time: float, status_code: int, error: Optional[str] = None) -> None:
+        """Add a performance measurement."""
+        
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get comprehensive performance statistics including P95, P99, error rates."""
+```
+
+### 8.5. Test Isolation and Resource Management
+
+#### Queue Cleanup Between Tests
+```python
+@pytest.fixture(autouse=True)
+async def clean_redis_queue(redis_container: RedisContainer) -> None:
+    """Clean Redis queue between tests for isolation."""
+    client = redis_container.get_client()
+    await client.flushdb()
+    yield
+```
+
+#### Resource Cleanup Patterns
+- **MUST** use `try/finally` blocks for resource cleanup
+- **PATTERN**: Print warnings for cleanup failures (don't fail tests)
+- **SCOPE**: Use appropriate fixture scopes (`class` for containers, `function` for DI)
+
+### 8.6. Performance Test Categories
+
+#### Load Testing
+- **Pattern**: Sustained request rates over time
+- **Metrics**: Requests per second, P95/P99 response times
+- **Example**: 2 req/s for 15 seconds with real infrastructure
+
+#### Stress Testing  
+- **Pattern**: Concurrent operations with varying load
+- **Metrics**: Success rates, resource utilization
+- **Example**: 25 concurrent Redis operations
+
+#### Endurance Testing
+- **Pattern**: Mixed workload types over extended periods
+- **Metrics**: Performance degradation over time
+- **Example**: Mixed quick/detailed/batch workloads
+
 ---
 **Fix underlying issues, don't simplify tests.**
 ===

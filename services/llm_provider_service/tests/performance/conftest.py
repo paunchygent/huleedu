@@ -14,6 +14,7 @@ import pytest
 from testcontainers.kafka import KafkaContainer
 from testcontainers.redis import RedisContainer
 
+from common_core import Environment
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.implementations.connection_pool_manager_impl import (
     ConnectionPoolManagerImpl,
@@ -59,7 +60,7 @@ async def performance_settings_with_containers(
 
     settings = Settings(
         SERVICE_NAME="llm_provider_service",
-        ENVIRONMENT="testing",
+        ENVIRONMENT=Environment.TESTING,
         LOG_LEVEL="INFO",
         # CRITICAL: Mock LLM to avoid API costs
         USE_MOCK_LLM=True,
@@ -84,7 +85,7 @@ def mock_only_settings() -> Settings:
     """Settings with all mocks for unit-style performance tests."""
     settings = Settings(
         SERVICE_NAME="llm_provider_service",
-        ENVIRONMENT="testing",
+        ENVIRONMENT=Environment.TESTING,
         LOG_LEVEL="INFO",
         USE_MOCK_LLM=True,  # CRITICAL: Prevents real API calls and costs
     )

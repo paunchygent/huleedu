@@ -15,6 +15,7 @@ from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
 from prometheus_client import REGISTRY, CollectorRegistry
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from common_core import LLMProviderType
 from services.cj_assessment_service.config import Settings
@@ -31,7 +32,6 @@ from services.cj_assessment_service.implementations.retry_manager_impl import Re
 # Import all business logic protocols
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
 from services.cj_assessment_service.metrics import setup_cj_assessment_database_monitoring
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,

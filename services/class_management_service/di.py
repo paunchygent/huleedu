@@ -4,7 +4,6 @@ from datetime import timedelta
 from typing import AsyncGenerator, cast
 
 from aiokafka.errors import KafkaError
-from config import Settings, settings
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
@@ -20,6 +19,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from services.class_management_service.config import Settings, settings
 from services.class_management_service.implementations.class_management_service_impl import (
     ClassManagementServiceImpl,
 )

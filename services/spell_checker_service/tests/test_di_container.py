@@ -37,8 +37,17 @@ async def patch_settings(
     elif "postgresql://" in conn_url:
         conn_url = conn_url.replace("postgresql://", "postgresql+asyncpg://")
 
+    # Extract connection components from URL
+    from urllib.parse import urlparse
+
+    parsed = urlparse(conn_url)
+
     class TestSettings(Settings):
-        DATABASE_URL: str = conn_url
+        DB_HOST: str = parsed.hostname or "localhost"
+        DB_PORT: int = parsed.port or 5432
+        DB_USER: str = parsed.username or "postgres"
+        DB_PASSWORD: str = parsed.password or "postgres"
+        DB_NAME: str = parsed.path.lstrip("/") if parsed.path else "postgres"
 
     test_settings = TestSettings()
     # replace singletons in both modules

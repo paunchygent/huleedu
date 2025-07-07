@@ -6,6 +6,7 @@ import asyncio
 
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
+from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
 from quart import Quart
@@ -27,8 +28,7 @@ from services.batch_orchestrator_service.implementations.batch_repository_postgr
     PostgreSQLBatchRepositoryImpl,
 )
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
-from huleedu_service_libs.database import DatabaseMetrics
-from services.batch_orchestrator_service.metrics import get_http_metrics, get_metrics
+from services.batch_orchestrator_service.metrics import get_metrics
 
 logger = create_service_logger("bos.startup")
 
@@ -68,7 +68,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         # Get database metrics from DI container
         async with container() as request_container:
             database_metrics = await request_container.get(DatabaseMetrics)
-        
+
         # Initialize metrics using shared metrics module with database metrics integration
         metrics = get_metrics(database_metrics)
 

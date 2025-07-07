@@ -8,12 +8,15 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_l
 from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
+from services.file_service.config import Settings
+
 logger = create_service_logger("file_service.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
 
 @health_bp.route("/healthz")
-async def health_check() -> Response | tuple[Response, int]:
+@inject
+async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Response, int]:
     """Standardized health check endpoint."""
     try:
         checks = {"service_responsive": True, "dependencies_available": True}
@@ -29,13 +32,13 @@ async def health_check() -> Response | tuple[Response, int]:
         overall_status = "healthy"
 
         health_response = {
-            "service": "file_service",
+            "service": settings.SERVICE_NAME,
             "status": overall_status,
             "message": f"File Service is {overall_status}",
             "version": "1.0.0",
             "checks": checks,
             "dependencies": dependencies,
-            "environment": "development",
+            "environment": settings.ENVIRONMENT.value,
         }
 
         return jsonify(health_response), 200

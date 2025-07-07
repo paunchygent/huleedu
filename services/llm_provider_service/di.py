@@ -11,6 +11,8 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import RedisClientProtocol
+from huleedu_service_libs.queue_protocols import QueueRedisClientProtocol
+from huleedu_service_libs.queue_redis_client import QueueRedisClient
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
@@ -77,13 +79,23 @@ class LLMProviderServiceProvider(Provider):
 
     @provide(scope=Scope.APP)
     async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
-        """Provide Redis client for caching."""
+        """Provide Redis client for general caching operations."""
         redis_client = RedisClient(
             client_id=f"{settings.SERVICE_NAME}-redis",
             redis_url=settings.REDIS_URL,
         )
         await redis_client.start()
         return redis_client
+
+    @provide(scope=Scope.APP)
+    async def provide_queue_redis_client(self, settings: Settings) -> QueueRedisClientProtocol:
+        """Provide specialized Redis client for queue operations."""
+        queue_redis_client = QueueRedisClient(
+            client_id=f"{settings.SERVICE_NAME}-queue-redis",
+            redis_url=settings.REDIS_URL,
+        )
+        await queue_redis_client.start()
+        return queue_redis_client
 
     @provide(scope=Scope.APP)
     def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
@@ -178,12 +190,12 @@ class LLMProviderServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_redis_queue_repository(
         self,
-        redis_client: RedisClientProtocol,
+        queue_redis_client: QueueRedisClientProtocol,
         settings: Settings,
     ) -> RedisQueueRepositoryImpl:
         """Provide Redis queue repository."""
         return RedisQueueRepositoryImpl(
-            redis_client=cast(RedisClient, redis_client),
+            redis_client=queue_redis_client,
             settings=settings,
         )
 

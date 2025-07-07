@@ -48,11 +48,12 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         # Get database metrics from container for integration
         async with container() as request_container:
             database_metrics = await request_container.get(DatabaseMetrics)
-        
+
         # Initialize metrics using shared module with database metrics and store in app context
         metrics = get_http_metrics()
         # Update metrics with database metrics
         from services.essay_lifecycle_service.metrics import get_metrics
+
         metrics = get_metrics(database_metrics)
 
         # Store metrics in app context (proper Quart pattern)

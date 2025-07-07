@@ -3,6 +3,8 @@ from __future__ import annotations
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from common_core.config_enums import Environment
+
 
 class Settings(BaseSettings):
     """
@@ -13,7 +15,7 @@ class Settings(BaseSettings):
     """
 
     LOG_LEVEL: str = "INFO"
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: Environment = Environment.DEVELOPMENT
     SERVICE_NAME: str = "class_management_service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     REDIS_URL: str = "redis://redis:6379"
@@ -31,12 +33,14 @@ class Settings(BaseSettings):
     PORT: int = 5002
     HOST: str = "0.0.0.0"
     USE_MOCK_REPOSITORY: bool = False
-    
+
     # Database Pool Configuration
     DATABASE_POOL_SIZE: int = Field(default=10, description="Database connection pool size")
     DATABASE_MAX_OVERFLOW: int = Field(default=20, description="Maximum overflow connections")
     DATABASE_POOL_PRE_PING: bool = Field(default=True, description="Pre-ping connections")
-    DATABASE_POOL_RECYCLE: int = Field(default=3600, description="Recycle connections after seconds")
+    DATABASE_POOL_RECYCLE: int = Field(
+        default=3600, description="Recycle connections after seconds"
+    )
 
     # Circuit Breaker Configuration
     CIRCUIT_BREAKER_ENABLED: bool = Field(

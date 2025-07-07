@@ -10,6 +10,7 @@ from __future__ import annotations
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from common_core.config_enums import Environment
 from common_core.event_enums import ProcessingEvent, topic_name
 
 
@@ -22,6 +23,7 @@ class Settings(BaseSettings):
     """
 
     LOG_LEVEL: str = "INFO"
+    ENVIRONMENT: Environment = Environment.DEVELOPMENT
     SERVICE_NAME: str = "file-service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     REDIS_URL: str = "redis://redis:6379"

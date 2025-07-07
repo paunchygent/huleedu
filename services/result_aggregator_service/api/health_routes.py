@@ -6,6 +6,7 @@ from dishka import FromDishka
 from huleedu_service_libs.database import DatabaseHealthChecker
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
+from prometheus_client import CollectorRegistry
 from quart import Blueprint, Response, current_app, jsonify
 from quart_dishka import inject
 
@@ -90,7 +91,6 @@ async def health_check(
         ), 503
 
 
-
 async def _check_redis_health(redis_client: RedisClientProtocol) -> dict:
     """Check Redis connection health."""
     try:
@@ -102,12 +102,14 @@ async def _check_redis_health(redis_client: RedisClientProtocol) -> dict:
 
 
 @health_bp.route("/metrics")
-async def metrics() -> Response:
+@inject
+async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
     """Prometheus metrics endpoint."""
     try:
-        from prometheus_client import generate_latest
+        from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-        return Response(generate_latest(), mimetype="text/plain; version=0.0.4")
+        metrics_data = generate_latest(registry)
+        return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
     except Exception as e:
         logger.error(f"Error generating metrics: {e}")
         return Response(f"Error generating metrics: {str(e)}", status=500)

@@ -215,10 +215,14 @@ All standard development tasks are executed via PDM scripts defined in the root 
 
 #### 2\. Static Analysis
 
-- `pdm run typecheck-all`: Runs MyPy on the entire codebase to perform static type checking.
+- `pdm run typecheck-all`: Runs MyPy on the entire codebase to perform static type checking. services/libs/ is special and needs to be checked using the method described in: .cursor/rules/086-mypy-configuration-standards.mdc
 
 #### 3\. Testing
 
 - `pdm run test-all`: Runs the complete test suite using `pytest`. (See Rule 070 for scoping).
 - `pdm run test-parallel`: Runs tests in parallel across multiple CPU cores (`pytest -n auto`).
 - `pdm run -p services/<service_name> test`: Runs the specific test suite for an individual service.
+
+### **`Docker & Service Management Tips`**
+
+- **DO NOT RESTART SERVICES AFTER CODE CHANGES; ALWAYS `docker compose up -d --build {service with code changes}`**

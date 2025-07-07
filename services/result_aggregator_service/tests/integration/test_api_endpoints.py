@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
-from prometheus_client import REGISTRY
+from huleedu_service_libs.protocols import RedisClientProtocol
+from prometheus_client import REGISTRY, CollectorRegistry
 from quart import Quart
 from quart.testing import QuartClient
 from quart_dishka import QuartDishka
@@ -37,12 +38,14 @@ class MockDIProvider(Provider):
         self._batch_query_service = AsyncMock(spec=BatchQueryServiceProtocol)
         self._security_service = AsyncMock(spec=SecurityServiceProtocol)
         self._cache_manager = AsyncMock(spec=CacheManagerProtocol)
+        self._redis_client = AsyncMock(spec=RedisClientProtocol)
 
     @provide
     def settings(self) -> Settings:
         """Provide test settings."""
         return Settings(
-            SERVICE_NAME="test_aggregator",
+            SERVICE_NAME="result_aggregator_service",
+            SERVICE_VERSION="1.0.0",
             REDIS_URL="redis://localhost:6379",
             DATABASE_URL="postgresql://test:test@localhost/test",
             INTERNAL_API_KEY="test-api-key-123",
@@ -77,6 +80,23 @@ class MockDIProvider(Provider):
     def metrics(self) -> ResultAggregatorMetrics:
         """Provide metrics instance."""
         return ResultAggregatorMetrics()
+
+    @provide
+    def redis_client(self) -> RedisClientProtocol:
+        """Provide mock Redis client."""
+        # Configure the mock to succeed on ping for health checks
+        self._redis_client.ping.return_value = "PONG"
+        return self._redis_client
+
+    @provide
+    def registry(self) -> CollectorRegistry:
+        """Provide Prometheus collector registry."""
+        # Add a simple metric for testing
+        from prometheus_client import Counter
+
+        test_counter = Counter("test_metric_total", "Test metric for endpoint verification")
+        test_counter.inc()
+        return REGISTRY
 
 
 @pytest.fixture(autouse=True)

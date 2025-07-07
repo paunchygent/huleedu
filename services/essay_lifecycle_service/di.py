@@ -171,7 +171,7 @@ class CoreInfrastructureProvider(Provider):
     def provide_database_engine(self, settings: Settings) -> AsyncEngine:
         """Provide database engine for metrics setup."""
         from sqlalchemy.ext.asyncio import create_async_engine
-        
+
         return create_async_engine(
             settings.DATABASE_URL,
             echo=False,

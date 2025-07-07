@@ -7,6 +7,7 @@ including Kafka connection settings, HTTP API configuration, and state persisten
 
 from __future__ import annotations
 
+from common_core.config_enums import Environment
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -20,7 +21,7 @@ class Settings(BaseSettings):
 
     # Service Configuration
     LOG_LEVEL: str = "INFO"
-    ENVIRONMENT: str = "development"  # development, production, testing
+    ENVIRONMENT: Environment = Environment.DEVELOPMENT
     SERVICE_NAME: str = "essay-lifecycle-service"
 
     # HTTP API Configuration

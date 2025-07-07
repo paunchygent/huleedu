@@ -15,6 +15,8 @@ from quart_dishka import QuartDishka
 dotenv.load_dotenv()
 
 # Import after environment is loaded
+from sqlalchemy.ext.asyncio import AsyncEngine
+
 from services.result_aggregator_service.api.health_routes import health_bp
 from services.result_aggregator_service.api.query_routes import query_bp
 from services.result_aggregator_service.config import Settings
@@ -25,7 +27,6 @@ from services.result_aggregator_service.di import (
 )
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
 from services.result_aggregator_service.protocols import BatchRepositoryProtocol
-from sqlalchemy.ext.asyncio import AsyncEngine
 from services.result_aggregator_service.startup_setup import setup_metrics_endpoint
 
 logger = create_service_logger("result_aggregator.app")

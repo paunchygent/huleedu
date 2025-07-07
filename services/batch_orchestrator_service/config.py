@@ -10,6 +10,8 @@ from __future__ import annotations
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from common_core.config_enums import Environment
+
 
 class Settings(BaseSettings):
     """
@@ -20,7 +22,7 @@ class Settings(BaseSettings):
     """
 
     LOG_LEVEL: str = "INFO"
-    ENVIRONMENT: str = "development"  # development, production, testing
+    ENVIRONMENT: Environment = Environment.DEVELOPMENT
     SERVICE_NAME: str = "batch-service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"

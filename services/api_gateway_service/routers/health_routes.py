@@ -21,11 +21,14 @@ async def health_check() -> dict[str, str | dict]:
         checks = {"service_responsive": True, "dependencies_available": True}
         dependencies = {
             "redis": {"status": "healthy", "note": "Rate limiting and session storage"},
-            "downstream_services": {"status": "healthy", "note": "Proxied service availability checked on request"},
+            "downstream_services": {
+                "status": "healthy",
+                "note": "Proxied service availability checked on request",
+            },
         }
-        
+
         overall_status = "healthy" if checks["dependencies_available"] else "unhealthy"
-        
+
         return {
             "service": "api_gateway_service",
             "status": overall_status,

@@ -8,6 +8,7 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from common_core import LLMProviderType
+from common_core.config_enums import Environment
 
 
 class ProviderConfig(BaseSettings):
@@ -39,7 +40,7 @@ class Settings(BaseSettings):
     # Service Identity
     SERVICE_NAME: str = "llm_provider_service"
     LOG_LEVEL: str = "INFO"
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: Environment = Environment.DEVELOPMENT
     PORT: int = 8080
     HOST: str = "0.0.0.0"
 

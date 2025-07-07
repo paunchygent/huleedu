@@ -12,6 +12,8 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from common_core.config_enums import Environment
+
 
 class Settings(BaseSettings):
     """
@@ -21,13 +23,17 @@ class Settings(BaseSettings):
     """
 
     LOG_LEVEL: str = "INFO"
-    ENVIRONMENT: str = "development"  # development, production, testing
+    ENVIRONMENT: Environment = Environment.DEVELOPMENT
     SERVICE_NAME: str = "spell-checker-service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
 
     # Database configuration
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost/spellchecker"
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5437
+    DB_USER: str = "postgres"
+    DB_PASSWORD: str = "postgres"
+    DB_NAME: str = "spellchecker"
 
     # Redis configuration for idempotency
     REDIS_URL: str = "redis://localhost:6379"
@@ -107,6 +113,11 @@ class Settings(BaseSettings):
         if self.L2_EXTERNAL_DATA_PATH:
             return f"{self.L2_EXTERNAL_DATA_PATH}/filtered_l2_dictionary.txt"
         return str(self._service_dir / "data" / "l2_error_dict" / "filtered_l2_dictionary.txt")
+
+    @property
+    def database_url(self) -> str:
+        """Database URL for SQLAlchemy and Alembic."""
+        return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     model_config = SettingsConfigDict(
         env_file=".env",

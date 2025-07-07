@@ -9,14 +9,17 @@ from unittest.mock import AsyncMock
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
+from huleedu_service_libs.database import DatabaseMetrics
 from prometheus_client import REGISTRY
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 
+from common_core.config_enums import Environment
 from common_core.domain_enums import CourseCode
 from common_core.events.class_events import ClassUpdatedV1, StudentUpdatedV1
 from common_core.events.envelope import EventEnvelope
 from services.class_management_service.app import app
+from services.class_management_service.config import Settings
 from services.class_management_service.di import MetricsProvider
 from services.class_management_service.implementations.class_management_service_impl import (
     ClassManagementServiceImpl,
@@ -64,6 +67,18 @@ class TestClassManagementApi:
             def provide_event_publisher(self) -> ClassEventPublisherProtocol:
                 return mock_event_publisher
 
+            @provide(scope=Scope.APP)
+            def provide_database_metrics(self) -> DatabaseMetrics:
+                """Provide a mock database metrics instance for testing."""
+                return AsyncMock(spec=DatabaseMetrics)
+
+            @provide(scope=Scope.APP)
+            def provide_settings(self) -> Settings:
+                """Provide settings for testing."""
+                return Settings(
+                    SERVICE_NAME="class_management_service", ENVIRONMENT=Environment.TESTING
+                )
+
             @provide(scope=Scope.REQUEST)
             def provide_class_management_service(
                 self,
@@ -93,7 +108,7 @@ class TestClassManagementApi:
         response = await app_client.get("/healthz")
         assert response.status_code == 200
         data = await response.get_json()
-        assert data["status"] == "ok"
+        assert data["status"] == "healthy"
 
     @pytest.mark.asyncio
     async def test_create_class(

@@ -21,25 +21,25 @@ logger = create_service_logger("huleedu.database.health_checks")
 def get_pool_status_safe(pool: Pool) -> Dict[str, Union[int, str]]:
     """
     Get pool status with type safety and graceful degradation.
-    
+
     This function safely extracts connection pool metrics from SQLAlchemy pools,
-    handling different pool implementations (QueuePool, StaticPool, etc.) that 
+    handling different pool implementations (QueuePool, StaticPool, etc.) that
     may have different method signatures.
-    
+
     Args:
         pool: SQLAlchemy connection pool instance
-        
+
     Returns:
         Dictionary with pool status metrics
     """
     try:
         # Type-safe attribute access with fallbacks, ensuring int results
-        pool_size = int(getattr(pool, 'size', lambda: 0)())
-        active_connections = int(getattr(pool, 'checkedout', lambda: 0)())
-        idle_connections = int(getattr(pool, 'checkedin', lambda: 0)())
-        overflow_connections = int(getattr(pool, 'overflow', lambda: 0)())
-        invalid_connections = int(getattr(pool, 'invalid', lambda: 0)())
-        
+        pool_size = int(getattr(pool, "size", lambda: 0)())
+        active_connections = int(getattr(pool, "checkedout", lambda: 0)())
+        idle_connections = int(getattr(pool, "checkedin", lambda: 0)())
+        overflow_connections = int(getattr(pool, "overflow", lambda: 0)())
+        invalid_connections = int(getattr(pool, "invalid", lambda: 0)())
+
         return {
             "status": "healthy",
             "pool_size": pool_size,
@@ -130,7 +130,7 @@ class DatabaseHealthChecker:
         try:
             # Get pool statistics using type-safe method
             pool_stats = get_pool_status_safe(self.engine.pool)
-            
+
             # Handle degraded pool status
             if pool_stats.get("status") == "degraded":
                 return {
@@ -142,7 +142,7 @@ class DatabaseHealthChecker:
 
             # Extract metrics with type safety
             pool_size = pool_stats["pool_size"]
-            checked_out = pool_stats["active_connections"] 
+            checked_out = pool_stats["active_connections"]
             checked_in = pool_stats["idle_connections"]
             overflow = pool_stats["overflow_connections"]
             invalid = pool_stats["invalid_connections"]

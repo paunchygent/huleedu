@@ -170,12 +170,9 @@ services:
       - "9121:9121"
     environment:
       REDIS_ADDR: "redis://redis:6379"
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9121/metrics"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+    # Health check removed - the oliver006/redis_exporter image doesn't include wget/curl
+    # and the exporter binary doesn't have a built-in health check mode.
+    # Monitor via Prometheus scrape success metric instead.
 
   node_exporter:
     image: prom/node-exporter:latest

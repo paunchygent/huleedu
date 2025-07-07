@@ -1,437 +1,390 @@
 """
-End-to-end performance tests.
+End-to-end performance tests using real infrastructure.
 
-Tests complete pipeline performance under realistic load patterns
-including burst scenarios and mixed workloads. All tests use mock providers to avoid API costs.
+Tests complete pipeline performance under realistic load patterns with real
+Redis and Kafka infrastructure. Uses mock LLM providers to avoid API costs
+while providing meaningful infrastructure performance data.
 """
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, Mock, patch
-from uuid import UUID
+from typing import Any, AsyncGenerator, Dict, Generator
+from uuid import uuid4
 
 import pytest
-from dishka import make_async_container
+from dishka import Scope, make_async_container, provide
+from huleedu_service_libs.resilience import CircuitBreakerRegistry
+from testcontainers.kafka import KafkaContainer
+from testcontainers.redis import RedisContainer
 
-from common_core import LLMProviderType
-from common_core.domain_enums import EssayComparisonWinner
+from common_core import Environment, LLMProviderType
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
+from services.llm_provider_service.implementations.connection_pool_manager_impl import (
+    ConnectionPoolManagerImpl,
+)
+from services.llm_provider_service.protocols import (
+    LLMOrchestratorProtocol,
+    LLMProviderProtocol,
+    LLMRetryManagerProtocol,
+)
 
 from .conftest import PerformanceMetrics
 
 
+class TestLLMProviderServiceProvider(LLMProviderServiceProvider):
+    """Test-specific provider that allows settings injection."""
+
+    def __init__(self, test_settings: Settings):
+        super().__init__()
+        self._test_settings = test_settings
+
+    @provide(scope=Scope.APP)
+    def provide_settings(self) -> Settings:
+        return self._test_settings
+
+    @provide(scope=Scope.APP)
+    async def provide_llm_provider_map(
+        self,
+        settings: Settings,
+        pool_manager: ConnectionPoolManagerImpl,
+        retry_manager: LLMRetryManagerProtocol,
+        circuit_breaker_registry: CircuitBreakerRegistry,
+    ) -> Dict[LLMProviderType, LLMProviderProtocol]:
+        """Provide dictionary of performance-optimized mock providers."""
+        # Always use performance-optimized mock providers for performance tests
+        from services.llm_provider_service.implementations.mock_provider_impl import (
+            MockProviderImpl,
+        )
+
+        mock_provider = MockProviderImpl(settings=settings, seed=42, performance_mode=True)
+        return {
+            LLMProviderType.MOCK: mock_provider,
+            LLMProviderType.ANTHROPIC: mock_provider,
+            LLMProviderType.OPENAI: mock_provider,
+            LLMProviderType.GOOGLE: mock_provider,
+            LLMProviderType.OPENROUTER: mock_provider,
+        }
+
+
+@pytest.fixture(scope="class")
+def redis_container() -> Generator[RedisContainer, None, None]:
+    """Provide a Redis container for testing."""
+    with RedisContainer("redis:7-alpine") as container:
+        yield container
+
+
+@pytest.fixture(scope="class")
+def kafka_container() -> Generator[KafkaContainer, None, None]:
+    """Provide a Kafka container for testing."""
+    with KafkaContainer("confluentinc/cp-kafka:7.4.0") as container:
+        yield container
+
+
+@pytest.fixture(scope="class")
+def infrastructure_settings(
+    redis_container: RedisContainer, kafka_container: KafkaContainer
+) -> Settings:
+    """Settings configured for testcontainer infrastructure."""
+    redis_host = redis_container.get_container_host_ip()
+    redis_port = redis_container.get_exposed_port(6379)
+    redis_url = f"redis://{redis_host}:{redis_port}/0"
+
+    return Settings(
+        SERVICE_NAME="llm_provider_service",
+        ENVIRONMENT=Environment.TESTING,
+        LOG_LEVEL="INFO",
+        USE_MOCK_LLM=True,  # Keep LLM mocked to avoid API costs
+        REDIS_URL=redis_url,
+        KAFKA_BOOTSTRAP_SERVERS=kafka_container.get_bootstrap_server(),
+        # Performance test configurations
+        CIRCUIT_BREAKER_ENABLED=True,
+    )
+
+
+@pytest.fixture
+async def infrastructure_di_container(
+    infrastructure_settings: Settings,
+) -> AsyncGenerator[Any, None]:
+    """DI container with real infrastructure for end-to-end performance testing."""
+    test_provider = TestLLMProviderServiceProvider(infrastructure_settings)
+    container = make_async_container(test_provider)
+
+    try:
+        yield container
+    finally:
+        # Cleanup all infrastructure components
+        async with container() as request_container:
+            try:
+                from huleedu_service_libs.kafka_client import KafkaBus
+
+                kafka_bus = await request_container.get(KafkaBus)
+                if hasattr(kafka_bus, "stop"):
+                    await kafka_bus.stop()
+            except Exception as e:
+                print(f"⚠ Failed to stop Kafka bus: {e}")
+
+            try:
+                from huleedu_service_libs.queue_protocols import QueueRedisClientProtocol
+
+                queue_redis_client = await request_container.get(QueueRedisClientProtocol)
+                if hasattr(queue_redis_client, "stop"):
+                    await queue_redis_client.stop()
+            except Exception as e:
+                print(f"⚠ Failed to stop queue Redis client: {e}")
+
+            try:
+                from huleedu_service_libs.protocols import RedisClientProtocol
+
+                redis_client = await request_container.get(RedisClientProtocol)
+                if hasattr(redis_client, "stop"):
+                    await redis_client.stop()
+            except Exception as e:
+                print(f"⚠ Failed to stop Redis client: {e}")
+
+
 class TestEndToEndPerformance:
-    """Tests for complete end-to-end pipeline performance."""
+    """Tests for complete end-to-end pipeline performance with real infrastructure."""
 
     @pytest.mark.asyncio
-    async def test_end_to_end_load_scenario(self, mock_only_settings: Settings) -> None:
-        """Test complete end-to-end load scenario with realistic patterns."""
-        from services.llm_provider_service.internal_models import LLMProviderResponse
-
+    async def test_end_to_end_load_scenario(self, infrastructure_di_container: Any) -> None:
+        """Test complete end-to-end load scenario with real infrastructure."""
         metrics = PerformanceMetrics()
 
         # Simulate realistic load pattern
         request_batches = [
-            (10, 0.1),  # 10 requests with 0.1s intervals
-            (20, 0.05),  # 20 requests with 0.05s intervals (higher load)
-            (5, 0.2),  # 5 requests with 0.2s intervals (cooldown)
+            (5, 0.2),  # 5 requests with 0.2s intervals
+            (8, 0.15),  # 8 requests with 0.15s intervals (higher load)
+            (3, 0.3),  # 3 requests with 0.3s intervals (cooldown)
         ]
 
-        with patch(
-            "services.llm_provider_service.implementations.mock_provider_impl.MockProviderImpl"
-        ) as MockProviderClass:
-            # Create a mock instance that returns proper response
-            mock_provider_instance = AsyncMock()
-            mock_response = LLMProviderResponse(
-                winner=EssayComparisonWinner.ESSAY_A,
-                justification="Essay A is better structured",
-                confidence=0.85,
-                provider=LLMProviderType.ANTHROPIC,
-                model="mock-model",
-                prompt_tokens=100,
-                completion_tokens=50,
-                total_tokens=150,
-                raw_response={"mock": "response"},
-            )
-            mock_provider_instance.generate_comparison = AsyncMock(
-                return_value=(mock_response, None)
-            )
+        async with infrastructure_di_container() as request_container:
+            orchestrator = await request_container.get(LLMOrchestratorProtocol)
 
-            # Make the class return our instance
-            MockProviderClass.return_value = mock_provider_instance
+        # Run load test batches
+        total_requests = 0
 
-            # Mock Kafka to prevent connection attempts
-            with patch("services.llm_provider_service.di.KafkaBus") as mock_kafka_bus:
-                mock_kafka_instance = AsyncMock()
-                mock_kafka_instance.start = AsyncMock()
-                mock_kafka_instance.stop = AsyncMock()
-                mock_kafka_bus.return_value = mock_kafka_instance
+        for batch_size, interval in request_batches:
+            batch_tasks = []
 
-                # Mock Redis to prevent connection attempts
-                with patch("services.llm_provider_service.di.RedisClient") as mock_redis_client:
-                    mock_redis_instance = AsyncMock()
-                    mock_redis_instance.start = AsyncMock()
-                    mock_redis_instance.stop = AsyncMock()
-                    # Fix the pipeline mock - it should return a regular Mock, not AsyncMock
-                    mock_client = Mock()  # Regular Mock for the client
-                    mock_pipeline = Mock()  # Regular Mock for the pipeline
-                    mock_pipeline.execute = AsyncMock(return_value=[])  # Only execute is async
-                    mock_client.pipeline.return_value = mock_pipeline
-                    mock_redis_instance.client = mock_client
-                    mock_redis_client.return_value = mock_redis_instance
+            for i in range(batch_size):
 
-                    # Patch the settings module to use our test settings
-                    with patch("services.llm_provider_service.di.settings", mock_only_settings):
-                        container = make_async_container(LLMProviderServiceProvider())
+                async def make_request(request_id: int) -> None:
+                    start_time = time.perf_counter()
 
-                        async with container() as request_container:
-                            from services.llm_provider_service.protocols import (
-                                LLMOrchestratorProtocol,
-                            )
+                    try:
+                        _, error = await orchestrator.perform_comparison(
+                            provider=LLMProviderType.MOCK,  # Mock to avoid API costs
+                            user_prompt="Compare these essays",
+                            essay_a=f"Load test essay A {request_id}",
+                            essay_b=f"Load test essay B {request_id}",
+                            correlation_id=uuid4(),
+                            model="mock-model",
+                        )
 
-                            orchestrator = await request_container.get(LLMOrchestratorProtocol)
+                        response_time = time.perf_counter() - start_time
+                        status_code = 200 if error is None else 500
 
-                            # Run load test batches
-                            total_requests = 0
+                        metrics.add_measurement(response_time, status_code)
 
-                            for batch_size, interval in request_batches:
-                                batch_tasks = []
+                    except Exception as e:
+                        response_time = time.perf_counter() - start_time
+                        metrics.add_measurement(response_time, 500, str(e))
 
-                                for i in range(batch_size):
+                batch_tasks.append(make_request(total_requests + i))
 
-                                    async def make_request(request_id: int) -> None:
-                                        start_time = time.perf_counter()
+                # Add interval between requests
+                if i < batch_size - 1:
+                    await asyncio.sleep(interval)
 
-                                        try:
-                                            _, error = await orchestrator.perform_comparison(
-                                                provider=LLMProviderType.ANTHROPIC,  # Mock
-                                                user_prompt="Compare these essays",
-                                                essay_a=f"Load test essay A {request_id}",
-                                                essay_b=f"Load test essay B {request_id}",
-                                                correlation_id=UUID(
-                                                    f"00000000-0000-0000-0000-{request_id:012d}"
-                                                ),
-                                                model="mock-model",
-                                            )
+            # Wait for batch to complete
+            await asyncio.gather(*batch_tasks)
+            total_requests += batch_size
 
-                                            response_time = time.perf_counter() - start_time
-                                            status_code = 200 if error is None else 500
+            # Brief pause between batches
+            await asyncio.sleep(0.5)
 
-                                            metrics.add_measurement(response_time, status_code)
+        # Analyze results
+        stats = metrics.get_statistics()
 
-                                        except Exception as e:
-                                            response_time = time.perf_counter() - start_time
-                                            metrics.add_measurement(response_time, 500, str(e))
+        print("End-to-end load test results (real infrastructure):")
+        print(f"  Total requests: {stats['total_requests']}")
+        success_rate = stats["successful_requests"] / stats["total_requests"] * 100
+        print(f"  Success rate: {success_rate:.1f}%")
+        print(f"  Error rate: {stats['error_rate']:.1f}%")
+        print("  Response times:")
+        print(f"    Mean: {stats['response_times']['mean']:.4f}s")
+        print(f"    Median: {stats['response_times']['median']:.4f}s")
+        print(f"    P95: {stats['response_times']['p95']:.4f}s")
+        print(f"    P99: {stats['response_times']['p99']:.4f}s")
+        print(f"  Status codes: {stats['status_codes']}")
+        print("  Infrastructure: Real Kafka + Redis (testcontainers)")
+        print("  LLM Provider: Mock (no API costs)")
 
-                                    batch_tasks.append(make_request(total_requests + i))
-
-                                    # Add interval between requests
-                                    if i < batch_size - 1:
-                                        await asyncio.sleep(interval)
-
-                                # Wait for batch to complete
-                                await asyncio.gather(*batch_tasks)
-                                total_requests += batch_size
-
-                                # Brief pause between batches
-                                await asyncio.sleep(0.5)
-
-                            # Analyze results
-                            stats = metrics.get_statistics()
-
-                            print("End-to-end load test results:")
-                            print(f"  Total requests: {stats['total_requests']}")
-                            success_rate = (
-                                stats["successful_requests"] / stats["total_requests"] * 100
-                            )
-                            print(f"  Success rate: {success_rate:.1f}%")
-                            print(f"  Error rate: {stats['error_rate']:.1f}%")
-                            print("  Response times:")
-                            print(f"    Mean: {stats['response_times']['mean']:.4f}s")
-                            print(f"    Median: {stats['response_times']['median']:.4f}s")
-                            print(f"    P95: {stats['response_times']['p95']:.4f}s")
-                            print(f"    P99: {stats['response_times']['p99']:.4f}s")
-                            print(f"  Status codes: {stats['status_codes']}")
-
-                            # Validate performance targets
-                            assert stats["response_times"]["p95"] < 0.5  # P95 under 500ms
-                            assert (
-                                stats["successful_requests"] / stats["total_requests"] >= 0.95
-                            )  # 95% success rate
-                            assert stats["error_rate"] < 5  # Less than 5% error rate
+        # Realistic performance targets for real infrastructure
+        assert stats["response_times"]["p95"] < 5.0  # P95 under 5s
+        assert stats["successful_requests"] / stats["total_requests"] >= 0.90  # 90% success rate
+        assert stats["error_rate"] < 10  # Less than 10% error rate
 
     @pytest.mark.asyncio
-    async def test_mixed_workload_performance(self, mock_only_settings: Settings) -> None:
-        """Test performance under mixed workload with different request types."""
-        from services.llm_provider_service.internal_models import LLMProviderResponse
-
+    async def test_mixed_workload_performance(self, infrastructure_di_container: Any) -> None:
+        """Test performance under mixed workload with real infrastructure."""
         metrics = PerformanceMetrics()
 
-        # Define different workload types
+        # Define different workload types (reduced for real infrastructure)
         workloads = [
-            ("quick", 15, 0.05, "Quick comparison"),
-            ("detailed", 10, 0.1, "Detailed analysis comparison"),
-            ("batch", 8, 0.15, "Batch processing comparison"),
+            ("quick", 5, 0.1, "Quick comparison"),
+            ("detailed", 4, 0.2, "Detailed analysis comparison"),
+            ("batch", 3, 0.3, "Batch processing comparison"),
         ]
 
-        with patch(
-            "services.llm_provider_service.implementations.mock_provider_impl.MockProviderImpl"
-        ) as MockProviderClass:
-            mock_provider_instance = AsyncMock()
-            mock_response = LLMProviderResponse(
-                winner=EssayComparisonWinner.ESSAY_A,
-                justification="Essay A is better structured",
-                confidence=0.85,
-                provider=LLMProviderType.ANTHROPIC,
-                model="mock-model",
-                prompt_tokens=100,
-                completion_tokens=50,
-                total_tokens=150,
-                raw_response={"mock": "response"},
-            )
-            mock_provider_instance.generate_comparison = AsyncMock(
-                return_value=(mock_response, None)
-            )
-            MockProviderClass.return_value = mock_provider_instance
+        async with infrastructure_di_container() as request_container:
+            orchestrator = await request_container.get(LLMOrchestratorProtocol)
 
-            with patch("services.llm_provider_service.di.KafkaBus") as mock_kafka_bus:
-                mock_kafka_instance = AsyncMock()
-                mock_kafka_instance.start = AsyncMock()
-                mock_kafka_instance.stop = AsyncMock()
-                mock_kafka_bus.return_value = mock_kafka_instance
+        async def execute_workload(
+            workload_name: str, count: int, delay: float, prompt: str
+        ) -> Dict[str, Any]:
+            """Execute a specific workload type."""
+            workload_metrics = PerformanceMetrics()
+            tasks = []
 
-                with patch("services.llm_provider_service.di.RedisClient") as mock_redis_client:
-                    mock_redis_instance = AsyncMock()
-                    mock_redis_instance.start = AsyncMock()
-                    mock_redis_instance.stop = AsyncMock()
-                    mock_client = Mock()
-                    mock_pipeline = Mock()
-                    mock_pipeline.execute = AsyncMock(return_value=[])
-                    mock_client.pipeline.return_value = mock_pipeline
-                    mock_redis_instance.client = mock_client
-                    mock_redis_client.return_value = mock_redis_instance
+            async def workload_request(request_id: int) -> None:
+                start_time = time.perf_counter()
+                try:
+                    _, error = await orchestrator.perform_comparison(
+                        provider=LLMProviderType.MOCK,
+                        user_prompt=prompt,
+                        essay_a=f"{workload_name} essay A {request_id}",
+                        essay_b=f"{workload_name} essay B {request_id}",
+                        correlation_id=uuid4(),
+                        model="mock-model",
+                    )
+                    response_time = time.perf_counter() - start_time
+                    status_code = 200 if error is None else 500
+                    workload_metrics.add_measurement(response_time, status_code)
+                    metrics.add_measurement(response_time, status_code)
+                except Exception as e:
+                    response_time = time.perf_counter() - start_time
+                    workload_metrics.add_measurement(response_time, 500, str(e))
+                    metrics.add_measurement(response_time, 500, str(e))
 
-                    with patch("services.llm_provider_service.di.settings", mock_only_settings):
-                        container = make_async_container(LLMProviderServiceProvider())
+            # Create tasks with delays
+            for i in range(count):
+                tasks.append(workload_request(i))
+                if i < count - 1:
+                    await asyncio.sleep(delay)
 
-                        async with container() as request_container:
-                            from services.llm_provider_service.protocols import (
-                                LLMOrchestratorProtocol,
-                            )
+            await asyncio.gather(*tasks)
+            return workload_metrics.get_statistics()
 
-                            orchestrator = await request_container.get(LLMOrchestratorProtocol)
+        # Execute all workloads concurrently
+        workload_results = {}
+        workload_tasks = []
 
-                            async def execute_workload(
-                                workload_name: str, count: int, delay: float, prompt: str
-                            ) -> dict:
-                                """Execute a specific workload type."""
-                                workload_metrics = PerformanceMetrics()
-                                tasks = []
+        for workload_name, count, delay, prompt in workloads:
+            task = execute_workload(workload_name, count, delay, prompt)
+            workload_tasks.append((workload_name, task))
 
-                                async def workload_request(request_id: int) -> None:
-                                    start_time = time.perf_counter()
-                                    try:
-                                        _, error = await orchestrator.perform_comparison(
-                                            provider=LLMProviderType.ANTHROPIC,
-                                            user_prompt=prompt,
-                                            essay_a=f"{workload_name} essay A {request_id}",
-                                            essay_b=f"{workload_name} essay B {request_id}",
-                                            correlation_id=UUID(
-                                                f"44444444-4444-4444-4444-{request_id:012d}"
-                                            ),
-                                            model="mock-model",
-                                        )
-                                        response_time = time.perf_counter() - start_time
-                                        status_code = 200 if error is None else 500
-                                        workload_metrics.add_measurement(response_time, status_code)
-                                        metrics.add_measurement(response_time, status_code)
-                                    except Exception as e:
-                                        response_time = time.perf_counter() - start_time
-                                        workload_metrics.add_measurement(response_time, 500, str(e))
-                                        metrics.add_measurement(response_time, 500, str(e))
+        # Run all workloads
+        for workload_name, task in workload_tasks:
+            workload_results[workload_name] = await task
 
-                                # Create tasks with delays
-                                for i in range(count):
-                                    tasks.append(workload_request(i))
-                                    if i < count - 1:
-                                        await asyncio.sleep(delay)
+        # Analyze overall mixed workload results
+        overall_stats = metrics.get_statistics()
 
-                                await asyncio.gather(*tasks)
-                                return workload_metrics.get_statistics()
+        print("Mixed workload performance results (real infrastructure):")
+        print(f"  Total requests: {overall_stats['total_requests']}")
+        overall_success_rate = (
+            overall_stats["successful_requests"] / overall_stats["total_requests"] * 100
+        )
+        print(f"  Overall success rate: {overall_success_rate:.1f}%")
+        print(f"  Overall P95: {overall_stats['response_times']['p95']:.4f}s")
+        print("  Infrastructure: Real Kafka + Redis (testcontainers)")
 
-                            # Execute all workloads concurrently
-                            workload_results = {}
-                            workload_tasks = []
+        # Per-workload analysis
+        for workload_name, stats in workload_results.items():
+            if stats:  # Check if stats is not empty
+                print(f"  {workload_name.capitalize()} workload:")
+                print(f"    Requests: {stats['total_requests']}")
+                workload_success_rate = stats["successful_requests"] / stats["total_requests"] * 100
+                print(f"    Success rate: {workload_success_rate:.1f}%")
+                print(f"    Mean time: {stats['response_times']['mean']:.4f}s")
 
-                            for workload_name, count, delay, prompt in workloads:
-                                task = execute_workload(workload_name, count, delay, prompt)
-                                workload_tasks.append((workload_name, task))
-
-                            # Run all workloads
-                            for workload_name, task in workload_tasks:
-                                workload_results[workload_name] = await task
-
-                            # Analyze overall mixed workload results
-                            overall_stats = metrics.get_statistics()
-
-                            print("Mixed workload performance results:")
-                            print(f"  Total requests: {overall_stats['total_requests']}")
-                            overall_success_rate = (
-                                overall_stats["successful_requests"]
-                                / overall_stats["total_requests"]
-                                * 100
-                            )
-                            print(f"  Overall success rate: {overall_success_rate:.1f}%")
-                            print(f"  Overall P95: {overall_stats['response_times']['p95']:.4f}s")
-
-                            # Per-workload analysis
-                            for workload_name, stats in workload_results.items():
-                                if stats:  # Check if stats is not empty
-                                    print(f"  {workload_name.capitalize()} workload:")
-                                    print(f"    Requests: {stats['total_requests']}")
-                                    workload_success_rate = (
-                                        stats["successful_requests"] / stats["total_requests"] * 100
-                                    )
-                                    print(f"    Success rate: {workload_success_rate:.1f}%")
-                                    print(f"    Mean time: {stats['response_times']['mean']:.4f}s")
-
-                            # Validate mixed workload performance
-                            assert (
-                                overall_stats["response_times"]["p95"] < 0.6
-                            )  # P95 under 600ms for mixed load
-                            assert (
-                                overall_stats["successful_requests"]
-                                / overall_stats["total_requests"]
-                                >= 0.90
-                            )  # 90% success rate
+        # Realistic mixed workload performance targets
+        assert overall_stats["response_times"]["p95"] < 6.0  # P95 under 6s for mixed load
+        assert (
+            overall_stats["successful_requests"] / overall_stats["total_requests"] >= 0.85
+        )  # 85% success rate
 
     @pytest.mark.asyncio
-    async def test_sustained_load_performance(self, mock_only_settings: Settings) -> None:
-        """Test performance under sustained load over time."""
-        from services.llm_provider_service.internal_models import LLMProviderResponse
-
-        duration_seconds = 30
-        requests_per_second = 5
-        # total_expected_requests = duration_seconds * requests_per_second  # Unused
+    async def test_sustained_load_performance(self, infrastructure_di_container: Any) -> None:
+        """Test performance under sustained load with real infrastructure."""
+        duration_seconds = 15  # Reduced for real infrastructure
+        requests_per_second = 2  # Reduced rate for real infrastructure
 
         metrics = PerformanceMetrics()
 
-        with patch(
-            "services.llm_provider_service.implementations.mock_provider_impl.MockProviderImpl"
-        ) as MockProviderClass:
-            mock_provider_instance = AsyncMock()
-            mock_response = LLMProviderResponse(
-                winner=EssayComparisonWinner.ESSAY_A,
-                justification="Essay A is better structured",
-                confidence=0.85,
-                provider=LLMProviderType.ANTHROPIC,
-                model="mock-model",
-                prompt_tokens=100,
-                completion_tokens=50,
-                total_tokens=150,
-                raw_response={"mock": "response"},
-            )
-            mock_provider_instance.generate_comparison = AsyncMock(
-                return_value=(mock_response, None)
-            )
-            MockProviderClass.return_value = mock_provider_instance
+        async with infrastructure_di_container() as request_container:
+            orchestrator = await request_container.get(LLMOrchestratorProtocol)
 
-            with patch("services.llm_provider_service.di.KafkaBus") as mock_kafka_bus:
-                mock_kafka_instance = AsyncMock()
-                mock_kafka_instance.start = AsyncMock()
-                mock_kafka_instance.stop = AsyncMock()
-                mock_kafka_bus.return_value = mock_kafka_instance
+        async def sustained_request_generator() -> None:
+            """Generate requests at sustained rate."""
+            request_id = 0
+            start_time = time.perf_counter()
 
-                with patch("services.llm_provider_service.di.RedisClient") as mock_redis_client:
-                    mock_redis_instance = AsyncMock()
-                    mock_redis_instance.start = AsyncMock()
-                    mock_redis_instance.stop = AsyncMock()
-                    mock_client = Mock()
-                    mock_pipeline = Mock()
-                    mock_pipeline.execute = AsyncMock(return_value=[])
-                    mock_client.pipeline.return_value = mock_pipeline
-                    mock_redis_instance.client = mock_client
-                    mock_redis_client.return_value = mock_redis_instance
+            while time.perf_counter() - start_time < duration_seconds:
 
-                    with patch("services.llm_provider_service.di.settings", mock_only_settings):
-                        container = make_async_container(LLMProviderServiceProvider())
+                async def make_sustained_request(req_id: int) -> None:
+                    req_start = time.perf_counter()
+                    try:
+                        _, error = await orchestrator.perform_comparison(
+                            provider=LLMProviderType.MOCK,
+                            user_prompt="Sustained load test",
+                            essay_a=f"Sustained essay A {req_id}",
+                            essay_b=f"Sustained essay B {req_id}",
+                            correlation_id=uuid4(),
+                            model="mock-model",
+                        )
+                        response_time = time.perf_counter() - req_start
+                        status_code = 200 if error is None else 500
+                        metrics.add_measurement(response_time, status_code)
+                    except Exception as e:
+                        response_time = time.perf_counter() - req_start
+                        metrics.add_measurement(response_time, 500, str(e))
 
-                        async with container() as request_container:
-                            from services.llm_provider_service.protocols import (
-                                LLMOrchestratorProtocol,
-                            )
+                # Start request without waiting for completion
+                asyncio.create_task(make_sustained_request(request_id))
+                request_id += 1
 
-                            orchestrator = await request_container.get(LLMOrchestratorProtocol)
+                # Wait for next request interval
+                await asyncio.sleep(1.0 / requests_per_second)
 
-                            async def sustained_request_generator() -> None:
-                                """Generate requests at sustained rate."""
-                                request_id = 0
-                                start_time = time.perf_counter()
+        # Run sustained load test
+        print(f"Starting sustained load test: {requests_per_second} req/s for {duration_seconds}s")
+        await sustained_request_generator()
 
-                                while time.perf_counter() - start_time < duration_seconds:
+        # Wait a bit for remaining requests to complete
+        await asyncio.sleep(2.0)
 
-                                    async def make_sustained_request(req_id: int) -> None:
-                                        req_start = time.perf_counter()
-                                        try:
-                                            _, error = await orchestrator.perform_comparison(
-                                                provider=LLMProviderType.ANTHROPIC,
-                                                user_prompt="Sustained load test",
-                                                essay_a=f"Sustained essay A {req_id}",
-                                                essay_b=f"Sustained essay B {req_id}",
-                                                correlation_id=UUID(
-                                                    f"55555555-5555-5555-5555-{req_id:012d}"
-                                                ),
-                                                model="mock-model",
-                                            )
-                                            response_time = time.perf_counter() - req_start
-                                            status_code = 200 if error is None else 500
-                                            metrics.add_measurement(response_time, status_code)
-                                        except Exception as e:
-                                            response_time = time.perf_counter() - req_start
-                                            metrics.add_measurement(response_time, 500, str(e))
+        # Analyze sustained load results
+        stats = metrics.get_statistics()
 
-                                    # Start request without waiting for completion
-                                    asyncio.create_task(make_sustained_request(request_id))
-                                    request_id += 1
+        print("Sustained load test results (real infrastructure):")
+        print(f"  Duration: {duration_seconds}s")
+        print(f"  Target rate: {requests_per_second} req/s")
+        print(f"  Actual requests: {stats['total_requests']}")
+        actual_rate = stats["total_requests"] / duration_seconds
+        print(f"  Actual rate: {actual_rate:.2f} req/s")
+        sustained_success_rate = stats["successful_requests"] / stats["total_requests"] * 100
+        print(f"  Success rate: {sustained_success_rate:.1f}%")
+        print("  Response times:")
+        print(f"    Mean: {stats['response_times']['mean']:.4f}s")
+        print(f"    P95: {stats['response_times']['p95']:.4f}s")
+        print(f"    P99: {stats['response_times']['p99']:.4f}s")
+        print("  Infrastructure: Real Kafka + Redis (testcontainers)")
 
-                                    # Wait for next request interval
-                                    await asyncio.sleep(1.0 / requests_per_second)
-
-                            # Run sustained load test
-                            print(
-                                f"Starting sustained load test: {requests_per_second} req/s "
-                                f"for {duration_seconds}s"
-                            )
-                            await sustained_request_generator()
-
-                            # Wait a bit for remaining requests to complete
-                            await asyncio.sleep(2.0)
-
-                            # Analyze sustained load results
-                            stats = metrics.get_statistics()
-
-                            print("Sustained load test results:")
-                            print(f"  Duration: {duration_seconds}s")
-                            print(f"  Target rate: {requests_per_second} req/s")
-                            print(f"  Actual requests: {stats['total_requests']}")
-                            actual_rate = stats["total_requests"] / duration_seconds
-                            print(f"  Actual rate: {actual_rate:.2f} req/s")
-                            sustained_success_rate = (
-                                stats["successful_requests"] / stats["total_requests"] * 100
-                            )
-                            print(f"  Success rate: {sustained_success_rate:.1f}%")
-                            print("  Response times:")
-                            print(f"    Mean: {stats['response_times']['mean']:.4f}s")
-                            print(f"    P95: {stats['response_times']['p95']:.4f}s")
-                            print(f"    P99: {stats['response_times']['p99']:.4f}s")
-
-                            # Validate sustained performance
-                            actual_rate = stats["total_requests"] / duration_seconds
-                            assert (
-                                actual_rate >= requests_per_second * 0.8
-                            )  # At least 80% of target rate
-                            assert stats["response_times"]["p95"] < 1.0  # P95 under 1 second
-                            assert (
-                                stats["successful_requests"] / stats["total_requests"] >= 0.85
-                            )  # 85% success rate
+        # Realistic sustained performance targets
+        actual_rate = stats["total_requests"] / duration_seconds
+        assert actual_rate >= requests_per_second * 0.80  # At least 80% of target rate
+        assert stats["response_times"]["p95"] < 8.0  # P95 under 8 seconds
+        assert stats["successful_requests"] / stats["total_requests"] >= 0.85  # 85% success rate

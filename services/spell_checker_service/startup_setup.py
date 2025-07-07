@@ -16,7 +16,7 @@ from opentelemetry.trace import Tracer
 from quart import Quart
 
 from services.spell_checker_service.config import Settings
-from services.spell_checker_service.metrics import get_http_metrics, get_metrics
+from services.spell_checker_service.metrics import get_metrics
 
 
 class SpellCheckerQuart(Quart):
@@ -55,6 +55,7 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
     # Get database metrics from DI container
     try:
         from huleedu_service_libs.database import DatabaseMetrics
+
         async with container() as request_container:
             database_metrics = await request_container.get(DatabaseMetrics)
         logger.info("Database metrics retrieved from DI container")
@@ -71,7 +72,7 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
 
     logger.info("All metrics initialized and stored in app extensions")
     logger.info(f"Available metrics: {list(metrics.keys())}")
-    
+
     # Log database metrics integration status
     if database_metrics:
         logger.info("Database metrics successfully integrated")

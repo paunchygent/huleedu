@@ -268,3 +268,41 @@ class QueueRepositoryProtocol(Protocol):
     async def get_memory_usage(self) -> int:
         """Get total memory usage in bytes."""
         ...
+
+
+class ConnectionPoolManagerProtocol(Protocol):
+    """Protocol for HTTP connection pool management."""
+
+    async def get_session(self, provider: str) -> Any:
+        """Get optimized session for specific provider.
+
+        Args:
+            provider: Provider name
+
+        Returns:
+            HTTP session for the provider
+        """
+        ...
+
+    async def get_connection_stats(self, provider: str) -> Dict[str, Any]:
+        """Get connection statistics for a provider.
+
+        Args:
+            provider: Provider name
+
+        Returns:
+            Dictionary with connection statistics
+        """
+        ...
+
+    async def health_check_connections(self) -> Dict[str, bool]:
+        """Perform health check on all connection pools.
+
+        Returns:
+            Dictionary mapping provider names to health status
+        """
+        ...
+
+    async def cleanup(self) -> None:
+        """Clean up all sessions and connection pools."""
+        ...

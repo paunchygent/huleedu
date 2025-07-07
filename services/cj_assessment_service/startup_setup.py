@@ -30,7 +30,7 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
 
             # Get database metrics for integration
             database_metrics = await request_container.get(DatabaseMetrics)
-            
+
             # Get shared metrics with database metrics integration (thread-safe singleton pattern)
             metrics = get_metrics(database_metrics)
 

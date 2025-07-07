@@ -55,7 +55,7 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
             self.engine = engine
         else:
             self.engine = create_async_engine(
-                settings.DATABASE_URL,
+                settings.database_url,
                 echo=False,
                 future=True,
                 pool_size=getattr(settings, "DATABASE_POOL_SIZE", 5),

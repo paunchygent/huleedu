@@ -33,7 +33,7 @@ class TestHealthAPI:
         assert response.status_code == 200
 
         data = await response.get_json()
-        assert data["status"] == "ok"
+        assert data["status"] == "healthy"
         assert data["message"] == "CJ Assessment Service is healthy"
         assert data["service"] == "cj_assessment_service"
         assert "checks" in data

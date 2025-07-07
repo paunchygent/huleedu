@@ -210,7 +210,9 @@ class RepositoryAndPublishingProvider(Provider):
         database_metrics_dict = get_database_metrics()
 
         # Create database metrics instance with BOS service prefix and existing metrics
-        return DatabaseMetrics(service_name="batch_orchestrator_service", metrics_dict=database_metrics_dict)
+        return DatabaseMetrics(
+            service_name="batch_orchestrator_service", metrics_dict=database_metrics_dict
+        )
 
     @provide(scope=Scope.APP)
     def provide_batch_repository(

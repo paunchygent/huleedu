@@ -9,7 +9,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.redis_client import RedisClient
+from huleedu_service_libs.queue_protocols import QueueRedisClientProtocol
 
 from common_core import QueueStatus
 from services.llm_provider_service.config import Settings
@@ -22,7 +22,7 @@ logger = create_service_logger("llm_provider_service.redis_queue")
 class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
     """Redis-based queue repository with sorted sets for priority."""
 
-    def __init__(self, redis_client: RedisClient, settings: Settings):
+    def __init__(self, redis_client: QueueRedisClientProtocol, settings: Settings):
         self.redis = redis_client
         self.settings = settings
         self.prefix = f"{settings.SERVICE_NAME}:queue"
@@ -45,7 +45,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
             score = -request.priority + (timestamp / 1e10)  # Ensure timestamp doesn't dominate
 
             # Use pipeline for atomic operations
-            pipe = self.redis.client.pipeline()
+            pipe = self.redis.pipeline()
 
             # Add to sorted set for ordering
             pipe.zadd(self.queue_key, {queue_id_str: score})
@@ -79,7 +79,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
         """Get highest priority queued request with optimized pipeline operations."""
         try:
             # Get top N items to reduce recursive calls and use batch operations
-            items = await self.redis.client.zrange(
+            items = await self.redis.zrange(
                 self.queue_key,
                 0,
                 9,
@@ -90,7 +90,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
                 return None
 
             # Batch get request data for all top items
-            request_jsons = await self.redis.client.hmget(self.data_key, *items)
+            request_jsons = await self.redis.hmget(self.data_key, *items)
 
             # Process in priority order to find first valid request
             orphaned_ids = []
@@ -139,12 +139,13 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
     async def _batch_cleanup_invalid_requests(
         self, orphaned_ids: List[str], expired_ids: List[str]
     ) -> None:
-        """Batch cleanup orphaned and expired requests using pipeline."""
+        """Batch cleanup orphaned and expired requests using direct operations."""
         try:
             if not orphaned_ids and not expired_ids:
                 return
 
-            pipe = self.redis.client.pipeline()
+            # Use pipeline for proper batch operations with the new protocol
+            pipe = self.redis.pipeline()
 
             # Clean up orphaned entries (missing data)
             for queue_id_str in orphaned_ids:
@@ -170,7 +171,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
         """Get specific request by ID."""
         try:
             queue_id_str = str(queue_id)
-            request_json = await self.redis.client.hget(self.data_key, queue_id_str)
+            request_json = await self.redis.hget(self.data_key, queue_id_str)
 
             if not request_json:
                 return None
@@ -194,14 +195,14 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
             queue_id_str = str(request.queue_id)
 
             # Check if exists
-            exists = await self.redis.client.hexists(self.data_key, queue_id_str)
+            exists = await self.redis.hexists(self.data_key, queue_id_str)
             if not exists:
                 logger.warning(f"Cannot update non-existent request: {queue_id_str}")
                 return False
 
             # Update data
             request_json = request.model_dump_json()
-            await self.redis.client.hset(self.data_key, queue_id_str, request_json)
+            await self.redis.hset(self.data_key, queue_id_str, request_json)
 
             logger.debug(f"Updated request {queue_id_str} with status {request.status}")
             return True
@@ -216,7 +217,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
             queue_id_str = str(queue_id)
 
             # Use pipeline for atomic deletion
-            pipe = self.redis.client.pipeline()
+            pipe = self.redis.pipeline()
             pipe.zrem(self.queue_key, queue_id_str)
             pipe.hdel(self.data_key, queue_id_str)
             pipe.delete(f"{self.data_key}:{queue_id_str}")  # Remove expiration marker
@@ -237,13 +238,13 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
         """Get all QUEUED status requests using optimized batch operations."""
         try:
             # Get all queue IDs from sorted set
-            queue_ids = await self.redis.client.zrange(self.queue_key, 0, -1)
+            queue_ids = await self.redis.zrange(self.queue_key, 0, -1)
 
             if not queue_ids:
                 return []
 
             # Batch get all data using hmget (single Redis call instead of N calls)
-            request_jsons = await self.redis.client.hmget(self.data_key, *queue_ids)
+            request_jsons = await self.redis.hmget(self.data_key, *queue_ids)
 
             requests = []
             for queue_id_str, request_json in zip(queue_ids, request_jsons):
@@ -265,7 +266,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
     async def count(self) -> int:
         """Get total queue size."""
         try:
-            count = await self.redis.client.zcard(self.queue_key)
+            count = await self.redis.zcard(self.queue_key)
             return count or 0
         except Exception as e:
             logger.error(f"Failed to get queue count: {e}")
@@ -275,13 +276,13 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
         """Get approximate memory usage in bytes using optimized batch operations."""
         try:
             # Get all queue IDs
-            queue_ids = await self.redis.client.hkeys(self.data_key)
+            queue_ids = await self.redis.hkeys(self.data_key)
 
             if not queue_ids:
                 return 0
 
             # Batch get all data using hmget (single Redis call)
-            request_jsons = await self.redis.client.hmget(self.data_key, *queue_ids)
+            request_jsons = await self.redis.hmget(self.data_key, *queue_ids)
 
             total_bytes = 0
             for request_json in request_jsons:
@@ -313,12 +314,12 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
             return 0
 
         try:
-            # Use pipeline for batch operations
-            pipe = self.redis.client.pipeline()
-
             # First, get all current request data in batch
             queue_id_strs = [str(queue_id) for queue_id, _ in status_updates]
-            current_data = await self.redis.client.hmget(self.data_key, *queue_id_strs)
+            current_data = await self.redis.hmget(self.data_key, *queue_id_strs)
+
+            # Use pipeline for batch operations
+            pipe = self.redis.pipeline()
 
             # Prepare updates
             successful_updates = 0
@@ -357,13 +358,13 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
         """
         try:
             # Get all queue IDs and their data in batch
-            queue_ids = await self.redis.client.zrange(self.queue_key, 0, -1)
+            queue_ids = await self.redis.zrange(self.queue_key, 0, -1)
 
             if not queue_ids:
                 return 0
 
             # Get all request data in batch
-            request_jsons = await self.redis.client.hmget(self.data_key, *queue_ids)
+            request_jsons = await self.redis.hmget(self.data_key, *queue_ids)
 
             # Identify expired requests
             expired_ids = []
@@ -384,7 +385,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
                 return 0
 
             # Batch delete using pipeline
-            pipe = self.redis.client.pipeline()
+            pipe = self.redis.pipeline()
 
             for queue_id_str in expired_ids:
                 pipe.zrem(self.queue_key, queue_id_str)
@@ -404,7 +405,7 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
         """Clean up expired requests from queue."""
         try:
             # Get all queue IDs
-            queue_ids = await self.redis.client.zrange(self.queue_key, 0, -1)
+            queue_ids = await self.redis.zrange(self.queue_key, 0, -1)
 
             if not queue_ids:
                 return 0
@@ -412,11 +413,11 @@ class RedisQueueRepositoryImpl(QueueRepositoryProtocol):
             expired_count = 0
             for queue_id_str in queue_ids:
                 # Check if expiration marker exists
-                marker_exists = await self.redis.client.exists(f"{self.data_key}:{queue_id_str}")
+                marker_exists = await self.redis.exists(f"{self.data_key}:{queue_id_str}")
 
                 if not marker_exists:
                     # Marker expired, remove the request
-                    request_json = await self.redis.client.hget(self.data_key, queue_id_str)
+                    request_json = await self.redis.hget(self.data_key, queue_id_str)
                     if request_json:
                         try:
                             request = QueuedRequest.model_validate_json(request_json)

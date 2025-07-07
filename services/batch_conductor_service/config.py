@@ -9,6 +9,8 @@ from __future__ import annotations
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from common_core.config_enums import Environment
+
 
 class Settings(BaseSettings):
     """Configuration settings for Batch Conductor Service."""
@@ -50,7 +52,7 @@ class Settings(BaseSettings):
     USE_MOCK_REPOSITORY: bool = Field(
         default=False, description="Use mock repository for development/testing"
     )
-    ENVIRONMENT: str = Field(default="development", description="Environment type")
+    ENVIRONMENT: Environment = Environment.DEVELOPMENT
 
     # Event-driven architecture configuration
     KAFKA_BOOTSTRAP_SERVERS: str = Field(

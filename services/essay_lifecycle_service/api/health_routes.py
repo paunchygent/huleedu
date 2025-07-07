@@ -7,12 +7,15 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_l
 from quart import Blueprint, Response, current_app, jsonify
 from quart_dishka import inject
 
+from services.essay_lifecycle_service.config import Settings
+
 logger = create_service_logger("els.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
 
 @health_bp.route("/healthz", methods=["GET"])
-async def health_check() -> Response | tuple[Response, int]:
+@inject
+async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Response, int]:
     """Standardized health check endpoint."""
     try:
         # Check database connectivity
@@ -41,13 +44,13 @@ async def health_check() -> Response | tuple[Response, int]:
         overall_status = "healthy" if checks["dependencies_available"] else "unhealthy"
 
         health_response = {
-            "service": "essay_lifecycle_service",
+            "service": settings.SERVICE_NAME,
             "status": overall_status,
             "message": f"Essay Lifecycle Service is {overall_status}",
             "version": "1.0.0",
             "checks": checks,
             "dependencies": dependencies,
-            "environment": "development",
+            "environment": settings.ENVIRONMENT.value,
         }
 
         status_code = 200 if overall_status == "healthy" else 503
@@ -55,9 +58,14 @@ async def health_check() -> Response | tuple[Response, int]:
 
     except Exception as e:
         logger.error(f"Health check failed: {e}")
+        # Fallback to service name if settings not available
+        try:
+            service_name = settings.SERVICE_NAME
+        except:
+            service_name = "essay-lifecycle-service"
         return jsonify(
             {
-                "service": "essay_lifecycle_service",
+                "service": service_name,
                 "status": "unhealthy",
                 "message": "Health check failed",
                 "version": "1.0.0",

@@ -27,13 +27,13 @@ async def initialize_database_schema(app: Quart, settings: Settings) -> AsyncEng
             pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
             pool_recycle=settings.DATABASE_POOL_RECYCLE,
         )
-        
+
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        
+
         # Store engine on app for health checks
         app.database_engine = engine
-        
+
         logger.info("Database schema initialized successfully")
         return engine
     except Exception as e:

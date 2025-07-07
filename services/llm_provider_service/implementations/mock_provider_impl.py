@@ -18,14 +18,16 @@ logger = create_service_logger("llm_provider_service.mock_provider")
 class MockProviderImpl(LLMProviderProtocol):
     """Mock LLM provider for testing without API calls."""
 
-    def __init__(self, settings: Settings, seed: int | None = None):
+    def __init__(self, settings: Settings, seed: int | None = None, performance_mode: bool = False):
         """Initialize mock provider.
 
         Args:
             settings: Service settings
             seed: Optional random seed for reproducible tests
+            performance_mode: If True, disables error simulation for performance testing
         """
         self.settings = settings
+        self.performance_mode = performance_mode
         if seed is not None:
             random.seed(seed)
 
@@ -53,8 +55,8 @@ class MockProviderImpl(LLMProviderProtocol):
         Returns:
             Tuple of (response_model, error_model)
         """
-        # Simulate occasional errors (5% chance)
-        if random.random() < 0.05:
+        # Simulate occasional errors (5% chance) - skip in performance mode
+        if not self.performance_mode and random.random() < 0.05:
             logger.warning("Mock provider simulating error")
             return None, LLMProviderError(
                 error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,

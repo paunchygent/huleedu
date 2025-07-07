@@ -1,43 +1,96 @@
 """
-Redis queue performance tests.
+Redis queue performance tests using real infrastructure.
 
 Tests Redis pipeline performance, queue throughput, and batch operations
-for optimized queue management.
+with real Redis testcontainer infrastructure for meaningful performance data.
+Uses mock LLM providers to avoid API costs.
 """
 
-import json
 import time
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, Mock
+from typing import Any, AsyncGenerator, Generator
 from uuid import uuid4
 
 import pytest
+from dishka import Scope, make_async_container, provide
+from testcontainers.redis import RedisContainer
 
-from common_core import QueueStatus
+from common_core import Environment, QueueStatus
 from services.llm_provider_service.api_models import LLMComparisonRequest
 from services.llm_provider_service.config import Settings
+from services.llm_provider_service.di import LLMProviderServiceProvider
 from services.llm_provider_service.implementations.redis_queue_repository_impl import (
     RedisQueueRepositoryImpl,
 )
 from services.llm_provider_service.queue_models import QueuedRequest
 
 
+class TestLLMProviderServiceProvider(LLMProviderServiceProvider):
+    """Test-specific provider that allows settings injection."""
+
+    def __init__(self, test_settings: Settings):
+        super().__init__()
+        self._test_settings = test_settings
+
+    @provide(scope=Scope.APP)
+    def provide_settings(self) -> Settings:
+        return self._test_settings
+
+
+@pytest.fixture(scope="class")
+def redis_container() -> Generator[RedisContainer, None, None]:
+    """Provide a Redis container for testing."""
+    with RedisContainer("redis:7-alpine") as container:
+        yield container
+
+
+@pytest.fixture(scope="class")
+def redis_performance_settings(redis_container: RedisContainer) -> Settings:
+    """Settings configured for Redis performance testing."""
+    redis_host = redis_container.get_container_host_ip()
+    redis_port = redis_container.get_exposed_port(6379)
+    redis_url = f"redis://{redis_host}:{redis_port}/0"
+
+    return Settings(
+        SERVICE_NAME="llm_provider_service",
+        ENVIRONMENT=Environment.TESTING,
+        LOG_LEVEL="INFO",
+        USE_MOCK_LLM=True,  # Keep LLM mocked to avoid API costs
+        REDIS_URL=redis_url,
+        KAFKA_BOOTSTRAP_SERVERS="localhost:9092",  # Not used in Redis tests
+    )
+
+
+@pytest.fixture
+async def redis_di_container(redis_performance_settings: Settings) -> AsyncGenerator[Any, None]:
+    """DI container with real Redis for performance testing."""
+    test_provider = TestLLMProviderServiceProvider(redis_performance_settings)
+    container = make_async_container(test_provider)
+
+    try:
+        yield container
+    finally:
+        # Cleanup Redis client
+        async with container() as request_container:
+            try:
+                from huleedu_service_libs.queue_protocols import QueueRedisClientProtocol
+
+                queue_redis_client = await request_container.get(QueueRedisClientProtocol)
+                if hasattr(queue_redis_client, "stop"):
+                    await queue_redis_client.stop()
+            except Exception as e:
+                print(f"⚠ Failed to stop queue Redis client: {e}")
+
+
 class TestRedisPerformance:
-    """Tests for Redis queue performance and optimization."""
+    """Tests for Redis queue performance with real infrastructure."""
 
     @pytest.mark.asyncio
-    async def test_redis_pipeline_performance(self, mock_only_settings: Settings) -> None:
-        """Test Redis pipeline performance improvements."""
-        # Mock Redis client for testing
-        mock_redis = AsyncMock()
-        mock_client = Mock()  # Regular Mock for the client
-        mock_pipeline = Mock()  # Regular Mock for the pipeline
-
-        mock_redis.client = mock_client
-        mock_client.pipeline.return_value = mock_pipeline
-        mock_pipeline.execute = AsyncMock(return_value=[True, True, True])
-
-        queue_repo = RedisQueueRepositoryImpl(mock_redis, mock_only_settings)
+    async def test_redis_pipeline_performance(self, redis_di_container: Any) -> None:
+        """Test Redis pipeline performance improvements with real infrastructure."""
+        async with redis_di_container() as request_container:
+            # Get real Redis queue repository from DI container
+            queue_repo = await request_container.get(RedisQueueRepositoryImpl)
 
         # Test batch operations
         requests = []
@@ -68,66 +121,40 @@ class TestRedisPerformance:
 
         pipeline_time = time.perf_counter() - start_time
 
-        # Verify pipeline was used
-        assert mock_redis.client.pipeline.called
-        assert mock_pipeline.execute.called
-
-        print(f"Redis pipeline performance: {pipeline_time:.4f}s for {len(requests)} requests")
+        print(f"Real Redis pipeline performance: {pipeline_time:.4f}s for {len(requests)} requests")
         print(f"Average per request: {pipeline_time / len(requests):.4f}s")
+        print("Infrastructure: Real Redis (testcontainer)")
+
+        # Realistic performance assertions for Redis pipeline
+        assert pipeline_time / len(requests) < 0.1  # Under 100ms per operation
 
     @pytest.mark.asyncio
-    async def test_queue_throughput_performance(self, mock_only_settings: Settings) -> None:
-        """Test queue processing throughput."""
-        mock_redis = AsyncMock()
-        mock_client = Mock()  # Regular Mock for the client
-        mock_pipeline = Mock()  # Regular Mock for the pipeline
+    async def test_queue_throughput_performance(self, redis_di_container: Any) -> None:
+        """Test queue processing throughput with real Redis."""
+        async with redis_di_container() as request_container:
+            queue_repo = await request_container.get(RedisQueueRepositoryImpl)
 
-        mock_redis.client = mock_client
-        mock_client.pipeline.return_value = mock_pipeline
-        mock_pipeline.execute = AsyncMock(return_value=[True, True, True])
-
-        # Generate proper UUIDs for test data
-        test_queue_ids = [str(uuid4()) for _ in range(5)]
-
-        # Create valid QueuedRequest JSON data
-        def create_valid_queue_request(queue_id: str) -> str:
-            return json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "request_data": {
-                        "user_prompt": "Compare these essays",
-                        "essay_a": "Test essay A",
-                        "essay_b": "Test essay B",
-                    },
-                    "queued_at": datetime.now(timezone.utc).isoformat(),
-                    "ttl": 14400,  # 4 hours in seconds
-                    "priority": 0,
-                    "status": "queued",  # lowercase, not QUEUED
-                    "retry_count": 0,
-                    "size_bytes": 100,
-                }
-            )
-
-        # Mock successful queue operations
-        mock_client.zrange = AsyncMock(return_value=test_queue_ids)
-        mock_client.hmget = AsyncMock(
-            return_value=[
-                create_valid_queue_request(test_queue_ids[0]),
-                create_valid_queue_request(test_queue_ids[1]),
-                create_valid_queue_request(test_queue_ids[2]),
-                create_valid_queue_request(test_queue_ids[3]),
-                create_valid_queue_request(test_queue_ids[4]),
-            ]
-        )
-
-        # Mock hget for individual retrievals
-        mock_client.hget = AsyncMock(
-            side_effect=lambda key, queue_id: create_valid_queue_request(queue_id)
-            if queue_id in test_queue_ids
-            else None
-        )
-
-        queue_repo = RedisQueueRepositoryImpl(mock_redis, mock_only_settings)
+            # Add real test data to Redis queue
+            test_requests = []
+            for i in range(5):
+                request_data = LLMComparisonRequest(
+                    user_prompt="Compare these essays",
+                    essay_a=f"Test essay A {i}",
+                    essay_b=f"Test essay B {i}",
+                )
+                request = QueuedRequest(
+                    queue_id=uuid4(),
+                    request_data=request_data,
+                    queued_at=datetime.now(timezone.utc),
+                    ttl=timedelta(hours=4),
+                    priority=0,
+                    status=QueueStatus.QUEUED,
+                    retry_count=0,
+                    size_bytes=100,
+                )
+                test_requests.append(request)
+                # Add to real Redis
+                await queue_repo.add(request)
 
         # Test batch queue retrieval
         start_time = time.perf_counter()
@@ -138,25 +165,18 @@ class TestRedisPerformance:
 
         retrieval_time = time.perf_counter() - start_time
 
-        print(f"Queue throughput: 10 retrievals in {retrieval_time:.4f}s")
+        print(f"Real Redis queue throughput: 10 retrievals in {retrieval_time:.4f}s")
         print(f"Average per retrieval: {retrieval_time / 10:.4f}s")
+        print("Infrastructure: Real Redis (testcontainer)")
 
-        # Verify batch operations were used
-        assert mock_redis.client.zrange.called
-        assert mock_redis.client.hmget.called
+        # Realistic performance assertions for Redis throughput
+        assert retrieval_time / 10 < 0.2  # Under 200ms per retrieval
 
     @pytest.mark.asyncio
-    async def test_redis_batch_operations_performance(self, mock_only_settings: Settings) -> None:
-        """Test performance of Redis batch operations vs individual operations."""
-        mock_redis = AsyncMock()
-        mock_client = Mock()
-        mock_pipeline = Mock()
-
-        mock_redis.client = mock_client
-        mock_client.pipeline.return_value = mock_pipeline
-        mock_pipeline.execute = AsyncMock(return_value=[True] * 20)
-
-        queue_repo = RedisQueueRepositoryImpl(mock_redis, mock_only_settings)
+    async def test_redis_batch_operations_performance(self, redis_di_container: Any) -> None:
+        """Test performance of Redis batch operations with real infrastructure."""
+        async with redis_di_container() as request_container:
+            queue_repo = await request_container.get(RedisQueueRepositoryImpl)
 
         # Create test requests
         requests = []
@@ -186,41 +206,40 @@ class TestRedisPerformance:
 
         batch_time = time.perf_counter() - batch_start_time
 
-        # Verify pipeline usage for batch operations
-        assert mock_redis.client.pipeline.call_count > 0
-        pipeline_calls = mock_redis.client.pipeline.call_count
-        execute_calls = mock_pipeline.execute.call_count
-
-        print("Redis batch operations performance:")
+        print("Real Redis batch operations performance:")
         print(f"  Total requests: {len(requests)}")
         print(f"  Batch time: {batch_time:.4f}s")
         print(f"  Time per request: {batch_time / len(requests):.6f}s")
-        print(f"  Pipeline calls: {pipeline_calls}")
-        print(f"  Execute calls: {execute_calls}")
+        print("  Infrastructure: Real Redis (testcontainer)")
 
-        # Performance assertions
-        assert batch_time < 0.5  # Should complete quickly with mocked Redis
-        assert batch_time / len(requests) < 0.01  # Each request should be very fast
+        # Realistic performance assertions for Redis batch operations
+        assert batch_time < 3.0  # Should complete within 3s
+        assert batch_time / len(requests) < 0.15  # Under 150ms per request
 
     @pytest.mark.asyncio
-    async def test_redis_memory_usage_tracking(self, mock_only_settings: Settings) -> None:
-        """Test Redis memory usage tracking performance."""
-        mock_redis = AsyncMock()
-        mock_client = Mock()
+    async def test_redis_memory_usage_tracking(self, redis_di_container: Any) -> None:
+        """Test Redis memory usage tracking performance with real infrastructure."""
+        async with redis_di_container() as request_container:
+            queue_repo = await request_container.get(RedisQueueRepositoryImpl)
 
-        # Mock memory tracking operations
-        mock_client.memory_usage = AsyncMock(return_value=1024)  # 1KB per key
-        mock_client.dbsize = AsyncMock(return_value=100)  # 100 keys
-        mock_client.info = AsyncMock(
-            return_value={
-                "used_memory": 1048576,  # 1MB
-                "used_memory_human": "1.00M",
-            }
-        )
-
-        mock_redis.client = mock_client
-
-        queue_repo = RedisQueueRepositoryImpl(mock_redis, mock_only_settings)
+            # Add real test data to Redis
+            for i in range(5):
+                request_data = LLMComparisonRequest(
+                    user_prompt="Memory test",
+                    essay_a=f"Memory essay A {i}",
+                    essay_b=f"Memory essay B {i}",
+                )
+                request = QueuedRequest(
+                    queue_id=uuid4(),
+                    request_data=request_data,
+                    queued_at=datetime.now(timezone.utc),
+                    ttl=timedelta(hours=4),
+                    priority=0,
+                    status=QueueStatus.QUEUED,
+                    retry_count=0,
+                    size_bytes=1024,  # 1KB per request
+                )
+                await queue_repo.add(request)
 
         # Test memory tracking performance
         memory_operations = 50
@@ -232,32 +251,23 @@ class TestRedisPerformance:
 
         memory_tracking_time = time.perf_counter() - start_time
 
-        print("Redis memory tracking performance:")
+        print("Real Redis memory tracking performance:")
         print(f"  Memory operations: {memory_operations}")
         print(f"  Total time: {memory_tracking_time:.4f}s")
         print(f"  Time per operation: {memory_tracking_time / memory_operations:.6f}s")
+        print("  Infrastructure: Real Redis (testcontainer)")
 
-        # Verify Redis operations were called
-        assert mock_client.info.called
-
-        # Performance assertions
-        assert memory_tracking_time < 1.0  # Should be fast with mocked Redis
-        assert memory_tracking_time / memory_operations < 0.01  # Each operation fast
+        # Realistic performance assertions for Redis memory tracking
+        assert memory_tracking_time < 5.0  # Should complete within 5s
+        assert memory_tracking_time / memory_operations < 0.1  # Under 100ms per operation
 
     @pytest.mark.asyncio
-    async def test_redis_concurrent_pipeline_operations(self, mock_only_settings: Settings) -> None:
-        """Test concurrent Redis pipeline operations performance."""
+    async def test_redis_concurrent_pipeline_operations(self, redis_di_container: Any) -> None:
+        """Test concurrent Redis pipeline operations performance with real infrastructure."""
         import asyncio
 
-        mock_redis = AsyncMock()
-        mock_client = Mock()
-        mock_pipeline = Mock()
-
-        mock_redis.client = mock_client
-        mock_client.pipeline.return_value = mock_pipeline
-        mock_pipeline.execute = AsyncMock(return_value=[True, True, True])
-
-        queue_repo = RedisQueueRepositoryImpl(mock_redis, mock_only_settings)
+        async with redis_di_container() as request_container:
+            queue_repo = await request_container.get(RedisQueueRepositoryImpl)
 
         async def concurrent_add_operation(operation_id: int) -> float:
             """Perform concurrent add operation."""
@@ -296,56 +306,35 @@ class TestRedisPerformance:
         max_operation_time = max(operation_times)
         min_operation_time = min(operation_times)
 
-        print("Concurrent Redis pipeline performance:")
+        print("Concurrent real Redis pipeline performance:")
         print(f"  Concurrent operations: {concurrent_ops}")
         print(f"  Total time: {total_time:.4f}s")
         print(f"  Operations per second: {concurrent_ops / total_time:.2f}")
         print(f"  Average operation time: {avg_operation_time:.6f}s")
         print(f"  Min/Max operation time: {min_operation_time:.6f}s / {max_operation_time:.6f}s")
+        print("  Infrastructure: Real Redis (testcontainer)")
 
-        # Verify pipeline was used for concurrent operations
-        assert mock_redis.client.pipeline.called
-        assert mock_pipeline.execute.called
-
-        # Performance assertions
-        assert total_time < 2.0  # Should handle concurrency well
-        assert avg_operation_time < 0.05  # Each operation should be fast
+        # Realistic performance assertions for Redis concurrency
+        assert total_time < 5.0  # Should handle concurrency within 5s
+        assert avg_operation_time < 0.2  # Under 200ms per operation
 
     @pytest.mark.asyncio
-    async def test_redis_pipeline_error_handling_performance(
-        self, mock_only_settings: Settings
-    ) -> None:
-        """Test performance impact of error handling in Redis pipelines."""
+    async def test_redis_pipeline_error_resilience(self, redis_di_container: Any) -> None:
+        """Test Redis pipeline resilience with real infrastructure."""
         import asyncio
 
-        mock_redis = AsyncMock()
-        mock_client = Mock()
-        mock_pipeline = Mock()
+        async with redis_di_container() as request_container:
+            queue_repo = await request_container.get(RedisQueueRepositoryImpl)
 
-        mock_redis.client = mock_client
-        mock_client.pipeline.return_value = mock_pipeline
-
-        # Simulate some operations succeeding and some failing
-        mock_pipeline.execute = AsyncMock(
-            side_effect=[
-                [True, True, Exception("Redis error")],  # Mixed success/failure
-                [True, True, True],  # All success
-                [Exception("Pipeline error")],  # Pipeline failure
-                [True, True, True],  # Recovery
-            ]
-        )
-
-        queue_repo = RedisQueueRepositoryImpl(mock_redis, mock_only_settings)
-
-        async def add_with_error_handling(operation_id: int) -> tuple[float, bool]:
-            """Add operation with error handling timing."""
+        async def add_with_resilience_test(operation_id: int) -> tuple[float, bool]:
+            """Test Redis resilience with real operations."""
             start_time = time.perf_counter()
 
             try:
                 request_data = LLMComparisonRequest(
-                    user_prompt=f"Error test {operation_id}",
-                    essay_a=f"Error essay A {operation_id}",
-                    essay_b=f"Error essay B {operation_id}",
+                    user_prompt=f"Resilience test {operation_id}",
+                    essay_a=f"Resilience essay A {operation_id}",
+                    essay_b=f"Resilience essay B {operation_id}",
                 )
                 request = QueuedRequest(
                     queue_id=uuid4(),
@@ -366,11 +355,11 @@ class TestRedisPerformance:
                 operation_time = time.perf_counter() - start_time
                 return operation_time, False
 
-        # Test error handling performance
-        error_test_ops = 10
+        # Test resilience performance
+        resilience_test_ops = 10
         start_time = time.perf_counter()
 
-        tasks = [add_with_error_handling(i) for i in range(error_test_ops)]
+        tasks = [add_with_resilience_test(i) for i in range(resilience_test_ops)]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         total_time = time.perf_counter() - start_time
@@ -388,14 +377,16 @@ class TestRedisPerformance:
                 # Exception occurred, estimate timing
                 operation_times.append(0.001)
 
-        avg_time_with_errors = sum(operation_times) / len(operation_times)
+        avg_time = sum(operation_times) / len(operation_times)
 
-        print("Redis error handling performance:")
-        print(f"  Operations with errors: {error_test_ops}")
+        print("Real Redis resilience performance:")
+        print(f"  Resilience test operations: {resilience_test_ops}")
         print(f"  Total time: {total_time:.4f}s")
         print(f"  Successful operations: {successes}")
-        print(f"  Average time with errors: {avg_time_with_errors:.6f}s")
+        print(f"  Average time: {avg_time:.6f}s")
+        print("  Infrastructure: Real Redis (testcontainer)")
 
-        # Verify error handling doesn't severely impact performance
-        assert total_time < 3.0  # Should handle errors reasonably fast
-        assert avg_time_with_errors < 0.1  # Error handling overhead should be minimal
+        # Realistic performance assertions for Redis resilience
+        assert total_time < 8.0  # Should complete within 8s
+        assert avg_time < 0.5  # Under 500ms per operation
+        assert successes >= resilience_test_ops * 0.90  # At least 90% success rate

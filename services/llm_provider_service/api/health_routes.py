@@ -5,7 +5,7 @@ from typing import Any, Dict
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
-from prometheus_client import generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
@@ -30,7 +30,7 @@ async def health_check(
         "version": "1.0.0",
         "checks": {"service_responsive": True, "dependencies_available": True},
         "dependencies": {},
-        "environment": settings.ENVIRONMENT,
+        "environment": settings.ENVIRONMENT.value,
     }
     dependencies: Dict[str, Any] = {}
 
@@ -88,7 +88,7 @@ async def metrics() -> Response:
     try:
         # Generate metrics from the default registry
         metrics_output = generate_latest()
-        return Response(metrics_output, mimetype="text/plain; version=0.0.4")
+        return Response(metrics_output, content_type=CONTENT_TYPE_LATEST)
     except Exception as e:
         logger.exception("Error generating metrics")
         return Response(f"Error generating metrics: {str(e)}", status=500)
