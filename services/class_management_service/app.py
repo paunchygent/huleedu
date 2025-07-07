@@ -33,7 +33,7 @@ app.register_blueprint(student_bp, url_prefix="/v1/classes")
 @app.before_serving
 async def startup() -> None:
     """Initialize database schema before the app starts serving."""
-    await startup_setup.initialize_database_schema(settings)
+    await startup_setup.initialize_database_schema(app, settings)
 
 
 @app.after_serving

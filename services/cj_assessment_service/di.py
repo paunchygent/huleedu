@@ -30,7 +30,7 @@ from services.cj_assessment_service.implementations.retry_manager_impl import Re
 
 # Import all business logic protocols
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
-from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
+from services.cj_assessment_service.metrics import setup_cj_assessment_database_monitoring
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
@@ -186,7 +186,7 @@ class CJAssessmentServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
         """Provide database metrics monitoring for CJ Assessment service."""
-        return setup_database_monitoring(
+        return setup_cj_assessment_database_monitoring(
             engine=engine, service_name="cj_assessment_service"
         )
 

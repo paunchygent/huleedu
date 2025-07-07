@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     PORT: int = 5002
     HOST: str = "0.0.0.0"
     USE_MOCK_REPOSITORY: bool = False
+    
+    # Database Pool Configuration
+    DATABASE_POOL_SIZE: int = Field(default=10, description="Database connection pool size")
+    DATABASE_MAX_OVERFLOW: int = Field(default=20, description="Maximum overflow connections")
+    DATABASE_POOL_PRE_PING: bool = Field(default=True, description="Pre-ping connections")
+    DATABASE_POOL_RECYCLE: int = Field(default=3600, description="Recycle connections after seconds")
 
     # Circuit Breaker Configuration
     CIRCUIT_BREAKER_ENABLED: bool = Field(

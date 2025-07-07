@@ -53,12 +53,15 @@ alwaysApply: false
   - [071.2-jaeger-tracing-patterns.mdc](mdc:071.2-jaeger-tracing-patterns.mdc): Distributed tracing with Jaeger
   - [071.3-grafana-loki-patterns.mdc](mdc:071.3-grafana-loki-patterns.mdc): Grafana dashboards and Loki logs
 - [072-grafana-playbook-rules.mdc](mdc:072-grafana-playbook-rules.mdc): Grafana dashboard and alerting playbook
+- [073-health-endpoint-implementation.mdc](mdc:073-health-endpoint-implementation.mdc): Health endpoint implementation patterns for HuleEdu services
+- [077-service-anti-patterns.mdc](mdc:077-service-anti-patterns.mdc): Common anti-patterns to avoid and their corrections
 - [080-repository-workflow-and-tooling.mdc](mdc:080-repository-workflow-and-tooling.mdc): PDM monorepo usage, version control, CI/CD
 - [081-pdm-dependency-management.mdc](mdc:081-pdm-dependency-management.mdc): PDM configuration and dependency management standards
 - [082-ruff-linting-standards.mdc](mdc:082-ruff-linting-standards.mdc): Ruff linting and formatting configuration
 - [083-pdm-standards-2025.mdc](mdc:083-pdm-standards-2025.mdc): Correct modern PDM syntax that must never be questioned
 - [084-docker-containerization-standards.mdc](mdc:084-docker-containerization-standards.mdc): Docker containerization patterns, import requirements, and troubleshooting
 - [085-docker-compose-v2-command-reference.mdc](mdc:085-docker-compose-v2-command-reference.mdc): Docker Compose v2 command reference
+- [086-mypy-configuration-standards.mdc](mdc:086-mypy-configuration-standards.mdc): MyPy configuration and monorepo type checking standards with module conflict resolution
 - [090-documentation-standards.mdc](mdc:090-documentation-standards.mdc): Service, contract, and architectural documentation
 
 ## Terminology & Your Interaction Modes

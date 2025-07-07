@@ -170,7 +170,7 @@ exclude = [
     "common_core/src/",
     "cj_essay_assessment/",
     "scripts/",
-    "services/libs/",
+    "services/libs/huleedu_service_libs/",
     "services/batch_orchestrator_service/implementations/circuit_breaker_example.py",
 ]
 

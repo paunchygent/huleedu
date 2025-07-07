@@ -96,3 +96,139 @@ Circuit breaker metrics are integrated into the service's Prometheus metrics:
 - **`circuit_breaker_calls_total`**: Call result counter with labels: `service`, `circuit_name`, `result` (success/failure/blocked)
 
 Circuit breakers protect Kafka publishing operations and are configurable via `ESSAY_LIFECYCLE_SERVICE_CIRCUIT_BREAKER_` environment variables.
+
+## 📊 Technical Patterns
+
+### Health Check Implementation
+
+ELS implements a comprehensive health check pattern using the DatabaseHealthChecker:
+
+```python
+# Health check endpoints with progressive detail levels
+@health_bp.route("/healthz")  # Basic health for load balancers
+@health_bp.route("/healthz/database")  # Comprehensive database metrics
+@health_bp.route("/healthz/database/summary")  # Lightweight polling endpoint
+
+# Startup pattern stores engine for health checks
+async def initialize_services(app: Quart, settings: Settings) -> None:
+    if settings.ENVIRONMENT != "testing":
+        temp_repo = PostgreSQLEssayRepository(settings)
+        await temp_repo.initialize_db_schema()
+        app.database_engine = temp_repo.engine  # Store for health checks
+```
+
+### Dependency Injection Patterns
+
+ELS uses 4 provider classes for clean separation of concerns:
+
+```python
+# Provider organization
+CoreInfrastructureProvider()     # Settings, Kafka, Redis, Database
+ServiceClientsProvider()         # Event publishers, metrics collectors
+CommandHandlerProvider()         # Spellcheck, CJ Assessment handlers
+BatchCoordinationProvider()      # Batch tracking, phase coordination
+
+# Route injection pattern using FromDishka
+@inject
+async def get_essay_status(
+    essay_id: str,
+    state_store: FromDishka[EssayRepositoryProtocol],
+) -> Response:
+    essay_state = await state_store.get_essay_state(essay_id)
+```
+
+### Database Monitoring
+
+Comprehensive database monitoring via DatabaseMetrics integration:
+
+```python
+def setup_essay_lifecycle_database_monitoring(
+    engine: AsyncEngine,
+    service_name: str = "essay_lifecycle_service"
+) -> DatabaseMetrics:
+    # Monitors connection pool, query performance, and health
+    return setup_database_monitoring(engine, service_name)
+
+# Metrics exposed via Prometheus:
+# - db_pool_size, db_pool_checked_out, db_pool_overflow
+# - db_query_duration_seconds (histogram by operation)
+# - db_query_errors_total (counter by operation and error_type)
+```
+
+### Error Handling Patterns
+
+State machine provides formal error transitions:
+
+```python
+# State machine error handling in SpellcheckCommandHandler
+essay_machine = EssayStateMachine(
+    essay_id=essay_id, 
+    initial_status=essay_state_model.current_status
+)
+
+if essay_machine.trigger(CMD_INITIATE_SPELLCHECK):
+    # Success path - persist state and dispatch
+    await self.repository.update_essay_status_via_machine(...)
+else:
+    # Invalid transition - log and skip
+    logger.warning(f"State machine trigger failed for essay {essay_id}")
+```
+
+Retry patterns for external services via circuit breakers:
+
+```python
+# Resilient Kafka publishing with circuit breaker
+kafka_publisher = ResilientKafkaPublisher(
+    delegate=base_kafka_bus,
+    circuit_breaker=kafka_circuit_breaker,
+    retry_interval=30,  # Retry every 30 seconds when open
+)
+```
+
+### Performance Considerations
+
+Batch processing patterns for efficient coordination:
+
+```python
+# Concurrent essay processing in batch commands
+successfully_transitioned_essays = []
+for essay_ref in command_data.essays_to_process:
+    # Process state transitions first
+    if essay_machine.trigger(CMD_INITIATE_SPELLCHECK):
+        successfully_transitioned_essays.append(essay_ref)
+
+# Then dispatch all at once
+if successfully_transitioned_essays:
+    await self.request_dispatcher.dispatch_spellcheck_requests(
+        essays_to_process=successfully_transitioned_essays,
+        language=language_enum,
+        correlation_id=correlation_id,
+    )
+```
+
+Async patterns for concurrent operations:
+
+```python
+# Idempotent message processing with Redis
+@idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
+    return await process_single_message(msg, ...)
+
+# Batch phase aggregation checks
+essays_in_phase = await self.repository.list_essays_by_batch_and_phase(
+    batch_id=batch_id, phase_name=phase_name.value
+)
+# Aggregate completion status and publish outcome event
+```
+
+Database connection pooling:
+
+```python
+# Configured in PostgreSQLEssayRepository
+create_async_engine(
+    settings.DATABASE_URL,
+    pool_size=settings.DATABASE_POOL_SIZE,
+    max_overflow=settings.DATABASE_MAX_OVERFLOW,
+    pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+    pool_recycle=settings.DATABASE_POOL_RECYCLE,
+)

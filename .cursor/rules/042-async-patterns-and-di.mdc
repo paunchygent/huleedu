@@ -133,3 +133,122 @@ async def kafka_clients(
         await consumer.stop()
         await producer.stop()
 ```
+
+### 3.6. Database Monitoring Integration Pattern
+
+For services with PostgreSQL persistence:
+
+```python
+# di.py
+from huleedu_service_libs.database import DatabaseMetrics
+from services.<service_name>.metrics import setup_<service>_database_monitoring
+
+class ServiceProvider(Provider):
+    @provide(scope=Scope.APP)
+    def provide_database_engine(self, settings: Settings) -> AsyncEngine:
+        return create_async_engine(
+            settings.DATABASE_URL,
+            echo=False,
+            future=True,
+            pool_size=settings.DATABASE_POOL_SIZE,
+            max_overflow=settings.DATABASE_MAX_OVERFLOW,
+            pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+            pool_recycle=settings.DATABASE_POOL_RECYCLE,
+        )
+    
+    @provide(scope=Scope.APP)
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        return setup_<service>_database_monitoring(
+            engine=engine, service_name=settings.SERVICE_NAME
+        )
+```
+
+### 3.7. Health Check Engine Storage Pattern
+
+PostgreSQL services MUST store the database engine on the app instance for health checks:
+
+```python
+# startup_setup.py
+async def initialize_database_schema(app: Quart, settings: Settings) -> AsyncEngine:
+    engine = create_async_engine(settings.DATABASE_URL, ...)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    app.database_engine = engine  # Required for health checks
+    return engine
+
+# app.py
+@app.before_serving
+async def startup() -> None:
+    await startup_setup.initialize_database_schema(app, settings)
+```
+
+### 3.8. Route Dependency Injection Patterns
+
+For Quart services using quart-dishka:
+
+```python
+# api/routes.py
+from dishka import FromDishka
+from quart_dishka import inject
+
+@blueprint.route("/endpoint")
+@inject  # MUST use @inject decorator
+async def handler(
+    service: FromDishka[ServiceProtocol],
+    settings: FromDishka[Settings],
+) -> Response:
+    # Dependencies are automatically injected
+    result = await service.process()
+    return jsonify(result)
+```
+
+### 3.9. Metrics Integration Pattern
+
+Services with database metrics integration:
+
+```python
+# metrics.py
+def setup_<service>_database_monitoring(
+    engine: AsyncEngine,
+    service_name: str,
+    existing_metrics: Optional[Dict[str, Any]] = None,
+) -> DatabaseMetrics:
+    """Setup comprehensive database monitoring for service."""
+    return setup_database_monitoring(engine, service_name, existing_metrics)
+
+# startup_setup.py
+async def initialize_services(app: Quart, settings: Settings) -> None:
+    # Get database metrics from container
+    async with container() as request_container:
+        database_metrics = await request_container.get(DatabaseMetrics)
+    
+    # Initialize metrics with database integration
+    metrics = get_metrics(database_metrics)
+    app.extensions["metrics"] = metrics
+```
+
+### 3.10. Provider Organization Pattern
+
+For complex services, organize providers by domain:
+
+```python
+# di.py
+class DatabaseProvider(Provider):
+    """Database engine, sessions, and metrics."""
+    
+class RepositoryProvider(Provider):
+    """Repository implementations."""
+    
+class ServiceProvider(Provider):
+    """Core service dependencies."""
+    
+class MetricsProvider(Provider):
+    """Prometheus metrics with database integration."""
+
+# app.py or worker_main.py
+container = make_async_container(
+    DatabaseProvider(),
+    RepositoryProvider(),
+    ServiceProvider(),
+    MetricsProvider(),
+)

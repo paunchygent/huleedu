@@ -1,0 +1,371 @@
+# Rule 073: Health Endpoint Implementation Standards
+
+## Overview
+
+All HuleEdu services MUST implement standardized health and metrics endpoints. Implementation patterns vary by service type (PostgreSQL/non-database, Quart/FastAPI) but follow consistent principles.
+
+## Core Requirements
+
+1. **ALL services MUST implement**:
+   - `/healthz` - Basic service health check
+   - `/metrics` - Prometheus metrics endpoint
+
+2. **PostgreSQL services MUST ALSO implement**:
+   - `/healthz/database` - Detailed database connection health
+   - `/healthz/database/summary` - Database operation summary metrics
+
+3. **Use service libraries**:
+   - `DatabaseHealthChecker` from `huleedu_service_libs.database`
+   - `create_service_logger` from `huleedu_service_libs.logging_utils`
+   - Proper dependency injection patterns
+
+## Implementation Patterns by Service Type
+
+### 1. Quart Services with PostgreSQL
+
+Complete three-tier health check implementation:
+
+```python
+from huleedu_service_libs.database import DatabaseHealthChecker
+from huleedu_service_libs.logging_utils import create_service_logger
+from quart import Blueprint, Response, current_app, jsonify
+from dishka import FromDishka
+from quart_dishka import inject
+
+logger = create_service_logger("service_name.api.health")
+
+health_bp = Blueprint("health", __name__)
+
+@health_bp.route("/healthz")
+async def health_check() -> Response | tuple[Response, int]:
+    """Basic service health check."""
+    try:
+        checks = {"service_responsive": True, "dependencies_available": True}
+        dependencies = {}
+
+        # Check database if available
+        engine = getattr(current_app, "database_engine", None)
+        if engine:
+            try:
+                health_checker = DatabaseHealthChecker(engine, current_app.config["SERVICE_NAME"])
+                summary = await health_checker.get_health_summary()
+                dependencies["database"] = {"status": summary.get("status", "unknown")}
+                if summary.get("status") not in ["healthy", "warning"]:
+                    checks["dependencies_available"] = False
+            except Exception as e:
+                logger.warning(f"Database health check failed: {e}")
+                dependencies["database"] = {"status": "unhealthy", "error": str(e)}
+                checks["dependencies_available"] = False
+
+        overall_status = "healthy" if checks["dependencies_available"] else "unhealthy"
+        
+        health_response = {
+            "service": current_app.config["SERVICE_NAME"],
+            "status": overall_status,
+            "message": f"Service is {overall_status}",
+            "version": current_app.config.get("SERVICE_VERSION", "1.0.0"),
+            "checks": checks,
+            "dependencies": dependencies,
+            "environment": current_app.config.get("ENVIRONMENT", "development"),
+        }
+        
+        status_code = 200 if overall_status == "healthy" else 503
+        return jsonify(health_response), status_code
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return jsonify({
+            "service": current_app.config.get("SERVICE_NAME", "unknown"),
+            "status": "unhealthy",
+            "message": "Health check failed",
+            "version": current_app.config.get("SERVICE_VERSION", "1.0.0"),
+            "error": str(e),
+        }), 503
+
+@health_bp.route("/healthz/database")
+@inject
+async def database_health(
+    db_session: FromDishka[AsyncSession],
+) -> Response:
+    """Detailed database connection pool health."""
+    try:
+        engine = db_session.bind
+        pool = engine.pool
+        
+        pool_size = pool.size()
+        checked_in = pool.checkedin()
+        checked_out = pool.checkedout()
+        overflow = pool.overflow()
+        total = pool.total()
+        
+        utilization_percent = (checked_out / pool_size * 100) if pool_size > 0 else 0
+        
+        health_data = {
+            "status": "healthy" if checked_out < pool_size else "warning",
+            "pool": {
+                "size": pool_size,
+                "checked_in": checked_in,
+                "checked_out": checked_out,
+                "overflow": overflow,
+                "total_connections": total,
+                "utilization_percent": round(utilization_percent, 2),
+            },
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+        
+        return jsonify(health_data)
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        return jsonify({
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }), 503
+
+@health_bp.route("/healthz/database/summary")
+async def database_health_summary() -> Response:
+    """Database operation summary metrics."""
+    try:
+        health_checker = getattr(current_app, "health_checker", None)
+        if not health_checker:
+            return jsonify({"error": "Health checker not initialized"}), 503
+            
+        summary = await health_checker.comprehensive_health_check()
+        return jsonify(summary)
+    except Exception as e:
+        logger.error(f"Database summary check failed: {e}")
+        return jsonify({
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }), 503
+
+@health_bp.route("/metrics")
+@inject
+async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
+    """Prometheus metrics endpoint."""
+    try:
+        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+        metrics_data = generate_latest(registry)
+        return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
+    except Exception as e:
+        logger.error(f"Error generating metrics: {e}", exc_info=True)
+        return Response("Error generating metrics", status=500)
+```
+
+### 2. FastAPI Services (API Gateway)
+
+FastAPI-specific implementation:
+
+```python
+from fastapi import APIRouter, Depends, Response
+from fastapi.responses import PlainTextResponse
+from dishka.integrations.fastapi import FromDishka, inject
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
+router = APIRouter(tags=["health"])
+
+@router.get("/healthz", status_code=200)
+@inject
+async def health_check(
+    settings: FromDishka[Settings],
+    redis_client: FromDishka[RedisClientProtocol] | None = None,
+) -> dict[str, str | dict]:
+    """Health check endpoint."""
+    checks = {"service_responsive": True, "dependencies_available": True}
+    dependencies = {}
+    
+    # Check Redis if available
+    if redis_client:
+        try:
+            await redis_client.ping()
+            dependencies["redis"] = {"status": "healthy"}
+        except Exception as e:
+            logger.warning(f"Redis health check failed: {e}")
+            dependencies["redis"] = {"status": "unhealthy", "error": str(e)}
+            checks["dependencies_available"] = False
+    
+    overall_status = "healthy" if checks["dependencies_available"] else "unhealthy"
+    
+    # FastAPI automatically converts dict to JSON response
+    return {
+        "service": settings.SERVICE_NAME,
+        "status": overall_status,
+        "message": f"Service is {overall_status}",
+        "version": settings.SERVICE_VERSION,
+        "checks": checks,
+        "dependencies": dependencies,
+        "environment": settings.ENVIRONMENT,
+    }
+
+@router.get("/metrics", response_class=PlainTextResponse)
+@inject
+async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
+    """Prometheus metrics endpoint."""
+    try:
+        metrics_data = generate_latest(registry)
+        return PlainTextResponse(content=metrics_data, media_type=CONTENT_TYPE_LATEST)
+    except Exception as e:
+        logger.error(f"Error generating metrics: {e}")
+        return PlainTextResponse(content="Error generating metrics", status_code=500)
+```
+
+### 3. Non-Database Quart Services
+
+For services with Redis/Kafka dependencies:
+
+```python
+@health_bp.route("/healthz")
+@inject
+async def health_check(
+    redis_client: FromDishka[RedisClientProtocol],
+    kafka_bus: FromDishka[KafkaPublisherProtocol] | None,
+    settings: FromDishka[Settings],
+) -> Response | tuple[Response, int]:
+    """Health check for non-database service."""
+    checks = {"service_responsive": True, "dependencies_available": True}
+    dependencies = {}
+    
+    # Check Redis
+    try:
+        await redis_client.ping()
+        dependencies["redis"] = {"status": "healthy"}
+    except Exception as e:
+        logger.warning(f"Redis health check failed: {e}")
+        dependencies["redis"] = {"status": "unhealthy", "error": str(e)}
+        checks["dependencies_available"] = False
+    
+    # Check Kafka if producer exists
+    if kafka_bus:
+        try:
+            # Kafka health check via producer metadata
+            dependencies["kafka"] = {"status": "healthy", "producer": "active"}
+        except Exception as e:
+            dependencies["kafka"] = {"status": "unhealthy", "error": str(e)}
+            # Kafka issues are warnings, not failures for producers
+    
+    overall_status = "healthy" if checks["dependencies_available"] else "unhealthy"
+    
+    health_response = {
+        "service": settings.SERVICE_NAME,
+        "status": overall_status,
+        "message": f"Service is {overall_status}",
+        "version": settings.SERVICE_VERSION,
+        "checks": checks,
+        "dependencies": dependencies,
+        "environment": settings.ENVIRONMENT,
+    }
+    
+    status_code = 200 if overall_status == "healthy" else 503
+    return jsonify(health_response), status_code
+```
+
+## Database Engine Storage Pattern
+
+PostgreSQL services MUST store both engine and health checker on app:
+
+```python
+# In startup_setup.py
+from huleedu_service_libs.database import DatabaseHealthChecker, setup_database_monitoring
+
+async def initialize_database(app: Quart, settings: Settings) -> AsyncEngine:
+    """Initialize database with health monitoring."""
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        pool_size=settings.DATABASE_POOL_SIZE,
+        max_overflow=settings.DATABASE_MAX_OVERFLOW,
+        pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+        pool_recycle=settings.DATABASE_POOL_RECYCLE,
+    )
+    
+    # Run migrations instead of create_all
+    # ... alembic migration code ...
+    
+    # Setup database monitoring
+    db_metrics = setup_database_monitoring(engine, settings.SERVICE_NAME)
+    
+    # Store on app for health endpoints
+    app.database_engine = engine
+    app.health_checker = DatabaseHealthChecker(engine, settings.SERVICE_NAME)
+    app.extensions["db_metrics"] = db_metrics
+    
+    return engine
+
+# In app.py
+@app.before_serving
+async def startup() -> None:
+    engine = await startup_setup.initialize_database(app, settings)
+    # ... rest of startup
+```
+
+## Response Format Standards
+
+### Required Fields
+
+All health responses MUST include:
+- `service`: Service identifier from settings
+- `status`: "healthy" | "unhealthy" | "degraded"
+- `message`: Human-readable status message
+- `version`: Service version from settings
+- `checks`: Dictionary of internal checks performed
+- `dependencies`: Dictionary of external dependency statuses
+- `environment`: Deployment environment from settings
+
+### Dependency Status Format
+
+Each dependency MUST report:
+```json
+{
+  "dependency_name": {
+    "status": "healthy|unhealthy|degraded",
+    "error": "error message if unhealthy (optional)",
+    "details": { } // optional additional context
+  }
+}
+```
+
+## HTTP Status Codes
+
+- `200 OK`: Service is healthy (including warnings/degraded states)
+- `503 Service Unavailable`: Service is unhealthy or critical dependencies failed
+
+## Common Anti-Patterns to Avoid
+
+1. **Hardcoding environment**: Always use `settings.ENVIRONMENT`
+2. **Importing logger in functions**: Import at module level
+3. **Inconsistent mime types**: Use `CONTENT_TYPE_LATEST` from prometheus_client
+4. **Missing error handling**: Always wrap in try/except with proper logging
+5. **Not checking if engine exists**: Use `getattr(current_app, "database_engine", None)`
+6. **Forgetting health checker storage**: Store both engine AND health checker on app
+
+## Testing Health Endpoints
+
+```python
+async def test_health_endpoint(client):
+    response = await client.get("/healthz")
+    assert response.status_code == 200
+    data = await response.get_json()
+    
+    # Verify required fields
+    assert "service" in data
+    assert "status" in data
+    assert "version" in data
+    assert "checks" in data
+    assert "dependencies" in data
+    assert "environment" in data
+    
+    # Verify status values
+    assert data["status"] in ["healthy", "unhealthy", "degraded"]
+```
+
+## Migration Checklist
+
+When updating existing services:
+1. [ ] Import logger at module level, not in functions
+2. [ ] Use settings for service name, version, and environment
+3. [ ] Store health checker on app for PostgreSQL services
+4. [ ] Implement all three tiers for database services
+5. [ ] Use CONTENT_TYPE_LATEST for metrics
+6. [ ] Return proper status codes (503 for unhealthy)
+7. [ ] Include all required response fields
+8. [ ] Use service libraries for all infrastructure

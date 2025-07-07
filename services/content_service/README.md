@@ -91,3 +91,164 @@ Service-specific tests (assumed to be in `services/content_service/tests/`) can 
 ```bash
 # From the monorepo root
 pdm run pytest services/content_service/tests/ -v
+```
+
+## 📊 Technical Patterns
+
+### Health Check Implementation
+
+The service implements a **simple, dependency-aware health check** pattern without database requirements:
+
+```python
+# From api/health_routes.py
+@health_bp.route("/healthz")
+async def health_check() -> Response | tuple[Response, int]:
+    """Standardized health check endpoint with storage validation."""
+    checks = {"service_responsive": True, "dependencies_available": True}
+    dependencies = {}
+    
+    # Storage accessibility check
+    store_path = settings.CONTENT_STORE_ROOT_PATH
+    if not store_path.exists() or not store_path.is_dir():
+        dependencies["storage"] = {
+            "status": "unhealthy",
+            "error": f"Storage path {store_path.resolve()} not accessible",
+        }
+        checks["dependencies_available"] = False
+    else:
+        dependencies["storage"] = {
+            "status": "healthy",
+            "path": str(store_path.resolve()),
+            "writable": True,
+        }
+```
+
+### Storage Strategy
+
+The service employs a **flat file storage pattern** with UUID-based naming:
+
+```python
+# From implementations/filesystem_content_store.py
+async def save_content(self, content_data: bytes) -> str:
+    """UUID-based flat file storage without directory hierarchy."""
+    content_id = uuid.uuid4().hex  # 32-character hex string
+    file_path = self.store_root / content_id  # Direct storage, no subdirs
+    
+    async with aiofiles.open(file_path, "wb") as f:
+        await f.write(content_data)
+    
+    return content_id
+```
+
+**Key characteristics:**
+- No file extensions (treats all content as opaque blobs)
+- No directory hierarchy (all files in single root directory)
+- UUID hex format validation in retrieval endpoint
+- Async I/O for non-blocking operations
+
+### Performance Metrics
+
+The service tracks operations using **Prometheus counters with dimensional labels**:
+
+```python
+# From di.py - Metrics initialization
+content_operations = Counter(
+    "content_operations_total",
+    "Total content operations",
+    ["operation", "status"],  # Dimensional tracking
+    registry=registry,
+)
+
+# From implementations/prometheus_content_metrics.py
+def record_operation(self, operation: OperationType, status: OperationStatus) -> None:
+    self.content_operations.labels(
+        operation=operation.value,  # UPLOAD, DOWNLOAD
+        status=status.value        # SUCCESS, FAILED, ERROR, NOT_FOUND
+    ).inc()
+```
+
+**Additional HTTP metrics:**
+```python
+# From startup_setup.py
+"http_requests_total": Counter(..., ["method", "endpoint", "status_code"]),
+"http_request_duration_seconds": Histogram(..., ["method", "endpoint"]),
+```
+
+### Error Recovery Patterns
+
+The service implements **defensive error handling** with appropriate status codes:
+
+```python
+# From api/content_routes.py - Upload error handling
+try:
+    raw_data = await request.data
+    if not raw_data:
+        metrics.record_operation(OperationType.UPLOAD, OperationStatus.FAILED)
+        return jsonify({"error": "No data provided"}), 400
+    
+    content_id = await store.save_content(raw_data)
+    metrics.record_operation(OperationType.UPLOAD, OperationStatus.SUCCESS)
+    return jsonify({"storage_id": content_id}), 201
+except Exception as e:
+    logger.error(f"Error during content upload: {e}", exc_info=True)
+    metrics.record_operation(OperationType.UPLOAD, OperationStatus.ERROR)
+    return jsonify({"error": "Failed to store content."}), 500
+```
+
+**Validation patterns:**
+- Content ID format validation (32 hex chars)
+- Empty upload rejection (400 Bad Request)
+- File existence check before serving (404 Not Found)
+- Generic error response for unexpected failures (500)
+
+### Scaling Considerations
+
+#### File System Limits
+
+**Current limitations:**
+- **Flat directory structure**: Performance degrades with >10K files per directory
+- **No content deduplication**: Identical content creates duplicate files
+- **No file size limits**: Large uploads could exhaust disk space
+
+**Mitigation strategies:**
+```python
+# Future enhancement: Hierarchical storage
+# Example: ab/cd/ef/abcdef... (3-level hierarchy)
+content_id = uuid.uuid4().hex
+file_path = self.store_root / content_id[:2] / content_id[2:4] / content_id[4:6] / content_id
+```
+
+#### Concurrent Operation Handling
+
+The service leverages **async/await patterns** for concurrent request handling:
+
+```python
+# Non-blocking file operations with aiofiles
+async with aiofiles.open(file_path, "wb") as f:
+    await f.write(content_data)
+
+# Async file existence check
+return bool(await aiofiles.os.path.isfile(str(file_path)))
+```
+
+**Concurrency characteristics:**
+- Each request gets its own coroutine
+- File I/O doesn't block the event loop
+- No explicit locking (relies on filesystem atomicity)
+
+#### Caching Strategies
+
+**Current state**: No caching implemented
+
+**Potential enhancements:**
+```python
+# In-memory LRU cache for frequently accessed content
+from functools import lru_cache
+
+@lru_cache(maxsize=100)
+async def get_cached_content_path(self, content_id: str) -> Path:
+    return self.store_root / content_id
+
+# HTTP caching headers for client-side caching
+response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+response.headers['ETag'] = f'"{content_id}"'

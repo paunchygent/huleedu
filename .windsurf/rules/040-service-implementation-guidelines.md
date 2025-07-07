@@ -98,9 +98,45 @@ Services with multiple entry points (e.g., HTTP + Worker) **MUST** use a shared 
 - **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
 - **MUST** use manual Kafka commits with error boundaries (no auto-commit)
 - **MUST** implement `/healthz` with consistent JSON response format
+
+### 4.10. Service Library Usage Patterns
+- **MUST** use service libraries for ALL infrastructure interactions:
+  - `huleedu_service_libs.kafka_client` for Kafka publishing
+  - `huleedu_service_libs.redis_client` for Redis operations
+  - `huleedu_service_libs.logging_utils` for structured logging
+  - `huleedu_service_libs.database` for PostgreSQL monitoring
+- **MUST** implement lifecycle management for all clients:
+  ```python
+  # Always in DI providers
+  client = RedisClient(client_id="service-redis")
+  await client.start()  # REQUIRED before use
+  # ... use client ...
+  await client.stop()   # REQUIRED for cleanup
+  ```
+- **MUST** use `@idempotent_consumer` decorator for ALL Kafka consumers:
+  ```python
+  @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+  async def handle_message(msg: ConsumerRecord):
+      # Automatically prevents duplicate processing
+      pass
+  ```
+- **MUST** integrate database monitoring for PostgreSQL services:
+  ```python
+  # In startup_setup.py
+  db_metrics = setup_database_monitoring(engine, "service_name")
+  app.extensions["db_metrics"] = db_metrics
+  app.health_checker = DatabaseHealthChecker(engine, "service_name")
+  ```
+- **MUST** wrap external dependencies with circuit breakers:
+  ```python
+  # In di.py
+  client = ExternalServiceImpl()
+  breaker = CircuitBreaker(name="external_api")
+  return make_resilient(client, breaker)
+  ```
 - **MUST** fail fast on startup errors with `logger.critical()` and `raise`
 
-### 4.10. Observability (Prometheus & Distributed Tracing)
+### 4.11. Observability (Prometheus & Distributed Tracing)
 - **Metrics Class**: `MUST` define all service-specific metrics in a dedicated class within `<service>/metrics.py` or `<service>/app/metrics.py`.
 - **DI Provider**: `MUST` create a MetricsProvider in `<service>/di.py` to provide the metrics class and `prometheus_client.REGISTRY` with `Scope.APP`.
 - **Metrics Endpoint**: `MUST` expose metrics at a `/metrics` endpoint, typically in `routers/health_routes.py`.

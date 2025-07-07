@@ -208,7 +208,7 @@ class CoreInfrastructureProvider(Provider):
             return store
         else:
             # Production: use PostgreSQL implementation with database metrics
-            postgres_repo = PostgreSQLEssayRepository(settings, database_metrics, engine)
+            postgres_repo = PostgreSQLEssayRepository(settings, database_metrics)
             await postgres_repo.initialize_db_schema()
             return postgres_repo
 

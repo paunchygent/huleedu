@@ -3,84 +3,69 @@
 from __future__ import annotations
 
 from dishka import FromDishka
-from huleedu_service_libs.database import DatabaseMetrics
-from huleedu_service_libs.database.health_checks import get_pool_status_safe
+from huleedu_service_libs.database import DatabaseHealthChecker
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
-from quart import Blueprint, Response, jsonify
+from quart import Blueprint, Response, current_app, jsonify
 from quart_dishka import inject
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = create_service_logger("class_management_service.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
 
 @health_bp.route("/healthz")
-@inject
-async def health_check(
-    engine: FromDishka[AsyncEngine], database_metrics: FromDishka[DatabaseMetrics]
-) -> Response | tuple[Response, int]:
-    """Health check endpoint with database connectivity verification."""
-    checks = {"service_responsive": True, "dependencies_available": True}
-    dependencies = {}
-
-    # Test database connectivity
+async def health_check() -> Response | tuple[Response, int]:
+    """Standardized health check endpoint."""
     try:
-        async with engine.begin() as conn:
-            await conn.execute(text("SELECT 1"))
+        # Check database connectivity
+        checks = {"service_responsive": True, "dependencies_available": True}
+        dependencies = {}
 
-        # Get connection pool status using type-safe method
-        pool_stats = get_pool_status_safe(engine.pool)
-        
-        if pool_stats.get("status") == "degraded":
-            dependencies["database"] = {
-                "status": "degraded", 
-                "error": pool_stats.get("error", "Pool status unavailable"),
-                "pool_type": pool_stats.get("pool_type", "unknown")
-            }
+        # Get database engine from app extensions
+        engine = getattr(current_app, "database_engine", None)
+        if engine:
+            try:
+                health_checker = DatabaseHealthChecker(engine, "class_management_service")
+                summary = await health_checker.get_health_summary()
+                dependencies["database"] = {"status": summary.get("status", "unknown")}
+                if summary.get("status") not in ["healthy", "warning"]:
+                    checks["dependencies_available"] = False
+            except Exception as e:
+                logger.warning(f"Database health check failed: {e}")
+                dependencies["database"] = {"status": "unhealthy", "error": str(e)}
+                checks["dependencies_available"] = False
         else:
             dependencies["database"] = {
-                "status": "healthy",
-                "pool_size": pool_stats["pool_size"],
-                "active_connections": pool_stats["active_connections"],
-                "idle_connections": pool_stats["idle_connections"],
-                "overflow": pool_stats["overflow_connections"],
-                "pool_type": pool_stats.get("pool_type", "unknown"),
+                "status": "unknown",
+                "note": "Database engine not configured",
             }
 
-            # Update connection pool metrics using type-safe values
-            # Only update metrics if we have valid integer values
-            if (isinstance(pool_stats["active_connections"], int) and 
-                isinstance(pool_stats["idle_connections"], int) and
-                isinstance(pool_stats["pool_size"], int) and
-                isinstance(pool_stats["overflow_connections"], int)):
-                database_metrics.set_connection_pool_status(
-                    active=pool_stats["active_connections"],
-                    idle=pool_stats["idle_connections"],
-                    total=pool_stats["pool_size"] + pool_stats["active_connections"],
-                    overflow=pool_stats["overflow_connections"],
-                )
+        overall_status = "healthy" if checks["dependencies_available"] else "unhealthy"
+
+        health_response = {
+            "service": "class_management_service",
+            "status": overall_status,
+            "message": f"Class Management Service is {overall_status}",
+            "version": "1.0.0",
+            "checks": checks,
+            "dependencies": dependencies,
+            "environment": "development",
+        }
+
+        status_code = 200 if overall_status == "healthy" else 503
+        return jsonify(health_response), status_code
 
     except Exception as e:
-        logger.error(f"Database health check failed: {e}")
-        dependencies["database"] = {"status": "unhealthy", "error": str(e)}
-        checks["dependencies_available"] = False
-
-    overall_status = "healthy" if checks["dependencies_available"] else "unhealthy"
-
-    health_status = {
-        "service": "class_management_service",
-        "status": overall_status,
-        "message": f"Class Management Service is {overall_status}",
-        "version": "1.0.0",
-        "checks": checks,
-        "dependencies": dependencies,
-        "environment": "development",
-    }
-
-    status_code = 200 if overall_status == "healthy" else 503
-    return jsonify(health_status), status_code
+        logger.error(f"Health check failed: {e}")
+        return jsonify(
+            {
+                "service": "class_management_service",
+                "status": "unhealthy",
+                "message": "Health check failed",
+                "version": "1.0.0",
+                "error": str(e),
+            }
+        ), 503
 
 
 @health_bp.route("/metrics")
