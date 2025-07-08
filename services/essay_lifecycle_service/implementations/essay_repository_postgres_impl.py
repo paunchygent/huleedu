@@ -26,7 +26,7 @@ from services.essay_lifecycle_service.protocols import EssayRepositoryProtocol
 from services.essay_lifecycle_service.state_store import EssayState as ConcreteEssayState
 
 if TYPE_CHECKING:
-    from protocols import EssayState
+    from services.essay_lifecycle_service.protocols import EssayState
 
 
 class PostgreSQLEssayRepository(EssayRepositoryProtocol):

@@ -10,13 +10,13 @@ from logging.config import fileConfig
 from typing import TYPE_CHECKING
 
 from alembic import context
-
-# Import service configuration and models
-from config import settings
-from models_db import Base
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
+
+# Import service configuration and models
+from services.batch_orchestrator_service.config import settings
+from services.batch_orchestrator_service.models_db import Base
 
 if TYPE_CHECKING:
     pass

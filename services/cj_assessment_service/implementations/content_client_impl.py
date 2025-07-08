@@ -7,8 +7,8 @@ enabling the CJ service to fetch spellchecked essay content from the Content Ser
 from __future__ import annotations
 
 import aiohttp
-from config import Settings
 
+from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import ContentClientProtocol
 
 

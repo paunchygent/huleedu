@@ -20,6 +20,7 @@ logger = create_service_logger("huleedu.database.health_checks")
 
 class PoolStatus(TypedDict):
     """Type-safe structure for database pool status."""
+
     status: str
     pool_size: int
     active_connections: int
@@ -290,7 +291,8 @@ class DatabaseHealthChecker:
                     """)
                     )
                     db_size = result.scalar()
-                except:
+                except Exception as e:
+                    logger.debug(f"Database size query failed: {e}")
                     db_size = "unavailable"
 
                 # Get long-running queries
@@ -298,7 +300,7 @@ class DatabaseHealthChecker:
                     text("""
                     SELECT COUNT(*) as long_running_queries
                     FROM pg_stat_activity
-                    WHERE state = 'active' 
+                    WHERE state = 'active'
                     AND query_start < NOW() - INTERVAL '5 minutes'
                     AND query != '<IDLE>'
                 """)

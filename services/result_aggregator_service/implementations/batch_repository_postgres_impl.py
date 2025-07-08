@@ -27,7 +27,8 @@ logger = create_service_logger("result_aggregator.batch_repository")
 
 
 class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
-    """PostgreSQL implementation of batch repository with internal session management and metrics."""
+    """PostgreSQL implementation of batch repository with internal
+    session management and metrics."""
 
     def __init__(
         self,

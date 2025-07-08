@@ -137,7 +137,9 @@ class QueueRedisClientProtocol(Protocol):
         """
         ...
 
-    async def get_queue_items_with_priorities(self, queue_key: str, count: int) -> List["QueueItem"]:
+    async def get_queue_items_with_priorities(
+        self, queue_key: str, count: int
+    ) -> List["QueueItem"]:
         """
         Get top priority queue items with their priority scores.
 

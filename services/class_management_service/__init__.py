@@ -6,23 +6,24 @@ in the HuleEdu platform.
 
 # Core components
 # Subpackages
-from . import api, implementations
-from .api_models import (
+from services.class_management_service.api_models import (
     CreateClassRequest,
     CreateStudentRequest,
     UpdateClassRequest,
     UpdateStudentRequest,
 )
-from .app import app
-from .config import Settings, settings
-from .models_db import Course, Student, UserClass
-from .protocols import (
+from services.class_management_service.config import Settings, settings
+from services.class_management_service.models_db import Course, Student, UserClass
+from services.class_management_service.protocols import (
     ClassEventPublisherProtocol,
     ClassManagementServiceProtocol,
     ClassRepositoryProtocol,
     T,
     U,
 )
+
+from . import api, implementations
+from .app import app
 
 # Define public API
 __all__ = [

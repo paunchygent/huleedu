@@ -6,9 +6,9 @@ from httpx import AsyncClient
 from starlette.responses import StreamingResponse
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from services.api_gateway_service.config import settings
 
 from ..app.metrics import GatewayMetrics
-from ..config import settings
 
 router = APIRouter(route_class=DishkaRoute)
 logger = create_service_logger("api_gateway.class_routes")

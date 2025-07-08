@@ -223,7 +223,8 @@ class TestResponseValidationOptimizations:
         assert total_validations / total_time > 10000  # Over 10k validations per second
 
     def test_regex_pattern_compilation_performance(self) -> None:
-        """Test that pre-compiled regex patterns improve performance by measuring PURE compilation overhead."""
+        """Test that pre-compiled regex patterns improve performance
+        by measuring PURE compilation overhead."""
         import re
 
         # Use realistic patterns from actual response validation

@@ -6,10 +6,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from config import settings
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry, Counter
 
+from services.content_service.config import settings
 from services.content_service.implementations.filesystem_content_store import FileSystemContentStore
 from services.content_service.implementations.prometheus_content_metrics import (
     PrometheusContentMetrics,

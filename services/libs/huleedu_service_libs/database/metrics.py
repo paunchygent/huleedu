@@ -158,15 +158,23 @@ class PrometheusDatabaseMetrics:
     def _get_existing_metrics(self) -> Dict[str, Any]:
         """Retrieve existing metrics from registry."""
         name_map = {
-            "database_query_duration_seconds": f"{self.service_name}_database_query_duration_seconds",
+            "database_query_duration_seconds": (
+                f"{self.service_name}_database_query_duration_seconds"
+            ),
             "database_connections_active": f"{self.service_name}_database_connections_active",
             "database_connections_idle": f"{self.service_name}_database_connections_idle",
             "database_connections_total": f"{self.service_name}_database_connections_total",
             "database_connections_overflow": f"{self.service_name}_database_connections_overflow",
-            "database_connections_acquired_total": f"{self.service_name}_database_connections_acquired_total",
-            "database_connections_released_total": f"{self.service_name}_database_connections_released_total",
+            "database_connections_acquired_total": (
+                f"{self.service_name}_database_connections_acquired_total"
+            ),
+            "database_connections_released_total": (
+                f"{self.service_name}_database_connections_released_total"
+            ),
             "database_transactions_total": f"{self.service_name}_database_transactions_total",
-            "database_transaction_duration_seconds": f"{self.service_name}_database_transaction_duration_seconds",
+            "database_transaction_duration_seconds": (
+                f"{self.service_name}_database_transaction_duration_seconds"
+            ),
             "database_errors_total": f"{self.service_name}_database_errors_total",
         }
 

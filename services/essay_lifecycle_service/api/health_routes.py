@@ -61,7 +61,7 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
         # Fallback to service name if settings not available
         try:
             service_name = settings.SERVICE_NAME
-        except:
+        except AttributeError:
             service_name = "essay-lifecycle-service"
         return jsonify(
             {

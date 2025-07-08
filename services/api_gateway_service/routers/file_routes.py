@@ -12,11 +12,11 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import JSONResponse
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from services.api_gateway_service.config import settings
 
 from ..app.metrics import GatewayMetrics
 from ..app.rate_limiter import limiter
 from ..auth import get_current_user_id
-from ..config import settings
 
 router = APIRouter(route_class=DishkaRoute)
 logger = create_service_logger("api_gateway.file_routes")

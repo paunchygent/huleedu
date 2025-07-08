@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from common_core.status_enums import EssayStatus
     from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
-    from config import Settings
+    from services.essay_lifecycle_service.config import Settings
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context

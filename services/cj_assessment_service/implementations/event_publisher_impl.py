@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from config import Settings
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
+from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol
 
 

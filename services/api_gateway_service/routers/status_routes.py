@@ -9,11 +9,11 @@ from pydantic import BaseModel, Field
 
 from common_core.status_enums import BatchClientStatus
 from huleedu_service_libs.logging_utils import create_service_logger
+from services.api_gateway_service.config import settings
 
 from .. import auth
 from ..acl_transformers import transform_bos_state_to_ras_response
 from ..app.metrics import GatewayMetrics
-from ..config import settings
 
 router = APIRouter(route_class=DishkaRoute)
 logger = create_service_logger("api_gateway.status_routes")

@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
-from config import settings
+from services.essay_lifecycle_service.config import settings
 from services.essay_lifecycle_service.protocols import EssayRepositoryProtocol
 
 logger = create_service_logger("els.api.batch")

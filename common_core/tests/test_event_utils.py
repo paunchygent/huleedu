@@ -8,6 +8,7 @@ for idempotency guarantees in the HuleEdu platform.
 import json
 from uuid import uuid4
 
+import pytest
 from huleedu_service_libs.event_utils import (
     extract_correlation_id_from_event,
     generate_deterministic_event_id,
@@ -148,8 +149,6 @@ class TestGenerateDeterministicEventId:
         msg = json.dumps(event).encode("utf-8")
 
         # Act & Assert
-        import pytest
-
         with pytest.raises(ValueError, match="Event message must contain a 'data' field"):
             generate_deterministic_event_id(msg)
 
@@ -159,8 +158,6 @@ class TestGenerateDeterministicEventId:
         malformed_msg = b'{"invalid": json syntax'
 
         # Act & Assert
-        import pytest
-
         with pytest.raises(ValueError, match="Failed to decode or process event message"):
             generate_deterministic_event_id(malformed_msg)
 
@@ -170,8 +167,6 @@ class TestGenerateDeterministicEventId:
         non_utf8_msg = b"\xff\xfe\x00\x00invalid_bytes"
 
         # Act & Assert
-        import pytest
-
         with pytest.raises((ValueError, UnicodeDecodeError)):
             generate_deterministic_event_id(non_utf8_msg)
 

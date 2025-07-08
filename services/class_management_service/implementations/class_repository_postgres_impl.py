@@ -34,7 +34,8 @@ U = TypeVar("U", bound=Student)
 
 
 class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
-    """PostgreSQL implementation of ClassRepositoryProtocol with generic types and database metrics."""
+    """PostgreSQL implementation of ClassRepositoryProtocol with
+    generic types and database metrics."""
 
     def __init__(
         self, session: AsyncSession, metrics: Optional[DatabaseMetricsProtocol] = None

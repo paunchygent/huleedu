@@ -4,15 +4,15 @@ HuleEdu Content Service Application.
 
 from __future__ import annotations
 
-import startup_setup
-from api.content_routes import content_bp
-from api.health_routes import health_bp
-from config import settings
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.metrics_middleware import setup_content_service_metrics_middleware
 from quart import Quart
 from quart_dishka import QuartDishka  # Added
 
+from services.content_service import startup_setup
+from services.content_service.api.content_routes import content_bp
+from services.content_service.api.health_routes import health_bp
+from services.content_service.config import settings
 from services.content_service.startup_setup import create_di_container  # Added
 
 # Configure structured logging

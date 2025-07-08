@@ -92,8 +92,6 @@ class TestEventEnvelopeSchemaVersion:
         """Test default value, serialization, and deserialization of schema_version."""
         import json
 
-        from common_core.events.envelope import EventEnvelope
-
         # Dummy data for the envelope
         dummy_data = BaseEventData(
             event_name=ProcessingEvent.PROCESSING_STARTED,

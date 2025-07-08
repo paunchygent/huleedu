@@ -121,7 +121,7 @@ async def infrastructure_di_container(
 
             try:
                 # Get and cleanup connection pool manager
-                from services.llm_provider_service.implementations.connection_pool_manager_impl import (
+                from services.llm_provider_service.implementations.connection_pool_manager_impl import (  # noqa: E501
                     ConnectionPoolManagerImpl,
                 )
 

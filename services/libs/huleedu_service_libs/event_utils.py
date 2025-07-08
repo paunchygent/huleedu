@@ -129,7 +129,9 @@ def extract_correlation_id_from_event(msg_value: bytes) -> str | None:
 
         # Runtime validation for type safety
         if correlation_id is not None and not isinstance(correlation_id, str):
-            raise TypeError(f"Expected correlation_id to be str or None, got: {type(correlation_id)}")
+            raise TypeError(
+                f"Expected correlation_id to be str or None, got: {type(correlation_id)}"
+            )
 
         return correlation_id
     except (json.JSONDecodeError, TypeError, KeyError):

@@ -132,7 +132,9 @@ def _get_existing_metrics() -> dict[str, Any]:
         "orchestration_commands_total": "huleedu_orchestration_commands_total",
         # Circuit Breaker Metrics
         "circuit_breaker_state": "batch_orchestrator_service_circuit_breaker_state",
-        "circuit_breaker_state_changes": "batch_orchestrator_service_circuit_breaker_state_changes_total",
+        "circuit_breaker_state_changes": (
+            "batch_orchestrator_service_circuit_breaker_state_changes_total"
+        ),
         "circuit_breaker_calls_total": "batch_orchestrator_service_circuit_breaker_calls_total",
     }
 

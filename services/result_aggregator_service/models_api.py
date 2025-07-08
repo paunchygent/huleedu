@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from services.result_aggregator_service.enums_api import BatchStatus, ProcessingPhase
 
 if TYPE_CHECKING:
-    from models_db import BatchResult
+    from services.result_aggregator_service.models_db import BatchResult
 
 
 class EssayResultResponse(BaseModel):

@@ -168,7 +168,8 @@ class TestLLMProviderServiceIntegration:
         try:
             await self._publish_test_event(envelope)
             print(
-                f"Successfully published test event to Kafka topic: {topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}"
+                f"Successfully published test event to Kafka topic: "
+                f"{topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}"
             )
         except Exception as e:
             pytest.skip(f"Failed to publish to Kafka: {str(e)}")

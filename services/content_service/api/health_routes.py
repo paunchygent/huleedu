@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from config import settings
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
 from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
+
+from services.content_service.config import settings
 
 logger = create_service_logger("content.api.health")
 health_bp = Blueprint("health_routes", __name__)

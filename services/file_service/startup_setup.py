@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from config import Settings
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -10,6 +9,7 @@ from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tr
 from quart import Quart
 from quart_dishka import QuartDishka
 
+from services.file_service.config import Settings
 from services.file_service.di import CoreInfrastructureProvider, ServiceImplementationsProvider
 
 logger = create_service_logger("file_service.startup")

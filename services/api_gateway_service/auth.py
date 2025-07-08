@@ -7,8 +7,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
 from huleedu_service_libs.logging_utils import create_service_logger
-
-from .config import settings
+from services.api_gateway_service.config import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token")
 logger = create_service_logger("api_gateway.auth")

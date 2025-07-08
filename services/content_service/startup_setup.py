@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from config import Settings
 from dishka import AsyncContainer, make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CollectorRegistry, Counter, Histogram
 from quart import Quart
 
+from services.content_service.config import Settings
 from services.content_service.di import ContentServiceProvider
 
 logger = create_service_logger("content.startup")

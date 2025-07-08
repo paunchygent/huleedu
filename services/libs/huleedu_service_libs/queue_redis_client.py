@@ -149,7 +149,8 @@ class QueueRedisClient(QueueRedisClientProtocol):
             result = await self.client.ping()
             success = bool(result)
             logger.debug(
-                f"Queue Redis PING by '{self.client_id}': result={'SUCCESS' if success else 'FAILED'}"
+                f"Queue Redis PING by '{self.client_id}': "
+                f"result={'SUCCESS' if success else 'FAILED'}"
             )
             return success
         except RedisConnectionError:
@@ -184,14 +185,12 @@ class QueueRedisClient(QueueRedisClientProtocol):
     @overload
     async def zrange(
         self, key: str, start: int, end: int, *, withscores: Literal[False] = False
-    ) -> List[str]:
-        ...
+    ) -> List[str]: ...
 
     @overload
     async def zrange(
         self, key: str, start: int, end: int, *, withscores: Literal[True]
-    ) -> List[tuple[str, float]]:
-        ...
+    ) -> List[tuple[str, float]]: ...
 
     async def zrange(
         self, key: str, start: int, end: int, *, withscores: bool = False
@@ -207,14 +206,24 @@ class QueueRedisClient(QueueRedisClientProtocol):
 
             if withscores:
                 # Validate List[tuple[str, float]]
-                if not all(isinstance(item, tuple) and len(item) == 2 and
-                          isinstance(item[0], str) and isinstance(item[1], (int, float))
-                          for item in result):
-                    raise TypeError(f"Expected List[tuple[str, float]] from Redis zrange with scores, got: {[type(item) for item in result]}")
+                if not all(
+                    isinstance(item, tuple)
+                    and len(item) == 2
+                    and isinstance(item[0], str)
+                    and isinstance(item[1], (int, float))
+                    for item in result
+                ):
+                    raise TypeError(
+                        f"Expected List[tuple[str, float]] from Redis zrange with scores, "
+                        f"got: {[type(item) for item in result]}"
+                    )
             else:
                 # Validate List[str]
                 if not all(isinstance(item, str) for item in result):
-                    raise TypeError(f"Expected List[str] from Redis zrange, got: {[type(item) for item in result]}")
+                    raise TypeError(
+                        f"Expected List[str] from Redis zrange, "
+                        f"got: {[type(item) for item in result]}"
+                    )
 
             logger.debug(
                 f"Queue Redis ZRANGE by '{self.client_id}': key='{key}' found={len(result)}"
@@ -266,15 +275,19 @@ class QueueRedisClient(QueueRedisClientProtocol):
             if not isinstance(result, list):
                 raise TypeError(f"Expected list from Redis zrange, got: {type(result)}")
             if not all(isinstance(item, str) for item in result):
-                raise TypeError(f"Expected List[str] from Redis zrange, got: {[type(item) for item in result]}")
+                raise TypeError(
+                    f"Expected List[str] from Redis zrange, got: {[type(item) for item in result]}"
+                )
 
             logger.debug(
-                f"Queue Redis get_queue_items by '{self.client_id}': queue='{queue_key}' count={count} found={len(result)}"
+                f"Queue Redis get_queue_items by '{self.client_id}': "
+                f"queue='{queue_key}' count={count} found={len(result)}"
             )
             return result
         except Exception as e:
             logger.error(
-                f"Error in Queue Redis get_queue_items by '{self.client_id}' for queue '{queue_key}': {e}",
+                f"Error in Queue Redis get_queue_items by '{self.client_id}' "
+                f"for queue '{queue_key}': {e}",
                 exc_info=True,
             )
             raise
@@ -287,16 +300,21 @@ class QueueRedisClient(QueueRedisClientProtocol):
             # Runtime type checking with clear error messages
             for item in result:
                 if not isinstance(item, tuple) or len(item) != 2:
-                    raise TypeError(f"Expected tuple[str, float] from Redis withscores=True, got: {type(item)}")
+                    raise TypeError(
+                        f"Expected tuple[str, float] from Redis withscores=True, "
+                        f"got: {type(item)}"
+                    )
 
             queue_items = [QueueItem.from_redis_tuple(item) for item in result]
             logger.debug(
-                f"Queue Redis get_queue_items_with_priorities by '{self.client_id}': queue='{queue_key}' count={count} found={len(queue_items)}"
+                f"Queue Redis get_queue_items_with_priorities by '{self.client_id}': "
+                f"queue='{queue_key}' count={count} found={len(queue_items)}"
             )
             return queue_items
         except Exception as e:
             logger.error(
-                f"Error in Queue Redis get_queue_items_with_priorities by '{self.client_id}' for queue '{queue_key}': {e}",
+                f"Error in Queue Redis get_queue_items_with_priorities by '{self.client_id}' "
+                f"for queue '{queue_key}': {e}",
                 exc_info=True,
             )
             raise
@@ -308,7 +326,8 @@ class QueueRedisClient(QueueRedisClientProtocol):
         try:
             result = await self.client.hset(key, field, value)
             logger.debug(
-                f"Queue Redis HSET by '{self.client_id}': key='{key}' field='{field}' result={result}"
+                f"Queue Redis HSET by '{self.client_id}': "
+                f"key='{key}' field='{field}' result={result}"
             )
             return int(result)
         except Exception as e:
@@ -324,7 +343,8 @@ class QueueRedisClient(QueueRedisClientProtocol):
         try:
             result = await self.client.hget(key, field)
             logger.debug(
-                f"Queue Redis HGET by '{self.client_id}': key='{key}' field='{field}' result={'HIT' if result else 'MISS'}"
+                f"Queue Redis HGET by '{self.client_id}': "
+                f"key='{key}' field='{field}' result={'HIT' if result else 'MISS'}"
             )
             return str(result) if result is not None else None
         except Exception as e:
@@ -340,7 +360,8 @@ class QueueRedisClient(QueueRedisClientProtocol):
         try:
             result = await self.client.hdel(key, *fields)
             logger.debug(
-                f"Queue Redis HDEL by '{self.client_id}': key='{key}' fields={fields} deleted={result}"
+                f"Queue Redis HDEL by '{self.client_id}': "
+                f"key='{key}' fields={fields} deleted={result}"
             )
             return int(result)
         except Exception as e:
@@ -356,7 +377,8 @@ class QueueRedisClient(QueueRedisClientProtocol):
         try:
             result = await self.client.hmget(key, *fields)
             logger.debug(
-                f"Queue Redis HMGET by '{self.client_id}': key='{key}' fields={len(fields)} hits={sum(1 for r in result if r is not None)}"
+                f"Queue Redis HMGET by '{self.client_id}': "
+                f"key='{key}' fields={len(fields)} hits={sum(1 for r in result if r is not None)}"
             )
             return [str(r) if r is not None else None for r in result]
         except Exception as e:
@@ -372,12 +394,14 @@ class QueueRedisClient(QueueRedisClientProtocol):
         try:
             result = await self.client.hexists(key, field)
             logger.debug(
-                f"Queue Redis HEXISTS by '{self.client_id}': key='{key}' field='{field}' exists={result}"
+                f"Queue Redis HEXISTS by '{self.client_id}': "
+                f"key='{key}' field='{field}' exists={result}"
             )
             return bool(result)
         except Exception as e:
             logger.error(
-                f"Error in Queue Redis HEXISTS operation by '{self.client_id}' for key '{key}': {e}",
+                f"Error in Queue Redis HEXISTS operation by '{self.client_id}' "
+                f"for key '{key}': {e}",
                 exc_info=True,
             )
             raise
@@ -392,7 +416,10 @@ class QueueRedisClient(QueueRedisClientProtocol):
             if not isinstance(result, list):
                 raise TypeError(f"Expected list from Redis hkeys, got: {type(result)}")
             if not all(isinstance(item, str) for item in result):
-                raise TypeError(f"Expected List[str] from Redis hkeys, got: {[type(item) for item in result]}")
+                raise TypeError(
+                    f"Expected List[str] from Redis hkeys, "
+                f"got: {[type(item) for item in result]}"
+                )
 
             logger.debug(
                 f"Queue Redis HKEYS by '{self.client_id}': key='{key}' count={len(result)}"
@@ -415,9 +442,15 @@ class QueueRedisClient(QueueRedisClientProtocol):
             if not isinstance(result, dict):
                 raise TypeError(f"Expected dict from Redis hgetall, got: {type(result)}")
             if not all(isinstance(k, str) and isinstance(v, str) for k, v in result.items()):
-                invalid_items = [(k, v, type(k), type(v)) for k, v in result.items()
-                               if not (isinstance(k, str) and isinstance(v, str))]
-                raise TypeError(f"Expected dict[str, str] from Redis hgetall, found invalid items: {invalid_items}")
+                invalid_items = [
+                    (k, v, type(k), type(v))
+                    for k, v in result.items()
+                    if not (isinstance(k, str) and isinstance(v, str))
+                ]
+                raise TypeError(
+                    f"Expected dict[str, str] from Redis hgetall, "
+                    f"found invalid items: {invalid_items}"
+                )
 
             logger.debug(
                 f"Queue Redis HGETALL by '{self.client_id}': key='{key}' fields={len(result)}"
@@ -425,7 +458,8 @@ class QueueRedisClient(QueueRedisClientProtocol):
             return result
         except Exception as e:
             logger.error(
-                f"Error in Queue Redis HGETALL operation by '{self.client_id}' for key '{key}': {e}",
+                f"Error in Queue Redis HGETALL operation by '{self.client_id}' "
+                f"for key '{key}': {e}",
                 exc_info=True,
             )
             raise
@@ -468,7 +502,8 @@ class QueueRedisClient(QueueRedisClientProtocol):
             result = await self.client.setex(key, ttl_seconds, value)
             success = bool(result)
             logger.debug(
-                f"Queue Redis SETEX by '{self.client_id}': key='{key}' ttl={ttl_seconds}s result={'SUCCESS' if success else 'FAILED'}"
+                f"Queue Redis SETEX by '{self.client_id}': "
+                f"key='{key}' ttl={ttl_seconds}s result={'SUCCESS' if success else 'FAILED'}"
             )
             return success
         except Exception as e:

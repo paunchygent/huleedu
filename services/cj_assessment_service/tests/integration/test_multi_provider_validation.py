@@ -89,18 +89,20 @@ class TestMultiProviderValidation:
     ) -> None:
         """Test each provider with real API calls to validate response format."""
         # Short, focused comparison prompt for cost control
-        prompt = """Compare these two essays and determine which is better written.
-
-Essay A (ID: test-a):
-Climate change requires immediate action. Scientific evidence shows rising temperatures globally. We must reduce emissions through renewable energy and policy changes.
-
-Essay B (ID: test-b):
-Climate change is happening but the evidence is mixed. Some scientists disagree about the causes. More research is needed before making expensive policy changes.
-
-Please respond with a JSON object containing:
-- 'winner': 'Essay A' or 'Essay B'
-- 'justification': Brief explanation (max 50 characters)
-- 'confidence': Rating from 1-5 (5 = very confident)"""
+        prompt = (
+            "Compare these two essays and determine which is better written.\n\n"
+            "Essay A (ID: test-a):\n"
+            "Climate change requires immediate action. Scientific evidence shows rising "
+            "temperatures globally. We must reduce emissions through renewable energy and policy "
+            "changes.\n\n"
+            "Essay B (ID: test-b):\n"
+            "Climate change is happening but the evidence is mixed. Some scientists disagree about "
+            "the causes. More research is needed before making expensive policy changes.\n\n"
+            "Please respond with a JSON object containing:\n"
+            "- 'winner': 'Essay A' or 'Essay B'\n"
+            "- 'justification': Brief explanation (max 50 characters)\n"
+            "- 'confidence': Rating from 1-5 (5 = very confident)"
+        )
 
         print(f"\n🧪 Testing {provider_config['description']} ({provider_config['model']})")
 
@@ -195,13 +197,15 @@ JSON response with winner, justification (max 50 chars), confidence 1-5."""
     ) -> None:
         """Test that justification length is properly enforced at max 50 characters."""
         # Prompt that might encourage longer responses
-        prompt = """Compare these two detailed essays and provide comprehensive analysis.
-
-Essay A: [Detailed essay about climate policy with multiple arguments, evidence, and counterarguments spanning several paragraphs with complex reasoning and nuanced perspectives]
-
-Essay B: [Another detailed essay with different viewpoints, extensive evidence, and sophisticated analytical framework]
-
-Please provide thorough justification for your choice with detailed reasoning."""
+        prompt = (
+            "Compare these two detailed essays and provide comprehensive analysis.\n\n"
+            "Essay A: [Detailed essay about climate policy with multiple arguments, evidence, and "
+            "counterarguments spanning several paragraphs with complex reasoning and nuanced "
+            "perspectives]\n\n"
+            "Essay B: [Another detailed essay with different viewpoints, extensive evidence, and "
+            "sophisticated analytical framework]\n\n"
+            "Please provide thorough justification for your choice with detailed reasoning."
+        )
 
         result, error = await llm_client.generate_comparison(user_prompt=prompt)
 

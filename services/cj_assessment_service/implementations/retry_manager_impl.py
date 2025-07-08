@@ -12,7 +12,6 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 import aiohttp
-from config import Settings
 from huleedu_service_libs.logging_utils import create_service_logger
 from tenacity import (
     AsyncRetrying,
@@ -22,6 +21,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import RetryManagerProtocol
 
 logger = create_service_logger("cj_assessment_service.retry_manager_impl")

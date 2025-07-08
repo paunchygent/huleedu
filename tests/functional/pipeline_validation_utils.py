@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import aiohttp
+
 from tests.utils.service_test_manager import ServiceTestManager
 
 
@@ -20,8 +22,6 @@ async def validate_batch_pipeline_state(
     # Get batch state from BOS
     endpoints = await service_manager.get_validated_endpoints()
     bos_base_url = endpoints["batch_orchestrator_service"]["base_url"]
-
-    import aiohttp
 
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{bos_base_url}/v1/batches/{batch_id}/status") as response:
@@ -48,8 +48,6 @@ async def validate_bcs_integration_occurred(
     # 1. Check BCS metrics for HTTP requests
     endpoints = await service_manager.get_validated_endpoints()
     bcs_metrics_url = endpoints["batch_conductor_service"]["metrics_url"]
-
-    import aiohttp
 
     async with aiohttp.ClientSession() as session:
         async with session.get(bcs_metrics_url) as response:

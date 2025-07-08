@@ -172,7 +172,8 @@ class TestSingleRequestPerformance:
 
     @pytest.mark.asyncio
     async def test_multiple_sequential_requests(self, infrastructure_di_container: Any) -> None:
-        """Test performance consistency across multiple sequential requests with real infrastructure."""
+        """Test performance consistency across multiple sequential requests
+        with real infrastructure."""
         request_count = 5  # Reduced for real infrastructure
         response_times = []
 

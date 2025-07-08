@@ -17,8 +17,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+import redis.asyncio as redis
 from aiokafka import ConsumerRecord
 from huleedu_service_libs.event_utils import generate_deterministic_event_id
+from huleedu_service_libs.idempotency import idempotent_consumer
 
 from tests.utils.kafka_test_manager import KafkaTestManager, create_kafka_test_config
 from tests.utils.service_test_manager import ServiceTestManager
@@ -38,8 +40,6 @@ class RealRedisTestHelper:
     async def cleanup_test_keys(self) -> None:
         """Clean up test keys from real Redis."""
         try:
-            import redis.asyncio as redis
-
             client = redis.from_url(self.redis_url)
             # Delete all keys with our test prefix
             keys = await client.keys(f"{self.test_key_prefix}:*")
@@ -121,8 +121,6 @@ class TestAuthenticRedisIdempotency:
         helper = RealRedisTestHelper()
 
         try:
-            import redis.asyncio as redis
-
             client = redis.from_url(helper.redis_url)
 
             # Test basic Redis operations
@@ -304,8 +302,6 @@ class TestControlledIdempotencyScenarios:
         Test that the same event processed by
         multiple services results in proper duplicate detection.
         """
-        from huleedu_service_libs.idempotency import idempotent_consumer
-
         # Simulate multiple services processing the same event
         services = ["batch_orchestrator_service", "essay_lifecycle_service"]
         processing_results = []
@@ -345,8 +341,6 @@ class TestControlledIdempotencyScenarios:
         """
         Test that services continue processing when Redis is unavailable (fail-open behavior).
         """
-        from huleedu_service_libs.idempotency import idempotent_consumer
-
         # Simulate Redis outage
         mock_redis_client.simulate_outage()
 
@@ -376,8 +370,6 @@ class TestControlledIdempotencyScenarios:
         """
         Test that Redis keys are properly cleaned up when processing fails.
         """
-        from huleedu_service_libs.idempotency import idempotent_consumer
-
         @idempotent_consumer(redis_client=mock_redis_client, ttl_seconds=3600)
         async def failing_process_event(msg: ConsumerRecord) -> bool:
             # Simulate processing failure

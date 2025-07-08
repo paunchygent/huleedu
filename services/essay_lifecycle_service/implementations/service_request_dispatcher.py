@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from common_core.metadata_models import EssayProcessingInputRefV1
     from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
-    from config import Settings
+    from services.essay_lifecycle_service.config import Settings
 
 from common_core.domain_enums import CourseCode, Language
 from huleedu_service_libs.logging_utils import create_service_logger

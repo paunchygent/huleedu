@@ -18,9 +18,8 @@ from common_core.domain_enums import ContentType
 from common_core.event_enums import ProcessingEvent
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.status_enums import EssayStatus, ProcessingStage
-
-from ..event_processor import process_single_message
-from ..protocols import (
+from services.spell_checker_service.event_processor import process_single_message
+from services.spell_checker_service.protocols import (
     ContentClientProtocol,
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,

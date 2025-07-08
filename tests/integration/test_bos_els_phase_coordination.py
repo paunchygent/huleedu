@@ -23,6 +23,7 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
@@ -203,8 +204,6 @@ class TestBosElsPhaseCoordination:
         malformed_msg.offset = 456
 
         # FIXED: With proper EventEnvelope parsing, malformed JSON raises ValidationError
-        from pydantic import ValidationError
-
         with pytest.raises(ValidationError):
             await kafka_consumer._handle_message(malformed_msg)
 
@@ -242,7 +241,6 @@ class TestBosElsPhaseCoordination:
         incomplete_msg.topic = "huleedu.els.batch.phase.outcome.v1"
 
         # FIXED: With proper EventEnvelope parsing, missing required fields raise ValidationError
-        from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
             await kafka_consumer._handle_message(incomplete_msg)

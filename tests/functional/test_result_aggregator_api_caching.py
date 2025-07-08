@@ -91,8 +91,6 @@ class FunctionalTestApiProvider(Provider):
         self, redis_client: FromDishka[RedisClientProtocol], settings: FromDishka[Settings]
     ) -> CacheManagerProtocol:
         """Provides the real cache manager implementation."""
-        from typing import cast
-
         from huleedu_service_libs.redis_client import RedisClient
         from huleedu_service_libs.redis_set_operations import RedisSetOperations
 
@@ -494,8 +492,6 @@ class TestAPIWithCaching:
         self, client: QuartClient, auth_headers: dict[str, str], setup_test_data: BatchResult
     ) -> None:
         """Test cache behavior under concurrent requests."""
-        import asyncio
-
         batch_id = "test-batch-001"
         endpoint = f"/internal/v1/batches/{batch_id}/status"
 
