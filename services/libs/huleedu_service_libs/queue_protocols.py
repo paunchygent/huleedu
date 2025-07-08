@@ -15,7 +15,10 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Protocol
+from typing import Any, List, Literal, Optional, Protocol, overload, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from huleedu_service_libs.queue_models import QueueItem
 
 
 class QueueRedisClientProtocol(Protocol):
@@ -60,8 +63,22 @@ class QueueRedisClientProtocol(Protocol):
         """
         ...
 
+    @overload
     async def zrange(
-        self, key: str, start: int, end: int, withscores: bool = False
+        self, key: str, start: int, end: int, *, withscores: Literal[False] = False
+    ) -> List[str]:
+        """Get range of members from sorted set (strings only)."""
+        ...
+
+    @overload
+    async def zrange(
+        self, key: str, start: int, end: int, *, withscores: Literal[True]
+    ) -> List[tuple[str, float]]:
+        """Get range of members from sorted set with scores."""
+        ...
+
+    async def zrange(
+        self, key: str, start: int, end: int, *, withscores: bool = False
     ) -> List[str] | List[tuple[str, float]]:
         """
         Get range of members from sorted set by rank.
@@ -99,6 +116,41 @@ class QueueRedisClientProtocol(Protocol):
 
         Returns:
             Number of elements in set
+        """
+        ...
+
+    # Domain-Specific Queue Operations
+    async def get_queue_items(self, queue_key: str, count: int) -> List[str]:
+        """
+        Get top priority queue item IDs.
+
+        Domain-specific method for retrieving queue items without exposing
+        low-level Redis sorted set operations. Provides type safety and
+        clear intent for queue operations.
+
+        Args:
+            queue_key: Redis queue key (sorted set)
+            count: Number of items to retrieve
+
+        Returns:
+            List of queue item IDs ordered by priority
+        """
+        ...
+
+    async def get_queue_items_with_priorities(self, queue_key: str, count: int) -> List["QueueItem"]:
+        """
+        Get top priority queue items with their priority scores.
+
+        Domain-specific method returning structured QueueItem objects
+        instead of raw Redis tuples. Provides type safety and domain
+        alignment for queue operations requiring priority information.
+
+        Args:
+            queue_key: Redis queue key (sorted set)
+            count: Number of items to retrieve
+
+        Returns:
+            List of QueueItem objects with IDs and priorities
         """
         ...
 

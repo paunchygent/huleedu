@@ -11,6 +11,8 @@ from __future__ import annotations
 import os
 from typing import Any, List, Optional
 
+from huleedu_service_libs.queue_models import QueueItem
+
 import redis.asyncio as aioredis
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.queue_protocols import (
@@ -219,6 +221,48 @@ class QueueRedisClient(QueueRedisClientProtocol):
         except Exception as e:
             logger.error(
                 f"Error in Queue Redis ZCARD operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    # Domain-Specific Queue Operations
+    async def get_queue_items(self, queue_key: str, count: int) -> List[str]:
+        """Get top priority queue item IDs with guaranteed type safety."""
+        self._ensure_started()
+        try:
+            result = await self.client.zrange(queue_key, 0, count - 1)
+            # Runtime type assertion for safety
+            assert all(isinstance(item, str) for item in result), \
+                f"Expected string items from Redis zrange, got: {[type(item) for item in result]}"
+            logger.debug(
+                f"Queue Redis get_queue_items by '{self.client_id}': queue='{queue_key}' count={count} found={len(result)}"
+            )
+            return result
+        except Exception as e:
+            logger.error(
+                f"Error in Queue Redis get_queue_items by '{self.client_id}' for queue '{queue_key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def get_queue_items_with_priorities(self, queue_key: str, count: int) -> List[QueueItem]:
+        """Get top priority queue items with priorities as value objects."""
+        self._ensure_started()
+        try:
+            result = await self.client.zrange(queue_key, 0, count - 1, withscores=True)
+            # Runtime type checking with clear error messages
+            for item in result:
+                if not isinstance(item, tuple) or len(item) != 2:
+                    raise TypeError(f"Expected tuple[str, float] from Redis withscores=True, got: {type(item)}")
+            
+            queue_items = [QueueItem.from_redis_tuple(item) for item in result]
+            logger.debug(
+                f"Queue Redis get_queue_items_with_priorities by '{self.client_id}': queue='{queue_key}' count={count} found={len(queue_items)}"
+            )
+            return queue_items
+        except Exception as e:
+            logger.error(
+                f"Error in Queue Redis get_queue_items_with_priorities by '{self.client_id}' for queue '{queue_key}': {e}",
                 exc_info=True,
             )
             raise
