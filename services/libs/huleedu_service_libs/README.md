@@ -16,6 +16,7 @@ A comprehensive collection of shared utilities and infrastructure components for
   - [Middleware](#middleware)
   - [Event Utilities](#event-utilities)
   - [Idempotency](#idempotency)
+  - [Type-Safe Quart App](#type-safe-quart-app)
 - [Integration Patterns](#integration-patterns)
 - [Testing Guidelines](#testing-guidelines)
 - [Migration Guide](#migration-guide)
@@ -678,6 +679,311 @@ async def handle_essay_submitted(msg: ConsumerRecord) -> None:
     # If processing fails, the idempotency key is released
     # allowing natural retry on the next Kafka poll
 ```
+
+### Type-Safe Quart App
+
+**Module**: `quart_app.py`  
+**Purpose**: Type-safe Quart application class that replaces setattr/getattr anti-patterns
+
+#### Problem Statement
+
+HuleEdu services historically used `setattr()`/`getattr()` for dynamic app attributes, violating DDD principles and type safety:
+
+```python
+# Anti-pattern (FORBIDDEN)
+setattr(app, "database_engine", engine)
+engine = getattr(current_app, "database_engine", None)
+```
+
+**Architectural Violations:**
+- **Global State Container**: Using Quart app as service locator
+- **Hidden Dependencies**: Business logic accesses framework internals without declaration
+- **Type System Bypass**: Runtime string-based access with no compile-time verification
+- **Poor Development Experience**: No IDE support, autocomplete, or refactoring safety
+
+#### Solution: HuleEduApp Class
+
+The `HuleEduApp` class provides type-safe infrastructure attributes with compile-time verification and IDE support.
+
+#### API Reference
+
+```python
+class HuleEduApp(Quart):
+    """Type-safe Quart application with HuleEdu infrastructure."""
+    
+    # Core Infrastructure (all services)
+    database_engine: Optional[AsyncEngine]
+    extensions: dict[str, Any]
+    
+    # Distributed Tracing
+    tracer: Optional[Tracer]
+    
+    # Dependency Injection
+    container: Optional[AsyncContainer]
+    
+    # Background Processing (service-specific)
+    consumer_task: Optional[asyncio.Task[None]]
+    kafka_consumer: Optional[Any]
+    
+    def __init__(self, import_name: str, *args, **kwargs) -> None
+```
+
+#### Infrastructure Attributes
+
+##### Core Infrastructure (All Services)
+
+**`database_engine: Optional[AsyncEngine]`**
+- **Purpose**: SQLAlchemy async engine for database operations
+- **Usage**: Set during service initialization, accessed in health checks
+- **Type**: `sqlalchemy.ext.asyncio.AsyncEngine`
+
+**`extensions: dict[str, Any]`**  
+- **Purpose**: Standard Quart extensions dictionary
+- **Usage**: Store app-level objects like metrics, tracer instances
+- **Type**: `dict[str, Any]`
+- **Pattern**: Follows standard Quart extension registration
+
+##### Distributed Tracing
+
+**`tracer: Optional[Tracer]`**
+- **Purpose**: OpenTelemetry tracer for distributed tracing
+- **Usage**: Services participating in distributed tracing
+- **Type**: `opentelemetry.trace.Tracer`
+
+##### Dependency Injection
+
+**`container: Optional[AsyncContainer]`**
+- **Purpose**: Dishka async container for dependency injection
+- **Usage**: Protocol-based dependency resolution and lifecycle management
+- **Type**: `dishka.AsyncContainer`
+
+##### Background Processing (Service-Specific)
+
+**`consumer_task: Optional[asyncio.Task[None]]`**
+- **Purpose**: Asyncio task for background Kafka consumer processing
+- **Usage**: Services with background Kafka consumers, graceful shutdown
+- **Type**: `asyncio.Task[None]`
+
+**`kafka_consumer: Optional[Any]`**
+- **Purpose**: Service-specific Kafka consumer instances
+- **Usage**: Custom Kafka consumer implementations
+- **Type**: `Any` (intentionally generic for service-specific consumer classes)
+
+#### Usage Examples
+
+##### Basic Usage
+
+```python
+from huleedu_service_libs import HuleEduApp
+from sqlalchemy.ext.asyncio import create_async_engine
+
+# Create type-safe app
+app = HuleEduApp(__name__)
+
+# Set infrastructure (type-safe)
+engine = create_async_engine(DATABASE_URL)
+app.database_engine = engine  # ✅ Type-safe assignment
+
+# Access infrastructure (type-safe)
+engine = app.database_engine  # ✅ IDE autocomplete, type checking
+```
+
+##### Startup Setup Pattern
+
+```python
+# startup_setup.py - RECOMMENDED PATTERN
+from huleedu_service_libs import HuleEduApp
+from dishka import make_async_container
+
+async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
+    """Initialize all service infrastructure with type safety."""
+    
+    # Database setup
+    engine = create_async_engine(settings.DATABASE_URL)
+    await initialize_database_schema(engine)
+    app.database_engine = engine  # Type-safe assignment
+    
+    # Dependency injection
+    container = make_async_container(ServiceProvider())
+    app.container = container
+    
+    # Distributed tracing
+    tracer = init_tracing(settings.SERVICE_NAME)
+    app.tracer = tracer
+    
+    # Standard extensions
+    app.extensions["metrics"] = setup_metrics()
+    app.extensions["QUART_DISHKA"] = QuartDishka(app=app, container=container)
+```
+
+##### Health Check Pattern
+
+```python
+# health_routes.py - MIGRATION FROM getattr()
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from huleedu_service_libs import HuleEduApp
+    current_app: HuleEduApp  # Type hint for IDE support
+
+@health_bp.route("/healthz")
+async def health_check():
+    """Type-safe health check with no runtime attribute errors."""
+    
+    # OLD (anti-pattern):
+    # engine = getattr(current_app, "database_engine", None)
+    
+    # NEW (type-safe):
+    engine = current_app.database_engine  # ✅ Compile-time verified
+    
+    if engine is None:
+        return jsonify({
+            "status": "error", 
+            "database": "not configured"
+        }), 500
+    
+    # Use typed engine for health check
+    health_checker = DatabaseHealthChecker(engine, "service_name")
+    summary = await health_checker.get_health_summary()
+    
+    status_code = 200 if summary["overall_status"] == "healthy" else 503
+    return jsonify(summary), status_code
+```
+
+##### Background Task Management
+
+```python
+# app.py - Worker service pattern
+async def setup_background_tasks(app: HuleEduApp, settings: Settings) -> None:
+    """Setup background Kafka consumer with lifecycle management."""
+    
+    # Start consumer task
+    consumer = SpellCheckerKafkaConsumer(settings)
+    consumer_task = asyncio.create_task(consumer.start())
+    
+    # Store for graceful shutdown
+    app.consumer_task = consumer_task
+    app.kafka_consumer = consumer
+
+@app.after_serving
+async def shutdown_background_tasks():
+    """Graceful shutdown of background tasks."""
+    if app.consumer_task is not None:
+        app.consumer_task.cancel()
+        try:
+            await app.consumer_task
+        except asyncio.CancelledError:
+            pass
+    
+    if app.kafka_consumer is not None:
+        await app.kafka_consumer.stop()
+```
+
+#### Migration Guide
+
+##### From setattr/getattr to Type-Safe Attributes
+
+**Step 1: Update App Creation**
+
+```python
+# Before (anti-pattern)
+from quart import Quart
+app = Quart(__name__)
+
+# After (type-safe)
+from huleedu_service_libs import HuleEduApp  
+app = HuleEduApp(__name__)
+```
+
+**Step 2: Replace setattr() Calls**
+
+```python
+# Before (anti-pattern)
+setattr(app, "database_engine", engine)
+setattr(app, "tracer", tracer)
+
+# After (type-safe)
+app.database_engine = engine
+app.tracer = tracer
+```
+
+**Step 3: Replace getattr() Calls**
+
+```python
+# Before (anti-pattern)
+engine = getattr(current_app, "database_engine", None)
+tracer = getattr(current_app, "tracer", None)
+
+# After (type-safe)
+engine = current_app.database_engine
+tracer = current_app.tracer
+```
+
+**Step 4: Add Type Hints for IDE Support**
+
+```python
+# In route files for enhanced IDE support
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from huleedu_service_libs import HuleEduApp
+    current_app: HuleEduApp
+```
+
+##### Service-by-Service Migration Order
+
+Based on task document analysis:
+
+1. **Class Management Service** (Pilot - simple infrastructure)
+2. **Result Aggregator Service** (Simple app.py structure)
+3. **Essay Lifecycle Service** (Standard startup pattern)
+4. **CJ Assessment Service** (DI container complexity)
+5. **Batch Orchestrator Service** (Most complex - metrics, tracer, consumer tasks)
+
+#### Benefits
+
+##### Type Safety
+- **Compile-time verification**: MyPy catches attribute access errors
+- **IDE autocomplete**: Full IntelliSense support for app attributes
+- **Refactoring safety**: Rename operations work across entire codebase
+
+##### Development Experience
+- **No more AttributeError**: Runtime errors become compile-time errors
+- **Self-documenting**: Attribute types are explicit in class definition
+- **Debugging efficiency**: Clear attribute names and types in debugger
+
+##### Architectural Compliance
+- **DDD Principle Alignment**: Infrastructure dependencies explicitly declared
+- **Clean Code Standards**: No magic strings or runtime attribute access
+- **Protocol-Based Design**: Clear interfaces for all infrastructure components
+
+#### Best Practices
+
+1. **Initialize all attributes in `__init__`**: All attributes start as `None` for type safety
+2. **Use TYPE_CHECKING imports**: Add type hints for `current_app` in route files
+3. **Follow startup patterns**: Initialize infrastructure in dedicated `startup_setup.py`
+4. **Graceful shutdown**: Always clean up background tasks and resources
+5. **Keep attributes focused**: Only cross-cutting infrastructure, no service-specific state
+
+#### Anti-Patterns to Avoid
+
+1. **Don't add service-specific attributes**: HuleEduApp is for cross-cutting concerns only
+2. **Don't bypass type system**: No `setattr()/getattr()` on HuleEduApp instances
+3. **Don't forget TYPE_CHECKING**: Add type hints for optimal IDE support
+4. **Don't skip initialization**: Always initialize all attributes to proper values
+5. **Don't store business logic**: Infrastructure only, no domain-specific objects
+
+#### Architectural Discipline
+
+**CRITICAL**: The HuleEduApp class must NOT become a global dumping ground. Attributes are strictly limited to cross-cutting, application-level infrastructure components like:
+
+- Database engines and connection pools
+- Distributed tracing infrastructure
+- Dependency injection containers
+- Background processing tasks
+- Standard Quart extensions
+
+Service-specific business logic, domain objects, or temporary state does NOT belong in HuleEduApp.
 
 ## Integration Patterns
 

@@ -8,7 +8,7 @@ during Kafka outages.
 
 import asyncio
 from datetime import datetime, timezone
-from typing import Optional, TypeVar
+from typing import Callable, Optional, TypeVar, cast
 
 from aiokafka.errors import KafkaError
 from huleedu_service_libs.kafka.fallback_handler import FallbackMessageHandler, QueuedMessage
@@ -122,8 +122,11 @@ class ResilientKafkaPublisher:
 
         try:
             # Attempt to publish through circuit breaker
-            await self.circuit_breaker.call(self.delegate.publish, topic, envelope, key)
+            # Cast the publish method to the expected type for circuit breaker compatibility
+            publish_func = cast(Callable[..., None], self.delegate.publish)
+            await self.circuit_breaker.call(publish_func, topic, envelope, key)
             logger.debug(f"Published message to topic '{topic}' via circuit breaker")
+            return  # Successfully published
 
         except CircuitBreakerError:
             # Circuit is open, queue message for later retry
@@ -218,6 +221,11 @@ class ResilientKafkaPublisher:
                 )
 
             except (KafkaError, Exception) as e:
+                # Type safety: message should not be None here due to earlier check
+                if message is None:
+                    logger.error("Unexpected None message in exception handler")
+                    continue
+
                 # If publishing fails, re-queue the message (with retry limit)
                 if message.retry_count < 5:  # Max 5 retries per message
                     message.retry_count += 1

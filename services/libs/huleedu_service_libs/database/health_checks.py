@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Dict, Union
+from typing import Any, Dict, NotRequired, TypedDict
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import text
@@ -18,7 +18,19 @@ from sqlalchemy.pool import Pool
 logger = create_service_logger("huleedu.database.health_checks")
 
 
-def get_pool_status_safe(pool: Pool) -> Dict[str, Union[int, str]]:
+class PoolStatus(TypedDict):
+    """Type-safe structure for database pool status."""
+    status: str
+    pool_size: int
+    active_connections: int
+    idle_connections: int
+    overflow_connections: int
+    invalid_connections: int
+    pool_type: str
+    error: NotRequired[str]  # Optional error message for degraded status
+
+
+def get_pool_status_safe(pool: Pool) -> PoolStatus:
     """
     Get pool status with type safety and graceful degradation.
 

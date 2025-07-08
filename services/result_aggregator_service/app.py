@@ -16,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 dotenv.load_dotenv()
 
 # Import after environment is loaded
-from sqlalchemy.ext.asyncio import AsyncEngine
 
 from services.result_aggregator_service.api.health_routes import health_bp
 from services.result_aggregator_service.api.query_routes import query_bp

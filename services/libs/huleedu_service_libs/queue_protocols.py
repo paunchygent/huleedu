@@ -15,7 +15,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, List, Literal, Optional, Protocol, overload, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, List, Literal, Optional, Protocol, overload
 
 if TYPE_CHECKING:
     from huleedu_service_libs.queue_models import QueueItem

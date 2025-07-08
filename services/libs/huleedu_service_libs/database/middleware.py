@@ -118,11 +118,14 @@ class DatabaseMetricsMiddleware:
         if table_mapping is None:
             table_mapping = {}
 
+        # Type narrowing: table_mapping is now guaranteed to be Dict[str, str]
+        final_table_mapping: Dict[str, str] = table_mapping
+
         class WrappedRepository(repository_class):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
                 self._metrics = self.metrics
-                self._table_mapping = table_mapping
+                self._table_mapping = final_table_mapping
 
             def __getattribute__(self, name):
                 attr = super().__getattribute__(name)

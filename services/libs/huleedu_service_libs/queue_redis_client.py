@@ -9,12 +9,11 @@ queue functionality.
 from __future__ import annotations
 
 import os
-from typing import Any, List, Optional
-
-from huleedu_service_libs.queue_models import QueueItem
+from typing import Any, List, Literal, Optional, overload
 
 import redis.asyncio as aioredis
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.queue_models import QueueItem
 from huleedu_service_libs.queue_protocols import (
     QueueRedisClientProtocol,
     QueueRedisPipelineProtocol,
@@ -78,6 +77,9 @@ class QueueRedisPipeline:
         """Execute all queued operations atomically."""
         try:
             result = await self._pipeline.execute()
+            # Runtime validation for pipeline results
+            if not isinstance(result, list):
+                raise TypeError(f"Expected list from Redis pipeline execute, got: {type(result)}")
             logger.debug(
                 f"Queue Redis pipeline executed by '{self._client_id}': {len(result)} operations"
             )
@@ -179,13 +181,41 @@ class QueueRedisClient(QueueRedisClientProtocol):
             )
             raise
 
+    @overload
     async def zrange(
-        self, key: str, start: int, end: int, withscores: bool = False
+        self, key: str, start: int, end: int, *, withscores: Literal[False] = False
+    ) -> List[str]:
+        ...
+
+    @overload
+    async def zrange(
+        self, key: str, start: int, end: int, *, withscores: Literal[True]
+    ) -> List[tuple[str, float]]:
+        ...
+
+    async def zrange(
+        self, key: str, start: int, end: int, *, withscores: bool = False
     ) -> List[str] | List[tuple[str, float]]:
         """Get range of members from sorted set by rank."""
         self._ensure_started()
         try:
             result = await self.client.zrange(key, start, end, withscores=withscores)
+
+            # Runtime validation based on withscores parameter
+            if not isinstance(result, list):
+                raise TypeError(f"Expected list from Redis zrange, got: {type(result)}")
+
+            if withscores:
+                # Validate List[tuple[str, float]]
+                if not all(isinstance(item, tuple) and len(item) == 2 and
+                          isinstance(item[0], str) and isinstance(item[1], (int, float))
+                          for item in result):
+                    raise TypeError(f"Expected List[tuple[str, float]] from Redis zrange with scores, got: {[type(item) for item in result]}")
+            else:
+                # Validate List[str]
+                if not all(isinstance(item, str) for item in result):
+                    raise TypeError(f"Expected List[str] from Redis zrange, got: {[type(item) for item in result]}")
+
             logger.debug(
                 f"Queue Redis ZRANGE by '{self.client_id}': key='{key}' found={len(result)}"
             )
@@ -231,9 +261,13 @@ class QueueRedisClient(QueueRedisClientProtocol):
         self._ensure_started()
         try:
             result = await self.client.zrange(queue_key, 0, count - 1)
-            # Runtime type assertion for safety
-            assert all(isinstance(item, str) for item in result), \
-                f"Expected string items from Redis zrange, got: {[type(item) for item in result]}"
+
+            # Runtime validation for type safety
+            if not isinstance(result, list):
+                raise TypeError(f"Expected list from Redis zrange, got: {type(result)}")
+            if not all(isinstance(item, str) for item in result):
+                raise TypeError(f"Expected List[str] from Redis zrange, got: {[type(item) for item in result]}")
+
             logger.debug(
                 f"Queue Redis get_queue_items by '{self.client_id}': queue='{queue_key}' count={count} found={len(result)}"
             )
@@ -254,7 +288,7 @@ class QueueRedisClient(QueueRedisClientProtocol):
             for item in result:
                 if not isinstance(item, tuple) or len(item) != 2:
                     raise TypeError(f"Expected tuple[str, float] from Redis withscores=True, got: {type(item)}")
-            
+
             queue_items = [QueueItem.from_redis_tuple(item) for item in result]
             logger.debug(
                 f"Queue Redis get_queue_items_with_priorities by '{self.client_id}': queue='{queue_key}' count={count} found={len(queue_items)}"
@@ -353,6 +387,13 @@ class QueueRedisClient(QueueRedisClientProtocol):
         self._ensure_started()
         try:
             result = await self.client.hkeys(key)
+
+            # Runtime validation for type safety
+            if not isinstance(result, list):
+                raise TypeError(f"Expected list from Redis hkeys, got: {type(result)}")
+            if not all(isinstance(item, str) for item in result):
+                raise TypeError(f"Expected List[str] from Redis hkeys, got: {[type(item) for item in result]}")
+
             logger.debug(
                 f"Queue Redis HKEYS by '{self.client_id}': key='{key}' count={len(result)}"
             )
@@ -369,6 +410,15 @@ class QueueRedisClient(QueueRedisClientProtocol):
         self._ensure_started()
         try:
             result = await self.client.hgetall(key)
+
+            # Runtime validation for type safety
+            if not isinstance(result, dict):
+                raise TypeError(f"Expected dict from Redis hgetall, got: {type(result)}")
+            if not all(isinstance(k, str) and isinstance(v, str) for k, v in result.items()):
+                invalid_items = [(k, v, type(k), type(v)) for k, v in result.items()
+                               if not (isinstance(k, str) and isinstance(v, str))]
+                raise TypeError(f"Expected dict[str, str] from Redis hgetall, found invalid items: {invalid_items}")
+
             logger.debug(
                 f"Queue Redis HGETALL by '{self.client_id}': key='{key}' fields={len(result)}"
             )

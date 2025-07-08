@@ -15,9 +15,11 @@ from huleedu_service_libs.observability import (
     inject_trace_context,
     trace_operation,
 )
+from huleedu_service_libs.quart_app import HuleEduApp
 from huleedu_service_libs.redis_client import RedisClient
 
 __all__ = [
+    "HuleEduApp",
     "KafkaBus",
     "RedisClient",
     "init_tracing",

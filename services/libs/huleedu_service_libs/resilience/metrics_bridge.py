@@ -73,7 +73,11 @@ class StateMapper:
     @classmethod
     def to_string(cls, state: CircuitBreakerState) -> str:
         """Convert circuit breaker state to string value."""
-        return state.value
+        value = state.value
+        # Runtime validation for type safety
+        if not isinstance(value, str):
+            raise TypeError(f"Expected CircuitBreakerState.value to be str, got: {type(value)}")
+        return value
 
 
 class PrometheusCircuitBreakerMetrics:

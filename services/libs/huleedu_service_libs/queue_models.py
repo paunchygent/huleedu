@@ -25,7 +25,7 @@ class QueueItem:
     """
     item_id: QueueItemId
     priority: PriorityScore
-    
+
     @classmethod
     def from_redis_tuple(cls, redis_tuple: tuple[str, float]) -> QueueItem:
         """

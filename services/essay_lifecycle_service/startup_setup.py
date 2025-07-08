@@ -71,7 +71,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
             # Create temporary repository instance to initialize schema and get engine
             temp_repo = PostgreSQLEssayRepository(settings)
             await temp_repo.initialize_db_schema()
-            setattr(app, "database_engine", temp_repo.engine)
+            app.database_engine = temp_repo.engine
             logger.info("Database schema initialized and engine stored for health checks")
 
         logger.info(
