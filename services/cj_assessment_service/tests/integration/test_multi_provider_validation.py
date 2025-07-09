@@ -8,6 +8,7 @@ Run with: pdm run test-expensive
 """
 
 from typing import Any
+from uuid import uuid4
 
 import aiohttp
 import pytest
@@ -18,6 +19,7 @@ from services.cj_assessment_service.implementations.llm_provider_service_client 
     LLMProviderServiceClient,
 )
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
+from services.cj_assessment_service.models_api import ErrorDetail
 
 
 @pytest.mark.expensive
@@ -107,11 +109,13 @@ class TestMultiProviderValidation:
         print(f"\n🧪 Testing {provider_config['description']} ({provider_config['model']})")
 
         # Use the client with provider override for proper integration testing
+        correlation_id = uuid4()
         result, error = await llm_client.generate_comparison(
             user_prompt=prompt,
             model_override=provider_config["model"],
             temperature_override=0.1,
             provider_override=provider_config["provider"].value,
+            correlation_id=correlation_id,
         )
 
         # Validate successful response
@@ -177,7 +181,11 @@ JSON response with winner, justification (max 50 chars), confidence 1-5."""
 
         start_time = time.time()
 
-        result, error = await llm_client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await llm_client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         response_time = time.time() - start_time
 
@@ -207,7 +215,11 @@ JSON response with winner, justification (max 50 chars), confidence 1-5."""
             "Please provide thorough justification for your choice with detailed reasoning."
         )
 
-        result, error = await llm_client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await llm_client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         if error is None:
             assert result is not None, "Result should not be None when error is None"

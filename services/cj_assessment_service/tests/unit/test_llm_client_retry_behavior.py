@@ -1,7 +1,9 @@
 """Unit tests for LLM Provider Service client retry behavior."""
 
 import json
+from typing import Any, Dict, Optional, Tuple
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 import aiohttp
 import pytest
@@ -11,26 +13,33 @@ from services.cj_assessment_service.implementations.llm_provider_service_client 
     LLMProviderServiceClient,
 )
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
+from services.cj_assessment_service.models_api import ErrorDetail
 
 
 class MockResponse:
     """Mock HTTP response."""
 
-    def __init__(self, status: int, text: str, request_info=None):
+    def __init__(self, status: int, text: str, request_info: Optional[Any] = None) -> None:
         self.status = status
         self._text = text
-        self.request_info = request_info or MagicMock()
-        self.history = []
-        self.headers = {}
+        # Create a proper mock for request_info with required attributes
+        if request_info is None:
+            request_info = MagicMock()
+            request_info.real_url = "http://test-llm-service/api/v1/comparison"
+            request_info.method = "POST"
+            request_info.headers = {}
+        self.request_info = request_info
+        self.history: Tuple[Any, ...] = ()  # ClientResponseError expects tuple
+        self.headers: Dict[str, str] = {}
 
-    async def text(self):
+    async def text(self) -> str:
         return self._text
 
-    def raise_for_status(self):
+    def raise_for_status(self) -> None:
         if self.status >= 400:
             raise aiohttp.ClientResponseError(
                 request_info=self.request_info,
-                history=self.history,
+                history=(),  # ClientResponseError expects tuple, not list
                 status=self.status,
                 message=f"HTTP {self.status}",
             )
@@ -75,7 +84,7 @@ Please respond with a JSON object containing:
         settings: Settings,
         retry_manager: RetryManagerImpl,
         test_prompt: str,
-    ):
+    ) -> None:
         """Test that 503 errors with is_retryable=true trigger retries."""
         # Create mock session
         mock_session = MagicMock(spec=aiohttp.ClientSession)
@@ -111,20 +120,22 @@ Please respond with a JSON object containing:
         )
 
         # Mock post method - must be a regular function, not async
-        def mock_post(*args, **kwargs):
+        def mock_post(*args: Any, **kwargs: Any) -> Any:
             nonlocal call_count
             call_count += 1
 
             # Context manager mock
             class AsyncContextManager:
-                async def __aenter__(self):
+                async def __aenter__(self) -> MockResponse:
                     # Fail first 2 attempts, succeed on 3rd
                     if call_count < 3:
+                        # Return the error response which will trigger the exception
+                        # when the code checks response.status and raises ClientResponseError
                         return error_response
                     else:
                         return success_response
 
-                async def __aexit__(self, exc_type, exc_val, exc_tb):
+                async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
                     return False
 
             return AsyncContextManager()
@@ -136,7 +147,11 @@ Please respond with a JSON object containing:
             session=mock_session, settings=settings, retry_manager=retry_manager
         )
 
-        result, error = await client.generate_comparison(test_prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            test_prompt,
+            correlation_id=correlation_id,
+        )
 
         # Verify retries happened
         assert call_count == 3, f"Expected 3 calls (2 failures + 1 success), got {call_count}"
@@ -149,7 +164,7 @@ Please respond with a JSON object containing:
         settings: Settings,
         retry_manager: RetryManagerImpl,
         test_prompt: str,
-    ):
+    ) -> None:
         """Test that 500 errors without JSON body trigger retries."""
         # Create mock session
         mock_session = MagicMock(spec=aiohttp.ClientSession)
@@ -161,16 +176,16 @@ Please respond with a JSON object containing:
         error_response = MockResponse(status=500, text="Internal Server Error")
 
         # Mock post method - must be a regular function, not async
-        def mock_post(*args, **kwargs):
+        def mock_post(*args: Any, **kwargs: Any) -> Any:
             nonlocal call_count
             call_count += 1
 
             # Context manager mock
             class AsyncContextManager:
-                async def __aenter__(self):
+                async def __aenter__(self) -> MockResponse:
                     return error_response
 
-                async def __aexit__(self, exc_type, exc_val, exc_tb):
+                async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
                     return False
 
             return AsyncContextManager()
@@ -183,20 +198,25 @@ Please respond with a JSON object containing:
         )
 
         # Expect failure after all retries
-        result, error = await client.generate_comparison(test_prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            test_prompt,
+            correlation_id=correlation_id,
+        )
 
         # Verify all retry attempts were made
         assert call_count == 3, f"Expected 3 retry attempts, got {call_count}"
         assert result is None
         assert error is not None
-        assert "500" in error or "Internal Server Error" in error
+        assert isinstance(error, ErrorDetail)
+        assert "500" in error.message or "Internal Server Error" in error.message
 
     async def test_non_retryable_400_error(
         self,
         settings: Settings,
         retry_manager: RetryManagerImpl,
         test_prompt: str,
-    ):
+    ) -> None:
         """Test that 400 errors do not trigger retries."""
         # Create mock session
         mock_session = MagicMock(spec=aiohttp.ClientSession)
@@ -210,16 +230,16 @@ Please respond with a JSON object containing:
         )
 
         # Mock post method - must be a regular function, not async
-        def mock_post(*args, **kwargs):
+        def mock_post(*args: Any, **kwargs: Any) -> Any:
             nonlocal call_count
             call_count += 1
 
             # Context manager mock
             class AsyncContextManager:
-                async def __aenter__(self):
+                async def __aenter__(self) -> MockResponse:
                     return error_response
 
-                async def __aexit__(self, exc_type, exc_val, exc_tb):
+                async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
                     return False
 
             return AsyncContextManager()
@@ -231,20 +251,25 @@ Please respond with a JSON object containing:
             session=mock_session, settings=settings, retry_manager=retry_manager
         )
 
-        result, error = await client.generate_comparison(test_prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            test_prompt,
+            correlation_id=correlation_id,
+        )
 
         # Verify no retries for non-retryable error
         assert call_count == 1, f"Expected 1 call (no retries), got {call_count}"
         assert result is None
         assert error is not None
-        assert "Invalid request format" in error
+        assert isinstance(error, ErrorDetail)
+        assert "Invalid request format" in error.message
 
     async def test_network_connection_error_retries(
         self,
         settings: Settings,
         retry_manager: RetryManagerImpl,
         test_prompt: str,
-    ):
+    ) -> None:
         """Test that network connection errors trigger retries."""
         # Create mock session
         mock_session = MagicMock(spec=aiohttp.ClientSession)
@@ -253,7 +278,7 @@ Please respond with a JSON object containing:
         call_count = 0
 
         # Mock post method to raise connection error
-        def mock_post(*args, **kwargs):
+        def mock_post(*args: Any, **kwargs: Any) -> Any:
             nonlocal call_count
             call_count += 1
             raise aiohttp.ClientConnectionError("Connection refused")
@@ -265,20 +290,25 @@ Please respond with a JSON object containing:
             session=mock_session, settings=settings, retry_manager=retry_manager
         )
 
-        result, error = await client.generate_comparison(test_prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            test_prompt,
+            correlation_id=correlation_id,
+        )
 
         # Verify retries happened for connection error
         assert call_count == 3, f"Expected 3 retry attempts, got {call_count}"
         assert result is None
         assert error is not None
-        assert "Connection refused" in error or "client error" in error.lower()
+        assert isinstance(error, ErrorDetail)
+        assert "Connection refused" in error.message or "client error" in error.message.lower()
 
     async def test_timeout_error_retries(
         self,
         settings: Settings,
         retry_manager: RetryManagerImpl,
         test_prompt: str,
-    ):
+    ) -> None:
         """Test that timeout errors trigger retries."""
         # Create mock session
         mock_session = MagicMock(spec=aiohttp.ClientSession)
@@ -287,7 +317,7 @@ Please respond with a JSON object containing:
         call_count = 0
 
         # Mock post method to raise timeout
-        def mock_post(*args, **kwargs):
+        def mock_post(*args: Any, **kwargs: Any) -> Any:
             nonlocal call_count
             call_count += 1
             raise aiohttp.ServerTimeoutError("Request timeout")
@@ -299,7 +329,11 @@ Please respond with a JSON object containing:
             session=mock_session, settings=settings, retry_manager=retry_manager
         )
 
-        result, error = await client.generate_comparison(test_prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            test_prompt,
+            correlation_id=correlation_id,
+        )
 
         # Verify retries happened for timeout
         assert call_count == 3, f"Expected 3 retry attempts, got {call_count}"
@@ -311,7 +345,7 @@ Please respond with a JSON object containing:
         settings: Settings,
         retry_manager: RetryManagerImpl,
         test_prompt: str,
-    ):
+    ) -> None:
         """Test that successful responses don't trigger retries."""
         # Create mock session
         mock_session = MagicMock(spec=aiohttp.ClientSession)
@@ -334,16 +368,16 @@ Please respond with a JSON object containing:
         )
 
         # Mock post method - must be a regular function, not async
-        def mock_post(*args, **kwargs):
+        def mock_post(*args: Any, **kwargs: Any) -> Any:
             nonlocal call_count
             call_count += 1
 
             # Context manager mock
             class AsyncContextManager:
-                async def __aenter__(self):
+                async def __aenter__(self) -> MockResponse:
                     return success_response
 
-                async def __aexit__(self, exc_type, exc_val, exc_tb):
+                async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
                     return False
 
             return AsyncContextManager()
@@ -355,7 +389,11 @@ Please respond with a JSON object containing:
             session=mock_session, settings=settings, retry_manager=retry_manager
         )
 
-        result, error = await client.generate_comparison(test_prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            test_prompt,
+            correlation_id=correlation_id,
+        )
 
         # Verify no retries for success
         assert call_count == 1, f"Expected 1 call (no retries), got {call_count}"

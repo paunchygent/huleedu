@@ -702,7 +702,8 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         if error:
             logger.debug(f"Queue status check failed after retries: {error.message}")
             return None
-        return result
+        # Result is dict[str, Any] | None from make_status_request
+        return result if isinstance(result, dict) else None
 
     async def _retrieve_queue_result(
         self, queue_id: str, correlation_id: UUID

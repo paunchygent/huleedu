@@ -49,7 +49,7 @@ class ComparisonResult(BaseModel):
 
     task: ComparisonTask
     llm_assessment: LLMAssessmentResponseSchema | None = None
-    error_message: str | None = None
+    error_detail: ErrorDetail | None = None
     raw_llm_response_content: str | None = None
 
 

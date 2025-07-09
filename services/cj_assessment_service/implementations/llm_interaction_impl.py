@@ -9,17 +9,20 @@ Cache system removed to preserve CJ Assessment methodology integrity.
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core import LLMProviderType
+from common_core.error_enums import ErrorCode
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
     ComparisonTask,
+    ErrorDetail,
     LLMAssessmentResponseSchema,
 )
 from services.cj_assessment_service.protocols import (
@@ -111,7 +114,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
 
                 # Make direct LLM API request - no caching
                 try:
-                    response_data, error_message = await provider.generate_comparison(
+                    response_data, error_detail = await provider.generate_comparison(
                         user_prompt=task.prompt,
                         correlation_id=correlation_id,
                         system_prompt_override=None,
@@ -138,7 +141,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         return ComparisonResult(
                             task=task,
                             llm_assessment=llm_assessment,
-                            error_message=None,
+                            error_detail=None,
                             raw_llm_response_content=None,
                         )
                     else:
@@ -152,12 +155,12 @@ class LLMInteractionImpl(LLMInteractionProtocol):
 
                         logger.error(
                             f"Task with essays {task.essay_a.id}-{task.essay_b.id} "
-                            f"failed: {error_message}",
+                            f"failed: {error_detail}",
                         )
                         return ComparisonResult(
                             task=task,
                             llm_assessment=None,
-                            error_message=error_message,
+                            error_detail=error_detail,
                             raw_llm_response_content=None,
                         )
 
@@ -178,7 +181,13 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     return ComparisonResult(
                         task=task,
                         llm_assessment=None,
-                        error_message=f"Unexpected error: {e!s}",
+                        error_detail=ErrorDetail(
+                            error_code=ErrorCode.PROCESSING_ERROR,
+                            message=f"Unexpected error processing task: {e!s}",
+                            correlation_id=correlation_id,
+                            timestamp=datetime.now(UTC),
+                            details={"essay_a_id": task.essay_a.id, "essay_b_id": task.essay_b.id},
+                        ),
                         raw_llm_response_content=None,
                     )
 
@@ -202,7 +211,16 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         ComparisonResult(
                             task=tasks[i],
                             llm_assessment=None,
-                            error_message=f"Task execution failed: {result!s}",
+                            error_detail=ErrorDetail(
+                                error_code=ErrorCode.PROCESSING_ERROR,
+                                message=f"Task execution failed: {result!s}",
+                                correlation_id=correlation_id,
+                                timestamp=datetime.now(UTC),
+                                details={
+                                    "essay_a_id": tasks[i].essay_a.id,
+                                    "essay_b_id": tasks[i].essay_b.id,
+                                },
+                            ),
                             raw_llm_response_content=None,
                         ),
                     )
@@ -230,7 +248,13 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                 ComparisonResult(
                     task=task,
                     llm_assessment=None,
-                    error_message=f"Critical processing error: {e!s}",
+                    error_detail=ErrorDetail(
+                        error_code=ErrorCode.PROCESSING_ERROR,
+                        message=f"Critical processing error: {e!s}",
+                        correlation_id=correlation_id,
+                        timestamp=datetime.now(UTC),
+                        details={"essay_a_id": task.essay_a.id, "essay_b_id": task.essay_b.id},
+                    ),
                     raw_llm_response_content=None,
                 )
                 for task in tasks

@@ -7,6 +7,7 @@ using string-based essay IDs and protocol-based database access.
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 import choix
 import numpy as np
@@ -27,7 +28,7 @@ async def record_comparisons_and_update_scores(
     comparison_results: list[ComparisonResult],
     db_session: AsyncSession,
     cj_batch_id: int,
-    correlation_id: str,
+    correlation_id: UUID,
     # settings: Settings # Pass settings if alpha for choix is configurable
 ) -> dict[str, float]:  # Returns dict of els_essay_id -> score
     """Record comparison results and update Bradley-Terry scores using choix.
@@ -62,6 +63,21 @@ async def record_comparisons_and_update_scores(
             elif result.llm_assessment.winner == EssayComparisonWinner.ERROR:
                 winner_db_val = "error"
 
+            # Extract error details if available
+            error_code = None
+            error_message = None
+            error_correlation_id = None
+            error_timestamp = None
+            error_service = None
+            error_details = None
+            if result.error_detail:
+                error_code = result.error_detail.error_code.value
+                error_message = result.error_detail.message
+                error_correlation_id = result.error_detail.correlation_id
+                error_timestamp = result.error_detail.timestamp
+                error_service = result.error_detail.service
+                error_details = result.error_detail.details
+
             new_pair = CJ_ComparisonPair(
                 cj_batch_id=cj_batch_id,
                 essay_a_els_id=result.task.essay_a.id,  # This is els_essay_id (string)
@@ -71,7 +87,12 @@ async def record_comparisons_and_update_scores(
                 confidence=result.llm_assessment.confidence,
                 justification=result.llm_assessment.justification,
                 raw_llm_response=result.raw_llm_response_content,
-                error_message=result.error_message,
+                error_code=error_code,
+                error_message=error_message,
+                error_correlation_id=error_correlation_id,
+                error_timestamp=error_timestamp,
+                error_service=error_service,
+                error_details=error_details,
             )
             db_session.add(new_pair)
 
@@ -202,7 +223,7 @@ def check_score_stability(
 async def get_essay_rankings(
     db_session: AsyncSession,
     cj_batch_id: int,  # This is the internal CJ_BatchUpload.id
-    correlation_id: str,
+    correlation_id: UUID,
 ) -> list[dict[str, Any]]:
     """Get final essay rankings for the CJ batch, ordered by score.
 

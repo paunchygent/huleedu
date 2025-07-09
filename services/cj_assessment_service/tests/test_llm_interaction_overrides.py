@@ -7,15 +7,19 @@ override parameters to providers.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
 
 from common_core import LLMProviderType
+from common_core.error_enums import ErrorCode
 from services.cj_assessment_service.implementations.llm_interaction_impl import LLMInteractionImpl
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
     ComparisonTask,
+    ErrorDetail,
     EssayForComparison,
 )
 from services.cj_assessment_service.protocols import LLMProviderProtocol
@@ -46,8 +50,6 @@ class TestLLMInteractionImplOverrides:
     ) -> LLMInteractionImpl:
         """Create LLMInteractionImpl instance for testing."""
         from typing import cast
-
-        from services.cj_assessment_service.protocols import LLMProviderProtocol
 
         providers = cast(
             dict[LLMProviderType, LLMProviderProtocol], {LLMProviderType.OPENAI: mock_provider}
@@ -99,6 +101,7 @@ class TestLLMInteractionImplOverrides:
 
         results = await llm_interaction_impl.perform_comparisons(
             tasks=[sample_comparison_task],
+            correlation_id=uuid4(),
             model_override=model_override,
         )
 
@@ -114,7 +117,7 @@ class TestLLMInteractionImplOverrides:
         assert result.task == sample_comparison_task
         assert result.llm_assessment is not None
         assert result.llm_assessment.confidence == 4  # 1-5 scale preserved
-        assert result.error_message is None
+        assert result.error_detail is None
 
     async def test_perform_comparisons_with_temperature_override(
         self,
@@ -127,6 +130,7 @@ class TestLLMInteractionImplOverrides:
 
         results = await llm_interaction_impl.perform_comparisons(
             tasks=[sample_comparison_task],
+            correlation_id=uuid4(),
             temperature_override=temperature_override,
         )
 
@@ -150,6 +154,7 @@ class TestLLMInteractionImplOverrides:
 
         results = await llm_interaction_impl.perform_comparisons(
             tasks=[sample_comparison_task],
+            correlation_id=uuid4(),
             max_tokens_override=max_tokens_override,
         )
 
@@ -169,18 +174,29 @@ class TestLLMInteractionImplOverrides:
         mock_provider: AsyncMock,
     ) -> None:
         """Test error handling when provider fails."""
-        # Mock provider error
-        mock_provider.generate_comparison = AsyncMock(return_value=(None, "Provider error"))
+        # Mock provider error with ErrorDetail
+        error_detail = ErrorDetail(
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+            message="Provider error",
+            correlation_id=uuid4(),
+            timestamp=datetime.now(timezone.utc),
+            service="cj_assessment_service",
+            details={"provider": "mock_provider"},
+        )
+        mock_provider.generate_comparison = AsyncMock(return_value=(None, error_detail))
 
         results = await llm_interaction_impl.perform_comparisons(
             tasks=[sample_comparison_task],
+            correlation_id=uuid4(),
         )
 
         # Verify error is handled properly
         assert len(results) == 1
         result = results[0]
         assert result.llm_assessment is None
-        assert result.error_message == "Provider error"
+        assert result.error_detail is not None
+        assert result.error_detail.message == "Provider error"
+        assert result.error_detail.error_code == ErrorCode.EXTERNAL_SERVICE_ERROR
 
     async def test_perform_comparisons_with_multiple_tasks(
         self,
@@ -200,7 +216,10 @@ class TestLLMInteractionImplOverrides:
             )
             tasks.append(task)
 
-        results = await llm_interaction_impl.perform_comparisons(tasks=tasks)
+        results = await llm_interaction_impl.perform_comparisons(
+            tasks=tasks,
+            correlation_id=uuid4(),
+        )
 
         # Verify all tasks processed
         assert len(results) == 3
@@ -209,4 +228,4 @@ class TestLLMInteractionImplOverrides:
         # Verify all results successful
         for result in results:
             assert result.llm_assessment is not None
-            assert result.error_message is None
+            assert result.error_detail is None

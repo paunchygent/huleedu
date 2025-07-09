@@ -23,7 +23,7 @@ logger = create_service_logger("cj_assessment_service.batch_preparation")
 
 async def create_cj_batch(
     request_data: dict[str, Any],
-    correlation_id: str,
+    correlation_id: UUID,
     database: CJRepositoryProtocol,
     log_extra: dict[str, Any],
 ) -> int:
@@ -56,7 +56,7 @@ async def create_cj_batch(
         cj_batch = await database.create_new_cj_batch(
             session=session,
             bos_batch_id=bos_batch_id,
-            event_correlation_id=correlation_id,
+            event_correlation_id=str(correlation_id),
             language=language,
             course_code=course_code,
             essay_instructions=essay_instructions,

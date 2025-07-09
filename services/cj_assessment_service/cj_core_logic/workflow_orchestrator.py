@@ -8,6 +8,7 @@ comparison processing, and result generation.
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -30,7 +31,7 @@ logger = create_service_logger("cj_assessment_service.workflow_orchestrator")
 
 async def run_cj_assessment_workflow(
     request_data: dict[str, Any],
-    correlation_id: str,
+    correlation_id: UUID,
     database: CJRepositoryProtocol,
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,
@@ -70,6 +71,7 @@ async def run_cj_assessment_workflow(
             cj_batch_id,
             database,
             content_client,
+            correlation_id,
             log_extra,
         )
 
@@ -81,6 +83,7 @@ async def run_cj_assessment_workflow(
             llm_interaction,
             request_data,
             settings,
+            correlation_id,
             log_extra,
         )
 
@@ -135,7 +138,7 @@ async def _finalize_batch_results(
     cj_batch_id: int,
     database: CJRepositoryProtocol,
     final_scores: dict[str, float],
-    correlation_id: str,
+    correlation_id: UUID,
     log_extra: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Finalize batch results and determine completion status."""

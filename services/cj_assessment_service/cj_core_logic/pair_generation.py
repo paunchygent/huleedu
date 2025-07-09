@@ -6,6 +6,8 @@ using string-based essay IDs and protocol-based database access.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +23,7 @@ async def generate_comparison_tasks(
     db_session: AsyncSession,
     cj_batch_id: int,
     existing_pairs_threshold: int = 5,
-    correlation_id: str | None = None,
+    correlation_id: UUID | None = None,
 ) -> list[ComparisonTask]:
     """Generate comparison tasks for essays, avoiding duplicate comparisons.
 

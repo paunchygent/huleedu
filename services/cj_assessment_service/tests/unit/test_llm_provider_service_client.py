@@ -12,6 +12,7 @@ from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
 )
+from services.cj_assessment_service.models_api import ErrorDetail
 
 
 @pytest.fixture
@@ -45,9 +46,40 @@ def mock_retry_manager() -> AsyncMock:
     """Create mock retry manager."""
     retry_manager = AsyncMock()
 
-    # Make retry manager pass through the function call
+    # Make retry manager pass through the function call but handle exceptions
     async def passthrough(func: Any, *args: Any, **kwargs: Any) -> Any:
-        return await func()
+        try:
+            return await func()
+        except aiohttp.ClientResponseError as e:
+            # Convert HTTP errors to ErrorDetail for tests
+            from datetime import datetime, timezone
+            from uuid import uuid4
+            from common_core.error_enums import ErrorCode
+            from services.cj_assessment_service.models_api import ErrorDetail
+            
+            error_detail = ErrorDetail(
+                error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+                message=f"{e.message}: {e.status}",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(timezone.utc),
+                details={"status_code": e.status}
+            )
+            return None, error_detail
+        except Exception as e:
+            # Convert other exceptions to ErrorDetail
+            from datetime import datetime, timezone
+            from uuid import uuid4
+            from common_core.error_enums import ErrorCode
+            from services.cj_assessment_service.models_api import ErrorDetail
+            
+            error_detail = ErrorDetail(
+                error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+                message=f"HTTP request failed: {str(e)}",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(timezone.utc),
+                details={"exception_type": type(e).__name__}
+            )
+            return None, error_detail
 
     retry_manager.with_retry.side_effect = passthrough
     return retry_manager
@@ -137,10 +169,12 @@ Essay B content.
 Please respond with a JSON object."""
 
         # Call generate_comparison
+        correlation_id = uuid4()
         result, error = await client.generate_comparison(
             user_prompt=prompt,
             model_override="claude-3-haiku",
             temperature_override=0.1,
+            correlation_id=correlation_id,
         )
 
         # Verify result
@@ -187,10 +221,17 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert result is None
-        assert error == "Internal server error: Provider unavailable"
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        assert "Internal server error" in error.message
+        assert "500" in error.message  # Status code is included in the message
 
     async def test_generate_comparison_network_error(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -206,10 +247,16 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert result is None
-        assert error and "HTTP request failed: Connection failed" in error
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        assert "Connection failed" in error.message
 
     async def test_generate_comparison_invalid_prompt(
         self, client: LLMProviderServiceClient
@@ -217,10 +264,16 @@ Essay B content."""
         """Test handling of invalid prompt format."""
         prompt = "This is not a valid comparison prompt"
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert result is None
-        assert error == "Invalid prompt format: Could not extract essays"
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        assert error.message == "Invalid prompt format: Could not extract essays"
 
     async def test_generate_comparison_json_parse_error(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -240,10 +293,16 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert result is None
-        assert error and "Failed to parse immediate response JSON" in error
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        assert "Failed to parse immediate response JSON" in error.message
 
     # Queue-based response tests
     async def test_generate_comparison_queued_success(
@@ -337,7 +396,11 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         # Verify successful result
         assert error is None
@@ -391,10 +454,16 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert result is None
-        assert error == "Queue processing failed: Provider timeout"
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        assert error.message == "Queue processing failed: Provider timeout"
 
     async def test_generate_comparison_queued_expired(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -436,10 +505,16 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert result is None
-        assert error == "Queue request expired"
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        assert error.message == "Queue request expired"
 
     async def test_generate_comparison_queued_timeout(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -481,10 +556,16 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert result is None
-        assert error == "Maximum polling attempts reached"
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        assert "Maximum polling attempts" in error.message  # Message includes attempt count
 
     async def test_generate_comparison_queued_polling_disabled(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock, mock_settings: Settings
@@ -516,10 +597,16 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert result is None
-        assert error == "Request queued but polling is disabled"
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        assert error.message == "Request queued but polling is disabled"
 
     async def test_generate_comparison_queued_no_queue_id(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -546,10 +633,16 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert result is None
-        assert error == "Queue response missing queue_id"
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        assert error.message == "Queue response missing queue_id"
 
     async def test_queue_status_check_not_found(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -584,12 +677,17 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert result is None
-        assert (
-            error == "Maximum polling attempts reached"
-        )  # Will exhaust attempts due to 404 errors
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        # Will exhaust attempts due to 404 errors
+        assert "Maximum polling attempts" in error.message
 
     async def test_result_retrieval_expired(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -645,10 +743,16 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert result is None
-        assert error == "Queue result expired"
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        assert error.message == "Queue result expired"
 
     @patch("asyncio.sleep")  # Mock sleep to speed up tests
     async def test_exponential_backoff_timing(
@@ -722,7 +826,11 @@ Essay A content.
 Essay B (ID: 456):
 Essay B content."""
 
-        result, error = await client.generate_comparison(user_prompt=prompt)
+        correlation_id = uuid4()
+        result, error = await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
         assert error is None
         assert result is not None

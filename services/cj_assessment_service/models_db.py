@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy import (
     JSON,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy import Enum as SQLAlchemyEnum
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -152,7 +154,14 @@ class ComparisonPair(Base):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     justification: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_llm_response: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Structured error fields (replacing error_message)
+    error_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_correlation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+    error_timestamp: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    error_service: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    error_details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))

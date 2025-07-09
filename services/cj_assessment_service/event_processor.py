@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
@@ -210,7 +210,7 @@ async def _process_cj_assessment_impl(
         # Run CJ assessment workflow with LLM interaction
         rankings, cj_job_id_ref = await run_cj_assessment_workflow(
             request_data=converted_request_data,
-            correlation_id=str(correlation_id),
+            correlation_id=correlation_id,
             database=database,
             content_client=content_client,
             llm_interaction=llm_interaction,
@@ -447,12 +447,14 @@ def _categorize_processing_error(exception: Exception) -> ErrorDetail:
     )
 
 
-def _create_publishing_error_detail(exception: Exception, correlation_id=None) -> ErrorDetail:
+def _create_publishing_error_detail(
+    exception: Exception, correlation_id: UUID | None = None
+) -> ErrorDetail:
     """Create structured error detail for event publishing failures."""
     return ErrorDetail(
         error_code=ErrorCode.KAFKA_PUBLISH_ERROR,
         message=f"Failed to publish failure event: {str(exception)}",
-        correlation_id=correlation_id,
+        correlation_id=correlation_id or uuid4(),
         timestamp=datetime.now(UTC),
         details={
             "exception_type": type(exception).__name__,

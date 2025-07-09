@@ -174,7 +174,7 @@ async def _process_comparison_iteration(
         db_session=session,
         cj_batch_id=cj_batch_id,
         existing_pairs_threshold=getattr(settings, "comparisons_per_stability_check_iteration", 5),
-        correlation_id=str(correlation_id),
+        correlation_id=correlation_id,
     )
 
     if not comparison_tasks_for_llm:
@@ -210,7 +210,7 @@ async def _process_comparison_iteration(
         comparison_results=valid_llm_results,
         db_session=session,
         cj_batch_id=cj_batch_id,
-        correlation_id=str(correlation_id),
+        correlation_id=correlation_id,
     )
 
     return len(valid_llm_results), current_bt_scores_dict

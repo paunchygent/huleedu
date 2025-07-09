@@ -195,6 +195,21 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
                 confidence = result.llm_assessment.confidence
                 justification = result.llm_assessment.justification
 
+            # Extract error details if available
+            error_code = None
+            error_message = None
+            error_correlation_id = None
+            error_timestamp = None
+            error_service = None
+            error_details = None
+            if result.error_detail:
+                error_code = result.error_detail.error_code.value
+                error_message = result.error_detail.message
+                error_correlation_id = result.error_detail.correlation_id
+                error_timestamp = result.error_detail.timestamp
+                error_service = result.error_detail.service
+                error_details = result.error_detail.details
+
             comparison_pair = ComparisonPair(
                 cj_batch_id=cj_batch_id,
                 essay_a_els_id=essay_a_id,
@@ -204,7 +219,12 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
                 confidence=confidence,
                 justification=justification,
                 raw_llm_response=None,  # Can be added later if needed
-                error_message=result.error_message,
+                error_code=error_code,
+                error_message=error_message,
+                error_correlation_id=error_correlation_id,
+                error_timestamp=error_timestamp,
+                error_service=error_service,
+                error_details=error_details,
                 processing_metadata={},  # Can be expanded later if needed
             )
             session.add(comparison_pair)

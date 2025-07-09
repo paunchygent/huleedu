@@ -86,7 +86,7 @@ def mock_boundary_services(
     """Create mock boundary services (external dependencies only)."""
     mock_content_client = AsyncMock()
     mock_content_client.fetch_content = AsyncMock(
-        return_value="Sample essay content for testing CJ assessment.",
+        return_value=("Sample essay content for testing CJ assessment.", None),
     )
     mock_event_publisher = AsyncMock()
     mock_event_publisher.publish_assessment_completed = AsyncMock()
@@ -106,7 +106,7 @@ def mock_boundary_services(
                         justification="Mock comparison result",
                     ),
                     raw_llm_response_content="Mock LLM response",
-                    error_message=None,
+                    error_detail=None,
                 ),
             )
         return results

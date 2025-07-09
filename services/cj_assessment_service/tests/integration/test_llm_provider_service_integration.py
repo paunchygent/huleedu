@@ -491,6 +491,7 @@ Please respond with a JSON object containing:
             try:
                 result, error = await client.generate_comparison(
                     user_prompt=prompt,
+                    correlation_id=uuid4(),
                     model_override="gpt-4o-mini",
                     temperature_override=0.1,
                 )

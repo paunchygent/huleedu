@@ -5,6 +5,7 @@ to the LLM Provider Service.
 """
 
 from typing import Any
+from uuid import uuid4
 
 import aiohttp
 import pytest
@@ -15,6 +16,7 @@ from services.cj_assessment_service.implementations.llm_provider_service_client 
     LLMProviderServiceClient,
 )
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
+from services.cj_assessment_service.models_api import ErrorDetail
 
 
 async def check_service_availability(service_url: str, timeout: int = 10) -> bool:
@@ -126,10 +128,12 @@ Always respond with valid JSON."""
 
         # Call the LLM Provider Service through the client
         # Use claude-3-haiku-20240307 which is a valid Anthropic model
+        correlation_id = uuid4()
         result, error = await llm_client.generate_comparison(
             user_prompt=prompt,
             model_override="claude-3-haiku-20240307",
             temperature_override=0.1,
+            correlation_id=correlation_id,
         )
 
         # Verify the response
@@ -159,12 +163,16 @@ Always respond with valid JSON."""
         # Test with a prompt that doesn't contain the expected essay format
         invalid_prompt = "This is not a valid essay comparison prompt"
 
+        correlation_id = uuid4()
         result, error = await llm_client.generate_comparison(
             user_prompt=invalid_prompt,
+            correlation_id=correlation_id,
         )
 
         assert result is None
-        assert error == "Invalid prompt format: Could not extract essays"
+        assert error is not None
+        assert isinstance(error, ErrorDetail)
+        assert error.message == "Invalid prompt format: Could not extract essays"
         print(f"\nError handling test passed: {error}")
 
     async def test_cj_assessment_with_mock_provider(
@@ -202,10 +210,12 @@ Please respond with a JSON object containing:
 Based on clarity, structure, argument quality, and writing mechanics.
 Always respond with valid JSON."""
 
+        correlation_id = uuid4()
         result, error = await llm_client.generate_comparison(
             user_prompt=prompt,
             model_override="mock-model",
             temperature_override=0.1,
+            correlation_id=correlation_id,
         )
 
         # Verify mock response
