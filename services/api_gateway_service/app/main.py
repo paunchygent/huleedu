@@ -7,12 +7,12 @@ from slowapi.middleware import SlowAPIMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from services.api_gateway_service.config import settings
 from services.api_gateway_service.app.startup_setup import (
     create_di_container,
     setup_dependency_injection,
     setup_tracing,
 )
+from services.api_gateway_service.config import settings
 
 from ..routers import batch_routes, class_routes, file_routes, status_routes, websocket_routes
 from ..routers.health_routes import router as health_router

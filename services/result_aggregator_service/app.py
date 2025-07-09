@@ -45,12 +45,13 @@ def create_app() -> HuleEduApp:
     # IMMEDIATE database engine initialization - satisfies non-optional contract
     # We need to get the engine from the container immediately
     import asyncio
+
     loop = asyncio.get_event_loop()
-    
+
     async def get_engine() -> AsyncEngine:
         async with app.container() as request_container:
             return await request_container.get(AsyncEngine)
-    
+
     app.database_engine = loop.run_until_complete(get_engine())
 
     # Use guaranteed container

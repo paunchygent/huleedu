@@ -6,26 +6,29 @@ enabling clean architecture and testability.
 
 from __future__ import annotations
 
-from typing import Any, AsyncContextManager, Protocol
+from typing import TYPE_CHECKING, Any, AsyncContextManager, Protocol
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+if TYPE_CHECKING:
+    from services.cj_assessment_service.models_api import ErrorDetail
 
 
 class ContentClientProtocol(Protocol):
     """Protocol for fetching spellchecked essay text from content service."""
 
-    async def fetch_content(self, storage_id: str) -> str:
+    async def fetch_content(
+        self, storage_id: str, correlation_id: UUID
+    ) -> tuple[str | None, ErrorDetail | None]:
         """Fetch essay text content by storage ID.
 
         Args:
             storage_id: The storage reference ID for the essay text
+            correlation_id: Request correlation ID for tracing
 
         Returns:
-            The essay text content
-
-        Raises:
-            Exception: If content cannot be fetched
+            Tuple of (content, error) where only one should be set
         """
         ...
 
@@ -38,11 +41,11 @@ class RetryManagerProtocol(Protocol):
         operation: Any,  # Callable coroutine
         *args: Any,
         **kwargs: Any,
-    ) -> tuple[Any, str | None]:
+    ) -> tuple[Any, ErrorDetail | None]:
         """Execute operation with retry logic.
 
         Returns:
-            Tuple of (result, error_message)
+            Tuple of (result, error_detail)
         """
         ...
 
@@ -53,22 +56,26 @@ class LLMProviderProtocol(Protocol):
     async def generate_comparison(
         self,
         user_prompt: str,
+        correlation_id: UUID,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
-    ) -> tuple[dict[str, Any] | None, str | None]:
+        provider_override: str | None = None,
+    ) -> tuple[dict[str, Any] | None, ErrorDetail | None]:
         """Generate a comparison assessment using the LLM.
 
         Args:
             user_prompt: The user prompt containing essay comparison request
+            correlation_id: Request correlation ID for tracing
             system_prompt_override: Optional system prompt override
             model_override: Optional model name override
             temperature_override: Optional temperature override (0.0-2.0)
             max_tokens_override: Optional max tokens override
+            provider_override: Optional provider name override
 
         Returns:
-            Tuple of (response_data, error_message)
+            Tuple of (response_data, error_detail)
         """
         ...
 
@@ -189,6 +196,7 @@ class LLMInteractionProtocol(Protocol):
     async def perform_comparisons(
         self,
         tasks: list[Any],
+        correlation_id: UUID,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
@@ -197,6 +205,7 @@ class LLMInteractionProtocol(Protocol):
 
         Args:
             tasks: List of ComparisonTask objects
+            correlation_id: Request correlation ID for tracing
             model_override: Optional model name override
             temperature_override: Optional temperature override (0.0-2.0)
             max_tokens_override: Optional max tokens override

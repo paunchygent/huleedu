@@ -134,7 +134,7 @@ class HuleEduApp(Quart):
         # Initialize only the guaranteed-present extensions dict
         # database_engine and container MUST be set in create_app()
         self.extensions = {}
-        
+
         # Optional infrastructure starts as None
         self.tracer = None
         self.consumer_task = None

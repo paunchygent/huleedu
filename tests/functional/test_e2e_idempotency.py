@@ -370,6 +370,7 @@ class TestControlledIdempotencyScenarios:
         """
         Test that Redis keys are properly cleaned up when processing fails.
         """
+
         @idempotent_consumer(redis_client=mock_redis_client, ttl_seconds=3600)
         async def failing_process_event(msg: ConsumerRecord) -> bool:
             # Simulate processing failure

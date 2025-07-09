@@ -85,7 +85,9 @@ async def run_cj_assessment_workflow(
         )
 
         # Phase 4: Complete and publish results
-        rankings = await _finalize_batch_results(cj_batch_id, database, final_scores, log_extra)
+        rankings = await _finalize_batch_results(
+            cj_batch_id, database, final_scores, correlation_id, log_extra
+        )
 
         logger.info(
             f"CJ assessment completed for batch {cj_batch_id}. "
@@ -96,7 +98,15 @@ async def run_cj_assessment_workflow(
         return rankings, str(cj_batch_id)
 
     except Exception as e:
-        logger.error(f"CJ assessment workflow failed: {e}", exc_info=True)
+        logger.error(
+            f"CJ assessment workflow failed: {e}",
+            extra={
+                "correlation_id": correlation_id,
+                "cj_batch_id": cj_batch_id,
+                "exception_type": type(e).__name__,
+            },
+            exc_info=True,
+        )
 
         # Try to update batch status to error if we have a batch ID
         if cj_batch_id:
@@ -108,7 +118,14 @@ async def run_cj_assessment_workflow(
                         status=CJBatchStatusEnum.ERROR_PROCESSING,
                     )
             except Exception as update_error:
-                logger.error(f"Failed to update batch status to error: {update_error}")
+                logger.error(
+                    f"Failed to update batch status to error: {update_error}",
+                    extra={
+                        "correlation_id": correlation_id,
+                        "cj_batch_id": cj_batch_id,
+                        "update_error_type": type(update_error).__name__,
+                    },
+                )
 
         # Re-raise the original exception
         raise
@@ -118,6 +135,7 @@ async def _finalize_batch_results(
     cj_batch_id: int,
     database: CJRepositoryProtocol,
     final_scores: dict[str, float],
+    correlation_id: str,
     log_extra: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Finalize batch results and determine completion status."""
@@ -134,7 +152,7 @@ async def _finalize_batch_results(
         )
 
         # Get final rankings
-        rankings = await scoring_ranking.get_essay_rankings(session, cj_batch_id)
+        rankings = await scoring_ranking.get_essay_rankings(session, cj_batch_id, correlation_id)
 
         logger.info(
             f"Finalized batch {cj_batch_id} with {len(rankings)} ranked essays",

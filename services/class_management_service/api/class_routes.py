@@ -13,14 +13,14 @@ from services.class_management_service.api_models import (
     CreateClassRequest,
     UpdateClassRequest,
 )
+from services.class_management_service.exceptions import (
+    ClassManagementServiceError,
+    CourseNotFoundError,
+    MultipleCourseError,
+)
 from services.class_management_service.metrics import CmsMetrics
 from services.class_management_service.models_db import Student, UserClass
 from services.class_management_service.protocols import ClassManagementServiceProtocol
-from services.class_management_service.exceptions import (
-    CourseNotFoundError,
-    MultipleCourseError,
-    ClassManagementServiceError,
-)
 
 logger = create_service_logger("class_management_service.api.class")
 class_bp = Blueprint("class_routes", __name__)

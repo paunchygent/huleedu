@@ -33,7 +33,7 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
         if TYPE_CHECKING:
             assert isinstance(current_app, HuleEduApp)
         engine = current_app.database_engine
-        
+
         try:
             health_checker = DatabaseHealthChecker(engine, "class_management_service")
             summary = await health_checker.get_health_summary()

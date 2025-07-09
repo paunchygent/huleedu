@@ -7,6 +7,7 @@ pairwise comparisons using LLM and updates Bradley-Terry scores.
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,7 @@ async def perform_iterative_comparisons(
     llm_interaction: LLMInteractionProtocol,
     request_data: dict[str, Any],
     settings: Settings,
+    correlation_id: UUID,
     log_extra: dict[str, Any],
 ) -> dict[str, float]:
     """Perform iterative comparison processing with LLM.
@@ -103,6 +105,7 @@ async def perform_iterative_comparisons(
                 max_tokens_override=max_tokens_override,
                 settings=settings,
                 current_iteration=current_iteration,
+                correlation_id=correlation_id,
                 log_extra=log_extra,
             )
 
@@ -156,6 +159,7 @@ async def _process_comparison_iteration(
     max_tokens_override: int | None,
     settings: Settings,
     current_iteration: int,
+    correlation_id: UUID,
     log_extra: dict[str, Any],
 ) -> tuple[int, dict[str, float]] | None:
     """Process a single comparison iteration.
@@ -170,6 +174,7 @@ async def _process_comparison_iteration(
         db_session=session,
         cj_batch_id=cj_batch_id,
         existing_pairs_threshold=getattr(settings, "comparisons_per_stability_check_iteration", 5),
+        correlation_id=str(correlation_id),
     )
 
     if not comparison_tasks_for_llm:
@@ -182,6 +187,7 @@ async def _process_comparison_iteration(
         model_override=model_override,
         temperature_override=temperature_override,
         max_tokens_override=max_tokens_override,
+        correlation_id=correlation_id,
     )
 
     # Filter out tasks that resulted in an error from the LLM
@@ -204,6 +210,7 @@ async def _process_comparison_iteration(
         comparison_results=valid_llm_results,
         db_session=session,
         cj_batch_id=cj_batch_id,
+        correlation_id=str(correlation_id),
     )
 
     return len(valid_llm_results), current_bt_scores_dict

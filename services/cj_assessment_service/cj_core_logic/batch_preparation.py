@@ -7,6 +7,7 @@ of the CJ assessment workflow.
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -73,6 +74,7 @@ async def prepare_essays_for_assessment(
     cj_batch_id: int,
     database: CJRepositoryProtocol,
     content_client: ContentClientProtocol,
+    correlation_id: UUID,
     log_extra: dict[str, Any],
 ) -> list[EssayForComparison]:
     """Fetch content and prepare essays for CJ assessment.
@@ -82,6 +84,7 @@ async def prepare_essays_for_assessment(
         cj_batch_id: The CJ batch ID to associate essays with
         database: Database access protocol implementation
         content_client: Content client protocol implementation
+        correlation_id: Request correlation ID for tracing
         log_extra: Logging context data
 
     Returns:
@@ -106,8 +109,35 @@ async def prepare_essays_for_assessment(
                 continue
 
             try:
-                # Fetch spellchecked content
-                assessment_input_text = await content_client.fetch_content(text_storage_id)
+                # Fetch spellchecked content using new correlation_id-aware interface
+                content, content_error = await content_client.fetch_content(
+                    text_storage_id, correlation_id
+                )
+
+                if content_error:
+                    logger.error(
+                        f"Failed to fetch content for essay {els_essay_id}: {content_error.message}",
+                        extra={
+                            "correlation_id": correlation_id,
+                            "els_essay_id": els_essay_id,
+                            "text_storage_id": text_storage_id,
+                            "error_code": content_error.error_code.value,
+                        },
+                    )
+                    continue  # Skip this essay and continue with others
+
+                if content is None:
+                    logger.error(
+                        f"Content is None for essay {els_essay_id} despite no error",
+                        extra={
+                            "correlation_id": correlation_id,
+                            "els_essay_id": els_essay_id,
+                            "text_storage_id": text_storage_id,
+                        },
+                    )
+                    continue  # Skip this essay and continue with others
+
+                assessment_input_text = content
 
                 # Store essay for CJ processing
                 cj_processed_essay = await database.create_or_update_cj_processed_essay(
@@ -126,10 +156,26 @@ async def prepare_essays_for_assessment(
                 )
                 essays_for_api_model.append(essay_for_api)
 
-                logger.debug(f"Prepared essay {els_essay_id} for CJ assessment")
+                logger.debug(
+                    f"Prepared essay {els_essay_id} for CJ assessment",
+                    extra={
+                        "correlation_id": correlation_id,
+                        "els_essay_id": els_essay_id,
+                        "cj_batch_id": cj_batch_id,
+                    },
+                )
 
             except Exception as e:
-                logger.error(f"Failed to prepare essay {els_essay_id}: {e}")
+                logger.error(
+                    f"Failed to prepare essay {els_essay_id}: {e}",
+                    extra={
+                        "correlation_id": correlation_id,
+                        "els_essay_id": els_essay_id,
+                        "cj_batch_id": cj_batch_id,
+                        "exception_type": type(e).__name__,
+                    },
+                    exc_info=True,
+                )
                 # Continue with other essays rather than failing entire batch
 
         logger.info(

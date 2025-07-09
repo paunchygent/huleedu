@@ -32,9 +32,10 @@ async def shutdown_services() -> None:
     try:
         # Shutdown Redis and other async resources
         from services.class_management_service.di import shutdown_container_resources
+
         await shutdown_container_resources()
         logger.info("Container resources shutdown completed")
     except Exception as e:
         logger.error(f"Error during container resource shutdown: {e}")
-    
+
     logger.info("Class Management Service shutdown completed")

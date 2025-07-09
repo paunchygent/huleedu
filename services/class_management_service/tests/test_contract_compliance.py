@@ -13,10 +13,10 @@ import pytest
 
 from common_core.domain_enums import CourseCode
 from common_core.events.class_events import (
-    ClassCreatedV1, 
-    ClassUpdatedV1, 
-    StudentCreatedV1, 
-    StudentUpdatedV1
+    ClassCreatedV1,
+    ClassUpdatedV1,
+    StudentCreatedV1,
+    StudentUpdatedV1,
 )
 from common_core.events.envelope import EventEnvelope
 
@@ -31,21 +31,21 @@ class TestEventContractCompliance:
             class_id=str(uuid.uuid4()),
             class_designation="Advanced English",
             course_codes=[CourseCode.ENG5],
-            user_id="test-teacher"
+            user_id="test-teacher",
         )
-        
+
         original_envelope = EventEnvelope[ClassCreatedV1](
             event_type="huleedu.class.created.v1",
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=original_data,
         )
-        
+
         # Act - serialize and deserialize
         serialized = original_envelope.model_dump_json()
         deserialized_dict = original_envelope.model_validate_json(serialized).model_dump()
         reconstructed = EventEnvelope[ClassCreatedV1].model_validate(deserialized_dict)
-        
+
         # Assert - round-trip integrity
         assert reconstructed.event_type == original_envelope.event_type
         assert reconstructed.source_service == original_envelope.source_service
@@ -62,21 +62,21 @@ class TestEventContractCompliance:
             class_id=str(uuid.uuid4()),
             class_designation="Updated Class Name",
             course_codes=[CourseCode.SV1],
-            user_id="test-teacher"
+            user_id="test-teacher",
         )
-        
+
         original_envelope = EventEnvelope[ClassUpdatedV1](
             event_type="huleedu.class.updated.v1",
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=original_data,
         )
-        
+
         # Act - serialize and deserialize
         serialized = original_envelope.model_dump_json()
         deserialized_dict = original_envelope.model_validate_json(serialized).model_dump()
         reconstructed = EventEnvelope[ClassUpdatedV1].model_validate(deserialized_dict)
-        
+
         # Assert - round-trip integrity
         assert reconstructed.data.class_id == original_data.class_id
         assert reconstructed.data.class_designation == original_data.class_designation
@@ -92,21 +92,21 @@ class TestEventContractCompliance:
             last_name="Smith",
             student_email="jane.smith@example.com",
             class_ids=[],
-            created_by_user_id="test-teacher"
+            created_by_user_id="test-teacher",
         )
-        
+
         original_envelope = EventEnvelope[StudentCreatedV1](
             event_type="huleedu.student.created.v1",
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=original_data,
         )
-        
+
         # Act - serialize and deserialize
         serialized = original_envelope.model_dump_json()
         deserialized_dict = original_envelope.model_validate_json(serialized).model_dump()
         reconstructed = EventEnvelope[StudentCreatedV1].model_validate(deserialized_dict)
-        
+
         # Assert - round-trip integrity
         assert reconstructed.data.student_id == original_data.student_id
         assert reconstructed.data.first_name == original_data.first_name
@@ -124,21 +124,21 @@ class TestEventContractCompliance:
             student_email="john.updated@example.com",
             add_class_ids=None,
             remove_class_ids=None,
-            updated_by_user_id="test-teacher"
+            updated_by_user_id="test-teacher",
         )
-        
+
         original_envelope = EventEnvelope[StudentUpdatedV1](
             event_type="huleedu.student.updated.v1",
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=original_data,
         )
-        
+
         # Act - serialize and deserialize
         serialized = original_envelope.model_dump_json()
         deserialized_dict = original_envelope.model_validate_json(serialized).model_dump()
         reconstructed = EventEnvelope[StudentUpdatedV1].model_validate(deserialized_dict)
-        
+
         # Assert - round-trip integrity
         assert reconstructed.data.student_id == original_data.student_id
         assert reconstructed.data.first_name == original_data.first_name
@@ -149,20 +149,20 @@ class TestEventContractCompliance:
         """Test correlation ID propagates correctly through event processing."""
         # Arrange
         test_correlation_id = uuid.uuid4()
-        
+
         # Test with different event types to ensure pattern consistency
         class_event = EventEnvelope[ClassCreatedV1](
             event_type="huleedu.class.created.v1",
-            source_service="class_management_service", 
+            source_service="class_management_service",
             correlation_id=test_correlation_id,
             data=ClassCreatedV1(
                 class_id=str(uuid.uuid4()),
                 class_designation="Test Class",
                 course_codes=[CourseCode.ENG5],
-                user_id="test-user"
+                user_id="test-user",
             ),
         )
-        
+
         student_event = EventEnvelope[StudentCreatedV1](
             event_type="huleedu.student.created.v1",
             source_service="class_management_service",
@@ -173,10 +173,10 @@ class TestEventContractCompliance:
                 last_name="Student",
                 student_email="test@example.com",
                 class_ids=[],
-                created_by_user_id="test-user"
+                created_by_user_id="test-user",
             ),
         )
-        
+
         # Assert - correlation ID consistency
         assert class_event.correlation_id == test_correlation_id
         assert student_event.correlation_id == test_correlation_id
@@ -190,15 +190,15 @@ class TestEventContractCompliance:
                 # Missing class_id - intentionally omitted
                 class_designation="Test Class",
                 course_codes=[CourseCode.ENG5],
-                user_id="test-user"
+                user_id="test-user",
             )  # type: ignore[call-arg]
-        
+
         with pytest.raises(ValueError):
             ClassCreatedV1(
                 class_id=str(uuid.uuid4()),
                 # Missing class_designation - intentionally omitted
                 course_codes=[CourseCode.ENG5],
-                user_id="test-user"
+                user_id="test-user",
             )  # type: ignore[call-arg]
 
     def test_event_data_type_validation(self) -> None:
@@ -208,9 +208,9 @@ class TestEventContractCompliance:
             class_id=str(uuid.uuid4()),
             class_designation="Test Class",
             course_codes=[CourseCode.ENG5, CourseCode.SV1],  # Multiple courses
-            user_id="test-user"
+            user_id="test-user",
         )
-        
+
         assert len(valid_event.course_codes) == 2
         assert CourseCode.ENG5 in valid_event.course_codes
         assert CourseCode.SV1 in valid_event.course_codes
@@ -222,9 +222,9 @@ class TestEventContractCompliance:
             class_id=str(uuid.uuid4()),
             class_designation="Test Class",
             course_codes=[CourseCode.ENG5],
-            user_id="test-user"
+            user_id="test-user",
         )
-        
+
         # Act & Assert - valid envelope
         valid_envelope = EventEnvelope[ClassCreatedV1](
             event_type="huleedu.class.created.v1",
@@ -232,7 +232,7 @@ class TestEventContractCompliance:
             correlation_id=uuid.uuid4(),
             data=test_data,
         )
-        
+
         # Verify envelope structure
         assert valid_envelope.event_id is not None
         assert valid_envelope.event_timestamp is not None
@@ -248,26 +248,26 @@ class TestEventContractCompliance:
             class_id=str(uuid.uuid4()),
             class_designation="JSON Test Class",
             course_codes=[CourseCode.ENG5],
-            user_id="test-user"
+            user_id="test-user",
         )
-        
+
         envelope = EventEnvelope[ClassCreatedV1](
             event_type="huleedu.class.created.v1",
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=event_data,
         )
-        
+
         # Act - serialize to JSON
         json_str = envelope.model_dump_json()
-        
+
         # Assert - JSON is valid and contains expected data
         assert isinstance(json_str, str)
         assert "class_id" in json_str
         assert "JSON Test Class" in json_str
         assert "ENG5" in json_str
         assert "class_management_service" in json_str
-        
+
         # Verify we can deserialize back
         reconstructed = EventEnvelope[ClassCreatedV1].model_validate_json(json_str)
         assert reconstructed.data.class_designation == "JSON Test Class"
@@ -276,15 +276,15 @@ class TestEventContractCompliance:
         """Test that event schemas maintain backward compatibility."""
         # This test ensures that existing event consumers won't break
         # when new optional fields are added to event schemas
-        
+
         # Simulate an older event payload that might be missing new optional fields
         minimal_class_event_data = {
             "class_id": str(uuid.uuid4()),
             "class_designation": "Minimal Class",
             "course_codes": ["ENG5"],
-            "user_id": "test-user"
+            "user_id": "test-user",
         }
-        
+
         # This should not raise an error even if new optional fields are added later
         event = ClassCreatedV1.model_validate(minimal_class_event_data)
         assert event.class_designation == "Minimal Class"

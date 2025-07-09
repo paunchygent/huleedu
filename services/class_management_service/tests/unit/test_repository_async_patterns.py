@@ -12,16 +12,16 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
+from huleedu_service_libs.database import DatabaseMetricsProtocol
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from common_core.domain_enums import CourseCode
 from common_core.metadata_models import PersonNameV1
-from huleedu_service_libs.database import DatabaseMetricsProtocol
 from services.class_management_service.api_models import CreateClassRequest, CreateStudentRequest
 from services.class_management_service.implementations.class_repository_postgres_impl import (
     PostgreSQLClassRepositoryImpl,
 )
 from services.class_management_service.models_db import Student, UserClass
-from sqlalchemy.ext.asyncio import AsyncEngine
 
 
 class TestRepositoryAsyncSessionPatterns:
@@ -32,14 +32,14 @@ class TestRepositoryAsyncSessionPatterns:
         # Arrange
         mock_engine = AsyncMock(spec=AsyncEngine)
         mock_metrics = AsyncMock(spec=DatabaseMetricsProtocol)
-        
+
         # Act
         repo = PostgreSQLClassRepositoryImpl[UserClass, Student](mock_engine, mock_metrics)
-        
+
         # Assert - repository stores engine and metrics correctly
         assert repo.engine is mock_engine
         assert repo.metrics is mock_metrics
-        
+
         # Verify async_session_maker is created (repository-managed sessions)
         assert repo.async_session_maker is not None
 
@@ -47,14 +47,14 @@ class TestRepositoryAsyncSessionPatterns:
         """Test repository works correctly without metrics."""
         # Arrange
         mock_engine = AsyncMock(spec=AsyncEngine)
-        
+
         # Act
         repo = PostgreSQLClassRepositoryImpl[UserClass, Student](mock_engine, None)
-        
+
         # Assert
         assert repo.engine is mock_engine
         assert repo.metrics is None
-        
+
         # Should not raise errors when metrics is None
         repo._record_operation_metrics("test_op", "test_table", 1.0, True)
         repo._record_error_metrics("TestError", "test_op")
@@ -65,11 +65,11 @@ class TestRepositoryAsyncSessionPatterns:
         mock_engine1 = AsyncMock(spec=AsyncEngine)
         mock_engine2 = AsyncMock(spec=AsyncEngine)
         mock_metrics = AsyncMock(spec=DatabaseMetricsProtocol)
-        
+
         # Act
         repo1 = PostgreSQLClassRepositoryImpl[UserClass, Student](mock_engine1, mock_metrics)
         repo2 = PostgreSQLClassRepositoryImpl[UserClass, Student](mock_engine2, mock_metrics)
-        
+
         # Assert - each repository has its own session maker (isolation)
         assert repo1.async_session_maker is not repo2.async_session_maker
         assert repo1.engine is not repo2.engine
@@ -81,52 +81,50 @@ class TestRepositoryAsyncSessionPatterns:
         mock_engine = AsyncMock(spec=AsyncEngine)
         mock_metrics = AsyncMock(spec=DatabaseMetricsProtocol)
         repo = PostgreSQLClassRepositoryImpl[UserClass, Student](mock_engine, mock_metrics)
-        
+
         # Act - call metrics recording methods directly (unit test boundary)
         repo._record_operation_metrics("create_class", "classes", 1.5, True)
         repo._record_error_metrics("SQLError", "create_class")
-        
+
         # Assert
         mock_metrics.record_query_duration.assert_called_once_with(
             operation="create_class", table="classes", duration=1.5, success=True
         )
-        mock_metrics.record_database_error.assert_called_once_with(
-            "SQLError", "create_class"
-        )
+        mock_metrics.record_database_error.assert_called_once_with("SQLError", "create_class")
 
     def test_repository_protocol_compliance(self) -> None:
         """Test repository implements required protocol methods."""
         # Arrange
         mock_engine = AsyncMock(spec=AsyncEngine)
         repo = PostgreSQLClassRepositoryImpl[UserClass, Student](mock_engine)
-        
+
         # Assert - verify protocol methods exist (not calling them, just checking structure)
-        assert hasattr(repo, 'create_class')
-        assert hasattr(repo, 'get_class_by_id')
-        assert hasattr(repo, 'update_class')
-        assert hasattr(repo, 'delete_class')
-        assert hasattr(repo, 'create_student')
-        assert hasattr(repo, 'get_student_by_id')
-        assert hasattr(repo, 'update_student')
-        assert hasattr(repo, 'delete_student')
-        assert hasattr(repo, 'associate_essay_to_student')
-        
+        assert hasattr(repo, "create_class")
+        assert hasattr(repo, "get_class_by_id")
+        assert hasattr(repo, "update_class")
+        assert hasattr(repo, "delete_class")
+        assert hasattr(repo, "create_student")
+        assert hasattr(repo, "get_student_by_id")
+        assert hasattr(repo, "update_student")
+        assert hasattr(repo, "delete_student")
+        assert hasattr(repo, "associate_essay_to_student")
+
         # Verify session context manager exists (critical async pattern)
-        assert hasattr(repo, 'session')
+        assert hasattr(repo, "session")
 
     def test_course_validation_logic_unit(self) -> None:
         """Test course validation business logic in isolation."""
         # Test multiple course error
         from services.class_management_service.exceptions import MultipleCourseError
-        
+
         multiple_courses = [CourseCode.ENG5, CourseCode.SV1]
-        
+
         # This tests the validation logic without database calls
         with pytest.raises(MultipleCourseError) as exc_info:
             # We need to trigger this validation - let's check the exception type
             error = MultipleCourseError(multiple_courses)
             raise error
-        
+
         assert exc_info.value.provided_course_codes == multiple_courses
         assert "Multiple courses provided" in str(exc_info.value)
 
@@ -134,14 +132,14 @@ class TestRepositoryAsyncSessionPatterns:
         """Test repository maintains type safety with generics."""
         # Arrange
         mock_engine = AsyncMock(spec=AsyncEngine)
-        
+
         # Act - create typed repository
         repo = PostgreSQLClassRepositoryImpl[UserClass, Student](mock_engine)
-        
+
         # Assert - verify type annotations are preserved
         # This is a compile-time check more than runtime, but ensures structure
         assert repo.__class__.__name__ == "PostgreSQLClassRepositoryImpl"
-        
+
         # The repository should be parameterized for UserClass and Student types
         # This test ensures the generic typing pattern is maintained
 
@@ -151,30 +149,28 @@ class TestRepositoryAsyncSessionPatterns:
         # Arrange
         mock_engine = AsyncMock(spec=AsyncEngine)
         repo = PostgreSQLClassRepositoryImpl[UserClass, Student](mock_engine)
-        
+
         # Act & Assert - verify session method exists and is async context manager
-        assert hasattr(repo, 'session')
-        
+        assert hasattr(repo, "session")
+
         # The session method should be an async context manager
         # We can verify its structure without calling database operations
         import inspect
+
         assert inspect.iscoroutinefunction(repo.session().__aenter__)
         assert inspect.iscoroutinefunction(repo.session().__aexit__)
 
     def test_api_model_validation_patterns(self) -> None:
         """Test repository correctly accepts API model types."""
         # Test CreateClassRequest structure
-        class_request = CreateClassRequest(
-            name="Test Class",
-            course_codes=[CourseCode.ENG5]
-        )
+        class_request = CreateClassRequest(name="Test Class", course_codes=[CourseCode.ENG5])
         assert class_request.name == "Test Class"
         assert class_request.course_codes == [CourseCode.ENG5]
-        
+
         # Test CreateStudentRequest structure
         student_request = CreateStudentRequest(
             person_name=PersonNameV1(first_name="John", last_name="Doe"),
-            email="john.doe@example.com"
+            email="john.doe@example.com",
         )
         assert student_request.person_name.first_name == "John"
         assert student_request.person_name.last_name == "Doe"

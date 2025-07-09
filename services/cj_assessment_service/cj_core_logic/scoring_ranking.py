@@ -27,6 +27,7 @@ async def record_comparisons_and_update_scores(
     comparison_results: list[ComparisonResult],
     db_session: AsyncSession,
     cj_batch_id: int,
+    correlation_id: str,
     # settings: Settings # Pass settings if alpha for choix is configurable
 ) -> dict[str, float]:  # Returns dict of els_essay_id -> score
     """Record comparison results and update Bradley-Terry scores using choix.
@@ -42,7 +43,11 @@ async def record_comparisons_and_update_scores(
     """
     logger.info(
         f"Recording {len(comparison_results)} comparison results for CJ Batch ID: {cj_batch_id}",
-        extra={"cj_batch_id": str(cj_batch_id)},
+        extra={
+            "cj_batch_id": str(cj_batch_id),
+            "correlation_id": correlation_id,
+            "result_count": len(comparison_results),
+        },
     )
 
     # 1. Store new comparison results
@@ -79,7 +84,11 @@ async def record_comparisons_and_update_scores(
     logger.info(
         f"Stored {successful_comparisons_this_round} new comparison pairs for "
         f"CJ Batch ID: {cj_batch_id}",
-        extra={"cj_batch_id": str(cj_batch_id)},
+        extra={
+            "cj_batch_id": str(cj_batch_id),
+            "correlation_id": correlation_id,
+            "successful_pairs": successful_comparisons_this_round,
+        },
     )
 
     # 2. Fetch ALL valid comparisons for this cj_batch_id to compute scores
@@ -193,6 +202,7 @@ def check_score_stability(
 async def get_essay_rankings(
     db_session: AsyncSession,
     cj_batch_id: int,  # This is the internal CJ_BatchUpload.id
+    correlation_id: str,
 ) -> list[dict[str, Any]]:
     """Get final essay rankings for the CJ batch, ordered by score.
 
@@ -205,7 +215,10 @@ async def get_essay_rankings(
     """
     logger.info(
         f"Generating final rankings for CJ Batch ID: {cj_batch_id}",
-        extra={"cj_batch_id": str(cj_batch_id)},
+        extra={
+            "cj_batch_id": str(cj_batch_id),
+            "correlation_id": correlation_id,
+        },
     )
 
     stmt = (
@@ -229,7 +242,10 @@ async def get_essay_rankings(
 
     logger.info(
         f"Generated rankings for {len(rankings)} essays in CJ Batch {cj_batch_id}.",
-        extra={"cj_batch_id": str(cj_batch_id)},
+        extra={
+            "cj_batch_id": str(cj_batch_id),
+            "correlation_id": correlation_id,
+        },
     )
     return rankings
 

@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
 from huleedu_service_libs.protocols import RedisClientProtocol
-from prometheus_client import REGISTRY, CollectorRegistry
 from huleedu_service_libs.quart_app import HuleEduApp
+from prometheus_client import REGISTRY, CollectorRegistry
 from quart.testing import QuartClient
 from quart_dishka import QuartDishka
 
@@ -125,10 +125,12 @@ async def app(test_provider: MockDIProvider) -> HuleEduApp:
     # IMMEDIATE initialization - satisfies non-optional contract
     container = make_async_container(test_provider)
     app.container = container
-    
+
     # Mock database engine for testing
     from unittest.mock import AsyncMock
+
     from sqlalchemy.ext.asyncio import AsyncEngine
+
     app.database_engine = AsyncMock(spec=AsyncEngine)
 
     # Register blueprints

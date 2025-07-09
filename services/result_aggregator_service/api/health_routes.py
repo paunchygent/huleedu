@@ -38,7 +38,7 @@ async def health_check(
         if TYPE_CHECKING:
             assert isinstance(current_app, HuleEduApp)
         engine = current_app.database_engine
-        
+
         try:
             health_checker = DatabaseHealthChecker(engine, "result_aggregator_service")
             summary = await health_checker.get_health_summary()

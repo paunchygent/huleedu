@@ -8,9 +8,13 @@ Updated for CJ Assessment Service with string-based essay IDs for ELS integratio
 
 from __future__ import annotations
 
+from datetime import datetime
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 from common_core import EssayComparisonWinner
+from common_core.error_enums import ErrorCode
 
 
 class EssayForComparison(BaseModel):
@@ -47,3 +51,29 @@ class ComparisonResult(BaseModel):
     llm_assessment: LLMAssessmentResponseSchema | None = None
     error_message: str | None = None
     raw_llm_response_content: str | None = None
+
+
+class ErrorDetail(BaseModel):
+    """Detailed error information for API responses.
+
+    This model provides structured error information including error codes,
+    correlation IDs, and additional context for effective debugging and monitoring.
+    """
+
+    error_code: ErrorCode
+    message: str
+    correlation_id: UUID
+    timestamp: datetime
+    service: str = "cj_assessment_service"
+    details: dict = Field(default_factory=dict)
+
+
+class ErrorResponse(BaseModel):
+    """API error response wrapper.
+
+    This model wraps ErrorDetail with an HTTP status code for consistent
+    error response format across all API endpoints.
+    """
+
+    error: ErrorDetail
+    status_code: int

@@ -12,10 +12,10 @@ from prometheus_client import REGISTRY
 def _clear_prometheus_registry() -> Any:
     """
     Fixture to clear the default Prometheus registry before each test.
-    
+
     This prevents "Duplicated timeseries in CollectorRegistry" errors
     when running multiple tests that register metrics.
-    
+
     REQUIRED by rule 070: Testing and Quality Assurance
     """
     collectors = list(REGISTRY._collector_to_names.keys())

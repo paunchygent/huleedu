@@ -11,11 +11,16 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
+from common_core.domain_enums import CourseCode
 from services.class_management_service.api_models import (
     CreateClassRequest,
     CreateStudentRequest,
     UpdateClassRequest,
     UpdateStudentRequest,
+)
+from services.class_management_service.exceptions import (
+    CourseNotFoundError,
+    MultipleCourseError,
 )
 from services.class_management_service.models_db import (
     Course,
@@ -26,11 +31,6 @@ from services.class_management_service.models_db import (
 from services.class_management_service.protocols import (
     ClassRepositoryProtocol,
 )
-from services.class_management_service.exceptions import (
-    CourseNotFoundError,
-    MultipleCourseError,
-)
-from common_core.domain_enums import CourseCode
 
 logger = create_service_logger("class_management_service.repository")
 
@@ -98,9 +98,7 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
         try:
             async with self.session() as session:
                 # Validate course codes
-                course = await self._validate_and_get_course(
-                    session, class_data.course_codes
-                )
+                course = await self._validate_and_get_course(session, class_data.course_codes)
 
                 new_class = UserClass(
                     name=class_data.name,
@@ -127,10 +125,7 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             stmt = (
                 select(UserClass)
                 .where(UserClass.id == class_id)
-                .options(
-                    selectinload(UserClass.students),
-                    selectinload(UserClass.course)
-                )
+                .options(selectinload(UserClass.students), selectinload(UserClass.course))
             )
             result = await session.execute(stmt)
             return cast(T | None, result.scalars().first())
@@ -142,7 +137,7 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             stmt = select(UserClass).where(UserClass.id == class_id)
             result = await session.execute(stmt)
             db_class = result.scalars().first()
-            
+
             if not db_class:
                 return None
 
@@ -151,9 +146,7 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
 
             if class_data.course_codes is not None:
                 # Validate course codes and get the single course
-                course = await self._validate_and_get_course(
-                    session, class_data.course_codes
-                )
+                course = await self._validate_and_get_course(session, class_data.course_codes)
                 db_class.course = course
 
             await session.flush()
@@ -183,17 +176,17 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
                     created_by_user_id=user_id,
                 )
                 session.add(new_student)
-                
+
                 if student_data.class_ids:
                     stmt = select(UserClass).where(UserClass.id.in_(student_data.class_ids))
                     result = await session.execute(stmt)
                     classes = result.scalars().all()
                     new_student.classes.extend(classes)
-                
+
                 await session.flush()
-                
+
                 # CRITICAL: Eager load classes relationship before session closes
-                await session.refresh(new_student, ['classes'])
+                await session.refresh(new_student, ["classes"])
                 return cast(U, new_student)
 
         except Exception as e:
@@ -219,8 +212,7 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
                     select(Student)
                     .where(Student.id == student_id)
                     .options(
-                        selectinload(Student.classes),
-                        selectinload(Student.essay_associations)
+                        selectinload(Student.classes), selectinload(Student.essay_associations)
                     )
                 )
                 result = await session.execute(stmt)
@@ -251,13 +243,12 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
                     select(Student)
                     .where(Student.id == student_id)
                     .options(
-                        selectinload(Student.classes),
-                        selectinload(Student.essay_associations)
+                        selectinload(Student.classes), selectinload(Student.essay_associations)
                     )
                 )
                 result = await session.execute(stmt)
                 db_student = result.scalars().first()
-                
+
                 if not db_student:
                     return None
 
@@ -270,7 +261,9 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
                     db_student.email = student_data.email
 
                 if student_data.add_class_ids:
-                    class_stmt = select(UserClass).where(UserClass.id.in_(student_data.add_class_ids))
+                    class_stmt = select(UserClass).where(
+                        UserClass.id.in_(student_data.add_class_ids)
+                    )
                     class_result = await session.execute(class_stmt)
                     classes_to_add = class_result.scalars().all()
                     for cls in classes_to_add:
@@ -350,32 +343,32 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
         self, session: AsyncSession, course_codes: list[CourseCode]
     ) -> Course:
         """Validate course codes and return the single course.
-        
+
         Args:
             session: Database session
             course_codes: List of course codes to validate
-            
+
         Returns:
             The validated Course entity
-            
+
         Raises:
             MultipleCourseError: If multiple course codes are provided
             CourseNotFoundError: If the course code is not found in the database
         """
         if len(course_codes) > 1:
             raise MultipleCourseError(course_codes)
-        
+
         if not course_codes:
             # This should be caught by Pydantic validation, but defensive programming
             raise CourseNotFoundError([])
-        
+
         course_code = course_codes[0]
-        
+
         stmt = select(Course).where(Course.course_code == course_code)
         result = await session.execute(stmt)
         course = result.scalars().first()
-        
+
         if course is None:
             raise CourseNotFoundError([course_code])
-        
+
         return course

@@ -301,8 +301,7 @@ class QueueRedisClient(QueueRedisClientProtocol):
             for item in result:
                 if not isinstance(item, tuple) or len(item) != 2:
                     raise TypeError(
-                        f"Expected tuple[str, float] from Redis withscores=True, "
-                        f"got: {type(item)}"
+                        f"Expected tuple[str, float] from Redis withscores=True, got: {type(item)}"
                     )
 
             queue_items = [QueueItem.from_redis_tuple(item) for item in result]
@@ -417,8 +416,7 @@ class QueueRedisClient(QueueRedisClientProtocol):
                 raise TypeError(f"Expected list from Redis hkeys, got: {type(result)}")
             if not all(isinstance(item, str) for item in result):
                 raise TypeError(
-                    f"Expected List[str] from Redis hkeys, "
-                f"got: {[type(item) for item in result]}"
+                    f"Expected List[str] from Redis hkeys, got: {[type(item) for item in result]}"
                 )
 
             logger.debug(

@@ -36,13 +36,14 @@ class ErrorCode(str, Enum):
     CIRCUIT_BREAKER_OPEN = "CIRCUIT_BREAKER_OPEN"
     REQUEST_QUEUED = "REQUEST_QUEUED"
     PROCESSING_ERROR = "PROCESSING_ERROR"  # Internal processing failures
+    INITIALIZATION_FAILED = "INITIALIZATION_FAILED"  # Job/process initialization failures
 
 
 class ClassManagementErrorCode(str, Enum):
     """
     Specific error codes for Class Management Service.
     """
-    
+
     COURSE_NOT_FOUND = "COURSE_NOT_FOUND"
     COURSE_VALIDATION_ERROR = "COURSE_VALIDATION_ERROR"
     MULTIPLE_COURSE_ERROR = "MULTIPLE_COURSE_ERROR"

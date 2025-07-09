@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import cast
+from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -67,6 +68,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
     async def perform_comparisons(
         self,
         tasks: list[ComparisonTask],
+        correlation_id: UUID,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
@@ -75,6 +77,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
 
         Args:
             tasks: List of comparison tasks to process.
+            correlation_id: Request correlation ID for tracing
             model_override: Optional model name override
             temperature_override: Optional temperature override (0.0-2.0)
             max_tokens_override: Optional max tokens override
@@ -110,6 +113,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                 try:
                     response_data, error_message = await provider.generate_comparison(
                         user_prompt=task.prompt,
+                        correlation_id=correlation_id,
                         system_prompt_override=None,
                         model_override=model_override,
                         temperature_override=temperature_override,

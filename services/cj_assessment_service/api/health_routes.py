@@ -6,6 +6,9 @@ for operational monitoring and observability.
 
 from __future__ import annotations
 
+from datetime import datetime
+from uuid import uuid4
+
 from dishka import FromDishka
 from huleedu_service_libs.database import DatabaseHealthChecker
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -13,8 +16,28 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry
 from quart import Blueprint, Response, current_app, jsonify
 from quart_dishka import inject
 
+from common_core.error_enums import ErrorCode
+from services.cj_assessment_service.models_api import ErrorDetail, ErrorResponse
+
 logger = create_service_logger("cj_assessment_service.api.health")
 health_bp = Blueprint("health_routes", __name__)
+
+
+def create_error_response(
+    error_code: ErrorCode, message: str, status_code: int = 500
+) -> tuple[Response, int]:
+    """Create a standardized error response using ErrorResponse format."""
+    error_detail = ErrorDetail(
+        error_code=error_code,
+        message=message,
+        correlation_id=uuid4(),
+        timestamp=datetime.utcnow(),
+        service="cj_assessment_service",
+    )
+
+    error_response = ErrorResponse(error=error_detail, status_code=status_code)
+
+    return jsonify(error_response.model_dump()), status_code
 
 
 @health_bp.route("/healthz")
@@ -61,15 +84,11 @@ async def health_check() -> tuple[Response, int]:
 
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return jsonify(
-            {
-                "service": "cj_assessment_service",
-                "status": "unhealthy",
-                "message": "Health check failed",
-                "version": "1.0.0",
-                "error": str(e),
-            }
-        ), 503
+        return create_error_response(
+            error_code=ErrorCode.SERVICE_UNAVAILABLE,
+            message=f"Health check failed: {str(e)}",
+            status_code=503,
+        )
 
 
 @health_bp.route("/healthz/database")
@@ -79,15 +98,10 @@ async def database_health_check() -> Response | tuple[Response, int]:
         # Get database engine from app extensions or container
         engine = getattr(current_app, "database_engine", None)
         if not engine:
-            return (
-                jsonify(
-                    {
-                        "status": "error",
-                        "message": "Database engine not configured",
-                        "timestamp": None,
-                    }
-                ),
-                503,
+            return create_error_response(
+                error_code=ErrorCode.SERVICE_UNAVAILABLE,
+                message="Database engine not configured",
+                status_code=503,
             )
 
         # Create health checker and perform comprehensive check
@@ -105,16 +119,10 @@ async def database_health_check() -> Response | tuple[Response, int]:
 
     except Exception as e:
         logger.error(f"Database health check failed: {e}", exc_info=True)
-        return (
-            jsonify(
-                {
-                    "status": "error",
-                    "message": f"Health check failed: {str(e)}",
-                    "service": "cj_assessment_service",
-                    "timestamp": None,
-                }
-            ),
-            503,
+        return create_error_response(
+            error_code=ErrorCode.SERVICE_UNAVAILABLE,
+            message=f"Database health check failed: {str(e)}",
+            status_code=503,
         )
 
 
@@ -125,14 +133,10 @@ async def database_health_summary() -> Response | tuple[Response, int]:
         # Get database engine from app extensions or container
         engine = getattr(current_app, "database_engine", None)
         if not engine:
-            return (
-                jsonify(
-                    {
-                        "status": "error",
-                        "message": "Database engine not configured",
-                    }
-                ),
-                503,
+            return create_error_response(
+                error_code=ErrorCode.SERVICE_UNAVAILABLE,
+                message="Database engine not configured",
+                status_code=503,
             )
 
         # Create health checker and get summary
@@ -146,15 +150,10 @@ async def database_health_summary() -> Response | tuple[Response, int]:
 
     except Exception as e:
         logger.error(f"Database health summary failed: {e}", exc_info=True)
-        return (
-            jsonify(
-                {
-                    "status": "error",
-                    "message": f"Health summary failed: {str(e)}",
-                    "service": "cj_assessment_service",
-                }
-            ),
-            503,
+        return create_error_response(
+            error_code=ErrorCode.SERVICE_UNAVAILABLE,
+            message=f"Database health summary failed: {str(e)}",
+            status_code=503,
         )
 
 
@@ -175,4 +174,9 @@ async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
         return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
     except Exception as e:
         logger.error(f"Error generating metrics: {e}", exc_info=True)
-        return Response("Error generating metrics", status=500)
+        response, status_code = create_error_response(
+            error_code=ErrorCode.PROCESSING_ERROR,
+            message=f"Error generating metrics: {str(e)}",
+            status_code=500,
+        )
+        return response

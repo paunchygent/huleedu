@@ -95,14 +95,15 @@ class TestClassManagementApi:
         container = make_async_container(TestProvider(), MetricsProvider())
 
         app.config.update({"TESTING": True})
-        
+
         # IMMEDIATE initialization - satisfies non-optional contract
         app.container = container
-        
+
         # Mock database engine for testing
         from sqlalchemy.ext.asyncio import AsyncEngine
+
         app.database_engine = AsyncMock(spec=AsyncEngine)
-        
+
         # Setup DI integration
         QuartDishka(app=app, container=container)
 

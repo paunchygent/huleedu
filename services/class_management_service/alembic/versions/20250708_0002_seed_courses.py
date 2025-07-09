@@ -6,8 +6,8 @@ Create Date: 2025-07-08 10:00:00.000000
 
 """
 
-from typing import Sequence, Union
 import uuid
+from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
@@ -30,7 +30,7 @@ def upgrade() -> None:
         sa.column("language", sa.String),
         sa.column("skill_level", sa.Integer),
     )
-    
+
     # Course metadata mapping (course_code -> (name, language, skill_level))
     course_data = [
         ("ENG5", "English 5", "en", 5),
@@ -40,7 +40,7 @@ def upgrade() -> None:
         ("SV2", "Svenska 2", "sv", 2),
         ("SV3", "Svenska 3", "sv", 3),
     ]
-    
+
     # Insert predefined courses
     for course_code, name, language, skill_level in course_data:
         op.execute(

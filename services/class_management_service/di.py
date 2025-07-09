@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import AsyncGenerator, cast
+from typing import cast
 
 from aiokafka.errors import KafkaError
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
@@ -52,7 +52,6 @@ class DatabaseProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_sessionmaker(self, engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
         return async_sessionmaker(engine, expire_on_commit=False)
-
 
     @provide(scope=Scope.APP)
     def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
@@ -145,7 +144,7 @@ class ServiceProvider(Provider):
 
         # Register with app shutdown via weakref to avoid circular references
         # Store the shutdown function for cleanup
-        if not hasattr(self, '_redis_shutdown_handlers'):
+        if not hasattr(self, "_redis_shutdown_handlers"):
             self._redis_shutdown_handlers = []
         self._redis_shutdown_handlers.append(_shutdown_redis)
 
@@ -174,13 +173,14 @@ class ServiceProvider(Provider):
 
     async def shutdown_resources(self) -> None:
         """Shutdown Redis and other async resources managed by this provider."""
-        if hasattr(self, '_redis_shutdown_handlers'):
+        if hasattr(self, "_redis_shutdown_handlers"):
             for shutdown_handler in self._redis_shutdown_handlers:
                 try:
                     await shutdown_handler()
                 except Exception as e:
                     # Log but don't raise to ensure all resources are cleaned up
                     from huleedu_service_libs.logging_utils import create_service_logger
+
                     logger = create_service_logger("cms.di.shutdown")
                     logger.error(f"Failed to shutdown Redis connection: {e}")
             self._redis_shutdown_handlers.clear()
@@ -205,7 +205,7 @@ def create_container() -> AsyncContainer:
     # Store provider reference for cleanup
     global _service_provider
     _service_provider = ServiceProvider()
-    
+
     return make_async_container(
         DatabaseProvider(),
         RepositoryProvider(),
@@ -213,8 +213,10 @@ def create_container() -> AsyncContainer:
         MetricsProvider(),
     )
 
+
 # Global reference for cleanup
 _service_provider: ServiceProvider | None = None
+
 
 async def shutdown_container_resources() -> None:
     """Shutdown async resources managed by providers."""

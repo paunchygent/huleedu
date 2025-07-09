@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
@@ -16,6 +17,7 @@ from huleedu_service_libs.observability import (
     use_trace_context,
 )
 
+from common_core.error_enums import ErrorCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import (
     CJAssessmentCompletedV1,
@@ -27,7 +29,11 @@ from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, ProcessingStage
 from services.cj_assessment_service.cj_core_logic import run_cj_assessment_workflow
 from services.cj_assessment_service.config import Settings
+from services.cj_assessment_service.exceptions import (
+    CJAssessmentError,
+)
 from services.cj_assessment_service.metrics import get_business_metrics
+from services.cj_assessment_service.models_api import ErrorDetail
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
@@ -66,7 +72,17 @@ async def process_single_message(
             msg.value.decode("utf-8"),
         )
     except Exception as e:
-        logger.error(f"Failed to parse CJ assessment message: {e}", exc_info=True)
+        # Use structured error handling for parsing failures
+        error_detail = _create_parsing_error_detail(str(e), type(e).__name__)
+        logger.error(
+            "Failed to parse CJ assessment message",
+            extra={
+                "error_code": error_detail.error_code.value,
+                "error_type": error_detail.details.get("exception_type"),
+                "message_size": len(msg.value) if msg.value else 0,
+            },
+            exc_info=True,
+        )
         return False
 
     # If we have trace context in metadata and a tracer, use the parent context
@@ -288,7 +304,17 @@ async def _process_cj_assessment_impl(
         return True
 
     except Exception as e:
-        logger.error(f"Error processing CJ assessment message: {e}", exc_info=True)
+        # Use structured error handling for processing failures
+        error_detail = _categorize_processing_error(e)
+
+        # Try to extract correlation_id if available
+        try:
+            envelope = EventEnvelope[ELS_CJAssessmentRequestV1].model_validate_json(
+                msg.value.decode("utf-8"),
+            )
+            error_detail.correlation_id = envelope.correlation_id
+        except:
+            pass  # correlation_id remains None if envelope parsing fails
 
         # Publish failure event
         try:
@@ -299,17 +325,26 @@ async def _process_cj_assessment_impl(
             request_event_data = envelope.data
             correlation_id = envelope.correlation_id
 
-            # Create detailed error information including exception type and traceback
-            import traceback
+            logger.error(
+                "Error processing CJ assessment message",
+                extra={
+                    "error_code": error_detail.error_code.value,
+                    "correlation_id": str(correlation_id),
+                    "error_type": error_detail.details.get("exception_type"),
+                    "entity_ref": request_event_data.entity_ref,
+                },
+                exc_info=True,
+            )
 
-            error_details = {
-                "error_message": str(e),
-                "error_type": type(e).__name__,
-                "traceback": traceback.format_exc(),
+            # Create structured error info for the event
+            structured_error_info = {
+                "error_code": error_detail.error_code.value,
+                "error_message": error_detail.message,
+                "correlation_id": str(error_detail.correlation_id),
+                "timestamp": error_detail.timestamp.isoformat(),
+                "service": error_detail.service,
+                "details": error_detail.details,
             }
-
-            # Log detailed error information
-            logger.error(f"Detailed error information: {error_details}")
 
             failed_event_data = CJAssessmentFailedV1(
                 event_name=ProcessingEvent.CJ_ASSESSMENT_FAILED,
@@ -320,9 +355,9 @@ async def _process_cj_assessment_impl(
                     timestamp=datetime.now(UTC),
                     processing_stage=ProcessingStage.FAILED,
                     event=ProcessingEvent.CJ_ASSESSMENT_FAILED.value,
-                    error_info=error_details,
+                    error_info=structured_error_info,
                 ),
-                cj_assessment_job_id="unknown",  # No CJ job created due to failure
+                cj_assessment_job_id=ErrorCode.INITIALIZATION_FAILED.value,  # No CJ job created due to failure
             )
 
             correlation_uuid = correlation_id
@@ -342,6 +377,85 @@ async def _process_cj_assessment_impl(
                 correlation_id=failed_envelope.correlation_id,
             )
         except Exception as publish_error:
-            logger.error(f"Failed to publish failure event: {publish_error}")
+            # Use structured error handling for publishing failures
+            publishing_error_detail = _create_publishing_error_detail(publish_error, correlation_id)
+            logger.error(
+                "Failed to publish failure event",
+                extra={
+                    "error_code": publishing_error_detail.error_code.value,
+                    "correlation_id": str(correlation_id)
+                    if "correlation_id" in locals()
+                    else "unknown",
+                    "original_error_type": error_detail.details.get("exception_type"),
+                    "publishing_error_type": type(publish_error).__name__,
+                },
+            )
 
         return False  # Don't commit failed messages
+
+
+# Helper functions for structured error handling
+
+
+def _create_parsing_error_detail(error_message: str, exception_type: str) -> ErrorDetail:
+    """Create structured error detail for message parsing failures."""
+    return ErrorDetail(
+        error_code=ErrorCode.PARSING_ERROR,
+        message=f"Failed to parse CJ assessment message: {error_message}",
+        correlation_id=uuid4(),  # Generate correlation_id for parsing stage
+        timestamp=datetime.now(UTC),
+        details={
+            "exception_type": exception_type,
+            "parsing_stage": "event_envelope",
+        },
+    )
+
+
+def _categorize_processing_error(exception: Exception) -> ErrorDetail:
+    """Categorize processing exceptions into appropriate ErrorCode types."""
+    if isinstance(exception, CJAssessmentError):
+        # Already a structured CJ Assessment error
+        return ErrorDetail(
+            error_code=exception.error_code,
+            message=exception.message,
+            correlation_id=exception.correlation_id or uuid4(),
+            timestamp=exception.timestamp,
+            details=exception.details,
+        )
+
+    # Categorize based on exception type
+    if "timeout" in str(exception).lower() or "TimeoutError" in type(exception).__name__:
+        error_code = ErrorCode.TIMEOUT
+    elif "connection" in str(exception).lower() or "ConnectionError" in type(exception).__name__:
+        error_code = ErrorCode.CONNECTION_ERROR
+    elif "validation" in str(exception).lower() or "ValidationError" in type(exception).__name__:
+        error_code = ErrorCode.VALIDATION_ERROR
+    elif "not found" in str(exception).lower() or "NotFound" in type(exception).__name__:
+        error_code = ErrorCode.RESOURCE_NOT_FOUND
+    else:
+        error_code = ErrorCode.PROCESSING_ERROR
+
+    return ErrorDetail(
+        error_code=error_code,
+        message=f"CJ assessment processing failed: {str(exception)}",
+        correlation_id=uuid4(),  # Generate correlation_id for generic processing error
+        timestamp=datetime.now(UTC),
+        details={
+            "exception_type": type(exception).__name__,
+            "processing_stage": "cj_assessment_workflow",
+        },
+    )
+
+
+def _create_publishing_error_detail(exception: Exception, correlation_id=None) -> ErrorDetail:
+    """Create structured error detail for event publishing failures."""
+    return ErrorDetail(
+        error_code=ErrorCode.KAFKA_PUBLISH_ERROR,
+        message=f"Failed to publish failure event: {str(exception)}",
+        correlation_id=correlation_id,
+        timestamp=datetime.now(UTC),
+        details={
+            "exception_type": type(exception).__name__,
+            "publishing_stage": "assessment_failed_event",
+        },
+    )

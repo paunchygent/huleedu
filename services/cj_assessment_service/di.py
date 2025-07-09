@@ -202,9 +202,10 @@ class CJAssessmentServiceProvider(Provider):
         self,
         session: aiohttp.ClientSession,
         settings: Settings,
+        retry_manager: RetryManagerProtocol,
     ) -> ContentClientProtocol:
         """Provide content client."""
-        return ContentClientImpl(session, settings)
+        return ContentClientImpl(session, settings, retry_manager)
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(

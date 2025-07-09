@@ -21,6 +21,7 @@ async def generate_comparison_tasks(
     db_session: AsyncSession,
     cj_batch_id: int,
     existing_pairs_threshold: int = 5,
+    correlation_id: str | None = None,
 ) -> list[ComparisonTask]:
     """Generate comparison tasks for essays, avoiding duplicate comparisons.
 
@@ -37,7 +38,14 @@ async def generate_comparison_tasks(
         logger.warning(f"Need at least 2 essays for comparison, got {len(essays_for_comparison)}")
         return []
 
-    logger.info(f"Generating comparison tasks for {len(essays_for_comparison)} essays")
+    logger.info(
+        f"Generating comparison tasks for {len(essays_for_comparison)} essays",
+        extra={
+            "correlation_id": correlation_id,
+            "cj_batch_id": cj_batch_id,
+            "essay_count": len(essays_for_comparison),
+        },
+    )
 
     # Get existing comparison pairs to avoid duplicates
     existing_comparison_ids = await _fetch_existing_comparison_ids(db_session, cj_batch_id)
@@ -80,7 +88,14 @@ async def generate_comparison_tasks(
         if new_pairs_count >= existing_pairs_threshold:
             break
 
-    logger.info(f"Generated {len(comparison_tasks)} new comparison tasks")
+    logger.info(
+        f"Generated {len(comparison_tasks)} new comparison tasks",
+        extra={
+            "correlation_id": correlation_id,
+            "cj_batch_id": cj_batch_id,
+            "task_count": len(comparison_tasks),
+        },
+    )
     return comparison_tasks
 
 

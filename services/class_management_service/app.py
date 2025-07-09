@@ -20,14 +20,14 @@ logger = create_service_logger("cms.app")
 def create_app() -> HuleEduApp:
     """Create and configure the Class Management Service app with guaranteed infrastructure."""
     app = HuleEduApp(__name__)
-    
+
     # IMMEDIATE initialization - satisfies non-optional contract
     app.container = create_container()
-    
+
     # Set database engine immediately to satisfy non-optional contract
     if not settings.DATABASE_URL:
         raise ValueError("DATABASE_URL is required but not configured")
-    
+
     app.database_engine = create_async_engine(
         settings.DATABASE_URL,
         echo=False,
@@ -37,15 +37,15 @@ def create_app() -> HuleEduApp:
         pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
         pool_recycle=settings.DATABASE_POOL_RECYCLE,
     )
-    
+
     # Integrate DI with Quart (must be done before registering blueprints)
     QuartDishka(app=app, container=app.container)
-    
+
     # Register Blueprints
     app.register_blueprint(health_bp)
     app.register_blueprint(class_bp, url_prefix="/v1/classes")
     app.register_blueprint(student_bp, url_prefix="/v1/classes")
-    
+
     return app
 
 
