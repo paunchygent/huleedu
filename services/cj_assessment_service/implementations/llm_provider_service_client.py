@@ -157,13 +157,42 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                         return await self._handle_queued_response(response_text)
 
                     else:
-                        # Handle error responses
+                        # Check if error is retryable
+                        try:
+                            error_data = json.loads(response_text)
+                            is_retryable = (
+                                response.status in [429, 500, 502, 503, 504] or
+                                error_data.get("is_retryable", False)
+                            )
+                            
+                            if is_retryable:
+                                # Log before raising for better debugging
+                                logger.warning(
+                                    f"Retryable error from LLM Provider Service: "
+                                    f"status={response.status}, error={error_data.get('error', 'Unknown')}"
+                                )
+                                # Create proper exception with details
+                                raise aiohttp.ClientResponseError(
+                                    request_info=response.request_info,
+                                    history=response.history,
+                                    status=response.status,
+                                    message=error_data.get("error", str(response.status)),
+                                    headers=response.headers
+                                )
+                        except json.JSONDecodeError:
+                            # If we can't parse JSON, use status code to decide
+                            if response.status in [429, 500, 502, 503, 504]:
+                                logger.warning(
+                                    f"Retryable HTTP error (no JSON body): status={response.status}"
+                                )
+                                response.raise_for_status()
+                        
+                        # Non-retryable error - return error tuple
                         return await self._handle_error_response(response.status, response_text)
 
             except aiohttp.ClientError as e:
-                error_msg = f"HTTP request failed: {str(e)}"
-                logger.error(error_msg)
-                return None, error_msg
+                # Re-raise to let retry manager handle it
+                raise
             except Exception as e:
                 error_msg = f"Unexpected error calling LLM Provider Service: {str(e)}"
                 logger.exception(error_msg)

@@ -1,117 +1,45 @@
-# Rule 077: Service Anti-Patterns to Avoid
+---
+description: Critical anti-patterns that cause production failures and their corrections
+globs: 
+alwaysApply: true
+---
+# 077: Service Anti-Patterns
 
-## Overview
-
-This rule documents anti-patterns discovered across HuleEdu services and their corrections. These patterns violate architectural principles, create maintenance issues, or prevent proper production deployment.
-
-## 1. Infrastructure Client Anti-Patterns
+## Infrastructure Client Anti-Patterns
 
 ### ❌ Direct Infrastructure Imports
-
-**Anti-pattern**:
 ```python
-# WRONG - Direct import
+# WRONG
 from redis.asyncio import Redis
-from aiokafka import AIOKafkaProducer
-import aiohttp
-
 redis = Redis(host="redis", port=6379)
-producer = AIOKafkaProducer(bootstrap_servers="kafka:9092")
-```
 
-**✅ Correct Pattern**:
-```python
-# RIGHT - Use service libraries
+# RIGHT
 from huleedu_service_libs import RedisClient, KafkaBus
-from huleedu_service_libs.protocols import RedisClientProtocol, KafkaPublisherProtocol
-
-# In DI provider
-redis_client = RedisClient(client_id="service-redis")
-kafka_bus = KafkaBus(client_id="service-producer")
+from huleedu_service_libs.protocols import RedisClientProtocol
 ```
 
 ### ❌ Missing Lifecycle Management
-
-**Anti-pattern**:
 ```python
-# WRONG - No lifecycle management
+# WRONG - No lifecycle
 @provide(scope=Scope.APP)
 async def provide_redis(settings: Settings) -> RedisClientProtocol:
     return RedisClient(client_id="service", redis_url=settings.REDIS_URL)
-```
 
-**✅ Correct Pattern**:
-```python
 # RIGHT - Proper lifecycle
 @provide(scope=Scope.APP)
 async def provide_redis(settings: Settings) -> RedisClientProtocol:
     client = RedisClient(client_id="service", redis_url=settings.REDIS_URL)
     await client.start()  # REQUIRED
     return client
-
-# In teardown
-await client.stop()  # REQUIRED
 ```
 
-## 2. Logging Anti-Patterns
-
-### ❌ Standard Library Logging
-
-**Anti-pattern**:
-```python
-# WRONG - Standard library
-import logging
-logger = logging.getLogger(__name__)
-logger.info(f"Processing {event_id}")
-```
-
-**✅ Correct Pattern**:
-```python
-# RIGHT - Service library structured logging
-from huleedu_service_libs.logging_utils import create_service_logger
-logger = create_service_logger("service.module")
-logger.info("Processing event", event_id=event_id, user_id=user_id)
-```
-
-### ❌ Logger Import in Functions
-
-**Anti-pattern** (found in CJ Assessment Service):
-```python
-async def health_check():
-    try:
-        # ...
-    except Exception as e:
-        from huleedu_service_libs.logging_utils import create_service_logger
-        logger = create_service_logger("service")  # WRONG
-```
-
-**✅ Correct Pattern**:
-```python
-# Module level import
-from huleedu_service_libs.logging_utils import create_service_logger
-logger = create_service_logger("service.api.health")
-
-async def health_check():
-    try:
-        # ...
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-```
-
-## 3. Health Endpoint Anti-Patterns
+## Health Endpoint Anti-Patterns
 
 ### ❌ Inconsistent Health Endpoints
-
-**Anti-pattern** (Class Management Service):
 ```python
-# WRONG - PostgreSQL service without database health endpoints
+# WRONG - PostgreSQL service without database health
 @health_bp.route("/healthz")  # Only basic health
-async def health_check():
-    # Missing /healthz/database and /healthz/database/summary
-```
 
-**✅ Correct Pattern**:
-```python
 # RIGHT - Full three-tier for PostgreSQL services
 @health_bp.route("/healthz")
 @health_bp.route("/healthz/database")
@@ -119,308 +47,150 @@ async def health_check():
 ```
 
 ### ❌ Hardcoded Values
-
-**Anti-pattern**:
 ```python
-# WRONG - Hardcoded environment
-health_response = {
-    "service": "class_management",  # Hardcoded
-    "environment": "development",    # Hardcoded
-    "version": "1.0.0"              # Hardcoded
-}
+# WRONG
+health_response = {"service": "class_management", "environment": "development"}
+
+# RIGHT
+health_response = {"service": settings.SERVICE_NAME, "environment": settings.ENVIRONMENT}
 ```
 
-**✅ Correct Pattern**:
-```python
-# RIGHT - From settings
-health_response = {
-    "service": settings.SERVICE_NAME,
-    "environment": settings.ENVIRONMENT,
-    "version": settings.SERVICE_VERSION
-}
-```
-
-### ❌ Missing Database Engine Storage
-
-**Anti-pattern**:
-```python
-# WRONG - Engine not stored on app
-engine = create_async_engine(settings.DATABASE_URL)
-# Missing: app.database_engine = engine
-```
-
-**✅ Correct Pattern**:
-```python
-# RIGHT - Store for health checks
-engine = create_async_engine(settings.DATABASE_URL)
-app.database_engine = engine
-app.health_checker = DatabaseHealthChecker(engine, settings.SERVICE_NAME)
-```
-
-## 4. Event Processing Anti-Patterns
+## Event Processing Anti-Patterns
 
 ### ❌ Missing Idempotency
-
-**Anti-pattern**:
 ```python
-# WRONG - No idempotency check
+# WRONG
 async def handle_message(msg: ConsumerRecord):
-    envelope = EventEnvelope.model_validate_json(msg.value)
     await process_event(envelope)  # Might process duplicates
-```
 
-**✅ Correct Pattern**:
-```python
-# RIGHT - Idempotent consumer
-from huleedu_service_libs.idempotency import idempotent_consumer
-
+# RIGHT
 @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
 async def handle_message(msg: ConsumerRecord):
-    envelope = EventEnvelope.model_validate_json(msg.value)
     await process_event(envelope)  # Automatically prevents duplicates
 ```
 
 ### ❌ Missing Trace Context
-
-**Anti-pattern**:
 ```python
-# WRONG - No trace propagation
-envelope = EventEnvelope(
-    event_type="ESSAY_SUBMITTED",
-    source_service="essay_service",
-    data=event_data
-)
-await kafka_bus.publish(topic, envelope)
+# WRONG
+envelope = EventEnvelope(event_type="ESSAY_SUBMITTED", data=event_data)
+
+# RIGHT  
+envelope = EventEnvelope(event_type="ESSAY_SUBMITTED", data=event_data)
+inject_trace_context(envelope)
 ```
 
-**✅ Correct Pattern**:
+## Database Anti-Patterns
+
+### ❌ Shared Engine Instances
 ```python
-# RIGHT - Trace context propagation
-from huleedu_service_libs.observability import inject_trace_context
-
-envelope = EventEnvelope(
-    event_type="ESSAY_SUBMITTED",
-    source_service="essay_service",
-    data=event_data,
-    metadata={}
-)
-inject_trace_context(envelope.metadata)
-await kafka_bus.publish(topic, envelope)
-```
-
-## 5. Database Anti-Patterns
-
-### ❌ Using create_all() Instead of Migrations
-
-**Anti-pattern**:
-```python
-# WRONG - Direct schema creation
-async with engine.begin() as conn:
-    await conn.run_sync(Base.metadata.create_all)
-```
-
-**✅ Correct Pattern**:
-```python
-# RIGHT - Use Alembic migrations
-from alembic.config import Config
-from alembic import command
-
-alembic_cfg = Config("alembic.ini")
-command.upgrade(alembic_cfg, "head")
-```
-
-### ❌ Missing Database Monitoring
-
-**Anti-pattern**:
-```python
-# WRONG - No monitoring setup
-engine = create_async_engine(settings.DATABASE_URL)
-# Missing database metrics
-```
-
-**✅ Correct Pattern**:
-```python
-# RIGHT - Setup monitoring
-from huleedu_service_libs.database import setup_database_monitoring
-
-engine = create_async_engine(settings.DATABASE_URL)
-db_metrics = setup_database_monitoring(engine, settings.SERVICE_NAME)
-app.extensions["db_metrics"] = db_metrics
-```
-
-## 6. Dependency Injection Anti-Patterns
-
-### ❌ Resource Leaks in Providers
-
-**Anti-pattern**:
-```python
-# WRONG - No cleanup
+# WRONG - Shared across DI scopes
 @provide(scope=Scope.APP)
-async def provide_http_client() -> aiohttp.ClientSession:
-    return aiohttp.ClientSession()  # Who closes this?
-```
+async def provide_engine() -> AsyncEngine:
+    return create_async_engine(settings.DATABASE_URL)
 
-**✅ Correct Pattern**:
-```python
-# RIGHT - Managed lifecycle
+@provide(scope=Scope.REQUEST) 
+async def provide_session(engine: FromDishka[AsyncEngine]) -> AsyncSession:
+    return AsyncSession(engine)  # MissingGreenlet errors
+
+# RIGHT - Repository-managed sessions
 @provide(scope=Scope.APP)
-async def provide_http_client() -> aiohttp.ClientSession:
-    session = aiohttp.ClientSession(
-        timeout=aiohttp.ClientTimeout(total=30)
-    )
-    yield session
-    await session.close()  # Cleanup on shutdown
+async def provide_repository(engine: FromDishka[AsyncEngine]) -> RepositoryProtocol:
+    return PostgreSQLRepositoryImpl(engine)  # Repository creates own sessionmaker
 ```
 
-### ❌ Missing Circuit Breakers
-
-**Anti-pattern**:
+### ❌ Direct Session Usage
 ```python
-# WRONG - Direct external service usage
+# WRONG - Direct session in DI
+async def create_student(session: FromDishka[AsyncSession], data: CreateStudentRequest):
+    student = Student(**data.model_dump())
+    session.add(student)
+    await session.commit()  # DetachedInstanceError
+
+# RIGHT - Repository pattern
+async def create_student(repo: FromDishka[RepositoryProtocol], data: CreateStudentRequest):
+    return await repo.create_student(data)  # Repository manages session lifecycle
+```
+
+## Dependency Injection Anti-Patterns
+
+### ❌ Factory Functions Without Scoping
+```python
+# WRONG - No scoping
+@provide
+async def create_client() -> RedisClientProtocol:
+    return RedisClient()  # New instance per request
+
+# RIGHT - Proper scoping
 @provide(scope=Scope.APP)
-async def provide_llm_client(settings: Settings) -> LLMProtocol:
-    return OpenAIClient(api_key=settings.OPENAI_API_KEY)
+async def create_client() -> RedisClientProtocol:
+    return RedisClient()  # Singleton
 ```
 
-**✅ Correct Pattern**:
+### ❌ Missing Protocol Contracts
 ```python
-# RIGHT - Wrapped with circuit breaker
-from huleedu_service_libs.resilience import CircuitBreaker, make_resilient
+# WRONG - Direct class dependency
+async def process(publisher: KafkaEventPublisher):
+    await publisher.publish(event)
 
-@provide(scope=Scope.APP)
-async def provide_llm_client(
-    settings: Settings,
-    metrics: ServiceMetrics
-) -> LLMProtocol:
-    client = OpenAIClient(api_key=settings.OPENAI_API_KEY)
-    breaker = CircuitBreaker(
-        name="openai",
-        failure_threshold=3,
-        recovery_timeout=timedelta(seconds=60),
-        metrics=metrics.circuit_breaker
-    )
-    return make_resilient(client, breaker)
+# RIGHT - Protocol dependency
+async def process(publisher: EventPublisherProtocol):
+    await publisher.publish(event)
 ```
 
-## 7. Metrics Anti-Patterns
+## Configuration Anti-Patterns
 
-### ❌ Multiple Registry Instances
-
-**Anti-pattern**:
+### ❌ Hardcoded Settings
 ```python
-# WRONG - Creates multiple registries
-from prometheus_client import Counter, Histogram, REGISTRY
+# WRONG
+kafka_client = KafkaBus(bootstrap_servers="kafka:9092")
 
-# In different modules
-request_count = Counter(...)  # Uses default REGISTRY
-request_duration = Histogram(...)  # Uses default REGISTRY
+# RIGHT
+kafka_client = KafkaBus(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS)
 ```
 
-**✅ Correct Pattern**:
+### ❌ Missing Environment Prefixes
 ```python
-# RIGHT - Single registry via DI
-@provide(scope=Scope.APP)
-def provide_registry() -> CollectorRegistry:
-    return CollectorRegistry()
-
-@provide(scope=Scope.APP)
-def provide_metrics(registry: CollectorRegistry) -> ServiceMetrics:
-    return ServiceMetrics(registry)
-```
-
-### ❌ Inconsistent Label Names
-
-**Anti-pattern**:
-```python
-# WRONG - Different label names
-# File Service
-labels=["method", "endpoint", "status"]
-# Other services
-labels=["method", "endpoint", "status_code"]
-```
-
-**✅ Correct Pattern**:
-```python
-# RIGHT - Consistent labels
-labels=["method", "endpoint", "status_code"]  # Always status_code
-```
-
-## 8. Configuration Anti-Patterns
-
-### ❌ Direct Config Property Access
-
-**Anti-pattern** (Spell Checker Service):
-```python
-# WRONG - Direct property
+# WRONG - Global settings
 class Settings(BaseSettings):
-    DATABASE_URL: str  # Used directly in alembic
-```
+    DB_HOST: str = "localhost"
 
-**✅ Correct Pattern**:
-```python
-# RIGHT - Property method
+# RIGHT - Service-specific prefix
 class Settings(BaseSettings):
-    DB_HOST: str
-    DB_PORT: int
-    DB_NAME: str
-    DB_USER: str
-    DB_PASSWORD: str
-    
-    @property
-    def database_url(self) -> str:
-        """Database URL for Alembic migration configuration."""
-        return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+    model_config = SettingsConfigDict(env_prefix="SERVICE_NAME_")
+    DB_HOST: str = "localhost"
 ```
 
-## 9. Startup Anti-Patterns
-
-### ❌ Silent Startup Failures
-
-**Anti-pattern**:
-```python
-# WRONG - Swallows errors
-try:
-    await setup_database(app, settings)
-except Exception as e:
-    logger.error(f"Database setup failed: {e}")
-    # Continues running with broken state
-```
-
-**✅ Correct Pattern**:
-```python
-# RIGHT - Fail fast
-try:
-    await setup_database(app, settings)
-except Exception as e:
-    logger.critical(f"Failed to initialize database: {e}")
-    raise  # Stop startup
-```
-
-## 10. Testing Anti-Patterns
+## Testing Anti-Patterns
 
 ### ❌ Testing Concrete Implementations
-
-**Anti-pattern**:
 ```python
-# WRONG - Mocking concrete class
-mock_redis = AsyncMock(spec=RedisClient)
+# WRONG
+def test_service(real_repository: PostgreSQLRepositoryImpl):
+    pass
+
+# RIGHT
+def test_service(mock_repository: AsyncMock(spec=RepositoryProtocol)):
+    pass
 ```
 
-**✅ Correct Pattern**:
+### ❌ Missing Prometheus Registry Cleanup
 ```python
-# RIGHT - Mock the protocol
-mock_redis = AsyncMock(spec=RedisClientProtocol)
+# WRONG - Registry conflicts between tests
+def test_metrics():
+    metric = Counter("test_counter")  # ValueError on second test
+
+# RIGHT - Registry cleanup
+@pytest.fixture(autouse=True)
+def _clear_prometheus_registry():
+    collectors = list(REGISTRY._collector_to_names.keys())
+    for collector in collectors:
+        REGISTRY.unregister(collector)
 ```
 
-## Summary
+## Critical Production Issues
 
-These anti-patterns were discovered through analysis of actual service implementations. Key themes:
-
-1. **Always use service libraries** - Never import infrastructure directly
-2. **Lifecycle management is mandatory** - Always start() and stop()
-3. **Consistency across services** - Same patterns everywhere
-4. **Fail fast on errors** - Don't hide startup failures
-5. **Monitor everything** - Database, HTTP, circuit breakers
-6. **Test protocols, not implementations** - Better isolation
-
-Following these patterns ensures production readiness and maintainability across all HuleEdu services.
+1. **MissingGreenlet**: Use repository-managed sessions, not DI-injected sessions
+2. **DetachedInstanceError**: Use `selectinload()` for relationships
+3. **Memory Leaks**: Implement proper lifecycle management for infrastructure clients
+4. **Duplicate Events**: Use `@idempotent_consumer` for all event handlers
+5. **Connection Pool Exhaustion**: Scope dependencies correctly (`APP` vs `REQUEST`)

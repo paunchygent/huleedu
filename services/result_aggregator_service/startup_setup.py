@@ -7,15 +7,15 @@ import signal
 from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.quart_app import HuleEduApp
 from prometheus_client import start_http_server
-from quart import Quart
 
 from services.result_aggregator_service.config import Settings
 
 logger = create_service_logger("result_aggregator.startup")
 
 
-def setup_metrics_endpoint(app: Quart) -> None:
+def setup_metrics_endpoint(app: HuleEduApp) -> None:
     """Setup Prometheus metrics endpoint on separate port."""
 
     @app.before_serving
@@ -29,7 +29,7 @@ def setup_metrics_endpoint(app: Quart) -> None:
         logger.info(f"Metrics server started on port {settings.METRICS_PORT}")
 
 
-def setup_signal_handlers(app: Quart) -> None:
+def setup_signal_handlers(app: HuleEduApp) -> None:
     """Setup graceful shutdown signal handlers."""
 
     async def graceful_shutdown() -> None:
@@ -37,8 +37,7 @@ def setup_signal_handlers(app: Quart) -> None:
         logger.info("Initiating graceful shutdown...")
 
         # Close container resources
-        if hasattr(app, "container"):
-            await app.container.close()
+        await app.container.close()
 
         logger.info("Graceful shutdown complete")
 

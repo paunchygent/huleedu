@@ -53,12 +53,6 @@ class DatabaseProvider(Provider):
     def provide_sessionmaker(self, engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
         return async_sessionmaker(engine, expire_on_commit=False)
 
-    @provide(scope=Scope.REQUEST)
-    async def provide_session(
-        self, sessionmaker: async_sessionmaker[AsyncSession]
-    ) -> AsyncGenerator[AsyncSession, None]:
-        async with sessionmaker() as session:
-            yield session
 
     @provide(scope=Scope.APP)
     def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
@@ -69,16 +63,16 @@ class DatabaseProvider(Provider):
 
 
 class RepositoryProvider(Provider):
-    @provide(scope=Scope.REQUEST)
+    @provide(scope=Scope.APP)
     def provide_class_repository(
         self,
         settings: Settings,
-        session: AsyncSession,
+        engine: AsyncEngine,
         database_metrics: DatabaseMetrics,
     ) -> ClassRepositoryProtocol[UserClass, Student]:
         if settings.ENVIRONMENT == "test" or settings.USE_MOCK_REPOSITORY:
             return MockClassRepositoryImpl[UserClass, Student]()
-        return PostgreSQLClassRepositoryImpl[UserClass, Student](session, database_metrics)
+        return PostgreSQLClassRepositoryImpl[UserClass, Student](engine, database_metrics)
 
 
 class ServiceProvider(Provider):
@@ -149,8 +143,11 @@ class ServiceProvider(Provider):
         async def _shutdown_redis() -> None:
             await redis_client.stop()
 
-        # TODO Note: In production, this would be registered with the app lifecycle
-        # For now, we rely on container cleanup
+        # Register with app shutdown via weakref to avoid circular references
+        # Store the shutdown function for cleanup
+        if not hasattr(self, '_redis_shutdown_handlers'):
+            self._redis_shutdown_handlers = []
+        self._redis_shutdown_handlers.append(_shutdown_redis)
 
         return cast(AtomicRedisClientProtocol, redis_client)
 
@@ -175,6 +172,19 @@ class ServiceProvider(Provider):
             student_type=Student,
         )
 
+    async def shutdown_resources(self) -> None:
+        """Shutdown Redis and other async resources managed by this provider."""
+        if hasattr(self, '_redis_shutdown_handlers'):
+            for shutdown_handler in self._redis_shutdown_handlers:
+                try:
+                    await shutdown_handler()
+                except Exception as e:
+                    # Log but don't raise to ensure all resources are cleaned up
+                    from huleedu_service_libs.logging_utils import create_service_logger
+                    logger = create_service_logger("cms.di.shutdown")
+                    logger.error(f"Failed to shutdown Redis connection: {e}")
+            self._redis_shutdown_handlers.clear()
+
 
 class MetricsProvider(Provider):
     """Provides Prometheus metrics-related dependencies."""
@@ -192,9 +202,22 @@ class MetricsProvider(Provider):
 
 def create_container() -> AsyncContainer:
     """Create and configure the application's dependency injection container."""
+    # Store provider reference for cleanup
+    global _service_provider
+    _service_provider = ServiceProvider()
+    
     return make_async_container(
         DatabaseProvider(),
         RepositoryProvider(),
-        ServiceProvider(),
+        _service_provider,
         MetricsProvider(),
     )
+
+# Global reference for cleanup
+_service_provider: ServiceProvider | None = None
+
+async def shutdown_container_resources() -> None:
+    """Shutdown async resources managed by providers."""
+    global _service_provider
+    if _service_provider:
+        await _service_provider.shutdown_resources()

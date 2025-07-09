@@ -1,38 +1,24 @@
 from __future__ import annotations
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from quart import Quart
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from huleedu_service_libs.quart_app import HuleEduApp
+from sqlalchemy.ext.asyncio import AsyncEngine
 
-from services.class_management_service.config import Settings
 from services.class_management_service.models_db import Base
 
 logger = create_service_logger("cms.startup")
 
 
-async def initialize_database_schema(app: Quart, settings: Settings) -> AsyncEngine:
-    """Initialize the database schema and return the engine for health checks."""
+async def initialize_database_schema(app: HuleEduApp) -> AsyncEngine:
+    """Initialize the database schema using the app's existing engine."""
     try:
         logger.info("Initializing database schema...")
 
-        if not settings.DATABASE_URL:
-            raise ValueError("DATABASE_URL is required but not configured")
-
-        engine = create_async_engine(
-            settings.DATABASE_URL,
-            echo=False,
-            future=True,
-            pool_size=settings.DATABASE_POOL_SIZE,
-            max_overflow=settings.DATABASE_MAX_OVERFLOW,
-            pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
-            pool_recycle=settings.DATABASE_POOL_RECYCLE,
-        )
+        # Use the engine already set in create_app (guaranteed to exist)
+        engine = app.database_engine
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-
-        # Store engine on app for health checks
-        setattr(app, "database_engine", engine)
 
         logger.info("Database schema initialized successfully")
         return engine
@@ -43,4 +29,12 @@ async def initialize_database_schema(app: Quart, settings: Settings) -> AsyncEng
 
 async def shutdown_services() -> None:
     """Gracefully shutdown all services."""
+    try:
+        # Shutdown Redis and other async resources
+        from services.class_management_service.di import shutdown_container_resources
+        await shutdown_container_resources()
+        logger.info("Container resources shutdown completed")
+    except Exception as e:
+        logger.error(f"Error during container resource shutdown: {e}")
+    
     logger.info("Class Management Service shutdown completed")

@@ -38,6 +38,18 @@ class ErrorCode(str, Enum):
     PROCESSING_ERROR = "PROCESSING_ERROR"  # Internal processing failures
 
 
+class ClassManagementErrorCode(str, Enum):
+    """
+    Specific error codes for Class Management Service.
+    """
+    
+    COURSE_NOT_FOUND = "COURSE_NOT_FOUND"
+    COURSE_VALIDATION_ERROR = "COURSE_VALIDATION_ERROR"
+    MULTIPLE_COURSE_ERROR = "MULTIPLE_COURSE_ERROR"
+    CLASS_NOT_FOUND = "CLASS_NOT_FOUND"
+    STUDENT_NOT_FOUND = "STUDENT_NOT_FOUND"
+
+
 class FileValidationErrorCode(str, Enum):
     """
     Specific error codes for file validation failures.

@@ -225,4 +225,4 @@ All standard development tasks are executed via PDM scripts defined in the root 
 
 ### **`Docker & Service Management Tips`**
 
-- **DO NOT RESTART SERVICES AFTER CODE CHANGES; ALWAYS `docker compose up -d --build {service with code changes}`**
+- **DO NOT RESTART SERVICES AFTER CODE CHANGES; ALWAYS `docker compose build --no-cache {service with code changes}`**

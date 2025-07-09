@@ -709,53 +709,50 @@ The `HuleEduApp` class provides type-safe infrastructure attributes with compile
 
 ```python
 class HuleEduApp(Quart):
-    """Type-safe Quart application with HuleEdu infrastructure."""
+    """Type-safe Quart application with guaranteed HuleEdu infrastructure."""
     
-    # Core Infrastructure (all services)
-    database_engine: Optional[AsyncEngine]
+    # GUARANTEED INFRASTRUCTURE (Non-Optional) - All services MUST provide these
+    database_engine: AsyncEngine
+    container: AsyncContainer
     extensions: dict[str, Any]
     
-    # Distributed Tracing
-    tracer: Optional[Tracer]
-    
-    # Dependency Injection
-    container: Optional[AsyncContainer]
-    
-    # Background Processing (service-specific)
-    consumer_task: Optional[asyncio.Task[None]]
-    kafka_consumer: Optional[Any]
+    # OPTIONAL INFRASTRUCTURE (Service-Specific) - May be absent
+    tracer: Optional[Tracer] = None
+    consumer_task: Optional[asyncio.Task[None]] = None
+    kafka_consumer: Optional[Any] = None
     
     def __init__(self, import_name: str, *args, **kwargs) -> None
 ```
 
 #### Infrastructure Attributes
 
-##### Core Infrastructure (All Services)
+##### Guaranteed Infrastructure (All Services)
 
-**`database_engine: Optional[AsyncEngine]`**
+**`database_engine: AsyncEngine`**
 - **Purpose**: SQLAlchemy async engine for database operations
-- **Usage**: Set during service initialization, accessed in health checks
+- **Usage**: MUST be set during service initialization, accessed in health checks
 - **Type**: `sqlalchemy.ext.asyncio.AsyncEngine`
+- **Contract**: NON-OPTIONAL - All services must provide this
+
+**`container: AsyncContainer`**
+- **Purpose**: Dishka async container for dependency injection
+- **Usage**: MUST be set during service initialization for protocol-based dependency resolution
+- **Type**: `dishka.AsyncContainer`
+- **Contract**: NON-OPTIONAL - All services must provide this
 
 **`extensions: dict[str, Any]`**  
 - **Purpose**: Standard Quart extensions dictionary
 - **Usage**: Store app-level objects like metrics, tracer instances
 - **Type**: `dict[str, Any]`
-- **Pattern**: Follows standard Quart extension registration
+- **Contract**: GUARANTEED PRESENT - Initialized to empty dict
 
-##### Distributed Tracing
+##### Optional Infrastructure (Service-Specific)
 
-**`tracer: Optional[Tracer]`**
+**`tracer: Optional[Tracer] = None`**
 - **Purpose**: OpenTelemetry tracer for distributed tracing
 - **Usage**: Services participating in distributed tracing
 - **Type**: `opentelemetry.trace.Tracer`
-
-##### Dependency Injection
-
-**`container: Optional[AsyncContainer]`**
-- **Purpose**: Dishka async container for dependency injection
-- **Usage**: Protocol-based dependency resolution and lifecycle management
-- **Type**: `dishka.AsyncContainer`
+- **Contract**: OPTIONAL - May be absent
 
 ##### Background Processing (Service-Specific)
 
@@ -771,55 +768,56 @@ class HuleEduApp(Quart):
 
 #### Usage Examples
 
-##### Basic Usage
+##### Guaranteed Initialization Pattern
 
 ```python
-from huleedu_service_libs import HuleEduApp
-from sqlalchemy.ext.asyncio import create_async_engine
-
-# Create type-safe app
-app = HuleEduApp(__name__)
-
-# Set infrastructure (type-safe)
-engine = create_async_engine(DATABASE_URL)
-app.database_engine = engine  # ✅ Type-safe assignment
-
-# Access infrastructure (type-safe)
-engine = app.database_engine  # ✅ IDE autocomplete, type checking
-```
-
-##### Startup Setup Pattern
-
-```python
-# startup_setup.py - RECOMMENDED PATTERN
 from huleedu_service_libs import HuleEduApp
 from dishka import make_async_container
+from sqlalchemy.ext.asyncio import create_async_engine
 
-async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
-    """Initialize all service infrastructure with type safety."""
+def create_app() -> HuleEduApp:
+    """Create app with guaranteed infrastructure initialization."""
+    app = HuleEduApp(__name__)
     
-    # Database setup
-    engine = create_async_engine(settings.DATABASE_URL)
-    await initialize_database_schema(engine)
-    app.database_engine = engine  # Type-safe assignment
+    # IMMEDIATE initialization - satisfies non-optional contract
+    app.database_engine = create_async_engine(DATABASE_URL)
+    app.container = make_async_container(ServiceProvider())
     
-    # Dependency injection
-    container = make_async_container(ServiceProvider())
-    app.container = container
-    
-    # Distributed tracing
-    tracer = init_tracing(settings.SERVICE_NAME)
-    app.tracer = tracer
-    
-    # Standard extensions
+    # Extensions already initialized to empty dict
     app.extensions["metrics"] = setup_metrics()
-    app.extensions["QUART_DISHKA"] = QuartDishka(app=app, container=container)
+    
+    return app
+
+# Type-safe access (no None checks needed)
+app = create_app()
+engine = app.database_engine  # ✅ Guaranteed to exist
+async with app.container() as request_container:  # ✅ No None check needed
+    # Access dependencies
+    pass
+```
+
+##### Migration from Optional Pattern
+
+```python
+# OLD (defensive programming with Optional types):
+if current_app.database_engine is not None:
+    engine = current_app.database_engine
+    # Use engine...
+
+if current_app.container is not None:
+    async with current_app.container() as request_container:
+        # Use container...
+
+# NEW (confident access with guaranteed types):
+engine = current_app.database_engine  # No None check needed
+async with current_app.container() as request_container:  # No None check needed
+    # Use container...
 ```
 
 ##### Health Check Pattern
 
 ```python
-# health_routes.py - MIGRATION FROM getattr()
+# health_routes.py - TYPE-SAFE WITH GUARANTEED INFRASTRUCTURE
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -828,21 +826,20 @@ if TYPE_CHECKING:
 
 @health_bp.route("/healthz")
 async def health_check():
-    """Type-safe health check with no runtime attribute errors."""
+    """Type-safe health check with guaranteed infrastructure."""
     
-    # OLD (anti-pattern):
+    # OLD (anti-pattern with getattr):
     # engine = getattr(current_app, "database_engine", None)
+    # if engine is None: return error
     
-    # NEW (type-safe):
-    engine = current_app.database_engine  # ✅ Compile-time verified
+    # OLD (defensive programming with Optional):
+    # if current_app.database_engine is not None:
+    #     engine = current_app.database_engine
     
-    if engine is None:
-        return jsonify({
-            "status": "error", 
-            "database": "not configured"
-        }), 500
+    # NEW (confident access with guaranteed types):
+    engine = current_app.database_engine  # ✅ Guaranteed to exist
     
-    # Use typed engine for health check
+    # Use typed engine for health check (no None check needed)
     health_checker = DatabaseHealthChecker(engine, "service_name")
     summary = await health_checker.get_health_summary()
     
@@ -881,42 +878,65 @@ async def shutdown_background_tasks():
 
 #### Migration Guide
 
-##### From setattr/getattr to Type-Safe Attributes
+##### From Optional to Guaranteed Types
 
-**Step 1: Update App Creation**
+**Step 1: Update App Creation to Guaranteed Initialization**
 
 ```python
-# Before (anti-pattern)
-from quart import Quart
-app = Quart(__name__)
+# Before (Optional pattern)
+from huleedu_service_libs import HuleEduApp
+def create_app() -> HuleEduApp:
+    app = HuleEduApp(__name__)
+    # ... setup code ...
+    app.database_engine = engine  # Set later
+    app.container = container     # Set later
+    return app
 
-# After (type-safe)
-from huleedu_service_libs import HuleEduApp  
-app = HuleEduApp(__name__)
+# After (guaranteed initialization)
+def create_app() -> HuleEduApp:
+    app = HuleEduApp(__name__)
+    
+    # IMMEDIATE initialization - satisfies non-optional contract
+    app.database_engine = create_async_engine(DATABASE_URL)
+    app.container = make_async_container(ServiceProvider())
+    
+    return app
 ```
 
-**Step 2: Replace setattr() Calls**
+**Step 2: Remove Defensive None Checks**
 
 ```python
-# Before (anti-pattern)
-setattr(app, "database_engine", engine)
-setattr(app, "tracer", tracer)
+# Before (Optional pattern - defensive programming)
+if current_app.database_engine is not None:
+    engine = current_app.database_engine
+    # Use engine...
 
-# After (type-safe)
-app.database_engine = engine
-app.tracer = tracer
+if current_app.container is not None:
+    async with current_app.container() as request_container:
+        # Use container...
+
+# After (guaranteed types - confident access)
+engine = current_app.database_engine  # No None check needed
+async with current_app.container() as request_container:  # No None check needed
+    # Use container...
 ```
 
-**Step 3: Replace getattr() Calls**
+**Step 3: Update Health Checks**
 
 ```python
-# Before (anti-pattern)
-engine = getattr(current_app, "database_engine", None)
-tracer = getattr(current_app, "tracer", None)
+# Before (defensive programming)
+@health_bp.route("/healthz")
+async def health_check():
+    engine = current_app.database_engine
+    if engine is None:
+        return jsonify({"status": "error", "database": "not configured"}), 500
+    # Use engine...
 
-# After (type-safe)
-engine = current_app.database_engine
-tracer = current_app.tracer
+# After (guaranteed contract)
+@health_bp.route("/healthz")
+async def health_check():
+    engine = current_app.database_engine  # Guaranteed to exist
+    # Use engine directly...
 ```
 
 **Step 4: Add Type Hints for IDE Support**
@@ -942,36 +962,41 @@ Based on task document analysis:
 
 #### Benefits
 
-##### Type Safety
-- **Compile-time verification**: MyPy catches attribute access errors
+##### Type Safety & Reliability
+- **Compile-time verification**: MyPy catches attribute access errors before runtime
+- **Guaranteed infrastructure**: No `None` checks needed for core components
 - **IDE autocomplete**: Full IntelliSense support for app attributes
 - **Refactoring safety**: Rename operations work across entire codebase
 
 ##### Development Experience
 - **No more AttributeError**: Runtime errors become compile-time errors
-- **Self-documenting**: Attribute types are explicit in class definition
+- **No defensive programming**: Eliminate `if x is not None:` checks
+- **Self-documenting**: Attribute types and contracts are explicit in class definition
 - **Debugging efficiency**: Clear attribute names and types in debugger
 
 ##### Architectural Compliance
 - **DDD Principle Alignment**: Infrastructure dependencies explicitly declared
 - **Clean Code Standards**: No magic strings or runtime attribute access
 - **Protocol-Based Design**: Clear interfaces for all infrastructure components
+- **Explicit Contracts**: Non-optional infrastructure enforces architectural discipline
 
 #### Best Practices
 
-1. **Initialize all attributes in `__init__`**: All attributes start as `None` for type safety
-2. **Use TYPE_CHECKING imports**: Add type hints for `current_app` in route files
-3. **Follow startup patterns**: Initialize infrastructure in dedicated `startup_setup.py`
-4. **Graceful shutdown**: Always clean up background tasks and resources
-5. **Keep attributes focused**: Only cross-cutting infrastructure, no service-specific state
+1. **Guaranteed initialization in create_app()**: Set database_engine and container immediately
+2. **No defensive programming**: Don't check for None on guaranteed infrastructure
+3. **Use TYPE_CHECKING imports**: Add type hints for `current_app` in route files
+4. **Follow startup patterns**: Initialize infrastructure in dedicated `startup_setup.py`
+5. **Graceful shutdown**: Always clean up background tasks and resources
+6. **Keep attributes focused**: Only cross-cutting infrastructure, no service-specific state
 
 #### Anti-Patterns to Avoid
 
 1. **Don't add service-specific attributes**: HuleEduApp is for cross-cutting concerns only
 2. **Don't bypass type system**: No `setattr()/getattr()` on HuleEduApp instances
 3. **Don't forget TYPE_CHECKING**: Add type hints for optimal IDE support
-4. **Don't skip initialization**: Always initialize all attributes to proper values
-5. **Don't store business logic**: Infrastructure only, no domain-specific objects
+4. **Don't skip guaranteed initialization**: Always set database_engine and container immediately
+5. **Don't use defensive programming**: No `if x is not None:` checks on guaranteed infrastructure
+6. **Don't store business logic**: Infrastructure only, no domain-specific objects
 
 #### Architectural Discipline
 

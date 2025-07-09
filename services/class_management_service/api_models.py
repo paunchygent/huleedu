@@ -14,12 +14,12 @@ from common_core.metadata_models import ParsedNameMetadata, PersonNameV1
 
 class CreateClassRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    course_codes: list[CourseCode]
+    course_codes: list[CourseCode] = Field(..., min_length=1, description="At least one course code is required")
 
 
 class UpdateClassRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
-    course_codes: list[CourseCode] | None = None
+    course_codes: list[CourseCode] | None = Field(None, min_length=1, description="At least one course code is required if provided")
 
 
 class CreateStudentRequest(BaseModel):

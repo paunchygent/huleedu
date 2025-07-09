@@ -16,6 +16,11 @@ from services.class_management_service.api_models import (
 from services.class_management_service.metrics import CmsMetrics
 from services.class_management_service.models_db import Student, UserClass
 from services.class_management_service.protocols import ClassManagementServiceProtocol
+from services.class_management_service.exceptions import (
+    CourseNotFoundError,
+    MultipleCourseError,
+    ClassManagementServiceError,
+)
 
 logger = create_service_logger("class_management_service.api.class")
 class_bp = Blueprint("class_routes", __name__)
@@ -46,6 +51,33 @@ async def create_class(
             ).inc()
             metrics.class_creations_total.inc()
             return jsonify({"id": str(new_class.id), "name": new_class.name}), 201
+        except CourseNotFoundError as e:
+            logger.warning(f"Course not found during class creation: {e.message}")
+            metrics.http_requests_total.labels(
+                method="POST", endpoint="/v1/classes/", http_status=400
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint="/v1/classes/", error_type="course_not_found"
+            ).inc()
+            return jsonify({"error": e.message, "error_code": e.error_code}), 400
+        except MultipleCourseError as e:
+            logger.warning(f"Multiple courses provided during class creation: {e.message}")
+            metrics.http_requests_total.labels(
+                method="POST", endpoint="/v1/classes/", http_status=400
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint="/v1/classes/", error_type="multiple_course_error"
+            ).inc()
+            return jsonify({"error": e.message, "error_code": e.error_code}), 400
+        except ClassManagementServiceError as e:
+            logger.warning(f"Class management service error during creation: {e.message}")
+            metrics.http_requests_total.labels(
+                method="POST", endpoint="/v1/classes/", http_status=400
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint="/v1/classes/", error_type="service_error"
+            ).inc()
+            return jsonify({"error": e.message, "error_code": e.error_code}), 400
         except Exception as e:
             logger.error(f"Error creating class: {e}", exc_info=True)
             metrics.http_requests_total.labels(
@@ -168,6 +200,33 @@ async def update_class(
                 endpoint=f"/v1/classes/{class_id}", error_type="bad_request"
             ).inc()
             return jsonify({"error": "Invalid class ID format"}), 400
+        except CourseNotFoundError as e:
+            logger.warning(f"Course not found during class update: {e.message}")
+            metrics.http_requests_total.labels(
+                method="PUT", endpoint=f"/v1/classes/{class_id}", http_status=400
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint=f"/v1/classes/{class_id}", error_type="course_not_found"
+            ).inc()
+            return jsonify({"error": e.message, "error_code": e.error_code}), 400
+        except MultipleCourseError as e:
+            logger.warning(f"Multiple courses provided during class update: {e.message}")
+            metrics.http_requests_total.labels(
+                method="PUT", endpoint=f"/v1/classes/{class_id}", http_status=400
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint=f"/v1/classes/{class_id}", error_type="multiple_course_error"
+            ).inc()
+            return jsonify({"error": e.message, "error_code": e.error_code}), 400
+        except ClassManagementServiceError as e:
+            logger.warning(f"Class management service error during update: {e.message}")
+            metrics.http_requests_total.labels(
+                method="PUT", endpoint=f"/v1/classes/{class_id}", http_status=400
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint=f"/v1/classes/{class_id}", error_type="service_error"
+            ).inc()
+            return jsonify({"error": e.message, "error_code": e.error_code}), 400
         except Exception as e:
             logger.error(f"Error updating class: {e}", exc_info=True)
             metrics.http_requests_total.labels(

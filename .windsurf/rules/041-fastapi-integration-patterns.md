@@ -1,25 +1,21 @@
 ---
-description: Defines concise FastAPI integration patterns for client-facing services, ensuring compliance with HuleEdu's core architecture.
+description: FastAPI integration patterns for client-facing services with HuleEdu architecture compliance
 globs: []
 alwaysApply: false
 ---
 # 041: FastAPI Integration Patterns
 
-## 1. Overview
+## Overview
 
-This rule provides patterns for building client-facing services with FastAPI. FastAPI is an approved exception for services that directly support the React frontend, due to its robust tooling and OpenAPI generation. All internal services **MUST** use Quart.
+FastAPI is approved ONLY for client-facing services that directly support React frontend. All internal services **MUST** use Quart.
 
-**Key Principles**:
--   **DI First**: Use Dishka for dependency injection, consistent with other services.
--   **Service Libs**: Integrate standard HuleEdu libraries for Kafka, logging, and metrics.
--   **Clear Contracts**: Define explicit Pydantic models for all requests, responses, and errors.
--   **Testability**: Ensure dependencies can be easily mocked for testing.
+**Key Requirements:**
+- **DI First**: Use Dishka for dependency injection
+- **Service Libs**: Integrate standard HuleEdu libraries (Kafka, logging, metrics)  
+- **Clear Contracts**: Explicit Pydantic models for requests/responses/errors
+- **Testability**: Dependencies easily mocked for testing
 
-## 2. Core Structure & Integration
-
-### 2.1. Directory Structure
-
-A typical FastAPI service follows this layout:
+## Core Structure
 
 ```
 services/<fastapi_service>/
@@ -31,257 +27,238 @@ services/<fastapi_service>/
 ├── models/
 │   ├── requests.py
 │   └── responses.py
-├── protocols.py            # Behavioral contracts (Protocols)
+├── protocols.py            # Behavioral contracts
 ├── implementations/
-│   └── <protocol>_impl.py
 ├── di.py                   # Dishka providers
 ├── config.py
 └── tests/
 ```
 
-### 2.2. Application Setup (`main.py`)
-
-The entrypoint configures DI, middleware, and routers.
+## Application Setup
 
 ```python
 # main.py
 from fastapi import FastAPI
 from dishka.integrations.fastapi import setup_dishka
 from .startup_setup import create_di_container
-from .routers import health_router, domain_router
 
-app = FastAPI(title="Client-Facing Service")
+app = FastAPI(title="Service Name", version="1.0.0")
 
-# 1. Create and set up DI container
-container = create_di_container()
-setup_dishka(container, app)
+@app.on_event("startup")
+async def startup():
+    container = create_di_container()
+    setup_dishka(container, app)
 
-# 2. Add middleware (e.g., CORS)
-app.add_middleware(...)
+# startup_setup.py
+from dishka import make_async_container
+from huleedu_service_libs.observability import setup_observability
 
-# 3. Register routers
-app.include_router(health_router)
-app.include_router(domain_router, prefix="/v1")
-
-# 4. Add startup/shutdown logic
-@app.on_event("shutdown")
-async def shutdown():
-    await container.close()
+def create_di_container():
+    container = make_async_container(ServiceProvider())
+    setup_observability(container)
+    return container
 ```
 
-### 2.3. Dependency Injection (`di.py`)
-
-Use Dishka providers to manage dependencies like database connections, Kafka clients, and other services.
+## Router Patterns
 
 ```python
-# di.py
-from dishka import Provider, Scope, provide
-from huleedu_service_libs.kafka_client import KafkaBus
-from .protocols import EventPublisherProtocol
-from .implementations import DefaultEventPublisher
-
-class FastAPIServiceProvider(Provider):
-    @provide(scope=Scope.APP)
-    async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
-        # ... setup and return KafkaBus instance
-    
-    @provide(scope=Scope.REQUEST)
-    def provide_event_publisher(self, kafka_bus: KafkaBus) -> EventPublisherProtocol:
-        return DefaultEventPublisher(kafka_bus)
-```
-
-### 2.4. Routers & Endpoints
-
-Use `APIRouter` to group related endpoints. Inject dependencies using `FromDishka`.
-
-```python
-# routers/health_routes.py
-from fastapi import APIRouter
+# routers/domain_routes.py
+from fastapi import APIRouter, Depends
 from dishka.integrations.fastapi import FromDishka
-from prometheus_client import CollectorRegistry, generate_latest
 
-health_router = APIRouter(tags=["Health"])
+router = APIRouter(prefix="/api/v1", tags=["domain"])
 
-@health_router.get("/metrics")
-async def metrics(registry: FromDishka[CollectorRegistry]):
-    return PlainTextResponse(generate_latest(registry))
+@router.post("/endpoint", response_model=ResponseModel)
+async def create_resource(
+    request: RequestModel,
+    service: FromDishka[ServiceProtocol],
+) -> ResponseModel:
+    result = await service.process(request)
+    return ResponseModel.from_domain(result)
+
+@router.get("/endpoint/{resource_id}")
+async def get_resource(
+    resource_id: str,
+    service: FromDishka[ServiceProtocol],
+) -> ResponseModel:
+    result = await service.get_by_id(resource_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    return ResponseModel.from_domain(result)
 ```
 
-## 3. Frontend Integration (React)
-
-### 3.1. CORS
-
-CORS **MUST** be configured to allow requests from the React frontend's origins.
+## Error Handling
 
 ```python
-# main.py
+# Custom exception handlers
+from fastapi import HTTPException
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(ValidationError)
+async def validation_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "Validation error", "errors": exc.errors()}
+    )
+
+@app.exception_handler(DomainError)
+async def domain_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc), "error_code": exc.error_code}
+    )
+```
+
+## Frontend Integration (React)
+
+```python
+# CORS configuration for React frontend
 from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS, # e.g., ["http://localhost:3000"]
+    allow_origins=["http://localhost:3000"],  # React dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Response models for frontend consumption
+class StudentResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    created_at: datetime
+    
+    @classmethod
+    def from_domain(cls, student: Student) -> "StudentResponse":
+        return cls(
+            id=str(student.id),
+            name=student.full_name,
+            email=student.email,
+            created_at=student.created_at
+        )
 ```
 
-### 3.2. Pydantic Models
-
-Use clear Pydantic models for all API boundaries.
+## Observability Integration
 
 ```python
-# models/requests.py
-from pydantic import BaseModel, Field
+# Metrics integration
+from huleedu_service_libs.observability import create_service_metrics
+from prometheus_client import generate_latest
 
-class PipelineRequest(BaseModel):
-    batch_id: str = Field(..., min_length=1)
-    pipeline_name: str
+@app.on_event("startup")
+async def setup_metrics():
+    app.state.metrics = create_service_metrics("service_name")
 
-# models/responses.py
-class AcceptedResponse(BaseModel):
-    message: str
-    correlation_id: str
-    status: str = "accepted"
+@app.get("/metrics")
+async def get_metrics():
+    return Response(generate_latest(), media_type="text/plain")
+
+# Distributed tracing
+from huleedu_service_libs.observability import trace_request
+
+@router.post("/endpoint")
+@trace_request("endpoint_operation")
+async def traced_endpoint(
+    request: RequestModel,
+    service: FromDishka[ServiceProtocol],
+):
+    return await service.process(request)
 ```
 
-## 4. Observability Integration
-
-### 4.1. Metrics Implementation
-**MUST** implement comprehensive metrics following established patterns:
-
-```python
-# app/metrics.py
-from prometheus_client import Counter, Histogram
-
-class ServiceMetrics:
-    def __init__(self) -> None:
-        self.http_requests_total = Counter(
-            "service_http_requests_total",
-            "Total HTTP requests",
-            ["method", "endpoint", "http_status"]
-        )
-        self.http_request_duration_seconds = Histogram(
-            "service_http_request_duration_seconds", 
-            "HTTP request duration",
-            ["method", "endpoint"]
-        )
-
-# di.py
-@provide(scope=Scope.APP)
-def provide_metrics(self) -> ServiceMetrics:
-    return ServiceMetrics()
-
-@provide(scope=Scope.APP) 
-def provide_registry(self) -> CollectorRegistry:
-    return REGISTRY
-```
-
-### 4.2. Health and Metrics Endpoints
-**MUST** provide standard observability endpoints:
+## Health Endpoints
 
 ```python
 # routers/health_routes.py
 from fastapi import APIRouter
-from fastapi.responses import PlainTextResponse
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from huleedu_service_libs.database import DatabaseHealthChecker
 
-router = APIRouter(tags=["Health"])
+health_router = APIRouter(tags=["health"])
 
-@router.get("/healthz")
-async def health_check() -> dict[str, str]:
-    return {"status": "ok", "message": "Service is healthy"}
+@health_router.get("/healthz")
+async def health_check():
+    return {
+        "service": "service_name",
+        "status": "healthy",
+        "environment": settings.ENVIRONMENT.value,
+    }
 
-@router.get("/metrics")
-@inject
-async def metrics(registry: FromDishka[CollectorRegistry]) -> PlainTextResponse:
-    metrics_data = generate_latest(registry)
-    return PlainTextResponse(content=metrics_data, media_type=CONTENT_TYPE_LATEST)
-```
-
-### 4.3. Route Instrumentation
-**MUST** instrument all routes with metrics:
-
-```python
-@router.post("/endpoint")
-@inject
-async def handler(
-    metrics: FromDishka[ServiceMetrics],
-    # other dependencies
+@health_router.get("/healthz/database")
+async def database_health(
+    health_checker: FromDishka[DatabaseHealthChecker],
 ):
-    endpoint = "/endpoint"
-    with metrics.http_request_duration_seconds.labels(method="POST", endpoint=endpoint).time():
-        try:
-            # ... business logic ...
-            metrics.http_requests_total.labels(method="POST", endpoint=endpoint, http_status="200").inc()
-            return result
-        except HTTPException:
-            raise  # Let FastAPI handle HTTP exceptions
-        except Exception as e:
-            metrics.http_requests_total.labels(method="POST", endpoint=endpoint, http_status="500").inc()
-            raise HTTPException(status_code=500, detail="Internal server error") from e
+    health_data = await health_checker.check_detailed_health()
+    status_code = 200 if health_data["healthy"] else 503
+    return Response(
+        content=json.dumps(health_data),
+        status_code=status_code,
+        media_type="application/json"
+    )
 ```
 
-## 5. Testing
-
-### 5.1. Test Provider Setup
-**MUST** include metrics providers in test setup and clear registry between tests:
+## Testing Patterns
 
 ```python
-# tests/test_api.py
-from fastapi.testclient import TestClient
+# tests/conftest.py
+import pytest
 from dishka import make_async_container
-from prometheus_client import CollectorRegistry
-
-class MockProvider(Provider):
-    @provide
-    def provide_metrics(self) -> ServiceMetrics:
-        return ServiceMetrics()
-    
-    @provide
-    def provide_registry(self) -> CollectorRegistry:
-        from prometheus_client import REGISTRY
-        return REGISTRY
-
-@pytest.fixture(autouse=True)
-def _clear_prometheus_registry():
-    """Clear Prometheus registry before each test to avoid collisions."""
-    from prometheus_client import REGISTRY
-    collectors = list(REGISTRY._collector_to_names.keys())
-    for collector in collectors:
-        REGISTRY.unregister(collector)
-    yield
+from fastapi.testclient import TestClient
 
 @pytest.fixture
-async def client():
-    container = make_async_container(MockProvider())
-    # ... setup test client with container
-    yield client
-    await container.close()
+def test_container():
+    """Test DI container with mocked dependencies."""
+    return make_async_container(TestServiceProvider())
+
+@pytest.fixture
+def client(test_container):
+    """FastAPI test client with test container."""
+    app.dependency_overrides[get_container] = lambda: test_container
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides.clear()
+
+# tests/test_api.py
+def test_create_resource(client, mock_service):
+    response = client.post("/api/v1/endpoint", json={"name": "test"})
+    assert response.status_code == 201
+    mock_service.process.assert_called_once()
 ```
 
-### 5.2. Integration Testing
-Use `respx` for mocking downstream HTTP services:
+## DI Provider Pattern
 
 ```python
-@pytest.mark.asyncio
-async def test_proxy_endpoint(client: AsyncClient, respx_mock: MockRouter):
-    downstream_url = "http://downstream_service:8000/api/endpoint"
-    mock_route = respx_mock.get(downstream_url).mock(
-        return_value=Response(200, json={"result": "success"})
-    )
+# di.py
+from dishka import Provider, provide, Scope
+from huleedu_service_libs import RedisClient, KafkaBus
+
+class ServiceProvider(Provider):
+    @provide(scope=Scope.APP)
+    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
+        client = RedisClient(client_id="service", redis_url=settings.REDIS_URL)
+        await client.start()
+        return client
     
-    response = await client.get("/v1/proxy/endpoint")
+    @provide(scope=Scope.APP)  
+    async def provide_kafka_bus(self, settings: Settings) -> KafkaPublisherProtocol:
+        bus = KafkaBus(client_id="service", bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS)
+        await bus.start()
+        return bus
     
-    assert response.status_code == 200
-    assert mock_route.called
+    @provide(scope=Scope.REQUEST)
+    async def provide_service(
+        self,
+        repository: RepositoryProtocol,
+        publisher: EventPublisherProtocol,
+    ) -> ServiceProtocol:
+        return ServiceImpl(repository, publisher)
 ```
 
-## 5. Compliance Summary
+## Compliance Requirements
 
--   **Framework**: FastAPI for client-facing, Quart for internal.
--   **DI**: Dishka with `Provider` classes.
--   **Libraries**: Use `huleedu_service_libs` for Kafka and logging.
--   **Contracts**: Use `typing.Protocol` for business logic interfaces.
--   **Models**: Strict Pydantic models for requests/responses.
--   **Deployment**: Use Uvicorn and provide a `/healthz` endpoint.
+1. **DI Framework**: MUST use Dishka for all dependencies
+2. **Service Libraries**: MUST use HuleEdu service libraries for infrastructure
+3. **Protocol Contracts**: MUST define behavioral contracts using `typing.Protocol`
+4. **Error Handling**: MUST implement custom exception handlers for domain errors
+5. **Observability**: MUST integrate metrics, tracing, and health endpoints
+6. **Testing**: MUST support dependency injection in tests with mocked protocols

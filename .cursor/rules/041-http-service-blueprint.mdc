@@ -1,94 +1,90 @@
 ---
-description: Defines all HTTP (Quart-based) service architectural patterns and directory structure.
+description: Defines all HTTP (HuleEduApp-based) service architectural patterns and directory structure.
 globs: 
 alwaysApply: false
 ---
 # 041: HTTP Service Blueprint
 
-## 1. Purpose
-Defines all HTTP (Quart-based) service architectural patterns and directory structure.
+## HuleEduApp Requirements
 
-**See also**: [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc) for core stack requirements.
+**app.py** (<150 LOC):
+- HuleEduApp initialization with guaranteed contracts
+- Dishka container setup
+- Blueprint registration
+- Startup/shutdown hooks
+- NO route definitions
 
-## 2. HTTP Service Blueprint Architecture **MANDATORY**
-
-### 2.1. Blueprint Pattern Requirements
-**ALL HTTP services (Quart-based) MUST follow this architecture:**
-
-- **app.py MUST** be lean (< 150 lines) and focused on:
-  - Quart app initialization
-  - Dependency injection setup with Dishka
-  - Blueprint registration
-  - Global middleware (metrics, logging, error handling)
-  - Startup/shutdown hooks
-- **FORBIDDEN**: Direct route definitions in app.py
-
-### 2.2. API Directory Structure **REQUIRED**
-```python
+## Directory Structure
+```
 services/<service_name>/
-├── app.py                          # Lean application setup
-├── api/                            # **REQUIRED** Blueprint routes directory
-│   ├── __init__.py
-│   ├── health_routes.py            # **REQUIRED** /healthz, /metrics endpoints
-│   └── <domain>_routes.py          # Domain-specific routes (e.g., content_routes.py)
-├── config.py                       # Pydantic settings
-├── protocols.py                    # Service behavioral contracts
-└── di.py                          # Dishka DI providers (if needed)
+├── app.py                # HuleEduApp setup
+├── api/                  # REQUIRED
+│   ├── health_routes.py  # REQUIRED
+│   └── <domain>_routes.py
+├── config.py            # Pydantic settings
+├── protocols.py         # typing.Protocol contracts
+└── di.py               # Dishka providers
 ```
 
-### 2.3. Blueprint Implementation Standards
+## Health Routes Pattern
 
-#### health_routes.py - **REQUIRED** for all HTTP services:
 ```python
-"""Health and metrics routes for [Service Name]."""
-from quart import Blueprint, Response, jsonify
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+# health_routes.py (REQUIRED)
+from typing import TYPE_CHECKING
+from quart import Blueprint, current_app
 
-health_bp = Blueprint('health_routes', __name__)
+if TYPE_CHECKING:
+    from huleedu_service_libs.quart_app import HuleEduApp
+
+health_bp = Blueprint('health', __name__)
 
 @health_bp.route("/healthz")
-async def health_check() -> Response:
-    """Health check endpoint."""
-    # Service-specific health validation logic
-    return jsonify({"status": "ok", "message": "[Service] is healthy"}), 200
-
-@health_bp.route("/metrics")
-async def metrics() -> Response:
-    """Prometheus metrics endpoint."""
-    metrics_data = generate_latest()
-    return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
+async def health_check():
+    if TYPE_CHECKING:
+        assert isinstance(current_app, HuleEduApp)
+    
+    # Guaranteed attributes (non-optional)
+    engine = current_app.database_engine
+    container = current_app.container
+    
+    # Health check logic
+    return jsonify({"status": "healthy"}), 200
 ```
 
-#### Domain-specific route files:
-- **MUST** define Blueprint with descriptive name (e.g., `content_bp`, `batch_bp`)
-- **MUST** focus on HTTP request/response handling only
-- **MUST** delegate business logic to protocol implementations
-- **Dependencies MUST** be injected via module functions from app.py
+## App Initialization Pattern
 
-#### app.py Blueprint Registration Pattern:
 ```python
-# Import Blueprints
-from .api.health_routes import health_bp
-from .api.content_routes import content_bp, set_content_dependencies
+# app.py
+from huleedu_service_libs.quart_app import HuleEduApp
 
-# Register Blueprints
-app.register_blueprint(health_bp)
-app.register_blueprint(content_bp)
-
-# Share dependencies with Blueprints
-@app.before_serving
-async def startup():
-    # Initialize dependencies
-    set_content_dependencies(store_root, metrics)
+def create_app() -> HuleEduApp:
+    app = HuleEduApp(__name__)
+    
+    # Guaranteed initialization (REQUIRED)
+    app.container = create_container()
+    app.database_engine = create_async_engine(settings.DATABASE_URL)
+    
+    # Register blueprints
+    app.register_blueprint(health_bp)
+    app.register_blueprint(domain_bp)
+    
+    return app
 ```
 
-## 3. API Design Standards
-- RESTful principles
-- Pydantic models for request/response schemas
-- API versioning (`/v1/...`)
-- `ErrorInfoModel` for standardized error responses
+## Test Fixture Pattern
 
-## 4. State Management
-- Each service owns its primary entities' state
-- State changes **MUST** be communicated via events
-- Follow state transition logic from Architectural Design Blueprint
+```python
+# tests/test_api_integration.py
+@pytest.fixture
+async def app_client():
+    container = make_async_container(TestProvider())
+    
+    # REQUIRED for HuleEduApp contract
+    app.container = container
+    app.database_engine = AsyncMock(spec=AsyncEngine)
+    
+    QuartDishka(app=app, container=container)
+    
+    async with app.test_client() as client:
+        yield client
+```

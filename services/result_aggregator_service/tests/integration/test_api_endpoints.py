@@ -9,7 +9,7 @@ import pytest
 from dishka import Provider, Scope, make_async_container, provide
 from huleedu_service_libs.protocols import RedisClientProtocol
 from prometheus_client import REGISTRY, CollectorRegistry
-from quart import Quart
+from huleedu_service_libs.quart_app import HuleEduApp
 from quart.testing import QuartClient
 from quart_dishka import QuartDishka
 
@@ -118,16 +118,24 @@ def test_provider() -> MockDIProvider:
 
 
 @pytest.fixture
-async def app(test_provider: MockDIProvider) -> Quart:
-    """Create test Quart app with dependency injection."""
-    app = Quart(__name__)
+async def app(test_provider: MockDIProvider) -> HuleEduApp:
+    """Create test HuleEduApp with dependency injection."""
+    app = HuleEduApp(__name__)
+
+    # IMMEDIATE initialization - satisfies non-optional contract
+    container = make_async_container(test_provider)
+    app.container = container
+    
+    # Mock database engine for testing
+    from unittest.mock import AsyncMock
+    from sqlalchemy.ext.asyncio import AsyncEngine
+    app.database_engine = AsyncMock(spec=AsyncEngine)
 
     # Register blueprints
     app.register_blueprint(health_bp)
     app.register_blueprint(query_bp)
 
-    # Setup DI container
-    container = make_async_container(test_provider)
+    # Setup DI integration
     QuartDishka(app=app, container=container)
 
     # Store provider for test access
@@ -137,7 +145,7 @@ async def app(test_provider: MockDIProvider) -> Quart:
 
 
 @pytest.fixture
-def client(app: Quart) -> QuartClient:
+def client(app: HuleEduApp) -> QuartClient:
     """Create test client."""
     return app.test_client()  # type: ignore[return-value]
 
@@ -231,7 +239,7 @@ class TestQueryEndpoints:
     async def test_get_batch_status_success(
         self,
         client: QuartClient,
-        app: Quart,
+        app: HuleEduApp,
         test_provider: MockDIProvider,
     ) -> None:
         """Test successful batch status retrieval."""
@@ -290,7 +298,7 @@ class TestQueryEndpoints:
     async def test_get_batch_status_not_found(
         self,
         client: QuartClient,
-        app: Quart,
+        app: HuleEduApp,
         test_provider: MockDIProvider,
     ) -> None:
         """Test batch status retrieval when batch doesn't exist."""
@@ -362,7 +370,7 @@ class TestQueryEndpoints:
     async def test_get_user_batches_success(
         self,
         client: QuartClient,
-        app: Quart,
+        app: HuleEduApp,
         test_provider: MockDIProvider,
     ) -> None:
         """Test successful user batches retrieval."""
@@ -412,7 +420,7 @@ class TestQueryEndpoints:
     async def test_get_user_batches_with_pagination(
         self,
         client: QuartClient,
-        app: Quart,
+        app: HuleEduApp,
         test_provider: MockDIProvider,
     ) -> None:
         """Test user batches retrieval with pagination parameters."""
@@ -458,7 +466,7 @@ class TestQueryEndpoints:
     async def test_get_user_batches_with_status_filter(
         self,
         client: QuartClient,
-        app: Quart,
+        app: HuleEduApp,
         test_provider: MockDIProvider,
     ) -> None:
         """Test user batches retrieval with status filter."""
@@ -505,7 +513,7 @@ class TestQueryEndpoints:
     async def test_get_user_batches_empty_result(
         self,
         client: QuartClient,
-        app: Quart,
+        app: HuleEduApp,
         test_provider: MockDIProvider,
     ) -> None:
         """Test user batches retrieval with no results."""
@@ -531,7 +539,7 @@ class TestQueryEndpoints:
     async def test_get_user_batches_service_error(
         self,
         client: QuartClient,
-        app: Quart,
+        app: HuleEduApp,
         test_provider: MockDIProvider,
     ) -> None:
         """Test user batches retrieval when service raises error."""

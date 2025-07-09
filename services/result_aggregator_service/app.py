@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
 
 import dotenv
-from dishka import AsyncContainer, make_async_container
+from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
-from quart import Quart
+from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -32,34 +31,34 @@ from services.result_aggregator_service.startup_setup import setup_metrics_endpo
 logger = create_service_logger("result_aggregator.app")
 
 
-class ResultAggregatorApp(Quart):
-    """Custom Quart app with typed application-specific attributes."""
-
-    container: AsyncContainer
-    consumer_task: Optional[asyncio.Task[None]]
-    database_engine: AsyncEngine
-
-
-def create_app() -> ResultAggregatorApp:
+def create_app() -> HuleEduApp:
     """Create and configure the Quart application."""
-    app = ResultAggregatorApp(__name__)
+    app = HuleEduApp(__name__)
 
     # CORS is handled by API Gateway - internal services don't need it
 
-    # Create DI container
-    container = make_async_container(
+    # IMMEDIATE container initialization - satisfies non-optional contract
+    app.container = make_async_container(
         CoreInfrastructureProvider(), DatabaseProvider(), ServiceProvider()
     )
 
-    # Setup Dishka integration
-    QuartDishka(app=app, container=container)
+    # IMMEDIATE database engine initialization - satisfies non-optional contract
+    # We need to get the engine from the container immediately
+    import asyncio
+    loop = asyncio.get_event_loop()
+    
+    async def get_engine() -> AsyncEngine:
+        async with app.container() as request_container:
+            return await request_container.get(AsyncEngine)
+    
+    app.database_engine = loop.run_until_complete(get_engine())
+
+    # Use guaranteed container
+    QuartDishka(app=app, container=app.container)
 
     # Register blueprints
     app.register_blueprint(health_bp)
     app.register_blueprint(query_bp)
-
-    # Store container reference
-    app.container = container
 
     # Setup metrics endpoint
     setup_metrics_endpoint(app)
@@ -74,15 +73,12 @@ app = create_app()
 async def startup() -> None:
     """Initialize services on startup."""
     try:
-        # Initialize database schema and setup engine
+        # Initialize database schema using existing engine and setup Kafka consumer
         async with app.container() as request_container:
             settings = await request_container.get(Settings)
             batch_repository = await request_container.get(BatchRepositoryProtocol)
             await batch_repository.initialize_schema()
             logger.info("Database schema initialized")
-
-            # Store database engine for health checks
-            app.database_engine = await request_container.get(AsyncEngine)
 
             # Get Kafka consumer
             consumer = await request_container.get(ResultAggregatorKafkaConsumer)
@@ -106,7 +102,7 @@ async def shutdown() -> None:
     """Gracefully shutdown services."""
     try:
         # Stop Kafka consumer
-        if hasattr(app, "consumer_task") and app.consumer_task is not None:
+        if app.consumer_task is not None:
             async with app.container() as request_container:
                 consumer = await request_container.get(ResultAggregatorKafkaConsumer)
             await consumer.stop()
