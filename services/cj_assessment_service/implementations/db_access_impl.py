@@ -15,9 +15,10 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from common_core.error_enums import ErrorCode
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-from services.cj_assessment_service.models_api import ComparisonResult
+from services.cj_assessment_service.models_api import ComparisonResult, ErrorDetail
 from services.cj_assessment_service.models_db import (
     Base,
     CJBatchUpload,
@@ -197,14 +198,12 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
 
             # Extract error details if available
             error_code = None
-            error_message = None
             error_correlation_id = None
             error_timestamp = None
             error_service = None
             error_details = None
             if result.error_detail:
-                error_code = result.error_detail.error_code.value
-                error_message = result.error_detail.message
+                error_code = result.error_detail.error_code
                 error_correlation_id = result.error_detail.correlation_id
                 error_timestamp = result.error_detail.timestamp
                 error_service = result.error_detail.service
@@ -220,7 +219,6 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
                 justification=justification,
                 raw_llm_response=None,  # Can be added later if needed
                 error_code=error_code,
-                error_message=error_message,
                 error_correlation_id=error_correlation_id,
                 error_timestamp=error_timestamp,
                 error_service=error_service,
@@ -290,3 +288,38 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             )
 
         return rankings
+
+    async def get_comparison_errors(self, cj_batch_id: str) -> list[ErrorDetail]:
+        """Retrieve all error details for a CJ batch."""
+        async with self.session() as session:
+            result = await session.execute(
+                select(ComparisonPair)
+                .where(ComparisonPair.cj_batch_id == cj_batch_id)
+                .where(ComparisonPair.error_code.is_not(None))
+            )
+            pairs = result.scalars().all()
+            return [self._reconstruct_error_detail(pair) for pair in pairs if self._can_reconstruct_error(pair)]
+
+    def _can_reconstruct_error(self, pair: ComparisonPair) -> bool:
+        """Check if a ComparisonPair has sufficient data to reconstruct an ErrorDetail."""
+        return (pair.error_code is not None and 
+                pair.error_correlation_id is not None and 
+                pair.error_timestamp is not None and 
+                pair.error_service is not None)
+
+    def _reconstruct_error_detail(self, pair: ComparisonPair) -> ErrorDetail:
+        """Reconstruct ErrorDetail from database fields."""
+        # This method should only be called after _can_reconstruct_error returns True
+        assert pair.error_code is not None
+        assert pair.error_correlation_id is not None
+        assert pair.error_timestamp is not None
+        assert pair.error_service is not None
+        
+        return ErrorDetail(
+            error_code=pair.error_code,
+            message=pair.error_details.get('message', '') if pair.error_details else '',
+            correlation_id=pair.error_correlation_id,
+            timestamp=pair.error_timestamp,
+            service=pair.error_service,
+            details=pair.error_details or {}
+        )

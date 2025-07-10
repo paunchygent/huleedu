@@ -40,14 +40,41 @@ class TestEventProcessorOverrides:
     def mock_content_client(self, sample_essay_text: str) -> AsyncMock:
         """Create mock content client protocol."""
         client = AsyncMock(spec=ContentClientProtocol)
-        client.fetch_content = AsyncMock(return_value=sample_essay_text)
+        client.fetch_content = AsyncMock(return_value=(sample_essay_text, None))
         return client
 
     @pytest.fixture
     def mock_llm_interaction(self, sample_comparison_results: list[dict[str, Any]]) -> AsyncMock:
         """Create mock LLM interaction protocol."""
+        from services.cj_assessment_service.models_api import (
+            ComparisonResult,
+            ComparisonTask,
+            EssayForComparison,
+            LLMAssessmentResponseSchema,
+        )
+        from common_core import EssayComparisonWinner
+        
         interaction = AsyncMock(spec=LLMInteractionProtocol)
-        interaction.perform_comparisons = AsyncMock(return_value=[])
+        
+        # Create realistic mock comparison results to prevent infinite loops
+        mock_results = [
+            ComparisonResult(
+                task=ComparisonTask(
+                    essay_a=EssayForComparison(id="essay_1", text_content="Sample essay A", current_bt_score=0.5),
+                    essay_b=EssayForComparison(id="essay_2", text_content="Sample essay B", current_bt_score=0.5),
+                    prompt="Compare these essays"
+                ),
+                llm_assessment=LLMAssessmentResponseSchema(
+                    winner=EssayComparisonWinner.ESSAY_A,
+                    justification="Essay A shows better structure",
+                    confidence=3.5
+                ),
+                error_detail=None,
+                raw_llm_response_content="Essay A is better"
+            )
+        ]
+        
+        interaction.perform_comparisons = AsyncMock(return_value=mock_results)
         return interaction
 
     @pytest.fixture

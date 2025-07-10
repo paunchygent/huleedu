@@ -71,6 +71,7 @@ async def perform_iterative_comparisons(
             extra=log_extra,
         )
 
+    # Update batch status to indicate comparison processing has started
     async with database.session() as session:
         await database.update_cj_batch_status(
             session=session,
@@ -78,22 +79,24 @@ async def perform_iterative_comparisons(
             status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
         )
 
-        previous_bt_scores: dict[str, float] = {
-            essay_api.id: essay_api.current_bt_score
-            for essay_api in essays_for_api_model
-            if essay_api.current_bt_score is not None
-        }
-        total_comparisons_performed = 0
-        current_iteration = 0
-        scores_are_stable = False
+    previous_bt_scores: dict[str, float] = {
+        essay_api.id: essay_api.current_bt_score
+        for essay_api in essays_for_api_model
+        if essay_api.current_bt_score is not None
+    }
+    total_comparisons_performed = 0
+    current_iteration = 0
+    scores_are_stable = False
 
-        while (
-            total_comparisons_performed < settings.MAX_PAIRWISE_COMPARISONS
-            and not scores_are_stable
-        ):
-            current_iteration += 1
-            logger.info(f"Starting CJ Iteration {current_iteration}", extra=log_extra)
+    while (
+        total_comparisons_performed < settings.MAX_PAIRWISE_COMPARISONS
+        and not scores_are_stable
+    ):
+        current_iteration += 1
+        logger.info(f"Starting CJ Iteration {current_iteration}", extra=log_extra)
 
+        # Each iteration gets its own session/transaction to ensure reads see previous writes
+        async with database.session() as session:
             # Process single iteration
             iteration_result = await _process_comparison_iteration(
                 essays_for_api_model=essays_for_api_model,
@@ -135,18 +138,17 @@ async def perform_iterative_comparisons(
             )
 
             previous_bt_scores = current_bt_scores_dict.copy()
-            await session.commit()
-            await session.begin()
+            # Session auto-commits at end of context - no manual transaction management needed
 
-        final_scores = {essay.id: essay.current_bt_score or 0.0 for essay in essays_for_api_model}
+    final_scores = {essay.id: essay.current_bt_score or 0.0 for essay in essays_for_api_model}
 
-        logger.info(
-            f"Comparison processing completed after {current_iteration} iterations, "
-            f"{total_comparisons_performed} total comparisons",
-            extra=log_extra,
-        )
+    logger.info(
+        f"Comparison processing completed after {current_iteration} iterations, "
+        f"{total_comparisons_performed} total comparisons",
+        extra=log_extra,
+    )
 
-        return final_scores
+    return final_scores
 
 
 async def _process_comparison_iteration(

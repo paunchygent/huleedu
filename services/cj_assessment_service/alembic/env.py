@@ -7,6 +7,7 @@ following the HuleEdu consolidated best practice template with service configura
 
 import asyncio
 from logging.config import fileConfig
+from typing import TYPE_CHECKING
 
 from alembic import context
 from sqlalchemy import pool
@@ -14,8 +15,11 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # Import service configuration and models
-from services.cj_assessment_service.config import settings
+from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_db import Base
+
+if TYPE_CHECKING:
+    pass
 
 # Alembic Config object
 config = context.config
@@ -25,16 +29,14 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the SQLAlchemy URL dynamically from service configuration
-config.set_main_option("sqlalchemy.url", settings.database_url)
-
-# Add your model's MetaData object here for 'autogenerate' support
+# Target metadata for autogenerate support
 target_metadata = Base.metadata
 
-# Other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# Initialize service configuration
+settings = Settings()
+
+# Set the database URL from service configuration
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 
 def run_migrations_offline() -> None:
@@ -88,7 +90,7 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
+    """Run migrations in 'online' mode using async engine."""
     asyncio.run(run_async_migrations())
 
 

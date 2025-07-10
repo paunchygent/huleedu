@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from common_core.error_enums import ErrorCode
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 
 
@@ -155,9 +156,8 @@ class ComparisonPair(Base):
     justification: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_llm_response: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Structured error fields (replacing error_message)
-    error_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Structured error fields
+    error_code: Mapped[ErrorCode | None] = mapped_column(SQLAlchemyEnum(ErrorCode), nullable=True)
     error_correlation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
     error_timestamp: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     error_service: Mapped[str | None] = mapped_column(String(100), nullable=True)

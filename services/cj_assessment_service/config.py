@@ -47,7 +47,10 @@ class Settings(BaseSettings):
         For production use, return the PostgreSQL URL from docker-compose.infrastructure.yml
         configuration (port 5434 for CJ Assessment Service).
         """
-        return "postgresql+asyncpg://huledu:huledu_password@localhost:5434/cj_assessment"
+        import os
+        db_user = os.getenv("HULEEDU_DB_USER", "huleedu_user")
+        db_password = os.getenv("HULEEDU_DB_PASSWORD", "ted5?SUCwef3-JIVres6!DEK")
+        return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5434/cj_assessment"
 
     # Default LLM provider for centralized service requests
     DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.OPENAI
