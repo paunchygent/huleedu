@@ -54,30 +54,32 @@ def mock_retry_manager() -> AsyncMock:
             # Convert HTTP errors to ErrorDetail for tests
             from datetime import datetime, timezone
             from uuid import uuid4
+
             from common_core.error_enums import ErrorCode
             from services.cj_assessment_service.models_api import ErrorDetail
-            
+
             error_detail = ErrorDetail(
                 error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
                 message=f"{e.message}: {e.status}",
                 correlation_id=uuid4(),
                 timestamp=datetime.now(timezone.utc),
-                details={"status_code": e.status}
+                details={"status_code": e.status},
             )
             return None, error_detail
         except Exception as e:
             # Convert other exceptions to ErrorDetail
             from datetime import datetime, timezone
             from uuid import uuid4
+
             from common_core.error_enums import ErrorCode
             from services.cj_assessment_service.models_api import ErrorDetail
-            
+
             error_detail = ErrorDetail(
                 error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
                 message=f"HTTP request failed: {str(e)}",
                 correlation_id=uuid4(),
                 timestamp=datetime.now(timezone.utc),
-                details={"exception_type": type(e).__name__}
+                details={"exception_type": type(e).__name__},
             )
             return None, error_detail
 

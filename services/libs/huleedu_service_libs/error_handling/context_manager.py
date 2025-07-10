@@ -86,7 +86,7 @@ class ErrorContext:
                     self.correlation_id = str(attributes.get("correlation_id", ""))
 
 
-class EnhancedError(Exception):
+class HuleEduError(Exception):
     """Base exception with rich error context."""
 
     def __init__(self, message: str, context: ErrorContext):
@@ -103,8 +103,8 @@ class EnhancedError(Exception):
         operation: str,
         correlation_id: str,
         context_data: Optional[Dict[str, Any]] = None,
-    ) -> "EnhancedError":
-        """Create EnhancedError from an existing exception."""
+    ) -> "HuleEduError":
+        """Create HuleEduError from an existing exception."""
         error_context = ErrorContext(
             error_type=type(exception).__name__,
             error_message=str(exception),
@@ -166,13 +166,13 @@ def capture_error_context(
             try:
                 return await func(*args, **kwargs)
             except Exception as e:
-                if isinstance(e, EnhancedError):
+                if isinstance(e, HuleEduError):
                     # Already enhanced, just re-raise
                     e.record_to_span()
                     raise
                 else:
                     # Enhance the error
-                    enhanced = EnhancedError.from_exception(
+                    enhanced = HuleEduError.from_exception(
                         e,
                         service_name=service_name,
                         operation=operation,
@@ -185,13 +185,13 @@ def capture_error_context(
             try:
                 return func(*args, **kwargs)
             except Exception as e:
-                if isinstance(e, EnhancedError):
+                if isinstance(e, HuleEduError):
                     # Already enhanced, just re-raise
                     e.record_to_span()
                     raise
                 else:
                     # Enhance the error
-                    enhanced = EnhancedError.from_exception(
+                    enhanced = HuleEduError.from_exception(
                         e,
                         service_name=service_name,
                         operation=operation,

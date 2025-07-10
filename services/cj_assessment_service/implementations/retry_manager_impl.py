@@ -359,7 +359,10 @@ class RetryManagerImpl(RetryManagerProtocol):
             elif isinstance(last_exception, aiohttp.ClientResponseError):
                 return None, self._create_error_detail(
                     error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                    message=f"API error: {last_exception.status} - {last_exception.message} (after retries)",
+                    message=(
+                        f"API error: {last_exception.status} - "
+                        f"{last_exception.message} (after retries)"
+                    ),
                     correlation_id=correlation_id,
                     details={
                         "provider": provider_name,

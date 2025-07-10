@@ -80,7 +80,9 @@ def mock_boundary_services(
 ) -> tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Any]:
     """Create mock boundary services (external dependencies only)."""
     mock_content_client = AsyncMock()
-    mock_content_client.fetch_content = AsyncMock(return_value=("Sample essay content for testing CJ assessment.", None))
+    mock_content_client.fetch_content = AsyncMock(
+        return_value=("Sample essay content for testing CJ assessment.", None)
+    )
     mock_event_publisher = AsyncMock()
     mock_event_publisher.publish_assessment_completed = AsyncMock()
     mock_event_publisher.publish_assessment_failed = AsyncMock()

@@ -233,7 +233,8 @@ class TestDatabaseBulkPerformance:
 
         total_students = sum(size for _, size in class_configs)
         print(
-            f"\n👨‍🏫 Testing multi-class setup: {len(class_configs)} classes, {total_students} total students"
+            f"\n👨‍🏫 Testing multi-class setup: {len(class_configs)} classes, "
+            f"{total_students} total students"
         )
 
         start_time = time.perf_counter()
@@ -334,8 +335,8 @@ class TestDatabaseBulkPerformance:
             SELECT c.created_by_user_id,
                    COUNT(DISTINCT c.id) as class_count,
                    COUNT(DISTINCT s.id) as total_students,
-                   CASE WHEN COUNT(DISTINCT c.id) > 0 
-                        THEN COUNT(DISTINCT s.id) / COUNT(DISTINCT c.id) 
+                   CASE WHEN COUNT(DISTINCT c.id) > 0
+                        THEN COUNT(DISTINCT s.id) / COUNT(DISTINCT c.id)
                         ELSE 0 END as avg_class_size
             FROM classes c
             LEFT JOIN students s ON c.created_by_user_id = s.created_by_user_id
@@ -372,7 +373,8 @@ class TestDatabaseBulkPerformance:
                 bulk_metrics.record_complex_query(query_duration)
 
                 print(
-                    f"  🔍 Teacher {query_set_id} Query {i + 1}: {query_duration:.4f}s ({len(rows)} rows)"
+                    f"  🔍 Teacher {query_set_id} Query {i + 1}: "
+                    f"{query_duration:.4f}s ({len(rows)} rows)"
                 )
 
             return query_times
@@ -490,7 +492,8 @@ class TestDatabaseBulkPerformance:
             )
             # Note: Python doesn't immediately return memory to OS, so we check growth instead
             assert memory_increase < batch_size * 0.1, (
-                f"Total memory increase {memory_increase:.2f} MB exceeds {batch_size * 0.1:.2f} MB for {batch_size} operations"
+                f"Total memory increase {memory_increase:.2f} MB exceeds "
+                f"{batch_size * 0.1:.2f} MB for {batch_size} operations"
             )
             assert during_operation_memory < baseline_memory + 50, (
                 f"Peak memory {during_operation_memory:.2f} MB exceeds baseline + 50 MB"

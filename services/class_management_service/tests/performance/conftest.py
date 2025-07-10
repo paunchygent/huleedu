@@ -336,7 +336,6 @@ class EducationalTestDataGenerator:
 
             # Use UUID suffix to ensure global uniqueness across concurrent operations
             unique_suffix = str(uuid.uuid4()).replace("-", "")[:8]
-            student_id = f"{i + 1000:04d}-{unique_suffix}"  # Globally unique student ID
 
             # Realistic email patterns with guaranteed uniqueness
             email_patterns = [
@@ -435,7 +434,7 @@ async def performance_async_engine(
         # Seed courses (essential for performance tests)
         await conn.execute(
             text("""
-            INSERT INTO courses (id, course_code, name, language, skill_level) VALUES 
+            INSERT INTO courses (id, course_code, name, language, skill_level) VALUES
             (gen_random_uuid(), 'ENG5', 'English 5', 'en', 5),
             (gen_random_uuid(), 'ENG6', 'English 6', 'en', 6),
             (gen_random_uuid(), 'ENG7', 'English 7', 'en', 7),

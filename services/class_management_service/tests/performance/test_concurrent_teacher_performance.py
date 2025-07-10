@@ -117,7 +117,8 @@ class TestConcurrentTeacherPerformance:
             success_rate = (teacher_successes / teacher_ops * 100) if teacher_ops > 0 else 0
 
             print(
-                f"  👨‍🏫 {result['teacher_id']}: {teacher_successes}/{teacher_ops} ops ({success_rate:.1f}%) in {result['total_time']:.2f}s"
+                f"  👨‍🏫 {result['teacher_id']}: {teacher_successes}/{teacher_ops} ops "
+                f"({success_rate:.1f}%) in {result['total_time']:.2f}s"
             )
 
             total_operations += teacher_ops
@@ -311,7 +312,9 @@ class TestConcurrentTeacherPerformance:
             workload = result["workload_type"]
 
             print(
-                f"  👨‍🏫 {result['teacher_id']} ({workload}): {teacher_successes}/{teacher_ops} ops ({success_rate:.1f}%) in {result['total_time']:.2f}s"
+                f"  👨‍🏫 {result['teacher_id']} ({workload}): "
+                f"{teacher_successes}/{teacher_ops} ops ({success_rate:.1f}%) "
+                f"in {result['total_time']:.2f}s"
             )
 
             total_operations += teacher_ops
@@ -428,7 +431,8 @@ class TestConcurrentTeacherPerformance:
             response_times.extend(teacher_response_times)
 
             print(
-                f"  👨‍🏫 {result['teacher_id']}: {teacher_successes}/{teacher_ops} ops ({success_rate:.1f}%, avg: {avg_response_time:.3f}s)"
+                f"  👨‍🏫 {result['teacher_id']}: {teacher_successes}/{teacher_ops} ops "
+                f"({success_rate:.1f}%, avg: {avg_response_time:.3f}s)"
             )
 
             total_operations += teacher_ops

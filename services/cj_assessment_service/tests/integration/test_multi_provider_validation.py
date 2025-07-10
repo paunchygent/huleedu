@@ -19,7 +19,6 @@ from services.cj_assessment_service.implementations.llm_provider_service_client 
     LLMProviderServiceClient,
 )
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
-from services.cj_assessment_service.models_api import ErrorDetail
 
 
 @pytest.mark.expensive

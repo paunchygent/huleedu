@@ -81,36 +81,42 @@ def mock_boundary_services(
 ) -> tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Any]:
     """Create mock boundary services (external dependencies only)."""
     mock_content_client = AsyncMock()
-    mock_content_client.fetch_content = AsyncMock(return_value=("Sample essay content for testing CJ assessment.", None))
+    mock_content_client.fetch_content = AsyncMock(
+        return_value=("Sample essay content for testing CJ assessment.", None)
+    )
     mock_event_publisher = AsyncMock()
     mock_event_publisher.publish_assessment_completed = AsyncMock()
     mock_event_publisher.publish_assessment_failed = AsyncMock()
     mock_llm_interaction = AsyncMock()
-    
+
     # Configure mock to return valid comparison results to prevent infinite loops
+    from common_core import EssayComparisonWinner
     from services.cj_assessment_service.models_api import (
         ComparisonResult,
         ComparisonTask,
         EssayForComparison,
         LLMAssessmentResponseSchema,
     )
-    from common_core import EssayComparisonWinner
-    
+
     mock_comparison_result = ComparisonResult(
         task=ComparisonTask(
-            essay_a=EssayForComparison(id="essay_1", text_content="Sample essay A", current_bt_score=0.5),
-            essay_b=EssayForComparison(id="essay_2", text_content="Sample essay B", current_bt_score=0.5),
-            prompt="Compare these essays"
+            essay_a=EssayForComparison(
+                id="essay_1", text_content="Sample essay A", current_bt_score=0.5
+            ),
+            essay_b=EssayForComparison(
+                id="essay_2", text_content="Sample essay B", current_bt_score=0.5
+            ),
+            prompt="Compare these essays",
         ),
         llm_assessment=LLMAssessmentResponseSchema(
             winner=EssayComparisonWinner.ESSAY_A,
             justification="Essay A demonstrates better structure",
-            confidence=3.5
+            confidence=3.5,
         ),
         error_detail=None,
-        raw_llm_response_content="Essay A is better"
+        raw_llm_response_content="Essay A is better",
     )
-    
+
     mock_llm_interaction.perform_comparisons = AsyncMock(return_value=[mock_comparison_result])
 
     class Settings:

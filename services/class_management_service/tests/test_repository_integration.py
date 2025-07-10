@@ -59,7 +59,7 @@ class TestRepositoryIntegration:
             # Seed courses (essential for class creation)
             await conn.execute(
                 text("""
-                INSERT INTO courses (id, course_code, name, language, skill_level) VALUES 
+                INSERT INTO courses (id, course_code, name, language, skill_level) VALUES
                 (gen_random_uuid(), 'ENG5', 'English 5', 'en', 5),
                 (gen_random_uuid(), 'ENG6', 'English 6', 'en', 6),
                 (gen_random_uuid(), 'ENG7', 'English 7', 'en', 7),
@@ -129,7 +129,8 @@ class TestRepositoryIntegration:
         assert created_student.last_name == "Student"
         assert created_student.email == "integration.student@example.com"
 
-        # CRITICAL: Access classes relationship (this would cause DetachedInstanceError if not properly eager loaded)
+        # CRITICAL: Access classes relationship
+        # (this would cause DetachedInstanceError if not properly eager loaded)
         assert created_student.classes is not None
         assert len(created_student.classes) == 0  # New student, no classes yet
 

@@ -38,7 +38,10 @@ class MultipleCourseError(ClassManagementServiceError):
 
     def __init__(self, provided_course_codes: list[CourseCode]) -> None:
         course_codes_str = ", ".join(code.value for code in provided_course_codes)
-        message = f"Multiple courses provided ({course_codes_str}), but only one course per class is supported"
+        message = (
+            f"Multiple courses provided ({course_codes_str}), "
+            f"but only one course per class is supported"
+        )
         super().__init__(message, ClassManagementErrorCode.MULTIPLE_COURSE_ERROR.value)
         self.provided_course_codes = provided_course_codes
 

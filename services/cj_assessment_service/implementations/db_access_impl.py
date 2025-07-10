@@ -15,7 +15,6 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from common_core.error_enums import ErrorCode
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import ComparisonResult, ErrorDetail
@@ -298,14 +297,20 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
                 .where(ComparisonPair.error_code.is_not(None))
             )
             pairs = result.scalars().all()
-            return [self._reconstruct_error_detail(pair) for pair in pairs if self._can_reconstruct_error(pair)]
+            return [
+                self._reconstruct_error_detail(pair)
+                for pair in pairs
+                if self._can_reconstruct_error(pair)
+            ]
 
     def _can_reconstruct_error(self, pair: ComparisonPair) -> bool:
         """Check if a ComparisonPair has sufficient data to reconstruct an ErrorDetail."""
-        return (pair.error_code is not None and 
-                pair.error_correlation_id is not None and 
-                pair.error_timestamp is not None and 
-                pair.error_service is not None)
+        return (
+            pair.error_code is not None
+            and pair.error_correlation_id is not None
+            and pair.error_timestamp is not None
+            and pair.error_service is not None
+        )
 
     def _reconstruct_error_detail(self, pair: ComparisonPair) -> ErrorDetail:
         """Reconstruct ErrorDetail from database fields."""
@@ -314,12 +319,12 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         assert pair.error_correlation_id is not None
         assert pair.error_timestamp is not None
         assert pair.error_service is not None
-        
+
         return ErrorDetail(
             error_code=pair.error_code,
-            message=pair.error_details.get('message', '') if pair.error_details else '',
+            message=pair.error_details.get("message", "") if pair.error_details else "",
             correlation_id=pair.error_correlation_id,
             timestamp=pair.error_timestamp,
             service=pair.error_service,
-            details=pair.error_details or {}
+            details=pair.error_details or {},
         )

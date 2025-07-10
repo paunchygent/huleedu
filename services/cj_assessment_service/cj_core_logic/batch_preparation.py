@@ -116,7 +116,8 @@ async def prepare_essays_for_assessment(
 
                 if content_error:
                     logger.error(
-                        f"Failed to fetch content for essay {els_essay_id}: {content_error.message}",
+                        f"Failed to fetch content for essay {els_essay_id}: "
+                        f"{content_error.message}",
                         extra={
                             "correlation_id": correlation_id,
                             "els_essay_id": els_essay_id,

@@ -135,7 +135,8 @@ class TestSingleOperationPerformance:
         )
 
         print(
-            f"✓ Sequential operations: class={class_duration:.3f}s, avg_enrollment={avg_enrollment_time:.3f}s"
+            f"✓ Sequential operations: class={class_duration:.3f}s, "
+            f"avg_enrollment={avg_enrollment_time:.3f}s"
         )
 
     async def test_short_burst_performance(
@@ -184,7 +185,8 @@ class TestSingleOperationPerformance:
         )
 
         print(
-            f"✓ Burst operations: {success_count}/{len(class_requests)} succeeded, avg={avg_operation_time:.3f}s"
+            f"✓ Burst operations: {success_count}/{len(class_requests)} succeeded, "
+            f"avg={avg_operation_time:.3f}s"
         )
 
     async def test_database_connection_performance(
@@ -224,7 +226,8 @@ class TestSingleOperationPerformance:
 
         # Connection reuse should be at least as fast as first connection
         assert avg_subsequent <= first_duration * 1.2, (
-            f"Connection reuse not efficient: first={first_duration:.3f}s, avg={avg_subsequent:.3f}s"
+            f"Connection reuse not efficient: first={first_duration:.3f}s, "
+            f"avg={avg_subsequent:.3f}s"
         )
 
         print(

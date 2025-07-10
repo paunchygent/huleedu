@@ -22,7 +22,7 @@ from .domain_enums import (
     get_course_level,
     get_course_name,
 )
-from .error_enums import ErrorCode, FileValidationErrorCode
+from .error_enums import ClassManagementErrorCode, ErrorCode, FileValidationErrorCode
 from .essay_service_models import (
     EssayLifecycleAIFeedbackRequestV1,
     EssayLifecycleNLPRequestV1,
@@ -66,6 +66,7 @@ from .metadata_models import (
     StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
+from .models.error_models import ErrorDetail
 from .observability_enums import CacheOperation, MetricName, OperationType
 from .pipeline_models import (
     EssayProcessingCounts,
@@ -115,6 +116,8 @@ __all__ = [
     # Error Enums
     "ErrorCode",
     "FileValidationErrorCode",
+    "ClassManagementErrorCode",
+    "ErrorDetail",
     # Config Enums
     "Environment",
     "LLMProviderType",

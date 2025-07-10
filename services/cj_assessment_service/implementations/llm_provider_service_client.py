@@ -566,7 +566,9 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         # Max attempts reached
         error_detail = ErrorDetail(
             error_code=ErrorCode.TIMEOUT,
-            message=f"Maximum polling attempts ({self.settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS}) reached",
+            message=(
+                f"Maximum polling attempts ({self.settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS}) reached"
+            ),
             correlation_id=correlation_id,
             timestamp=datetime.now(UTC),
             details={

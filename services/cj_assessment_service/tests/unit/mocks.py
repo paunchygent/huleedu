@@ -79,42 +79,45 @@ class MockDatabase(CJRepositoryProtocol):
     def session(self) -> AsyncContextManager[AsyncSession]:
         """Provide async database session context manager."""
         mock_session = AsyncMock(spec=AsyncSession)
-        
+
         # Track session objects to be added
         session_objects: list[Any] = []
-        
+
         def mock_add(obj: Any) -> None:
             """Mock session.add() to store objects temporarily."""
             session_objects.append(obj)
-        
+
         async def mock_flush() -> None:
             """Mock session.flush() to persist objects to mock storage."""
             for obj in session_objects:
                 # Handle ComparisonPair objects
-                if hasattr(obj, 'cj_batch_id') and hasattr(obj, 'essay_a_els_id'):
+                if hasattr(obj, "cj_batch_id") and hasattr(obj, "essay_a_els_id"):
                     batch_id = obj.cj_batch_id
                     if batch_id not in self.comparison_pairs:
                         self.comparison_pairs[batch_id] = []
                     self.comparison_pairs[batch_id].append(obj)
             session_objects.clear()
-        
+
         async def mock_execute(stmt: Any) -> Any:
             """Mock session.execute() to return stored data based on query."""
             # Check if this is a SELECT query with columns vs SELECT entity
-            is_column_select = (hasattr(stmt, 'selected_columns') and 
-                              stmt.selected_columns and 
-                              len(stmt.selected_columns) == 2)
-            
+            is_column_select = (
+                hasattr(stmt, "selected_columns")
+                and stmt.selected_columns
+                and len(stmt.selected_columns) == 2
+            )
+
             query_str = str(stmt.compile(compile_kwargs={"literal_binds": True}))
-            
-            if 'comparison_pairs' in query_str and 'cj_batch_id' in query_str:
+
+            if "comparison_pairs" in query_str and "cj_batch_id" in query_str:
                 # Extract batch ID from query
                 import re
-                match = re.search(r'cj_batch_id = (\d+)', query_str)
+
+                match = re.search(r"cj_batch_id = (\d+)", query_str)
                 if match:
                     cj_batch_id = int(match.group(1))
                     pairs = self.comparison_pairs.get(cj_batch_id, [])
-                    
+
                     if is_column_select:
                         # This is a column-based SELECT (like pair generation)
                         # Return tuples of (essay_a_els_id, essay_b_els_id) for pair generation
@@ -123,42 +126,42 @@ class MockDatabase(CJRepositoryProtocol):
                     else:
                         # This is a full entity SELECT (like scoring)
                         # Filter out pairs with error winners for scoring queries
-                        if 'winner' in query_str and 'error' in query_str:
+                        if "winner" in query_str and "error" in query_str:
                             valid_pairs = [p for p in pairs if p.winner and p.winner != "error"]
                             return MockResult(valid_pairs)
                         return MockResult(pairs)
-            
+
             # Handle ProcessedEssay queries
-            if 'processed_essays' in query_str:
+            if "processed_essays" in query_str:
                 # Return empty list for essay queries in mock
                 return MockResult([])
-            
+
             return MockResult([])
-        
+
         # Create a proper result mock that behaves like SQLAlchemy
         class MockResult:
             def __init__(self, data: list[Any] | None = None):
                 self.data = data or []
-            
+
             def scalars(self) -> Any:
                 return MockScalars(self.data)
-            
+
             def all(self) -> list[Any]:
                 return self.data
-            
+
             def first(self) -> Any:
                 return self.data[0] if self.data else None
-        
+
         class MockScalars:
             def __init__(self, data: list[Any] | None = None):
                 self.data = data or []
-            
+
             def all(self) -> list[Any]:
                 return self.data
-            
+
             def first(self) -> Any:
                 return self.data[0] if self.data else None
-        
+
         # Configure the mock session's methods
         mock_session.add = mock_add
         mock_session.flush = AsyncMock(side_effect=mock_flush)
@@ -206,12 +209,13 @@ class MockDatabase(CJRepositoryProtocol):
         """Extract cj_batch_id from SQLAlchemy statement."""
         try:
             # Try to get WHERE clause conditions
-            if hasattr(stmt, 'whereclause') and stmt.whereclause is not None:
+            if hasattr(stmt, "whereclause") and stmt.whereclause is not None:
                 # Look for cj_batch_id comparison
                 where_str = str(stmt.whereclause)
-                if 'cj_batch_id' in where_str:
+                if "cj_batch_id" in where_str:
                     import re
-                    match = re.search(r'cj_batch_id = (\d+)', where_str)
+
+                    match = re.search(r"cj_batch_id = (\d+)", where_str)
                     if match:
                         return int(match.group(1))
             return None

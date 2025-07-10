@@ -88,10 +88,7 @@ async def perform_iterative_comparisons(
     current_iteration = 0
     scores_are_stable = False
 
-    while (
-        total_comparisons_performed < settings.MAX_PAIRWISE_COMPARISONS
-        and not scores_are_stable
-    ):
+    while total_comparisons_performed < settings.MAX_PAIRWISE_COMPARISONS and not scores_are_stable:
         current_iteration += 1
         logger.info(f"Starting CJ Iteration {current_iteration}", extra=log_extra)
 

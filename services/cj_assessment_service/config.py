@@ -48,6 +48,7 @@ class Settings(BaseSettings):
         configuration (port 5434 for CJ Assessment Service).
         """
         import os
+
         db_user = os.getenv("HULEEDU_DB_USER", "huleedu_user")
         db_password = os.getenv("HULEEDU_DB_PASSWORD", "ted5?SUCwef3-JIVres6!DEK")
         return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5434/cj_assessment"

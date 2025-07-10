@@ -313,7 +313,7 @@ async def _process_cj_assessment_impl(
                 msg.value.decode("utf-8"),
             )
             error_detail.correlation_id = envelope.correlation_id
-        except:
+        except Exception:
             pass  # correlation_id remains None if envelope parsing fails
 
         # Publish failure event
@@ -357,7 +357,7 @@ async def _process_cj_assessment_impl(
                     event=ProcessingEvent.CJ_ASSESSMENT_FAILED.value,
                     error_info=structured_error_info,
                 ),
-                cj_assessment_job_id=ErrorCode.INITIALIZATION_FAILED.value,  # No CJ job created due to failure
+                cj_assessment_job_id=ErrorCode.INITIALIZATION_FAILED.value,
             )
 
             correlation_uuid = correlation_id
