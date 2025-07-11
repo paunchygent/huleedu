@@ -185,9 +185,9 @@ class RetryManagerImpl(RetryManagerProtocol):
         Raises:
             HuleEduError: On permanent failure after all retries exhausted
         """
-        # Extract metadata from kwargs
-        provider_name = kwargs.get("provider_name", "unknown")
-        correlation_id = kwargs.get("correlation_id", uuid4())
+        # Extract metadata from kwargs and remove from operation kwargs
+        provider_name = kwargs.pop("provider_name", "unknown")
+        correlation_id = kwargs.pop("correlation_id", uuid4())
 
         if not self.settings.llm_retry_enabled:
             logger.debug(f"{provider_name}: Retries disabled. Making single API call attempt.")

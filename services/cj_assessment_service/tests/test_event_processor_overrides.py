@@ -97,8 +97,7 @@ class TestEventProcessorOverrides:
         """Create mock for core assessment workflow."""
         mock_workflow = AsyncMock()
         mock_workflow.return_value = CJAssessmentWorkflowResult(
-            rankings=sample_comparison_results,
-            batch_id="cj_batch_123"
+            rankings=sample_comparison_results, batch_id="cj_batch_123"
         )
         return mock_workflow
 

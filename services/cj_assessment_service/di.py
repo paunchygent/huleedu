@@ -15,7 +15,7 @@ from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
 from prometheus_client import REGISTRY, CollectorRegistry
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from common_core import LLMProviderType
 from services.cj_assessment_service.config import Settings
@@ -45,10 +45,20 @@ from services.cj_assessment_service.protocols import (
 class CJAssessmentServiceProvider(Provider):
     """Dishka provider for CJ Assessment Service dependencies."""
 
+    def __init__(self, engine: AsyncEngine) -> None:
+        """Initialize provider with guaranteed infrastructure."""
+        super().__init__()
+        self._engine = engine
+
     @provide(scope=Scope.APP)
     def provide_settings(self) -> Settings:
         """Provide application settings."""
         return service_settings
+
+    @provide(scope=Scope.APP)
+    def provide_database_engine(self) -> AsyncEngine:
+        """Provide database engine from guaranteed infrastructure."""
+        return self._engine
 
     @provide(scope=Scope.APP)
     def provide_metrics_registry(self) -> CollectorRegistry:
@@ -170,18 +180,7 @@ class CJAssessmentServiceProvider(Provider):
             settings=settings,
         )
 
-    @provide(scope=Scope.APP)
-    def provide_database_engine(self, settings: Settings) -> AsyncEngine:
-        """Provide database engine for CJ Assessment Service."""
-        return create_async_engine(
-            settings.DATABASE_URL_CJ,
-            echo=False,
-            future=True,
-            pool_size=settings.DATABASE_POOL_SIZE,
-            max_overflow=settings.DATABASE_MAX_OVERFLOW,
-            pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
-            pool_recycle=settings.DATABASE_POOL_RECYCLE,
-        )
+    # Database engine provider removed - engine created in create_app() for guaranteed infra
 
     @provide(scope=Scope.APP)
     def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
@@ -192,10 +191,10 @@ class CJAssessmentServiceProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_database_handler(
-        self, settings: Settings, database_metrics: DatabaseMetrics
+        self, settings: Settings, database_metrics: DatabaseMetrics, engine: AsyncEngine
     ) -> CJRepositoryProtocol:
-        """Provide database handler with database metrics integration."""
-        return PostgreSQLCJRepositoryImpl(settings, database_metrics)
+        """Provide database handler with injected engine from HuleEduApp."""
+        return PostgreSQLCJRepositoryImpl(settings, database_metrics, engine)
 
     @provide(scope=Scope.APP)
     def provide_content_client(

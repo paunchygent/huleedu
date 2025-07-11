@@ -489,22 +489,18 @@ Please respond with a JSON object containing:
 - 'confidence': Rating from 1-5 (5 = very confident)"""
 
             try:
-                result, error = await client.generate_comparison(
+                result = await client.generate_comparison(
                     user_prompt=prompt,
                     correlation_id=uuid4(),
                     model_override="gpt-4o-mini",
                     temperature_override=0.1,
                 )
 
-                if error is None:
-                    print(f"CJ Assessment client result: {result}")
-                    assert result is not None
-                    assert "winner" in result
-                    assert "justification" in result
-                    assert "confidence" in result
-                else:
-                    print(f"CJ Assessment client error: {error}")
-                    # Some errors are expected in test environment
+                print(f"CJ Assessment client result: {result}")
+                assert result is not None
+                assert "winner" in result
+                assert "justification" in result
+                assert "confidence" in result
 
             except Exception as e:
                 print(f"CJ Assessment client exception: {e}")

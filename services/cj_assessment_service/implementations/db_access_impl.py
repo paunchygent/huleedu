@@ -32,23 +32,30 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
     """PostgreSQL implementation of CJRepositoryProtocol for CJ Assessment Service."""
 
     def __init__(
-        self, settings: Settings, database_metrics: Optional[DatabaseMetrics] = None
+        self,
+        settings: Settings,
+        database_metrics: Optional[DatabaseMetrics] = None,
+        engine: Optional[Any] = None,
     ) -> None:
-        """Initialize the database handler with connection settings and optional metrics."""
+        """Initialize the database handler with injected engine or connection settings."""
         self.settings = settings
         self.logger = create_service_logger("cj_assessment.repository.postgres")
         self.database_metrics = database_metrics
 
-        # Create async engine with enhanced connection pooling (following BOS/ELS pattern)
-        self.engine = create_async_engine(
-            settings.DATABASE_URL_CJ,
-            echo=False,
-            future=True,
-            pool_size=settings.DATABASE_POOL_SIZE,
-            max_overflow=settings.DATABASE_MAX_OVERFLOW,
-            pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
-            pool_recycle=settings.DATABASE_POOL_RECYCLE,
-        )
+        # Use injected engine or create new one (for backward compatibility)
+        if engine is not None:
+            self.engine = engine
+        else:
+            # Create async engine with enhanced connection pooling (following BOS/ELS pattern)
+            self.engine = create_async_engine(
+                settings.database_url,
+                echo=False,
+                future=True,
+                pool_size=settings.DATABASE_POOL_SIZE,
+                max_overflow=settings.DATABASE_MAX_OVERFLOW,
+                pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+                pool_recycle=settings.DATABASE_POOL_RECYCLE,
+            )
 
         # Setup database monitoring if metrics are provided
         if self.database_metrics:

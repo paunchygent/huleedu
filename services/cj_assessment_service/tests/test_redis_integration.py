@@ -10,6 +10,7 @@ import pytest
 from dishka import make_async_container
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
 
@@ -17,7 +18,9 @@ from services.cj_assessment_service.di import CJAssessmentServiceProvider
 @pytest.mark.asyncio
 async def test_redis_client_di_injection() -> None:
     """Test that RedisClient can be injected via DI container."""
-    container = make_async_container(CJAssessmentServiceProvider())
+    # Create test database engine
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    container = make_async_container(CJAssessmentServiceProvider(engine=engine))
 
     async with container() as request_container:
         # Test that we can get a RedisClient from DI

@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     # External service URLs
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
 
-    # Database configuration
-    DATABASE_URL_CJ: str = "sqlite+aiosqlite:///./cj_assessment.db"
+    # Database configuration - PostgreSQL only (no sqlite fallback)
+    # DATABASE_URL_CJ removed - use database_url property for consistent PostgreSQL access
 
     # Database Connection Pool Settings (following BOS/ELS pattern)
     DATABASE_POOL_SIZE: int = 5
@@ -42,13 +42,19 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        """Return the PostgreSQL database URL for migrations.
+        """Return the PostgreSQL database URL for both runtime and migrations.
 
-        For production use, return the PostgreSQL URL from docker-compose.infrastructure.yml
-        configuration (port 5434 for CJ Assessment Service).
+        Standardized PostgreSQL configuration following HuleEduApp pattern.
+        Uses environment-specific connection details.
         """
         import os
 
+        # Check for environment variable first (Docker environment)
+        env_url = os.getenv("CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ")
+        if env_url:
+            return env_url
+
+        # Fallback to local development configuration
         db_user = os.getenv("HULEEDU_DB_USER", "huleedu_user")
         db_password = os.getenv("HULEEDU_DB_PASSWORD", "ted5?SUCwef3-JIVres6!DEK")
         return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5434/cj_assessment"

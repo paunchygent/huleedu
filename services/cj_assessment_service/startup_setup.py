@@ -5,46 +5,37 @@ from __future__ import annotations
 from dishka import AsyncContainer
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
-from quart import Quart
+from huleedu_service_libs.quart_app import HuleEduApp
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_metrics
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
 logger = create_service_logger("cj_assessment_service.startup")
 
 
-async def initialize_services(app: Quart, settings: Settings, container: AsyncContainer) -> None:
-    """Initialize database schema and metrics (DI container already initialized in app.py)."""
+async def initialize_services(
+    app: HuleEduApp, settings: Settings, container: AsyncContainer
+) -> None:
+    """Initialize database schema using guaranteed infrastructure."""
     try:
-        # Initialize database schema directly (following BOS/ELS pattern)
+        # Use guaranteed database engine for schema initialization
+        async with app.database_engine.begin() as conn:
+            from services.cj_assessment_service.models_db import Base
+
+            await conn.run_sync(Base.metadata.create_all)
+
+        logger.info("Database schema initialized successfully")
+
+        # Initialize metrics with guaranteed infrastructure
         async with container() as request_container:
-            database = await request_container.get(CJRepositoryProtocol)
-            await database.initialize_db_schema()
-            logger.info("Database schema initialized successfully")
-
-            # Store database engine for health checks
-            if hasattr(database, "engine"):
-                setattr(app, "database_engine", database.engine)
-                logger.info("Database engine stored for health checks")
-
-            # Get database metrics for integration
             database_metrics = await request_container.get(DatabaseMetrics)
-
-            # Get shared metrics with database metrics integration (thread-safe singleton pattern)
             metrics = get_metrics(database_metrics)
-
-            # Store metrics in app context (proper Quart pattern)
-            app.extensions = getattr(app, "extensions", {})
             app.extensions["metrics"] = metrics
 
         logger.info("HTTP metrics initialized and stored in app extensions")
         logger.info(f"Available HTTP metrics: {list(metrics.keys())}")
 
-        logger.info(
-            "CJ Assessment Service DI container and quart-dishka integration "
-            "initialized successfully.",
-        )
+        logger.info("CJ Assessment Service initialized successfully")
     except Exception as e:
         logger.critical(f"Failed to initialize CJ Assessment Service: {e}", exc_info=True)
         raise

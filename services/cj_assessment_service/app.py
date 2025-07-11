@@ -13,9 +13,8 @@ Key principles:
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
 
-from dishka import AsyncContainer, make_async_container
+from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
@@ -23,8 +22,9 @@ from huleedu_service_libs.logging_utils import (
 )
 from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
-from quart import Quart
+from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from services.cj_assessment_service.api.health_routes import health_bp
 from services.cj_assessment_service.config import Settings
@@ -35,15 +35,10 @@ from services.cj_assessment_service.startup_setup import initialize_services, sh
 logger = create_service_logger("cj_assessment_service.app")
 
 
-class CJAssessmentApp(Quart):
-    """Custom Quart app with typed service-specific attributes."""
-
-    container: AsyncContainer
-    consumer_task: Optional[asyncio.Task[None]]
-    kafka_consumer: Optional[CJAssessmentKafkaConsumer]
+# CJAssessmentApp removed - using HuleEduApp for guaranteed infrastructure
 
 
-def create_app(settings: Settings | None = None) -> CJAssessmentApp:
+def create_app(settings: Settings | None = None) -> HuleEduApp:
     """Create and configure the Quart application.
 
     Args:
@@ -58,8 +53,8 @@ def create_app(settings: Settings | None = None) -> CJAssessmentApp:
     # Configure logging
     configure_service_logging("cj_assessment_service", log_level=settings.LOG_LEVEL)
 
-    # Create Quart app
-    app = CJAssessmentApp(__name__)
+    # Create HuleEduApp with guaranteed infrastructure
+    app = HuleEduApp(__name__)
 
     # Configure app settings
     app.config.update(
@@ -69,18 +64,28 @@ def create_app(settings: Settings | None = None) -> CJAssessmentApp:
         },
     )
 
-    # Initialize dependency injection container
-    container = make_async_container(CJAssessmentServiceProvider())
-    QuartDishka(app=app, container=container)
+    # Initialize guaranteed infrastructure immediately
+    app.database_engine = create_async_engine(
+        settings.database_url,  # Use PostgreSQL URL
+        echo=False,
+        future=True,
+        pool_size=settings.DATABASE_POOL_SIZE,
+        max_overflow=settings.DATABASE_MAX_OVERFLOW,
+        pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+        pool_recycle=settings.DATABASE_POOL_RECYCLE,
+    )
+    app.container = make_async_container(CJAssessmentServiceProvider(engine=app.database_engine))
+    app.extensions = {}
 
-    # Store container reference and initialize consumer attributes
-    app.container = container
+    # Optional service-specific attributes (preserve existing patterns)
     app.consumer_task = None
     app.kafka_consumer = None
 
+    # Setup dependency injection
+    QuartDishka(app=app, container=app.container)
+
     # Initialize tracing early, before blueprint registration
     tracer = init_tracing("cj_assessment_service")
-    app.extensions = getattr(app, "extensions", {})
     app.extensions["tracer"] = tracer
     setup_tracing_middleware(app, tracer)
 
@@ -91,8 +96,8 @@ def create_app(settings: Settings | None = None) -> CJAssessmentApp:
     async def startup() -> None:
         """Application startup tasks including Kafka consumer."""
         try:
-            # Initialize services
-            await initialize_services(app, settings, container)
+            # Initialize services using guaranteed infrastructure
+            await initialize_services(app, settings, app.container)
 
             # Setup metrics middleware (per Rule 020.4.4)
             setup_standard_service_metrics_middleware(app, "cj_assessment")
@@ -102,6 +107,7 @@ def create_app(settings: Settings | None = None) -> CJAssessmentApp:
                 app.kafka_consumer = await request_container.get(CJAssessmentKafkaConsumer)
 
             # Start consumer as background task
+            assert app.kafka_consumer is not None, "Kafka consumer must be initialized"
             app.consumer_task = asyncio.create_task(app.kafka_consumer.start_consumer())
 
             logger.info("CJ Assessment Service started successfully")

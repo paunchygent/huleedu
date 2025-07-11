@@ -46,7 +46,9 @@ def mock_settings_disabled() -> Settings:
 @pytest.fixture
 def provider() -> CJAssessmentServiceProvider:
     """DI provider for testing."""
-    return CJAssessmentServiceProvider()
+    from sqlalchemy.ext.asyncio import create_async_engine
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    return CJAssessmentServiceProvider(engine=engine)
 
 
 @pytest.mark.asyncio
