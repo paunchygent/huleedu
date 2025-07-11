@@ -15,9 +15,10 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-from services.cj_assessment_service.models_api import ComparisonResult, ErrorDetail
+from services.cj_assessment_service.models_api import ComparisonResult
 from services.cj_assessment_service.models_db import (
     Base,
     CJBatchUpload,
@@ -288,7 +289,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
 
         return rankings
 
-    async def get_comparison_errors(self, cj_batch_id: str) -> list[ErrorDetail]:
+    async def get_comparison_errors(self, cj_batch_id: str) -> list[CanonicalErrorDetail]:
         """Retrieve all error details for a CJ batch."""
         async with self.session() as session:
             result = await session.execute(
@@ -312,7 +313,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             and pair.error_service is not None
         )
 
-    def _reconstruct_error_detail(self, pair: ComparisonPair) -> ErrorDetail:
+    def _reconstruct_error_detail(self, pair: ComparisonPair) -> CanonicalErrorDetail:
         """Reconstruct ErrorDetail from database fields."""
         # This method should only be called after _can_reconstruct_error returns True
         assert pair.error_code is not None
@@ -320,11 +321,17 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         assert pair.error_timestamp is not None
         assert pair.error_service is not None
 
-        return ErrorDetail(
+        return CanonicalErrorDetail(
             error_code=pair.error_code,
             message=pair.error_details.get("message", "") if pair.error_details else "",
             correlation_id=pair.error_correlation_id,
             timestamp=pair.error_timestamp,
             service=pair.error_service,
+            operation=(
+                pair.error_details.get("operation", "unknown") if pair.error_details else "unknown"
+            ),
             details=pair.error_details or {},
+            stack_trace=None,  # Not stored in DB
+            trace_id=None,     # Not stored in DB
+            span_id=None,      # Not stored in DB
         )

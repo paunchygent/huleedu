@@ -8,11 +8,12 @@ from uuid import uuid4
 import aiohttp
 import pytest
 
+from common_core.error_enums import ErrorCode
+from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
 )
-from services.cj_assessment_service.models_api import ErrorDetail
 
 
 @pytest.fixture
@@ -43,45 +44,44 @@ def mock_session() -> AsyncMock:
 
 @pytest.fixture
 def mock_retry_manager() -> AsyncMock:
-    """Create mock retry manager."""
+    """Create mock retry manager that preserves HuleEduError semantics like real implementation."""
     retry_manager = AsyncMock()
 
-    # Make retry manager pass through the function call but handle exceptions
+    # Make retry manager behave like the real implementation - preserve HuleEduError instances
     async def passthrough(func: Any, *args: Any, **kwargs: Any) -> Any:
         try:
             return await func()
+        except HuleEduError:
+            # ✅ CORRECT: Pass through HuleEduError unchanged (preserves error code semantics)
+            raise
         except aiohttp.ClientResponseError as e:
-            # Convert HTTP errors to ErrorDetail for tests
-            from datetime import datetime, timezone
+            # Convert raw HTTP errors to HuleEduError
             from uuid import uuid4
 
-            from common_core.error_enums import ErrorCode
-            from services.cj_assessment_service.models_api import ErrorDetail
+            from huleedu_service_libs.error_handling import raise_external_service_error
 
-            error_detail = ErrorDetail(
-                error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+            raise_external_service_error(
+                service="cj_assessment_service",
+                operation="llm_provider_service_client_request",
+                external_service="llm_provider_service",
                 message=f"{e.message}: {e.status}",
                 correlation_id=uuid4(),
-                timestamp=datetime.now(timezone.utc),
-                details={"status_code": e.status},
+                status_code=e.status,
             )
-            return None, error_detail
         except Exception as e:
-            # Convert other exceptions to ErrorDetail
-            from datetime import datetime, timezone
+            # Convert other raw exceptions to HuleEduError
             from uuid import uuid4
 
-            from common_core.error_enums import ErrorCode
-            from services.cj_assessment_service.models_api import ErrorDetail
+            from huleedu_service_libs.error_handling import raise_external_service_error
 
-            error_detail = ErrorDetail(
-                error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+            raise_external_service_error(
+                service="cj_assessment_service",
+                operation="llm_provider_service_client_request",
+                external_service="llm_provider_service",
                 message=f"HTTP request failed: {str(e)}",
                 correlation_id=uuid4(),
-                timestamp=datetime.now(timezone.utc),
-                details={"exception_type": type(e).__name__},
+                exception_type=type(e).__name__,
             )
-            return None, error_detail
 
     retry_manager.with_retry.side_effect = passthrough
     return retry_manager
@@ -172,15 +172,17 @@ Please respond with a JSON object."""
 
         # Call generate_comparison
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            model_override="claude-3-haiku",
-            temperature_override=0.1,
-            correlation_id=correlation_id,
-        )
+        try:
+            result = await client.generate_comparison(
+                user_prompt=prompt,
+                model_override="claude-3-haiku",
+                temperature_override=0.1,
+                correlation_id=correlation_id,
+            )
+        except HuleEduError as e:
+            pytest.fail(f"Unexpected error: {e}")
 
         # Verify result
-        assert error is None
         assert result is not None
         assert result["winner"] == "Essay A"
         assert result["justification"] == "Essay A has better structure"
@@ -224,16 +226,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert "Internal server error" in error.message
-        assert "500" in error.message  # Status code is included in the message
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+            message_contains="Internal server error"
+        ) as captured:
+            await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
 
     async def test_generate_comparison_network_error(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -250,15 +250,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert "Connection failed" in error.message
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+            message_contains="Connection failed"
+        ) as captured:
+            await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
 
     async def test_generate_comparison_invalid_prompt(
         self, client: LLMProviderServiceClient
@@ -267,15 +266,14 @@ Essay B content."""
         prompt = "This is not a valid comparison prompt"
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert error.message == "Invalid prompt format: Could not extract essays"
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.VALIDATION_ERROR,
+            message_contains="Invalid prompt format"
+        ) as captured:
+            await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
 
     async def test_generate_comparison_json_parse_error(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -296,15 +294,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert "Failed to parse immediate response JSON" in error.message
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.PARSING_ERROR,
+            message_contains="Failed to parse immediate response JSON"
+        ) as captured:
+            await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
 
     # Queue-based response tests
     async def test_generate_comparison_queued_success(
@@ -399,13 +396,15 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
+        try:
+            result = await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
+        except HuleEduError as e:
+            pytest.fail(f"Unexpected error: {e}")
 
         # Verify successful result
-        assert error is None
         assert result is not None
         assert result["winner"] == "Essay B"
         assert result["justification"] == "Essay B has superior argumentation"
@@ -457,15 +456,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert error.message == "Queue processing failed: Provider timeout"
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.PROCESSING_ERROR,
+            message_contains="Queue processing failed"
+        ) as captured:
+            await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
 
     async def test_generate_comparison_queued_expired(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -508,15 +506,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert error.message == "Queue request expired"
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.TIMEOUT,
+            message_contains="Queue request expired"
+        ) as captured:
+            await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
 
     async def test_generate_comparison_queued_timeout(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -559,15 +556,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert "Maximum polling attempts" in error.message  # Message includes attempt count
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.TIMEOUT,
+            message_contains="Maximum polling attempts"
+        ) as captured:
+            await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
 
     async def test_generate_comparison_queued_polling_disabled(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock, mock_settings: Settings
@@ -600,15 +596,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert error.message == "Request queued but polling is disabled"
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.CONFIGURATION_ERROR,
+            message_contains="Request queued but polling is disabled"
+        ) as captured:
+            await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
 
     async def test_generate_comparison_queued_no_queue_id(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -636,15 +631,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert error.message == "Queue response missing queue_id"
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.INVALID_RESPONSE,
+            message_contains="Queue response missing queue_id"
+        ) as captured:
+            await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
 
     async def test_queue_status_check_not_found(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -680,16 +674,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        # Will exhaust attempts due to 404 errors
-        assert "Maximum polling attempts" in error.message
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.TIMEOUT,
+            message_contains="Maximum polling attempts"
+        ) as captured:
+            await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
 
     async def test_result_retrieval_expired(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -746,15 +738,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert error.message == "Queue result expired"
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+            message_contains="Queue result expired"
+        ) as captured:
+            await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
 
     @patch("asyncio.sleep")  # Mock sleep to speed up tests
     async def test_exponential_backoff_timing(
@@ -829,12 +820,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
+        try:
+            result = await client.generate_comparison(
+                user_prompt=prompt,
+                correlation_id=correlation_id,
+            )
+        except HuleEduError as e:
+            pytest.fail(f"Unexpected error: {e}")
 
-        assert error is None
         assert result is not None
 
         # Verify sleep was called with exponential backoff

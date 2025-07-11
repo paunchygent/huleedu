@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from common_core import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
+from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 
 
 class EssayForComparison(BaseModel):
@@ -75,5 +76,5 @@ class ErrorResponse(BaseModel):
     error response format across all API endpoints.
     """
 
-    error: ErrorDetail
+    error: CanonicalErrorDetail
     status_code: int

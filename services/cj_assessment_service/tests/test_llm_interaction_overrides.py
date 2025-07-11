@@ -7,9 +7,8 @@ override parameters to providers.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -19,7 +18,6 @@ from services.cj_assessment_service.implementations.llm_interaction_impl import 
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
     ComparisonTask,
-    ErrorDetail,
     EssayForComparison,
 )
 from services.cj_assessment_service.protocols import LLMProviderProtocol
@@ -39,7 +37,7 @@ class TestLLMInteractionImplOverrides:
             "justification": "Essay A demonstrates better structure and clarity.",
             "confidence": 4,  # 1-5 scale
         }
-        provider.generate_comparison = AsyncMock(return_value=(mock_response, None))
+        provider.generate_comparison = AsyncMock(return_value=mock_response)
         return provider
 
     @pytest.fixture
@@ -174,20 +172,34 @@ class TestLLMInteractionImplOverrides:
         mock_provider: AsyncMock,
     ) -> None:
         """Test error handling when provider fails."""
-        # Mock provider error with ErrorDetail
-        error_detail = ErrorDetail(
-            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
-            message="Provider error",
-            correlation_id=uuid4(),
-            timestamp=datetime.now(timezone.utc),
-            service="cj_assessment_service",
-            details={"provider": "mock_provider"},
-        )
-        mock_provider.generate_comparison = AsyncMock(return_value=(None, error_detail))
+        # Mock provider to raise HuleEduError
+        from huleedu_service_libs.error_handling import raise_external_service_error
+
+        correlation_id = uuid4()
+
+        def mock_error(
+            user_prompt: str,
+            correlation_id: UUID,
+            system_prompt_override: str | None = None,
+            model_override: str | None = None,
+            temperature_override: float | None = None,
+            max_tokens_override: int | None = None,
+            provider_override: str | None = None,
+        ) -> None:  # noqa: ARG001
+            raise_external_service_error(
+                service="cj_assessment_service",
+                operation="generate_comparison",
+                external_service="llm_provider_service",
+                message="LLM Provider unavailable",
+                correlation_id=correlation_id,
+                details={"provider": "test"},
+            )
+
+        mock_provider.generate_comparison = AsyncMock(side_effect=mock_error)
 
         results = await llm_interaction_impl.perform_comparisons(
             tasks=[sample_comparison_task],
-            correlation_id=uuid4(),
+            correlation_id=correlation_id,
         )
 
         # Verify error is handled properly
@@ -195,8 +207,8 @@ class TestLLMInteractionImplOverrides:
         result = results[0]
         assert result.llm_assessment is None
         assert result.error_detail is not None
-        assert result.error_detail.message == "Provider error"
-        assert result.error_detail.error_code == ErrorCode.EXTERNAL_SERVICE_ERROR
+        assert "Unexpected error processing task" in result.error_detail.message
+        assert result.error_detail.error_code == ErrorCode.PROCESSING_ERROR
 
     async def test_perform_comparisons_with_multiple_tasks(
         self,

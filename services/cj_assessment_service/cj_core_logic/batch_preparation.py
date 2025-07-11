@@ -110,33 +110,9 @@ async def prepare_essays_for_assessment(
 
             try:
                 # Fetch spellchecked content using new correlation_id-aware interface
-                content, content_error = await content_client.fetch_content(
+                content = await content_client.fetch_content(
                     text_storage_id, correlation_id
                 )
-
-                if content_error:
-                    logger.error(
-                        f"Failed to fetch content for essay {els_essay_id}: "
-                        f"{content_error.message}",
-                        extra={
-                            "correlation_id": correlation_id,
-                            "els_essay_id": els_essay_id,
-                            "text_storage_id": text_storage_id,
-                            "error_code": content_error.error_code.value,
-                        },
-                    )
-                    continue  # Skip this essay and continue with others
-
-                if content is None:
-                    logger.error(
-                        f"Content is None for essay {els_essay_id} despite no error",
-                        extra={
-                            "correlation_id": correlation_id,
-                            "els_essay_id": els_essay_id,
-                            "text_storage_id": text_storage_id,
-                        },
-                    )
-                    continue  # Skip this essay and continue with others
 
                 assessment_input_text = content
 

@@ -9,19 +9,30 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
 import aiohttp
+from huleedu_service_libs.error_handling import (
+    HuleEduError,
+    raise_authentication_error,
+    raise_configuration_error,
+    raise_external_service_error,
+    raise_invalid_request,
+    raise_invalid_response,
+    raise_parsing_error,
+    raise_processing_error,
+    raise_rate_limit_error,
+    raise_resource_not_found,
+    raise_service_unavailable,
+    raise_timeout_error,
+    raise_validation_error,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core.error_enums import ErrorCode
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.exceptions import (
-    map_status_to_error_code,
-)
-from services.cj_assessment_service.models_api import ErrorDetail
+from services.cj_assessment_service.exceptions import map_status_to_error_code
 from services.cj_assessment_service.protocols import LLMProviderProtocol, RetryManagerProtocol
 
 logger = create_service_logger("cj_assessment_service.llm_provider_service_client")
@@ -101,7 +112,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         provider_override: str | None = None,
-    ) -> tuple[dict[str, Any] | None, ErrorDetail | None]:
+    ) -> dict[str, Any]:
         """Generate comparison via LLM Provider Service.
 
         Handles both immediate (200) and queued (202) responses from the LLM Provider Service.
@@ -122,22 +133,14 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         # Extract essays from the formatted prompt
         extraction_result = self._extract_essays_from_prompt(user_prompt)
         if not extraction_result:
-            error_detail = ErrorDetail(
-                error_code=ErrorCode.VALIDATION_ERROR,
+            raise_validation_error(
+                service="cj_assessment_service",
+                operation="generate_comparison",
+                field="user_prompt",
                 message="Invalid prompt format: Could not extract essays",
                 correlation_id=correlation_id,
-                timestamp=datetime.now(UTC),
-                details={"prompt_length": len(user_prompt)},
+                prompt_length=len(user_prompt),
             )
-            logger.error(
-                "Could not extract essays from prompt",
-                extra={
-                    "error_code": error_detail.error_code.value,
-                    "correlation_id": str(correlation_id),
-                    "prompt_length": len(user_prompt),
-                },
-            )
-            return None, error_detail
 
         base_prompt, essay_a, essay_b = extraction_result
 
@@ -160,7 +163,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         # Make initial HTTP request with retry logic
         url = f"{self.base_url}/comparison"
 
-        async def make_request() -> tuple[dict[str, Any] | None, ErrorDetail | None]:
+        async def make_request() -> dict[str, Any]:
             try:
                 async with self.session.post(
                     url,
@@ -222,40 +225,36 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                                 )
                                 response.raise_for_status()
 
-                        # Non-retryable error - return error tuple
-                        return await self._handle_error_response(
+                        # Non-retryable error - handle and raise
+                        await self._handle_error_response(
                             response.status, response_text, correlation_id
                         )
+                        # This should never be reached as _handle_error_response raises
+                        raise AssertionError("_handle_error_response should have raised")
 
             except aiohttp.ClientError:
                 # Re-raise to let retry manager handle it
                 raise
+            except HuleEduError:
+                # Re-raise HuleEduError as-is (preserve error code semantics)
+                raise
             except Exception as e:
-                error_detail = ErrorDetail(
-                    error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+                # Only convert unexpected raw exceptions to structured errors
+                raise_external_service_error(
+                    service="cj_assessment_service",
+                    operation="generate_comparison.make_request",
+                    external_service="llm_provider_service",
                     message=f"Unexpected error calling LLM Provider Service: {str(e)}",
                     correlation_id=correlation_id,
-                    timestamp=datetime.now(UTC),
-                    details={"exception_type": type(e).__name__},
+                    exception_type=type(e).__name__,
                 )
-                logger.exception(
-                    "Unexpected error calling LLM Provider Service",
-                    extra={
-                        "error_code": error_detail.error_code.value,
-                        "correlation_id": str(correlation_id),
-                        "exception_type": type(e).__name__,
-                    },
-                )
-                return None, error_detail
 
         # Use retry manager for resilience
-        result, error = await self.retry_manager.with_retry(make_request)
-
-        return result, error
+        return await self.retry_manager.with_retry(make_request)
 
     async def _handle_immediate_response(
         self, response_text: str, correlation_id: UUID
-    ) -> tuple[dict[str, Any] | None, ErrorDetail | None]:
+    ) -> dict[str, Any]:
         """Handle immediate (200) response from LLM Provider Service.
 
         Args:
@@ -285,29 +284,21 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 f"response_time: {response_data.get('response_time_ms', 'N/A')}ms"
             )
 
-            return result, None
+            return result
 
         except json.JSONDecodeError as e:
-            error_detail = ErrorDetail(
-                error_code=ErrorCode.PARSING_ERROR,
+            raise_parsing_error(
+                service="cj_assessment_service",
+                operation="_handle_immediate_response",
+                parse_target="immediate_response_json",
                 message=f"Failed to parse immediate response JSON: {str(e)}",
                 correlation_id=correlation_id,
-                timestamp=datetime.now(UTC),
-                details={"response_preview": response_text[:200]},
+                response_preview=response_text[:200],
             )
-            logger.error(
-                "Failed to parse immediate response JSON",
-                extra={
-                    "error_code": error_detail.error_code.value,
-                    "correlation_id": str(correlation_id),
-                    "response_preview": response_text[:200],
-                },
-            )
-            return None, error_detail
 
     async def _handle_queued_response(
         self, response_text: str, correlation_id: UUID
-    ) -> tuple[dict[str, Any] | None, ErrorDetail | None]:
+    ) -> dict[str, Any]:
         """Handle queued (202) response from LLM Provider Service.
 
         Args:
@@ -322,22 +313,15 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             queue_id = queue_response.get("queue_id")
 
             if not queue_id:
-                error_detail = ErrorDetail(
-                    error_code=ErrorCode.INVALID_RESPONSE,
+                raise_invalid_response(
+                    service="cj_assessment_service",
+                    operation="_handle_queued_response",
+                    expected="queue_id in response",
+                    actual="missing queue_id",
                     message="Queue response missing queue_id",
                     correlation_id=correlation_id,
-                    timestamp=datetime.now(UTC),
-                    details={"response_preview": response_text[:200]},
+                    response_preview=response_text[:200],
                 )
-                logger.error(
-                    "Queue response missing queue_id",
-                    extra={
-                        "error_code": error_detail.error_code.value,
-                        "correlation_id": str(correlation_id),
-                        "response_preview": response_text[:200],
-                    },
-                )
-                return None, error_detail
 
             logger.info(
                 "Request queued for processing",
@@ -350,47 +334,31 @@ class LLMProviderServiceClient(LLMProviderProtocol):
 
             # Check if polling is disabled
             if not self.settings.LLM_QUEUE_POLLING_ENABLED:
-                error_detail = ErrorDetail(
-                    error_code=ErrorCode.CONFIGURATION_ERROR,
+                raise_configuration_error(
+                    service="cj_assessment_service",
+                    operation="_handle_queued_response",
+                    config_key="LLM_QUEUE_POLLING_ENABLED",
                     message="Request queued but polling is disabled",
                     correlation_id=correlation_id,
-                    timestamp=datetime.now(UTC),
-                    details={"queue_id": queue_id},
+                    queue_id=queue_id,
                 )
-                logger.error(
-                    "Request queued but polling is disabled",
-                    extra={
-                        "error_code": error_detail.error_code.value,
-                        "correlation_id": str(correlation_id),
-                        "queue_id": queue_id,
-                    },
-                )
-                return None, error_detail
 
             # Start polling for results
             return await self._poll_for_results(queue_id, correlation_id)
 
         except json.JSONDecodeError as e:
-            error_detail = ErrorDetail(
-                error_code=ErrorCode.PARSING_ERROR,
+            raise_parsing_error(
+                service="cj_assessment_service",
+                operation="_handle_queued_response",
+                parse_target="queued_response_json",
                 message=f"Failed to parse queued response JSON: {str(e)}",
                 correlation_id=correlation_id,
-                timestamp=datetime.now(UTC),
-                details={"response_preview": response_text[:200]},
+                response_preview=response_text[:200],
             )
-            logger.error(
-                "Failed to parse queued response JSON",
-                extra={
-                    "error_code": error_detail.error_code.value,
-                    "correlation_id": str(correlation_id),
-                    "response_preview": response_text[:200],
-                },
-            )
-            return None, error_detail
 
     async def _handle_error_response(
         self, status_code: int, response_text: str, correlation_id: UUID
-    ) -> tuple[dict[str, Any] | None, ErrorDetail | None]:
+    ) -> None:
         """Handle error responses from LLM Provider Service.
 
         Args:
@@ -398,8 +366,8 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             response_text: Raw response text from the HTTP response
             correlation_id: Correlation ID for request tracing
 
-        Returns:
-            Tuple of (response_data, error_detail)
+        Raises:
+            HuleEduError: Always raises appropriate error based on status code
         """
         try:
             error_data = json.loads(response_text)
@@ -422,28 +390,74 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             }
 
         error_code = map_status_to_error_code(status_code)
-        error_detail = ErrorDetail(
-            error_code=error_code,
-            message=f"LLM Provider Service error: {error_msg}",
-            correlation_id=correlation_id,
-            timestamp=datetime.now(UTC),
-            details=details,
-        )
 
-        logger.error(
-            "LLM Provider Service error",
-            extra={
-                "error_code": error_detail.error_code.value,
-                "correlation_id": str(correlation_id),
-                "status_code": status_code,
-                "is_retryable": details.get("is_retryable", False),
-            },
-        )
-        return None, error_detail
+        # Map error codes to appropriate factory functions
+        if error_code == ErrorCode.INVALID_REQUEST:
+            raise_invalid_request(
+                service="cj_assessment_service",
+                operation="_handle_error_response",
+                message=f"LLM Provider Service error: {error_msg}",
+                correlation_id=correlation_id,
+                **details
+            )
+        elif error_code == ErrorCode.AUTHENTICATION_ERROR:
+            raise_authentication_error(
+                service="cj_assessment_service",
+                operation="_handle_error_response",
+                message=f"LLM Provider Service error: {error_msg}",
+                correlation_id=correlation_id,
+                **details
+            )
+        elif error_code == ErrorCode.RESOURCE_NOT_FOUND:
+            raise_resource_not_found(
+                service="cj_assessment_service",
+                operation="_handle_error_response",
+                resource_type="LLM Provider endpoint",
+                resource_id="N/A",
+                message=f"LLM Provider Service error: {error_msg}",
+                correlation_id=correlation_id,
+                **details
+            )
+        elif error_code == ErrorCode.TIMEOUT:
+            raise_timeout_error(
+                service="cj_assessment_service",
+                operation="_handle_error_response",
+                timeout_seconds=60,
+                message=f"LLM Provider Service error: {error_msg}",
+                correlation_id=correlation_id,
+                **details
+            )
+        elif error_code == ErrorCode.RATE_LIMIT:
+            raise_rate_limit_error(
+                service="cj_assessment_service",
+                operation="_handle_error_response",
+                message=f"LLM Provider Service error: {error_msg}",
+                correlation_id=correlation_id,
+                **details
+            )
+        elif error_code == ErrorCode.SERVICE_UNAVAILABLE:
+            raise_service_unavailable(
+                service="cj_assessment_service",
+                operation="_handle_error_response",
+                unavailable_service="llm_provider_service",
+                message=f"LLM Provider Service error: {error_msg}",
+                correlation_id=correlation_id,
+                **details
+            )
+        else:
+            # Default to external service error
+            raise_external_service_error(
+                service="cj_assessment_service",
+                operation="_handle_error_response",
+                external_service="llm_provider_service",
+                message=f"LLM Provider Service error: {error_msg}",
+                correlation_id=correlation_id,
+                **details
+            )
 
     async def _poll_for_results(
         self, queue_id: str, correlation_id: UUID
-    ) -> tuple[dict[str, Any] | None, ErrorDetail | None]:
+    ) -> dict[str, Any]:
         """Poll for results from the queue using exponential backoff.
 
         Args:
@@ -466,23 +480,14 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             # Check total timeout
             timeout_seconds = self.settings.LLM_QUEUE_TOTAL_TIMEOUT_SECONDS
             if time.time() - start_time > timeout_seconds:
-                error_detail = ErrorDetail(
-                    error_code=ErrorCode.TIMEOUT,
+                raise_timeout_error(
+                    service="cj_assessment_service",
+                    operation="_poll_for_results",
+                    timeout_seconds=timeout_seconds,
                     message=f"Queue polling timed out after {timeout_seconds} seconds",
                     correlation_id=correlation_id,
-                    timestamp=datetime.now(UTC),
-                    details={"queue_id": queue_id, "timeout_seconds": timeout_seconds},
+                    queue_id=queue_id,
                 )
-                logger.error(
-                    "Queue polling timed out",
-                    extra={
-                        "error_code": error_detail.error_code.value,
-                        "correlation_id": str(correlation_id),
-                        "queue_id": queue_id,
-                        "timeout_seconds": timeout_seconds,
-                    },
-                )
-                return None, error_detail
 
             # Wait before polling (except first attempt)
             if attempt > 0:
@@ -508,41 +513,24 @@ class LLMProviderServiceClient(LLMProviderProtocol):
 
             elif status == "failed":
                 error_msg = status_result.get("error_message", "Queue processing failed")
-                error_detail = ErrorDetail(
-                    error_code=ErrorCode.PROCESSING_ERROR,
+                raise_processing_error(
+                    service="cj_assessment_service",
+                    operation="_poll_for_results",
                     message=f"Queue processing failed: {error_msg}",
                     correlation_id=correlation_id,
-                    timestamp=datetime.now(UTC),
-                    details={"queue_id": queue_id, "original_error": error_msg},
+                    queue_id=queue_id,
+                    original_error=error_msg,
                 )
-                logger.error(
-                    "Queue processing failed",
-                    extra={
-                        "error_code": error_detail.error_code.value,
-                        "correlation_id": str(correlation_id),
-                        "queue_id": queue_id,
-                        "original_error": error_msg,
-                    },
-                )
-                return None, error_detail
 
             elif status == "expired":
-                error_detail = ErrorDetail(
-                    error_code=ErrorCode.TIMEOUT,
+                raise_timeout_error(
+                    service="cj_assessment_service",
+                    operation="_poll_for_results",
+                    timeout_seconds=self.settings.LLM_QUEUE_TOTAL_TIMEOUT_SECONDS,
                     message="Queue request expired",
                     correlation_id=correlation_id,
-                    timestamp=datetime.now(UTC),
-                    details={"queue_id": queue_id},
+                    queue_id=queue_id,
                 )
-                logger.error(
-                    "Queue request expired",
-                    extra={
-                        "error_code": error_detail.error_code.value,
-                        "correlation_id": str(correlation_id),
-                        "queue_id": queue_id,
-                    },
-                )
-                return None, error_detail
 
             elif status in ["queued", "processing"]:
                 # Continue polling
@@ -564,28 +552,17 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 continue
 
         # Max attempts reached
-        error_detail = ErrorDetail(
-            error_code=ErrorCode.TIMEOUT,
+        raise_timeout_error(
+            service="cj_assessment_service",
+            operation="_poll_for_results",
+            timeout_seconds=int(time.time() - start_time),
             message=(
                 f"Maximum polling attempts ({self.settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS}) reached"
             ),
             correlation_id=correlation_id,
-            timestamp=datetime.now(UTC),
-            details={
-                "queue_id": queue_id,
-                "max_attempts": self.settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS,
-            },
+            queue_id=queue_id,
+            max_attempts=self.settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS,
         )
-        logger.error(
-            "Maximum polling attempts reached",
-            extra={
-                "error_code": error_detail.error_code.value,
-                "correlation_id": str(correlation_id),
-                "queue_id": queue_id,
-                "max_attempts": self.settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS,
-            },
-        )
-        return None, error_detail
 
     async def _check_queue_status(
         self, queue_id: str, correlation_id: UUID
@@ -600,7 +577,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             Status data dictionary or None on error
         """
 
-        async def make_status_request() -> tuple[dict[str, Any] | None, ErrorDetail | None]:
+        async def make_status_request() -> dict[str, Any]:
             try:
                 status_url = f"{self.base_url}/status/{queue_id}"
 
@@ -613,45 +590,27 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                     if response.status == 200:
                         try:
                             status_data: dict[str, Any] = json.loads(response_text)
-                            return status_data, None
+                            return status_data
                         except json.JSONDecodeError as e:
-                            error_detail = ErrorDetail(
-                                error_code=ErrorCode.PARSING_ERROR,
+                            raise_parsing_error(
+                                service="cj_assessment_service",
+                                operation="_check_queue_status.make_status_request",
+                                parse_target="queue_status_json",
                                 message=f"Failed to parse queue status JSON: {e}",
                                 correlation_id=correlation_id,
-                                timestamp=datetime.now(UTC),
-                                details={
-                                    "queue_id": queue_id,
-                                    "response_preview": response_text[:200],
-                                },
+                                queue_id=queue_id,
+                                response_preview=response_text[:200],
                             )
-                            logger.error(
-                                "Failed to parse queue status JSON",
-                                extra={
-                                    "error_code": error_detail.error_code.value,
-                                    "correlation_id": str(correlation_id),
-                                    "queue_id": queue_id,
-                                },
-                            )
-                            return None, error_detail
 
                     elif response.status == 404:
-                        error_detail = ErrorDetail(
-                            error_code=ErrorCode.RESOURCE_NOT_FOUND,
+                        raise_resource_not_found(
+                            service="cj_assessment_service",
+                            operation="_check_queue_status.make_status_request",
+                            resource_type="queue",
+                            resource_id=queue_id,
                             message=f"Queue ID not found: {queue_id}",
                             correlation_id=correlation_id,
-                            timestamp=datetime.now(UTC),
-                            details={"queue_id": queue_id},
                         )
-                        logger.error(
-                            "Queue ID not found",
-                            extra={
-                                "error_code": error_detail.error_code.value,
-                                "correlation_id": str(correlation_id),
-                                "queue_id": queue_id,
-                            },
-                        )
-                        return None, error_detail
 
                     else:
                         # Check if error is retryable
@@ -659,57 +618,39 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                             # Raise for retry
                             response.raise_for_status()
 
-                        error_detail = ErrorDetail(
-                            error_code=map_status_to_error_code(response.status),
-                            message=f"Queue status check failed: HTTP {response.status}",
-                            correlation_id=correlation_id,
-                            timestamp=datetime.now(UTC),
-                            details={"queue_id": queue_id, "status_code": response.status},
+                        # Use _handle_error_response to raise appropriate error
+                        await self._handle_error_response(
+                            response.status, response_text, correlation_id
                         )
-                        logger.error(
-                            "Queue status check failed",
-                            extra={
-                                "error_code": error_detail.error_code.value,
-                                "correlation_id": str(correlation_id),
-                                "queue_id": queue_id,
-                                "status_code": response.status,
-                            },
-                        )
-                        return None, error_detail
+                        # This should never be reached
+                        raise AssertionError("_handle_error_response should have raised")
 
             except aiohttp.ClientError:
                 # Re-raise to let retry manager handle it
                 raise
             except Exception as e:
-                error_detail = ErrorDetail(
-                    error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+                raise_external_service_error(
+                    service="cj_assessment_service",
+                    operation="_check_queue_status.make_status_request",
+                    external_service="llm_provider_service",
                     message=f"Unexpected error checking queue status: {e}",
                     correlation_id=correlation_id,
-                    timestamp=datetime.now(UTC),
-                    details={"queue_id": queue_id, "exception_type": type(e).__name__},
+                    queue_id=queue_id,
+                    exception_type=type(e).__name__,
                 )
-                logger.error(
-                    "Unexpected error checking queue status",
-                    extra={
-                        "error_code": error_detail.error_code.value,
-                        "correlation_id": str(correlation_id),
-                        "queue_id": queue_id,
-                        "exception_type": type(e).__name__,
-                    },
-                )
-                return None, error_detail
 
         # Use retry manager for resilience
-        result, error = await self.retry_manager.with_retry(make_status_request)
-        if error:
-            logger.debug(f"Queue status check failed after retries: {error.message}")
+        try:
+            result = await self.retry_manager.with_retry(make_status_request)
+            return result
+        except Exception:
+            # Log and return None to continue polling
+            logger.debug("Queue status check failed after retries")
             return None
-        # Result is dict[str, Any] | None from make_status_request
-        return result if isinstance(result, dict) else None
 
     async def _retrieve_queue_result(
         self, queue_id: str, correlation_id: UUID
-    ) -> tuple[dict[str, Any] | None, ErrorDetail | None]:
+    ) -> dict[str, Any]:
         """Retrieve the result of a completed queue request with retry logic.
 
         Args:
@@ -720,7 +661,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             Tuple of (response_data, error_detail)
         """
 
-        async def make_result_request() -> tuple[dict[str, Any] | None, ErrorDetail | None]:
+        async def make_result_request() -> dict[str, Any]:
             try:
                 result_url = f"{self.base_url}/results/{queue_id}"
 
@@ -757,80 +698,48 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                                 },
                             )
 
-                            return result, None
+                            return result
 
                         except json.JSONDecodeError as e:
-                            error_detail = ErrorDetail(
-                                error_code=ErrorCode.PARSING_ERROR,
+                            raise_parsing_error(
+                                service="cj_assessment_service",
+                                operation="_retrieve_queue_result.make_result_request",
+                                parse_target="queue_result_json",
                                 message=f"Failed to parse queue result JSON: {str(e)}",
                                 correlation_id=correlation_id,
-                                timestamp=datetime.now(UTC),
-                                details={
-                                    "queue_id": queue_id,
-                                    "response_preview": response_text[:200],
-                                },
+                                queue_id=queue_id,
+                                response_preview=response_text[:200],
                             )
-                            logger.error(
-                                "Failed to parse queue result JSON",
-                                extra={
-                                    "error_code": error_detail.error_code.value,
-                                    "correlation_id": str(correlation_id),
-                                    "queue_id": queue_id,
-                                    "response_preview": response_text[:200],
-                                },
-                            )
-                            return None, error_detail
 
                     elif response.status == 202:
                         # Result not ready yet (shouldn't happen if status was "completed")
-                        error_detail = ErrorDetail(
-                            error_code=ErrorCode.PROCESSING_ERROR,
+                        raise_processing_error(
+                            service="cj_assessment_service",
+                            operation="_retrieve_queue_result.make_result_request",
                             message="Queue result not ready yet",
                             correlation_id=correlation_id,
-                            timestamp=datetime.now(UTC),
-                            details={"queue_id": queue_id},
+                            queue_id=queue_id,
                         )
-                        logger.warning(
-                            "Queue result not ready yet",
-                            extra={"correlation_id": str(correlation_id), "queue_id": queue_id},
-                        )
-                        return None, error_detail
 
                     elif response.status == 404:
-                        error_detail = ErrorDetail(
-                            error_code=ErrorCode.RESOURCE_NOT_FOUND,
+                        raise_resource_not_found(
+                            service="cj_assessment_service",
+                            operation="_retrieve_queue_result.make_result_request",
+                            resource_type="queue_result",
+                            resource_id=queue_id,
                             message="Queue result not found",
                             correlation_id=correlation_id,
-                            timestamp=datetime.now(UTC),
-                            details={"queue_id": queue_id},
                         )
-                        logger.error(
-                            "Queue result not found",
-                            extra={
-                                "error_code": error_detail.error_code.value,
-                                "correlation_id": str(correlation_id),
-                                "queue_id": queue_id,
-                            },
-                        )
-                        return None, error_detail
 
                     elif response.status == 410:
-                        error_detail = ErrorDetail(
-                            error_code=ErrorCode.TIMEOUT,
+                        raise_timeout_error(
+                            service="cj_assessment_service",
+                            operation="_retrieve_queue_result.make_result_request",
+                            timeout_seconds=0,  # Already expired
                             message="Queue result expired",
                             correlation_id=correlation_id,
-                            timestamp=datetime.now(UTC),
-                            details={"queue_id": queue_id},
+                            queue_id=queue_id,
                         )
-                        logger.error(
-                            "Queue result expired",
-                            extra={
-                                "error_code": error_detail.error_code.value,
-                                "correlation_id": str(correlation_id),
-                                "queue_id": queue_id,
-                            },
-                        )
-                        return None, error_detail
 
                     else:
                         # Check if error is retryable
@@ -838,49 +747,26 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                             # Raise for retry
                             response.raise_for_status()
 
-                        error_detail = ErrorDetail(
-                            error_code=map_status_to_error_code(response.status),
-                            message=f"Queue result retrieval failed: HTTP {response.status}",
-                            correlation_id=correlation_id,
-                            timestamp=datetime.now(UTC),
-                            details={"queue_id": queue_id, "status_code": response.status},
+                        # Use _handle_error_response to raise appropriate error
+                        await self._handle_error_response(
+                            response.status, response_text, correlation_id
                         )
-                        logger.error(
-                            "Queue result retrieval failed",
-                            extra={
-                                "error_code": error_detail.error_code.value,
-                                "correlation_id": str(correlation_id),
-                                "queue_id": queue_id,
-                                "status_code": response.status,
-                            },
-                        )
-                        return None, error_detail
+                        # This should never be reached
+                        raise AssertionError("_handle_error_response should have raised")
 
             except aiohttp.ClientError:
                 # Re-raise to let retry manager handle it
                 raise
             except Exception as e:
-                error_detail = ErrorDetail(
-                    error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+                raise_external_service_error(
+                    service="cj_assessment_service",
+                    operation="_retrieve_queue_result.make_result_request",
+                    external_service="llm_provider_service",
                     message=f"Unexpected error retrieving queue result: {str(e)}",
                     correlation_id=correlation_id,
-                    timestamp=datetime.now(UTC),
-                    details={"queue_id": queue_id, "exception_type": type(e).__name__},
+                    queue_id=queue_id,
+                    exception_type=type(e).__name__,
                 )
-                logger.exception(
-                    "Unexpected error retrieving queue result",
-                    extra={
-                        "error_code": error_detail.error_code.value,
-                        "correlation_id": str(correlation_id),
-                        "queue_id": queue_id,
-                        "exception_type": type(e).__name__,
-                    },
-                )
-                return None, error_detail
 
         # Use retry manager for resilience
-        result, error = await self.retry_manager.with_retry(make_result_request)
-        if error:
-            logger.debug(f"Queue result retrieval failed after retries: {error.message}")
-            return None, error
-        return result, None
+        return await self.retry_manager.with_retry(make_result_request)

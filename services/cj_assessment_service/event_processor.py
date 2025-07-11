@@ -10,6 +10,9 @@ if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
 
 from aiokafka import ConsumerRecord
+from huleedu_service_libs.error_handling.error_detail_factory import (
+    create_error_detail_with_context,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import (
     inject_trace_context,
@@ -26,6 +29,7 @@ from common_core.events.cj_assessment_events import (
 )
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
+from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import BatchStatus, ProcessingStage
 from services.cj_assessment_service.cj_core_logic import run_cj_assessment_workflow
 from services.cj_assessment_service.config import Settings
@@ -33,7 +37,6 @@ from services.cj_assessment_service.exceptions import (
     CJAssessmentError,
 )
 from services.cj_assessment_service.metrics import get_business_metrics
-from services.cj_assessment_service.models_api import ErrorDetail
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
@@ -399,11 +402,12 @@ async def _process_cj_assessment_impl(
 
 def _create_parsing_error_detail(error_message: str, exception_type: str) -> ErrorDetail:
     """Create structured error detail for message parsing failures."""
-    return ErrorDetail(
+    return create_error_detail_with_context(
         error_code=ErrorCode.PARSING_ERROR,
         message=f"Failed to parse CJ assessment message: {error_message}",
+        service="cj_assessment_service",
+        operation="parse_kafka_message",
         correlation_id=uuid4(),  # Generate correlation_id for parsing stage
-        timestamp=datetime.now(UTC),
         details={
             "exception_type": exception_type,
             "parsing_stage": "event_envelope",
@@ -414,12 +418,14 @@ def _create_parsing_error_detail(error_message: str, exception_type: str) -> Err
 def _categorize_processing_error(exception: Exception) -> ErrorDetail:
     """Categorize processing exceptions into appropriate ErrorCode types."""
     if isinstance(exception, CJAssessmentError):
-        # Already a structured CJ Assessment error
-        return ErrorDetail(
+        # Already a structured CJ Assessment error - recreate with canonical model
+        return create_error_detail_with_context(
             error_code=exception.error_code,
             message=exception.message,
+            service="cj_assessment_service",
+            operation="process_cj_assessment",
             correlation_id=exception.correlation_id or uuid4(),
-            timestamp=exception.timestamp,
+            capture_stack=False,  # Don't capture stack since it's already a structured error
             details=exception.details,
         )
 
@@ -435,11 +441,12 @@ def _categorize_processing_error(exception: Exception) -> ErrorDetail:
     else:
         error_code = ErrorCode.PROCESSING_ERROR
 
-    return ErrorDetail(
+    return create_error_detail_with_context(
         error_code=error_code,
         message=f"CJ assessment processing failed: {str(exception)}",
+        service="cj_assessment_service",
+        operation="categorize_processing_error",
         correlation_id=uuid4(),  # Generate correlation_id for generic processing error
-        timestamp=datetime.now(UTC),
         details={
             "exception_type": type(exception).__name__,
             "processing_stage": "cj_assessment_workflow",
@@ -451,11 +458,12 @@ def _create_publishing_error_detail(
     exception: Exception, correlation_id: UUID | None = None
 ) -> ErrorDetail:
     """Create structured error detail for event publishing failures."""
-    return ErrorDetail(
+    return create_error_detail_with_context(
         error_code=ErrorCode.KAFKA_PUBLISH_ERROR,
         message=f"Failed to publish failure event: {str(exception)}",
+        service="cj_assessment_service",
+        operation="publish_failure_event",
         correlation_id=correlation_id or uuid4(),
-        timestamp=datetime.now(UTC),
         details={
             "exception_type": type(exception).__name__,
             "publishing_stage": "assessment_failed_event",

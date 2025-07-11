@@ -6,18 +6,20 @@ for operational monitoring and observability.
 
 from __future__ import annotations
 
-from datetime import datetime
 from uuid import uuid4
 
 from dishka import FromDishka
 from huleedu_service_libs.database import DatabaseHealthChecker
+from huleedu_service_libs.error_handling.error_detail_factory import (
+    create_error_detail_with_context,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry
 from quart import Blueprint, Response, current_app, jsonify
 from quart_dishka import inject
 
 from common_core.error_enums import ErrorCode
-from services.cj_assessment_service.models_api import ErrorDetail, ErrorResponse
+from services.cj_assessment_service.models_api import ErrorResponse
 
 logger = create_service_logger("cj_assessment_service.api.health")
 health_bp = Blueprint("health_routes", __name__)
@@ -27,12 +29,14 @@ def create_error_response(
     error_code: ErrorCode, message: str, status_code: int = 500
 ) -> tuple[Response, int]:
     """Create a standardized error response using ErrorResponse format."""
-    error_detail = ErrorDetail(
+    error_detail = create_error_detail_with_context(
         error_code=error_code,
         message=message,
-        correlation_id=uuid4(),
-        timestamp=datetime.utcnow(),
         service="cj_assessment_service",
+        operation="health_api_error",
+        correlation_id=uuid4(),
+        capture_stack=False,  # Don't capture stack for API boundary errors
+        details={},
     )
 
     error_response = ErrorResponse(error=error_detail, status_code=status_code)

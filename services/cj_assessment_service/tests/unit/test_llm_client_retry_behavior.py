@@ -8,12 +8,13 @@ from uuid import uuid4
 import aiohttp
 import pytest
 
+from common_core.error_enums import ErrorCode
+from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
 )
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
-from services.cj_assessment_service.models_api import ErrorDetail
 
 
 class MockResponse:
@@ -148,14 +149,16 @@ Please respond with a JSON object containing:
         )
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            test_prompt,
-            correlation_id=correlation_id,
-        )
+        try:
+            result = await client.generate_comparison(
+                test_prompt,
+                correlation_id=correlation_id,
+            )
+        except HuleEduError as e:
+            pytest.fail(f"Unexpected error: {e}")
 
         # Verify retries happened
         assert call_count == 3, f"Expected 3 calls (2 failures + 1 success), got {call_count}"
-        assert error is None
         assert result is not None
         assert result["winner"] == "Essay A"
 
@@ -199,17 +202,15 @@ Please respond with a JSON object containing:
 
         # Expect failure after all retries
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            test_prompt,
-            correlation_id=correlation_id,
-        )
+        with pytest.raises(aiohttp.ClientResponseError) as exc_info:
+            await client.generate_comparison(
+                test_prompt,
+                correlation_id=correlation_id,
+            )
 
         # Verify all retry attempts were made
         assert call_count == 3, f"Expected 3 retry attempts, got {call_count}"
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert "500" in error.message or "Internal Server Error" in error.message
+        assert exc_info.value.status == 500
 
     async def test_non_retryable_400_error(
         self,
@@ -252,17 +253,17 @@ Please respond with a JSON object containing:
         )
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            test_prompt,
-            correlation_id=correlation_id,
-        )
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+            message_contains="Invalid request format"
+        ) as captured:
+            await client.generate_comparison(
+                test_prompt,
+                correlation_id=correlation_id,
+            )
 
         # Verify no retries for non-retryable error
         assert call_count == 1, f"Expected 1 call (no retries), got {call_count}"
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert "Invalid request format" in error.message
 
     async def test_network_connection_error_retries(
         self,
@@ -291,17 +292,15 @@ Please respond with a JSON object containing:
         )
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            test_prompt,
-            correlation_id=correlation_id,
-        )
+        with pytest.raises(aiohttp.ClientConnectionError) as exc_info:
+            await client.generate_comparison(
+                test_prompt,
+                correlation_id=correlation_id,
+            )
 
         # Verify retries happened for connection error
         assert call_count == 3, f"Expected 3 retry attempts, got {call_count}"
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert "Connection refused" in error.message or "client error" in error.message.lower()
+        assert "Connection refused" in str(exc_info.value)
 
     async def test_timeout_error_retries(
         self,
@@ -330,15 +329,15 @@ Please respond with a JSON object containing:
         )
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            test_prompt,
-            correlation_id=correlation_id,
-        )
+        with pytest.raises(aiohttp.ServerTimeoutError) as exc_info:
+            await client.generate_comparison(
+                test_prompt,
+                correlation_id=correlation_id,
+            )
 
         # Verify retries happened for timeout
         assert call_count == 3, f"Expected 3 retry attempts, got {call_count}"
-        assert result is None
-        assert error is not None
+        assert "timeout" in str(exc_info.value).lower()
 
     async def test_successful_response_no_retries(
         self,
@@ -390,14 +389,16 @@ Please respond with a JSON object containing:
         )
 
         correlation_id = uuid4()
-        result, error = await client.generate_comparison(
-            test_prompt,
-            correlation_id=correlation_id,
-        )
+        try:
+            result = await client.generate_comparison(
+                test_prompt,
+                correlation_id=correlation_id,
+            )
+        except HuleEduError as e:
+            pytest.fail(f"Unexpected error: {e}")
 
         # Verify no retries for success
         assert call_count == 1, f"Expected 1 call (no retries), got {call_count}"
-        assert error is None
         assert result is not None
         assert result["winner"] == "Essay B"
         assert result["confidence"] == 4.2

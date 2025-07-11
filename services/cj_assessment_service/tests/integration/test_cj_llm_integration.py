@@ -11,12 +11,13 @@ import aiohttp
 import pytest
 
 from common_core import LLMProviderType
+from common_core.error_enums import ErrorCode
+from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
 )
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
-from services.cj_assessment_service.models_api import ErrorDetail
 
 
 async def check_service_availability(service_url: str, timeout: int = 10) -> bool:
@@ -129,15 +130,17 @@ Always respond with valid JSON."""
         # Call the LLM Provider Service through the client
         # Use claude-3-haiku-20240307 which is a valid Anthropic model
         correlation_id = uuid4()
-        result, error = await llm_client.generate_comparison(
-            user_prompt=prompt,
-            model_override="claude-3-haiku-20240307",
-            temperature_override=0.1,
-            correlation_id=correlation_id,
-        )
+        try:
+            result = await llm_client.generate_comparison(
+                user_prompt=prompt,
+                model_override="claude-3-haiku-20240307",
+                temperature_override=0.1,
+                correlation_id=correlation_id,
+            )
+        except HuleEduError as e:
+            pytest.fail(f"Unexpected error: {e}")
 
         # Verify the response
-        assert error is None, f"Unexpected error: {error}"
         assert result is not None, "Expected a result"
 
         print("\nComparison Result:")
@@ -164,16 +167,18 @@ Always respond with valid JSON."""
         invalid_prompt = "This is not a valid essay comparison prompt"
 
         correlation_id = uuid4()
-        result, error = await llm_client.generate_comparison(
-            user_prompt=invalid_prompt,
-            correlation_id=correlation_id,
-        )
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.VALIDATION_ERROR,
+            service="cj_assessment_service",
+            operation="generate_comparison",
+            message_contains="Invalid prompt format"
+        ) as captured:
+            await llm_client.generate_comparison(
+                user_prompt=invalid_prompt,
+                correlation_id=correlation_id,
+            )
 
-        assert result is None
-        assert error is not None
-        assert isinstance(error, ErrorDetail)
-        assert error.message == "Invalid prompt format: Could not extract essays"
-        print(f"\nError handling test passed: {error}")
+        print(f"\nError handling test passed: {captured.error}")
 
     async def test_cj_assessment_with_mock_provider(
         self, integration_settings: Settings, http_session: Any, retry_manager: RetryManagerImpl
@@ -211,15 +216,17 @@ Based on clarity, structure, argument quality, and writing mechanics.
 Always respond with valid JSON."""
 
         correlation_id = uuid4()
-        result, error = await llm_client.generate_comparison(
-            user_prompt=prompt,
-            model_override="mock-model",
-            temperature_override=0.1,
-            correlation_id=correlation_id,
-        )
+        try:
+            result = await llm_client.generate_comparison(
+                user_prompt=prompt,
+                model_override="mock-model",
+                temperature_override=0.1,
+                correlation_id=correlation_id,
+            )
+        except HuleEduError as e:
+            pytest.fail(f"Unexpected error: {e}")
 
         # Verify mock response
-        assert error is None, f"Unexpected error: {error}"
         assert result is not None, "Expected a result from mock provider"
 
         print("\nMock Provider Result:")

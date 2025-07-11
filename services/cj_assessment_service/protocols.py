@@ -6,13 +6,12 @@ enabling clean architecture and testability.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncContextManager, Protocol
+from typing import Any, AsyncContextManager, Awaitable, Callable, Protocol, TypeVar
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-if TYPE_CHECKING:
-    from services.cj_assessment_service.models_api import ErrorDetail
+T = TypeVar("T")
 
 
 class ContentClientProtocol(Protocol):
@@ -20,7 +19,7 @@ class ContentClientProtocol(Protocol):
 
     async def fetch_content(
         self, storage_id: str, correlation_id: UUID
-    ) -> tuple[str | None, ErrorDetail | None]:
+    ) -> str:
         """Fetch essay text content by storage ID.
 
         Args:
@@ -28,7 +27,10 @@ class ContentClientProtocol(Protocol):
             correlation_id: Request correlation ID for tracing
 
         Returns:
-            Tuple of (content, error) where only one should be set
+            The essay text content
+
+        Raises:
+            HuleEduError: On any failure to fetch content
         """
         ...
 
@@ -38,14 +40,22 @@ class RetryManagerProtocol(Protocol):
 
     async def with_retry(
         self,
-        operation: Any,  # Callable coroutine
+        operation: Callable[..., Awaitable[T]],
         *args: Any,
         **kwargs: Any,
-    ) -> tuple[Any, ErrorDetail | None]:
+    ) -> T:
         """Execute operation with retry logic.
 
+        Args:
+            operation: Async callable to execute with retries
+            *args: Positional arguments for the operation
+            **kwargs: Keyword arguments for the operation
+
         Returns:
-            Tuple of (result, error_detail)
+            The result from the successful operation
+
+        Raises:
+            HuleEduError: On permanent failure after all retries exhausted
         """
         ...
 
@@ -62,7 +72,7 @@ class LLMProviderProtocol(Protocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         provider_override: str | None = None,
-    ) -> tuple[dict[str, Any] | None, ErrorDetail | None]:
+    ) -> dict[str, Any]:
         """Generate a comparison assessment using the LLM.
 
         Args:
@@ -75,7 +85,10 @@ class LLMProviderProtocol(Protocol):
             provider_override: Optional provider name override
 
         Returns:
-            Tuple of (response_data, error_detail)
+            The LLM response data containing the comparison result
+
+        Raises:
+            HuleEduError: On any failure to generate comparison
         """
         ...
 

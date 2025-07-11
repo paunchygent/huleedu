@@ -9,14 +9,17 @@ Cache system removed to preserve CJ Assessment methodology integrity.
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
+from huleedu_service_libs.error_handling.error_detail_factory import (
+    create_error_detail_with_context,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core import LLMProviderType
 from common_core.error_enums import ErrorCode
+from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import (
@@ -31,6 +34,18 @@ from services.cj_assessment_service.protocols import (
 )
 
 logger = create_service_logger("cj_assessment_service.llm_interaction_impl")
+
+
+def _convert_to_local_error_detail(canonical_error: CanonicalErrorDetail) -> ErrorDetail:
+    """Convert canonical ErrorDetail to local service ErrorDetail."""
+    return ErrorDetail(
+        error_code=canonical_error.error_code,
+        message=canonical_error.message,
+        correlation_id=canonical_error.correlation_id,
+        timestamp=canonical_error.timestamp,
+        service=canonical_error.service,
+        details=canonical_error.details,
+    )
 
 
 class LLMInteractionImpl(LLMInteractionProtocol):
@@ -114,7 +129,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
 
                 # Make direct LLM API request - no caching
                 try:
-                    response_data, error_detail = await provider.generate_comparison(
+                    response_data = await provider.generate_comparison(
                         user_prompt=task.prompt,
                         correlation_id=correlation_id,
                         system_prompt_override=None,
@@ -123,46 +138,26 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         max_tokens_override=max_tokens_override,
                     )
 
-                    if response_data:
-                        # Record successful LLM API call metric
-                        if llm_api_calls_metric:
-                            llm_api_calls_metric.labels(
-                                provider=self.settings.DEFAULT_LLM_PROVIDER.value,
-                                model=model_override or self.settings.DEFAULT_LLM_MODEL,
-                                status="success",
-                            ).inc()
+                    # Record successful LLM API call metric
+                    if llm_api_calls_metric:
+                        llm_api_calls_metric.labels(
+                            provider=self.settings.DEFAULT_LLM_PROVIDER.value,
+                            model=model_override or self.settings.DEFAULT_LLM_MODEL,
+                            status="success",
+                        ).inc()
 
-                        logger.info(
-                            f"LLM Response for essays {task.essay_a.id} vs {task.essay_b.id}: "
-                            f"Winner -> {response_data.get('winner')}",
-                        )
+                    logger.info(
+                        f"LLM Response for essays {task.essay_a.id} vs {task.essay_b.id}: "
+                        f"Winner -> {response_data.get('winner')}",
+                    )
 
-                        llm_assessment = LLMAssessmentResponseSchema(**response_data)
-                        return ComparisonResult(
-                            task=task,
-                            llm_assessment=llm_assessment,
-                            error_detail=None,
-                            raw_llm_response_content=None,
-                        )
-                    else:
-                        # Record failed LLM API call metric
-                        if llm_api_calls_metric:
-                            llm_api_calls_metric.labels(
-                                provider=self.settings.DEFAULT_LLM_PROVIDER.value,
-                                model=model_override or self.settings.DEFAULT_LLM_MODEL,
-                                status="error",
-                            ).inc()
-
-                        logger.error(
-                            f"Task with essays {task.essay_a.id}-{task.essay_b.id} "
-                            f"failed: {error_detail}",
-                        )
-                        return ComparisonResult(
-                            task=task,
-                            llm_assessment=None,
-                            error_detail=error_detail,
-                            raw_llm_response_content=None,
-                        )
+                    llm_assessment = LLMAssessmentResponseSchema(**response_data)
+                    return ComparisonResult(
+                        task=task,
+                        llm_assessment=llm_assessment,
+                        error_detail=None,
+                        raw_llm_response_content=None,
+                    )
 
                 except Exception as e:
                     # Record failed LLM API call metric
@@ -181,12 +176,18 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     return ComparisonResult(
                         task=task,
                         llm_assessment=None,
-                        error_detail=ErrorDetail(
-                            error_code=ErrorCode.PROCESSING_ERROR,
-                            message=f"Unexpected error processing task: {e!s}",
-                            correlation_id=correlation_id,
-                            timestamp=datetime.now(UTC),
-                            details={"essay_a_id": task.essay_a.id, "essay_b_id": task.essay_b.id},
+                        error_detail=_convert_to_local_error_detail(
+                            create_error_detail_with_context(
+                                error_code=ErrorCode.PROCESSING_ERROR,
+                                message=f"Unexpected error processing task: {e!s}",
+                                service="cj_assessment_service",
+                                operation="process_comparison_task",
+                                correlation_id=correlation_id,
+                                details={
+                                    "essay_a_id": task.essay_a.id,
+                                    "essay_b_id": task.essay_b.id,
+                                },
+                            )
                         ),
                         raw_llm_response_content=None,
                     )
@@ -211,15 +212,18 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         ComparisonResult(
                             task=tasks[i],
                             llm_assessment=None,
-                            error_detail=ErrorDetail(
-                                error_code=ErrorCode.PROCESSING_ERROR,
-                                message=f"Task execution failed: {result!s}",
-                                correlation_id=correlation_id,
-                                timestamp=datetime.now(UTC),
-                                details={
-                                    "essay_a_id": tasks[i].essay_a.id,
-                                    "essay_b_id": tasks[i].essay_b.id,
-                                },
+                            error_detail=_convert_to_local_error_detail(
+                                create_error_detail_with_context(
+                                    error_code=ErrorCode.PROCESSING_ERROR,
+                                    message=f"Task execution failed: {result!s}",
+                                    service="cj_assessment_service",
+                                    operation="process_comparisons_batch",
+                                    correlation_id=correlation_id,
+                                    details={
+                                        "essay_a_id": tasks[i].essay_a.id,
+                                        "essay_b_id": tasks[i].essay_b.id,
+                                    },
+                                )
                             ),
                             raw_llm_response_content=None,
                         ),
@@ -248,12 +252,15 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                 ComparisonResult(
                     task=task,
                     llm_assessment=None,
-                    error_detail=ErrorDetail(
-                        error_code=ErrorCode.PROCESSING_ERROR,
-                        message=f"Critical processing error: {e!s}",
-                        correlation_id=correlation_id,
-                        timestamp=datetime.now(UTC),
-                        details={"essay_a_id": task.essay_a.id, "essay_b_id": task.essay_b.id},
+                    error_detail=_convert_to_local_error_detail(
+                        create_error_detail_with_context(
+                            error_code=ErrorCode.PROCESSING_ERROR,
+                            message=f"Critical processing error: {e!s}",
+                            service="cj_assessment_service",
+                            operation="process_comparisons_critical_error",
+                            correlation_id=correlation_id,
+                            details={"essay_a_id": task.essay_a.id, "essay_b_id": task.essay_b.id},
+                        )
                     ),
                     raw_llm_response_content=None,
                 )
