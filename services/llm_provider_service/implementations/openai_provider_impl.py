@@ -1,15 +1,21 @@
 """OpenAI LLM provider implementation."""
 
 import json
-from typing import Tuple
+from uuid import UUID
 
 import aiohttp
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core import EssayComparisonWinner, LLMProviderType
-from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
-from services.llm_provider_service.internal_models import LLMProviderError, LLMProviderResponse
+from services.llm_provider_service.exceptions import (
+    raise_authentication_error,
+    raise_configuration_error,
+    raise_external_service_error,
+    raise_parsing_error,
+    raise_rate_limit_error,
+)
+from services.llm_provider_service.internal_models import LLMProviderResponse
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
 from services.llm_provider_service.response_validator import validate_and_normalize_response
 
@@ -43,34 +49,38 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         user_prompt: str,
         essay_a: str,
         essay_b: str,
+        correlation_id: UUID,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
-    ) -> Tuple[LLMProviderResponse | None, LLMProviderError | None]:
+    ) -> LLMProviderResponse:
         """Generate LLM comparison response.
 
         Args:
             user_prompt: The comparison prompt template
             essay_a: First essay to compare
             essay_b: Second essay to compare
+            correlation_id: Request correlation ID for tracing
             system_prompt_override: Optional system prompt override
             model_override: Optional model override
             temperature_override: Optional temperature override
             max_tokens_override: Optional max tokens override
 
         Returns:
-            Tuple of (response_model, error_model)
+            The LLM provider response containing comparison result
+
+        Raises:
+            HuleEduError: On any failure to generate comparison
         """
         if not self.api_key:
-            from uuid import uuid4
-
-            return None, LLMProviderError(
-                error_type=ErrorCode.CONFIGURATION_ERROR,
-                error_message="OpenAI API key not configured",
-                provider=LLMProviderType.OPENAI,
-                correlation_id=uuid4(),
-                is_retryable=False,
+            raise_configuration_error(
+                service="llm_provider_service",
+                operation="generate_comparison",
+                config_key="OPENAI_API_KEY",
+                message="OpenAI API key not configured",
+                correlation_id=correlation_id,
+                details={"provider": "openai"}
             )
 
         # Prepare the full prompt with essays
@@ -97,6 +107,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                 operation_name="openai_api_request",
                 system_prompt=system_prompt,
                 user_prompt=full_prompt,
+                correlation_id=correlation_id,
                 model_override=model_override,
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
@@ -104,35 +115,39 @@ class OpenAIProviderImpl(LLMProviderProtocol):
             # Type assert since retry manager returns Any
             return result  # type: ignore
         except Exception as e:
-            from uuid import uuid4
-
-            return None, LLMProviderError(
-                error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                error_message=f"OpenAI API call failed: {str(e)}",
-                provider=LLMProviderType.OPENAI,
-                correlation_id=uuid4(),
-                is_retryable=True,
+            raise_external_service_error(
+                service="llm_provider_service",
+                operation="openai_api_request",
+                external_service="openai_api",
+                message=f"OpenAI API call failed: {str(e)}",
+                correlation_id=correlation_id,
+                details={"provider": "openai"}
             )
 
     async def _make_api_request(
         self,
         system_prompt: str,
         user_prompt: str,
+        correlation_id: UUID,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
-    ) -> Tuple[LLMProviderResponse | None, LLMProviderError | None]:
+    ) -> LLMProviderResponse:
         """Make API request to OpenAI.
 
         Args:
             system_prompt: System prompt
             user_prompt: User prompt with essays
+            correlation_id: Request correlation ID for tracing
             model_override: Optional model override
             temperature_override: Optional temperature override
             max_tokens_override: Optional max tokens override
 
         Returns:
-            Tuple of (response_model, error_model)
+            The LLM provider response
+
+        Raises:
+            HuleEduError: On any failure to make API request
         """
         endpoint = f"{self.api_base}/chat/completions"
         headers = {
@@ -195,25 +210,11 @@ class OpenAIProviderImpl(LLMProviderProtocol):
 
                         try:
                             # Validate and normalize response using centralized validator
-                            validated_response, validation_error = validate_and_normalize_response(
-                                text_content
+                            validated_response = validate_and_normalize_response(
+                                text_content, provider="openai", correlation_id=correlation_id
                             )
 
-                            if validation_error:
-                                error_msg = f"Response validation failed: {validation_error}"
-                                logger.error(error_msg, extra={"response_text": text_content[:500]})
-                                from uuid import uuid4
-
-                                return None, LLMProviderError(
-                                    error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                                    error_message=error_msg,
-                                    provider=LLMProviderType.OPENAI,
-                                    correlation_id=uuid4(),
-                                    is_retryable=False,
-                                )
-
                             # Convert to internal format
-                            assert validated_response is not None  # Type assertion for mypy
                             # Convert winner string to enum value
                             if validated_response.winner == "Essay A":
                                 winner = EssayComparisonWinner.ESSAY_A
@@ -244,59 +245,65 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                                 raw_response=response_data,
                             )
 
-                            return response_model, None
+                            return response_model
 
                         except (json.JSONDecodeError, ValueError, KeyError) as e:
                             error_msg = f"Failed to parse OpenAI response: {str(e)}"
                             logger.error(error_msg, extra={"response_text": text_content[:500]})
-                            from uuid import uuid4
-
-                            return None, LLMProviderError(
-                                error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                                error_message=error_msg,
-                                provider=LLMProviderType.OPENAI,
-                                correlation_id=uuid4(),
-                                is_retryable=False,
+                            raise_parsing_error(
+                                service="llm_provider_service",
+                                operation="openai_api_request",
+                                parse_target="json_response",
+                                message=error_msg,
+                                correlation_id=correlation_id,
+                                details={"provider": "openai"}
                             )
                     else:
-                        from uuid import uuid4
-
-                        return None, LLMProviderError(
-                            error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                            error_message="No choices in OpenAI response",
-                            provider=LLMProviderType.OPENAI,
-                            correlation_id=uuid4(),
-                            is_retryable=False,
+                        raise_external_service_error(
+                            service="llm_provider_service",
+                            operation="openai_api_request",
+                            external_service="openai_api",
+                            message="No choices in OpenAI response",
+                            correlation_id=correlation_id,
+                            details={"provider": "openai"}
                         )
 
                 else:
                     error_text = await response.text()
                     error_msg = f"OpenAI API error: {response.status} - {error_text}"
 
-                    # Determine error type
-                    if response.status == 429:
-                        error_type = ErrorCode.RATE_LIMIT
-                    elif response.status == 401:
-                        error_type = ErrorCode.AUTHENTICATION_ERROR
-                    elif response.status >= 500:
-                        error_type = ErrorCode.EXTERNAL_SERVICE_ERROR
-                    else:
-                        error_type = ErrorCode.EXTERNAL_SERVICE_ERROR
-
                     # Raise for retryable status codes to trigger retry
                     if response.status in {429, 500, 502, 503, 504}:
                         response.raise_for_status()
 
-                    from uuid import uuid4
-
-                    return None, LLMProviderError(
-                        error_type=error_type,
-                        error_message=error_msg,
-                        provider=LLMProviderType.OPENAI,
-                        correlation_id=uuid4(),
-                        retry_after=60 if response.status == 429 else None,
-                        is_retryable=response.status in {429, 500, 502, 503, 504},
-                    )
+                    # Handle specific HTTP errors with appropriate exceptions
+                    if response.status == 429:
+                        raise_rate_limit_error(
+                            service="llm_provider_service",
+                            operation="openai_api_request",
+                            limit=0,  # Unknown limit from API
+                            window_seconds=60,
+                            message=f"Rate limit exceeded: {error_text}",
+                            correlation_id=correlation_id,
+                            details={"provider": "openai", "retry_after": 60}
+                        )
+                    elif response.status == 401:
+                        raise_authentication_error(
+                            service="llm_provider_service",
+                            operation="openai_api_request",
+                            message=f"Authentication failed: {error_text}",
+                            correlation_id=correlation_id,
+                            details={"provider": "openai"}
+                        )
+                    else:
+                        raise_external_service_error(
+                            service="llm_provider_service",
+                            operation="openai_api_request",
+                            external_service="openai_api",
+                            message=error_msg,
+                            correlation_id=correlation_id,
+                            details={"provider": "openai", "status_code": response.status}
+                        )
 
         except aiohttp.ClientResponseError:
             # Will be retried by retry manager
@@ -308,14 +315,13 @@ class OpenAIProviderImpl(LLMProviderProtocol):
             # Unexpected errors
             error_msg = f"Unexpected error calling OpenAI API: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            from uuid import uuid4
-
-            return None, LLMProviderError(
-                error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                error_message=error_msg,
-                provider=LLMProviderType.OPENAI,
-                correlation_id=uuid4(),
-                is_retryable=True,
+            raise_external_service_error(
+                service="llm_provider_service",
+                operation="openai_api_request",
+                external_service="openai_api",
+                message=error_msg,
+                correlation_id=correlation_id,
+                details={"provider": "openai"}
             )
 
     def _format_comparison_prompt(self, user_prompt: str, essay_a: str, essay_b: str) -> str:

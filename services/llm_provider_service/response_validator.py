@@ -8,12 +8,17 @@ from __future__ import annotations
 import json
 import re
 import time
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
+from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field, ValidationError
 
 from common_core import EssayComparisonWinner
+from services.llm_provider_service.exceptions import (
+    raise_parsing_error,
+    raise_validation_error,
+)
 
 logger = create_service_logger("llm_provider_service.response_validator")
 
@@ -41,7 +46,8 @@ class StandardizedLLMResponse(BaseModel):
 def validate_and_normalize_response(
     raw_response: str | Dict[str, Any],
     provider: str = "unknown",
-) -> Tuple[StandardizedLLMResponse | None, str | None]:
+    correlation_id: UUID | None = None,
+) -> StandardizedLLMResponse:
     """Validate and normalize LLM response to standardized format.
 
     Performance optimized for sub-500ms response times.
@@ -49,9 +55,13 @@ def validate_and_normalize_response(
     Args:
         raw_response: Raw response from LLM (JSON string or dict)
         provider: Provider name for metrics tracking
+        correlation_id: Request correlation ID for error tracking
 
     Returns:
-        Tuple of (validated_response, error_message)
+        Validated and normalized response
+
+    Raises:
+        HuleEduError: On validation or parsing failures
     """
     start_time = time.perf_counter()
 
@@ -64,7 +74,14 @@ def validate_and_normalize_response(
                 parsed_data = json.loads(raw_response)
             except json.JSONDecodeError as e:
                 _record_validation_metrics(provider, "json_parse", start_time, False)
-                return None, f"Invalid JSON format: {str(e)}"
+                raise_parsing_error(
+                    service="llm_provider_service",
+                    operation="response_validation",
+                    parse_target="json",
+                    message=f"Invalid JSON format: {str(e)}",
+                    correlation_id=correlation_id or UUID(int=0),
+                    details={"provider": provider}
+                )
 
         # Fast normalization with minimal string operations
         normalized_data = _fast_normalize_fields(parsed_data)
@@ -73,16 +90,30 @@ def validate_and_normalize_response(
         validated_response = StandardizedLLMResponse.model_validate(normalized_data)
 
         _record_validation_metrics(provider, "success", start_time, True)
-        return validated_response, None
+        return validated_response
 
     except ValidationError as e:
         _record_validation_metrics(provider, "validation_error", start_time, False)
         error_msg = _format_validation_errors(e)
-        return None, f"Validation failed: {error_msg}"
+        raise_validation_error(
+            service="llm_provider_service",
+            operation="response_validation",
+            field="response_fields",
+            message=f"Validation failed: {error_msg}",
+            correlation_id=correlation_id or UUID(int=0),
+            details={"provider": provider}
+        )
 
     except Exception as e:
         _record_validation_metrics(provider, "unexpected_error", start_time, False)
-        return None, f"Unexpected validation error: {str(e)}"
+        raise_validation_error(
+            service="llm_provider_service",
+            operation="response_validation",
+            field="unknown",
+            message=f"Unexpected validation error: {str(e)}",
+            correlation_id=correlation_id or UUID(int=0),
+            details={"provider": provider}
+        )
 
 
 def _fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -161,7 +192,8 @@ def _record_validation_metrics(
 def validate_and_normalize_response_fast(
     raw_response: Dict[str, Any],
     provider: str = "unknown",
-) -> Tuple[StandardizedLLMResponse | None, str | None]:
+    correlation_id: UUID | None = None,
+) -> StandardizedLLMResponse:
     """Ultra-fast validation for pre-parsed dict responses.
 
     Optimized for scenarios where JSON is already parsed and we need minimal validation.
@@ -170,9 +202,13 @@ def validate_and_normalize_response_fast(
     Args:
         raw_response: Pre-parsed response dict
         provider: Provider name for metrics tracking
+        correlation_id: Request correlation ID for error tracking
 
     Returns:
-        Tuple of (validated_response, error_message)
+        Validated response
+
+    Raises:
+        HuleEduError: On validation failures
     """
     start_time = time.perf_counter()
 
@@ -184,11 +220,18 @@ def validate_and_normalize_response_fast(
         validated_response = StandardizedLLMResponse.model_construct(**normalized_data)
 
         _record_validation_metrics(provider, "fast_success", start_time, True)
-        return validated_response, None
+        return validated_response
 
     except Exception as e:
         _record_validation_metrics(provider, "fast_error", start_time, False)
-        return None, f"Fast validation error: {str(e)}"
+        raise_validation_error(
+            service="llm_provider_service",
+            operation="fast_response_validation",
+            field="response_fields",
+            message=f"Fast validation error: {str(e)}",
+            correlation_id=correlation_id or UUID(int=0),
+            details={"provider": provider}
+        )
 
 
 def _ultra_fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -220,22 +263,27 @@ def _ultra_fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
 def batch_validate_responses(
     responses: list[Dict[str, Any]],
     provider: str = "unknown",
-) -> list[Tuple[StandardizedLLMResponse | None, str | None]]:
+    correlation_id: UUID | None = None,
+) -> list[StandardizedLLMResponse]:
     """Batch validate multiple responses for improved performance.
 
     Args:
         responses: List of response dicts to validate
         provider: Provider name for metrics tracking
+        correlation_id: Request correlation ID for error tracking
 
     Returns:
-        List of validation results
+        List of validated responses
+
+    Raises:
+        HuleEduError: On batch validation failures
     """
     start_time = time.perf_counter()
     results = []
 
     try:
         for response in responses:
-            result = validate_and_normalize_response_fast(response, provider)
+            result = validate_and_normalize_response_fast(response, provider, correlation_id)
             results.append(result)
 
         _record_validation_metrics(provider, "batch_success", start_time, True)
@@ -243,9 +291,13 @@ def batch_validate_responses(
 
     except Exception as e:
         _record_validation_metrics(provider, "batch_error", start_time, False)
-        # Return partial results if possible
-        return results + [(None, f"Batch validation error: {str(e)}")] * (
-            len(responses) - len(results)
+        raise_validation_error(
+            service="llm_provider_service",
+            operation="batch_response_validation",
+            field="batch_responses",
+            message=f"Batch validation error: {str(e)}",
+            correlation_id=correlation_id or UUID(int=0),
+            details={"provider": provider, "processed_count": len(results)}
         )
 
 
