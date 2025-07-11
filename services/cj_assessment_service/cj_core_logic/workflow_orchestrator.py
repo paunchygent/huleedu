@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from pydantic import BaseModel, Field
 
 from services.cj_assessment_service.cj_core_logic import (
     batch_preparation,
@@ -29,6 +30,21 @@ from services.cj_assessment_service.protocols import (
 logger = create_service_logger("cj_assessment_service.workflow_orchestrator")
 
 
+class CJAssessmentWorkflowResult(BaseModel):
+    """Result of a complete CJ assessment workflow execution.
+
+    This model encapsulates the final output of the CJ assessment process,
+    including essay rankings and the associated batch identifier.
+    """
+
+    rankings: list[dict[str, Any]] = Field(
+        description="Ordered list of essay rankings with scores and metadata", default_factory=list
+    )
+    batch_id: str = Field(
+        description="String identifier of the CJ batch that was processed", min_length=1
+    )
+
+
 async def run_cj_assessment_workflow(
     request_data: dict[str, Any],
     correlation_id: UUID,
@@ -37,7 +53,7 @@ async def run_cj_assessment_workflow(
     llm_interaction: LLMInteractionProtocol,
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
-) -> tuple[list[dict[str, Any]], str]:
+) -> CJAssessmentWorkflowResult:
     """Run the complete CJ assessment workflow for a batch of essays.
 
     Args:
@@ -98,7 +114,7 @@ async def run_cj_assessment_workflow(
             extra=log_extra,
         )
 
-        return rankings, str(cj_batch_id)
+        return CJAssessmentWorkflowResult(rankings=rankings, batch_id=str(cj_batch_id))
 
     except Exception as e:
         logger.error(

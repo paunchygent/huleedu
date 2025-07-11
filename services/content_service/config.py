@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     PORT: int = 8001  # Default port, matches docker-compose and pdm dev script for content_service
     WEB_CONCURRENCY: int = 1
 
+    # Quart app.run() parameters
+    DEBUG: bool = False
+    HTTP_HOST: str = "0.0.0.0"
+    HTTP_PORT: int = 8001
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

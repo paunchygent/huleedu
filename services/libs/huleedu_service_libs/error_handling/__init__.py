@@ -8,12 +8,6 @@ from huleedu_service_libs.error_handling.class_management_factories import (
     raise_multiple_course_error,
     raise_student_not_found,
 )
-from huleedu_service_libs.error_handling.context_manager import (
-    ErrorContext,
-)
-from huleedu_service_libs.error_handling.context_manager import (
-    HuleEduError as LegacyHuleEduError,
-)
 from huleedu_service_libs.error_handling.error_detail_factory import (
     create_error_detail_with_context,
 )
@@ -126,7 +120,4 @@ __all__ = [
     "ErrorDetailMatcher",
     "create_test_error_detail",
     "create_test_huleedu_error",
-    # Legacy - to be removed
-    "ErrorContext",
-    "LegacyHuleEduError",
 ]

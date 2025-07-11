@@ -211,7 +211,7 @@ async def _process_cj_assessment_impl(
         )
 
         # Run CJ assessment workflow with LLM interaction
-        rankings, cj_job_id_ref = await run_cj_assessment_workflow(
+        workflow_result = await run_cj_assessment_workflow(
             request_data=converted_request_data,
             correlation_id=correlation_id,
             database=database,
@@ -225,9 +225,11 @@ async def _process_cj_assessment_impl(
             f"CJ assessment workflow completed for batch {converted_request_data['bos_batch_id']}",
             extra={
                 **log_extra,
-                "job_id": cj_job_id_ref,
-                "rankings_count": len(rankings) if rankings else 0,
-                "rankings_preview": rankings[:2] if rankings else [],
+                "job_id": workflow_result.batch_id,
+                "rankings_count": len(workflow_result.rankings),
+                "rankings_preview": workflow_result.rankings[:2]
+                if workflow_result.rankings
+                else [],
             },
         )
 
@@ -244,9 +246,11 @@ async def _process_cj_assessment_impl(
             )
 
         # Record comparisons made (estimated from rankings count)
-        if comparisons_metric and rankings:
+        if comparisons_metric and workflow_result.rankings:
             # CJ assessments typically require n(n-1)/2 comparisons for n essays
-            estimated_comparisons = len(rankings) * (len(rankings) - 1) // 2
+            estimated_comparisons = (
+                len(workflow_result.rankings) * (len(workflow_result.rankings) - 1) // 2
+            )
             comparisons_metric.observe(estimated_comparisons)
             logger.debug(
                 f"Recorded estimated comparisons: {estimated_comparisons} for batch "
@@ -265,8 +269,8 @@ async def _process_cj_assessment_impl(
                 processing_stage=ProcessingStage.COMPLETED,
                 event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
             ),
-            cj_assessment_job_id=cj_job_id_ref,
-            rankings=rankings,
+            cj_assessment_job_id=workflow_result.batch_id,
+            rankings=workflow_result.rankings,
         )
 
         # The envelope for the outgoing event
@@ -290,8 +294,8 @@ async def _process_cj_assessment_impl(
             extra={
                 **log_extra,
                 "completion_topic": settings_obj.CJ_ASSESSMENT_COMPLETED_TOPIC,
-                "job_id": cj_job_id_ref,
-                "rankings_count": len(rankings) if rankings else 0,
+                "job_id": workflow_result.batch_id,
+                "rankings_count": len(workflow_result.rankings),
             },
         )
 

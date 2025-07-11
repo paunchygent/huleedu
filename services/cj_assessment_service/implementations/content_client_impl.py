@@ -37,9 +37,7 @@ class ContentClientImpl(ContentClientProtocol):
         self.retry_manager = retry_manager
         self.content_service_base_url = settings.CONTENT_SERVICE_URL.rstrip("/")
 
-    async def fetch_content(
-        self, storage_id: str, correlation_id: UUID
-    ) -> str:
+    async def fetch_content(self, storage_id: str, correlation_id: UUID) -> str:
         """Fetch essay text content by storage ID from Content Service.
 
         Args:
@@ -75,7 +73,7 @@ class ContentClientImpl(ContentClientProtocol):
                             operation="fetch_content",
                             message="Empty content received from Content Service",
                             correlation_id=correlation_id,
-                            storage_id=storage_id
+                            storage_id=storage_id,
                         )
 
                     logger.info(
@@ -94,7 +92,7 @@ class ContentClientImpl(ContentClientProtocol):
                         operation="fetch_content",
                         resource_type="Content",
                         resource_id=storage_id,
-                        correlation_id=correlation_id
+                        correlation_id=correlation_id,
                     )
 
                 else:
@@ -108,12 +106,10 @@ class ContentClientImpl(ContentClientProtocol):
                         correlation_id=correlation_id,
                         status_code=response.status,
                         error_text=error_text[:500],  # Truncate long error messages
-                        storage_id=storage_id
+                        storage_id=storage_id,
                     )
 
         # Use retry manager which will handle TimeoutError, ClientError, etc.
         return await self.retry_manager.with_retry(
-            _make_content_request,
-            provider_name="content_service",
-            correlation_id=correlation_id
+            _make_content_request, provider_name="content_service", correlation_id=correlation_id
         )

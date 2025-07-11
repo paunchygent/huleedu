@@ -332,6 +332,6 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             ),
             details=pair.error_details or {},
             stack_trace=None,  # Not stored in DB
-            trace_id=None,     # Not stored in DB
-            span_id=None,      # Not stored in DB
+            trace_id=None,  # Not stored in DB
+            span_id=None,  # Not stored in DB
         )

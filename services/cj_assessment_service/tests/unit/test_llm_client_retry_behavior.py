@@ -7,9 +7,9 @@ from uuid import uuid4
 
 import aiohttp
 import pytest
+from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
 
 from common_core.error_enums import ErrorCode
-from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
@@ -254,9 +254,8 @@ Please respond with a JSON object containing:
 
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
-            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
-            message_contains="Invalid request format"
-        ) as captured:
+            error_code=ErrorCode.INVALID_REQUEST, message_contains="Invalid request format"
+        ) as _:
             await client.generate_comparison(
                 test_prompt,
                 correlation_id=correlation_id,

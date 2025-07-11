@@ -7,9 +7,9 @@ from uuid import uuid4
 
 import aiohttp
 import pytest
+from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
 
 from common_core.error_enums import ErrorCode
-from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
@@ -227,9 +227,8 @@ Essay B content."""
 
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
-            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
-            message_contains="Internal server error"
-        ) as captured:
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR, message_contains="Internal server error"
+        ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,
                 correlation_id=correlation_id,
@@ -251,9 +250,8 @@ Essay B content."""
 
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
-            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
-            message_contains="Connection failed"
-        ) as captured:
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR, message_contains="Connection failed"
+        ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,
                 correlation_id=correlation_id,
@@ -267,9 +265,8 @@ Essay B content."""
 
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
-            error_code=ErrorCode.VALIDATION_ERROR,
-            message_contains="Invalid prompt format"
-        ) as captured:
+            error_code=ErrorCode.VALIDATION_ERROR, message_contains="Invalid prompt format"
+        ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,
                 correlation_id=correlation_id,
@@ -296,8 +293,8 @@ Essay B content."""
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
             error_code=ErrorCode.PARSING_ERROR,
-            message_contains="Failed to parse immediate response JSON"
-        ) as captured:
+            message_contains="Failed to parse immediate response JSON",
+        ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,
                 correlation_id=correlation_id,
@@ -457,9 +454,8 @@ Essay B content."""
 
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
-            error_code=ErrorCode.PROCESSING_ERROR,
-            message_contains="Queue processing failed"
-        ) as captured:
+            error_code=ErrorCode.PROCESSING_ERROR, message_contains="Queue processing failed"
+        ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,
                 correlation_id=correlation_id,
@@ -507,9 +503,8 @@ Essay B content."""
 
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
-            error_code=ErrorCode.TIMEOUT,
-            message_contains="Queue request expired"
-        ) as captured:
+            error_code=ErrorCode.TIMEOUT, message_contains="Queue request expired"
+        ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,
                 correlation_id=correlation_id,
@@ -557,9 +552,8 @@ Essay B content."""
 
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
-            error_code=ErrorCode.TIMEOUT,
-            message_contains="Maximum polling attempts"
-        ) as captured:
+            error_code=ErrorCode.TIMEOUT, message_contains="Maximum polling attempts"
+        ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,
                 correlation_id=correlation_id,
@@ -598,8 +592,8 @@ Essay B content."""
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
             error_code=ErrorCode.CONFIGURATION_ERROR,
-            message_contains="Request queued but polling is disabled"
-        ) as captured:
+            message_contains="Request queued but polling is disabled",
+        ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,
                 correlation_id=correlation_id,
@@ -633,8 +627,8 @@ Essay B content."""
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
             error_code=ErrorCode.INVALID_RESPONSE,
-            message_contains="Queue response missing queue_id"
-        ) as captured:
+            message_contains="Queue response missing queue_id",
+        ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,
                 correlation_id=correlation_id,
@@ -675,9 +669,8 @@ Essay B content."""
 
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
-            error_code=ErrorCode.TIMEOUT,
-            message_contains="Maximum polling attempts"
-        ) as captured:
+            error_code=ErrorCode.TIMEOUT, message_contains="Maximum polling attempts"
+        ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,
                 correlation_id=correlation_id,
@@ -739,9 +732,8 @@ Essay B content."""
 
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
-            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
-            message_contains="Queue result expired"
-        ) as captured:
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR, message_contains="Queue result expired"
+        ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,
                 correlation_id=correlation_id,

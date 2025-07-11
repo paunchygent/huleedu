@@ -81,7 +81,7 @@ def mock_boundary_services(
     """Create mock boundary services (external dependencies only)."""
     mock_content_client = AsyncMock()
     mock_content_client.fetch_content = AsyncMock(
-        return_value=("Sample essay content for testing CJ assessment.", None)
+        return_value="Sample essay content for testing CJ assessment."
     )
     mock_event_publisher = AsyncMock()
     mock_event_publisher.publish_assessment_completed = AsyncMock()

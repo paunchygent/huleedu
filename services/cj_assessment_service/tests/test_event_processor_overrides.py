@@ -18,6 +18,9 @@ from common_core.events.cj_assessment_events import (
     LLMConfigOverrides,
 )
 from common_core.events.envelope import EventEnvelope
+from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
+    CJAssessmentWorkflowResult,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.protocols import (
@@ -40,7 +43,7 @@ class TestEventProcessorOverrides:
     def mock_content_client(self, sample_essay_text: str) -> AsyncMock:
         """Create mock content client protocol."""
         client = AsyncMock(spec=ContentClientProtocol)
-        client.fetch_content = AsyncMock(return_value=(sample_essay_text, None))
+        client.fetch_content = AsyncMock(return_value=sample_essay_text)
         return client
 
     @pytest.fixture
@@ -93,7 +96,10 @@ class TestEventProcessorOverrides:
     def mock_core_workflow(self, sample_comparison_results: list[dict[str, Any]]) -> AsyncMock:
         """Create mock for core assessment workflow."""
         mock_workflow = AsyncMock()
-        mock_workflow.return_value = (sample_comparison_results, "cj_batch_123")
+        mock_workflow.return_value = CJAssessmentWorkflowResult(
+            rankings=sample_comparison_results,
+            batch_id="cj_batch_123"
+        )
         return mock_workflow
 
     @pytest.mark.asyncio

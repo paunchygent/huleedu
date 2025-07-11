@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common_core import EssayComparisonWinner
@@ -28,6 +29,21 @@ from services.cj_assessment_service.protocols import (
 from . import pair_generation, scoring_ranking
 
 logger = create_service_logger("cj_assessment_service.comparison_processing")
+
+
+class ComparisonIterationResult(BaseModel):
+    """Result of a single comparison iteration with LLM comparisons and score updates.
+
+    This model encapsulates the outcome of processing a batch of comparison tasks,
+    including the count of valid results and the updated Bradley-Terry scores.
+    """
+
+    valid_results_count: int = Field(
+        description="Number of valid LLM comparison results processed", ge=0
+    )
+    updated_scores: dict[str, float] = Field(
+        description="Updated Bradley-Terry scores mapped by essay ID", default_factory=dict
+    )
 
 
 async def perform_iterative_comparisons(
@@ -116,25 +132,26 @@ async def perform_iterative_comparisons(
                 )
                 break
 
-            valid_results_count, current_bt_scores_dict = iteration_result
-            total_comparisons_performed += valid_results_count
+            total_comparisons_performed += iteration_result.valid_results_count
 
             # Update scores in the local essays_for_api_model for next iteration
             for essay_api_item in essays_for_api_model:
-                if essay_api_item.id in current_bt_scores_dict:
-                    essay_api_item.current_bt_score = current_bt_scores_dict[essay_api_item.id]
+                if essay_api_item.id in iteration_result.updated_scores:
+                    essay_api_item.current_bt_score = iteration_result.updated_scores[
+                        essay_api_item.id
+                    ]
 
             # Check for score stability
             scores_are_stable = _check_iteration_stability(
                 total_comparisons_performed=total_comparisons_performed,
-                current_bt_scores_dict=current_bt_scores_dict,
+                current_bt_scores_dict=iteration_result.updated_scores,
                 previous_bt_scores=previous_bt_scores,
                 settings=settings,
                 current_iteration=current_iteration,
                 log_extra=log_extra,
             )
 
-            previous_bt_scores = current_bt_scores_dict.copy()
+            previous_bt_scores = iteration_result.updated_scores.copy()
             # Session auto-commits at end of context - no manual transaction management needed
 
     final_scores = {essay.id: essay.current_bt_score or 0.0 for essay in essays_for_api_model}
@@ -160,7 +177,7 @@ async def _process_comparison_iteration(
     current_iteration: int,
     correlation_id: UUID,
     log_extra: dict[str, Any],
-) -> tuple[int, dict[str, float]] | None:
+) -> ComparisonIterationResult | None:
     """Process a single comparison iteration.
 
     Returns:
@@ -212,7 +229,9 @@ async def _process_comparison_iteration(
         correlation_id=correlation_id,
     )
 
-    return len(valid_llm_results), current_bt_scores_dict
+    return ComparisonIterationResult(
+        valid_results_count=len(valid_llm_results), updated_scores=current_bt_scores_dict
+    )
 
 
 def _check_iteration_stability(

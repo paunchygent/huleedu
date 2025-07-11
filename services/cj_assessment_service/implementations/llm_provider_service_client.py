@@ -398,7 +398,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 operation="_handle_error_response",
                 message=f"LLM Provider Service error: {error_msg}",
                 correlation_id=correlation_id,
-                **details
+                **details,
             )
         elif error_code == ErrorCode.AUTHENTICATION_ERROR:
             raise_authentication_error(
@@ -406,7 +406,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 operation="_handle_error_response",
                 message=f"LLM Provider Service error: {error_msg}",
                 correlation_id=correlation_id,
-                **details
+                **details,
             )
         elif error_code == ErrorCode.RESOURCE_NOT_FOUND:
             raise_resource_not_found(
@@ -416,7 +416,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 resource_id="N/A",
                 message=f"LLM Provider Service error: {error_msg}",
                 correlation_id=correlation_id,
-                **details
+                **details,
             )
         elif error_code == ErrorCode.TIMEOUT:
             raise_timeout_error(
@@ -425,7 +425,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 timeout_seconds=60,
                 message=f"LLM Provider Service error: {error_msg}",
                 correlation_id=correlation_id,
-                **details
+                **details,
             )
         elif error_code == ErrorCode.RATE_LIMIT:
             raise_rate_limit_error(
@@ -433,7 +433,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 operation="_handle_error_response",
                 message=f"LLM Provider Service error: {error_msg}",
                 correlation_id=correlation_id,
-                **details
+                **details,
             )
         elif error_code == ErrorCode.SERVICE_UNAVAILABLE:
             raise_service_unavailable(
@@ -442,7 +442,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 unavailable_service="llm_provider_service",
                 message=f"LLM Provider Service error: {error_msg}",
                 correlation_id=correlation_id,
-                **details
+                **details,
             )
         else:
             # Default to external service error
@@ -452,12 +452,10 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 external_service="llm_provider_service",
                 message=f"LLM Provider Service error: {error_msg}",
                 correlation_id=correlation_id,
-                **details
+                **details,
             )
 
-    async def _poll_for_results(
-        self, queue_id: str, correlation_id: UUID
-    ) -> dict[str, Any]:
+    async def _poll_for_results(self, queue_id: str, correlation_id: UUID) -> dict[str, Any]:
         """Poll for results from the queue using exponential backoff.
 
         Args:
@@ -648,9 +646,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             logger.debug("Queue status check failed after retries")
             return None
 
-    async def _retrieve_queue_result(
-        self, queue_id: str, correlation_id: UUID
-    ) -> dict[str, Any]:
+    async def _retrieve_queue_result(self, queue_id: str, correlation_id: UUID) -> dict[str, Any]:
         """Retrieve the result of a completed queue request with retry logic.
 
         Args:

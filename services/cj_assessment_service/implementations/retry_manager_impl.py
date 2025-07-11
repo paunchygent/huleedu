@@ -201,7 +201,7 @@ class RetryManagerImpl(RetryManagerProtocol):
                     message="API call timed out",
                     correlation_id=correlation_id,
                     provider=provider_name,
-                    retry_enabled=False
+                    retry_enabled=False,
                 )
             except aiohttp.ClientResponseError as e:
                 raise_external_service_error(
@@ -211,7 +211,7 @@ class RetryManagerImpl(RetryManagerProtocol):
                     message=f"API error: {e.status} - {e.message}",
                     correlation_id=correlation_id,
                     status_code=e.status,
-                    retry_enabled=False
+                    retry_enabled=False,
                 )
             except aiohttp.ClientError as e:
                 raise_connection_error(
@@ -221,7 +221,7 @@ class RetryManagerImpl(RetryManagerProtocol):
                     message=f"API client error: {e}",
                     correlation_id=correlation_id,
                     exception_type=type(e).__name__,
-                    retry_enabled=False
+                    retry_enabled=False,
                 )
             except HuleEduError:
                 # Already a properly formatted error, just re-raise
@@ -234,7 +234,7 @@ class RetryManagerImpl(RetryManagerProtocol):
                     correlation_id=correlation_id,
                     provider=provider_name,
                     exception_type=type(e).__name__,
-                    retry_enabled=False
+                    retry_enabled=False,
                 )
 
         # Create retry configuration
@@ -279,7 +279,7 @@ class RetryManagerImpl(RetryManagerProtocol):
                     correlation_id=correlation_id,
                     provider=provider_name,
                     retry_attempts=self.settings.llm_retry_attempts,
-                    after_retries=True
+                    after_retries=True,
                 )
             elif isinstance(last_exception, aiohttp.ClientResponseError):
                 raise_external_service_error(
@@ -293,7 +293,7 @@ class RetryManagerImpl(RetryManagerProtocol):
                     correlation_id=correlation_id,
                     status_code=last_exception.status,
                     retry_attempts=self.settings.llm_retry_attempts,
-                    after_retries=True
+                    after_retries=True,
                 )
             elif isinstance(last_exception, aiohttp.ClientError):
                 raise_connection_error(
@@ -304,7 +304,7 @@ class RetryManagerImpl(RetryManagerProtocol):
                     correlation_id=correlation_id,
                     exception_type=type(last_exception).__name__,
                     retry_attempts=self.settings.llm_retry_attempts,
-                    after_retries=True
+                    after_retries=True,
                 )
             else:
                 raise_unknown_error(
@@ -315,7 +315,7 @@ class RetryManagerImpl(RetryManagerProtocol):
                     provider=provider_name,
                     exception_type=type(last_exception).__name__,
                     retry_attempts=self.settings.llm_retry_attempts,
-                    after_retries=True
+                    after_retries=True,
                 )
 
         # This should never be reached, but satisfies mypy

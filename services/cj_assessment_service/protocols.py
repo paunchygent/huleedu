@@ -17,9 +17,7 @@ T = TypeVar("T")
 class ContentClientProtocol(Protocol):
     """Protocol for fetching spellchecked essay text from content service."""
 
-    async def fetch_content(
-        self, storage_id: str, correlation_id: UUID
-    ) -> str:
+    async def fetch_content(self, storage_id: str, correlation_id: UUID) -> str:
         """Fetch essay text content by storage ID.
 
         Args:

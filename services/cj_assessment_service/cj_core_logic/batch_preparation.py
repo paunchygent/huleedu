@@ -110,9 +110,7 @@ async def prepare_essays_for_assessment(
 
             try:
                 # Fetch spellchecked content using new correlation_id-aware interface
-                content = await content_client.fetch_content(
-                    text_storage_id, correlation_id
-                )
+                content = await content_client.fetch_content(text_storage_id, correlation_id)
 
                 assessment_input_text = content
 

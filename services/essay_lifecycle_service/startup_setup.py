@@ -5,7 +5,7 @@ from __future__ import annotations
 from dishka import make_async_container
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
-from quart import Quart
+from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 
 from services.essay_lifecycle_service.api.batch_routes import (
@@ -32,7 +32,7 @@ logger = create_service_logger("els.startup")
 # ELS doesn't need background tasks like BOS, but keeping structure consistent
 
 
-async def initialize_services(app: Quart, settings: Settings) -> None:
+async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
     """Initialize DI container, Quart-Dishka integration, and metrics."""
 
     try:

@@ -9,10 +9,10 @@ from uuid import uuid4
 
 import aiohttp
 import pytest
+from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
 
 from common_core import LLMProviderType
 from common_core.error_enums import ErrorCode
-from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
@@ -171,7 +171,7 @@ Always respond with valid JSON."""
             error_code=ErrorCode.VALIDATION_ERROR,
             service="cj_assessment_service",
             operation="generate_comparison",
-            message_contains="Invalid prompt format"
+            message_contains="Invalid prompt format",
         ) as captured:
             await llm_client.generate_comparison(
                 user_prompt=invalid_prompt,

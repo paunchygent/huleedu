@@ -13,8 +13,9 @@ from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
+from huleedu_service_libs.quart_app import HuleEduApp
 from pydantic import ValidationError
-from quart import Quart, Response, jsonify
+from quart import Response, jsonify
 
 # Import Blueprints
 # Import local modules using absolute imports for containerized deployment
@@ -31,7 +32,7 @@ configure_service_logging(
 )
 logger = create_service_logger("els.app")
 
-app = Quart(__name__)
+app = HuleEduApp(__name__)
 
 # Initialize tracing early, before blueprint registration
 tracer = init_tracing("essay_lifecycle_api")
