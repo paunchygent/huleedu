@@ -1,12 +1,11 @@
 """Protocol definitions for LLM Provider Service."""
 
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol
 from uuid import UUID
 
 from common_core import LLMProviderType, QueueStatus
 from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
-    LLMProviderError,
     LLMProviderResponse,
     LLMQueuedResult,
 )
@@ -21,24 +20,29 @@ class LLMProviderProtocol(Protocol):
         user_prompt: str,
         essay_a: str,
         essay_b: str,
+        correlation_id: UUID,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
-    ) -> Tuple[LLMProviderResponse | None, LLMProviderError | None]:
+    ) -> LLMProviderResponse:
         """Generate LLM comparison response.
 
         Args:
             user_prompt: The comparison prompt
             essay_a: First essay to compare
             essay_b: Second essay to compare
+            correlation_id: Request correlation ID for tracing
             system_prompt_override: Optional system prompt override
             model_override: Optional model override
             temperature_override: Optional temperature override
             max_tokens_override: Optional max tokens override
 
         Returns:
-            Tuple of (response_model, error_model)
+            The LLM provider response containing comparison result
+
+        Raises:
+            HuleEduError: On any failure to generate comparison
         """
         ...
 
@@ -54,7 +58,7 @@ class LLMOrchestratorProtocol(Protocol):
         essay_b: str,
         correlation_id: UUID,
         **overrides: Any,
-    ) -> Tuple[LLMOrchestratorResponse | LLMQueuedResult | None, LLMProviderError | None]:
+    ) -> LLMOrchestratorResponse | LLMQueuedResult:
         """Perform LLM comparison with provider selection.
 
         Args:
@@ -66,21 +70,25 @@ class LLMOrchestratorProtocol(Protocol):
             **overrides: Additional parameter overrides
 
         Returns:
-            Tuple of (response, error):
-            - Success: (LLMOrchestratorResponse, None)
-            - Queued: (LLMQueuedResult, None)
-            - Error: (None, LLMProviderError)
+            LLMOrchestratorResponse for immediate results or LLMQueuedResult for queued processing
+
+        Raises:
+            HuleEduError: On any failure to perform comparison
         """
         ...
 
-    async def test_provider(self, provider: LLMProviderType) -> Tuple[bool, str]:
+    async def test_provider(self, provider: LLMProviderType, correlation_id: UUID) -> bool:
         """Test provider connectivity and availability.
 
         Args:
             provider: Provider to test
+            correlation_id: Request correlation ID for tracing
 
         Returns:
-            Tuple of (success, message)
+            True if provider is available and functional
+
+        Raises:
+            HuleEduError: On provider test failure with details
         """
         ...
 
@@ -201,7 +209,7 @@ class QueueManagerProtocol(Protocol):
         self,
         queue_id: UUID,
         status: QueueStatus,
-        error_message: Optional[str] = None,
+        message: Optional[str] = None,
         result_location: Optional[str] = None,
     ) -> bool:
         """Update status of a queued request.
@@ -209,11 +217,14 @@ class QueueManagerProtocol(Protocol):
         Args:
             queue_id: The queue ID to update
             status: New status
-            error_message: Optional error message
+            message: Optional error or status message
             result_location: Optional result location
 
         Returns:
             True if updated successfully
+
+        Raises:
+            HuleEduError: On failure to update status
         """
         ...
 

@@ -65,7 +65,7 @@ class LLMProviderError(BaseModel):
     """Model for provider error responses."""
 
     error_type: ErrorCode | LLMProviderErrorType = Field(description="Type of error")
-    error_message: str = Field(description="Error message")
+    message: str = Field(description="Error message")
     provider: LLMProviderType = Field(description="Provider that failed")
     correlation_id: UUID = Field(description="Request correlation ID")
     retry_after: int | None = Field(default=None, description="Seconds to wait before retry")

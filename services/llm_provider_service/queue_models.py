@@ -81,7 +81,7 @@ class QueuedRequest(BaseModel):
         default=None,
         description="When processing completed",
     )
-    error_message: Optional[str] = Field(
+    message: Optional[str] = Field(
         default=None,
         description="Error details if failed",
     )
@@ -192,5 +192,5 @@ class QueueStatusResponse(BaseModel):
     estimated_processing_time: Optional[timedelta] = None
     result_available: bool = False
     result_location: Optional[str] = None
-    error_message: Optional[str] = None
+    message: Optional[str] = None
     expires_at: datetime
