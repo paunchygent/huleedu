@@ -78,15 +78,15 @@ class Settings(BaseSettings):
         description="Enable polling for queued LLM requests (202 responses)",
     )
     LLM_QUEUE_POLLING_INITIAL_DELAY_SECONDS: float = Field(
-        default=2.0,
+        default=0.5,
         description="Initial delay before first queue status check in seconds",
     )
     LLM_QUEUE_POLLING_MAX_DELAY_SECONDS: float = Field(
-        default=60.0,
+        default=10.0,
         description="Maximum delay between queue status checks in seconds",
     )
     LLM_QUEUE_POLLING_EXPONENTIAL_BASE: float = Field(
-        default=1.5,
+        default=1.2,
         description="Exponential backoff base for queue polling delays",
     )
     LLM_QUEUE_POLLING_MAX_ATTEMPTS: int = Field(

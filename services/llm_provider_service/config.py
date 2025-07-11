@@ -151,7 +151,7 @@ class Settings(BaseSettings):
         description="How long requests stay in queue before expiring",
     )
     QUEUE_POLL_INTERVAL_SECONDS: float = Field(
-        default=1.0,
+        default=0.5,
         description="How often to check for new requests in queue",
     )
     QUEUE_MAX_RETRIES: int = Field(

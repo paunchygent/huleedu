@@ -134,11 +134,10 @@ class ConnectionPoolMonitor:
                 "checked_in": pool.checkedin(),
                 "checked_out": pool.checkedout(),
                 "overflow": pool.overflow(),
-                "invalid": pool.invalid(),
             }
         except Exception as e:
             self.service_logger.error(f"Error getting pool status: {e}")
-            return {"size": 0, "checked_in": 0, "checked_out": 0, "overflow": 0, "invalid": 0}
+            return {"size": 0, "checked_in": 0, "checked_out": 0, "overflow": 0}
 
     def _update_pool_metrics(self) -> None:
         """Update pool metrics with current status."""
@@ -171,7 +170,6 @@ class ConnectionPoolMonitor:
                 "active_connections": status["checked_out"],
                 "idle_connections": status["checked_in"],
                 "overflow_connections": status["overflow"],
-                "invalid_connections": status["invalid"],
                 "pool_usage_percent": (status["checked_out"] / max(status["size"], 1)) * 100,
             }
         except Exception as e:
@@ -181,7 +179,6 @@ class ConnectionPoolMonitor:
                 "active_connections": 0,
                 "idle_connections": 0,
                 "overflow_connections": 0,
-                "invalid_connections": 0,
                 "pool_usage_percent": 0.0,
             }
 
