@@ -4,7 +4,7 @@ Kafka consumer for Batch Conductor Service.
 Consumes processing result events from specialized services to build real-time
 batch processing state for intelligent pipeline dependency resolution.
 
-Follows established patterns from spell_checker_service and cj_assessment_service.
+Follows established patterns from spellchecker_service and cj_assessment_service.
 """
 
 from __future__ import annotations

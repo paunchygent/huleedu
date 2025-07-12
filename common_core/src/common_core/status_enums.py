@@ -132,7 +132,7 @@ class CacheStatus(str, Enum):
 
 # --- Spell-checker job status ---
 class SpellcheckJobStatus(str, Enum):
-    """Lifecycle of a spell-checker job handled by spell_checker_service."""
+    """Lifecycle of a spell-checker job handled by spellchecker_service."""
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"

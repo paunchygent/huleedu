@@ -82,7 +82,7 @@ class ServiceClient:
         failure_threshold=3,
         recovery_timeout=timedelta(seconds=30),
         expected_exception=ClientError,
-        name="spell_checker_service",
+        name="spellchecker_service",
     )
     async def check_spelling(self, text: str) -> dict[str, Any]:
         """Call spell checker service with circuit breaker protection."""
@@ -90,7 +90,7 @@ class ServiceClient:
             self.session = aiohttp.ClientSession()
 
         async with self.session.post(
-            "http://spell_checker_service:8080/api/v1/check", json={"text": text}
+            "http://spellchecker_service:8080/api/v1/check", json={"text": text}
         ) as response:
             response.raise_for_status()
             return await response.json()  # type: ignore[return-value]

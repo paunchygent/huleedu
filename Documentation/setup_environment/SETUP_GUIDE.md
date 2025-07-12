@@ -58,7 +58,7 @@ HuleEdu is a sophisticated microservice ecosystem built with:
 |---------|----------|---------|
 | **Batch Orchestration** | `services/batch_service/` | Manages essay batch processing workflows |
 | **Content Service** | `services/content_service/` | Handles content storage and retrieval |
-| **Spell Checker** | `services/spell_checker_service/` | Performs spell checking on essays |
+| **Spell Checker** | `services/spellchecker_service/` | Performs spell checking on essays |
 | **Essay Service** | `services/essay_service/` | 🚧 *Placeholder - Not yet implemented* |
 | **Common Core** | `common_core/` | Shared models, events, and utilities |
 | **Service Libraries** | `services/libs/` | Common service infrastructure |
@@ -91,7 +91,7 @@ pdm run docker-restart # Restart all services
 ```bash
 pdm run dev-content         # Run content service in development mode
 pdm run dev-batch           # Run batch service in development mode
-pdm run -p services/spell_checker_service start_worker    # Start spell checker worker
+pdm run -p services/spellchecker_service start_worker    # Start spell checker worker
 ```
 
 ## Development Workflow
@@ -129,7 +129,7 @@ pdm run docker-up
 # Run individual services for development
 pdm run dev-content
 pdm run dev-batch
-pdm run -p services/spell_checker_service start_worker
+pdm run -p services/spellchecker_service start_worker
 ```
 
 ## AI Agent Development Notes

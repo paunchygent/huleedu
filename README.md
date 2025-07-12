@@ -22,7 +22,7 @@ The project is organized as a monorepo managed by PDM:
 * **`common_core/`**: A shared Python package containing common Pydantic models for data contracts (events, API DTOs), enums, and shared metadata structures.
 * **`services/`**: Contains the individual microservices.
   * **`libs/`**: Shared utility libraries for services, such as Kafka client wrappers and logging utilities.
-  * Each service has its own directory (e.g., `content_service/`, `spell_checker_service/`).
+  * Each service has its own directory (e.g., `content_service/`, `spellchecker_service/`).
 * **`scripts/`**: Project-level scripts for tasks like environment setup and Kafka topic bootstrapping.
 * **`Documentation/`**: Contains architectural documents, task tracking (like `TASKS/`), and setup guides.
 * **`.cursor/rules/`**: Contains the detailed development rules and standards. The [000-rule-index.mdc](.cursor/rules/000-rule-index.mdc) serves as an index to all rules.
@@ -40,7 +40,7 @@ The HuleEdu ecosystem currently comprises the following services:
 * **Spell Checker Service** ✅ **IMPLEMENTED**:
   * **Description**: A Kafka consumer worker service that performs advanced spell checking on essays, including L2 error correction and standard spell checking using `pyspellchecker`. Integrated with Essay Lifecycle Service for essay slot coordination.
   * **Port**: 8002 (Metrics)
-  * **Location**: `services/spell_checker_service/`
+  * **Location**: `services/spellchecker_service/`
   * **Architecture**: Clean architecture with DI, protocols, language parameter support, and comprehensive test coverage
 
 * **Batch Orchestrator Service** ✅ **IMPLEMENTED**:

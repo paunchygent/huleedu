@@ -10,7 +10,7 @@ from typing import Dict, Tuple
 
 class ContentType(str, Enum):
     ORIGINAL_ESSAY = "original_essay"
-    CORRECTED_TEXT = "corrected_text"  # spell_checker_service output
+    CORRECTED_TEXT = "corrected_text"  # spellchecker_service output
     PROCESSING_LOG = "processing_log"
     NLP_METRICS_JSON = "nlp_metrics_json"
     STUDENT_FACING_AI_FEEDBACK_TEXT = "student_facing_ai_feedback_text"

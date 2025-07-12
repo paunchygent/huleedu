@@ -49,7 +49,7 @@ class TestServiceHealth:
         endpoints = await service_manager.get_validated_endpoints()
 
         # Test services that should have metrics endpoints
-        services_with_metrics = ["spell_checker_service", "cj_assessment_service"]
+        services_with_metrics = ["spellchecker_service", "cj_assessment_service"]
 
         for service_name in services_with_metrics:
             if service_name in endpoints:

@@ -135,11 +135,11 @@ services:
       start_period: 20s
 
 
-  spell_checker_service:
+  spellchecker_service:
     build:
       context: .
-      dockerfile: services/spell_checker_service/Dockerfile
-    container_name: huleedu_spell_checker_service
+      dockerfile: services/spellchecker_service/Dockerfile
+    container_name: huleedu_spellchecker_service
     restart: unless-stopped
     depends_on:
       kafka_topic_setup:
@@ -159,11 +159,11 @@ services:
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - LOG_LEVEL=DEBUG
       # Database configuration
-      - SPELL_CHECKER_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@spellchecker_db:5432/spellchecker
+      - SPELLCHECKER_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@spellchecker_db:5432/spellchecker
       - HTTP_PORT=8002
-      - SPELL_CHECKER_SERVICE_REDIS_URL=redis://redis:6379
+      - SPELLCHECKER_SERVICE_REDIS_URL=redis://redis:6379
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - OTEL_SERVICE_NAME=spell_checker_service
+      - OTEL_SERVICE_NAME=spellchecker_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
     healthcheck:

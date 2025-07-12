@@ -91,7 +91,7 @@
 #### 4. Spell Checker Service ❌ MINIMAL ERROR HANDLING
 
 - **Pattern**: Basic exception handling without structured errors
-- **Location**: `services/spell_checker_service/`
+- **Location**: `services/spellchecker_service/`
 - **Issues**:
   - Repository uses string error messages
   - No standardized error propagation
@@ -99,9 +99,9 @@
 
 **Files Requiring Migration:**
 
-- `services/spell_checker_service/repository_protocol.py`
-- `services/spell_checker_service/implementations/spell_repository_postgres_impl.py`
-- `services/spell_checker_service/protocol_implementations/`
+- `services/spellchecker_service/repository_protocol.py`
+- `services/spellchecker_service/implementations/spell_repository_postgres_impl.py`
+- `services/spellchecker_service/protocol_implementations/`
 
 #### 5. Essay Lifecycle Service ❌ MIXED PATTERNS
 
@@ -226,11 +226,11 @@ def raise_validation_error(
 **Estimated Effort**: 1 development cycle
 **Files to Modify**:
 
-- `services/spell_checker_service/repository_protocol.py`
+- `services/spellchecker_service/repository_protocol.py`
   - Replace method signatures to raise HuleEduError instead of returning tuples
-- `services/spell_checker_service/implementations/spell_repository_postgres_impl.py`
+- `services/spellchecker_service/implementations/spell_repository_postgres_impl.py`
   - Replace try/catch blocks to use `raise_processing_error`
-- `services/spell_checker_service/protocol_implementations/`
+- `services/spellchecker_service/protocol_implementations/`
   - Update error handling in all implementations
 
 **Migration Steps**:
@@ -550,7 +550,7 @@ Per service completion requirements:
 
 **Spell Checker Service**:
 
-- File: `services/spell_checker_service/models_db.py`
+- File: `services/spellchecker_service/models_db.py`
 - Issues: Potential error_message fields in job/token models
 - Migration: Replace with structured error storage or remove
 - Impact: Database schema changes

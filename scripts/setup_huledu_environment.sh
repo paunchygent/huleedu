@@ -87,7 +87,7 @@ echo -e "${BLUE}--- HuleEdu Monorepo Information ---${NC}"
 echo -e "${BLUE}This monorepo contains multiple microservices:${NC}"
 echo -e "${BLUE}  • Batch Orchestration Service (services/batch_orchestrator_service)${NC}"
 echo -e "${BLUE}  • Content Service (services/content_service)${NC}"
-echo -e "${BLUE}  • Spell Checker Service (services/spell_checker_service)${NC}"
+echo -e "${BLUE}  • Spell Checker Service (services/spellchecker_service)${NC}"
 echo -e "${BLUE}  • Common Core Package (common_core)${NC}"
 echo -e "${BLUE}  • Service Libraries (services/libs)${NC}"
 echo -e "${YELLOW}  • Essay Service (services/essay_service) - [PLACEHOLDER - NOT YET IMPLEMENTED]${NC}"
@@ -112,7 +112,7 @@ echo -e "${BLUE}  • pdm run docker-up     - Start services with Docker Compose
 echo -e "${BLUE}Individual service development:${NC}"
 echo -e "${BLUE}  • pdm run dev-content   - Run content service in dev mode${NC}"
 echo -e "${BLUE}  • pdm run dev-batch     - Run batch orchestrator service in dev mode${NC}"
-echo -e "${BLUE}  • pdm run -p services/spell_checker_service start_worker - Start spell checker worker${NC}"
+echo -e "${BLUE}  • pdm run -p services/spellchecker_service start_worker - Start spell checker worker${NC}"
 
 echo -e "${GREEN}Environment is ready for AI agent development work!${NC}"
 

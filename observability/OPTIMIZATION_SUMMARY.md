@@ -114,7 +114,7 @@ Documented actual metric names across services:
 | file_service | `file_service_http_requests_total` | `file_service_http_request_duration_seconds` | `status` |
 | class_management_service | `cms_http_requests_total` | `cms_http_request_duration_seconds` | `http_status` |
 | cj_assessment_service | `cj_assessment_http_requests_total` | `cj_assessment_http_request_duration_seconds` | `status_code` |
-| spell_checker_service | `spell_checker_http_requests_total` | `spell_checker_http_request_duration_seconds` | `status_code` |
+| spellchecker_service | `spell_checker_http_requests_total` | `spell_checker_http_request_duration_seconds` | `status_code` |
 | llm_provider_service | `llm_provider_http_requests_total` | `llm_provider_http_request_duration_seconds` | `status_code` |
 
 ## New Infrastructure Capabilities
@@ -181,7 +181,7 @@ Validates:
 - file_service
 - class_management_service
 - cj_assessment_service
-- spell_checker_service
+- spellchecker_service
 - llm_provider_service
 - essay_lifecycle_api
 - api_gateway_service

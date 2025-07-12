@@ -59,7 +59,7 @@ class TestE2EPipelineWorkflows:
     @pytest.mark.e2e
     @pytest.mark.docker
     @pytest.mark.asyncio
-    async def test_spell_checker_service_health(self):
+    async def test_spellchecker_service_health(self):
         """
         Test Spell Checker Service health validation using ServiceTestManager.
 
@@ -69,11 +69,11 @@ class TestE2EPipelineWorkflows:
 
         # Validate Spell Checker Service using modern endpoint validation
         endpoints = await service_manager.get_validated_endpoints()
-        if "spell_checker_service" not in endpoints:
+        if "spellchecker_service" not in endpoints:
             pytest.skip("Spell Checker Service not available")
 
         # Verify the service is healthy
-        spell_checker_info = endpoints["spell_checker_service"]
+        spell_checker_info = endpoints["spellchecker_service"]
         assert spell_checker_info["status"] == "healthy"
         print("✅ Spell Checker Service health validated")
 

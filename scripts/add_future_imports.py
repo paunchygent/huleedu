@@ -78,11 +78,11 @@ FILES_TO_UPDATE = [
     "services/result_aggregator_service/tests/integration/test_kafka_consumer_idempotency.py",
     "services/result_aggregator_service/tests/integration/test_kafka_consumer_error_handling.py",
     "services/result_aggregator_service/tests/integration/test_api_endpoints.py",
-    # spell_checker_service
-    "services/spell_checker_service/spell_logic/l2_dictionary_loader.py",
-    "services/spell_checker_service/tests/unit/test_spell_idempotency_basic.py",
-    "services/spell_checker_service/tests/unit/test_spell_idempotency_outage.py",
-    "services/spell_checker_service/tests/spell_logic/test_l2_dictionary_loader.py",
+    # spellchecker_service
+    "services/spellchecker_service/spell_logic/l2_dictionary_loader.py",
+    "services/spellchecker_service/tests/unit/test_spell_idempotency_basic.py",
+    "services/spellchecker_service/tests/unit/test_spell_idempotency_outage.py",
+    "services/spellchecker_service/tests/spell_logic/test_l2_dictionary_loader.py",
 ]
 
 

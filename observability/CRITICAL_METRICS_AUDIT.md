@@ -20,7 +20,7 @@ All services are UP and accessible to Prometheus:
 | file_service | 7001 | ✅ UP | ✅ YES | **WORKING** |
 | cj_assessment_service | 9090 | ✅ UP | ✅ YES | **WORKING** |
 | batch_orchestrator_service | 5000 | ✅ UP | ✅ YES | **WORKING** |
-| spell_checker_service | 8002 | ✅ UP | ✅ YES | **WORKING** |
+| spellchecker_service | 8002 | ✅ UP | ✅ YES | **WORKING** |
 | class_management_service | 5002 | ✅ UP | ✅ YES | **WORKING** |
 | llm_provider_service | 8080 | ✅ UP | ✅ YES | **WORKING** |
 | api_gateway_service | 8080 | ✅ UP | ✅ YES | **WORKING** |
@@ -82,7 +82,7 @@ All remaining services use proper registry patterns and expose standard Python G
 ## PROMETHEUS COLLECTION STATUS
 
 **Current Collection**: 9/10 services working
-- **Collecting**: content_service, file_service, cj_assessment_service, batch_orchestrator_service, spell_checker_service, class_management_service, llm_provider_service, api_gateway_service, result_aggregator_service
+- **Collecting**: content_service, file_service, cj_assessment_service, batch_orchestrator_service, spellchecker_service, class_management_service, llm_provider_service, api_gateway_service, result_aggregator_service
 - **Missing**: essay_lifecycle_api (registry isolation issue)
 
 **Original Problem Statement Was Incorrect**: 

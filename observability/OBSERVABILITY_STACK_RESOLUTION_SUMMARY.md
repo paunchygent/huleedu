@@ -69,7 +69,7 @@
 | file_service | 7001 | `file_service_http_requests_total` | ✅ WORKING |  
 | cj_assessment_service | 9090 | `cj_assessment_http_requests_total` | ✅ WORKING |
 | batch_orchestrator_service | 5000 | `bos_http_requests_total` | ✅ WORKING |
-| spell_checker_service | 8002 | `spell_checker_http_requests_total` | ✅ WORKING |
+| spellchecker_service | 8002 | `spell_checker_http_requests_total` | ✅ WORKING |
 | class_management_service | 5002 | `cms_http_requests_total` | ✅ WORKING |
 | llm_provider_service | 8080 | `llm_provider_http_requests_total` | ✅ WORKING |
 | api_gateway_service | 8080 | `gateway_http_requests_total` | ✅ WORKING |

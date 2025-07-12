@@ -44,12 +44,12 @@ class TestE2ESpellcheckWorkflows:
     @pytest.mark.e2e
     @pytest.mark.docker
     @pytest.mark.asyncio
-    async def test_spell_checker_service_health_prerequisite(self):
+    async def test_spellchecker_service_health_prerequisite(self):
         """Validate Spell Checker Service metrics endpoint before spellcheck pipeline tests."""
         service_manager = ServiceTestManager()
 
         # Use utility to get metrics instead of direct HTTP call
-        metrics_text = await service_manager.get_service_metrics("spell_checker_service", 8002)
+        metrics_text = await service_manager.get_service_metrics("spellchecker_service", 8002)
 
         if metrics_text is None:
             pytest.skip("Spell Checker Service metrics not available")

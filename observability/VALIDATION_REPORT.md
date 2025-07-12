@@ -68,7 +68,7 @@ Services Available: [
   "file_service", 
   "llm_provider_service",
   "result_aggregator_service",
-  "spell_checker_service"
+  "spellchecker_service"
 ]
 ```
 
@@ -102,7 +102,7 @@ Services: [
   api_gateway_service, batch_orchestrator_service, 
   cj_assessment_service, content_service, file_service,
   llm_provider_service, result_aggregator_service,
-  spell_checker_service, class_management_service
+  spellchecker_service, class_management_service
 ]
 ```
 
@@ -111,7 +111,7 @@ Services: [
 ```yaml
 # ✅ JAEGER SERVICES WITH TRACES
 Services: [
-  llm-provider-service, file_service, spell_checker_service,
+  llm-provider-service, file_service, spellchecker_service,
   cj_assessment_service, essay_lifecycle_api, 
   batch_orchestrator_service, essay_lifecycle_service
 ]

@@ -172,7 +172,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(spell_checker_service_database_query_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(spellchecker_service_database_query_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "Spell Checker Service (99th)",
           "refId": "F"
         }
@@ -306,7 +306,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(spell_checker_service_database_connections_active / spell_checker_service_database_connections_total) * 100",
+          "expr": "(spellchecker_service_database_connections_active / spellchecker_service_database_connections_total) * 100",
           "legendFormat": "Spell Checker Service",
           "refId": "F"
         }
@@ -440,7 +440,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(rate(spell_checker_service_database_transaction_duration_seconds_count{result=\"error\"}[5m]) / rate(spell_checker_service_database_transaction_duration_seconds_count[5m])) * 100",
+          "expr": "(rate(spellchecker_service_database_transaction_duration_seconds_count{result=\"error\"}[5m]) / rate(spellchecker_service_database_transaction_duration_seconds_count[5m])) * 100",
           "legendFormat": "Spell Checker Service",
           "refId": "F"
         }
@@ -574,7 +574,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(spell_checker_service_database_query_duration_seconds_count[5m])",
+          "expr": "rate(spellchecker_service_database_query_duration_seconds_count[5m])",
           "legendFormat": "Spell Checker Service",
           "refId": "F"
         }
@@ -783,7 +783,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "spell_checker_service_database_connections_active",
+          "expr": "spellchecker_service_database_connections_active",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -794,7 +794,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "spell_checker_service_database_connections_total",
+          "expr": "spellchecker_service_database_connections_total",
           "format": "table",
           "hide": false,
           "instant": true,

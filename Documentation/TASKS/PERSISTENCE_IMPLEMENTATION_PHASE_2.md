@@ -6,7 +6,7 @@ Some services still rely solely on in-memory data, object-storage, or transient 
 
 | Service | Current State | Gap |
 |---------|---------------|-----|
-| **spell_checker_service** | PostgreSQL (async SQLAlchemy) + Alembic ✅ | Repository, schema, DI, docker-compose integrated |
+| **spellchecker_service** | PostgreSQL (async SQLAlchemy) + Alembic ✅ | Repository, schema, DI, docker-compose integrated |
 | **cj_assessment_service** | Same as spell-checker | No durable store for assessment results & config |
 | **api_gateway_service** | Stateless | Needs persistent session & API analytics (Auth, rate-limit) |
 | **file_service** | Persists files to MinIO/S3, but no DB index; Redis pub/sub only | Missing metadata index, versioning, soft-delete tracking |

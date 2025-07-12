@@ -48,7 +48,7 @@ services/
 ├── content_service/                 # Quart-based content storage service
 ├── essay_lifecycle_service/         # Hybrid Quart HTTP + Kafka worker service
 ├── file_service/                    # Quart-based file upload service
-├── spell_checker_service/           # Kafka worker service
+├── spellchecker_service/           # Kafka worker service
 └── libs/                            # Shared libraries for services
 ```
 
@@ -91,7 +91,7 @@ services/essay_lifecycle_service/    # Hybrid HTTP + Kafka service
 
 ### 4.2. Standard Blueprint Files
 
-**Note on Worker Service Structure (e.g., `spell_checker_service`):**
+**Note on Worker Service Structure (e.g., `spellchecker_service`):**
 - `worker_main.py`: Handles service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes DI container.
 - `event_processor.py`: Contains logic for deserializing incoming messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
 - `core_logic.py`: Houses the fundamental, reusable business logic, algorithms, and interactions with external systems (like HTTP calls to other services), implemented as standalone functions or simple classes.

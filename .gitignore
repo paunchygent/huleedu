@@ -19,7 +19,7 @@ cj_ai_essay_assessment/*.xml
 
 # Service data directories
 scripts/utils/md-to-html-converter
-services/spell_checker_service/data/corrected_essays
+services/spellchecker_service/data/corrected_essays
 data/corrected_essays
 test_uploads/
 

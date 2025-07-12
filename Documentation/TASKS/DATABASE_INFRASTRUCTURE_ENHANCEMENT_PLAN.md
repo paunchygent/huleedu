@@ -18,7 +18,7 @@ This document outlines a three-phased approach to standardize and enhance databa
 
 **Affected Components**:
 
-- **PostgreSQL Services (6)**: batch_orchestrator_service, essay_lifecycle_service, cj_assessment_service, class_management_service, result_aggregator_service, spell_checker_service
+- **PostgreSQL Services (6)**: batch_orchestrator_service, essay_lifecycle_service, cj_assessment_service, class_management_service, result_aggregator_service, spellchecker_service
 - **Infrastructure**: docker-compose.infrastructure.yml, service libraries
 - **Monitoring**: Prometheus metrics, Grafana dashboards
 

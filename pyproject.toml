@@ -51,7 +51,7 @@ dev = [
     "-e file:///${PROJECT_ROOT}/common_core",
     "-e file:///${PROJECT_ROOT}/services/libs",
     "-e file:///${PROJECT_ROOT}/services/content_service",
-    "-e file:///${PROJECT_ROOT}/services/spell_checker_service",
+    "-e file:///${PROJECT_ROOT}/services/spellchecker_service",
     "-e file:///${PROJECT_ROOT}/services/batch_orchestrator_service",
     "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service",
     "-e file:///${PROJECT_ROOT}/services/file_service",
@@ -102,7 +102,7 @@ docker-clean = "docker system prune -af --volumes"  # Clean all unused Docker re
 dev-content = "pdm run -p services/content_service dev"
 dev-batch = "pdm run -p services/batch_orchestrator_service dev"
 dev-file = "pdm run -p services/file_service dev"
-run-spellchecker = "pdm run -p services/spell_checker_service start_worker"
+run-spellchecker = "pdm run -p services/spellchecker_service start_worker"
 dev-gateway = "pdm run -p services/api_gateway_service dev"
 dev-aggregator = "pdm run -p services/result_aggregator_service dev"
 dev-llm = "pdm run -p services/llm_provider_service dev"
@@ -180,7 +180,7 @@ module = [
     "common_core.*",
     "services.libs.*",
     "services.content_service.*",
-    "services.spell_checker_service.*",
+    "services.spellchecker_service.*",
     "services.batch_orchestrator_service.*",
     "services.essay_lifecycle_service.*",
     "services.file_service.*",
@@ -258,7 +258,7 @@ testpaths = [
     "tests",
     "common_core/tests",
     "services/content_service/tests",
-    "services/spell_checker_service/tests",
+    "services/spellchecker_service/tests",
     "services/batch_orchestrator_service/tests",
     "services/essay_lifecycle_service/tests",
     "services/file_service/tests",

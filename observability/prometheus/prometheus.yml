@@ -24,9 +24,9 @@ scrape_configs:
       - targets: ['batch_orchestrator_service:5000']
     metrics_path: '/metrics'
     
-  - job_name: 'spell_checker_service'
+  - job_name: 'spellchecker_service'
     static_configs:
-      - targets: ['spell_checker_service:8002']
+      - targets: ['spellchecker_service:8002']
     metrics_path: '/metrics'
     
   - job_name: 'essay_lifecycle_api'

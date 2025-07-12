@@ -150,7 +150,7 @@ pdm run typecheck-all
 # Test each service
 pdm run -p services/content_service test
 pdm run -p services/batch_service test
-pdm run -p services/spell_checker_service test
+pdm run -p services/spellchecker_service test
 ```
 
 ### ✅ Full Test Suite

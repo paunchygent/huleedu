@@ -62,7 +62,7 @@ EXCLUDE_PATTERNS = [
 SERVICE_DIRS = [
     "services/batch_orchestrator_service",
     "services/essay_lifecycle_service",
-    "services/spell_checker_service",
+    "services/spellchecker_service",
     "services/cj_assessment_service",
     "services/api_gateway_service",
     "services/file_service",

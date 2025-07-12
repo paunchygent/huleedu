@@ -24,7 +24,7 @@
 | batch_conductor_service | 4002 | ✅ UP | ✅ **NEW - WORKING** |
 | essay_lifecycle_api | 6000 | ✅ UP | ✅ **FIXED - WORKING** |
 | batch_orchestrator_service | 5000 | ✅ UP | ⚠️ Basic metrics only |
-| spell_checker_service | 8002 | ✅ UP | ⚠️ Basic metrics only |
+| spellchecker_service | 8002 | ✅ UP | ⚠️ Basic metrics only |
 | class_management_service | 5002 | ✅ UP | ⚠️ Basic metrics only |
 | llm_provider_service | 8080 | ✅ UP | ⚠️ Basic metrics only |
 | api_gateway_service | 8080 | ✅ UP | ⚠️ Basic metrics only |

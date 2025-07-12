@@ -15,7 +15,7 @@
 
 **Critical Issues Identified:**
 
-1. **Service Naming Inconsistency**: `spell_checker_service` vs `spellchecker_db` creates cognitive overhead
+1. **Service Naming Inconsistency**: `spellchecker_service` vs `spellchecker_db` creates cognitive overhead
 2. **Legacy Folder Structure**: `protocol_implementations/` folder exists alongside standardized `implementations/`
 3. **Platform Drift**: Final service not aligned with HuleEdu architectural standards
 
@@ -49,7 +49,7 @@
 **Agent 1: Service Reference Inventory**
 
 ```
-MISSION: Complete inventory of all spell_checker_service references
+MISSION: Complete inventory of all spellchecker_service references
 SCOPE: Entire codebase, configuration, documentation
 OUTPUT: Categorized reference list with impact assessment
 TOOLS: Grep, file system analysis, dependency tracking
@@ -99,26 +99,26 @@ TOOLS: Import analysis, dependency graphing
 
 ```bash
 # Move implementation files to standard location
-services/spell_checker_service/protocol_implementations/content_client_impl.py
-→ services/spell_checker_service/implementations/content_client_impl.py
+services/spellchecker_service/protocol_implementations/content_client_impl.py
+→ services/spellchecker_service/implementations/content_client_impl.py
 
-services/spell_checker_service/protocol_implementations/event_publisher_impl.py  
-→ services/spell_checker_service/implementations/event_publisher_impl.py
+services/spellchecker_service/protocol_implementations/event_publisher_impl.py  
+→ services/spellchecker_service/implementations/event_publisher_impl.py
 
-services/spell_checker_service/protocol_implementations/result_store_impl.py
-→ services/spell_checker_service/implementations/result_store_impl.py
+services/spellchecker_service/protocol_implementations/result_store_impl.py
+→ services/spellchecker_service/implementations/result_store_impl.py
 
-services/spell_checker_service/protocol_implementations/spell_logic_impl.py
-→ services/spell_checker_service/implementations/spell_logic_impl.py
+services/spellchecker_service/protocol_implementations/spell_logic_impl.py
+→ services/spellchecker_service/implementations/spell_logic_impl.py
 ```
 
 **2.2 Import Statement Updates**
 
 ```python
 # di.py - Update imports (4 changes)
-from services.spell_checker_service.protocol_implementations.content_client_impl import DefaultContentClient
+from services.spellchecker_service.protocol_implementations.content_client_impl import DefaultContentClient
 # BECOMES:
-from services.spell_checker_service.implementations.content_client_impl import DefaultContentClient
+from services.spellchecker_service.implementations.content_client_impl import DefaultContentClient
 
 # Similar pattern for: event_publisher_impl, result_store_impl, spell_logic_impl
 ```
@@ -127,9 +127,9 @@ from services.spell_checker_service.implementations.content_client_impl import D
 
 ```python
 # test_contract_compliance.py
-from services.spell_checker_service.protocol_implementations.spell_logic_impl import DefaultSpellLogic
+from services.spellchecker_service.protocol_implementations.spell_logic_impl import DefaultSpellLogic
 # BECOMES:
-from services.spell_checker_service.implementations.spell_logic_impl import DefaultSpellLogic
+from services.spellchecker_service.implementations.spell_logic_impl import DefaultSpellLogic
 
 # Apply to: test_event_router.py, spell_idempotency_test_utils.py
 ```
@@ -158,7 +158,7 @@ from services.spell_checker_service.implementations.spell_logic_impl import Defa
 
 #### Phase 3: Service Naming Alignment (HIGH COORDINATION, HIGH IMPACT)
 
-**Objective:** Rename `spell_checker_service` to `spellchecker_service` for platform consistency.
+**Objective:** Rename `spellchecker_service` to `spellchecker_service` for platform consistency.
 
 **Coordination Requirements:**
 
@@ -191,12 +191,12 @@ from services.spell_checker_service.implementations.spell_logic_impl import Defa
 # Create migration checklist
 coordination_checklist:
   infrastructure:
-    - docker_compose_services: [spell_checker_service]
-    - volume_names: [spell_checker_db_data]  
+    - docker_compose_services: [spellchecker_service]
+    - volume_names: [spellchecker_db_data]  
     - service_discovery: [consul_entries, dns_records]
   
   observability:
-    - prometheus_jobs: [spell_checker_service]
+    - prometheus_jobs: [spellchecker_service]
     - grafana_dashboards: [15_references]
     - alert_rules: [database_metrics, http_metrics]
     - loki_labels: [service_name_filters]
@@ -211,14 +211,14 @@ coordination_checklist:
 
 ```bash
 # Atomic directory operation
-mv services/spell_checker_service services/spellchecker_service
+mv services/spellchecker_service services/spellchecker_service
 ```
 
 **3.3 Import Path Mass Update**
 
 ```python
 # Pattern replacement across codebase (60+ files)
-FROM: from services.spell_checker_service.{module}
+FROM: from services.spellchecker_service.{module}
 TO:   from services.spellchecker_service.{module}
 
 # Specific locations requiring updates:
@@ -232,7 +232,7 @@ TO:   from services.spellchecker_service.{module}
 
 ```yaml
 # docker-compose.services.yml
-spell_checker_service:  # RENAME TO: spellchecker_service
+spellchecker_service:  # RENAME TO: spellchecker_service
   depends_on:
     - spellchecker_db
   environment:
@@ -416,27 +416,27 @@ VALIDATION: Full test suite, type safety, observability verification
 **File Moves:**
 
 ```
-services/spell_checker_service/protocol_implementations/content_client_impl.py
-→ services/spell_checker_service/implementations/content_client_impl.py
+services/spellchecker_service/protocol_implementations/content_client_impl.py
+→ services/spellchecker_service/implementations/content_client_impl.py
 
-services/spell_checker_service/protocol_implementations/event_publisher_impl.py
-→ services/spell_checker_service/implementations/event_publisher_impl.py
+services/spellchecker_service/protocol_implementations/event_publisher_impl.py
+→ services/spellchecker_service/implementations/event_publisher_impl.py
 
-services/spell_checker_service/protocol_implementations/result_store_impl.py
-→ services/spell_checker_service/implementations/result_store_impl.py
+services/spellchecker_service/protocol_implementations/result_store_impl.py
+→ services/spellchecker_service/implementations/result_store_impl.py
 
-services/spell_checker_service/protocol_implementations/spell_logic_impl.py
-→ services/spell_checker_service/implementations/spell_logic_impl.py
+services/spellchecker_service/protocol_implementations/spell_logic_impl.py
+→ services/spellchecker_service/implementations/spell_logic_impl.py
 ```
 
 **Import Updates (7 Files):**
 
 ```
-services/spell_checker_service/di.py - Lines 27, 30, 33, 36
-services/spell_checker_service/tests/test_contract_compliance.py - Line 62
-services/spell_checker_service/tests/test_event_router.py - Multiple references
-services/spell_checker_service/tests/unit/spell_idempotency_test_utils.py - Import line
-services/spell_checker_service/README.md - Documentation table
+services/spellchecker_service/di.py - Lines 27, 30, 33, 36
+services/spellchecker_service/tests/test_contract_compliance.py - Line 62
+services/spellchecker_service/tests/test_event_router.py - Multiple references
+services/spellchecker_service/tests/unit/spell_idempotency_test_utils.py - Import line
+services/spellchecker_service/README.md - Documentation table
 ```
 
 ### Phase 3: Service Naming Migration (100+ Files)
@@ -456,7 +456,7 @@ monitoring/alerting/*.yml - Alert rule definitions
 **Core Service Files (45+ Files):**
 
 ```
-services/spell_checker_service/ → services/spellchecker_service/
+services/spellchecker_service/ → services/spellchecker_service/
 ├── All internal Python files with relative imports
 ├── Configuration files (alembic.ini, pyproject.toml)  
 ├── Docker files (Dockerfile, requirements)

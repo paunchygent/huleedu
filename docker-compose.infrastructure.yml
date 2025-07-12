@@ -161,8 +161,8 @@ services:
       - POSTGRES_USER=${HULEEDU_DB_USER}
       - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
-      - spell_checker_db_data:/var/lib/postgresql/data
-      - ./services/spell_checker_service/docker/init_pg.sql:/docker-entrypoint-initdb.d/00_pg_trgm.sql:ro
+      - spellchecker_db_data:/var/lib/postgresql/data
+      - ./services/spellchecker_service/docker/init_pg.sql:/docker-entrypoint-initdb.d/00_pg_trgm.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d spellchecker"]
       interval: 10s

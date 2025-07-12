@@ -3,7 +3,7 @@ pipelines:
     description: "Pipeline that runs spellcheck, NLP analysis, then AI-driven feedback on an essay."
     steps:
       - name: "spellcheck"
-        service_name: "spell_checker_service"
+        service_name: "spellchecker_service"
         event_type: "huleedu.els.spellcheck.initiate.command.v1"
         event_data_model: "BatchServiceSpellcheckInitiateCommandDataV1"
         depends_on: []
@@ -25,7 +25,7 @@ pipelines:
     description: "Pipeline that performs CJ Comparative Judgment assessment after spellchecking."
     steps:
       - name: "spellcheck"
-        service_name: "spell_checker_service"
+        service_name: "spellchecker_service"
         event_type: "huleedu.els.spellcheck.initiate.command.v1"
         event_data_model: "BatchServiceSpellcheckInitiateCommandDataV1"
         depends_on: []
@@ -40,7 +40,7 @@ pipelines:
     description: "Pipeline that executes NLP analysis after spellchecking."
     steps:
       - name: "spellcheck"
-        service_name: "spell_checker_service"
+        service_name: "spellchecker_service"
         event_type: "huleedu.els.spellcheck.initiate.command.v1"
         event_data_model: "BatchServiceSpellcheckInitiateCommandDataV1"
         depends_on: []
@@ -55,7 +55,7 @@ pipelines:
     description: "Comprehensive pipeline covering spellcheck, NLP analysis, AI feedback, and CJ assessment."
     steps:
       - name: "spellcheck"
-        service_name: "spell_checker_service"
+        service_name: "spellchecker_service"
         event_type: "huleedu.els.spellcheck.initiate.command.v1"
         event_data_model: "BatchServiceSpellcheckInitiateCommandDataV1"
         depends_on: []

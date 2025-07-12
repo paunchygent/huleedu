@@ -40,10 +40,10 @@ These are straightforward standardization fixes that improve codebase consistenc
 
 **Files Modified**:
 
-- `services/spell_checker_service/config.py`: Added property pattern
-- `services/spell_checker_service/alembic/env.py`: Updated reference
-- `services/spell_checker_service/di.py`: Updated reference  
-- `services/spell_checker_service/implementations/spell_repository_postgres_impl.py`: Updated reference
+- `services/spellchecker_service/config.py`: Added property pattern
+- `services/spellchecker_service/alembic/env.py`: Updated reference
+- `services/spellchecker_service/di.py`: Updated reference  
+- `services/spellchecker_service/implementations/spell_repository_postgres_impl.py`: Updated reference
 
 **Result**: All PostgreSQL services now use consistent property-based database URL pattern
 

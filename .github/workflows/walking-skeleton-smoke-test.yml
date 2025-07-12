@@ -38,7 +38,7 @@ jobs:
             "huleedu_content_service" 
             "huleedu_essay_lifecycle_api" 
             "huleedu_file_service" 
-            "huleedu_spell_checker_service"
+            "huleedu_spellchecker_service"
             "huleedu_cj_assessment_service"
             "huleedu_kafka"
           )
@@ -86,7 +86,7 @@ jobs:
             ["batch_orchestrator_service"]="http://localhost:5001/healthz"
             ["essay_lifecycle_service"]="http://localhost:6001/healthz"
             ["file_service"]="http://localhost:7001/healthz"
-            ["spell_checker_service"]="http://localhost:8002/healthz"
+            ["spellchecker_service"]="http://localhost:8002/healthz"
           )
           
           # Test each service health endpoint
@@ -119,7 +119,7 @@ jobs:
             ["batch_orchestrator_service"]="http://localhost:5001/metrics"
             ["essay_lifecycle_service"]="http://localhost:6001/metrics"
             ["file_service"]="http://localhost:7001/metrics"
-            ["spell_checker_service"]="http://localhost:8002/metrics"
+            ["spellchecker_service"]="http://localhost:8002/metrics"
             ["cj_assessment_service"]="http://localhost:9095/metrics"
           )
           
@@ -272,7 +272,7 @@ jobs:
           docker compose logs --tail=50 file_service
           
           echo "--- Spell Checker Service Logs ---"
-          docker compose logs --tail=50 spell_checker_service
+          docker compose logs --tail=50 spellchecker_service
           
           echo "--- CJ Assessment Service Logs ---"
           docker compose logs --tail=50 cj_assessment_service

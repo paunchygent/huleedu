@@ -183,7 +183,7 @@ Protect content fetching operations across all services. This phase prioritizes 
 
 **Services to Update** (Priority Order):
 1. **Spell Checker Service** ⭐⭐⭐⭐ (HIGH)
-   - File: `services/spell_checker_service/protocol_implementations/content_client_impl.py`
+   - File: `services/spellchecker_service/protocol_implementations/content_client_impl.py`
    - Impact: Processing pipeline depends on content fetching
    
 2. **CJ Assessment Service** ⭐⭐⭐ (MEDIUM)  
@@ -338,7 +338,7 @@ Complete integration tests for remaining services:
 
 **To Implement**:
 - `services/file_service/tests/integration/test_kafka_circuit_breaker.py`
-- `services/spell_checker_service/tests/integration/test_content_circuit_breaker.py`
+- `services/spellchecker_service/tests/integration/test_content_circuit_breaker.py`
 - `services/class_management_service/tests/integration/test_kafka_circuit_breaker.py`
 - `services/cj_assessment_service/tests/integration/test_content_circuit_breaker.py`
 

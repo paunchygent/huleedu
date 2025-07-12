@@ -83,7 +83,7 @@ groups:
         cj_assessment_circuit_breaker_state == 1 or
         class_management_circuit_breaker_state == 1 or
         file_service_circuit_breaker_state == 1 or
-        spell_checker_circuit_breaker_state == 1
+        spellchecker_circuit_breaker_state == 1
       )
     for: 30s
     labels:
@@ -155,7 +155,7 @@ groups:
         (cj_assessment_service_database_connections_active / cj_assessment_service_database_connections_total) > 0.90 or
         (class_management_service_database_connections_active / class_management_service_database_connections_total) > 0.90 or
         (result_aggregator_service_database_connections_active / result_aggregator_service_database_connections_total) > 0.90 or
-        (spell_checker_service_database_connections_active / spell_checker_service_database_connections_total) > 0.90
+        (spellchecker_service_database_connections_active / spellchecker_service_database_connections_total) > 0.90
       )
     for: 2m
     labels:
@@ -174,7 +174,7 @@ groups:
         histogram_quantile(0.95, sum(rate(cj_assessment_service_database_query_duration_seconds_bucket[5m])) by (le)) > 1 or
         histogram_quantile(0.95, sum(rate(class_management_service_database_query_duration_seconds_bucket[5m])) by (le)) > 1 or
         histogram_quantile(0.95, sum(rate(result_aggregator_service_database_query_duration_seconds_bucket[5m])) by (le)) > 1 or
-        histogram_quantile(0.95, sum(rate(spell_checker_service_database_query_duration_seconds_bucket[5m])) by (le)) > 1
+        histogram_quantile(0.95, sum(rate(spellchecker_service_database_query_duration_seconds_bucket[5m])) by (le)) > 1
       )
     for: 5m
     labels:
@@ -193,7 +193,7 @@ groups:
         sum(rate(cj_assessment_service_database_errors_total[5m])) > 0.1 or
         sum(rate(class_management_service_database_errors_total[5m])) > 0.1 or
         sum(rate(result_aggregator_service_database_errors_total[5m])) > 0.1 or
-        sum(rate(spell_checker_service_database_errors_total[5m])) > 0.1
+        sum(rate(spellchecker_service_database_errors_total[5m])) > 0.1
       )
     for: 1m
     labels:
@@ -212,7 +212,7 @@ groups:
         (rate(cj_assessment_service_database_transaction_duration_seconds_count{result="error"}[5m]) / rate(cj_assessment_service_database_transaction_duration_seconds_count[5m])) > 0.05 or
         (rate(class_management_service_database_transaction_duration_seconds_count{result="error"}[5m]) / rate(class_management_service_database_transaction_duration_seconds_count[5m])) > 0.05 or
         (rate(result_aggregator_service_database_transaction_duration_seconds_count{result="error"}[5m]) / rate(result_aggregator_service_database_transaction_duration_seconds_count[5m])) > 0.05 or
-        (rate(spell_checker_service_database_transaction_duration_seconds_count{result="error"}[5m]) / rate(spell_checker_service_database_transaction_duration_seconds_count[5m])) > 0.05
+        (rate(spellchecker_service_database_transaction_duration_seconds_count{result="error"}[5m]) / rate(spellchecker_service_database_transaction_duration_seconds_count[5m])) > 0.05
       )
     for: 3m
     labels:
@@ -231,7 +231,7 @@ groups:
         increase(cj_assessment_service_database_connections_acquired_total[10m]) - increase(cj_assessment_service_database_connections_released_total[10m]) > 5 or
         increase(class_management_service_database_connections_acquired_total[10m]) - increase(class_management_service_database_connections_released_total[10m]) > 5 or
         increase(result_aggregator_service_database_connections_acquired_total[10m]) - increase(result_aggregator_service_database_connections_released_total[10m]) > 5 or
-        increase(spell_checker_service_database_connections_acquired_total[10m]) - increase(spell_checker_service_database_connections_released_total[10m]) > 5
+        increase(spellchecker_service_database_connections_acquired_total[10m]) - increase(spellchecker_service_database_connections_released_total[10m]) > 5
       )
     for: 5m
     labels:

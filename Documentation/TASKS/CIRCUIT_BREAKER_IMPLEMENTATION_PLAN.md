@@ -159,7 +159,7 @@ class Settings(BaseSettings):
 #### 1.4 Implement Content Service Circuit Breakers
 
 Apply the same pattern to:
-- `services/spell_checker_service/protocol_implementations/content_client_impl.py`
+- `services/spellchecker_service/protocol_implementations/content_client_impl.py`
 - `services/cj_assessment_service/implementations/content_client_impl.py`
 
 ### Phase 2: Kafka Producer Circuit Breakers (Week 2)

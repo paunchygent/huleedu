@@ -5,7 +5,7 @@
 **Task ID:** POSTGRESQL-TEST-ARCH-001  
 **Priority:** High - Architectural Foundation  
 **Status:** Implementation Ready  
-**Dependencies:** spell_checker_service HuleEduApp migration (completed)
+**Dependencies:** spellchecker_service HuleEduApp migration (completed)
 
 ---
 
@@ -15,7 +15,7 @@
 
 **Critical Issue Identified:** PostgreSQL-dependent services have inconsistent test architectures that fail to catch production-specific issues, violating the HuleEdu principle of production fidelity.
 
-**Evidence from spell_checker_service:**
+**Evidence from spellchecker_service:**
 ```
 sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) near "EXTENSION": syntax error
 [SQL: CREATE EXTENSION IF NOT EXISTS pg_trgm]
@@ -71,7 +71,7 @@ sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) near "EXTENSION": sy
 ### Implementation Strategy
 
 #### Phase 1: Immediate Fixes (COMPLETED)
-✅ **spell_checker_service Test Fix**
+✅ **spellchecker_service Test Fix**
 - Converted `test_container_resolves_repository` to use PostgreSQL testcontainer
 - Added `@pytest.mark.integration` marker for test categorization
 - Verified PostgreSQL extension creation (`pg_trgm`)
@@ -109,9 +109,9 @@ async def postgres_test_engine() -> AsyncGenerator[AsyncEngine, None]:
 
 **Service-Specific Test Standards:**
 ```python
-# Example: services/spell_checker_service/tests/conftest.py
+# Example: services/spellchecker_service/tests/conftest.py
 from huleedu_service_libs.test_utilities import postgres_test_engine
-from services.spell_checker_service.models_db import Base
+from services.spellchecker_service.models_db import Base
 
 @pytest.fixture
 async def spell_checker_repository(postgres_test_engine: AsyncEngine):
@@ -177,7 +177,7 @@ integration_tests:
 ### Implementation Roadmap
 
 #### Week 1: Foundation (HIGH PRIORITY)
-- [x] **Fix spell_checker_service** (COMPLETED - 109/109 tests passing)
+- [x] **Fix spellchecker_service** (COMPLETED - 109/109 tests passing)
 - [ ] **Create test utility library** in `services/libs/huleedu_service_libs/`
 - [ ] **Document test architecture standards** in project documentation
 - [ ] **Add pytest markers** for test categorization
@@ -214,7 +214,7 @@ integration_tests:
 ### Success Metrics
 
 #### Immediate (Week 1)
-- ✅ spell_checker_service: 109/109 tests passing with PostgreSQL testcontainers
+- ✅ spellchecker_service: 109/109 tests passing with PostgreSQL testcontainers
 - [ ] Test utility library created and documented
 - [ ] 2+ additional services migrated successfully
 
@@ -247,7 +247,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 ```
 
 **Service-Specific Extensions:**
-- **spell_checker_service**: `pg_trgm` for GIN trigram indexing
+- **spellchecker_service**: `pg_trgm` for GIN trigram indexing
 - **essay_lifecycle_service**: `pg_trgm` for essay content search
 - **cj_assessment_service**: Full-text search extensions
 - **result_aggregator_service**: Analytics and aggregation extensions
@@ -292,7 +292,7 @@ async def test_di_container(postgres_test_engine: AsyncEngine):
 
 This PostgreSQL test architecture alignment establishes the foundation for platform-wide testing excellence. By implementing production-fidelity testing with PostgreSQL testcontainers, we eliminate the architectural drift between test and production environments while maintaining developer velocity through a clear test hierarchy.
 
-The successful fix of the spell_checker_service (109/109 tests passing) demonstrates the viability of this approach and provides a proven pattern for platform-wide adoption.
+The successful fix of the spellchecker_service (109/109 tests passing) demonstrates the viability of this approach and provides a proven pattern for platform-wide adoption.
 
 **Next Actions:**
 1. Create shared test utility library
