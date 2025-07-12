@@ -6,30 +6,25 @@ for the Quart-based health API component of the combined service.
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING
 
 from dishka import AsyncContainer
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
-from opentelemetry.trace import Tracer
-from quart import Quart
+
+if TYPE_CHECKING:
+    from huleedu_service_libs.quart_app import HuleEduApp
 
 from services.spell_checker_service.config import Settings
 from services.spell_checker_service.metrics import get_metrics
 
-
-class SpellCheckerQuart(Quart):
-    """Custom Quart application class with type hints for custom attributes."""
-
-    tracer: Tracer
-    extensions: dict[str, Any]
-
-
 logger = create_service_logger("spell_checker_service.startup_setup")
 
 
-async def initialize_services(app: Quart, settings: Settings, container: AsyncContainer) -> None:
+async def initialize_services(
+    app: "HuleEduApp", settings: Settings, container: AsyncContainer
+) -> None:
     """Initialize application services and metrics.
 
     Args:
@@ -37,7 +32,6 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
         settings: Application settings
         container: DI container for service dependencies
     """
-    app = cast(SpellCheckerQuart, app)
     """Initialize application services and metrics.
 
     Args:
@@ -66,8 +60,7 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
     # Get shared metrics with database metrics integration (thread-safe singleton pattern)
     metrics = get_metrics(database_metrics)
 
-    # Store metrics in app context (proper Quart pattern)
-    app.extensions = getattr(app, "extensions", {})
+    # Store metrics in app context (extensions dict is guaranteed to exist with HuleEduApp)
     app.extensions["metrics"] = metrics
 
     logger.info("All metrics initialized and stored in app extensions")

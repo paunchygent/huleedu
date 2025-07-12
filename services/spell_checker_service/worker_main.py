@@ -14,6 +14,7 @@ import sys
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from services.spell_checker_service.config import settings
 from services.spell_checker_service.di import SpellCheckerServiceProvider
@@ -59,8 +60,19 @@ async def main() -> None:
     init_tracing("spell_checker_service")
     logger.info("OpenTelemetry tracing initialized")
 
+    # Initialize database engine
+    engine = create_async_engine(
+        settings.database_url,
+        echo=False,
+        future=True,
+        pool_size=getattr(settings, "DATABASE_POOL_SIZE", 5),
+        max_overflow=getattr(settings, "DATABASE_MAX_OVERFLOW", 10),
+        pool_pre_ping=getattr(settings, "DATABASE_POOL_PRE_PING", True),
+        pool_recycle=getattr(settings, "DATABASE_POOL_RECYCLE", 1800),
+    )
+
     # Initialize dependency injection container
-    container = make_async_container(SpellCheckerServiceProvider())
+    container = make_async_container(SpellCheckerServiceProvider(engine=engine))
 
     try:
         async with container() as request_container:

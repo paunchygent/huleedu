@@ -56,8 +56,30 @@ async def patch_settings(
 
 
 @pytest.mark.asyncio
-async def test_container_resolves_repository(patch_settings: None) -> None:  # noqa: PT004 fixture used
-    provider = SpellCheckerServiceProvider()
+@pytest.mark.integration
+async def test_container_resolves_repository(
+    postgres_container: PostgresContainer, patch_settings: None
+) -> None:  # noqa: PT004 fixture used
+    """Integration test: DI container resolves PostgreSQL repository with proper extensions."""
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy import text
+    from services.spell_checker_service.models_db import Base
+
+    # Create PostgreSQL engine from testcontainer
+    conn_url = postgres_container.get_connection_url()
+    if "+psycopg2://" in conn_url:
+        conn_url = conn_url.replace("+psycopg2://", "+asyncpg://")
+    elif "postgresql://" in conn_url:
+        conn_url = conn_url.replace("postgresql://", "postgresql+asyncpg://")
+
+    engine = create_async_engine(conn_url, echo=False, pool_size=5, max_overflow=0)
+    
+    # Setup PostgreSQL extensions and schema
+    async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+        await conn.run_sync(Base.metadata.create_all)
+
+    provider = SpellCheckerServiceProvider(engine=engine)
     container = make_async_container(provider)
     try:
         repo: SpellcheckRepositoryProtocol = await container.get(SpellcheckRepositoryProtocol)
@@ -69,3 +91,4 @@ async def test_container_resolves_repository(patch_settings: None) -> None:  # n
         await repo.create_job(batch_id=uuid.uuid4(), essay_id=uuid.uuid4())
     finally:
         await container.close()
+        await engine.dispose()

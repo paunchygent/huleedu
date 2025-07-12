@@ -27,7 +27,12 @@ def test_settings() -> Settings:
 @pytest.mark.asyncio
 async def test_redis_client_di_injection(test_settings: Settings) -> None:
     """Test that RedisClient can be injected via DI container."""
-    container = make_async_container(SpellCheckerServiceProvider())
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    # Create test engine
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+
+    container = make_async_container(SpellCheckerServiceProvider(engine=engine))
 
     async with container() as request_container:
         # Test that we can get a RedisClient from DI

@@ -46,7 +46,12 @@ def mock_settings_disabled() -> Settings:
 @pytest.fixture
 def provider() -> SpellCheckerServiceProvider:
     """DI provider for testing."""
-    return SpellCheckerServiceProvider()
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    # Create test engine
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+
+    return SpellCheckerServiceProvider(engine=engine)
 
 
 @pytest.mark.asyncio

@@ -48,6 +48,11 @@ from services.spell_checker_service.repository_protocol import SpellcheckReposit
 class SpellCheckerServiceProvider(Provider):
     """Provider for Spell Checker Service dependencies."""
 
+    def __init__(self, engine: AsyncEngine) -> None:
+        """Initialize provider with pre-configured database engine."""
+        super().__init__()
+        self._engine = engine
+
     @provide(scope=Scope.APP)
     def provide_settings(self) -> Settings:
         """Provide service settings."""
@@ -143,19 +148,9 @@ class SpellCheckerServiceProvider(Provider):
         return DefaultResultStore(content_service_url=app_settings.CONTENT_SERVICE_URL)
 
     @provide(scope=Scope.APP)
-    def provide_database_engine(self, settings: Settings) -> AsyncEngine:
-        """Provide database engine for metrics setup."""
-        from sqlalchemy.ext.asyncio import create_async_engine
-
-        return create_async_engine(
-            settings.database_url,
-            echo=False,
-            future=True,
-            pool_size=getattr(settings, "DATABASE_POOL_SIZE", 5),
-            max_overflow=getattr(settings, "DATABASE_MAX_OVERFLOW", 10),
-            pool_pre_ping=getattr(settings, "DATABASE_POOL_PRE_PING", True),
-            pool_recycle=getattr(settings, "DATABASE_POOL_RECYCLE", 1800),
-        )
+    def provide_database_engine(self) -> AsyncEngine:
+        """Provide the pre-configured database engine."""
+        return self._engine
 
     @provide(scope=Scope.APP)
     def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:

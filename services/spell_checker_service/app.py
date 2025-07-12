@@ -13,16 +13,16 @@ Key principles:
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
 
-from dishka import AsyncContainer, make_async_container
+from dishka import make_async_container
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
     create_service_logger,
 )
 from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
-from quart import Quart
+from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from services.spell_checker_service.api.health_routes import health_bp
 from services.spell_checker_service.config import Settings
@@ -33,15 +33,9 @@ from services.spell_checker_service.startup_setup import initialize_services, sh
 logger = create_service_logger("spell_checker_service.app")
 
 
-class SpellCheckerApp(Quart):
-    """Custom Quart app with typed service-specific attributes."""
-
-    container: AsyncContainer
-    consumer_task: Optional[asyncio.Task[None]]
-    kafka_consumer: Optional[SpellCheckerKafkaConsumer]
 
 
-def create_app(settings: Settings | None = None) -> SpellCheckerApp:
+def create_app(settings: Settings | None = None) -> HuleEduApp:
     """Create and configure the Quart application.
 
     Args:
@@ -56,8 +50,8 @@ def create_app(settings: Settings | None = None) -> SpellCheckerApp:
     # Configure logging
     configure_service_logging("spell_checker_service", log_level=settings.LOG_LEVEL)
 
-    # Create Quart app
-    app = SpellCheckerApp(__name__)
+    # Create HuleEduApp with guaranteed infrastructure
+    app = HuleEduApp(__name__)
 
     # Configure app settings
     app.config.update(
@@ -67,14 +61,25 @@ def create_app(settings: Settings | None = None) -> SpellCheckerApp:
         },
     )
 
-    # Initialize dependency injection container
-    container = make_async_container(SpellCheckerServiceProvider())
-    QuartDishka(app=app, container=container)
+    # Initialize guaranteed infrastructure immediately
+    app.database_engine = create_async_engine(
+        settings.database_url,
+        echo=False,
+        future=True,
+        pool_size=getattr(settings, "DATABASE_POOL_SIZE", 5),
+        max_overflow=getattr(settings, "DATABASE_MAX_OVERFLOW", 10),
+        pool_pre_ping=getattr(settings, "DATABASE_POOL_PRE_PING", True),
+        pool_recycle=getattr(settings, "DATABASE_POOL_RECYCLE", 1800),
+    )
+    app.container = make_async_container(SpellCheckerServiceProvider(engine=app.database_engine))
+    app.extensions = {}
 
-    # Store container reference and initialize consumer attributes
-    app.container = container
+    # Optional service-specific attributes (preserve existing patterns)
     app.consumer_task = None
     app.kafka_consumer = None
+
+    # Setup dependency injection
+    QuartDishka(app=app, container=app.container)
 
     # Register mandatory health Blueprint
     app.register_blueprint(health_bp)
@@ -84,7 +89,7 @@ def create_app(settings: Settings | None = None) -> SpellCheckerApp:
         """Application startup tasks including Kafka consumer."""
         try:
             # Initialize services and metrics
-            await initialize_services(app, settings, container)
+            await initialize_services(app, settings, app.container)
 
             # Setup metrics middleware (per Rule 020.4.4)
             setup_standard_service_metrics_middleware(app, "spell_checker")
@@ -94,6 +99,7 @@ def create_app(settings: Settings | None = None) -> SpellCheckerApp:
                 app.kafka_consumer = await request_container.get(SpellCheckerKafkaConsumer)
 
             # Start consumer as background task
+            assert app.kafka_consumer is not None, "Kafka consumer must be initialized"
             app.consumer_task = asyncio.create_task(app.kafka_consumer.start_consumer())
 
             logger.info("Spell Checker Service started successfully")
