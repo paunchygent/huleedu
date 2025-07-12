@@ -16,6 +16,7 @@ from huleedu_service_libs import init_tracing
 from huleedu_service_libs.idempotency import idempotent_consumer
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from services.cj_assessment_service.config import settings
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
@@ -43,8 +44,19 @@ async def main() -> None:
     tracer = init_tracing("cj_assessment_service")
     logger.info("OpenTelemetry tracing initialized")
 
-    # Initialize Dishka container
-    container = make_async_container(CJAssessmentServiceProvider())
+    # Initialize database engine for DI container
+    engine = create_async_engine(
+        settings.database_url,
+        echo=False,
+        future=True,
+        pool_size=settings.DATABASE_POOL_SIZE,
+        max_overflow=settings.DATABASE_MAX_OVERFLOW,
+        pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+        pool_recycle=settings.DATABASE_POOL_RECYCLE,
+    )
+    
+    # Initialize Dishka container with engine
+    container = make_async_container(CJAssessmentServiceProvider(engine=engine))
 
     try:
         async with container() as request_container:

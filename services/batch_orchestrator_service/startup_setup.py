@@ -9,7 +9,7 @@ from huleedu_service_libs import init_tracing
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
-from quart import Quart
+from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 
 from services.batch_orchestrator_service.config import Settings
@@ -37,7 +37,7 @@ kafka_consumer_instance: BatchKafkaConsumer | None = None
 consumer_task: asyncio.Task | None = None
 
 
-async def initialize_services(app: Quart, settings: Settings) -> None:
+async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
     """Initialize DI container, Quart-Dishka integration, metrics, and Kafka consumer."""
     global kafka_consumer_instance, consumer_task
 
@@ -54,6 +54,9 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
             EventHandlingProvider(),
             InitiatorMapProvider(),
         )
+
+        # Initialize guaranteed HuleEduApp infrastructure immediately
+        app.container = container
         QuartDishka(app=app, container=container)
 
         # Initialize database schema directly (bypasses DI scoping issues)
@@ -61,9 +64,9 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         await db_repository.initialize_db_schema()
         logger.info("Database schema initialized successfully")
 
-        # Store database engine for health checks
-        setattr(app, "database_engine", db_repository.db_infrastructure.engine)
-        logger.info("Database engine stored for health checks")
+        # Initialize guaranteed database engine infrastructure
+        app.database_engine = db_repository.db_infrastructure.engine
+        logger.info("Database engine initialized for guaranteed access")
 
         # Get database metrics from DI container
         async with container() as request_container:
@@ -72,8 +75,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         # Initialize metrics using shared metrics module with database metrics integration
         metrics = get_metrics(database_metrics)
 
-        # Store metrics in app context (proper Quart pattern)
-        app.extensions = getattr(app, "extensions", {})
+        # Store metrics in app extensions (HuleEduApp guarantees extensions dict)
         app.extensions["metrics"] = metrics
 
         # Initialize tracing

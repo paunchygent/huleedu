@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
-from quart import Quart
+from huleedu_service_libs.quart_app import HuleEduApp
 
 # Import Blueprints
 # Import local modules using absolute imports for containerized deployment
@@ -22,7 +22,7 @@ from services.batch_orchestrator_service.config import settings
 configure_service_logging("batch-service", log_level=settings.LOG_LEVEL)
 logger = create_service_logger("bos.app")
 
-app = Quart(__name__)
+app = HuleEduApp(__name__)
 
 
 @app.before_serving

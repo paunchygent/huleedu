@@ -1,5 +1,7 @@
 """Health and metrics routes for Essay Lifecycle Service."""
 
+from typing import TYPE_CHECKING
+
 from dishka import FromDishka
 from huleedu_service_libs.database import DatabaseHealthChecker
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -8,6 +10,9 @@ from quart import Blueprint, Response, current_app, jsonify
 from quart_dishka import inject
 
 from services.essay_lifecycle_service.config import Settings
+
+if TYPE_CHECKING:
+    from huleedu_service_libs.quart_app import HuleEduApp
 
 logger = create_service_logger("els.api.health")
 health_bp = Blueprint("health_routes", __name__)
@@ -22,24 +27,21 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
         checks = {"service_responsive": True, "dependencies_available": True}
         dependencies = {}
 
-        # Get database engine from app extensions
-        engine = getattr(current_app, "database_engine", None)
-        if engine:
-            try:
-                health_checker = DatabaseHealthChecker(engine, "essay_lifecycle_service")
-                summary = await health_checker.get_health_summary()
-                dependencies["database"] = {"status": summary.get("status", "unknown")}
-                if summary.get("status") not in ["healthy", "warning"]:
-                    checks["dependencies_available"] = False
-            except Exception as e:
-                logger.warning(f"Database health check failed: {e}")
-                dependencies["database"] = {"status": "unhealthy", "error": str(e)}
+        # Get database engine (guaranteed to exist with HuleEduApp)
+        if TYPE_CHECKING:
+            assert isinstance(current_app, HuleEduApp)
+        engine = current_app.database_engine
+
+        try:
+            health_checker = DatabaseHealthChecker(engine, "essay_lifecycle_service")
+            summary = await health_checker.get_health_summary()
+            dependencies["database"] = {"status": summary.get("status", "unknown")}
+            if summary.get("status") not in ["healthy", "warning"]:
                 checks["dependencies_available"] = False
-        else:
-            dependencies["database"] = {
-                "status": "unknown",
-                "note": "Database engine not configured",
-            }
+        except Exception as e:
+            logger.warning(f"Database health check failed: {e}")
+            dependencies["database"] = {"status": "unhealthy", "error": str(e)}
+            checks["dependencies_available"] = False
 
         overall_status = "healthy" if checks["dependencies_available"] else "unhealthy"
 
@@ -78,19 +80,10 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
 async def database_health_check() -> Response | tuple[Response, int]:
     """Database-specific health check endpoint with detailed metrics."""
     try:
-        # Get database engine from app extensions or container
-        engine = getattr(current_app, "database_engine", None)
-        if not engine:
-            return (
-                jsonify(
-                    {
-                        "status": "error",
-                        "message": "Database engine not configured",
-                        "timestamp": None,
-                    }
-                ),
-                503,
-            )
+        # Get database engine (guaranteed to exist with HuleEduApp)
+        if TYPE_CHECKING:
+            assert isinstance(current_app, HuleEduApp)
+        engine = current_app.database_engine
 
         # Create health checker and perform comprehensive check
         health_checker = DatabaseHealthChecker(engine, "essay_lifecycle_service")
@@ -124,18 +117,10 @@ async def database_health_check() -> Response | tuple[Response, int]:
 async def database_health_summary() -> Response | tuple[Response, int]:
     """Lightweight database health summary for frequent polling."""
     try:
-        # Get database engine from app extensions or container
-        engine = getattr(current_app, "database_engine", None)
-        if not engine:
-            return (
-                jsonify(
-                    {
-                        "status": "error",
-                        "message": "Database engine not configured",
-                    }
-                ),
-                503,
-            )
+        # Get database engine (guaranteed to exist with HuleEduApp)
+        if TYPE_CHECKING:
+            assert isinstance(current_app, HuleEduApp)
+        engine = current_app.database_engine
 
         # Create health checker and get summary
         health_checker = DatabaseHealthChecker(engine, "essay_lifecycle_service")
