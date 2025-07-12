@@ -4,6 +4,7 @@ import time
 from uuid import UUID, uuid4
 
 from dishka import FromDishka
+from huleedu_service_libs.error_handling.quart_handlers import create_error_response
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.resilience import CircuitBreakerError, CircuitBreakerRegistry
 from quart import Blueprint, Response, jsonify, request
@@ -18,6 +19,7 @@ from services.llm_provider_service.api_models import (
     LLMQueuedResponse,
 )
 from services.llm_provider_service.config import Settings
+from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 from services.llm_provider_service.implementations.trace_context_manager_impl import (
     TraceContextManagerImpl,
@@ -99,41 +101,40 @@ async def generate_comparison(
             )
 
             # Call orchestrator
-            result, error = await orchestrator.perform_comparison(
-                provider=provider_override,
-                user_prompt=comparison_request.user_prompt,
-                essay_a=comparison_request.essay_a,
-                essay_b=comparison_request.essay_b,
-                correlation_id=correlation_id,
-                model_override=model_override,
-                temperature_override=temperature_override,
-                system_prompt_override=system_prompt_override,
-            )
+            try:
+                result = await orchestrator.perform_comparison(
+                    provider=provider_override,
+                    user_prompt=comparison_request.user_prompt,
+                    essay_a=comparison_request.essay_a,
+                    essay_b=comparison_request.essay_b,
+                    correlation_id=correlation_id,
+                    model_override=model_override,
+                    temperature_override=temperature_override,
+                    system_prompt_override=system_prompt_override,
+                )
+            except HuleEduError as error:
+                # Track metrics for error
+                _duration_ms = int((time.time() - start_time) * 1000)
+                tracer.mark_span_error(error)
 
-            # Track metrics
-            _duration_ms = int((time.time() - start_time) * 1000)
-
-            if error:
-                tracer.mark_span_error(Exception(error.error_message))
+                # Extract provider info for metrics
+                provider_for_metrics = provider_override or "unknown"
                 metrics["llm_requests_total"].labels(
-                    provider=error.provider,
+                    provider=provider_for_metrics,
                     model=model_override or "default",
                     request_type="comparison",
                     status="failed",
                 ).inc()
-                logger.error(f"Comparison request failed: {error.error_message}")
-                return jsonify(
-                    {
-                        "error": error.error_message,
-                        "error_type": error.error_type.value,
-                        "correlation_id": str(error.correlation_id),
-                        "retry_after": error.retry_after,
-                    }
-                ), 503 if error.is_retryable else 400
 
-            # Success - result should not be None if no error
+                logger.error(f"Comparison request failed: {str(error)}")
+
+                # Use service libraries error response factory
+                error_response, status_code = create_error_response(error)
+                return jsonify(error_response), status_code
+
+            # Success - result should not be None
             if not result:
-                logger.error("Orchestrator returned no result and no error")
+                logger.error("Orchestrator returned no result")
                 return jsonify(
                     {
                         "error": "Internal error: No result from orchestrator",
@@ -287,13 +288,16 @@ async def test_provider(
         except ValueError:
             return jsonify({"error": f"Invalid provider: {provider}"}), 400
 
-        success, message = await orchestrator.test_provider(provider=provider_enum)
+        correlation_id = uuid4()
+        success = await orchestrator.test_provider(
+            provider=provider_enum, correlation_id=correlation_id
+        )
 
         return jsonify(
             {
                 "success": success,
                 "provider": provider,
-                "message": message,
+                "message": "Provider operational" if success else "Provider unavailable",
             }
         ), 200
 
@@ -333,7 +337,7 @@ async def get_queue_status(
             estimated_processing_time=None,  # TODO: Calculate from queue stats
             result_available=queued_request.status == QueueStatus.COMPLETED,
             result_location=queued_request.result_location,
-            error_message=queued_request.error_message,
+            message=queued_request.message,
             expires_at=queued_request.queued_at + queued_request.ttl,
         )
 

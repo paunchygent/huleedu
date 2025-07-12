@@ -156,7 +156,7 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
         self,
         queue_id: UUID,
         status: QueueStatus,
-        error_message: Optional[str] = None,
+        message: Optional[str] = None,
         result_location: Optional[str] = None,
     ) -> bool:
         """Update status in appropriate backend."""
@@ -168,8 +168,8 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
 
         # Update fields
         request.status = status
-        if error_message:
-            request.error_message = error_message
+        # Note: QueuedRequest doesn't have error_message field
+        # Error messages are handled separately in queue status tracking
         if result_location:
             request.result_location = result_location
 

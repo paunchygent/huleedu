@@ -2,22 +2,26 @@
 
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability.tracing import get_current_trace_id
 
 from common_core import CircuitBreakerState, LLMProviderType
-from common_core.error_enums import ErrorCode
 from services.llm_provider_service.api_models import LLMComparisonRequest
 from services.llm_provider_service.config import Settings
+from services.llm_provider_service.exceptions import (
+    HuleEduError,
+    raise_configuration_error,
+    raise_external_service_error,
+    raise_llm_queue_full_error,
+)
 from services.llm_provider_service.implementations.trace_context_manager_impl import (
     TraceContextManagerImpl,
 )
 from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
-    LLMProviderError,
     LLMQueuedResult,
 )
 from services.llm_provider_service.protocols import (
@@ -65,7 +69,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         essay_b: str,
         correlation_id: UUID,
         **overrides: Any,
-    ) -> Tuple[LLMOrchestratorResponse | LLMQueuedResult | None, LLMProviderError | None]:
+    ) -> LLMOrchestratorResponse | LLMQueuedResult:
         """Perform LLM comparison with provider-first logic and queuing fallback.
 
         Args:
@@ -77,10 +81,10 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             **overrides: Additional parameter overrides
 
         Returns:
-            Tuple of (response, error):
-            - Success: (LLMOrchestratorResponse, None)
-            - Queued: (LLMQueuedResult, None)
-            - Error: (None, LLMProviderError)
+            LLMOrchestratorResponse for immediate results or LLMQueuedResult for queued processing
+
+        Raises:
+            HuleEduError: On any failure to perform comparison
         """
         start_time = time.time()
 
@@ -89,12 +93,13 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             available = [p.value for p in self.providers.keys()]
             error_msg = f"Provider '{provider.value}' not found. Available: {available}"
             logger.error(error_msg)
-            return None, LLMProviderError(
-                error_type=ErrorCode.CONFIGURATION_ERROR,
-                error_message=error_msg,
-                provider=provider,
+            raise_configuration_error(
+                service="llm_provider_service",
+                operation="orchestrator_perform_comparison",
+                config_key="provider",
+                message=error_msg,
                 correlation_id=correlation_id,
-                is_retryable=False,
+                details={"requested_provider": provider.value, "available_providers": available}
             )
 
         # Publish request started event
@@ -142,7 +147,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         correlation_id: UUID,
         overrides: Dict[str, Any],
         start_time: float,
-    ) -> Tuple[LLMQueuedResult | None, LLMProviderError | None]:
+    ) -> LLMQueuedResult:
         """Queue a request when provider is unavailable."""
         logger.warning(
             f"Provider {provider.value} is unavailable, queuing request. "
@@ -201,7 +206,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 estimated_wait_minutes=queue_stats.estimated_wait_minutes,
                 priority=queued_request.priority,
                 queued_at=datetime.now(timezone.utc).isoformat(),
-            ), None
+            )
         else:
             # Queue is full
             queue_stats = await self.queue_manager.get_queue_stats()
@@ -214,13 +219,17 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 circuit_breaker_opened=True,
             )
 
-            return None, LLMProviderError(
-                error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                error_message="Service temporarily at capacity. Please try again later.",
-                provider=provider,
+            raise_llm_queue_full_error(
+                service="llm_provider_service",
+                operation="orchestrator_queue_request",
+                queue_size=queue_stats.current_size,
+                message="Service temporarily at capacity. Please try again later.",
                 correlation_id=correlation_id,
-                is_retryable=True,
-                retry_after=300,  # 5 minutes
+                details={
+                    "provider": provider.value,
+                    "queue_usage_percent": queue_stats.usage_percent,
+                    "retry_after_seconds": 300
+                }
             )
 
     async def _make_llm_request(
@@ -232,7 +241,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         correlation_id: UUID,
         overrides: Dict[str, Any],
         start_time: float,
-    ) -> Tuple[LLMOrchestratorResponse | None, LLMProviderError | None]:
+    ) -> LLMOrchestratorResponse:
         """Make direct LLM request when provider is available."""
         try:
             provider_impl = self.providers[provider]
@@ -244,10 +253,11 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 correlation_id=correlation_id,
             ):
                 # Call the provider with tracing context
-                result, error = await provider_impl.generate_comparison(
+                result = await provider_impl.generate_comparison(
                     user_prompt=user_prompt,
                     essay_a=essay_a,
                     essay_b=essay_b,
+                    correlation_id=correlation_id,
                     system_prompt_override=overrides.get("system_prompt_override"),
                     model_override=overrides.get("model_override"),
                     temperature_override=overrides.get("temperature_override"),
@@ -256,66 +266,63 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
             response_time_ms = int((time.time() - start_time) * 1000)
 
-            if result:
-                # Success - fresh LLM response
-                token_usage_dict: Dict[str, int] = {
-                    "prompt_tokens": result.prompt_tokens,
-                    "completion_tokens": result.completion_tokens,
-                    "total_tokens": result.total_tokens,
-                }
-                cost_estimate_value: float = (
-                    self._estimate_cost(provider.value, token_usage_dict) or 0.0
-                )
+            # Success - fresh LLM response
+            token_usage_dict: Dict[str, int] = {
+                "prompt_tokens": result.prompt_tokens,
+                "completion_tokens": result.completion_tokens,
+                "total_tokens": result.total_tokens,
+            }
+            cost_estimate_value: float = (
+                self._estimate_cost(provider.value, token_usage_dict) or 0.0
+            )
 
-                # Publish completion event
-                await self.event_publisher.publish_llm_request_completed(
-                    provider=provider.value,
-                    correlation_id=correlation_id,
-                    success=True,
-                    response_time_ms=response_time_ms,
-                    metadata={
-                        "request_type": "comparison",
-                        "token_usage": token_usage_dict,
-                        "cost_estimate": cost_estimate_value,
-                        "model_used": result.model,
-                    },
-                )
+            # Publish completion event
+            await self.event_publisher.publish_llm_request_completed(
+                provider=provider.value,
+                correlation_id=correlation_id,
+                success=True,
+                response_time_ms=response_time_ms,
+                metadata={
+                    "request_type": "comparison",
+                    "token_usage": token_usage_dict,
+                    "cost_estimate": cost_estimate_value,
+                    "model_used": result.model,
+                },
+            )
 
-                logger.info(
-                    f"LLM request successful for provider {provider.value}, "
-                    f"correlation_id: {correlation_id}, "
-                    f"response_time: {response_time_ms}ms"
-                )
+            logger.info(
+                f"LLM request successful for provider {provider.value}, "
+                f"correlation_id: {correlation_id}, "
+                f"response_time: {response_time_ms}ms"
+            )
 
-                # Capture current trace ID from active span
-                current_trace_id = get_current_trace_id()
+            # Capture current trace ID from active span
+            current_trace_id = get_current_trace_id()
 
-                # Return fresh orchestrator response
-                return LLMOrchestratorResponse(
-                    winner=result.winner,
-                    justification=result.justification,
-                    confidence=result.confidence,
-                    provider=provider,
-                    model=result.model,
-                    response_time_ms=response_time_ms,
-                    token_usage=token_usage_dict,
-                    cost_estimate=cost_estimate_value,
-                    correlation_id=correlation_id,
-                    trace_id=current_trace_id,
-                ), None
+            # Return fresh orchestrator response
+            return LLMOrchestratorResponse(
+                winner=result.winner,
+                justification=result.justification,
+                confidence=result.confidence,
+                provider=provider,
+                model=result.model,
+                response_time_ms=response_time_ms,
+                token_usage=token_usage_dict,
+                cost_estimate=cost_estimate_value,
+                correlation_id=correlation_id,
+                trace_id=current_trace_id,
+            )
 
-            else:
-                # Request failed
-                error_message = error.error_message if error else "Unknown error"
-                await self._handle_provider_failure(
-                    provider=provider,
-                    correlation_id=correlation_id,
-                    error=error_message,
-                    response_time_ms=response_time_ms,
-                )
-
-                return None, error  # error is already LLMProviderError
-
+        except HuleEduError:
+            # Provider error - already logged and traced
+            response_time_ms = int((time.time() - start_time) * 1000)
+            await self._handle_provider_failure(
+                provider=provider,
+                correlation_id=correlation_id,
+                error="Provider error occurred",
+                response_time_ms=response_time_ms,
+            )
+            raise
         except Exception as e:
             # Unexpected error
             response_time_ms = int((time.time() - start_time) * 1000)
@@ -329,12 +336,13 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 response_time_ms=response_time_ms,
             )
 
-            return None, LLMProviderError(
-                error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                error_message=error_msg,
-                provider=provider,
+            raise_external_service_error(
+                service="llm_provider_service",
+                operation="orchestrator_llm_request",
+                external_service=f"{provider.value}_provider",
+                message=error_msg,
                 correlation_id=correlation_id,
-                is_retryable=True,
+                details={"provider": provider.value}
             )
 
     async def _handle_provider_failure(
@@ -385,35 +393,54 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             },
         )
 
-    async def test_provider(self, provider: LLMProviderType) -> Tuple[bool, str]:
+    async def test_provider(self, provider: LLMProviderType, correlation_id: UUID) -> bool:
         """Test provider connectivity and availability.
 
         Args:
             provider: Provider to test
+            correlation_id: Request correlation ID for tracing
 
         Returns:
-            Tuple of (success, message)
+            True if provider is available and functional
+
+        Raises:
+            HuleEduError: On provider test failure with details
         """
         if provider not in self.providers:
-            return False, f"Provider '{provider.value}' not found"
+            raise_configuration_error(
+                service="llm_provider_service",
+                operation="orchestrator_test_provider",
+                config_key="provider",
+                message=f"Provider '{provider.value}' not found",
+                correlation_id=correlation_id,
+                details={"requested_provider": provider.value}
+            )
 
         try:
             # Simple test prompt
             test_prompt = "Complete this sentence in exactly 5 words: The weather today is"
 
-            _, error = await self.providers[provider].generate_comparison(
+            await self.providers[provider].generate_comparison(
                 user_prompt=test_prompt,
                 essay_a="Test essay A",
                 essay_b="Test essay B",
+                correlation_id=correlation_id,
             )
 
-            if error:
-                return False, f"Provider test failed: {error.error_message}"
+            return True
 
-            return True, f"Provider '{provider.value}' is operational"
-
+        except HuleEduError:
+            # Provider error - already logged and traced
+            raise
         except Exception as e:
-            return False, f"Provider test failed with exception: {str(e)}"
+            raise_external_service_error(
+                service="llm_provider_service",
+                operation="orchestrator_test_provider",
+                external_service=f"{provider.value}_provider",
+                message=f"Provider test failed with exception: {str(e)}",
+                correlation_id=correlation_id,
+                details={"provider": provider.value}
+            )
 
     def _estimate_cost(self, provider: str, token_usage: Dict[str, int] | None) -> float | None:
         """Estimate cost based on provider and token usage.

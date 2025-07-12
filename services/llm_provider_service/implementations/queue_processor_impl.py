@@ -14,14 +14,17 @@ from uuid import UUID
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core import LLMProviderType, QueueStatus
-from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
+from services.llm_provider_service.exceptions import (
+    HuleEduError,
+    raise_processing_error,
+)
 from services.llm_provider_service.implementations.trace_context_manager_impl import (
     TraceContextManagerImpl,
 )
 from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
-    LLMProviderError,
+    LLMQueuedResult,
 )
 from services.llm_provider_service.protocols import (
     LLMEventPublisherProtocol,
@@ -181,7 +184,7 @@ class QueueProcessorImpl:
                 )
 
                 # Note: This will check provider availability and make the actual LLM call
-                result, error = await self.orchestrator.perform_comparison(
+                result = await self.orchestrator.perform_comparison(
                     provider=provider,
                     user_prompt=req_data.user_prompt,
                     essay_a=req_data.essay_a,
@@ -190,28 +193,42 @@ class QueueProcessorImpl:
                     **overrides,
                 )
 
-            if error:
-                await self._handle_request_error(request, error)
-            elif isinstance(result, LLMOrchestratorResponse):
+            if isinstance(result, LLMOrchestratorResponse):
                 await self._handle_request_success(request, result)
-            else:
+            elif isinstance(result, LLMQueuedResult):
                 # Shouldn't happen - queued request shouldn't return another queued result
+                logger.error(
+                    f"Unexpected queued result for request {request.queue_id}: {type(result)}"
+                )
+                raise_processing_error(
+                    service="llm_provider_service",
+                    operation="queue_request_processing",
+                    message="Unexpected queued result during queue processing",
+                    correlation_id=req_data.correlation_id or request.queue_id,
+                    details={"provider": provider.value, "queue_id": str(request.queue_id)}
+                )
+            else:
+                # Unexpected result type
                 logger.error(
                     f"Unexpected result type for request {request.queue_id}: {type(result)}"
                 )
-                await self._handle_request_error(
-                    request,
-                    LLMProviderError(
-                        error_type=ErrorCode.PROCESSING_ERROR,
-                        error_message="Unexpected processing result",
-                        provider=provider,
-                        correlation_id=req_data.correlation_id or request.queue_id,
-                        is_retryable=False,
-                    ),
+                raise_processing_error(
+                    service="llm_provider_service",
+                    operation="queue_request_processing",
+                    message="Unexpected processing result type",
+                    correlation_id=req_data.correlation_id or request.queue_id,
+                    details={"provider": provider.value, "result_type": str(type(result))}
                 )
 
+        except HuleEduError as e:
+            logger.error(
+                f"LLM service error processing request {request.queue_id}: {e}", exc_info=True
+            )
+            await self._handle_request_hule_error(request, e)
         except Exception as e:
-            logger.error(f"Error processing request {request.queue_id}: {e}", exc_info=True)
+            logger.error(
+                f"Unexpected error processing request {request.queue_id}: {e}", exc_info=True
+            )
             # Get provider from config or use default
             req_provider = LLMProviderType.OPENAI
             if (
@@ -220,15 +237,12 @@ class QueueProcessorImpl:
             ):
                 req_provider = request.request_data.llm_config_overrides.provider_override
 
-            await self._handle_request_error(
-                request,
-                LLMProviderError(
-                    error_type=ErrorCode.PROCESSING_ERROR,
-                    error_message=f"Processing failed: {str(e)}",
-                    provider=req_provider,
-                    correlation_id=request.request_data.correlation_id or request.queue_id,
-                    is_retryable=True,
-                ),
+            raise_processing_error(
+                service="llm_provider_service",
+                operation="queue_request_processing",
+                message=f"Processing failed: {str(e)}",
+                correlation_id=request.request_data.correlation_id or request.queue_id,
+                details={"provider": req_provider.value, "queue_id": str(request.queue_id)}
             )
 
     async def _handle_request_success(
@@ -274,20 +288,25 @@ class QueueProcessorImpl:
 
         self._requests_processed += 1
 
-    async def _handle_request_error(self, request: QueuedRequest, error: LLMProviderError) -> None:
-        """Handle request processing error.
+    async def _handle_request_hule_error(self, request: QueuedRequest, error: HuleEduError) -> None:
+        """Handle request processing error from HuleEduError.
 
         Args:
             request: The failed request
-            error: The error that occurred
+            error: The HuleEduError that occurred
         """
+        error_details = error.error_detail
         logger.error(
-            f"Request {request.queue_id} failed: {error.error_message}, "
+            f"Request {request.queue_id} failed: {error_details.message}, "
             f"correlation_id: {request.request_data.correlation_id}"
         )
 
-        # Check if we should retry
-        if error.is_retryable and request.retry_count < self.settings.QUEUE_MAX_RETRIES:
+        # Check if we should retry based on error type
+        is_retryable = error_details.error_code.name in {
+            "RATE_LIMIT", "EXTERNAL_SERVICE_ERROR", "TIMEOUT", "CONNECTION_ERROR"
+        }
+
+        if is_retryable and request.retry_count < self.settings.QUEUE_MAX_RETRIES:
             request.retry_count += 1
             request.status = QueueStatus.QUEUED
             logger.info(
@@ -302,15 +321,23 @@ class QueueProcessorImpl:
             await self.queue_manager.update_status(
                 queue_id=request.queue_id,
                 status=QueueStatus.FAILED,
-                error_message=error.error_message,
+                message=error_details.message,
             )
+
+            # Get provider from error or use default
+            provider = LLMProviderType.OPENAI
+            if "provider" in error_details.details:
+                try:
+                    provider = LLMProviderType(error_details.details["provider"])
+                except ValueError:
+                    pass
 
             # Publish failure event
             await self.event_publisher.publish_llm_provider_failure(
-                provider=error.provider.value,
-                failure_type=error.error_type.value,
-                correlation_id=error.correlation_id,
-                error_details=error.error_message,
+                provider=provider.value,
+                failure_type=error_details.error_code.name.lower(),
+                correlation_id=error_details.correlation_id,
+                error_details=error_details.message,
                 circuit_breaker_opened=False,
             )
 
@@ -328,7 +355,7 @@ class QueueProcessorImpl:
         await self.queue_manager.update_status(
             queue_id=request.queue_id,
             status=QueueStatus.EXPIRED,
-            error_message="Request expired before processing",
+            message="Request expired before processing",
         )
 
     def _is_expired(self, request: QueuedRequest) -> bool:

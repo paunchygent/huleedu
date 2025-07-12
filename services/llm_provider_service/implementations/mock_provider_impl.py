@@ -1,15 +1,14 @@
 """Mock LLM provider implementation for testing."""
 
 import random
-from typing import Tuple
-from uuid import uuid4
+from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core import EssayComparisonWinner, LLMProviderType
-from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
-from services.llm_provider_service.internal_models import LLMProviderError, LLMProviderResponse
+from services.llm_provider_service.exceptions import raise_external_service_error
+from services.llm_provider_service.internal_models import LLMProviderResponse
 from services.llm_provider_service.protocols import LLMProviderProtocol
 
 logger = create_service_logger("llm_provider_service.mock_provider")
@@ -36,34 +35,40 @@ class MockProviderImpl(LLMProviderProtocol):
         user_prompt: str,
         essay_a: str,
         essay_b: str,
+        correlation_id: UUID,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
-    ) -> Tuple[LLMProviderResponse | None, LLMProviderError | None]:
+    ) -> LLMProviderResponse:
         """Generate mock comparison result.
 
         Args:
             user_prompt: The comparison prompt
             essay_a: First essay to compare
             essay_b: Second essay to compare
+            correlation_id: Request correlation ID for tracing
             system_prompt_override: Optional system prompt override
             model_override: Optional model override
             temperature_override: Optional temperature override
             max_tokens_override: Optional max tokens override
 
         Returns:
-            Tuple of (response_model, error_model)
+            The LLM provider response containing comparison result
+
+        Raises:
+            HuleEduError: On simulated provider failures
         """
         # Simulate occasional errors (5% chance) - skip in performance mode
         if not self.performance_mode and random.random() < 0.05:
             logger.warning("Mock provider simulating error")
-            return None, LLMProviderError(
-                error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                error_message="Mock provider simulated error",
-                provider=LLMProviderType.MOCK,
-                correlation_id=uuid4(),
-                is_retryable=True,
+            raise_external_service_error(
+                service="llm_provider_service",
+                operation="mock_comparison_generation",
+                external_service="mock_provider",
+                message="Mock provider simulated error for testing",
+                correlation_id=correlation_id,
+                details={"provider": "mock", "error_simulation": True}
             )
 
         # Randomly select winner with slight bias towards Essay B
@@ -119,4 +124,4 @@ class MockProviderImpl(LLMProviderProtocol):
         logger.debug(
             f"Mock provider generated response: winner={winner.value}, confidence={confidence}"
         )
-        return response, None
+        return response

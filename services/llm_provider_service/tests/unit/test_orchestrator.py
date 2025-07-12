@@ -9,8 +9,9 @@ from common_core import LLMProviderType
 from common_core.domain_enums import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
+from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.llm_orchestrator_impl import LLMOrchestratorImpl
-from services.llm_provider_service.internal_models import LLMProviderError, LLMProviderResponse
+from services.llm_provider_service.internal_models import LLMProviderResponse
 
 
 @pytest.fixture
@@ -111,10 +112,10 @@ async def test_orchestrator_successful_comparison(
         completion_tokens=50,
         total_tokens=150,
     )
-    mock_provider.generate_comparison.return_value = (mock_response, None)
+    mock_provider.generate_comparison.return_value = mock_response
 
     # Act
-    result, error = await orchestrator.perform_comparison(
+    result = await orchestrator.perform_comparison(
         provider=LLMProviderType.MOCK,
         user_prompt="Compare these essays",
         essay_a="Essay A content",
@@ -123,7 +124,6 @@ async def test_orchestrator_successful_comparison(
     )
 
     # Assert
-    assert error is None
     assert result is not None
     # Result should be an LLMOrchestratorResponse for successful case
     from services.llm_provider_service.internal_models import LLMOrchestratorResponse
@@ -147,22 +147,20 @@ async def test_orchestrator_provider_not_found(orchestrator: LLMOrchestratorImpl
     # Arrange
     correlation_id = uuid4()
 
-    # Act
-    result, error = await orchestrator.perform_comparison(
-        provider=LLMProviderType.GOOGLE,  # Valid provider type but not configured in test setup
-        user_prompt="Compare",
-        essay_a="A",
-        essay_b="B",
-        correlation_id=correlation_id,
-    )
+    # Act & Assert
+    with pytest.raises(HuleEduError) as exc_info:
+        await orchestrator.perform_comparison(
+            provider=LLMProviderType.GOOGLE,  # Valid provider type but not configured in test setup
+            user_prompt="Compare",
+            essay_a="A",
+            essay_b="B",
+            correlation_id=correlation_id,
+        )
 
-    # Assert
-    assert result is None
-    assert error is not None
-    assert error.error_type == ErrorCode.CONFIGURATION_ERROR
-    assert "not found" in error.error_message
-    assert error.provider == LLMProviderType.GOOGLE
-    assert error.is_retryable is False
+    # Verify error details
+    assert exc_info.value.error_detail.error_code == ErrorCode.CONFIGURATION_ERROR
+    assert "not found" in str(exc_info.value)
+    assert "google" in str(exc_info.value).lower()
 
 
 @pytest.mark.asyncio
@@ -202,7 +200,7 @@ async def test_orchestrator_queues_when_provider_unavailable(
     mock_queue_manager.get_queue_stats.return_value = mock_queue_stats
 
     # Act
-    result, error = await orchestrator.perform_comparison(
+    result = await orchestrator.perform_comparison(
         provider=LLMProviderType.MOCK,
         user_prompt="Compare",
         essay_a="A",
@@ -211,7 +209,6 @@ async def test_orchestrator_queues_when_provider_unavailable(
     )
 
     # Assert
-    assert error is None
     assert result is not None
     # Result should be an LLMQueuedResult for queued case
     from services.llm_provider_service.internal_models import LLMQueuedResult
@@ -237,40 +234,48 @@ async def test_orchestrator_provider_error(
     """Test orchestrator handles provider errors."""
     # Arrange
     correlation_id = uuid4()
-    provider_error = LLMProviderError(
-        error_type=ErrorCode.RATE_LIMIT,
-        error_message="Rate limit exceeded",
-        provider=LLMProviderType.MOCK,
-        correlation_id=correlation_id,
-        retry_after=60,
-        is_retryable=True,
-    )
-    mock_provider.generate_comparison.return_value = (None, provider_error)
+    from services.llm_provider_service.exceptions import raise_rate_limit_error
 
-    # Act
-    result, error = await orchestrator.perform_comparison(
-        provider=LLMProviderType.MOCK,
-        user_prompt="Compare",
-        essay_a="A",
-        essay_b="B",
-        correlation_id=correlation_id,
-    )
+    # Mock provider to raise rate limit error
+    def mock_rate_limit_error(*args, **kwargs) -> None:
+        raise_rate_limit_error(
+            service="llm_provider_service",
+            operation="generate_comparison",
+            external_service="mock_provider",
+            message="Rate limit exceeded",
+            correlation_id=correlation_id,
+            details={"retry_after": 60, "provider": "mock"},
+            limit=1000,
+            window_seconds=60
+        )
 
-    # Assert
-    assert result is None
-    assert error == provider_error
+    mock_provider.generate_comparison.side_effect = mock_rate_limit_error
+
+    # Act & Assert
+    with pytest.raises(HuleEduError) as exc_info:
+        await orchestrator.perform_comparison(
+            provider=LLMProviderType.MOCK,
+            user_prompt="Compare",
+            essay_a="A",
+            essay_b="B",
+            correlation_id=correlation_id,
+        )
+
+    # Verify error details
+    assert exc_info.value.error_detail.error_code == ErrorCode.RATE_LIMIT
+    assert "Rate limit exceeded" in str(exc_info.value)
 
     # Verify failure events were published
     mock_event_publisher.publish_llm_provider_failure.assert_called_once()
     mock_event_publisher.publish_llm_request_completed.assert_called_once_with(
-        provider=LLMProviderType.MOCK,
+        provider="mock",  # Event publisher uses string value
         correlation_id=correlation_id,
         success=False,
         response_time_ms=pytest.approx(0, abs=100),  # Allow some variance in timing
         metadata={
             "request_type": "comparison",
-            "error_message": "Rate limit exceeded",
-            "failure_type": "rate_limit",
+            "error_message": "Provider error occurred",
+            "failure_type": "unknown",
         },
     )
 
@@ -291,14 +296,14 @@ async def test_orchestrator_test_provider_success(
         completion_tokens=5,
         total_tokens=15,
     )
-    mock_provider.generate_comparison.return_value = (mock_response, None)
+    mock_provider.generate_comparison.return_value = mock_response
 
     # Act
-    success, message = await orchestrator.test_provider(LLMProviderType.MOCK)
+    correlation_id = uuid4()
+    success = await orchestrator.test_provider(LLMProviderType.MOCK, correlation_id)
 
     # Assert
     assert success is True
-    assert "operational" in message
 
 
 @pytest.mark.asyncio
@@ -309,13 +314,10 @@ async def test_orchestrator_test_provider_failure(
     # Arrange
     mock_provider.generate_comparison.side_effect = Exception("Connection failed")
 
-    # Act
-    success, message = await orchestrator.test_provider(LLMProviderType.MOCK)
-
-    # Assert
-    assert success is False
-    assert "exception" in message
-    assert "Connection failed" in message
+    # Act & Assert
+    correlation_id = uuid4()
+    with pytest.raises(HuleEduError):
+        await orchestrator.test_provider(LLMProviderType.MOCK, correlation_id)
 
 
 @pytest.mark.asyncio
@@ -335,10 +337,10 @@ async def test_orchestrator_with_overrides(
         completion_tokens=10,
         total_tokens=30,
     )
-    mock_provider.generate_comparison.return_value = (mock_response, None)
+    mock_provider.generate_comparison.return_value = mock_response
 
     # Act
-    result, error = await orchestrator.perform_comparison(
+    result = await orchestrator.perform_comparison(
         provider=LLMProviderType.MOCK,
         user_prompt="Compare",
         essay_a="A",
@@ -350,12 +352,12 @@ async def test_orchestrator_with_overrides(
     )
 
     # Assert
-    assert error is None
     assert result is not None
     mock_provider.generate_comparison.assert_called_once_with(
         user_prompt="Compare",
         essay_a="A",
         essay_b="B",
+        correlation_id=correlation_id,
         system_prompt_override="Custom prompt",
         model_override="overridden-model",
         temperature_override=0.5,

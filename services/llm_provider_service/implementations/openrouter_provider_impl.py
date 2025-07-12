@@ -2,16 +2,22 @@
 
 import json
 import time
-from typing import Dict, Optional, Tuple
-from uuid import uuid4
+from typing import Dict, Optional
+from uuid import UUID
 
 import aiohttp
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core import EssayComparisonWinner, LLMProviderType
-from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
-from services.llm_provider_service.internal_models import LLMProviderError, LLMProviderResponse
+from services.llm_provider_service.exceptions import (
+    raise_authentication_error,
+    raise_configuration_error,
+    raise_external_service_error,
+    raise_parsing_error,
+    raise_rate_limit_error,
+)
+from services.llm_provider_service.internal_models import LLMProviderResponse
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
 from services.llm_provider_service.response_validator import validate_and_normalize_response
 
@@ -50,32 +56,38 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
         user_prompt: str,
         essay_a: str,
         essay_b: str,
+        correlation_id: UUID,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
-    ) -> Tuple[LLMProviderResponse | None, LLMProviderError | None]:
+    ) -> LLMProviderResponse:
         """Generate LLM comparison response.
 
         Args:
             user_prompt: The comparison prompt template
             essay_a: First essay to compare
             essay_b: Second essay to compare
+            correlation_id: Request correlation ID for tracing
             system_prompt_override: Optional system prompt override
             model_override: Optional model override
             temperature_override: Optional temperature override
             max_tokens_override: Optional max tokens override
 
         Returns:
-            Tuple of (response_model, error_model)
+            The LLM provider response containing comparison result
+
+        Raises:
+            HuleEduError: On any failure to generate comparison
         """
         if not self.api_key:
-            return None, LLMProviderError(
-                error_type=ErrorCode.CONFIGURATION_ERROR,
-                error_message="OpenRouter API key not configured",
-                provider=LLMProviderType.OPENROUTER,
-                correlation_id=uuid4(),
-                is_retryable=False,
+            raise_configuration_error(
+                service="llm_provider_service",
+                operation="generate_comparison",
+                config_key="OPENROUTER_API_KEY",
+                message="OpenRouter API key not configured",
+                correlation_id=correlation_id,
+                details={"provider": "openrouter"}
             )
 
         # Prepare the full prompt with essays
@@ -102,6 +114,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                 operation_name="openrouter_api_request",
                 system_prompt=system_prompt,
                 user_prompt=full_prompt,
+                correlation_id=correlation_id,
                 model_override=model_override,
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
@@ -109,33 +122,39 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
             # Type assert since retry manager returns Any
             return result  # type: ignore
         except Exception as e:
-            return None, LLMProviderError(
-                error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                error_message=f"OpenRouter API call failed: {str(e)}",
-                provider=LLMProviderType.OPENROUTER,
-                correlation_id=uuid4(),
-                is_retryable=True,
+            raise_external_service_error(
+                service="llm_provider_service",
+                operation="openrouter_api_request",
+                external_service="openrouter_api",
+                message=f"OpenRouter API call failed: {str(e)}",
+                correlation_id=correlation_id,
+                details={"provider": "openrouter"}
             )
 
     async def _make_api_request(
         self,
         system_prompt: str,
         user_prompt: str,
+        correlation_id: UUID,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
-    ) -> Tuple[LLMProviderResponse | None, LLMProviderError | None]:
+    ) -> LLMProviderResponse:
         """Make API request to OpenRouter.
 
         Args:
             system_prompt: System prompt
             user_prompt: User prompt with essays
+            correlation_id: Request correlation ID for tracing
             model_override: Optional model override
             temperature_override: Optional temperature override
             max_tokens_override: Optional max tokens override
 
         Returns:
-            Tuple of (response_model, error_model)
+            The LLM provider response
+
+        Raises:
+            HuleEduError: On API request failure
         """
         endpoint = f"{self.api_base}/chat/completions"
         headers = {
@@ -205,24 +224,12 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
 
                         try:
                             # Validate and normalize response using centralized validator
-                            validated_response, validation_error = validate_and_normalize_response(
-                                text_content
+                            validated_response = validate_and_normalize_response(
+                                text_content, provider="openrouter", correlation_id=correlation_id
                             )
-
-                            if validation_error:
-                                error_msg = f"Response validation failed: {validation_error}"
-                                logger.error(error_msg, extra={"response_text": text_content[:500]})
-                                return None, LLMProviderError(
-                                    error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                                    error_message=error_msg,
-                                    provider=LLMProviderType.OPENROUTER,
-                                    correlation_id=uuid4(),
-                                    is_retryable=False,
-                                )
 
                             # Use validated response directly
                             # (already in assessment domain language)
-                            assert validated_response is not None  # Type assertion for mypy
 
                             # Convert winner string to enum value
                             if validated_response.winner == "Essay A":
@@ -254,53 +261,68 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                                 raw_response=response_data,
                             )
 
-                            return response_model, None
+                            return response_model
 
                         except (json.JSONDecodeError, ValueError, KeyError) as e:
                             error_msg = f"Failed to parse OpenRouter response: {str(e)}"
                             logger.error(error_msg, extra={"response_text": text_content[:500]})
-                            return None, LLMProviderError(
-                                error_type=ErrorCode.PARSING_ERROR,
-                                error_message=error_msg,
-                                provider=LLMProviderType.OPENROUTER,
-                                correlation_id=uuid4(),
-                                is_retryable=False,
+                            raise_parsing_error(
+                                service="llm_provider_service",
+                                operation="openrouter_response_parsing",
+                                parse_target="openrouter_response",
+                                message=error_msg,
+                                correlation_id=correlation_id,
+                                details={
+                                    "provider": "openrouter",
+                                    "response_preview": text_content[:100]
+                                }
                             )
                     else:
-                        return None, LLMProviderError(
-                            error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                            error_message="No choices in OpenRouter response",
-                            provider=LLMProviderType.OPENROUTER,
-                            correlation_id=uuid4(),
-                            is_retryable=False,
+                        raise_external_service_error(
+                            service="llm_provider_service",
+                            operation="openrouter_response_parsing",
+                            external_service="openrouter_api",
+                            message="No choices in OpenRouter response",
+                            correlation_id=correlation_id,
+                            details={"provider": "openrouter"}
                         )
 
                 else:
                     error_text = await response.text()
                     error_msg = f"OpenRouter API error: {response.status} - {error_text}"
 
-                    # Determine error type
-                    if response.status == 429:
-                        error_type = ErrorCode.RATE_LIMIT
-                    elif response.status == 401 or response.status == 403:
-                        error_type = ErrorCode.AUTHENTICATION_ERROR
-                    elif response.status >= 500:
-                        error_type = ErrorCode.EXTERNAL_SERVICE_ERROR
-                    else:
-                        error_type = ErrorCode.EXTERNAL_SERVICE_ERROR
-
                     # Raise for retryable status codes to trigger retry
                     if response.status in {429, 500, 502, 503, 504}:
                         response.raise_for_status()
 
-                    return None, LLMProviderError(
-                        error_type=error_type,
-                        error_message=error_msg,
-                        provider=LLMProviderType.OPENROUTER,
-                        correlation_id=uuid4(),
-                        retry_after=60 if response.status == 429 else None,
-                        is_retryable=response.status in {429, 500, 502, 503, 504},
-                    )
+                    # Determine error type and raise appropriate exception
+                    if response.status == 429:
+                        raise_rate_limit_error(
+                            service="llm_provider_service",
+                            operation="openrouter_api_request",
+                            limit=1000,  # Default reasonable limit
+                            window_seconds=60,  # 1 minute window
+                            message=error_msg,
+                            correlation_id=correlation_id,
+                            details={"provider": "openrouter", "retry_after": 60}
+                        )
+                    elif response.status == 401 or response.status == 403:
+                        raise_authentication_error(
+                            service="llm_provider_service",
+                            operation="openrouter_api_request",
+                            message=error_msg,
+                            correlation_id=correlation_id,
+                            details={"provider": "openrouter"}
+                        )
+                    else:
+                        raise_external_service_error(
+                            service="llm_provider_service",
+                            operation="openrouter_api_request",
+                            external_service="openrouter_api",
+                            message=error_msg,
+                            correlation_id=correlation_id,
+                            details={"provider": "openrouter", "status_code": response.status}
+                        )
 
         except aiohttp.ClientResponseError:
             # Will be retried by retry manager
@@ -312,12 +334,13 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
             # Unexpected errors
             error_msg = f"Unexpected error calling OpenRouter API: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            return None, LLMProviderError(
-                error_type=ErrorCode.EXTERNAL_SERVICE_ERROR,
-                error_message=error_msg,
-                provider=LLMProviderType.OPENROUTER,
-                correlation_id=uuid4(),
-                is_retryable=True,
+            raise_external_service_error(
+                service="llm_provider_service",
+                operation="openrouter_api_request",
+                external_service="openrouter_api",
+                message=error_msg,
+                correlation_id=correlation_id,
+                details={"provider": "openrouter"}
             )
 
     def _format_comparison_prompt(self, user_prompt: str, essay_a: str, essay_b: str) -> str:

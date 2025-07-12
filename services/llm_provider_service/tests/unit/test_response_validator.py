@@ -2,9 +2,11 @@
 
 import json
 from typing import Any, Dict
+from uuid import uuid4
 
 import pytest
 
+from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.response_validator import (
     StandardizedLLMResponse,
     validate_and_normalize_response,
@@ -82,10 +84,10 @@ class TestValidateAndNormalizeResponse:
             }
         )
 
-        validated, error = validate_and_normalize_response(json_response)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(json_response, correlation_id=correlation_id)
 
         assert validated is not None
-        assert error is None
         assert validated.winner == "Essay A"
         assert validated.confidence == 4.2
 
@@ -97,10 +99,10 @@ class TestValidateAndNormalizeResponse:
             "confidence": 3.5,
         }
 
-        validated, error = validate_and_normalize_response(dict_response)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(dict_response, correlation_id=correlation_id)
 
         assert validated is not None
-        assert error is None
         assert validated.winner == "Essay B"
 
     def test_invalid_json_string(self) -> None:
@@ -109,11 +111,11 @@ class TestValidateAndNormalizeResponse:
             '{"winner": "Essay A", "justification": "Good essay"'  # Missing closing brace
         )
 
-        validated, error = validate_and_normalize_response(invalid_json)
+        correlation_id = uuid4()
+        with pytest.raises(HuleEduError) as exc_info:
+            validate_and_normalize_response(invalid_json, correlation_id=correlation_id)
 
-        assert validated is None
-        assert error is not None
-        assert "Invalid JSON format" in error
+        assert "Invalid JSON format" in str(exc_info.value)
 
     def test_missing_required_fields_gets_defaults(self) -> None:
         """Test validation with missing required fields gets default values."""
@@ -122,10 +124,10 @@ class TestValidateAndNormalizeResponse:
             # Missing justification and confidence - should get defaults
         }
 
-        validated, error = validate_and_normalize_response(incomplete_response)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(incomplete_response, correlation_id=correlation_id)
 
         assert validated is not None
-        assert error is None
         assert validated.winner == "Essay A"
         assert len(validated.justification) >= 10
         assert validated.confidence == 3.0
@@ -138,10 +140,10 @@ class TestValidateAndNormalizeResponse:
             "confidence": 3.0,
         }
 
-        validated, error = validate_and_normalize_response(invalid_response)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(invalid_response, correlation_id=correlation_id)
 
         assert validated is not None
-        assert error is None
         assert validated.winner == "Essay A"  # Normalized from "A"
 
     def test_confidence_out_of_range(self) -> None:
@@ -152,10 +154,10 @@ class TestValidateAndNormalizeResponse:
             "confidence": 10.0,  # Will be clamped to 5.0
         }
 
-        validated, error = validate_and_normalize_response(response_with_high_confidence)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(response_with_high_confidence, correlation_id=correlation_id)
 
         assert validated is not None
-        assert error is None
         assert validated.confidence == 5.0
 
     def test_justification_normalization(self) -> None:
@@ -167,9 +169,9 @@ class TestValidateAndNormalizeResponse:
             "confidence": 3.0,
         }
 
-        validated, error = validate_and_normalize_response(short_response)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(short_response, correlation_id=correlation_id)
         assert validated is not None
-        assert error is None
         assert len(validated.justification) >= 10
         assert "clear choice" in validated.justification
 
@@ -180,9 +182,9 @@ class TestValidateAndNormalizeResponse:
             "confidence": 4.0,
         }
 
-        validated, error = validate_and_normalize_response(long_response)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(long_response, correlation_id=correlation_id)
         assert validated is not None
-        assert error is None
         assert len(validated.justification) == 50
         assert validated.justification.endswith("...")
 
@@ -198,10 +200,10 @@ class TestProviderFormatCompatibility:
             "confidence": 4.3,
         }
 
-        validated, error = validate_and_normalize_response(anthropic_response)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(anthropic_response, correlation_id=correlation_id)
 
         assert validated is not None
-        assert error is None
         assert validated.winner == "Essay A"
         assert validated.justification == anthropic_response["justification"]
 
@@ -215,10 +217,10 @@ class TestProviderFormatCompatibility:
             }
         )
 
-        validated, error = validate_and_normalize_response(openai_response)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(openai_response, correlation_id=correlation_id)
 
         assert validated is not None
-        assert error is None
         assert validated.winner == "Essay B"
 
     def test_google_structured_output_format(self) -> None:
@@ -231,10 +233,10 @@ class TestProviderFormatCompatibility:
             }
         )
 
-        validated, error = validate_and_normalize_response(google_response)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(google_response, correlation_id=correlation_id)
 
         assert validated is not None
-        assert error is None
 
     def test_openrouter_json_mode_format(self) -> None:
         """Test validation with OpenRouter JSON mode response format."""
@@ -246,10 +248,10 @@ class TestProviderFormatCompatibility:
             }
         )
 
-        validated, error = validate_and_normalize_response(openrouter_response)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(openrouter_response, correlation_id=correlation_id)
 
         assert validated is not None
-        assert error is None
 
 
 class TestResponseFormatStandardization:
@@ -280,10 +282,10 @@ class TestResponseFormatStandardization:
         self, provider_response: Dict[str, Any], expected_choice: str
     ) -> None:
         """Test that standardized responses convert correctly to internal format."""
-        validated, error = validate_and_normalize_response(provider_response)
+        correlation_id = uuid4()
+        validated = validate_and_normalize_response(provider_response, correlation_id=correlation_id)
 
         assert validated is not None
-        assert error is None
         assert validated.winner == f"Essay {expected_choice}"
         assert len(validated.justification) <= 50  # Justification length validation
         assert 1.0 <= validated.confidence <= 5.0  # Confidence range validation

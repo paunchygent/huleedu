@@ -11,7 +11,8 @@ from services.llm_provider_service.api_models import (
     LLMConfigOverrides,
     LLMProviderStatus,
 )
-from services.llm_provider_service.internal_models import LLMOrchestratorResponse, LLMProviderError
+from services.llm_provider_service.exceptions import HuleEduError
+from services.llm_provider_service.internal_models import LLMOrchestratorResponse
 
 
 @pytest.mark.asyncio
@@ -147,26 +148,31 @@ def test_provider_error_response_format() -> None:
     """Test provider error response formatting."""
     # Arrange
     correlation_id = uuid4()
-    from common_core.error_enums import ErrorCode
+    from services.llm_provider_service.exceptions import raise_rate_limit_error
 
-    error = LLMProviderError(
-        error_type=ErrorCode.RATE_LIMIT,
-        error_message="Rate limit exceeded. Please retry after 60 seconds.",
-        provider=LLMProviderType.OPENAI,
-        correlation_id=correlation_id,
-        retry_after=60,
-        is_retryable=True,
-    )
+    # Simulate catching a HuleEduError
+    try:
+        raise_rate_limit_error(
+            service="llm_provider_service",
+            operation="generate_comparison",
+            external_service="openai_api",
+            message="Rate limit exceeded. Please retry after 60 seconds.",
+            correlation_id=correlation_id,
+            details={"retry_after": 60, "provider": "openai"},
+            limit=1000,
+            window_seconds=60
+        )
+    except HuleEduError as error:
+        # Act - Format for API response
+        error_response = {
+            "error": str(error),
+            "error_code": error.error_detail.error_code.value,
+            "correlation_id": str(correlation_id),
+            "details": error.error_detail.details,
+        }
 
-    # Act - Format for API response
-    error_response = {
-        "error": error.error_message,
-        "error_type": error.error_type.value,
-        "correlation_id": str(error.correlation_id),
-        "retry_after": error.retry_after,
-    }
-
-    # Assert
-    assert error_response["error"] == "Rate limit exceeded. Please retry after 60 seconds."
-    assert error_response["retry_after"] == 60
-    assert error_response["correlation_id"] == str(correlation_id)
+        # Assert
+        assert "Rate limit exceeded" in error_response["error"]
+        assert error_response["error_code"] == "RATE_LIMIT"
+        assert error_response["correlation_id"] == str(correlation_id)
+        assert error_response["details"]["retry_after"] == 60
