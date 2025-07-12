@@ -14,6 +14,10 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Iterable, Optional
 
 from huleedu_service_libs.database import DatabaseMetricsProtocol
+from huleedu_service_libs.error_handling import (
+    raise_connection_error,
+    raise_processing_error,
+)
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -93,11 +97,25 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
 
     async def initialize_db_schema(self) -> None:
         """Create database tables if they don't exist (idempotent)."""
-        async with self.engine.begin() as conn:
-            # Ensure pg_trgm extension required for GIN trigram index exists
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
-            await conn.run_sync(Base.metadata.create_all)
-        _LOGGER.info("Spell-checker DB schema initialised")
+        try:
+            async with self.engine.begin() as conn:
+                # Ensure pg_trgm extension required for GIN trigram index exists
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+                await conn.run_sync(Base.metadata.create_all)
+            _LOGGER.info("Spell-checker DB schema initialised")
+        except Exception as e:
+            self._record_error_metrics(e.__class__.__name__, "initialize_db_schema")
+
+            raise_connection_error(
+                service="spellchecker_service",
+                operation="initialize_db_schema",
+                target="database",
+                message=f"Failed to initialize database schema: {e.__class__.__name__}",
+                correlation_id=uuid.uuid4(),  # Generate correlation_id for schema initialization
+                error_type=e.__class__.__name__,
+                error_details=str(e),
+                database_url=str(self.settings.database_url),
+            )
 
     @asynccontextmanager
     async def session(self) -> AsyncGenerator[AsyncSession, None]:
@@ -106,9 +124,10 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
         try:
             yield session
             await session.commit()
-        except Exception:
+        except Exception as e:
             await session.rollback()
-            raise
+            # Re-raise the exception to be handled by calling methods with proper correlation_id
+            raise e
         finally:
             await session.close()
 
@@ -121,6 +140,7 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
         essay_id: uuid.UUID,
         *,
         language: str = "en",
+        correlation_id: uuid.UUID,
     ) -> uuid.UUID:
         start_time = time.time()
         operation = "create_job"
@@ -137,6 +157,8 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
                     language=language,
                 )
                 session.add(job)
+
+            # Event recording would be handled by observability layer if available
             _LOGGER.debug("Created spellcheck job %s", new_job_id)
             return new_job_id
 
@@ -144,8 +166,20 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
             success = False
             error_type = e.__class__.__name__
             self._record_error_metrics(error_type, operation)
-            _LOGGER.error(f"Failed to create spellcheck job: {error_type}: {e}")
-            raise
+            # Error recording handled by HuleEduError framework
+
+            raise_processing_error(
+                service="spellchecker_service",
+                operation=operation,
+                message=f"Failed to create spellcheck job: {error_type}",
+                correlation_id=correlation_id,
+                job_id=None,
+                batch_id=str(batch_id),
+                essay_id=str(essay_id),
+                language=language,
+                error_type=error_type,
+                error_details=str(e),
+            )
 
         finally:
             duration = time.time() - start_time
@@ -156,46 +190,106 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
         job_id: uuid.UUID,
         status: SCJobStatus,
         *,
-        error_message: str | None = None,
         processing_ms: int | None = None,
+        correlation_id: uuid.UUID,
     ) -> None:
-        async with self.session() as session:
-            stmt = (
-                update(SpellcheckJob)
-                .where(SpellcheckJob.job_id == job_id)
-                .values(
-                    status=status,
-                    error_message=error_message,
-                    processing_ms=processing_ms,
+        try:
+            async with self.session() as session:
+                stmt = (
+                    update(SpellcheckJob)
+                    .where(SpellcheckJob.job_id == job_id)
+                    .values(
+                        status=status,
+                        processing_ms=processing_ms,
+                    )
                 )
+                await session.execute(stmt)
+
+            # Event recording would be handled by observability layer if available
+            _LOGGER.debug("Updated job %s to status %s", job_id, status)
+
+        except Exception as e:
+            # Error recording handled by HuleEduError framework
+            self._record_error_metrics(e.__class__.__name__, "update_status")
+
+            raise_processing_error(
+                service="spellchecker_service",
+                operation="update_status",
+                message=f"Failed to update job status: {e.__class__.__name__}",
+                correlation_id=correlation_id,
+                job_id=job_id,
+                status=status.value,
+                processing_ms=processing_ms,
+                error_type=e.__class__.__name__,
+                error_details=str(e),
             )
-            await session.execute(stmt)
-        _LOGGER.debug("Updated job %s to status %s", job_id, status)
 
     async def add_tokens(
         self,
         job_id: uuid.UUID,
         tokens: Iterable[tuple[str, list[str] | None, int | None, str | None]],
+        *,
+        correlation_id: uuid.UUID,
     ) -> None:
-        rows = [
-            SpellcheckToken(
-                job_id=job_id,
-                token=t[0],
-                suggestions=t[1],
-                position=t[2],
-                sentence=t[3],
-            )
-            for t in tokens
-        ]
-        async with self.session() as session:
-            session.add_all(rows)
-        _LOGGER.debug("Inserted %d tokens for job %s", len(rows), job_id)
+        try:
+            # Convert to list first to avoid consuming iterable multiple times
+            token_list = list(tokens)
+            rows = [
+                SpellcheckToken(
+                    job_id=job_id,
+                    token=t[0],
+                    suggestions=t[1],
+                    position=t[2],
+                    sentence=t[3],
+                )
+                for t in token_list
+            ]
+            async with self.session() as session:
+                session.add_all(rows)
 
-    async def get_job(self, job_id: uuid.UUID) -> SpellcheckJob | None:  # type: ignore[name-defined]
-        async with self.session() as session:
-            result = await session.execute(
-                select(SpellcheckJob)
-                .options(selectinload(SpellcheckJob.tokens))
-                .where(SpellcheckJob.job_id == job_id)
+            # Event recording would be handled by observability layer if available
+            _LOGGER.debug("Inserted %d tokens for job %s", len(rows), job_id)
+
+        except Exception as e:
+            # Error recording handled by HuleEduError framework
+            self._record_error_metrics(e.__class__.__name__, "add_tokens")
+
+            raise_processing_error(
+                service="spellchecker_service",
+                operation="add_tokens",
+                message=f"Failed to insert tokens: {e.__class__.__name__}",
+                correlation_id=correlation_id,
+                job_id=job_id,
+                token_count=len(rows) if "rows" in locals() else 0,
+                error_type=e.__class__.__name__,
+                error_details=str(e),
             )
-            return result.scalars().first()
+
+    async def get_job(
+        self, job_id: uuid.UUID, *, correlation_id: uuid.UUID
+    ) -> SpellcheckJob | None:  # type: ignore[name-defined]
+        try:
+            async with self.session() as session:
+                result = await session.execute(
+                    select(SpellcheckJob)
+                    .options(selectinload(SpellcheckJob.tokens))
+                    .where(SpellcheckJob.job_id == job_id)
+                )
+                job = result.scalars().first()
+
+                # Event recording would be handled by observability layer if available
+                return job
+
+        except Exception as e:
+            # Error recording handled by HuleEduError framework
+            self._record_error_metrics(e.__class__.__name__, "get_job")
+
+            raise_processing_error(
+                service="spellchecker_service",
+                operation="get_job",
+                message=f"Failed to retrieve job: {e.__class__.__name__}",
+                correlation_id=correlation_id,
+                job_id=job_id,
+                error_type=e.__class__.__name__,
+                error_details=str(e),
+            )

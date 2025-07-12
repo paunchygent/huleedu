@@ -21,9 +21,11 @@ class ContentClientProtocol(Protocol):
     async def fetch_content(
         self,
         storage_id: str,
-        http_session: ClientSession,  # http_session is now aiohttp.ClientSession
+        http_session: ClientSession,
+        correlation_id: UUID,
+        essay_id: str | None = None,
     ) -> str:
-        """Fetches content string based on a storage ID."""
+        """Fetches content string based on a storage ID with correlation tracking."""
         ...
 
 
@@ -34,9 +36,10 @@ class SpellLogicProtocol(Protocol):
         essay_id: str | None,
         original_text_storage_id: str,
         initial_system_metadata: SystemProcessingMetadata,
+        correlation_id: UUID,
         language: str = "en",
     ) -> SpellcheckResultDataV1:
-        """Performs spell check and returns a SpellcheckResultDataV1."""
+        """Performs spell check and returns a SpellcheckResultDataV1 with correlation tracking."""
         ...
 
 
@@ -47,8 +50,10 @@ class ResultStoreProtocol(Protocol):
         content_type: ContentType,
         content: str,
         http_session: ClientSession,
+        correlation_id: UUID,
+        essay_id: str | None = None,
     ) -> str:
-        """Stores content and returns a storage ID."""
+        """Stores content and returns a storage ID with correlation tracking."""
         ...
 
 

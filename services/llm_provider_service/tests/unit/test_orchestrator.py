@@ -247,7 +247,7 @@ async def test_orchestrator_provider_error(
             correlation_id=correlation_id,
             details={"retry_after": 60, "provider": "mock"},
             limit=1000,
-            window_seconds=60
+            window_seconds=60,
         )
 
     mock_provider.generate_comparison.side_effect = mock_rate_limit_error

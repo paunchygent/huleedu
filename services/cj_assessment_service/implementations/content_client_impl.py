@@ -111,7 +111,5 @@ class ContentClientImpl(ContentClientProtocol):
 
         # Use retry manager which will handle TimeoutError, ClientError, etc.
         return await self.retry_manager.with_retry(
-            _make_content_request,
-            provider_name="content_service",
-            correlation_id=correlation_id
+            _make_content_request, provider_name="content_service", correlation_id=correlation_id
         )

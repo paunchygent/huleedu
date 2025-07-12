@@ -205,7 +205,7 @@ class QueueProcessorImpl:
                     operation="queue_request_processing",
                     message="Unexpected queued result during queue processing",
                     correlation_id=req_data.correlation_id or request.queue_id,
-                    details={"provider": provider.value, "queue_id": str(request.queue_id)}
+                    details={"provider": provider.value, "queue_id": str(request.queue_id)},
                 )
             else:
                 # Unexpected result type
@@ -217,7 +217,7 @@ class QueueProcessorImpl:
                     operation="queue_request_processing",
                     message="Unexpected processing result type",
                     correlation_id=req_data.correlation_id or request.queue_id,
-                    details={"provider": provider.value, "result_type": str(type(result))}
+                    details={"provider": provider.value, "result_type": str(type(result))},
                 )
 
         except HuleEduError as e:
@@ -242,7 +242,7 @@ class QueueProcessorImpl:
                 operation="queue_request_processing",
                 message=f"Processing failed: {str(e)}",
                 correlation_id=request.request_data.correlation_id or request.queue_id,
-                details={"provider": req_provider.value, "queue_id": str(request.queue_id)}
+                details={"provider": req_provider.value, "queue_id": str(request.queue_id)},
             )
 
     async def _handle_request_success(
@@ -303,7 +303,10 @@ class QueueProcessorImpl:
 
         # Check if we should retry based on error type
         is_retryable = error_details.error_code.name in {
-            "RATE_LIMIT", "EXTERNAL_SERVICE_ERROR", "TIMEOUT", "CONNECTION_ERROR"
+            "RATE_LIMIT",
+            "EXTERNAL_SERVICE_ERROR",
+            "TIMEOUT",
+            "CONNECTION_ERROR",
         }
 
         if is_retryable and request.retry_count < self.settings.QUEUE_MAX_RETRIES:

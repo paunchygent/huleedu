@@ -80,7 +80,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 config_key="ANTHROPIC_API_KEY",
                 message="Anthropic API key not configured",
                 correlation_id=correlation_id,
-                details={"provider": "anthropic"}
+                details={"provider": "anthropic"},
             )
 
         # Prepare the full prompt with essays
@@ -122,7 +122,7 @@ You will use the comparison_result tool to provide your analysis."""
                 external_service="anthropic_api",
                 message=f"Anthropic API call failed: {str(e)}",
                 correlation_id=correlation_id,
-                details={"provider": "anthropic"}
+                details={"provider": "anthropic"},
             )
 
     async def _make_api_request(
@@ -218,7 +218,7 @@ You will use the comparison_result tool to provide your analysis."""
                             parse_target="json",
                             message=f"Failed to parse Anthropic response: {str(e)}",
                             correlation_id=correlation_id,
-                            details={"provider": "anthropic"}
+                            details={"provider": "anthropic"},
                         )
 
                     # Log the structure for debugging
@@ -295,7 +295,7 @@ You will use the comparison_result tool to provide your analysis."""
                                 parse_target="tool_response",
                                 message=error_msg,
                                 correlation_id=correlation_id,
-                                details={"provider": "anthropic"}
+                                details={"provider": "anthropic"},
                             )
                     else:
                         # Log the full response for debugging
@@ -309,7 +309,7 @@ You will use the comparison_result tool to provide your analysis."""
                             external_service="anthropic_api",
                             message="No tool use found in Anthropic response",
                             correlation_id=correlation_id,
-                            details={"provider": "anthropic"}
+                            details={"provider": "anthropic"},
                         )
 
                 else:
@@ -329,7 +329,7 @@ You will use the comparison_result tool to provide your analysis."""
                             window_seconds=60,
                             message=f"Rate limit exceeded: {error_text}",
                             correlation_id=correlation_id,
-                            details={"provider": "anthropic", "retry_after": 60}
+                            details={"provider": "anthropic", "retry_after": 60},
                         )
                     elif response.status == 401:
                         raise_authentication_error(
@@ -337,7 +337,7 @@ You will use the comparison_result tool to provide your analysis."""
                             operation="anthropic_api_request",
                             message=f"Authentication failed: {error_text}",
                             correlation_id=correlation_id,
-                            details={"provider": "anthropic"}
+                            details={"provider": "anthropic"},
                         )
                     else:
                         raise_external_service_error(
@@ -346,7 +346,7 @@ You will use the comparison_result tool to provide your analysis."""
                             external_service="anthropic_api",
                             message=error_msg,
                             correlation_id=correlation_id,
-                            details={"provider": "anthropic", "status_code": response.status}
+                            details={"provider": "anthropic", "status_code": response.status},
                         )
 
         except aiohttp.ClientResponseError:
@@ -365,7 +365,7 @@ You will use the comparison_result tool to provide your analysis."""
                 external_service="anthropic_api",
                 message=error_msg,
                 correlation_id=correlation_id,
-                details={"provider": "anthropic"}
+                details={"provider": "anthropic"},
             )
 
     def _format_comparison_prompt(self, user_prompt: str, essay_a: str, essay_b: str) -> str:

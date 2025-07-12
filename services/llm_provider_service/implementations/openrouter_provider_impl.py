@@ -87,7 +87,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                 config_key="OPENROUTER_API_KEY",
                 message="OpenRouter API key not configured",
                 correlation_id=correlation_id,
-                details={"provider": "openrouter"}
+                details={"provider": "openrouter"},
             )
 
         # Prepare the full prompt with essays
@@ -128,7 +128,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                 external_service="openrouter_api",
                 message=f"OpenRouter API call failed: {str(e)}",
                 correlation_id=correlation_id,
-                details={"provider": "openrouter"}
+                details={"provider": "openrouter"},
             )
 
     async def _make_api_request(
@@ -274,8 +274,8 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                                 correlation_id=correlation_id,
                                 details={
                                     "provider": "openrouter",
-                                    "response_preview": text_content[:100]
-                                }
+                                    "response_preview": text_content[:100],
+                                },
                             )
                     else:
                         raise_external_service_error(
@@ -284,7 +284,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                             external_service="openrouter_api",
                             message="No choices in OpenRouter response",
                             correlation_id=correlation_id,
-                            details={"provider": "openrouter"}
+                            details={"provider": "openrouter"},
                         )
 
                 else:
@@ -304,7 +304,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                             window_seconds=60,  # 1 minute window
                             message=error_msg,
                             correlation_id=correlation_id,
-                            details={"provider": "openrouter", "retry_after": 60}
+                            details={"provider": "openrouter", "retry_after": 60},
                         )
                     elif response.status == 401 or response.status == 403:
                         raise_authentication_error(
@@ -312,7 +312,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                             operation="openrouter_api_request",
                             message=error_msg,
                             correlation_id=correlation_id,
-                            details={"provider": "openrouter"}
+                            details={"provider": "openrouter"},
                         )
                     else:
                         raise_external_service_error(
@@ -321,7 +321,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                             external_service="openrouter_api",
                             message=error_msg,
                             correlation_id=correlation_id,
-                            details={"provider": "openrouter", "status_code": response.status}
+                            details={"provider": "openrouter", "status_code": response.status},
                         )
 
         except aiohttp.ClientResponseError:
@@ -340,7 +340,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                 external_service="openrouter_api",
                 message=error_msg,
                 correlation_id=correlation_id,
-                details={"provider": "openrouter"}
+                details={"provider": "openrouter"},
             )
 
     def _format_comparison_prompt(self, user_prompt: str, essay_a: str, essay_b: str) -> str:

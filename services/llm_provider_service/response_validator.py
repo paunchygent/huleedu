@@ -80,7 +80,7 @@ def validate_and_normalize_response(
                     parse_target="json",
                     message=f"Invalid JSON format: {str(e)}",
                     correlation_id=correlation_id or UUID(int=0),
-                    details={"provider": provider}
+                    details={"provider": provider},
                 )
 
         # Fast normalization with minimal string operations
@@ -101,7 +101,7 @@ def validate_and_normalize_response(
             field="response_fields",
             message=f"Validation failed: {error_msg}",
             correlation_id=correlation_id or UUID(int=0),
-            details={"provider": provider}
+            details={"provider": provider},
         )
 
     except Exception as e:
@@ -112,7 +112,7 @@ def validate_and_normalize_response(
             field="unknown",
             message=f"Unexpected validation error: {str(e)}",
             correlation_id=correlation_id or UUID(int=0),
-            details={"provider": provider}
+            details={"provider": provider},
         )
 
 
@@ -230,7 +230,7 @@ def validate_and_normalize_response_fast(
             field="response_fields",
             message=f"Fast validation error: {str(e)}",
             correlation_id=correlation_id or UUID(int=0),
-            details={"provider": provider}
+            details={"provider": provider},
         )
 
 
@@ -297,7 +297,7 @@ def batch_validate_responses(
             field="batch_responses",
             message=f"Batch validation error: {str(e)}",
             correlation_id=correlation_id or UUID(int=0),
-            details={"provider": provider, "processed_count": len(results)}
+            details={"provider": provider, "processed_count": len(results)},
         )
 
 

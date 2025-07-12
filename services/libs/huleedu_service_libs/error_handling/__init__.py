@@ -55,6 +55,9 @@ from huleedu_service_libs.error_handling.quart_handlers import (
     extract_correlation_id,
     register_error_handlers,
 )
+from huleedu_service_libs.error_handling.spellchecker_factories import (
+    raise_spell_event_correlation_error,
+)
 from huleedu_service_libs.error_handling.testing import (
     ErrorCapture,
     ErrorDetailMatcher,
@@ -110,6 +113,8 @@ __all__ = [
     "raise_raw_storage_failed",
     "raise_text_extraction_failed",
     "raise_unknown_validation_error",
+    # Spellchecker error factories
+    "raise_spell_event_correlation_error",
     # Quart integration
     "register_error_handlers",
     "create_error_response",

@@ -90,9 +90,12 @@ async def repo(async_engine: AsyncEngine) -> AsyncGenerator[PostgreSQLSpellcheck
 async def test_create_and_fetch_job(repo: PostgreSQLSpellcheckRepository) -> None:
     batch_id = uuid4()
     essay_id = uuid4()
+    correlation_id = uuid4()
 
-    job_id = await repo.create_job(batch_id=batch_id, essay_id=essay_id)
-    job = await repo.get_job(job_id)
+    job_id = await repo.create_job(
+        batch_id=batch_id, essay_id=essay_id, correlation_id=correlation_id
+    )
+    job = await repo.get_job(job_id, correlation_id=correlation_id)
 
     assert job is not None
     assert job.batch_id == batch_id
@@ -102,25 +105,31 @@ async def test_create_and_fetch_job(repo: PostgreSQLSpellcheckRepository) -> Non
 
 @pytest.mark.asyncio
 async def test_update_status(repo: PostgreSQLSpellcheckRepository) -> None:
-    job_id = await repo.create_job(batch_id=uuid4(), essay_id=uuid4())
+    correlation_id = uuid4()
+    job_id = await repo.create_job(
+        batch_id=uuid4(), essay_id=uuid4(), correlation_id=correlation_id
+    )
 
-    await repo.update_status(job_id, SCJobStatus.IN_PROGRESS)
-    updated = await repo.get_job(job_id)
+    await repo.update_status(job_id, SCJobStatus.IN_PROGRESS, correlation_id=correlation_id)
+    updated = await repo.get_job(job_id, correlation_id=correlation_id)
     assert updated is not None
     assert updated.status == SCJobStatus.IN_PROGRESS
 
 
 @pytest.mark.asyncio
 async def test_add_tokens(repo: PostgreSQLSpellcheckRepository) -> None:
-    job_id = await repo.create_job(batch_id=uuid4(), essay_id=uuid4())
+    correlation_id = uuid4()
+    job_id = await repo.create_job(
+        batch_id=uuid4(), essay_id=uuid4(), correlation_id=correlation_id
+    )
 
     tokens = [
         ("mispelled", ["misspelled"], 15, "This is a mispelled word."),
         ("hous", ["house"], 37, None),
     ]
-    await repo.add_tokens(job_id, tokens)
+    await repo.add_tokens(job_id, tokens, correlation_id=correlation_id)
 
-    job = await repo.get_job(job_id)
+    job = await repo.get_job(job_id, correlation_id=correlation_id)
     assert job is not None
     assert len(job.tokens) == 2
 

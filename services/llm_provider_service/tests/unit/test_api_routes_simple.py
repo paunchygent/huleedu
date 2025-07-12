@@ -161,7 +161,7 @@ def test_provider_error_response_format() -> None:
             limit=1000,
             window_seconds=60,
             retry_after=60,
-            provider="openai"
+            provider="openai",
         )
     except HuleEduError as error:
         # Act - Format for API response

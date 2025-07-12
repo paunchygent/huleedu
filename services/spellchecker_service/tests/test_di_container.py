@@ -89,7 +89,9 @@ async def test_container_resolves_repository(
         # Sanity: can create a job (ensures DB wiring is live)
         import uuid
 
-        await repo.create_job(batch_id=uuid.uuid4(), essay_id=uuid.uuid4())
+        await repo.create_job(
+            batch_id=uuid.uuid4(), essay_id=uuid.uuid4(), correlation_id=uuid.uuid4()
+        )
     finally:
         await container.close()
         await engine.dispose()

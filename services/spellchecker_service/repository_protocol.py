@@ -29,6 +29,7 @@ class SpellcheckRepositoryProtocol(Protocol):
         essay_id: UUID,
         *,
         language: str = "en",
+        correlation_id: UUID,
     ) -> UUID:
         """Insert a new *pending* spell-check job and return its `job_id`."""
 
@@ -37,20 +38,22 @@ class SpellcheckRepositoryProtocol(Protocol):
         job_id: UUID,
         status: SCJobStatus,
         *,
-        error_message: str | None = None,
         processing_ms: int | None = None,
+        correlation_id: UUID,
     ) -> None:
-        """Update the status (and optionally error_message / processing_ms)."""
+        """Update the status (and optionally processing_ms)."""
 
     async def add_tokens(
         self,
         job_id: UUID,
         tokens: list[tuple[str, list[str] | None, int | None, str | None]],
+        *,
+        correlation_id: UUID,
     ) -> None:
         """Bulk-insert tokens for a job.
 
         Each tuple represents `(token, suggestions, position, sentence)`.
         """
 
-    async def get_job(self, job_id: UUID) -> "SpellcheckJob" | None:
+    async def get_job(self, job_id: UUID, *, correlation_id: UUID) -> "SpellcheckJob" | None:
         """Return the ORM model for the given job (or *None* if missing)."""

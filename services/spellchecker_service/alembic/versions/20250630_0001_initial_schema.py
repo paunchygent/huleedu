@@ -29,7 +29,7 @@ def upgrade() -> None:
         sa.Column("essay_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("language", sa.String(16), nullable=False, server_default="en"),
         sa.Column("status", sa.String(32), nullable=False, server_default="pending"),
-        sa.Column("error_message", sa.Text(), nullable=True),
+        sa.Column("error_detail", postgresql.JSON(), nullable=True),
         sa.Column("processing_ms", sa.Integer(), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=False), server_default=sa.func.now(), nullable=False

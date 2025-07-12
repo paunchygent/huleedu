@@ -63,3 +63,15 @@ class FileValidationErrorCode(str, Enum):
     RAW_STORAGE_FAILED = "RAW_STORAGE_FAILED"
     TEXT_EXTRACTION_FAILED = "TEXT_EXTRACTION_FAILED"
     UNKNOWN_VALIDATION_ERROR = "UNKNOWN_VALIDATION_ERROR"
+
+
+class SpellcheckerErrorCode(str, Enum):
+    """
+    Business logic specific error codes for spellchecker service operations.
+
+    Note: Common operations use generic ErrorCode enum (CONNECTION_ERROR,
+    PROCESSING_ERROR, CONTENT_SERVICE_ERROR, KAFKA_PUBLISH_ERROR, etc.)
+    """
+
+    # Spellchecker-specific business logic errors only
+    SPELL_EVENT_CORRELATION_ERROR = "SPELL_EVENT_CORRELATION_ERROR"

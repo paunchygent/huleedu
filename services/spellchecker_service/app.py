@@ -33,8 +33,6 @@ from services.spellchecker_service.startup_setup import initialize_services, shu
 logger = create_service_logger("spellchecker_service.app")
 
 
-
-
 def create_app(settings: Settings | None = None) -> HuleEduApp:
     """Create and configure the Quart application.
 

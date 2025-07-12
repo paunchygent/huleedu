@@ -15,6 +15,7 @@ from common_core.error_enums import (
     ClassManagementErrorCode,
     ErrorCode,
     FileValidationErrorCode,
+    SpellcheckerErrorCode,
 )
 from common_core.models.error_models import ErrorDetail
 
@@ -68,6 +69,8 @@ ERROR_CODE_TO_HTTP_STATUS = {
     FileValidationErrorCode.RAW_STORAGE_FAILED: 500,
     FileValidationErrorCode.TEXT_EXTRACTION_FAILED: 500,
     FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR: 400,
+    # Spellchecker error codes
+    SpellcheckerErrorCode.SPELL_EVENT_CORRELATION_ERROR: 400,
 }
 
 

@@ -29,14 +29,14 @@ class Settings(BaseSettings):
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
 
     # Database configuration
-    DB_HOST: str = "localhost"
-    DB_PORT: int = 5437
-    DB_USER: str = "postgres"
-    DB_PASSWORD: str = "postgres"
+    DB_HOST: str = "spellchecker_db"
+    DB_PORT: int = 5432
+    DB_USER: str = "huleedu_user"
+    DB_PASSWORD: str = "password"
     DB_NAME: str = "spellchecker"
 
     # Redis configuration for idempotency
-    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_URL: str = "redis://redis:6379"
 
     CONSUMER_GROUP: str = "spellchecker-service-group-v1.1"
     PRODUCER_CLIENT_ID: str = "spellchecker-service-producer"
@@ -117,7 +117,17 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """Database URL for SQLAlchemy and Alembic."""
-        return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        import os
+
+        # Check for environment variable first (Docker environment) - follows service naming pattern
+        env_url = os.getenv("SPELLCHECKER_SERVICE_DATABASE_URL")
+        if env_url:
+            return env_url
+
+        # Fallback to constructed URL for local development
+        db_user = os.getenv("HULEEDU_DB_USER", self.DB_USER)
+        db_password = os.getenv("HULEEDU_DB_PASSWORD", self.DB_PASSWORD)
+        return f"postgresql+asyncpg://{db_user}:{db_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     model_config = SettingsConfigDict(
         env_file=".env",

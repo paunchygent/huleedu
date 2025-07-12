@@ -68,7 +68,7 @@ class MockProviderImpl(LLMProviderProtocol):
                 external_service="mock_provider",
                 message="Mock provider simulated error for testing",
                 correlation_id=correlation_id,
-                details={"provider": "mock", "error_simulation": True}
+                details={"provider": "mock", "error_simulation": True},
             )
 
         # Randomly select winner with slight bias towards Essay B

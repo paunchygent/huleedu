@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import List
+from typing import Any, List
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     Enum,
     ForeignKey,
@@ -61,7 +62,7 @@ class SpellcheckJob(Base):
     status: Mapped[SCJobStatus] = mapped_column(
         Enum(SCJobStatus), nullable=False, default=SCJobStatus.PENDING
     )
-    error_message: Mapped[str | None] = mapped_column(Text)
+    error_detail: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     processing_ms: Mapped[int | None] = mapped_column(
         Integer, CheckConstraint("processing_ms >= 0")
     )

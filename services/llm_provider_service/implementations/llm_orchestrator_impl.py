@@ -99,7 +99,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 config_key="provider",
                 message=error_msg,
                 correlation_id=correlation_id,
-                details={"requested_provider": provider.value, "available_providers": available}
+                details={"requested_provider": provider.value, "available_providers": available},
             )
 
         # Publish request started event
@@ -228,8 +228,8 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 details={
                     "provider": provider.value,
                     "queue_usage_percent": queue_stats.usage_percent,
-                    "retry_after_seconds": 300
-                }
+                    "retry_after_seconds": 300,
+                },
             )
 
     async def _make_llm_request(
@@ -342,7 +342,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 external_service=f"{provider.value}_provider",
                 message=error_msg,
                 correlation_id=correlation_id,
-                details={"provider": provider.value}
+                details={"provider": provider.value},
             )
 
     async def _handle_provider_failure(
@@ -413,7 +413,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 config_key="provider",
                 message=f"Provider '{provider.value}' not found",
                 correlation_id=correlation_id,
-                details={"requested_provider": provider.value}
+                details={"requested_provider": provider.value},
             )
 
         try:
@@ -439,7 +439,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 external_service=f"{provider.value}_provider",
                 message=f"Provider test failed with exception: {str(e)}",
                 correlation_id=correlation_id,
-                details={"provider": provider.value}
+                details={"provider": provider.value},
             )
 
     def _estimate_cost(self, provider: str, token_usage: Dict[str, int] | None) -> float | None:

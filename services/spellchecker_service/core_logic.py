@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import aiohttp  # For ClientSession type hint
-from aiohttp import ClientTimeout
+from uuid import UUID
 
-#
-# from common_core.events.spellcheck_models import SpellcheckResultDataV1 # Not directly returned
-# from common_core.metadata_models import StorageReferenceMetadata # Not directly used
+import aiohttp  # For ClientSession type hint
+from huleedu_service_libs.error_handling import (
+    raise_content_service_error,
+    raise_processing_error,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
+
+# OpenTelemetry tracing handled by HuleEduError automatically
 
 # Protocols are not implemented here, but these functions can be *used* by their implementations
 # from .protocols import (
@@ -25,71 +28,211 @@ async def default_fetch_content_impl(
     session: aiohttp.ClientSession,
     storage_id: str,
     content_service_url: str,
+    correlation_id: UUID,
     essay_id: str | None = None,
 ) -> str:
     """
     Default implementation for fetching content from the content service.
-    Raises exception on failure.
+    Uses structured error handling with HuleEduError exceptions.
     """
     url = f"{content_service_url}/{storage_id}"
     log_prefix = f"Essay {essay_id}: " if essay_id else ""
-    logger.debug(f"{log_prefix}Fetching content from URL: {url}")
+
+    logger.debug(
+        f"{log_prefix}Fetching content from URL: {url}",
+        extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
+    )
+
     try:
-        timeout = ClientTimeout(total=10)
+        timeout = aiohttp.ClientTimeout(total=10)
         async with session.get(url, timeout=timeout) as response:
-            response.raise_for_status()
-            content = await response.text()
-            logger.debug(
-                f"{log_prefix}Fetched content from {storage_id} (first 100 chars: {content[:100]})",
-            )
-            return content
+            if response.status == 200:
+                content = await response.text()
+                logger.debug(
+                    f"{log_prefix}Successfully fetched content from {storage_id} (length: {len(content)})",
+                    extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
+                )
+                return content
+
+            elif response.status == 404:
+                error_text = await response.text()
+                raise_content_service_error(
+                    service="spellchecker_service",
+                    operation="fetch_content",
+                    message=f"Content not found: {storage_id}",
+                    correlation_id=correlation_id,
+                    content_service_url=content_service_url,
+                    status_code=response.status,
+                    storage_id=storage_id,
+                )
+
+            else:
+                error_text = await response.text()
+                raise_content_service_error(
+                    service="spellchecker_service",
+                    operation="fetch_content",
+                    message=f"Content Service error: {response.status} - {error_text[:100]}",
+                    correlation_id=correlation_id,
+                    content_service_url=content_service_url,
+                    status_code=response.status,
+                    storage_id=storage_id,
+                )
+
+    except aiohttp.ServerTimeoutError:
+        raise_content_service_error(
+            service="spellchecker_service",
+            operation="fetch_content",
+            message=f"Timeout fetching content from {storage_id}",
+            correlation_id=correlation_id,
+            content_service_url=content_service_url,
+            storage_id=storage_id,
+            timeout_seconds=10,
+        )
+
+    except aiohttp.ClientError as e:
+        raise_content_service_error(
+            service="spellchecker_service",
+            operation="fetch_content",
+            message=f"Connection error fetching content: {str(e)}",
+            correlation_id=correlation_id,
+            content_service_url=content_service_url,
+            storage_id=storage_id,
+            client_error_type=type(e).__name__,
+        )
+
     except Exception as e:
         logger.error(
-            f"{log_prefix}Error fetching content {storage_id} from {url}: {e}",
+            f"{log_prefix}Unexpected error fetching content {storage_id}: {e}",
             exc_info=True,
+            extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
         )
-        raise  # Re-raise after logging
+        raise_content_service_error(
+            service="spellchecker_service",
+            operation="fetch_content",
+            message=f"Unexpected error fetching content: {str(e)}",
+            correlation_id=correlation_id,
+            content_service_url=content_service_url,
+            storage_id=storage_id,
+            error_type=type(e).__name__,
+        )
 
 
 async def default_store_content_impl(
     session: aiohttp.ClientSession,
     text_content: str,
     content_service_url: str,
+    correlation_id: UUID,
     essay_id: str | None = None,
 ) -> str:
     """
     Default implementation for storing content to the content service.
-    Raises exception on failure.
+    Uses structured error handling with HuleEduError exceptions.
     """
     log_prefix = f"Essay {essay_id}: " if essay_id else ""
+
     logger.debug(
-        f"{log_prefix}Storing content (length: {len(text_content)}) "
-        f"to Content Service via {content_service_url}",
+        f"{log_prefix}Storing content (length: {len(text_content)}) to Content Service via {content_service_url}",
+        extra={"correlation_id": str(correlation_id), "content_length": len(text_content)},
     )
+
     try:
-        timeout = ClientTimeout(total=10)
+        timeout = aiohttp.ClientTimeout(total=10)
         async with session.post(
             content_service_url,
             data=text_content.encode("utf-8"),
             timeout=timeout,
         ) as response:
-            response.raise_for_status()
-            # Assuming Content Service returns JSON like {"storage_id": "..."}
-            data: dict[str, str] = await response.json()
-            storage_id = data.get("storage_id")
-            if not storage_id:
-                raise ValueError("Content service response did not include 'storage_id'")
-            logger.info(f"{log_prefix}Stored corrected text, new_storage_id: {storage_id}")
-            return storage_id
+            if response.status == 200:
+                try:
+                    # Assuming Content Service returns JSON like {"storage_id": "..."}
+                    data: dict[str, str] = await response.json()
+                    storage_id = data.get("storage_id")
+
+                    if not storage_id:
+                        raise_content_service_error(
+                            service="spellchecker_service",
+                            operation="store_content",
+                            message="Content service response missing 'storage_id' field",
+                            correlation_id=correlation_id,
+                            content_service_url=content_service_url,
+                            status_code=response.status,
+                            response_data=str(data),
+                        )
+
+                    logger.info(
+                        f"{log_prefix}Successfully stored content, new storage_id: {storage_id}",
+                        extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
+                    )
+                    return storage_id
+
+                except Exception as json_error:
+                    response_text = await response.text()
+                    raise_content_service_error(
+                        service="spellchecker_service",
+                        operation="store_content",
+                        message=f"Failed to parse Content Service JSON response: {str(json_error)}",
+                        correlation_id=correlation_id,
+                        content_service_url=content_service_url,
+                        status_code=response.status,
+                        response_text=response_text[:200],
+                    )
+
+            else:
+                error_text = await response.text()
+                raise_content_service_error(
+                    service="spellchecker_service",
+                    operation="store_content",
+                    message=f"Content Service error: {response.status} - {error_text[:100]}",
+                    correlation_id=correlation_id,
+                    content_service_url=content_service_url,
+                    status_code=response.status,
+                    response_text=error_text[:200],
+                )
+
+    except aiohttp.ServerTimeoutError:
+        raise_content_service_error(
+            service="spellchecker_service",
+            operation="store_content",
+            message="Timeout storing content to Content Service",
+            correlation_id=correlation_id,
+            content_service_url=content_service_url,
+            content_length=len(text_content),
+            timeout_seconds=10,
+        )
+
+    except aiohttp.ClientError as e:
+        raise_content_service_error(
+            service="spellchecker_service",
+            operation="store_content",
+            message=f"Connection error storing content: {str(e)}",
+            correlation_id=correlation_id,
+            content_service_url=content_service_url,
+            content_length=len(text_content),
+            client_error_type=type(e).__name__,
+        )
+
     except Exception as e:
-        logger.error(f"{log_prefix}Error storing content: {e}", exc_info=True)
-        raise  # Re-raise after logging
+        logger.error(
+            f"{log_prefix}Unexpected error storing content: {e}",
+            exc_info=True,
+            extra={"correlation_id": str(correlation_id), "content_length": len(text_content)},
+        )
+        raise_content_service_error(
+            service="spellchecker_service",
+            operation="store_content",
+            message=f"Unexpected error storing content: {str(e)}",
+            correlation_id=correlation_id,
+            content_service_url=content_service_url,
+            content_length=len(text_content),
+            error_type=type(e).__name__,
+        )
 
 
 async def default_perform_spell_check_algorithm(
     text: str,
     essay_id: str | None = None,
     language: str = "en",
+    correlation_id: UUID | None = None,
 ) -> tuple[str, int]:
     """
     Complete L2 + pyspellchecker pipeline implementation.
@@ -102,8 +245,13 @@ async def default_perform_spell_check_algorithm(
     5. Return final corrected text + correction count
     """
     log_prefix = f"Essay {essay_id}: " if essay_id else ""
+    log_extra = {"essay_id": essay_id, "text_length": len(text), "language": language}
+    if correlation_id:
+        log_extra["correlation_id"] = str(correlation_id)
+
     logger.info(
         f"{log_prefix}Performing L2 + pyspellchecker algorithm for text (length: {len(text)})",
+        extra=log_extra,
     )
 
     # Skip empty content or content with less than 20 words
@@ -123,8 +271,8 @@ async def default_perform_spell_check_algorithm(
 
         # 1. Load L2 dictionaries using environment-aware configuration
         logger.debug(
-            f"{log_prefix}Loading L2 error dictionary from: "
-            f"{settings.effective_filtered_dict_path}",
+            f"{log_prefix}Loading L2 error dictionary from: {settings.effective_filtered_dict_path}",
+            extra=log_extra,
         )
         l2_errors = load_l2_errors(settings.effective_filtered_dict_path, filter_entries=False)
 
@@ -136,21 +284,28 @@ async def default_perform_spell_check_algorithm(
         l2_correction_count = len(l2_corrections)
 
         if l2_correction_count > 0:
-            logger.debug(f"{log_prefix}Applied {l2_correction_count} L2 corrections")
+            logger.debug(
+                f"{log_prefix}Applied {l2_correction_count} L2 corrections",
+                extra={**log_extra, "l2_corrections": l2_correction_count},
+            )
 
         # 3. Initialize pyspellchecker
-        logger.debug(f"{log_prefix}Initializing SpellChecker for language: {language}")
+        logger.debug(
+            f"{log_prefix}Initializing SpellChecker for language: {language}", extra=log_extra
+        )
         try:
             spell_checker = SpellChecker(language=language)
         except Exception as e:
-            logger.error(
-                f"{log_prefix}Failed to initialize SpellChecker for language '{language}': {e}",
+            logger.warning(
+                f"{log_prefix}Failed to initialize SpellChecker for language '{language}': {e}, "
+                f"falling back to L2 corrections only",
+                extra=log_extra,
             )
             # Fallback to L2 corrections only
             return l2_corrected_text, l2_correction_count
 
         # 4. Apply pyspellchecker corrections
-        logger.debug(f"{log_prefix}Running pyspellchecker on L2-corrected text")
+        logger.debug(f"{log_prefix}Running pyspellchecker on L2-corrected text", extra=log_extra)
 
         # Tokenize using pattern from prototype
         token_pattern = re.compile(r"\w+(?:[-']\w+)*|[^\s\w]+|\s+")
@@ -262,23 +417,46 @@ async def default_perform_spell_check_algorithm(
                     l2_context_reverted_count=0,  # Not implemented in simplified flow
                     output_dir=settings.effective_correction_log_dir,
                 )
-                logger.debug(f"{log_prefix}Detailed correction logging completed")
+                logger.debug(f"{log_prefix}Detailed correction logging completed", extra=log_extra)
             except Exception as e:
-                logger.warning(f"{log_prefix}Failed to log detailed corrections: {e}")
+                logger.warning(
+                    f"{log_prefix}Failed to log detailed corrections: {e}", extra=log_extra
+                )
 
         logger.info(
-            f"{log_prefix}L2 + pyspellchecker algorithm completed:\n"
+            f"{log_prefix}L2 + pyspellchecker algorithm completed: "
             f"{l2_correction_count} L2 corrections, "
             f"{pyspell_correction_count} pyspellchecker corrections, "
             f"{total_corrections} total corrections",
+            extra={**log_extra, "total_corrections": total_corrections},
         )
 
         return final_corrected_text, total_corrections
 
     except Exception as e:
-        logger.error(f"{log_prefix}Error in spell check algorithm: {e}", exc_info=True)
-        # Fallback to original text
-        return text, 0
+        logger.error(
+            f"{log_prefix}Critical error in spell check algorithm: {e}",
+            exc_info=True,
+            extra=log_extra,
+        )
+
+        if correlation_id:
+            raise_processing_error(
+                service="spellchecker_service",
+                operation="perform_spell_check_algorithm",
+                message=f"Spell check algorithm failed: {str(e)}",
+                correlation_id=correlation_id,
+                algorithm_stage="spell_processing",
+                content_length=len(text),
+                language=language,
+                essay_id=essay_id,
+            )
+        else:
+            # Legacy fallback for backwards compatibility when correlation_id not provided
+            logger.warning(
+                f"{log_prefix}Falling back to original text due to algorithm error", extra=log_extra
+            )
+            return text, 0
 
 
 # The classes ContentClient, ResultStore, SpellLogic that implement the protocols

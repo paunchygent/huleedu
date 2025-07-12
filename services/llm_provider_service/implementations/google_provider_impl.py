@@ -81,7 +81,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                 config_key="GOOGLE_API_KEY",
                 message="Google API key not configured",
                 correlation_id=correlation_id,
-                details={"provider": "google"}
+                details={"provider": "google"},
             )
 
         if not self.project_id:
@@ -91,7 +91,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                 config_key="GOOGLE_PROJECT_ID",
                 message="Google project ID not configured",
                 correlation_id=correlation_id,
-                details={"provider": "google"}
+                details={"provider": "google"},
             )
 
         # Prepare the full prompt with essays
@@ -132,7 +132,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                 external_service="google_api",
                 message=f"Google API call failed: {str(e)}",
                 correlation_id=correlation_id,
-                details={"provider": "google"}
+                details={"provider": "google"},
             )
 
     async def _make_api_request(
@@ -270,7 +270,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                                     parse_target="json_response",
                                     message=error_msg,
                                     correlation_id=correlation_id,
-                                    details={"provider": "google"}
+                                    details={"provider": "google"},
                                 )
 
                     raise_external_service_error(
@@ -279,7 +279,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                         external_service="google_api",
                         message="No content in Google response",
                         correlation_id=correlation_id,
-                        details={"provider": "google"}
+                        details={"provider": "google"},
                     )
 
                 else:
@@ -299,7 +299,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                             window_seconds=60,
                             message=f"Rate limit exceeded: {error_text}",
                             correlation_id=correlation_id,
-                            details={"provider": "google", "retry_after": 60}
+                            details={"provider": "google", "retry_after": 60},
                         )
                     elif response.status in {401, 403}:
                         raise_authentication_error(
@@ -307,7 +307,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                             operation="google_api_request",
                             message=f"Authentication failed: {error_text}",
                             correlation_id=correlation_id,
-                            details={"provider": "google"}
+                            details={"provider": "google"},
                         )
                     else:
                         raise_external_service_error(
@@ -316,7 +316,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                             external_service="google_api",
                             message=error_msg,
                             correlation_id=correlation_id,
-                            details={"provider": "google", "status_code": response.status}
+                            details={"provider": "google", "status_code": response.status},
                         )
 
         except aiohttp.ClientResponseError:
@@ -335,7 +335,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                 external_service="google_api",
                 message=error_msg,
                 correlation_id=correlation_id,
-                details={"provider": "google"}
+                details={"provider": "google"},
             )
 
     def _format_comparison_prompt(self, user_prompt: str, essay_a: str, essay_b: str) -> str:

@@ -80,7 +80,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                 config_key="OPENAI_API_KEY",
                 message="OpenAI API key not configured",
                 correlation_id=correlation_id,
-                details={"provider": "openai"}
+                details={"provider": "openai"},
             )
 
         # Prepare the full prompt with essays
@@ -121,7 +121,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                 external_service="openai_api",
                 message=f"OpenAI API call failed: {str(e)}",
                 correlation_id=correlation_id,
-                details={"provider": "openai"}
+                details={"provider": "openai"},
             )
 
     async def _make_api_request(
@@ -256,7 +256,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                                 parse_target="json_response",
                                 message=error_msg,
                                 correlation_id=correlation_id,
-                                details={"provider": "openai"}
+                                details={"provider": "openai"},
                             )
                     else:
                         raise_external_service_error(
@@ -265,7 +265,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                             external_service="openai_api",
                             message="No choices in OpenAI response",
                             correlation_id=correlation_id,
-                            details={"provider": "openai"}
+                            details={"provider": "openai"},
                         )
 
                 else:
@@ -285,7 +285,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                             window_seconds=60,
                             message=f"Rate limit exceeded: {error_text}",
                             correlation_id=correlation_id,
-                            details={"provider": "openai", "retry_after": 60}
+                            details={"provider": "openai", "retry_after": 60},
                         )
                     elif response.status == 401:
                         raise_authentication_error(
@@ -293,7 +293,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                             operation="openai_api_request",
                             message=f"Authentication failed: {error_text}",
                             correlation_id=correlation_id,
-                            details={"provider": "openai"}
+                            details={"provider": "openai"},
                         )
                     else:
                         raise_external_service_error(
@@ -302,7 +302,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                             external_service="openai_api",
                             message=error_msg,
                             correlation_id=correlation_id,
-                            details={"provider": "openai", "status_code": response.status}
+                            details={"provider": "openai", "status_code": response.status},
                         )
 
         except aiohttp.ClientResponseError:
@@ -321,7 +321,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                 external_service="openai_api",
                 message=error_msg,
                 correlation_id=correlation_id,
-                details={"provider": "openai"}
+                details={"provider": "openai"},
             )
 
     def _format_comparison_prompt(self, user_prompt: str, essay_a: str, essay_b: str) -> str:
