@@ -14,6 +14,7 @@
 ### **Phase 1: COMPLIANCE RESTORATION ✅ COMPLETED**
 
 **Current Implementation Status:**
+
 - ✅ Phase 1 (Compliance Restoration): COMPLETED - All pattern violations fixed
 - ⏳ Phase 2 (Event Processing): PENDING - Ready to implement
 - ⏳ Phase 3 (Comprehensive Testing): PENDING - Ready to implement
@@ -26,6 +27,7 @@
 4. **Zero MyPy Errors**: Full type safety across 495 source files
 
 **Completed Error Function Mappings:**
+
 - `raise_spell_content_service_error` → `raise_content_service_error` ✅
 - `raise_spell_algorithm_error` → `raise_processing_error` ✅
 - `raise_spell_database_connection_error` → `raise_connection_error` ✅
@@ -34,6 +36,7 @@
 - `raise_spell_event_publishing_error` → `raise_kafka_publish_error` ✅
 
 **Remaining Allowed Exception:**
+
 - `raise_spell_event_correlation_error` - Business-specific correlation ID handling (retained)
 
 ---
@@ -45,6 +48,7 @@
 ### **Error Handling Infrastructure Files**
 
 **1. Generic Error Factory Functions:**
+
 ```
 File: /Users/olofs_mba/Documents/Repos/huledu-reboot/services/libs/huleedu_service_libs/error_handling/factories.py
 Purpose: Contains ALL generic error factory functions that MUST be used
@@ -58,6 +62,7 @@ Key Functions:
 ```
 
 **2. Error Code Enumerations:**
+
 ```
 File: /Users/olofs_mba/Documents/Repos/huledu-reboot/common_core/src/common_core/error_enums.py
 Purpose: Contains generic ErrorCode enum and service-specific enums
@@ -67,6 +72,7 @@ Key Classes:
 ```
 
 **3. Service-Specific Factory (MINIMAL):**
+
 ```
 File: /Users/olofs_mba/Documents/Repos/huledu-reboot/services/libs/huleedu_service_libs/error_handling/spellchecker_factories.py  
 Purpose: Contains ONLY spellchecker-specific business logic errors
@@ -75,6 +81,7 @@ Allowed Functions:
 ```
 
 **4. Error Handler Integration:**
+
 ```
 File: /Users/olofs_mba/Documents/Repos/huledu-reboot/services/libs/huleedu_service_libs/error_handling/quart_handlers.py
 Purpose: HTTP status code mapping for all error codes
@@ -82,6 +89,7 @@ Key Mapping: ERROR_CODE_TO_HTTP_STATUS dictionary
 ```
 
 **5. Core Error Model:**
+
 ```
 File: /Users/olofs_mba/Documents/Repos/huledu-reboot/common_core/src/common_core/models/error_models.py
 Purpose: Contains ErrorDetail model structure
@@ -89,6 +97,7 @@ Key Class: ErrorDetail (immutable error data model)
 ```
 
 **6. HuleEduError Exception:**
+
 ```
 File: /Users/olofs_mba/Documents/Repos/huledu-reboot/services/libs/huleedu_service_libs/error_handling/huleedu_error.py
 Purpose: Platform exception with automatic OpenTelemetry integration
@@ -180,6 +189,7 @@ raise_spell_event_correlation_error(...)    # ✅ ALLOWED (business logic specif
 **Target File:** `services/spellchecker_service/implementations/spell_repository_postgres_impl.py`
 
 **Required Changes:**
+
 ```python
 # CURRENT VIOLATIONS (fix these imports)
 from huleedu_service_libs.error_handling import (
@@ -201,6 +211,7 @@ from huleedu_service_libs.error_handling import (
 **Target File:** `services/spellchecker_service/core_logic.py`
 
 **Required Changes:**
+
 ```python
 # CURRENT VIOLATIONS (fix these)
 from huleedu_service_libs.error_handling import (
@@ -232,11 +243,13 @@ from huleedu_service_libs.error_handling import (
 **Target File:** `services/spellchecker_service/event_processor.py`
 
 **Current Pattern Issues:**
+
 - Basic event processing error handling
 - Missing correlation ID propagation from Kafka messages
 - Limited error context for event processing failures
 
 **Modernization Requirements:**
+
 - Extract correlation ID from Kafka message headers
 - Implement structured error handling using `raise_processing_error` and `raise_parsing_error`
 - Add OpenTelemetry span error recording
@@ -247,6 +260,7 @@ from huleedu_service_libs.error_handling import (
 **Target File:** `services/spellchecker_service/kafka_consumer.py`
 
 **Modernization Requirements:**
+
 - Integrate generic HuleEduError handling in message processing loops
 - Implement structured error logging for Kafka failures using `raise_connection_error`
 - Add correlation ID extraction and propagation
@@ -257,6 +271,7 @@ from huleedu_service_libs.error_handling import (
 **Target File:** `services/spellchecker_service/worker_main.py`
 
 **Modernization Requirements:**
+
 - Modernize service startup error handling using `raise_initialization_failed`
 - Implement structured shutdown error handling
 - Add correlation ID context initialization
@@ -269,6 +284,7 @@ from huleedu_service_libs.error_handling import (
 ### **3.1 OpenTelemetry Integration Validation**
 
 **Requirements:**
+
 - All HuleEduError instances automatically record to OpenTelemetry spans
 - Error attributes properly added to traces
 - Correlation ID propagation functional across service boundaries
@@ -277,6 +293,7 @@ from huleedu_service_libs.error_handling import (
 ### **3.2 Structured Logging Integration**
 
 **Requirements:**
+
 - All errors use huleedu_service_libs.logging_utils patterns
 - Correlation ID included in log context for all error scenarios
 - Structured error details properly formatted in log entries
@@ -285,6 +302,7 @@ from huleedu_service_libs.error_handling import (
 ### **3.3 Metrics Integration Verification**
 
 **Requirements:**
+
 - Error count metrics by generic ErrorCode category
 - Error rate monitoring functional
 - Service health metrics include error status
@@ -318,16 +336,19 @@ from huleedu_service_libs.error_handling import (
 ### Phase 1: Compliance Restoration (Immediate)
 
 **Day 1: Error Function Compliance Audit**
+
 - Identify all non-compliant error function calls across spellchecker service
 - Map to appropriate generic error function replacements
 - Update all import statements
 
 **Day 2: Implementation Layer Compliance Fix**
+
 - Replace all `raise_spell_*` calls with generic equivalents
 - Verify error context preservation
 - Test correlation ID tracking maintained
 
 **Day 3: Repository Layer Compliance Fix**  
+
 - Fix repository error handling to use generic functions
 - Verify database error categorization maintained
 - Test OpenTelemetry integration functional
@@ -335,28 +356,34 @@ from huleedu_service_libs.error_handling import (
 ### Phase 2: Event Processing Integration (Week 2)
 
 **Day 1-2: Event Processor Modernization**
+
 - Update event_processor.py with compliant HuleEduError integration
 - Implement correlation ID extraction from Kafka messages using generic error functions
 
 **Day 3-4: Kafka Consumer Integration**
+
 - Modernize kafka_consumer.py error handling with generic functions
 - Add structured error logging and metrics
 
 **Day 5: Worker Main Coordination**
+
 - Update worker_main.py service lifecycle error handling
 - Implement correlation ID context initialization
 
 ### Phase 3: Comprehensive Testing and Validation (Week 3)
 
 **Day 1-2: Error Scenario Testing**
+
 - Execute error scenario testing across all operations
 - Validate correlation ID propagation and observability integration
 
 **Day 3-4: Observability Verification**
+
 - Verify OpenTelemetry error recording functionality
 - Validate structured logging and metrics integration
 
 **Day 5: Platform Compliance Verification**
+
 - Confirm 100% generic error function usage
 - Validate platform pattern compliance
 - Document migration patterns for remaining services
@@ -368,12 +395,14 @@ from huleedu_service_libs.error_handling import (
 ### Compliance Validation Requirements
 
 **Platform Pattern Compliance:**
+
 - ✅ Zero service-specific error function calls (except `raise_spell_event_correlation_error`)
 - ✅ All error handling uses generic ErrorCode enums
 - ✅ Consistent error patterns matching other platform services
 - ✅ Complete correlation ID tracking implementation
 
 **Functional Validation:**
+
 - ✅ Zero regression in error user experience
 - ✅ All error scenarios properly categorized using generic codes
 - ✅ OpenTelemetry error recording operational
@@ -382,12 +411,14 @@ from huleedu_service_libs.error_handling import (
 ### Quality Assurance Requirements
 
 **Code Quality Maintenance:**
+
 - ✅ Zero MyPy type checking errors maintained
 - ✅ Zero Ruff linting violations maintained
 - ✅ All tests pass with compliant error handling changes
 - ✅ Import resolution functional across service
 
 **Platform Integration:**
+
 - ✅ Error handling patterns match llm_provider_service gold standard
 - ✅ Kafka event processing error handling functional
 - ✅ Database operation error handling reliable
@@ -396,6 +427,7 @@ from huleedu_service_libs.error_handling import (
 ### Platform Foundation Requirements
 
 **Migration Template Establishment:**
+
 - ✅ Compliant migration patterns documented for remaining 8 services
 - ✅ Generic error handling template established for platform-wide adoption
 - ✅ Observability integration patterns validated and documented
@@ -408,11 +440,13 @@ from huleedu_service_libs.error_handling import (
 ### Implementation Risks
 
 **High Risk Areas:**
+
 - **Compliance Fixes**: Changing error function calls could affect error context preservation
 - **Event Processing Integration**: Kafka message processing error handling changes could impact message consumption
 - **Platform Pattern Adherence**: Must ensure new implementations follow established patterns exactly
 
 **Mitigation Strategies:**
+
 - **Error Context Preservation**: Ensure all error details and correlation IDs maintained during function replacement
 - **Comprehensive Testing**: Execute all error scenarios through automated testing
 - **Pattern Validation**: Compare final implementation against llm_provider_service gold standard
@@ -420,10 +454,12 @@ from huleedu_service_libs.error_handling import (
 ### Platform Consistency Risks  
 
 **Cross-Service Dependencies:**
+
 - **Error Response Format**: Must maintain consistent error response structure
 - **Observability Integration**: Error handling changes must integrate correctly with monitoring systems
 
 **Mitigation Approaches:**
+
 - **Gold Standard Compliance**: Follow llm_provider_service patterns exactly
 - **Observability Verification**: Ensure all error scenarios properly recorded in monitoring systems
 - **Documentation**: Maintain comprehensive documentation for migration template
@@ -435,12 +471,14 @@ from huleedu_service_libs.error_handling import (
 ### Technical Excellence Metrics
 
 **Platform Compliance:**
+
 - **100% generic error function adoption** across all error scenarios
 - **Zero service-specific error patterns** except business logic specific functions
 - **Complete correlation ID coverage** for all operations
 - **Full observability integration** functional
 
 **Code Quality Metrics:**
+
 - **Zero type checking errors** maintained across service
 - **Zero linting violations** maintained across service  
 - **100% test passing rate** with compliant error handling
@@ -449,12 +487,14 @@ from huleedu_service_libs.error_handling import (
 ### Platform Foundation Metrics
 
 **Migration Pattern Establishment:**
+
 - **Compliant migration documentation** created for remaining services
 - **Generic error handling template** established for platform-wide adoption
 - **Observability integration patterns** validated and documented
 - **Quality assurance processes** verified for compliant error handling changes
 
 **Service Reliability Metrics:**
+
 - **Zero regression** in service functionality
 - **Improved error visibility** for debugging and monitoring
 - **Enhanced correlation tracking** across service operations
@@ -467,6 +507,7 @@ from huleedu_service_libs.error_handling import (
 ### Phase 1: Compliance Restoration ✅ COMPLETED
 
 **What Was Accomplished:**
+
 - Replaced all 6 non-compliant error function patterns with generic equivalents
 - Fixed type safety issues (aiohttp exceptions, UUID parameters)
 - Updated test mocks to match implementation patterns
@@ -474,6 +515,7 @@ from huleedu_service_libs.error_handling import (
 - Zero MyPy errors across entire codebase
 
 **Files Modified:**
+
 - `implementations/spell_repository_postgres_impl.py` ✅
 - `implementations/spell_logic_impl.py` ✅
 - `implementations/content_client_impl.py` ✅
@@ -485,12 +527,14 @@ from huleedu_service_libs.error_handling import (
 ### Next Steps: Phase 2 & 3
 
 **Phase 2: Event Processing (Ready to Start)**
+
 - Target files: `event_processor.py`, `kafka_consumer.py`, `worker_main.py`
 - Add correlation ID extraction from Kafka messages
 - Implement HuleEduError patterns in event processing
 - Add OpenTelemetry span error recording
 
 **Phase 3: Comprehensive Testing (After Phase 2)**
+
 - Create error scenario test suite
 - Verify observability integration
 - Test correlation ID propagation
@@ -503,23 +547,26 @@ from huleedu_service_libs.error_handling import (
 This comprehensive modernization plan restores spellchecker service error handling to platform compliance standards and completes the remaining modernization phases. Through systematic compliance restoration and integration of event processing error handling, we establish the compliant foundation for platform-wide error handling standardization.
 
 **Platform Impact:**
+
 - Provides compliant migration template for 8 remaining services requiring error handling modernization
 - Establishes platform-consistent error handling patterns for future service development
 - Enhances platform observability and debugging capabilities with consistent error categorization
 - Creates foundation for comprehensive error monitoring and management
 
 **Implementation Confidence:**
+
 - Clear compliance restoration requirements with specific error function mapping
 - Comprehensive validation criteria ensuring zero functional regression
 - Platform pattern adherence verified against gold standard implementations
 - Established success metrics for technical and platform excellence
 
 **Strategic Value:**
+
 - Foundation for platform-wide error handling standardization using consistent patterns
 - Enhanced developer experience through platform-consistent error debugging
 - Improved operational visibility through standardized observability integration
 - Model implementation for microservice error handling excellence
 
-**Phase 1 Status:** The spellchecker service now has fully compliant error handling patterns, having successfully replaced all non-compliant functions with generic platform equivalents. 
+**Phase 1 Status:** The spellchecker service now has fully compliant error handling patterns, having successfully replaced all non-compliant functions with generic platform equivalents.
 
 **Ready for Phase 2 & 3:** Event processing modernization and comprehensive testing remain to complete the error handling excellence journey. The foundation is solid, and the path forward is clear.
