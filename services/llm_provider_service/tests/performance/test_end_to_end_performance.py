@@ -20,19 +20,19 @@ from testcontainers.redis import RedisContainer
 from common_core import Environment, LLMProviderType
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
+from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.connection_pool_manager_impl import (
     ConnectionPoolManagerImpl,
+)
+from services.llm_provider_service.internal_models import (
+    LLMOrchestratorResponse,
+    LLMQueuedResult,
 )
 from services.llm_provider_service.protocols import (
     LLMOrchestratorProtocol,
     LLMProviderProtocol,
     LLMRetryManagerProtocol,
 )
-from services.llm_provider_service.internal_models import (
-    LLMOrchestratorResponse,
-    LLMQueuedResult,
-)
-from services.llm_provider_service.exceptions import HuleEduError
 
 from .conftest import PerformanceMetrics
 
@@ -188,7 +188,7 @@ class TestEndToEndPerformance:
                         )
 
                         response_time = time.perf_counter() - start_time
-                        
+
                         # Granular status codes based on response type
                         if isinstance(result, LLMQueuedResult):
                             status_code = 202  # Accepted (queued)
@@ -277,7 +277,7 @@ class TestEndToEndPerformance:
                         model="mock-model",
                     )
                     response_time = time.perf_counter() - start_time
-                    
+
                     # Granular status codes based on response type
                     if isinstance(result, LLMQueuedResult):
                         status_code = 202  # Accepted (queued)
@@ -285,7 +285,7 @@ class TestEndToEndPerformance:
                         status_code = 200  # Success (immediate response)
                     else:
                         status_code = 500  # Unexpected response type
-                        
+
                     workload_metrics.add_measurement(response_time, status_code)
                     metrics.add_measurement(response_time, status_code)
                 except HuleEduError as e:
@@ -377,7 +377,7 @@ class TestEndToEndPerformance:
                             model="mock-model",
                         )
                         response_time = time.perf_counter() - req_start
-                        
+
                         # Granular status codes based on response type
                         if isinstance(result, LLMQueuedResult):
                             status_code = 202  # Accepted (queued)
@@ -385,7 +385,7 @@ class TestEndToEndPerformance:
                             status_code = 200  # Success (immediate response)
                         else:
                             status_code = 500  # Unexpected response type
-                            
+
                         metrics.add_measurement(response_time, status_code)
                     except HuleEduError as e:
                         # Application-level errors (rate limits, auth, validation, etc.)

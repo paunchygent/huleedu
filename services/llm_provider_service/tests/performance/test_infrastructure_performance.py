@@ -194,7 +194,7 @@ class TestInfrastructurePerformance:
                 start_time = time.perf_counter()
 
                 try:
-                    result = await orchestrator.perform_comparison(
+                    await orchestrator.perform_comparison(
                         provider=LLMProviderType.MOCK,  # Mock to avoid API costs
                         user_prompt=f"Compare these essays for infrastructure test {request_id}",
                         essay_a=f"Infrastructure test essay A {request_id}",
@@ -389,7 +389,11 @@ class TestInfrastructurePerformance:
                             model="mock-model",
                         )
                         duration = time.perf_counter() - start
-                        return duration, True, result.__dict__ if hasattr(result, '__dict__') else {}
+                        return (
+                            duration,
+                            True,
+                            result.__dict__ if hasattr(result, "__dict__") else {},
+                        )
                     except Exception as e:
                         duration = time.perf_counter() - start
                         return duration, False, {"error": str(e)}

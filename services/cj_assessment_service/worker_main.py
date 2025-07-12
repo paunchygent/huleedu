@@ -54,7 +54,7 @@ async def main() -> None:
         pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
         pool_recycle=settings.DATABASE_POOL_RECYCLE,
     )
-    
+
     # Initialize Dishka container with engine
     container = make_async_container(CJAssessmentServiceProvider(engine=engine))
 
