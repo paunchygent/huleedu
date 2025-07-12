@@ -13,6 +13,7 @@ import json
 import time
 from datetime import datetime
 from typing import Any, AsyncGenerator, Generator
+from uuid import uuid4
 
 import pytest
 from dishka import Scope, provide
@@ -202,9 +203,13 @@ class TestResponseValidationOptimizations:
 
         for _ in range(iterations):
             for response in test_responses:
-                result, _ = validate_and_normalize_response(response, "test_provider")
-                if result is not None:
-                    successful_validations += 1
+                try:
+                    result = validate_and_normalize_response(response, correlation_id=uuid4())
+                    if result is not None:
+                        successful_validations += 1
+                except Exception:
+                    # Validation failed, don't count as successful
+                    pass
 
         total_time = time.perf_counter() - start_time
         total_validations = iterations * len(test_responses)

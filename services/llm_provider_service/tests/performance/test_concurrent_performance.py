@@ -158,7 +158,7 @@ class TestConcurrentPerformance:
             start_time = time.perf_counter()
 
             try:
-                _, error = await orchestrator.perform_comparison(
+                await orchestrator.perform_comparison(
                     provider=LLMProviderType.MOCK,  # Mock to avoid API costs
                     user_prompt="Compare these essays",
                     essay_a=f"Sample essay A content {request_id}",
@@ -168,7 +168,7 @@ class TestConcurrentPerformance:
                 )
 
                 response_time = time.perf_counter() - start_time
-                return response_time, error is None
+                return response_time, True
             except Exception:
                 response_time = time.perf_counter() - start_time
                 return response_time, False
@@ -213,7 +213,7 @@ class TestConcurrentPerformance:
         async def make_request(request_id: int) -> Tuple[float, bool]:
             start_time = time.perf_counter()
             try:
-                _, error = await orchestrator.perform_comparison(
+                await orchestrator.perform_comparison(
                     provider=LLMProviderType.MOCK,
                     user_prompt="Stress test comparison",
                     essay_a=f"Stress essay A {request_id}",
@@ -222,7 +222,7 @@ class TestConcurrentPerformance:
                     model="mock-model",
                 )
                 response_time = time.perf_counter() - start_time
-                return response_time, error is None
+                return response_time, True
             except Exception:
                 response_time = time.perf_counter() - start_time
                 return response_time, False
@@ -270,7 +270,7 @@ class TestConcurrentPerformance:
         async def make_burst_request(burst_id: int, request_id: int) -> Tuple[float, bool]:
             start_time = time.perf_counter()
             try:
-                _, error = await orchestrator.perform_comparison(
+                await orchestrator.perform_comparison(
                     provider=LLMProviderType.MOCK,
                     user_prompt="Burst test comparison",
                     essay_a=f"Burst {burst_id} essay A {request_id}",
@@ -279,7 +279,7 @@ class TestConcurrentPerformance:
                     model="mock-model",
                 )
                 response_time = time.perf_counter() - start_time
-                return response_time, error is None
+                return response_time, True
             except Exception:
                 response_time = time.perf_counter() - start_time
                 return response_time, False
@@ -350,7 +350,7 @@ class TestConcurrentPerformance:
         ) -> Tuple[float, bool, str]:
             start_time = time.perf_counter()
             try:
-                _, error = await orchestrator.perform_comparison(
+                await orchestrator.perform_comparison(
                     provider=provider,
                     user_prompt="Mixed provider test",
                     essay_a=f"Essay A for {provider.value} {request_id}",
@@ -359,7 +359,7 @@ class TestConcurrentPerformance:
                     model="mock-model",
                 )
                 response_time = time.perf_counter() - start_time
-                return response_time, error is None, provider.value
+                return response_time, True, provider.value
             except Exception:
                 response_time = time.perf_counter() - start_time
                 return response_time, False, provider.value

@@ -152,7 +152,7 @@ class TestInfrastructurePerformance:
             # Measure single request performance with real infrastructure
             start_time = time.perf_counter()
 
-            result, error = await orchestrator.perform_comparison(
+            result = await orchestrator.perform_comparison(
                 provider=LLMProviderType.MOCK,  # Mock provider to avoid API costs
                 user_prompt="Compare these two essays for infrastructure testing",
                 essay_a="Sample essay A content for infrastructure testing",
@@ -164,7 +164,6 @@ class TestInfrastructurePerformance:
             response_time = time.perf_counter() - start_time
 
             # Assertions for infrastructure performance
-            assert error is None, f"Request failed: {error}"
             assert result is not None
             assert result.winner in [EssayComparisonWinner.ESSAY_A, EssayComparisonWinner.ESSAY_B]
 
@@ -195,7 +194,7 @@ class TestInfrastructurePerformance:
                 start_time = time.perf_counter()
 
                 try:
-                    result, error = await orchestrator.perform_comparison(
+                    result = await orchestrator.perform_comparison(
                         provider=LLMProviderType.MOCK,  # Mock to avoid API costs
                         user_prompt=f"Compare these essays for infrastructure test {request_id}",
                         essay_a=f"Infrastructure test essay A {request_id}",
@@ -205,7 +204,7 @@ class TestInfrastructurePerformance:
                     )
 
                     response_time = time.perf_counter() - start_time
-                    return response_time, error is None
+                    return response_time, True
                 except Exception:
                     response_time = time.perf_counter() - start_time
                     return response_time, False
@@ -381,7 +380,7 @@ class TestInfrastructurePerformance:
                 async def make_e2e_request(request_id: int) -> Tuple[float, bool, Dict[str, Any]]:
                     start = time.perf_counter()
                     try:
-                        result, error = await orchestrator.perform_comparison(
+                        result = await orchestrator.perform_comparison(
                             provider=LLMProviderType.MOCK,
                             user_prompt=f"Compare these essays for e2e test {request_id}",
                             essay_a=f"End-to-end test essay A {request_id}",
@@ -390,7 +389,7 @@ class TestInfrastructurePerformance:
                             model="mock-model",
                         )
                         duration = time.perf_counter() - start
-                        return duration, error is None, result or {}
+                        return duration, True, result.__dict__ if hasattr(result, '__dict__') else {}
                     except Exception as e:
                         duration = time.perf_counter() - start
                         return duration, False, {"error": str(e)}

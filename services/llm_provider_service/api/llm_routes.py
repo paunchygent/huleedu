@@ -129,7 +129,7 @@ async def generate_comparison(
                 logger.error(f"Comparison request failed: {str(error)}")
 
                 # Use service libraries error response factory
-                error_response, status_code = create_error_response(error)
+                error_response, status_code = create_error_response(error.error_detail)
                 return jsonify(error_response), status_code
 
             # Success - result should not be None

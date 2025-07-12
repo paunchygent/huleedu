@@ -125,7 +125,9 @@ class TestValidateAndNormalizeResponse:
         }
 
         correlation_id = uuid4()
-        validated = validate_and_normalize_response(incomplete_response, correlation_id=correlation_id)
+        validated = validate_and_normalize_response(
+            incomplete_response, correlation_id=correlation_id
+        )
 
         assert validated is not None
         assert validated.winner == "Essay A"
@@ -155,7 +157,9 @@ class TestValidateAndNormalizeResponse:
         }
 
         correlation_id = uuid4()
-        validated = validate_and_normalize_response(response_with_high_confidence, correlation_id=correlation_id)
+        validated = validate_and_normalize_response(
+            response_with_high_confidence, correlation_id=correlation_id
+        )
 
         assert validated is not None
         assert validated.confidence == 5.0
@@ -201,7 +205,9 @@ class TestProviderFormatCompatibility:
         }
 
         correlation_id = uuid4()
-        validated = validate_and_normalize_response(anthropic_response, correlation_id=correlation_id)
+        validated = validate_and_normalize_response(
+            anthropic_response, correlation_id=correlation_id
+        )
 
         assert validated is not None
         assert validated.winner == "Essay A"
@@ -249,7 +255,9 @@ class TestProviderFormatCompatibility:
         )
 
         correlation_id = uuid4()
-        validated = validate_and_normalize_response(openrouter_response, correlation_id=correlation_id)
+        validated = validate_and_normalize_response(
+            openrouter_response, correlation_id=correlation_id
+        )
 
         assert validated is not None
 
@@ -283,7 +291,9 @@ class TestResponseFormatStandardization:
     ) -> None:
         """Test that standardized responses convert correctly to internal format."""
         correlation_id = uuid4()
-        validated = validate_and_normalize_response(provider_response, correlation_id=correlation_id)
+        validated = validate_and_normalize_response(
+            provider_response, correlation_id=correlation_id
+        )
 
         assert validated is not None
         assert validated.winner == f"Essay {expected_choice}"

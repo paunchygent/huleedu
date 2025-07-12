@@ -1,5 +1,6 @@
 """Unit tests for LLM orchestrator."""
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -237,7 +238,7 @@ async def test_orchestrator_provider_error(
     from services.llm_provider_service.exceptions import raise_rate_limit_error
 
     # Mock provider to raise rate limit error
-    def mock_rate_limit_error(*args, **kwargs) -> None:
+    def mock_rate_limit_error(*args: Any, **kwargs: Any) -> None:
         raise_rate_limit_error(
             service="llm_provider_service",
             operation="generate_comparison",

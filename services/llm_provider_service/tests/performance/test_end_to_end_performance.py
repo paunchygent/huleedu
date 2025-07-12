@@ -28,6 +28,11 @@ from services.llm_provider_service.protocols import (
     LLMProviderProtocol,
     LLMRetryManagerProtocol,
 )
+from services.llm_provider_service.internal_models import (
+    LLMOrchestratorResponse,
+    LLMQueuedResult,
+)
+from services.llm_provider_service.exceptions import HuleEduError
 
 from .conftest import PerformanceMetrics
 
@@ -173,7 +178,7 @@ class TestEndToEndPerformance:
                     start_time = time.perf_counter()
 
                     try:
-                        _, error = await orchestrator.perform_comparison(
+                        result = await orchestrator.perform_comparison(
                             provider=LLMProviderType.MOCK,  # Mock to avoid API costs
                             user_prompt="Compare these essays",
                             essay_a=f"Load test essay A {request_id}",
@@ -183,11 +188,23 @@ class TestEndToEndPerformance:
                         )
 
                         response_time = time.perf_counter() - start_time
-                        status_code = 200 if error is None else 500
+                        
+                        # Granular status codes based on response type
+                        if isinstance(result, LLMQueuedResult):
+                            status_code = 202  # Accepted (queued)
+                        elif isinstance(result, LLMOrchestratorResponse):
+                            status_code = 200  # Success (immediate response)
+                        else:
+                            status_code = 500  # Unexpected response type
 
                         metrics.add_measurement(response_time, status_code)
 
+                    except HuleEduError as e:
+                        # Application-level errors (rate limits, auth, validation, etc.)
+                        response_time = time.perf_counter() - start_time
+                        metrics.add_measurement(response_time, 400, str(e))
                     except Exception as e:
+                        # Infrastructure errors (network, timeout, etc.)
                         response_time = time.perf_counter() - start_time
                         metrics.add_measurement(response_time, 500, str(e))
 
@@ -251,7 +268,7 @@ class TestEndToEndPerformance:
             async def workload_request(request_id: int) -> None:
                 start_time = time.perf_counter()
                 try:
-                    _, error = await orchestrator.perform_comparison(
+                    result = await orchestrator.perform_comparison(
                         provider=LLMProviderType.MOCK,
                         user_prompt=prompt,
                         essay_a=f"{workload_name} essay A {request_id}",
@@ -260,10 +277,24 @@ class TestEndToEndPerformance:
                         model="mock-model",
                     )
                     response_time = time.perf_counter() - start_time
-                    status_code = 200 if error is None else 500
+                    
+                    # Granular status codes based on response type
+                    if isinstance(result, LLMQueuedResult):
+                        status_code = 202  # Accepted (queued)
+                    elif isinstance(result, LLMOrchestratorResponse):
+                        status_code = 200  # Success (immediate response)
+                    else:
+                        status_code = 500  # Unexpected response type
+                        
                     workload_metrics.add_measurement(response_time, status_code)
                     metrics.add_measurement(response_time, status_code)
+                except HuleEduError as e:
+                    # Application-level errors (rate limits, auth, validation, etc.)
+                    response_time = time.perf_counter() - start_time
+                    workload_metrics.add_measurement(response_time, 400, str(e))
+                    metrics.add_measurement(response_time, 400, str(e))
                 except Exception as e:
+                    # Infrastructure errors (network, timeout, etc.)
                     response_time = time.perf_counter() - start_time
                     workload_metrics.add_measurement(response_time, 500, str(e))
                     metrics.add_measurement(response_time, 500, str(e))
@@ -337,7 +368,7 @@ class TestEndToEndPerformance:
                 async def make_sustained_request(req_id: int) -> None:
                     req_start = time.perf_counter()
                     try:
-                        _, error = await orchestrator.perform_comparison(
+                        result = await orchestrator.perform_comparison(
                             provider=LLMProviderType.MOCK,
                             user_prompt="Sustained load test",
                             essay_a=f"Sustained essay A {req_id}",
@@ -346,9 +377,22 @@ class TestEndToEndPerformance:
                             model="mock-model",
                         )
                         response_time = time.perf_counter() - req_start
-                        status_code = 200 if error is None else 500
+                        
+                        # Granular status codes based on response type
+                        if isinstance(result, LLMQueuedResult):
+                            status_code = 202  # Accepted (queued)
+                        elif isinstance(result, LLMOrchestratorResponse):
+                            status_code = 200  # Success (immediate response)
+                        else:
+                            status_code = 500  # Unexpected response type
+                            
                         metrics.add_measurement(response_time, status_code)
+                    except HuleEduError as e:
+                        # Application-level errors (rate limits, auth, validation, etc.)
+                        response_time = time.perf_counter() - req_start
+                        metrics.add_measurement(response_time, 400, str(e))
                     except Exception as e:
+                        # Infrastructure errors (network, timeout, etc.)
                         response_time = time.perf_counter() - req_start
                         metrics.add_measurement(response_time, 500, str(e))
 

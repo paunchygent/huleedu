@@ -158,9 +158,10 @@ def test_provider_error_response_format() -> None:
             external_service="openai_api",
             message="Rate limit exceeded. Please retry after 60 seconds.",
             correlation_id=correlation_id,
-            details={"retry_after": 60, "provider": "openai"},
             limit=1000,
-            window_seconds=60
+            window_seconds=60,
+            retry_after=60,
+            provider="openai"
         )
     except HuleEduError as error:
         # Act - Format for API response
@@ -175,4 +176,5 @@ def test_provider_error_response_format() -> None:
         assert "Rate limit exceeded" in error_response["error"]
         assert error_response["error_code"] == "RATE_LIMIT"
         assert error_response["correlation_id"] == str(correlation_id)
+        assert isinstance(error_response["details"], dict)
         assert error_response["details"]["retry_after"] == 60

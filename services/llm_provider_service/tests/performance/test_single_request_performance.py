@@ -151,7 +151,7 @@ class TestSingleRequestPerformance:
         # Measure single request performance
         start_time = time.perf_counter()
 
-        result, error = await orchestrator.perform_comparison(
+        result = await orchestrator.perform_comparison(
             provider=LLMProviderType.MOCK,
             user_prompt="Compare these essays",
             essay_a="Sample essay A content",
@@ -163,7 +163,6 @@ class TestSingleRequestPerformance:
         response_time = time.perf_counter() - start_time
 
         # Realistic assertions for single request with real infrastructure
-        assert error is None
         assert result is not None
         assert response_time < 2.0  # Should be under 2s for real infrastructure
 
@@ -184,7 +183,7 @@ class TestSingleRequestPerformance:
         for i in range(request_count):
             start_time = time.perf_counter()
 
-            result, error = await orchestrator.perform_comparison(
+            result = await orchestrator.perform_comparison(
                 provider=LLMProviderType.MOCK,
                 user_prompt="Compare these essays",
                 essay_a=f"Sample essay A content {i}",
@@ -197,7 +196,6 @@ class TestSingleRequestPerformance:
             response_times.append(response_time)
 
             # Verify each request succeeds
-            assert error is None
             assert result is not None
 
         # Analyze performance consistency
@@ -239,7 +237,7 @@ class TestSingleRequestPerformance:
         for _ in range(5):
             start_time = time.perf_counter()
 
-            result, error = await orchestrator.perform_comparison(
+            result = await orchestrator.perform_comparison(
                 provider=LLMProviderType.MOCK,
                 user_prompt="Test",
                 essay_a="A",
@@ -250,8 +248,6 @@ class TestSingleRequestPerformance:
 
             overhead_time = time.perf_counter() - start_time
             overhead_measurements.append(overhead_time)
-
-            assert error is None
             assert result is not None
 
         avg_overhead = sum(overhead_measurements) / len(overhead_measurements)
