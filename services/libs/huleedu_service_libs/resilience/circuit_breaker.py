@@ -74,7 +74,8 @@ class CircuitBreaker:
         self.success_threshold = success_threshold
         self.expected_exception = expected_exception
         self.name = name or "circuit_breaker"
-        self.tracer = tracer or trace.get_tracer(__name__)
+        self._explicit_tracer = tracer
+        self._lazy_tracer: Optional[trace.Tracer] = None
         self.metrics = metrics
         self.service_name = service_name or "unknown"
 
@@ -87,6 +88,22 @@ class CircuitBreaker:
         # Initialize metrics with current state
         if self.metrics:
             self.metrics.set_state(self.name, self.state, self.service_name)
+
+    @property
+    def tracer(self) -> trace.Tracer:
+        """
+        Get tracer instance using lazy initialization.
+        
+        Returns explicit tracer if provided, otherwise initializes
+        and caches a default tracer on first access.
+        """
+        if self._explicit_tracer is not None:
+            return self._explicit_tracer
+        
+        if self._lazy_tracer is None:
+            self._lazy_tracer = trace.get_tracer(__name__)
+        
+        return self._lazy_tracer
 
     async def call(self, func: Callable[..., T], *args, **kwargs) -> T:
         """

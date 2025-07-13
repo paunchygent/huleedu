@@ -18,7 +18,6 @@ from aiokafka import ConsumerRecord
 from huleedu_service_libs.error_handling import (
     raise_content_service_error,
     raise_parsing_error,
-    raise_spell_event_correlation_error,
     raise_validation_error,
 )
 from huleedu_service_libs.error_handling.error_detail_factory import (
@@ -128,17 +127,8 @@ async def process_single_message(
         )
 
     # Extract correlation_id early - this is critical for error tracking
+    # correlation_id is guaranteed to be present due to EventEnvelope default_factory
     correlation_id = request_envelope.correlation_id
-    if not correlation_id:
-        # This is a business logic specific error - use the allowed service-specific function
-        raise_spell_event_correlation_error(
-            service="spellchecker_service",
-            operation="extract_correlation_id",
-            message="Missing correlation_id in event envelope",
-            correlation_id=uuid4(),  # Generate one for the error itself
-            missing_field="correlation_id",
-            event_id=str(request_envelope.event_id) if request_envelope.event_id else None,
-        )
 
     # If we have trace context in metadata and a tracer, use the parent context
     if request_envelope.metadata and tracer:
@@ -156,7 +146,7 @@ async def process_single_message(
                     "correlation_id": str(correlation_id),
                     "event_id": str(request_envelope.event_id),
                 },
-            ):
+            ) as span:
                 try:
                     return await _process_single_message_impl(
                         msg,
@@ -169,13 +159,13 @@ async def process_single_message(
                         kafka_bus,
                         tracer,
                         consumer_group_id,
+                        span,
                     )
                 except HuleEduError as he:
-                    # Record structured error to current span
-                    current_span = trace.get_current_span()
-                    if current_span:
-                        current_span.set_status(trace.Status(trace.StatusCode.ERROR, str(he)))
-                        current_span.set_attributes(
+                    # Record structured error to the current span
+                    if span:
+                        span.set_status(trace.Status(trace.StatusCode.ERROR, str(he)))
+                        span.set_attributes(
                             {
                                 "error.type": he.error_detail.error_code.value,
                                 "error.message": he.error_detail.message,
@@ -186,10 +176,9 @@ async def process_single_message(
                 except Exception as e:
                     # Categorize and convert to structured error
                     error_detail = _categorize_processing_error(e, correlation_id)
-                    current_span = trace.get_current_span()
-                    if current_span:
-                        current_span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                        current_span.set_attributes(
+                    if span:
+                        span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                        span.set_attributes(
                             {
                                 "error.type": error_detail.error_code.value,
                                 "error.message": error_detail.message,
@@ -211,6 +200,7 @@ async def process_single_message(
                 kafka_bus,
                 tracer,
                 consumer_group_id,
+                None,  # No span for no parent context branch
             )
         except HuleEduError:
             # Already structured - re-raise
@@ -232,6 +222,7 @@ async def _process_single_message_impl(
     kafka_bus: KafkaPublisherProtocol,
     tracer: "Tracer | None" = None,
     consumer_group_id: str = "spell-checker-group",
+    span: "trace.Span | None" = None,
 ) -> bool:
     """Implementation of message processing logic.
 
@@ -464,6 +455,17 @@ async def _process_single_message_impl(
             extra={"correlation_id": str(he.error_detail.correlation_id)},
         )
 
+        # Record error on span for observability
+        if span:
+            span.set_status(trace.Status(trace.StatusCode.ERROR, str(he)))
+            span.set_attributes(
+                {
+                    "error.type": he.error_detail.error_code.value,
+                    "error.message": he.error_detail.message,
+                    "error.correlation_id": str(he.error_detail.correlation_id),
+                }
+            )
+
         # Publish structured error event
         await _publish_structured_error_event(
             he.error_detail,
@@ -490,6 +492,17 @@ async def _process_single_message_impl(
         # Categorize the error
         correlation_id_for_error = request_envelope.correlation_id if request_envelope else uuid4()
         error_detail = _categorize_processing_error(e, correlation_id_for_error)
+
+        # Record error on span for observability
+        if span:
+            span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+            span.set_attributes(
+                {
+                    "error.type": error_detail.error_code.value,
+                    "error.message": error_detail.message,
+                    "error.correlation_id": str(error_detail.correlation_id),
+                }
+            )
 
         # Publish structured error event
         if request_envelope and event_publisher:

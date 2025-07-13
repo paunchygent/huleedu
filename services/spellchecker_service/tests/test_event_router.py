@@ -85,10 +85,14 @@ class TestProcessSingleMessage:
         # Assert
         assert result is True  # Should commit the message
 
-        # Verify protocol calls
+        # Verify protocol calls - modernized signature includes correlation_id
+        from uuid import UUID
+
+        kafka_data = json.loads(kafka_message.value.decode("utf-8"))
         mock_content_client.fetch_content.assert_called_once_with(
-            storage_id=json.loads(kafka_message.value.decode("utf-8"))["data"]["text_storage_id"],
+            storage_id=kafka_data["data"]["text_storage_id"],
             http_session=mock_http_session,
+            correlation_id=UUID(kafka_data["correlation_id"]),
         )
 
         # Verify that the real spell logic called the result store to save corrected content
@@ -151,12 +155,14 @@ class TestProcessSingleMessage:
             # Assert
             assert result is True  # Should still commit to avoid reprocessing
 
-            # Verify fetch was attempted
+            # Verify fetch was attempted - modernized signature includes correlation_id
+            from uuid import UUID
+
+            kafka_data = json.loads(kafka_message.value.decode("utf-8"))
             mock_content_client.fetch_content.assert_called_once_with(
-                storage_id=json.loads(kafka_message.value.decode("utf-8"))["data"][
-                    "text_storage_id"
-                ],
+                storage_id=kafka_data["data"]["text_storage_id"],
                 http_session=mock_http_session,
+                correlation_id=UUID(kafka_data["correlation_id"]),
             )
 
             # Verify other main operations were NOT called
@@ -173,10 +179,16 @@ class TestProcessSingleMessage:
             assert published_event_data.entity_ref.entity_id == sample_essay_id
             assert published_event_data.event_name == ESSAY_RESULT_EVENT
             assert published_event_data.system_metadata.processing_stage == ProcessingStage.FAILED
-            assert "fetch_error" in published_event_data.system_metadata.error_info
+            # Verify modernized structured error information
+            assert "error_code" in published_event_data.system_metadata.error_info
             assert (
-                "Failed to fetch original content"
-                in published_event_data.system_metadata.error_info["fetch_error"]
+                published_event_data.system_metadata.error_info["error_code"]
+                == "CONTENT_SERVICE_ERROR"
+            )
+            assert "error_message" in published_event_data.system_metadata.error_info
+            assert (
+                "Failed to fetch content"
+                in published_event_data.system_metadata.error_info["error_message"]
             )
 
     @pytest.mark.asyncio
@@ -302,25 +314,30 @@ class TestProcessSingleMessage:
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
         mock_spell_logic = AsyncMock(spec=SpellLogicProtocol)
 
-        # 2. Patch the core algorithm function (should not be called)
+        # 2. Import HuleEduError for expected exception
+        from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
+
+        # 3. Patch the core algorithm function (should not be called)
         with patch(
             "services.spellchecker_service.core_logic.default_perform_spell_check_algorithm",
             new_callable=AsyncMock,
         ) as mock_spell_check_algo:
-            # Act
-            result = await process_single_message(
-                invalid_kafka_message,
-                mock_http_session,
-                mock_content_client,
-                mock_result_store,
-                mock_event_publisher,
-                mock_spell_logic,
-                mock_kafka_bus,
-                consumer_group_id="test-group",
-            )
+            # Act & Assert - Modernized code raises HuleEduError instead of returning False
+            with pytest.raises(HuleEduError) as exc_info:
+                await process_single_message(
+                    invalid_kafka_message,
+                    mock_http_session,
+                    mock_content_client,
+                    mock_result_store,
+                    mock_event_publisher,
+                    mock_spell_logic,
+                    mock_kafka_bus,
+                    consumer_group_id="test-group",
+                )
 
-            # Assert
-            assert result is False  # Unparseable messages return False (not committed)
+            # Verify the error is a parsing error with structured details
+            assert "PARSING_ERROR" in str(exc_info.value)
+            assert "Failed to parse Kafka message" in str(exc_info.value)
 
             # Verify no processing functions/protocol methods were called
             mock_content_client.fetch_content.assert_not_called()

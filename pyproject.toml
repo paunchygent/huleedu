@@ -40,7 +40,7 @@ monorepo-tools = [
     "pytest-xdist",
     "httpx",
     "pre-commit",
-    "testcontainers[postgres,kafka]",  # For PostgreSQL and Kafka integration tests
+    "testcontainers[postgres,kafka,redis]",  # For PostgreSQL, Kafka, and Redis integration tests
     "kafka-python",
     "respx",
     "types-psutil",  # Type stubs for psutil

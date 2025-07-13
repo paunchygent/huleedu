@@ -4,7 +4,7 @@ This directory contains all configuration files for the HuleEdu observability st
 
 ## Directory Structure
 
-```
+```text
 observability/
 ├── docker-compose.observability.yml  # Main observability stack definition
 ├── prometheus/                       # Prometheus configuration

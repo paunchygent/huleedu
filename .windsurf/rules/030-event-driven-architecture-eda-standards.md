@@ -38,3 +38,10 @@ Example: `huleedu.essay.spellcheck.requested.v1`
 ## 5. Schema Evolution
 - Additive, optional changes are safe
 - Breaking changes **REQUIRE** new event version
+
+## 6. Error Handling
+- **MUST** use generic platform error handling patterns
+- **MUST** implement correlation ID propagation
+- **MUST** use `HuleEduError` for structured error reporting
+
+Use graceful degradation as a **platform standard** for all event-driven services
