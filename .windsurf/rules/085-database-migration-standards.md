@@ -1,0 +1,47 @@
+---
+description: Database migration standards for HuleEdu microservices
+globs: 
+alwaysApply: true
+---
+# 085: Database Migration Standards
+
+## 1. Pre-Migration Analysis (MANDATORY)
+
+**Before ANY migration, MUST check state:**
+```bash
+pdm run -p services/<service> migrate-current
+docker exec huleedu_<service>_db psql -U ${HULEEDU_DB_USER} -d <db> -c "\dt"
+```
+
+## 2. State Scenarios
+
+**Schema exists, no tracking:** `migrate-stamp <revision>` then `migrate-upgrade`
+**Clean state:** Direct `migrate-upgrade`
+
+## 3. Migration Commands (REQUIRED)
+
+**Use service-specific PDM scripts only:**
+```bash
+pdm run -p services/<service> migrate-upgrade
+pdm run -p services/<service> migrate-current
+pdm run -p services/<service> migrate-stamp <revision>
+```
+
+## 4. Prohibited Practices
+
+**FORBIDDEN:**
+- PYTHONPATH hacks
+- Manual SQL schema changes
+- Applying migrations without state analysis
+- Absolute imports in alembic/env.py
+
+## 5. Post-Migration Verification
+
+**MUST verify after migration:**
+```bash
+pdm run -p services/<service> migrate-current
+docker exec huleedu_<service>_db psql -U ${HULEEDU_DB_USER} -d <db> -c "\d <table>"
+```
+
+---
+**Understand state before changing. Use established tools.**
