@@ -16,8 +16,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 # Import service configuration and models
-from services.essay_lifecycle_service.config import settings
-from services.essay_lifecycle_service.models_db import Base
+from config import settings
+from models_db import Base
 
 if TYPE_CHECKING:
     pass

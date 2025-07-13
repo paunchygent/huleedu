@@ -12,7 +12,11 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import aiohttp
 import pytest
+from aiohttp.client_reqrep import RequestInfo
+from multidict import CIMultiDict, CIMultiDictProxy
+from yarl import URL
 
 from ..core_logic import (
     default_fetch_content_impl,
@@ -64,6 +68,7 @@ class TestDefaultImplementations:
         mock_response = AsyncMock()
         mock_response.status = 200  # Mock status attribute
         mock_response.text = AsyncMock(return_value="Sample content")
+        mock_response.raise_for_status = MagicMock()  # Success case - no exception
 
         mock_session = AsyncMock()
         # Use MagicMock for get() since it's not async, but returns an async context manager
@@ -81,6 +86,7 @@ class TestDefaultImplementations:
         # Assert
         assert result == "Sample content"
         mock_session.get.assert_called_once()
+        mock_response.raise_for_status.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_default_fetch_content_http_error(
@@ -93,6 +99,12 @@ class TestDefaultImplementations:
         mock_response = AsyncMock()
         mock_response.status = 404  # Mock status attribute for error case
         mock_response.text = AsyncMock(return_value="Not found")
+        # Mock raise_for_status to raise ClientResponseError for 404
+        url = URL("http://test-content-service.com/api/v1/content/test-storage-id")
+        headers = CIMultiDictProxy(CIMultiDict({"Content-Type": "application/json"}))
+        request_info = RequestInfo(url, "get", headers, url)
+        error = aiohttp.ClientResponseError(request_info, (), status=404, message="Not Found")
+        mock_response.raise_for_status = MagicMock(side_effect=error)
 
         mock_session = AsyncMock()
         mock_session.get = MagicMock(return_value=mock_http_context_manager(mock_response))
@@ -109,6 +121,7 @@ class TestDefaultImplementations:
 
         # Assert
         mock_session.get.assert_called_once()
+        mock_response.raise_for_status.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_default_store_content_success(self, sample_essay_id: str) -> None:
@@ -120,6 +133,7 @@ class TestDefaultImplementations:
         mock_response = AsyncMock()
         mock_response.status = 200  # Mock status attribute
         mock_response.json = AsyncMock(return_value={"storage_id": expected_storage_id})
+        mock_response.raise_for_status = MagicMock()  # Success case - no exception
 
         mock_session = AsyncMock()
         mock_session.post = MagicMock(return_value=mock_http_context_manager(mock_response))
@@ -136,6 +150,7 @@ class TestDefaultImplementations:
         # Assert
         assert result == expected_storage_id
         mock_session.post.assert_called_once()
+        mock_response.raise_for_status.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_default_store_content_http_error(self, sample_essay_id: str) -> None:
@@ -146,6 +161,14 @@ class TestDefaultImplementations:
         mock_response = AsyncMock()
         mock_response.status = 500  # Mock status attribute for error case
         mock_response.text = AsyncMock(return_value="Internal Server Error")
+        # Mock raise_for_status to raise ClientResponseError for 500
+        url = URL("http://test-content-service.com/api/v1/content")
+        headers = CIMultiDictProxy(CIMultiDict({"Content-Type": "application/json"}))
+        request_info = RequestInfo(url, "post", headers, url)
+        error = aiohttp.ClientResponseError(
+            request_info, (), status=500, message="Internal Server Error"
+        )
+        mock_response.raise_for_status = MagicMock(side_effect=error)
 
         mock_session = AsyncMock()
         mock_session.post = MagicMock(return_value=mock_http_context_manager(mock_response))
@@ -162,3 +185,4 @@ class TestDefaultImplementations:
 
         # Assert
         mock_session.post.assert_called_once()
+        mock_response.raise_for_status.assert_called_once()

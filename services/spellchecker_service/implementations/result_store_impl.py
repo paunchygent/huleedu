@@ -61,56 +61,58 @@ class DefaultResultStore(ResultStoreProtocol):
                 data=content.encode("utf-8"),
                 timeout=timeout,
             ) as response:
-                if response.status == 200:
-                    # Parse response JSON
-                    try:
-                        data: dict[str, str] = await response.json()
-                        storage_id = data.get("storage_id")
+                # Use response.raise_for_status() to handle all 2xx codes correctly
+                response.raise_for_status()
+                # Parse response JSON - only reached on successful 2xx response
+                try:
+                    data: dict[str, str] = await response.json()
+                    storage_id = data.get("storage_id")
 
-                        if not storage_id:
-                            raise_content_service_error(
-                                service="spellchecker_service",
-                                operation="store_content",
-                                message="Content service response missing 'storage_id' field",
-                                correlation_id=correlation_id,
-                                content_service_url=self.content_service_url,
-                                status_code=response.status,
-                                content_type=content_type.value,
-                                response_data=str(data),
-                            )
-
-                        logger.info(
-                            f"{log_prefix}Successfully stored content, new storage_id: {storage_id}",
-                            extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
-                        )
-                        return storage_id
-
-                    except Exception as json_error:
-                        response_text = await response.text()
+                    if not storage_id:
                         raise_content_service_error(
                             service="spellchecker_service",
                             operation="store_content",
-                            message=f"Failed to parse Content Service JSON response: {str(json_error)}",
+                            message="Content service response missing 'storage_id' field",
                             correlation_id=correlation_id,
                             content_service_url=self.content_service_url,
                             status_code=response.status,
                             content_type=content_type.value,
-                            response_text=response_text[:200],
-                            json_error=str(json_error),
+                            response_data=str(data),
                         )
 
-                else:
-                    error_text = await response.text()
+                    logger.info(
+                        f"{log_prefix}Successfully stored content, new storage_id: {storage_id}",
+                        extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
+                    )
+                    return storage_id
+
+                except Exception as json_error:
+                    response_text = await response.text()
                     raise_content_service_error(
                         service="spellchecker_service",
                         operation="store_content",
-                        message=f"Content Service error: {response.status} - {error_text[:100]}",
+                        message=f"Failed to parse Content Service JSON response: {str(json_error)}",
                         correlation_id=correlation_id,
                         content_service_url=self.content_service_url,
                         status_code=response.status,
                         content_type=content_type.value,
-                        response_text=error_text[:200],
+                        response_text=response_text[:200],
+                        json_error=str(json_error),
                     )
+
+        except aiohttp.ClientResponseError as e:
+            # Handle HTTP errors (4xx/5xx) from raise_for_status()
+            # Note: response body is not available in ClientResponseError
+            raise_content_service_error(
+                service="spellchecker_service",
+                operation="store_content",
+                message=f"Content Service HTTP error: {e.status} - {e.message}",
+                correlation_id=correlation_id,
+                content_service_url=self.content_service_url,
+                status_code=e.status,
+                content_type=content_type.value,
+                response_text=e.message[:200] if e.message else "No error message",
+            )
 
         except aiohttp.ServerTimeoutError:
             raise_content_service_error(

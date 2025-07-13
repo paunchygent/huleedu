@@ -35,6 +35,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
+        batch_id: str,
         correlation_id: UUID,
     ) -> None:
         """Dispatch individual spellcheck requests to Spell Checker Service."""
@@ -64,7 +65,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 essay_entity_ref = EntityReference(
                     entity_id=essay_ref.essay_id,
                     entity_type="essay",
-                    parent_id=None,  # Could set batch_id here if needed
+                    parent_id=batch_id,  # Set batch_id as parent for proper entity reference propagation
                 )
 
                 # Create system metadata

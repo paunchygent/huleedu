@@ -21,10 +21,10 @@ from uuid import UUID, uuid4
 import pytest
 from aiokafka import ConsumerRecord
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
+from huleedu_service_libs.observability.tracing import inject_trace_context
 from opentelemetry import trace
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from huleedu_service_libs.observability.tracing import inject_trace_context
 from common_core.error_enums import ErrorCode
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 from common_core.event_enums import ProcessingEvent

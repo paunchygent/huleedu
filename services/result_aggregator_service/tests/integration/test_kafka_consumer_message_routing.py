@@ -216,7 +216,7 @@ class TestKafkaConsumerRouting:
         )
 
         record = create_kafka_record(
-            topic="huleedu.els.batch_phase.outcome.v1",
+            topic="huleedu.els.batch.phase.outcome.v1",
             event_envelope=envelope,
         )
 

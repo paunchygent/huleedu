@@ -75,7 +75,7 @@ def opentelemetry_test_isolation() -> Generator[InMemorySpanExporter, None, None
     current_provider = trace.get_tracer_provider()
 
     # If no provider is set yet, create one for tests
-    if not hasattr(current_provider, 'add_span_processor'):
+    if not hasattr(current_provider, "add_span_processor"):
         test_provider = TracerProvider()
         trace.set_tracer_provider(test_provider)
         current_provider = test_provider

@@ -11,7 +11,8 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.redis_set_operations import RedisSetOperations
-from sqlalchemy.ext.asyncio import AsyncEngine
+from prometheus_client import REGISTRY, CollectorRegistry
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.implementations.aggregator_service_impl import (
@@ -99,6 +100,11 @@ class CoreInfrastructureProvider(Provider):
             metrics=metrics,
         )
 
+    @provide
+    def provide_collector_registry(self) -> CollectorRegistry:
+        """Provide the default Prometheus collector registry."""
+        return REGISTRY
+
 
 class DatabaseProvider(Provider):
     """Provider for database components."""
@@ -115,8 +121,6 @@ class DatabaseProvider(Provider):
     @provide
     def provide_database_engine(self, settings: Settings) -> AsyncEngine:
         """Provide database engine for metrics setup."""
-        from sqlalchemy.ext.asyncio import create_async_engine
-
         return create_async_engine(
             settings.DATABASE_URL,
             echo=False,

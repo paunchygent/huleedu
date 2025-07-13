@@ -93,16 +93,16 @@ class CircuitBreaker:
     def tracer(self) -> trace.Tracer:
         """
         Get tracer instance using lazy initialization.
-        
+
         Returns explicit tracer if provided, otherwise initializes
         and caches a default tracer on first access.
         """
         if self._explicit_tracer is not None:
             return self._explicit_tracer
-        
+
         if self._lazy_tracer is None:
             self._lazy_tracer = trace.get_tracer(__name__)
-        
+
         return self._lazy_tracer
 
     async def call(self, func: Callable[..., T], *args, **kwargs) -> T:

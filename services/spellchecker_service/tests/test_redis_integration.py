@@ -142,7 +142,7 @@ async def test_redis_client_lifecycle_with_testcontainer(
 @pytest.mark.asyncio
 async def test_redis_protocol_compliance() -> None:
     """Test that RedisClient implements the RedisClientProtocol correctly.
-    
+
     This is a unit test that doesn't require Redis infrastructure.
     """
     redis_client = RedisClient(client_id="spell-protocol-test", redis_url="redis://localhost:6379")
@@ -194,7 +194,7 @@ async def test_redis_client_di_injection_legacy_localhost(
     test_settings_localhost: Settings,
 ) -> None:
     """Test Redis DI injection against localhost Redis (requires manual Redis setup).
-    
+
     This test is marked with @pytest.mark.docker and expects Redis to be running
     on localhost:6379. Use this for environments where testcontainers cannot be used.
     """

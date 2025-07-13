@@ -21,7 +21,7 @@ HULEEDU_TOPICS = [
     "huleedu.batch.spellcheck.initiate.command.v1",
     "huleedu.essay.spellcheck.requested.v1",
     "huleedu.essay.spellcheck.completed.v1",
-    "huleedu.els.batch_phase.outcome.v1",
+    "huleedu.els.batch.phase.outcome.v1",
     "huleedu.batch.cj_assessment.initiate.command.v1",
     "huleedu.cj_assessment.completed.v1",
     "huleedu.batch.nlp.initiate.command.v1",

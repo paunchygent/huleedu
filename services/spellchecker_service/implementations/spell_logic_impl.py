@@ -100,8 +100,6 @@ class DefaultSpellLogic(SpellLogicProtocol):
 
         new_storage_id: str | None = None
         storage_metadata_for_result: StorageReferenceMetadata | None = None
-        current_status = EssayStatus.SPELLCHECKED_SUCCESS
-        error_detail = None
 
         # Store corrected text if available
         if corrected_text:
@@ -120,7 +118,8 @@ class DefaultSpellLogic(SpellLogicProtocol):
                         references={ContentType.CORRECTED_TEXT: {"default": new_storage_id}},
                     )
                     logger.info(
-                        f"Successfully stored corrected text for essay {essay_id}, new storage_id: {new_storage_id}",
+                        f"Successfully stored corrected text for essay {essay_id}, "
+                        f"new storage_id: {new_storage_id}",
                         extra={
                             "correlation_id": str(correlation_id),
                             "essay_id": essay_id,
@@ -172,7 +171,8 @@ class DefaultSpellLogic(SpellLogicProtocol):
         final_system_metadata.entity = final_entity_ref
 
         logger.info(
-            f"Spell check completed successfully for essay {essay_id} with {corrections_count} corrections",
+            f"Spell check completed successfully for essay {essay_id} "
+            f"with {corrections_count} corrections",
             extra={
                 "correlation_id": str(correlation_id),
                 "essay_id": essay_id,

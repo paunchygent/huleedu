@@ -2,6 +2,7 @@
 Default implementation of BatchEssayTracker protocol.
 
 Lean implementation following clean architecture principles with proper DI.
+Database operations extracted to BatchTrackerPersistence for <400 LoC compliance.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from common_core.metadata_models import (
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.implementations.batch_expectation import BatchExpectation
+from services.essay_lifecycle_service.implementations.batch_tracker_persistence import BatchTrackerPersistence
 from services.essay_lifecycle_service.protocols import BatchEssayTracker
 
 
@@ -38,11 +40,13 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
     Enhanced to handle validation failures and prevent infinite waits.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, persistence: BatchTrackerPersistence) -> None:
         self._logger = create_service_logger("batch_tracker")
         self.batch_expectations: dict[str, BatchExpectation] = {}
         self.validation_failures: dict[str, list[EssayValidationFailedV1]] = {}
         self._event_callbacks: dict[str, Callable[[Any], Awaitable[None]]] = {}
+        self._persistence = persistence
+        self._initialized = False
 
     def register_event_callback(
         self, event_type: str, callback: Callable[[Any], Awaitable[None]]
@@ -54,7 +58,11 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         self, event: Any, correlation_id: UUID
     ) -> None:  # BatchEssaysRegistered
         """
-        Register batch slot expectations from BOS.
+        Register batch slot expectations from BOS with idempotency support.
+
+        Handles duplicate BatchEssaysRegistered events gracefully by checking
+        database existence first. Preserves original correlation ID and prevents
+        duplicate timeout monitoring for robust event replay handling.
 
         Args:
             event: BatchEssaysRegistered from BOS containing essay-ID slots and
@@ -63,8 +71,39 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         batch_essays_registered = BatchEssaysRegistered.model_validate(event)
         batch_id = batch_essays_registered.batch_id
 
+        # **Idempotency Check: Database existence first**
+        existing_batch = await self._persistence.get_batch_from_database(batch_id)
+        
+        if existing_batch is not None:
+            # Batch already exists in database - handle idempotently
+            self._logger.info(
+                f"Batch {batch_id} already registered in database, acknowledging idempotently",
+                extra={
+                    "batch_id": batch_id,
+                    "original_correlation_id": existing_batch.correlation_id,
+                    "new_correlation_id": str(correlation_id),
+                    "expected_count": existing_batch.expected_count,
+                }
+            )
+            
+            # Restore to memory if not present (recovery scenario)
+            if batch_id not in self.batch_expectations:
+                expectation = self._persistence.expectation_from_db(existing_batch)
+                self.batch_expectations[batch_id] = expectation
+                
+                # Only start timeout monitoring if not already running
+                if expectation.timeout_task is None or expectation.timeout_task.done():
+                    await self._start_timeout_monitoring(expectation)
+                    
+                self._logger.info(
+                    f"Restored batch {batch_id} to memory from database during idempotent registration"
+                )
+            
+            return
+
+        # **New Batch Registration**
         if batch_id in self.batch_expectations:
-            self._logger.warning(f"Batch {batch_id} already registered, overwriting")
+            self._logger.warning(f"Batch {batch_id} exists in memory but not database, replacing")
 
         expectation = BatchExpectation(
             batch_id=batch_id,
@@ -80,10 +119,13 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         self.batch_expectations[batch_id] = expectation
 
-        # Start timeout monitoring
+        # Persist to database (dual-write pattern)
+        await self._persistence.persist_batch_expectation(expectation)
+
+        # Start timeout monitoring for new batch
         await self._start_timeout_monitoring(expectation)
 
-        msg = f"Registered batch {batch_id} with {len(batch_essays_registered.essay_ids)} slots: {batch_essays_registered.essay_ids}, course: {batch_essays_registered.course_code.value}"
+        msg = f"Registered new batch {batch_id} with {len(batch_essays_registered.essay_ids)} slots: {batch_essays_registered.essay_ids}, course: {batch_essays_registered.course_code.value}"
         self._logger.info(msg)
 
     def assign_slot_to_content(
@@ -105,7 +147,10 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             return None
 
         expectation = self.batch_expectations[batch_id]
-        return expectation.assign_next_slot(text_storage_id, original_file_name)
+        internal_essay_id = expectation.assign_next_slot(text_storage_id, original_file_name)
+
+        # Note: Slot assignment persistence handled separately in async context
+        return internal_essay_id
 
     def mark_slot_fulfilled(
         self, batch_id: str, internal_essay_id: str, text_storage_id: str
@@ -241,6 +286,47 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 return expectation.user_id
         return None
 
+    async def persist_slot_assignment(
+        self, batch_id: str, internal_essay_id: str, text_storage_id: str, original_file_name: str
+    ) -> None:
+        """Persist slot assignment to database via persistence layer."""
+        await self._persistence.persist_slot_assignment(
+            batch_id, internal_essay_id, text_storage_id, original_file_name
+        )
+
+    async def remove_batch_from_database(self, batch_id: str) -> None:
+        """Remove completed batch from database via persistence layer."""
+        await self._persistence.remove_batch_from_database(batch_id)
+
+    async def initialize_from_database(self) -> None:
+        """Initialize batch expectations from database on startup (recovery mechanism)."""
+        if self._initialized:
+            return
+
+        try:
+            expectations = await self._persistence.initialize_from_database()
+            
+            for expectation in expectations:
+                self.batch_expectations[expectation.batch_id] = expectation
+
+                # Start timeout monitoring for recovered batches
+                await self._start_timeout_monitoring(expectation)
+
+                self._logger.info(
+                    f"Recovered batch expectation: {expectation.batch_id} with {len(expectation.slot_assignments)} assignments"
+                )
+
+            self._logger.info(
+                f"Initialized batch tracker with {len(self.batch_expectations)} active batches from database"
+            )
+
+        except Exception as e:
+            self._logger.error(f"Failed to initialize from database: {e}")
+            # Continue with empty state if database recovery fails
+
+        finally:
+            self._initialized = True
+
     def _create_batch_ready_event(
         self, batch_id: str, expectation: BatchExpectation
     ) -> tuple[BatchEssaysReady, UUID]:
@@ -290,7 +376,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         # Store correlation ID before cleanup
         original_correlation_id = expectation.correlation_id
 
-        # Clean up completed batch
+        # Clean up completed batch from memory (database cleanup handled separately)
         del self.batch_expectations[batch_id]
         if batch_id in self.validation_failures:
             del self.validation_failures[batch_id]

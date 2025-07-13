@@ -141,6 +141,7 @@ class SpellcheckCommandHandler:
                 await self.request_dispatcher.dispatch_spellcheck_requests(
                     essays_to_process=successfully_transitioned_essays,
                     language=language_enum,
+                    batch_id=command_data.entity_ref.entity_id,
                     correlation_id=correlation_id,
                 )
 

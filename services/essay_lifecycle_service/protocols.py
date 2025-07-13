@@ -280,6 +280,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
+        batch_id: str,
         correlation_id: UUID,
     ) -> None:
         """Dispatch spellcheck requests to Spellcheck Service."""
@@ -359,6 +360,16 @@ class BatchEssayTracker(Protocol):
 
     def get_user_id_for_essay(self, essay_id: str) -> str | None:
         """Look up user_id for a given essay by searching through batch expectations."""
+        ...
+
+    async def persist_slot_assignment(
+        self, batch_id: str, internal_essay_id: str, text_storage_id: str, original_file_name: str
+    ) -> None:
+        """Persist slot assignment to database."""
+        ...
+
+    async def remove_batch_from_database(self, batch_id: str) -> None:
+        """Remove completed batch from database."""
         ...
 
 

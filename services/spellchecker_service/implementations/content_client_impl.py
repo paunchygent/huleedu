@@ -52,40 +52,41 @@ class DefaultContentClient(ContentClientProtocol):
         try:
             timeout = aiohttp.ClientTimeout(total=10)
             async with http_session.get(url, timeout=timeout) as response:
-                if response.status == 200:
-                    content = await response.text()
-                    logger.debug(
-                        f"{log_prefix}Successfully fetched content from {storage_id} "
-                        f"(length: {len(content)})",
-                        extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
-                    )
-                    return content
+                # Use response.raise_for_status() to handle all 2xx codes correctly
+                response.raise_for_status()
+                # Parse response - only reached on successful 2xx response
+                content = await response.text()
+                logger.debug(
+                    f"{log_prefix}Successfully fetched content from {storage_id} "
+                    f"(length: {len(content)})",
+                    extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
+                )
+                return content
 
-                elif response.status == 404:
-                    error_text = await response.text()
-                    raise_content_service_error(
-                        service="spellchecker_service",
-                        operation="fetch_content",
-                        message=f"Content not found: {storage_id}",
-                        correlation_id=correlation_id,
-                        content_service_url=self.content_service_url,
-                        status_code=response.status,
-                        storage_id=storage_id,
-                        response_text=error_text[:200],
-                    )
-
-                else:
-                    error_text = await response.text()
-                    raise_content_service_error(
-                        service="spellchecker_service",
-                        operation="fetch_content",
-                        message=f"Content Service error: {response.status} - {error_text[:100]}",
-                        correlation_id=correlation_id,
-                        content_service_url=self.content_service_url,
-                        status_code=response.status,
-                        storage_id=storage_id,
-                        response_text=error_text[:200],
-                    )
+        except aiohttp.ClientResponseError as e:
+            # Handle HTTP errors (4xx/5xx) from raise_for_status()
+            if e.status == 404:
+                raise_content_service_error(
+                    service="spellchecker_service",
+                    operation="fetch_content",
+                    message=f"Content not found: {storage_id}",
+                    correlation_id=correlation_id,
+                    content_service_url=self.content_service_url,
+                    status_code=e.status,
+                    storage_id=storage_id,
+                )
+            else:
+                # Note: response body is not available in ClientResponseError
+                raise_content_service_error(
+                    service="spellchecker_service",
+                    operation="fetch_content",
+                    message=f"Content Service HTTP error: {e.status} - {e.message}",
+                    correlation_id=correlation_id,
+                    content_service_url=self.content_service_url,
+                    status_code=e.status,
+                    storage_id=storage_id,
+                    response_text=e.message[:200] if e.message else "No error message",
+                )
 
         except aiohttp.ServerTimeoutError:
             raise_content_service_error(

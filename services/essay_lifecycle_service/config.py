@@ -55,8 +55,8 @@ class Settings(BaseSettings):
     DATABASE_HOST: str = Field(default="essay_lifecycle_db", alias="ELS_DB_HOST")
     DATABASE_PORT: int = Field(default=5432, alias="ELS_DB_PORT")
     DATABASE_NAME: str = Field(default="essay_lifecycle", alias="ELS_DB_NAME")
-    DATABASE_USER: str = Field(default="huleedu_user", alias="ELS_DB_USER")
-    DATABASE_PASSWORD: str = Field(default="REDACTED_DEFAULT_PASSWORD", alias="ELS_DB_PASSWORD")
+    DATABASE_USER: str = Field(default="huleedu_user", alias="HULEEDU_DB_USER")
+    DATABASE_PASSWORD: str = Field(default="REDACTED_DEFAULT_PASSWORD", alias="HULEEDU_DB_PASSWORD")
 
     # PostgreSQL Connection Pool Settings
     DATABASE_MAX_OVERFLOW: int = 20
@@ -99,7 +99,16 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """Construct the PostgreSQL database URL from configuration settings."""
-        return f"postgresql+asyncpg://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_NAME}"
+        # For development/migration: map container names to localhost
+        host = self.DATABASE_HOST
+        port = self.DATABASE_PORT
+
+        # Map container database hosts to localhost for local development
+        if host == "essay_lifecycle_db":
+            host = "localhost"
+            port = 5433  # External port from docker-compose
+
+        return f"postgresql+asyncpg://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}@{host}:{port}/{self.DATABASE_NAME}"
 
 
 # Create a single instance for the application to use

@@ -130,6 +130,12 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 event_data.batch_id, event_data.text_storage_id, event_data.original_file_name
             )
 
+            # Persist slot assignment to database if successful
+            if assigned_essay_id is not None:
+                await self.batch_tracker.persist_slot_assignment(
+                    event_data.batch_id, assigned_essay_id, event_data.text_storage_id, event_data.original_file_name
+                )
+
             if assigned_essay_id is None:
                 # No slots available - publish ExcessContentProvisionedV1 event
                 logger.warning(
@@ -210,6 +216,9 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     event_data=batch_ready_event,
                     correlation_id=publish_correlation_id,
                 )
+
+                # Clean up completed batch from database
+                await self.batch_tracker.remove_batch_from_database(batch_ready_event.batch_id)
 
             return True
 

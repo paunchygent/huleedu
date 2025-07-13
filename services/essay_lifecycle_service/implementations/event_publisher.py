@@ -320,7 +320,7 @@ class DefaultEventPublisher(EventPublisher):
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type="huleedu.els.batch_phase.outcome.v1",
+            event_type="huleedu.els.batch.phase.outcome.v1",
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,

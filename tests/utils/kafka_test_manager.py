@@ -51,7 +51,7 @@ def create_kafka_test_config(
             "spellcheck_completed": "huleedu.essay.spellcheck.completed.v1",
             "batch_cj_assessment_initiate": "huleedu.batch.cj_assessment.initiate.command.v1",
             "cj_assessment_completed": "huleedu.cj_assessment.completed.v1",
-            "els_batch_phase_outcome": "huleedu.els.batch_phase.outcome.v1",
+            "els_batch_phase_outcome": "huleedu.els.batch.phase.outcome.v1",
             "pipeline_progress": "huleedu.batch.pipeline.progress.updated.v1",
         }
     return KafkaTestConfig(bootstrap_servers, topics, assignment_timeout)

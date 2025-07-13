@@ -92,6 +92,7 @@ services:
       - COLLECTOR_OTLP_ENABLED=true
       - SPAN_STORAGE_TYPE=memory
       - MEMORY_MAX_TRACES=10000
+      - QUERY_MAX_CLOCK_SKEW_ADJUSTMENT=30s
     volumes:
       - jaeger_data:/tmp
 
@@ -152,8 +153,15 @@ services:
     ports:
       - "9187:9187"
     environment:
-      # Primary database connection - monitors batch_orchestrator_db
-      DATA_SOURCE_NAME: "postgresql://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@batch_orchestrator_db:5432/batch_orchestrator?sslmode=disable"
+      # Use separate environment variables to avoid issues with special characters in passwords
+      DATA_SOURCE_USER: "${HULEEDU_DB_USER}"
+      DATA_SOURCE_PASS: "${HULEEDU_DB_PASSWORD}"
+      DATA_SOURCE_HOST: "batch_orchestrator_db"
+      DATA_SOURCE_PORT: "5432"
+      DATA_SOURCE_DB: "batch_orchestrator"
+      PG_EXPORTER_DISABLE_DEFAULT_METRICS: "true"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "true"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9187/metrics"]
       interval: 30s

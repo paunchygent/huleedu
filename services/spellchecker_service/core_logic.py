@@ -46,37 +46,41 @@ async def default_fetch_content_impl(
     try:
         timeout = aiohttp.ClientTimeout(total=10)
         async with session.get(url, timeout=timeout) as response:
-            if response.status == 200:
-                content = await response.text()
-                logger.debug(
-                    f"{log_prefix}Successfully fetched content from {storage_id} (length: {len(content)})",
-                    extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
-                )
-                return content
+            # Use response.raise_for_status() to handle all 2xx codes correctly
+            response.raise_for_status()
+            # Parse response - only reached on successful 2xx response
+            content = await response.text()
+            logger.debug(
+                f"{log_prefix}Successfully fetched content from {storage_id} "
+                f"(length: {len(content)})",
+                extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
+            )
+            return content
 
-            elif response.status == 404:
-                error_text = await response.text()
-                raise_content_service_error(
-                    service="spellchecker_service",
-                    operation="fetch_content",
-                    message=f"Content not found: {storage_id}",
-                    correlation_id=correlation_id,
-                    content_service_url=content_service_url,
-                    status_code=response.status,
-                    storage_id=storage_id,
-                )
-
-            else:
-                error_text = await response.text()
-                raise_content_service_error(
-                    service="spellchecker_service",
-                    operation="fetch_content",
-                    message=f"Content Service error: {response.status} - {error_text[:100]}",
-                    correlation_id=correlation_id,
-                    content_service_url=content_service_url,
-                    status_code=response.status,
-                    storage_id=storage_id,
-                )
+    except aiohttp.ClientResponseError as e:
+        # Handle HTTP errors (4xx/5xx) from raise_for_status()
+        if e.status == 404:
+            raise_content_service_error(
+                service="spellchecker_service",
+                operation="fetch_content",
+                message=f"Content not found: {storage_id}",
+                correlation_id=correlation_id,
+                content_service_url=content_service_url,
+                status_code=e.status,
+                storage_id=storage_id,
+            )
+        else:
+            # Note: response body is not available in ClientResponseError
+            raise_content_service_error(
+                service="spellchecker_service",
+                operation="fetch_content",
+                message=f"Content Service HTTP error: {e.status} - {e.message}",
+                correlation_id=correlation_id,
+                content_service_url=content_service_url,
+                status_code=e.status,
+                storage_id=storage_id,
+                response_text=e.message[:200] if e.message else "No error message",
+            )
 
     except aiohttp.ServerTimeoutError:
         raise_content_service_error(
@@ -131,7 +135,8 @@ async def default_store_content_impl(
     log_prefix = f"Essay {essay_id}: " if essay_id else ""
 
     logger.debug(
-        f"{log_prefix}Storing content (length: {len(text_content)}) to Content Service via {content_service_url}",
+        f"{log_prefix}Storing content (length: {len(text_content)}) to Content Service "
+        f"via {content_service_url}",
         extra={"correlation_id": str(correlation_id), "content_length": len(text_content)},
     )
 
@@ -142,52 +147,57 @@ async def default_store_content_impl(
             data=text_content.encode("utf-8"),
             timeout=timeout,
         ) as response:
-            if response.status == 200:
-                try:
-                    # Assuming Content Service returns JSON like {"storage_id": "..."}
-                    data: dict[str, str] = await response.json()
-                    storage_id = data.get("storage_id")
+            # Use response.raise_for_status() to handle all 2xx codes correctly
+            response.raise_for_status()
+            # Parse response JSON - only reached on successful 2xx response
+            try:
+                # Assuming Content Service returns JSON like {"storage_id": "..."}
+                data: dict[str, str] = await response.json()
+                storage_id = data.get("storage_id")
 
-                    if not storage_id:
-                        raise_content_service_error(
-                            service="spellchecker_service",
-                            operation="store_content",
-                            message="Content service response missing 'storage_id' field",
-                            correlation_id=correlation_id,
-                            content_service_url=content_service_url,
-                            status_code=response.status,
-                            response_data=str(data),
-                        )
-
-                    logger.info(
-                        f"{log_prefix}Successfully stored content, new storage_id: {storage_id}",
-                        extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
-                    )
-                    return storage_id
-
-                except Exception as json_error:
-                    response_text = await response.text()
+                if not storage_id:
                     raise_content_service_error(
                         service="spellchecker_service",
                         operation="store_content",
-                        message=f"Failed to parse Content Service JSON response: {str(json_error)}",
+                        message="Content service response missing 'storage_id' field",
                         correlation_id=correlation_id,
                         content_service_url=content_service_url,
                         status_code=response.status,
-                        response_text=response_text[:200],
+                        response_data=str(data),
                     )
 
-            else:
-                error_text = await response.text()
+                logger.info(
+                    f"{log_prefix}Successfully stored content, new storage_id: {storage_id}",
+                    extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
+                )
+                return storage_id
+
+            except Exception as json_error:
+                response_text = await response.text()
                 raise_content_service_error(
                     service="spellchecker_service",
                     operation="store_content",
-                    message=f"Content Service error: {response.status} - {error_text[:100]}",
+                    message=f"Failed to parse Content Service JSON response: {str(json_error)}",
                     correlation_id=correlation_id,
                     content_service_url=content_service_url,
                     status_code=response.status,
-                    response_text=error_text[:200],
+                    response_text=response_text[:200],
+                    json_error=str(json_error),
                 )
+
+    except aiohttp.ClientResponseError as e:
+        # Handle HTTP errors (4xx/5xx) from raise_for_status()
+        # Note: response body is not available in ClientResponseError
+        raise_content_service_error(
+            service="spellchecker_service",
+            operation="store_content",
+            message=f"Content Service HTTP error: {e.status} - {e.message}",
+            correlation_id=correlation_id,
+            content_service_url=content_service_url,
+            status_code=e.status,
+            content_length=len(text_content),
+            response_text=e.message[:200] if e.message else "No error message",
+        )
 
     except aiohttp.ServerTimeoutError:
         raise_content_service_error(
@@ -271,7 +281,8 @@ async def default_perform_spell_check_algorithm(
 
         # 1. Load L2 dictionaries using environment-aware configuration
         logger.debug(
-            f"{log_prefix}Loading L2 error dictionary from: {settings.effective_filtered_dict_path}",
+            f"{log_prefix}Loading L2 error dictionary from: "
+            f"{settings.effective_filtered_dict_path}",
             extra=log_extra,
         )
         l2_errors = load_l2_errors(settings.effective_filtered_dict_path, filter_entries=False)

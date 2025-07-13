@@ -11,9 +11,9 @@ from datetime import datetime
 from typing import Any
 
 from common_core.status_enums import EssayStatus
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import ENUM as SQLAlchemyEnum
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -71,7 +71,8 @@ class BatchEssayTracker(Base):
     """
     Database model for tracking batch coordination and essay slots.
 
-    Supports the batch essay tracking functionality.
+    Enhanced to support batch expectations persistence for robustness against service restarts.
+    Stores the complete batch expectation state including course context and slot tracking.
     """
 
     __tablename__ = "batch_essay_trackers"
@@ -80,22 +81,73 @@ class BatchEssayTracker(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     # Batch identification
-    batch_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    batch_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
 
-    # Slot and content tracking
+    # Batch expectation data
+    expected_essay_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    available_slots: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    expected_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # Course context from BOS
+    course_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    essay_instructions: Mapped[str] = mapped_column(Text, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Event correlation
+    correlation_id: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Timeout configuration
+    timeout_seconds: Mapped[int] = mapped_column(Integer, default=300, nullable=False)
+
+    # Legacy fields (maintained for compatibility)
     total_slots: Mapped[int] = mapped_column(Integer, nullable=False)
     assigned_slots: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_ready: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    # Batch metadata as JSON
+    # Additional metadata as JSON
     batch_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=True)
-
-    # Status and readiness tracking
-    is_ready: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("NOW()"), onupdate=text("NOW()")
+    )
+
+    # Relationship to slot assignments
+    slot_assignments: Mapped[list[SlotAssignmentDB]] = relationship(
+        "SlotAssignmentDB", back_populates="batch_tracker", cascade="all, delete-orphan"
+    )
+
+
+class SlotAssignmentDB(Base):
+    """
+    Database model for individual slot assignments within batch expectations.
+
+    Stores the assignment of content (text storage) to internal essay ID slots.
+    Normalized relationship with BatchEssayTracker for efficient querying.
+    """
+
+    __tablename__ = "slot_assignments"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Foreign key to batch tracker
+    batch_tracker_id: Mapped[int] = mapped_column(
+        ForeignKey("batch_essay_trackers.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    # Slot assignment data
+    internal_essay_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    text_storage_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    original_file_name: Mapped[str] = mapped_column(String(500), nullable=False)
+
+    # Assignment timestamp
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
+
+    # Relationship back to batch tracker
+    batch_tracker: Mapped[BatchEssayTracker] = relationship(
+        "BatchEssayTracker", back_populates="slot_assignments"
     )
 
 

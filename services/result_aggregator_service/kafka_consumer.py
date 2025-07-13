@@ -49,7 +49,7 @@ class ResultAggregatorKafkaConsumer:
         # Topic subscription list - current services only
         self.topics = [
             topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),  # Add batch registration
-            "huleedu.els.batch_phase.outcome.v1",
+            "huleedu.els.batch.phase.outcome.v1",
             "huleedu.essay.spellcheck.completed.v1",
             "huleedu.cj_assessment.completed.v1",
             # Future topics to add when services are implemented:
@@ -170,7 +170,7 @@ class ResultAggregatorKafkaConsumer:
                     batch_envelope, batch_envelope.data
                 )
 
-            elif record.topic == "huleedu.els.batch_phase.outcome.v1":
+            elif record.topic == "huleedu.els.batch.phase.outcome.v1":
                 phase_envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(
                     message_value_str
                 )

@@ -455,16 +455,7 @@ async def _process_single_message_impl(
             extra={"correlation_id": str(he.error_detail.correlation_id)},
         )
 
-        # Record error on span for observability
-        if span:
-            span.set_status(trace.Status(trace.StatusCode.ERROR, str(he)))
-            span.set_attributes(
-                {
-                    "error.type": he.error_detail.error_code.value,
-                    "error.message": he.error_detail.message,
-                    "error.correlation_id": str(he.error_detail.correlation_id),
-                }
-            )
+        # The outer exception handler will record the error on the span.
 
         # Publish structured error event
         await _publish_structured_error_event(
