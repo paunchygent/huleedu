@@ -1,31 +1,19 @@
-"""Shared test fixtures and configuration for Class Management Service tests."""
+"""
+Pytest configuration and fixtures for LLM Provider Service tests.
+
+This module provides fixtures for testing the LLM provider service
+with dependency injection and OpenTelemetry test isolation.
+"""
 
 from __future__ import annotations
 
-from typing import Any, Generator
+from typing import Generator
 
 import pytest
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from prometheus_client import REGISTRY
-
-
-@pytest.fixture(autouse=True)
-def _clear_prometheus_registry() -> Any:
-    """
-    Fixture to clear the default Prometheus registry before each test.
-
-    This prevents "Duplicated timeseries in CollectorRegistry" errors
-    when running multiple tests that register metrics.
-
-    REQUIRED by rule 070: Testing and Quality Assurance
-    """
-    collectors = list(REGISTRY._collector_to_names.keys())
-    for collector in collectors:
-        REGISTRY.unregister(collector)
-    yield
 
 
 @pytest.fixture
