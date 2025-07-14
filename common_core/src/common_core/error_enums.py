@@ -75,3 +75,37 @@ class SpellcheckerErrorCode(str, Enum):
 
     # Spellchecker-specific business logic errors only
     SPELL_EVENT_CORRELATION_ERROR = "SPELL_EVENT_CORRELATION_ERROR"
+
+
+class LLMErrorCode(str, Enum):
+    """
+    Error codes specific to LLM Provider Service.
+
+    Covers provider communication, request validation, processing,
+    and response handling errors.
+    """
+
+    # Provider errors
+    PROVIDER_UNAVAILABLE = "LLM_PROVIDER_UNAVAILABLE"
+    PROVIDER_RATE_LIMIT = "LLM_PROVIDER_RATE_LIMIT"
+    PROVIDER_TIMEOUT = "LLM_PROVIDER_TIMEOUT"
+    PROVIDER_API_ERROR = "LLM_PROVIDER_API_ERROR"
+
+    # Request errors
+    INVALID_PROMPT = "LLM_INVALID_PROMPT"
+    CONTENT_TOO_LONG = "LLM_CONTENT_TOO_LONG"
+    INVALID_CONFIG = "LLM_INVALID_CONFIG"
+
+    # Processing errors
+    QUEUE_FULL = "LLM_QUEUE_FULL"
+    INTERNAL_ERROR = "LLM_INTERNAL_ERROR"
+    CALLBACK_TOPIC_MISSING = "LLM_CALLBACK_TOPIC_MISSING"
+    INVALID_CALLBACK_TOPIC = "LLM_INVALID_CALLBACK_TOPIC"
+
+    # Response errors
+    PARSING_ERROR = "LLM_PARSING_ERROR"
+    INVALID_RESPONSE = "LLM_INVALID_RESPONSE"
+    COST_LIMIT_EXCEEDED = "LLM_COST_LIMIT_EXCEEDED"
+
+    # System errors
+    CONFIGURATION_ERROR = "LLM_CONFIGURATION_ERROR"

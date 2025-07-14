@@ -25,6 +25,11 @@ class LLMComparisonRequest(BaseModel):
     essay_a: str = Field(..., description="First essay to compare")
     essay_b: str = Field(..., description="Second essay to compare")
 
+    # REQUIRED callback topic for async processing
+    callback_topic: str = Field(
+        ..., description="Kafka topic for result callback (required for all requests)"
+    )
+
     # Optional configuration overrides
     llm_config_overrides: LLMConfigOverrides | None = None
 

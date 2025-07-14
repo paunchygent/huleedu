@@ -9,7 +9,6 @@ import asyncio
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
-from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -65,8 +64,6 @@ class QueueProcessorImpl:
         # Processing state
         self._running = False
         self._processing_task: Optional[asyncio.Task] = None
-        self._results_cache: Dict[UUID, LLMOrchestratorResponse] = {}
-        self._max_results_cache_size = 1000
 
         # Performance tracking
         self._requests_processed = 0
@@ -259,8 +256,6 @@ class QueueProcessorImpl:
             f"correlation_id: {request.request_data.correlation_id}"
         )
 
-        # Store result in cache
-        self._store_result(request.queue_id, result)
 
         # Update status to completed
         await self.queue_manager.update_status(
@@ -373,31 +368,7 @@ class QueueProcessorImpl:
         expiry_time = request.queued_at + request.ttl
         return datetime.now(timezone.utc) > expiry_time
 
-    def _store_result(self, queue_id: UUID, result: LLMOrchestratorResponse) -> None:
-        """Store result in local cache.
 
-        Args:
-            queue_id: The queue ID
-            result: The result to store
-        """
-        # Simple cache management - remove oldest if at capacity
-        if len(self._results_cache) >= self._max_results_cache_size:
-            # Remove first item (oldest in insertion order)
-            oldest_key = next(iter(self._results_cache))
-            del self._results_cache[oldest_key]
-
-        self._results_cache[queue_id] = result
-
-    def get_result(self, queue_id: UUID) -> Optional[LLMOrchestratorResponse]:
-        """Get a stored result.
-
-        Args:
-            queue_id: The queue ID to retrieve
-
-        Returns:
-            The stored result or None if not found
-        """
-        return self._results_cache.get(queue_id)
 
     async def _periodic_cleanup(self) -> None:
         """Perform periodic cleanup tasks."""
@@ -413,7 +384,4 @@ class QueueProcessorImpl:
             logger.info(f"Cleaned up {expired_count} expired requests")
 
         # Log processing stats
-        logger.info(
-            f"Queue processor stats - Processed: {self._requests_processed}, "
-            f"Results cached: {len(self._results_cache)}"
-        )
+        logger.info(f"Queue processor stats - Processed: {self._requests_processed}")

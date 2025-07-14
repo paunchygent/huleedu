@@ -1,10 +1,33 @@
 # TASK-LLM-01: Event-Driven Callback Publishing in LLM Provider Service
 
-**Status**: Ready for Implementation  
+**Status**: In Progress - Phase 1 Complete  
 **Estimated Duration**: 3-4 days  
 **Dependencies**: None  
 **Risk Level**: Medium (Breaking change - removes polling endpoints)
 **Architectural Impact**: High (Establishes event-driven pattern for platform)
+
+## Implementation Progress
+
+### Phase 1: Event Contract & Infrastructure ✅ COMPLETED (2025-01-14)
+
+**Event Models** (`common_core/src/common_core/events/llm_provider_events.py`):
+
+- `TokenUsage`: Pydantic model with `prompt_tokens`, `completion_tokens`, `total_tokens` (int, ge=0)
+- `LLMComparisonResultV1`: Event payload with mutual exclusion validation via `@model_validator`, confidence range 1-5 (matching CJ Assessment), success fields: `winner`, `justification`, `confidence`; error field: `error_detail`
+
+**Error Infrastructure** (`common_core/src/common_core/error_enums.py`):
+
+- `LLMErrorCode` enum: 14 codes covering provider/request/processing/response/system errors, all prefixed "LLM_"
+
+**Event System Integration**:
+
+- `ProcessingEvent.LLM_COMPARISON_RESULT = "llm_provider.comparison_result"`
+- Topic mapping: `huleedu.llm_provider.comparison_result.v1` (auto-discovered)
+- Updated exports in `common_core/__init__.py` with model rebuilds
+
+**Testing**: 19 comprehensive tests (validation, serialization, mutual exclusion), 5 enum tests, all passing typecheck/lint
+
+**Key Discovery**: Fixed confidence score mismatch (0-1 → 1-5 scale) to align with CJ Assessment Service expectations
 
 ## 📋 Executive Summary
 
@@ -100,7 +123,7 @@ class LLMComparisonResultV1(BaseModel):
         None, max_length=500, description="Justification for the decision"
     )
     confidence: Optional[float] = Field(
-        None, ge=0.0, le=1.0, description="Confidence score"
+        None, ge=1.0, le=5.0, description="Confidence score (1-5)"
     )
     
     # === ERROR FIELD (mutually exclusive with success fields) ===

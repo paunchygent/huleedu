@@ -1,7 +1,7 @@
 """LLM provider API routes."""
 
 import time
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from dishka import FromDishka
 from huleedu_service_libs.error_handling.quart_handlers import create_error_response
@@ -10,7 +10,7 @@ from huleedu_service_libs.resilience import CircuitBreakerError, CircuitBreakerR
 from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
 
-from common_core import CircuitBreakerState, LLMProviderType, QueueStatus
+from common_core import CircuitBreakerState, LLMProviderType
 from services.llm_provider_service.api_models import (
     LLMComparisonRequest,
     LLMComparisonResponse,
@@ -20,14 +20,12 @@ from services.llm_provider_service.api_models import (
 )
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import HuleEduError
-from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 from services.llm_provider_service.implementations.trace_context_manager_impl import (
     TraceContextManagerImpl,
 )
 from services.llm_provider_service.internal_models import LLMQueuedResult
 from services.llm_provider_service.metrics import get_llm_metrics
-from services.llm_provider_service.protocols import LLMOrchestratorProtocol, QueueManagerProtocol
-from services.llm_provider_service.queue_models import QueueStatusResponse
+from services.llm_provider_service.protocols import LLMOrchestratorProtocol
 
 logger = create_service_logger("llm_provider_service.api")
 
@@ -160,7 +158,6 @@ async def generate_comparison(
                         f"Provider {result.provider.value} is currently unavailable."
                     ),
                     estimated_wait_minutes=result.estimated_wait_minutes,
-                    status_url=f"/api/v1/status/{result.queue_id}",
                     retry_after=60,
                 )
 
@@ -311,115 +308,5 @@ async def test_provider(
         ), 500
 
 
-@llm_bp.route("/status/<uuid:queue_id>", methods=["GET"])
-@inject
-async def get_queue_status(
-    queue_id: UUID,
-    queue_manager: FromDishka[QueueManagerProtocol],
-) -> Response | tuple[Response, int]:
-    """Get status of a queued request."""
-    try:
-        # queue_id is already a UUID object from Quart's converter
-        queue_uuid = queue_id
-
-        # Get request status
-        queued_request = await queue_manager.get_status(queue_uuid)
-
-        if not queued_request:
-            return jsonify({"error": "Queue request not found"}), 404
-
-        # Build response
-        response = QueueStatusResponse(
-            queue_id=queued_request.queue_id,
-            status=queued_request.status,
-            queued_at=queued_request.queued_at,
-            position_in_queue=None,  # TODO: Implement queue position tracking
-            estimated_processing_time=None,  # TODO: Calculate from queue stats
-            result_available=queued_request.status == QueueStatus.COMPLETED,
-            result_location=queued_request.result_location,
-            message=queued_request.message,
-            expires_at=queued_request.queued_at + queued_request.ttl,
-        )
-
-        return jsonify(response.model_dump(mode="json")), 200
-
-    except ValueError:
-        return jsonify({"error": "Invalid queue ID format"}), 400
-    except Exception as e:
-        logger.exception(f"Error getting queue status for {queue_id}")
-        return jsonify(
-            {
-                "error": "Failed to get queue status",
-                "details": str(e),
-            }
-        ), 500
 
 
-@llm_bp.route("/results/<uuid:queue_id>", methods=["GET"])
-@inject
-async def get_queue_result(
-    queue_id: UUID,
-    queue_manager: FromDishka[QueueManagerProtocol],
-    queue_processor: FromDishka[QueueProcessorImpl],
-) -> Response | tuple[Response, int]:
-    """Get the result of a completed queued request."""
-    try:
-        # queue_id is already a UUID object from Quart's converter
-        queue_uuid = queue_id
-
-        # Get request status first
-        queued_request = await queue_manager.get_status(queue_uuid)
-
-        if not queued_request:
-            return jsonify({"error": "Queue request not found"}), 404
-
-        if queued_request.status != QueueStatus.COMPLETED:
-            return jsonify(
-                {
-                    "error": "Result not available",
-                    "status": queued_request.status.value,
-                    "message": "Request has not completed processing",
-                }
-            ), 202
-
-        # Get the actual result from the processor cache
-        result = queue_processor.get_result(queue_uuid)
-
-        if not result:
-            return jsonify(
-                {
-                    "error": "Result not found in cache",
-                    "message": "Result may have expired or been evicted from cache",
-                }
-            ), 410  # Gone
-
-        # Build response - direct mapping from internal model to API response model
-        # No translation needed as both use assessment domain language
-        confidence_scaled = 1.0 + (result.confidence * 4.0)
-        confidence_scaled = max(1.0, min(5.0, confidence_scaled))
-
-        response = LLMComparisonResponse(
-            winner=result.winner,
-            justification=result.justification,
-            confidence=confidence_scaled,
-            provider=result.provider,
-            model=result.model,
-            response_time_ms=result.response_time_ms,
-            correlation_id=result.correlation_id,
-            token_usage=result.token_usage,
-            cost_estimate=result.cost_estimate,
-            trace_id=result.trace_id,
-        )
-
-        return jsonify(response.model_dump()), 200
-
-    except ValueError:
-        return jsonify({"error": "Invalid queue ID format"}), 400
-    except Exception as e:
-        logger.exception(f"Error getting queue result for {queue_id}")
-        return jsonify(
-            {
-                "error": "Failed to get queue result",
-                "details": str(e),
-            }
-        ), 500

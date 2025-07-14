@@ -4,6 +4,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol
 from uuid import UUID
 
 from common_core import LLMProviderType, QueueStatus
+from common_core.events.envelope import EventEnvelope
 from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
     LLMProviderResponse,
@@ -146,6 +147,21 @@ class LLMEventPublisherProtocol(Protocol):
             correlation_id: Request correlation ID
             error_details: Error details
             circuit_breaker_opened: Whether circuit breaker opened
+        """
+        ...
+
+    async def publish_to_topic(
+        self,
+        topic: str,
+        envelope: EventEnvelope[Any],
+        key: Optional[str] = None,
+    ) -> None:
+        """Publish event to specific topic.
+
+        Args:
+            topic: Kafka topic name
+            envelope: Event envelope to publish
+            key: Optional message key for partitioning
         """
         ...
 

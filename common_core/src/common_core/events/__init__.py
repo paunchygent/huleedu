@@ -27,6 +27,7 @@ from .file_management_events import (
     BatchFileRemovedV1,
     StudentParsingCompletedV1,
 )
+from .llm_provider_events import LLMComparisonResultV1, TokenUsage
 from .spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .validation_events import (
     StudentAssociation,
@@ -51,6 +52,7 @@ __all__ = [
     "EventEnvelope",
     "EventTracker",
     "ExcessContentProvisionedV1",
+    "LLMComparisonResultV1",
     "ProcessingUpdate",
     "SpellcheckRequestedDataV1",
     "SpellcheckResultDataV1",
@@ -58,5 +60,6 @@ __all__ = [
     "StudentAssociationsConfirmedV1",
     "StudentCreatedV1",
     "StudentParsingCompletedV1",
+    "TokenUsage",
     "ValidationTimeoutProcessedV1",
 ]

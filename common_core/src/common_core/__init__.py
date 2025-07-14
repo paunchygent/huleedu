@@ -52,12 +52,14 @@ from .events.file_events import (
     EssayValidationFailedV1,
 )
 from .events.llm_provider_events import (
+    LLMComparisonResultV1,
     LLMCostAlertV1,
     LLMCostTrackingV1,
     LLMProviderFailureV1,
     LLMRequestCompletedV1,
     LLMRequestStartedV1,
     LLMUsageAnalyticsV1,
+    TokenUsage,
 )
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .metadata_models import (
@@ -153,12 +155,14 @@ __all__ = [
     "EssayContentProvisionedV1",
     "EssayValidationFailedV1",
     # LLM Provider Event Models
-    "LLMRequestStartedV1",
-    "LLMRequestCompletedV1",
-    "LLMProviderFailureV1",
-    "LLMUsageAnalyticsV1",
+    "LLMComparisonResultV1",
     "LLMCostAlertV1",
     "LLMCostTrackingV1",
+    "LLMProviderFailureV1",
+    "LLMRequestCompletedV1",
+    "LLMRequestStartedV1",
+    "LLMUsageAnalyticsV1",
+    "TokenUsage",
     # Batch Service Command Models
     "BatchServiceSpellcheckInitiateCommandDataV1",
     "BatchServiceNLPInitiateCommandDataV1",
@@ -193,3 +197,5 @@ EssayValidationFailedV1.model_rebuild(raise_errors=True)
 ELS_CJAssessmentRequestV1.model_rebuild(raise_errors=True)
 CJAssessmentCompletedV1.model_rebuild(raise_errors=True)
 CJAssessmentFailedV1.model_rebuild(raise_errors=True)
+LLMComparisonResultV1.model_rebuild(raise_errors=True)
+TokenUsage.model_rebuild(raise_errors=True)

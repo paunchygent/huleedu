@@ -1,7 +1,7 @@
 """Event publisher implementation for LLM usage events."""
 
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from huleedu_service_libs.kafka_client import KafkaBus
@@ -223,5 +223,39 @@ class LLMEventPublisherImpl(LLMEventPublisherProtocol):
                     "provider": provider,
                     "correlation_id": str(correlation_id),
                     "failure_type": failure_type,
+                },
+            )
+
+    async def publish_to_topic(
+        self,
+        topic: str,
+        envelope: EventEnvelope[Any],
+        key: Optional[str] = None,
+    ) -> None:
+        """Publish event to specific topic.
+
+        Args:
+            topic: Kafka topic name
+            envelope: Event envelope to publish
+            key: Optional message key for partitioning
+        """
+        try:
+            # Use the existing kafka_bus.publish method for consistency
+            await self.kafka_bus.publish(topic, envelope, key)
+
+            logger.debug(
+                f"Published event to topic: {topic}, "
+                f"event_type: {envelope.event_type}, "
+                f"correlation_id: {envelope.correlation_id}"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Failed to publish event to topic {topic}: {e}",
+                exc_info=True,
+                extra={
+                    "topic": topic,
+                    "event_type": envelope.event_type,
+                    "correlation_id": str(envelope.correlation_id),
                 },
             )

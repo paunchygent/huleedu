@@ -7,6 +7,8 @@ HULEEDU_PIPELINE_IMPLEMENT_002 Phase 1 Task 1.2.
 
 from __future__ import annotations
 
+from enum import Enum
+
 import pytest
 
 from common_core.domain_enums import (
@@ -18,7 +20,7 @@ from common_core.domain_enums import (
     get_course_level,
     get_course_name,
 )
-from common_core.error_enums import ErrorCode, FileValidationErrorCode
+from common_core.error_enums import ErrorCode, FileValidationErrorCode, LLMErrorCode
 from common_core.event_enums import _TOPIC_MAPPING, ProcessingEvent, topic_name
 from common_core.status_enums import BatchStatus, EssayStatus, ProcessingStage
 
@@ -280,6 +282,63 @@ class TestOtherEnums:
             assert len(event.value) > 0
 
 
+class TestLLMErrorCode:
+    """Test LLMErrorCode enum functionality."""
+
+    def test_llm_error_code_exists(self) -> None:
+        """Test that LLMErrorCode enum exists and has expected attributes."""
+        assert hasattr(LLMErrorCode, "PROVIDER_UNAVAILABLE")
+        assert hasattr(LLMErrorCode, "PROVIDER_RATE_LIMIT")
+        assert hasattr(LLMErrorCode, "PROVIDER_TIMEOUT")
+        assert hasattr(LLMErrorCode, "PROVIDER_API_ERROR")
+
+    def test_llm_error_code_values(self) -> None:
+        """Test that all LLMErrorCode values are correct."""
+        # Provider errors
+        assert LLMErrorCode.PROVIDER_UNAVAILABLE.value == "LLM_PROVIDER_UNAVAILABLE"
+        assert LLMErrorCode.PROVIDER_RATE_LIMIT.value == "LLM_PROVIDER_RATE_LIMIT"
+        assert LLMErrorCode.PROVIDER_TIMEOUT.value == "LLM_PROVIDER_TIMEOUT"
+        assert LLMErrorCode.PROVIDER_API_ERROR.value == "LLM_PROVIDER_API_ERROR"
+
+        # Request errors
+        assert LLMErrorCode.INVALID_PROMPT.value == "LLM_INVALID_PROMPT"
+        assert LLMErrorCode.CONTENT_TOO_LONG.value == "LLM_CONTENT_TOO_LONG"
+        assert LLMErrorCode.INVALID_CONFIG.value == "LLM_INVALID_CONFIG"
+
+        # Processing errors
+        assert LLMErrorCode.QUEUE_FULL.value == "LLM_QUEUE_FULL"
+        assert LLMErrorCode.INTERNAL_ERROR.value == "LLM_INTERNAL_ERROR"
+        assert LLMErrorCode.CALLBACK_TOPIC_MISSING.value == "LLM_CALLBACK_TOPIC_MISSING"
+        assert LLMErrorCode.INVALID_CALLBACK_TOPIC.value == "LLM_INVALID_CALLBACK_TOPIC"
+
+        # Response errors
+        assert LLMErrorCode.PARSING_ERROR.value == "LLM_PARSING_ERROR"
+        assert LLMErrorCode.INVALID_RESPONSE.value == "LLM_INVALID_RESPONSE"
+        assert LLMErrorCode.COST_LIMIT_EXCEEDED.value == "LLM_COST_LIMIT_EXCEEDED"
+
+        # System errors
+        assert LLMErrorCode.CONFIGURATION_ERROR.value == "LLM_CONFIGURATION_ERROR"
+
+    def test_llm_error_code_inherits_from_str(self) -> None:
+        """Test that LLMErrorCode inherits from str."""
+        for error_code in LLMErrorCode:
+            assert isinstance(error_code, str)
+            assert isinstance(error_code.value, str)
+
+    def test_llm_error_code_is_enum(self) -> None:
+        """Test that LLMErrorCode is an Enum subclass."""
+        assert issubclass(LLMErrorCode, Enum)
+        assert issubclass(LLMErrorCode, str)
+
+    def test_all_llm_error_codes_are_strings(self) -> None:
+        """Test that all LLMErrorCode values are non-empty strings."""
+        for error_code in LLMErrorCode:
+            assert isinstance(error_code.value, str)
+            assert len(error_code.value) > 0
+            # All LLM error codes should start with LLM_
+            assert error_code.value.startswith("LLM_"), f"{error_code.value} should start with LLM_"
+
+
 class TestTopicMappingPrivateDict:
     """Test the _TOPIC_MAPPING private dictionary."""
 
@@ -478,3 +537,35 @@ class TestEnhancedProcessingEvents:
 
         for event in enhanced_events:
             assert event in _TOPIC_MAPPING, f"Event {event} should be mapped but is missing"
+
+
+class TestLLMProviderEvents:
+    """Test LLM Provider ProcessingEvent entries and topic mappings."""
+
+    def test_llm_comparison_result_event_exists(self) -> None:
+        """Test that LLM_COMPARISON_RESULT event exists."""
+        assert hasattr(ProcessingEvent, "LLM_COMPARISON_RESULT")
+        assert ProcessingEvent.LLM_COMPARISON_RESULT.value == "llm_provider.comparison_result"
+
+    def test_llm_comparison_result_topic_mapping(self) -> None:
+        """Test topic mapping for LLM_COMPARISON_RESULT event."""
+        result = topic_name(ProcessingEvent.LLM_COMPARISON_RESULT)
+        assert result == "huleedu.llm_provider.comparison_result.v1"
+
+    def test_llm_comparison_result_in_topic_mapping(self) -> None:
+        """Test that LLM_COMPARISON_RESULT is included in _TOPIC_MAPPING."""
+        assert ProcessingEvent.LLM_COMPARISON_RESULT in _TOPIC_MAPPING
+
+    def test_llm_provider_events_string_values(self) -> None:
+        """Test that LLM provider events have correct string values."""
+        # Test all LLM provider events that should exist
+        llm_events = {
+            "LLM_COMPARISON_RESULT": "llm_provider.comparison_result",
+            "LLM_COST_ALERT": "llm_provider.cost.alert",
+            "LLM_COST_TRACKING": "llm_provider.cost.tracking",
+        }
+
+        for event_name, expected_value in llm_events.items():
+            if hasattr(ProcessingEvent, event_name):
+                event = getattr(ProcessingEvent, event_name)
+                assert event.value == expected_value, f"{event_name} has incorrect value"

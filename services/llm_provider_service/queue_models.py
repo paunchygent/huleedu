@@ -95,10 +95,7 @@ class QueuedRequest(BaseModel):
         default=None,
         description="Client-provided correlation ID",
     )
-    callback_url: Optional[str] = Field(
-        default=None,
-        description="Optional webhook for completion notification",
-    )
+    callback_topic: str = Field(..., description="Kafka topic for result delivery")
     trace_context: Optional[Dict[str, Any]] = Field(
         default=None,
         description="OpenTelemetry trace context for request processing",
