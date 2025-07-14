@@ -15,7 +15,9 @@
 ## ULTRATHINK Analysis Framework
 
 ### Phase 1: Root Cause Investigation ✅ COMPLETED
+
 **Technical Analysis**:
+
 - Identified hash collision in `services/libs/huleedu_service_libs/event_utils.py`
 - Original implementation used data-only hashing: `hashlib.sha256(json.dumps(data_payload, sort_keys=True).encode("utf-8")).hexdigest()`
 - Deployment race condition: old data-only vs new event_id+data hashing created identical hashes for different events
@@ -26,7 +28,9 @@
 **Critical Pipeline Impact**: ELS skipped BatchEssaysRegistered → No expectations created → Content events generated "No expectation registered" errors. BOS skipped BatchPhaseOutcome → CJ assessment never initiated → Pipeline never completed.
 
 ### Phase 2: Industry Research and Best Practices ✅ COMPLETED
+
 **Authoritative Patterns Researched**:
+
 1. **Event-ID Based Idempotency**: Industry standard for controlled environments with trusted producers
 2. **Service Namespacing**: AWS/Azure pattern for Redis key isolation
 3. **TTL Optimization**: Event-type specific retention (AWS SQS: 5min-14days, GCP Pub/Sub: ordering windows)
@@ -36,7 +40,9 @@
 **Reference Architecture**: Kafka idempotent producers + Redis consumer deduplication + service isolation
 
 ### Phase 3: Platform Architecture Analysis ✅ COMPLETED
+
 **HuleEdu Event Envelope Structure**:
+
 ```python
 class EventEnvelope(BaseModel, Generic[T_EventData]):
     event_id: UUID = Field(default_factory=uuid4)  # Globally unique
@@ -47,14 +53,16 @@ class EventEnvelope(BaseModel, Generic[T_EventData]):
 ```
 
 **Service Inventory**:
+
 - Essay Lifecycle Service: `"essay-lifecycle-service"` (v2 implemented)
-- Batch Orchestrator Service: `"batch-service"` (v2 implemented) 
+- Batch Orchestrator Service: `"batch-service"` (v2 implemented)
 - Spellchecker Service: `"spell-checker-service"` (v2 implemented)
 - CJ Assessment Service: `"cj-assessment-service"` (v2 implemented)
 - Result Aggregator Service: `"result-aggregator-service"` (v2 implemented)
 - Batch Conductor Service: `"batch-conductor-service"` (v2 implemented)
 
 **TTL Requirements Analysis**:
+
 - Quick processing (spellcheck, validation): 1 hour (3600s)
 - Batch coordination (workflow events): 12 hours (43200s)
 - Assessment processing (AI workflows): 24 hours (86400s)
@@ -69,6 +77,7 @@ class EventEnvelope(BaseModel, Generic[T_EventData]):
 **File Created**: `/services/libs/huleedu_service_libs/idempotency_v2.py`
 
 **Technical Implementation**:
+
 ```python
 class IdempotencyConfig:
     def __init__(self, service_name: str, event_type_ttls: Dict[str, int] | None = None, 
@@ -83,6 +92,7 @@ class IdempotencyConfig:
 ```
 
 **Key Features Implemented**:
+
 - **Service Namespacing**: Redis keys isolated per service for debugging
 - **Event-Type TTLs**: Configurable retention per event type
 - **Enhanced Observability**: Structured logging with timing metrics
@@ -90,6 +100,7 @@ class IdempotencyConfig:
 - **Backward Compatibility**: Drop-in replacement for existing decorator
 
 **Event-Type TTL Configuration**:
+
 ```python
 DEFAULT_EVENT_TYPE_TTLS = {
     "huleedu.essay.spellcheck.completed.v1": 3600,  # 1 hour
@@ -102,11 +113,13 @@ DEFAULT_EVENT_TYPE_TTLS = {
 ### Phase 2: Service Migration Implementation ✅ COMPLETED
 
 **Essay Lifecycle Service** ✅:
+
 - File: `/services/essay_lifecycle_service/worker_main.py`
 - Implementation: `IdempotencyConfig(service_name=settings.SERVICE_NAME, enable_debug_logging=True)`
 - Status: Using v2 with enhanced logging
 
 **Batch Orchestrator Service** ✅:
+
 - File: `/services/batch_orchestrator_service/kafka_consumer.py`
 - Migration: `huleedu_service_libs.idempotency` → `huleedu_service_libs.idempotency_v2`
 - Configuration: Service name "batch-service", debug logging enabled
@@ -114,22 +127,26 @@ DEFAULT_EVENT_TYPE_TTLS = {
 - Critical Fix: Resolves BatchPhaseOutcome false duplicates that blocked CJ assessment
 
 **Spellchecker Service** ✅:
+
 - File: `/services/spellchecker_service/kafka_consumer.py`
 - TTL Optimization: Reduced from 24h to 1h for quick processing events
 - Service Isolation: `huleedu:idempotency:v2:spell-checker-service:*` Redis namespace
 
 **CJ Assessment Service** ✅:
+
 - Files: `/services/cj_assessment_service/kafka_consumer.py`, `/services/cj_assessment_service/worker_main.py`
 - Service Name Standardization: `"cj_assessment_service"` → `"cj-assessment-service"`
 - TTL: 24 hours for complex AI workflows
 - Tests Updated: 3 test files migrated to v2 API
 
 **Result Aggregator Service** ✅:
+
 - File: `/services/result_aggregator_service/kafka_consumer.py`
 - Event-Specific TTLs: Batch registration (12h), processing (24h), aggregation (72h)
 - Enhanced observability for aggregation workflows
 
 **Batch Conductor Service** ✅:
+
 - File: `/services/batch_conductor_service/kafka_consumer.py`
 - Dynamic Decorator Pattern: Maintained existing consumption loop structure
 - TTL: 24 hours for coordination events (SpellCheck, CJ Assessment, AI Feedback completion)
@@ -137,10 +154,12 @@ DEFAULT_EVENT_TYPE_TTLS = {
 ### Phase 3: Configuration and TTL Optimization ✅ COMPLETED
 
 **Redis Key Format Standardization**:
+
 - V1: `huleedu:events:seen:{hash}` (global namespace)
 - V2: `huleedu:idempotency:v2:{service}:{event_type}:{hash}` (service isolated)
 
 **TTL Matrix Implementation**:
+
 | Event Type | TTL | Business Justification |
 |------------|-----|----------------------|
 | huleedu.essay.spellcheck.completed.v1 | 3600s | Quick processing, immediate completion |
@@ -151,6 +170,7 @@ DEFAULT_EVENT_TYPE_TTLS = {
 | huleedu.result_aggregator.batch.completed.v1 | 259200s | Long-running aggregation |
 
 **Memory Optimization Impact**:
+
 - Spellcheck events: 24h → 1h (96% reduction)
 - Batch coordination: Maintains 12h for workflow reliability
 - Assessment: Maintains 24h for AI processing complexity
@@ -159,6 +179,7 @@ DEFAULT_EVENT_TYPE_TTLS = {
 ### Phase 4: Enhanced Observability Implementation ✅ COMPLETED
 
 **Structured Logging Format**:
+
 ```python
 log_context = {
     "service": config.service_name,
@@ -179,6 +200,7 @@ log_context = {
 ```
 
 **Debug Logging Levels**:
+
 - `DUPLICATE_EVENT_DETECTED`: Warning level with action="skipped_duplicate"
 - `FIRST_TIME_EVENT`: Debug level with action="processing_new"
 - `PROCESSING_SUCCESS`: Debug level with performance metrics
@@ -186,6 +208,7 @@ log_context = {
 - `REDIS_ERROR`: Error level with fail-open behavior
 
 **Production Debugging Capabilities**:
+
 - Redis operation timing for performance monitoring
 - Service isolation for troubleshooting specific microservices
 - Event correlation tracking across service boundaries
@@ -194,6 +217,7 @@ log_context = {
 ### Phase 5: Testing and Verification ✅ COMPLETED
 
 **Service-Level Test Results**:
+
 - Batch Orchestrator Service: 6/6 idempotency tests passing
 - Spellchecker Service: Integration tests confirmed v2 functionality
 - CJ Assessment Service: 6/6 tests passing (3 basic, 1 failure, 2 outage scenarios)
@@ -201,11 +225,13 @@ log_context = {
 - Batch Conductor Service: 37/38 tests passing (1 unrelated health check failure)
 
 **System Integration Verification**:
+
 - Redis FLUSHALL executed to ensure clean state
 - All services rebuilt with v2 implementation
 - `ESSAY_LIFECYCLE_SERVICE_DISABLE_IDEMPOTENCY=false` (re-enabled)
 
 **Diagnostic Test Results**:
+
 - `verify_redis_is_pristine` fixture: Redis confirmed clean before tests
 - Distributed state manager clearing 26+ keys successfully
 - Cross-service event deduplication working correctly
@@ -217,6 +243,7 @@ log_context = {
 ### Phase 6: End-to-End Pipeline Verification 🔄 IN PROGRESS
 
 **Immediate Tasks Required**:
+
 1. **Service Rebuild Completion**: Currently rebuilding all services with v2 implementation
 2. **Pipeline Flow Test**: Execute comprehensive E2E test to verify:
    - BatchEssaysRegistered events processed without false duplicates
@@ -225,6 +252,7 @@ log_context = {
 3. **Performance Validation**: Monitor Redis key namespacing and TTL behavior in integration environment
 
 **Success Criteria**:
+
 - `test_comprehensive_real_batch_pipeline` completes successfully
 - No "Duplicate message skipped" for legitimate new events
 - BOS successfully processes BatchPhaseOutcome and triggers CJ assessment phase
@@ -233,7 +261,8 @@ log_context = {
 ### Phase 7: Production Readiness Assessment 📋 PENDING
 
 **Configuration Hardening**:
-1. **Debug Logging Strategy**: 
+
+1. **Debug Logging Strategy**:
    - Enable debug logging in staging for initial monitoring
    - Production configuration with warning+ levels only
    - Gradual rollback of debug verbosity based on stability metrics
@@ -249,6 +278,7 @@ log_context = {
    - SLA impact assessment for new processing overhead
 
 **Rollback Preparation**:
+
 - Backward compatibility wrapper maintains v1 interface
 - Feature flag mechanism for selective v2 rollback per service
 - Database state preservation during potential rollbacks
@@ -256,6 +286,7 @@ log_context = {
 ### Phase 8: Documentation and Knowledge Transfer 📚 PENDING
 
 **Service README Updates Required**:
+
 - `/services/essay_lifecycle_service/README.md`: Document v2 configuration and debug logging
 - `/services/batch_orchestrator_service/README.md`: Document resolution of BatchPhaseOutcome issue
 - `/services/spellchecker_service/README.md`: Document TTL optimization for quick processing
@@ -263,7 +294,8 @@ log_context = {
 - `/services/result_aggregator_service/README.md`: Document aggregation-specific TTL matrix
 - `/services/batch_conductor_service/README.md`: Document coordination event handling
 
-**Library Documentation**: 
+**Library Documentation**:
+
 - `/services/libs/huleedu_service_libs/README.md`: Comprehensive v2 API documentation required
   - IdempotencyConfig class reference
   - Migration guide from v1 to v2
@@ -272,18 +304,54 @@ log_context = {
   - Troubleshooting guide for production issues
 
 **Architecture Documentation Updates**:
+
 - Update event-driven architecture documentation with v2 patterns
 - Redis key strategy documentation
 - Cross-service idempotency coordination patterns
 
-### Phase 9: Performance Optimization and Monitoring 🔧 PENDING
+### Phase 9: Missing Idempotency Test Coverage 📋 PENDING
+
+**Gap Analysis Complete**:
+Services using idempotency v2 decorator but lacking dedicated idempotency tests:
+- **Batch Conductor Service**: Uses v2 in `kafka_consumer.py` but has no `test_idempotency_*.py` files
+- **Other services**: Need audit to confirm no additional gaps
+
+**Implementation Requirements**:
+
+1. **Create Comprehensive Idempotency Test Suite for Batch Conductor Service**:
+   - Use Result Aggregator Service tests as primary template (most complete integration tests)
+   - Use CJ Assessment Service tests as secondary template (good service-specific scenarios)
+   - Follow pattern: `test_batch_conductor_idempotency_basic.py` and `test_batch_conductor_idempotency_outage.py`
+
+2. **Test Coverage Requirements**:
+   - **Basic Scenarios**: First-time processing, duplicate detection, deterministic ID generation
+   - **Error Handling**: Processing failures, exception cleanup, Redis operation failures
+   - **Service-Specific Workflows**: Real Batch Conductor business logic (no mocking)
+   - **Integration Patterns**: Actual Kafka message handling with v2 idempotency
+
+3. **Template Usage Standards**:
+   - Service name: `"batch-conductor-service"`
+   - TTL: 24 hours (86400s) for coordination events  
+   - Redis key format: `huleedu:idempotency:v2:batch-conductor-service:{event_type}:{hash}`
+   - Real event processing workflows - NO business logic mocking
+   - Use existing service dependencies and protocols
+
+4. **Validation Criteria**:
+   - All tests must pass without cheats or shortcuts
+   - Must validate actual Batch Conductor event types and workflows
+   - Must use v2 API (`IdempotencyConfig`, `idempotent_consumer_v2`)
+   - Must follow HuleEdu testing patterns (protocol-based mocking only)
+
+### Phase 10: Performance Optimization and Monitoring 🔧 PENDING
 
 **Redis Performance Optimization**:
+
 1. **Connection Pooling Review**: Ensure v2 implementation doesn't increase connection overhead
 2. **Pipeline Operations**: Evaluate batch Redis operations for high-throughput scenarios
 3. **Memory Efficiency Monitoring**: Track actual memory savings from TTL optimization
 
 **Observability Enhancement**:
+
 1. **Metrics Integration**: Export idempotency metrics to Prometheus
    - Duplicate detection rates per service
    - Redis operation latency by service
@@ -294,6 +362,7 @@ log_context = {
    - Service-specific idempotency issues
 
 **Service-Specific Monitoring**:
+
 - Essay Lifecycle Service: Batch coordination event processing rates
 - Batch Orchestrator Service: Phase transition success rates  
 - Assessment Services: Complex workflow completion tracking
@@ -304,6 +373,7 @@ log_context = {
 ## Technical Architecture Summary
 
 ### Redis Key Strategy
+
 ```
 V2 Format: huleedu:idempotency:v2:{service_name}:{event_type}:{deterministic_hash}
 
@@ -314,6 +384,7 @@ Examples:
 ```
 
 ### Service Configuration Matrix
+
 | Service | Service Name | TTL Strategy | Debug Logging | Migration Status |
 |---------|--------------|--------------|---------------|------------------|
 | ELS | essay-lifecycle-service | Event-specific | Enabled | ✅ Complete |
@@ -324,6 +395,7 @@ Examples:
 | Batch Conductor | batch-conductor-service | Standard (24h) | Enabled | ✅ Complete |
 
 ### Event Processing Flow
+
 ```
 1. Message Receipt → Parse EventEnvelope
 2. Extract event_id + event_type + source_service  
@@ -340,17 +412,20 @@ Examples:
 ## Risk Assessment and Mitigation
 
 ### Technical Risks
+
 1. **Redis Memory Pressure**: Mitigated by optimized TTLs and monitoring
 2. **Service Coupling**: Mitigated by service namespacing and independent TTL configuration  
 3. **Performance Regression**: Mitigated by fail-open behavior and async Redis operations
 4. **Rollback Complexity**: Mitigated by backward-compatible interface and feature flags
 
 ### Business Risks  
+
 1. **Pipeline Disruption**: Mitigated by comprehensive testing and gradual rollout
 2. **Data Loss**: Mitigated by fail-open behavior ensuring processing continues during Redis outages
 3. **Assessment Accuracy**: Mitigated by proper duplicate prevention in CJ assessment workflows
 
 ### Operational Risks
+
 1. **Monitoring Blind Spots**: Mitigated by enhanced observability and structured logging
 2. **Configuration Drift**: Mitigated by centralized IdempotencyConfig management
 3. **Knowledge Transfer**: Mitigated by comprehensive documentation requirements in Phase 8
@@ -360,17 +435,20 @@ Examples:
 ## Success Metrics
 
 ### Functional Success Criteria ✅
+
 - [x] All 7 services migrated to idempotency v2  
 - [x] Service-specific test suites passing
 - [x] Redis key namespacing implemented
 - [ ] End-to-end pipeline test completion (Phase 6)
 
 ### Performance Success Criteria
+
 - [ ] Redis memory usage reduction (estimated 60% from TTL optimization)
 - [ ] No increase in event processing latency
 - [ ] Successful handling of Redis outages without pipeline disruption
 
 ### Operational Success Criteria  
+
 - [ ] Zero false positive duplicate detections in production
 - [ ] Complete pipeline progression without manual intervention
 - [ ] Comprehensive monitoring and alerting deployed

@@ -15,7 +15,7 @@ A comprehensive collection of shared utilities and infrastructure components for
   - [Resilience Patterns](#resilience-patterns)
   - [Middleware](#middleware)
   - [Event Utilities](#event-utilities)
-  - [Idempotency](#idempotency)
+  - [Idempotency v2](#idempotency-v2)
   - [Type-Safe Quart App](#type-safe-quart-app)
 - [Integration Patterns](#integration-patterns)
 - [Testing Guidelines](#testing-guidelines)
@@ -44,7 +44,7 @@ huleedu_service_libs/
 ├── logging_utils.py         # Structured logging with context
 ├── metrics_middleware.py    # HTTP metrics collection
 ├── event_utils.py           # Event processing utilities
-├── idempotency.py          # Idempotent message processing
+├── idempotency_v2.py        # Advanced idempotent message processing
 ├── protocols.py            # Shared protocol definitions
 ├── database/               # Database monitoring & health
 ├── middleware/             # Framework-specific middleware
@@ -653,31 +653,131 @@ if user_id:
     )
 ```
 
-### Idempotency
+### Idempotency v2
 
-**Module**: `idempotency.py`  
-**Purpose**: Decorator for idempotent Kafka message processing
+**Module**: `idempotency_v2.py`  
+**Purpose**: Advanced idempotency decorator with service namespacing and configurable TTLs
 
-#### Features
-- Deterministic event ID generation
-- Atomic Redis SET NX operations
-- Automatic lock release on failure
-- Fail-open on Redis errors
+#### Key Features
+- **Service Isolation**: Each service maintains separate idempotency namespace
+- **Event-Type Specific TTLs**: Optimized memory usage based on business requirements
+- **Enhanced Observability**: Comprehensive structured logging for debugging
+- **Robust Error Handling**: Fail-open behavior with proper cleanup
+- **Backward Compatibility**: Drop-in replacement for existing decorator
+- **Deterministic Event ID Generation**: Using proven hash algorithms
+- **Atomic Redis Operations**: SET NX with configurable TTL
+- **Automatic Lock Release**: On processing failures to allow retry
 
-#### Usage Example
+#### API Reference
 
 ```python
-from huleedu_service_libs.idempotency import idempotent_consumer
+class IdempotencyConfig:
+    def __init__(
+        self,
+        service_name: str,
+        event_type_ttls: Dict[str, int] | None = None,
+        default_ttl: int = 86400,
+        key_prefix: str = "huleedu:idempotency:v2",
+        enable_debug_logging: bool = False,
+    )
+    
+    def get_ttl_for_event_type(self, event_type: str) -> int
+    def generate_redis_key(self, event_type: str, event_id: str, deterministic_hash: str) -> str
 
-@idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+def idempotent_consumer_v2(
+    redis_client: RedisClientProtocol,
+    config: IdempotencyConfig,
+) -> Callable
+
+# Backward compatibility function
+def idempotent_consumer(
+    redis_client: RedisClientProtocol,
+    ttl_seconds: int = 86400,
+    service_name: str = "unknown-service",
+) -> Callable
+```
+
+#### Usage Examples
+
+**V2 API (Recommended)**:
+```python
+from huleedu_service_libs.idempotency_v2 import idempotent_consumer_v2, IdempotencyConfig
+
+# Configure idempotency with service-specific settings
+config = IdempotencyConfig(
+    service_name="essay-lifecycle-service",
+    event_type_ttls={
+        "huleedu.essay.spellcheck.requested.v1": 3600,  # 1 hour
+        "huleedu.cj_assessment.completed.v1": 86400,    # 24 hours
+        "huleedu.result_aggregator.batch.completed.v1": 259200,  # 72 hours
+    },
+    enable_debug_logging=True
+)
+
+@idempotent_consumer_v2(redis_client=redis_client, config=config)
 async def handle_essay_submitted(msg: ConsumerRecord) -> None:
     envelope = EventEnvelope.model_validate_json(msg.value)
     
     # This will only execute once per unique event
+    # TTL automatically determined by event type
     await process_essay(envelope.data)
     
     # If processing fails, the idempotency key is released
     # allowing natural retry on the next Kafka poll
+```
+
+**Backward Compatible API**:
+```python
+from huleedu_service_libs.idempotency_v2 import idempotent_consumer
+
+@idempotent_consumer(
+    redis_client=redis_client, 
+    ttl_seconds=86400,
+    service_name="my-service"
+)
+async def handle_message(msg: ConsumerRecord) -> None:
+    # Existing code works unchanged
+    envelope = EventEnvelope.model_validate_json(msg.value)
+    await process_event(envelope.data)
+```
+
+#### Service Namespacing
+
+Redis keys are automatically namespaced by service for better isolation and debugging:
+
+```
+# Key format: {prefix}:{service}:{event_type}:{deterministic_hash}
+huleedu:idempotency:v2:essay-lifecycle-service:huleedu_essay_submitted_v1:a1b2c3d4...
+```
+
+#### Event-Type Specific TTLs
+
+Pre-configured TTL mappings optimize Redis memory usage:
+
+- **Quick Processing Events**: 1 hour (spellcheck, validation)
+- **Batch Coordination**: 12 hours (workflow coordination)
+- **Assessment Processing**: 24 hours (complex AI workflows)
+- **Long-Running Processes**: 72 hours (batch operations, aggregations)
+
+#### Enhanced Observability
+
+Structured logging provides comprehensive debugging information:
+
+```json
+{
+  "message": "DUPLICATE_EVENT_DETECTED: Event already processed, skipping",
+  "service": "essay-lifecycle-service",
+  "event_type": "huleedu.essay.submitted.v1",
+  "event_id": "550e8400-e29b-41d4-a716-446655440000",
+  "correlation_id": "abc123",
+  "source_service": "api-gateway",
+  "deterministic_hash": "a1b2c3d4e5f6...",
+  "redis_key": "huleedu:idempotency:v2:essay-lifecycle-service:huleedu_essay_submitted_v1:a1b2c3d4",
+  "ttl_seconds": 86400,
+  "action": "skipped_duplicate",
+  "redis_duration_ms": 1.23,
+  "total_duration_ms": 2.45
+}
 ```
 
 ### Type-Safe Quart App
@@ -1069,13 +1169,17 @@ async def setup_services(app: Quart, settings: Settings):
 
 ```python
 # In worker_main.py
-from huleedu_service_libs.idempotency import idempotent_consumer
+from huleedu_service_libs.idempotency_v2 import idempotent_consumer_v2, IdempotencyConfig
 
 class EventProcessor:
-    def __init__(self, redis_client: RedisClientProtocol, ...):
+    def __init__(self, redis_client: RedisClientProtocol, service_name: str, ...):
         self.redis_client = redis_client
+        self.config = IdempotencyConfig(
+            service_name=service_name,
+            enable_debug_logging=True
+        )
     
-    @idempotent_consumer(redis_client=self.redis_client)
+    @idempotent_consumer_v2(redis_client=self.redis_client, config=self.config)
     async def process_message(self, msg: ConsumerRecord):
         with trace_operation(self.tracer, "process_event"):
             envelope = EventEnvelope.model_validate_json(msg.value)
@@ -1160,6 +1264,53 @@ async def test_circuit_breaker_opens_on_failures():
 
 ## Migration Guide
 
+### Migrating to Idempotency v2
+
+**From Old Idempotency API**:
+```python
+# Before (old API - DEPRECATED)
+from huleedu_service_libs.idempotency import idempotent_consumer
+
+@idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+async def handle_message(msg: ConsumerRecord):
+    # Process message
+    pass
+```
+
+**To V2 API (Recommended)**:
+```python
+# After (v2 API with enhanced features)
+from huleedu_service_libs.idempotency_v2 import idempotent_consumer_v2, IdempotencyConfig
+
+config = IdempotencyConfig(
+    service_name="my-service",
+    enable_debug_logging=True,  # Enable for better observability
+    event_type_ttls={
+        "huleedu.specific.event.v1": 3600,  # Custom TTL for specific events
+    }
+)
+
+@idempotent_consumer_v2(redis_client=redis_client, config=config)
+async def handle_message(msg: ConsumerRecord):
+    # Same processing logic - no changes needed
+    pass
+```
+
+**Backward Compatible Migration**:
+```python
+# Minimal change migration (uses v2 under the hood)
+from huleedu_service_libs.idempotency_v2 import idempotent_consumer
+
+@idempotent_consumer(
+    redis_client=redis_client, 
+    ttl_seconds=86400,
+    service_name="my-service"  # Add service name for namespacing
+)
+async def handle_message(msg: ConsumerRecord):
+    # Existing code works unchanged
+    pass
+```
+
 ### Migrating from Direct Redis/Kafka Clients
 
 **Before**:
@@ -1238,7 +1389,7 @@ db_metrics = setup_database_monitoring(engine, "my_service")
 1. **Always use lifecycle management**: Call `start()` and `stop()` on clients
 2. **Use protocols for dependency injection**: Depend on `RedisClientProtocol`, not `RedisClient`
 3. **Configure logging early**: Call `configure_service_logging()` in startup
-4. **Use idempotency decorator**: Wrap all Kafka consumers with `@idempotent_consumer`
+4. **Use idempotency decorator**: Wrap all Kafka consumers with `@idempotent_consumer_v2` or backward-compatible `@idempotent_consumer`
 5. **Add circuit breakers**: Protect external service calls with circuit breakers
 6. **Propagate trace context**: Use `inject_trace_context()` and `extract_trace_context()`
 7. **Monitor database health**: Use `DatabaseHealthChecker` in health endpoints
@@ -1255,6 +1406,6 @@ db_metrics = setup_database_monitoring(engine, "my_service")
 5. **Unstructured logging**: Avoid f-strings, use keyword arguments
 6. **Missing correlation IDs**: Always propagate trace context
 7. **Hardcoded configuration**: Use environment variables
-8. **Skipping idempotency**: Every consumer needs idempotency
+8. **Skipping idempotency**: Every consumer needs idempotency (use v2 API for new services)
 9. **Blocking in async code**: Use async clients throughout
 10. **Ignoring metrics**: Monitor all critical operations

@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
-from huleedu_service_libs.idempotency import idempotent_consumer
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
 from services.spellchecker_service.event_processor import process_single_message
 from services.spellchecker_service.protocols import SpellLogicProtocol
@@ -30,7 +30,9 @@ async def test_exception_failure_releases_lock(
     redis_client = MockRedisClient()
     kafka_msg = create_mock_kafka_message(sample_spellcheck_request_event)
 
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(service_name="spell-checker-service")
+    
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_with_exception(msg: ConsumerRecord) -> bool:
         raise RuntimeError("Unexpected infrastructure failure")
 
@@ -53,7 +55,9 @@ async def test_redis_failure_fallback(
     redis_client.should_fail_set = True
     kafka_msg = create_mock_kafka_message(sample_spellcheck_request_event)
 
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(service_name="spell-checker-service")
+    
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
             msg=msg,

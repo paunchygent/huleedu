@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
-from huleedu_service_libs.idempotency import idempotent_consumer
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
 from common_core.status_enums import EssayStatus
 from services.spellchecker_service.event_processor import process_single_message
@@ -37,7 +37,9 @@ async def test_first_time_event_processing_success(
     http_session, content_client, result_store, event_publisher, kafka_bus = mock_boundary_services
     kafka_msg = create_mock_kafka_message(sample_spellcheck_request_event)
 
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(service_name="spell-checker-service")
+    
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
             msg=msg,
@@ -56,9 +58,9 @@ async def test_first_time_event_processing_success(
     assert len(redis_client.set_calls) == 1
     assert len(redis_client.delete_calls) == 0
     set_call = redis_client.set_calls[0]
-    assert set_call[0].startswith("huleedu:events:seen:")
-    assert set_call[1] == "1"
-    assert set_call[2] == 86400
+    assert set_call[0].startswith("huleedu:idempotency:v2:spell-checker-service:")
+    assert "spell-checker-service" in set_call[0]
+    assert set_call[2] == 3600  # Default TTL for spellcheck events in v2
     content_client.fetch_content.assert_called_once()
     result_store.store_content.assert_called_once()
     event_publisher.publish_spellcheck_result.assert_called_once()
@@ -77,9 +79,13 @@ async def test_duplicate_event_skipped(
     http_session, content_client, result_store, event_publisher, kafka_bus = mock_boundary_services
     kafka_msg = create_mock_kafka_message(sample_spellcheck_request_event)
     deterministic_id = generate_deterministic_event_id(kafka_msg.value)
-    redis_client.keys[f"huleedu:events:seen:{deterministic_id}"] = "1"
+    # Simulate v2 key format for duplicate detection
+    v2_key = f"huleedu:idempotency:v2:spell-checker-service:huleedu_essay_spellcheck_requested_v1:{deterministic_id}"
+    redis_client.keys[v2_key] = '{"processed_at": 1640995200, "processed_by": "spell-checker-service"}'
 
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(service_name="spell-checker-service")
+    
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
         return await process_single_message(
             msg=msg,
@@ -114,7 +120,9 @@ async def test_processing_failure_keeps_lock(
     content_client.fetch_content.side_effect = Exception("Content service unavailable")
     kafka_msg = create_mock_kafka_message(sample_spellcheck_request_event)
 
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(service_name="spell-checker-service")
+    
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
             msg=msg,
@@ -177,7 +185,9 @@ async def test_deterministic_event_id_generation(
     kafka_msg1 = create_mock_kafka_message(event1)
     kafka_msg2 = create_mock_kafka_message(event2)
 
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(service_name="spell-checker-service")
+    
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
         return await process_single_message(
             msg=msg,
@@ -202,8 +212,10 @@ async def test_deterministic_event_id_generation(
     key1 = redis_client.set_calls[0][0]
     key2 = redis_client.set_calls[1][0]
     assert key1 == key2
-    assert key1.startswith("huleedu:events:seen:")
-    assert len(key1.split(":")[3]) == 64
+    assert key1.startswith("huleedu:idempotency:v2:spell-checker-service:")
+    assert "huleedu_essay_spellcheck_requested_v1" in key1
+    # V2 keys have format: prefix:service:event_type:hash
+    assert len(key1.split(":")[-1]) == 64
 
     assert content_client.fetch_content.call_count == 1
     assert result_store.store_content.call_count == 1

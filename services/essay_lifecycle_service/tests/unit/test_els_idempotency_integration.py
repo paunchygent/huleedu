@@ -1,8 +1,9 @@
 """
-Unit tests for Essay Lifecycle Service idempotency integration.
+Unit tests for Essay Lifecycle Service idempotency integration with v2 API.
 
-Tests the idempotency decorator applied to ELS message processing.
+Tests the v2 idempotency decorator applied to ELS message processing.
 Follows testing patterns: mock boundaries (Redis), not business logic.
+Migrated to v2 API with service namespacing and enhanced error handling.
 """
 
 from __future__ import annotations
@@ -131,8 +132,8 @@ def mock_handlers() -> tuple[AsyncMock, AsyncMock, AsyncMock]:
 async def test_first_time_event_processing_success(
     sample_batch_registered_event: dict, mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
 ) -> None:
-    """Test that first-time events are processed successfully with idempotency."""
-    from huleedu_service_libs.idempotency import idempotent_consumer
+    """Test that first-time events are processed successfully with v2 idempotency."""
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
     redis_client = MockRedisClient()
     batch_coordination_handler, batch_command_handler, service_result_handler = mock_handlers
@@ -140,8 +141,15 @@ async def test_first_time_event_processing_success(
     # Create Kafka message
     kafka_msg = create_mock_kafka_message(sample_batch_registered_event)
 
-    # Apply idempotency decorator to real message processor
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=3600)
+    # Configure v2 idempotency with ELS service name
+    config = IdempotencyConfig(
+        service_name="essay-lifecycle-service",
+        default_ttl=3600,
+        enable_debug_logging=True,
+    )
+
+    # Apply v2 idempotency decorator to real message processor
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
             msg=msg,
@@ -158,11 +166,17 @@ async def test_first_time_event_processing_success(
     assert len(redis_client.set_calls) == 1  # SETNX was called
     assert len(redis_client.delete_calls) == 0  # No cleanup needed
 
-    # Verify Redis key format
+    # Verify v2 Redis key format with service namespacing
     set_call = redis_client.set_calls[0]
-    assert set_call[0].startswith("huleedu:events:seen:")
-    assert set_call[1] == "1"
-    assert set_call[2] == 3600
+    assert set_call[0].startswith("huleedu:idempotency:v2:essay-lifecycle-service:")
+    # V2 stores JSON metadata instead of "1"
+    import json
+    stored_data = json.loads(set_call[1])
+    assert "processed_at" in stored_data
+    assert "processed_by" in stored_data
+    assert stored_data["processed_by"] == "essay-lifecycle-service"
+    # V2 uses event-type specific TTL (43200 for batch coordination events)
+    assert set_call[2] == 43200
 
     # Verify business logic was called
     batch_coordination_handler.handle_batch_essays_registered.assert_called_once()
@@ -174,7 +188,7 @@ async def test_duplicate_event_skipped(
 ) -> None:
     """Test that duplicate events are skipped without processing business logic."""
     from huleedu_service_libs.event_utils import generate_deterministic_event_id
-    from huleedu_service_libs.idempotency import idempotent_consumer
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
     redis_client = MockRedisClient()
     batch_coordination_handler, batch_command_handler, service_result_handler = mock_handlers
@@ -182,12 +196,21 @@ async def test_duplicate_event_skipped(
     # Create Kafka message
     kafka_msg = create_mock_kafka_message(sample_batch_registered_event)
 
-    # Pre-populate Redis with the event key to simulate duplicate
+    # Pre-populate Redis with the event key to simulate duplicate using v2 format
     deterministic_id = generate_deterministic_event_id(kafka_msg.value)
-    redis_client.keys[f"huleedu:events:seen:{deterministic_id}"] = "1"
+    event_type = sample_batch_registered_event["event_type"]
+    safe_event_type = event_type.replace(".", "_")
+    redis_client.keys[f"huleedu:idempotency:v2:essay-lifecycle-service:{safe_event_type}:{deterministic_id}"] = '{"processed_at": 1640995200.0}'
 
-    # Apply idempotency decorator
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=3600)
+    # Configure v2 idempotency
+    config = IdempotencyConfig(
+        service_name="essay-lifecycle-service",
+        default_ttl=3600,
+        enable_debug_logging=True,
+    )
+
+    # Apply v2 idempotency decorator
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
         return await process_single_message(
             msg=msg,
@@ -212,13 +235,13 @@ async def test_duplicate_event_skipped(
 async def test_processing_failure_keeps_lock(
     sample_batch_registered_event: dict, mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
 ) -> None:
-    """Test that business logic failures keep the idempotency lock (no retry)."""
-    from huleedu_service_libs.idempotency import idempotent_consumer
+    """Test that business logic failures keep the idempotency lock in v2 (ELS returns False)."""
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
     redis_client = MockRedisClient()
     batch_coordination_handler, batch_command_handler, service_result_handler = mock_handlers
 
-    # Configure business logic to fail
+    # Configure business logic to fail (ELS catches exceptions and returns False)
     batch_coordination_handler.handle_batch_essays_registered.side_effect = Exception(
         "Processing failed"
     )
@@ -226,8 +249,15 @@ async def test_processing_failure_keeps_lock(
     # Create Kafka message
     kafka_msg = create_mock_kafka_message(sample_batch_registered_event)
 
-    # Apply idempotency decorator
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=3600)
+    # Configure v2 idempotency
+    config = IdempotencyConfig(
+        service_name="essay-lifecycle-service",
+        default_ttl=3600,
+        enable_debug_logging=True,
+    )
+
+    # Apply v2 idempotency decorator
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
             msg=msg,
@@ -236,29 +266,36 @@ async def test_processing_failure_keeps_lock(
             service_result_handler=service_result_handler,
         )
 
-    # Process message - should return False for processing failure
+    # Process message - ELS returns False for processing failures
     result = await handle_message_idempotently(kafka_msg)
 
-    # Assertions
-    assert result is False  # Processing failed, should return False
+    # Assertions - v2 preserves lock when function returns False (no exception)
+    assert result is False  # Processing failed, ELS returns False
     assert len(redis_client.set_calls) == 1  # SETNX was attempted
-    assert len(redis_client.delete_calls) == 0  # Key was NOT deleted (business logic failure)
+    assert len(redis_client.delete_calls) == 0  # Key was NOT deleted (no exception raised)
 
 
 @pytest.mark.asyncio
 async def test_exception_failure_releases_lock(
     sample_batch_registered_event: dict,
 ) -> None:
-    """Test that unhandled exceptions release the idempotency lock for retry."""
-    from huleedu_service_libs.idempotency import idempotent_consumer
+    """Test that unhandled exceptions release the idempotency lock for retry in v2."""
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
     redis_client = MockRedisClient()
 
     # Create Kafka message
     kafka_msg = create_mock_kafka_message(sample_batch_registered_event)
 
-    # Apply idempotency decorator to a function that raises an exception
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=3600)
+    # Configure v2 idempotency
+    config = IdempotencyConfig(
+        service_name="essay-lifecycle-service",
+        default_ttl=3600,
+        enable_debug_logging=True,
+    )
+
+    # Apply v2 idempotency decorator to a function that raises an exception
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_with_exception(msg: ConsumerRecord) -> bool:
         raise RuntimeError("Unhandled exception (e.g., network failure)")
 
@@ -270,17 +307,17 @@ async def test_exception_failure_releases_lock(
     assert len(redis_client.set_calls) == 1  # SETNX was attempted
     assert len(redis_client.delete_calls) == 1  # Key was deleted for retry
 
-    # Verify Redis key was deleted
+    # Verify v2 Redis key format was deleted
     delete_call = redis_client.delete_calls[0]
-    assert delete_call.startswith("huleedu:events:seen:")
+    assert delete_call.startswith("huleedu:idempotency:v2:essay-lifecycle-service:")
 
 
 @pytest.mark.asyncio
 async def test_redis_failure_fallback(
     sample_batch_registered_event: dict, mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
 ) -> None:
-    """Test that Redis failures fall back to processing without idempotency."""
-    from huleedu_service_libs.idempotency import idempotent_consumer
+    """Test that Redis failures fall back to processing without idempotency in v2."""
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
     redis_client = MockRedisClient()
     redis_client.should_fail_set = True  # Force Redis failure
@@ -289,8 +326,15 @@ async def test_redis_failure_fallback(
     # Create Kafka message
     kafka_msg = create_mock_kafka_message(sample_batch_registered_event)
 
-    # Apply idempotency decorator
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=3600)
+    # Configure v2 idempotency
+    config = IdempotencyConfig(
+        service_name="essay-lifecycle-service",
+        default_ttl=3600,
+        enable_debug_logging=True,
+    )
+
+    # Apply v2 idempotency decorator
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
             msg=msg,
@@ -315,8 +359,8 @@ async def test_redis_failure_fallback(
 async def test_deterministic_event_id_generation(
     mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock],
 ) -> None:
-    """Test that identical message content generates identical Redis keys."""
-    from huleedu_service_libs.idempotency import idempotent_consumer
+    """Test that identical message content generates identical Redis keys in v2."""
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
     redis_client = MockRedisClient()
     batch_coordination_handler, batch_command_handler, service_result_handler = mock_handlers
@@ -349,8 +393,15 @@ async def test_deterministic_event_id_generation(
     msg1 = create_mock_kafka_message(event_data)
     msg2 = create_mock_kafka_message(event_data)
 
-    # Apply idempotency decorator
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=3600)
+    # Configure v2 idempotency
+    config = IdempotencyConfig(
+        service_name="essay-lifecycle-service",
+        default_ttl=3600,
+        enable_debug_logging=True,
+    )
+
+    # Apply v2 idempotency decorator
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
         return await process_single_message(
             msg=msg,
@@ -367,11 +418,16 @@ async def test_deterministic_event_id_generation(
     result2 = await handle_message_idempotently(msg2)
     assert result2 is None  # Should be None for duplicate
 
-    # Verify both messages generated the same Redis key
+    # Verify both messages generated the same v2 Redis key
     assert len(redis_client.set_calls) == 2
     key1 = redis_client.set_calls[0][0]
     key2 = redis_client.set_calls[1][0]
     assert key1 == key2
+    assert key1.startswith("huleedu:idempotency:v2:essay-lifecycle-service:")
+    # V2 key format: huleedu:idempotency:v2:service:event_type:hash
+    key_parts = key1.split(":")
+    assert len(key_parts) == 6  # prefix:idempotency:v2:service:event_type:hash
+    assert len(key_parts[5]) == 64  # SHA-256 hash is 64 chars
 
     # Business logic should only be called once
     assert batch_coordination_handler.handle_batch_essays_registered.call_count == 1
