@@ -140,7 +140,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
             # Convert to ConcreteEssayState
             current_state = self._db_to_essay_state(db_essay)
-            
+
             # Log the transition for debugging
             self.logger.debug(
                 f"Updating essay {essay_id} from {current_state.current_status.value} to {new_status.value}"
@@ -160,7 +160,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 k.value: v for k, v in current_state.storage_references.items()
             }
 
-            stmt = (
+            update_stmt = (
                 update(EssayStateDB)
                 .where(EssayStateDB.essay_id == essay_id)
                 .values(
@@ -171,9 +171,9 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                     updated_at=datetime.now(UTC).replace(tzinfo=None),
                 )
             )
-            result = await session.execute(stmt)
+            update_result = await session.execute(update_stmt)
 
-            if result.rowcount == 0:
+            if update_result.rowcount == 0:
                 raise ValueError(f"Essay {essay_id} update failed - not found")
 
             self.logger.debug(f"Updated essay {essay_id} status to {new_status.value}")

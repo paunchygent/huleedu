@@ -66,7 +66,7 @@ class ResultAggregatorKafkaConsumer:
                 # Batch registration and coordination events (12 hours)
                 "BatchEssaysRegistered": 43200,
                 "ELSBatchPhaseOutcomeV1": 43200,
-                # Processing completion events (24 hours)  
+                # Processing completion events (24 hours)
                 "SpellcheckResultDataV1": 86400,
                 "CJAssessmentCompletedV1": 86400,
                 # Aggregation completion events (72 hours for batch lifecycle)

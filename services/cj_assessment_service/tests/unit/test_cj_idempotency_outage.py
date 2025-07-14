@@ -155,7 +155,7 @@ async def test_exception_failure_releases_lock(
         default_ttl=86400,
         enable_debug_logging=True,
     )
-    
+
     @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         await mock_process(msg)
@@ -193,7 +193,7 @@ async def test_redis_failure_fallback(
         default_ttl=86400,
         enable_debug_logging=True,
     )
-    
+
     @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(

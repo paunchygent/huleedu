@@ -142,7 +142,7 @@ async def test_first_time_event_processing_success(
         default_ttl=86400,
         enable_debug_logging=True,
     )
-    
+
     @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
@@ -164,6 +164,7 @@ async def test_first_time_event_processing_success(
     assert set_call[0].startswith("huleedu:idempotency:v2:cj-assessment-service:")
     # V2 stores JSON metadata instead of "1"
     import json
+
     stored_data = json.loads(set_call[1])
     assert "processed_at" in stored_data
     assert "processed_by" in stored_data
@@ -189,14 +190,16 @@ async def test_duplicate_event_skipped(
 
     deterministic_id = generate_deterministic_event_id(kafka_msg.value)
     # Update key format for v2
-    mock_redis_client.keys[f"huleedu:idempotency:v2:cj-assessment-service:huleedu_els_cj_assessment_requested_v1:{deterministic_id}"] = '{"processed_at": 1640995200.0}'
+    mock_redis_client.keys[
+        f"huleedu:idempotency:v2:cj-assessment-service:huleedu_els_cj_assessment_requested_v1:{deterministic_id}"
+    ] = '{"processed_at": 1640995200.0}'
 
     config = IdempotencyConfig(
         service_name="cj-assessment-service",
         default_ttl=86400,
         enable_debug_logging=True,
     )
-    
+
     @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
         return await process_single_message(
@@ -270,7 +273,7 @@ async def test_deterministic_event_id_generation(
         default_ttl=86400,
         enable_debug_logging=True,
     )
-    
+
     @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
         return await process_single_message(

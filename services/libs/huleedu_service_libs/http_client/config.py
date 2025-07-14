@@ -57,7 +57,9 @@ class ContentServiceConfig(BaseModel):
 
     fetch_endpoint_path: str = Field(
         default="",
-        description="Additional path for content fetch endpoint (appended to base_url/{storage_id})",
+        description=(
+            "Additional path for content fetch endpoint (appended to base_url/{storage_id})"
+        ),
     )
 
     store_endpoint_path: str = Field(

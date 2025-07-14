@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 
 import pytest
 from aiokafka import ConsumerRecord
-from huleedu_service_libs.idempotency_v2 import idempotent_consumer_v2, IdempotencyConfig
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
 
 # Real handler functions for testing (not mocks)
@@ -108,7 +108,7 @@ def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
         event_data["event_id"] = str(uuid.uuid4())
     if "source_service" not in event_data:
         event_data["source_service"] = "test-service"
-    
+
     message_json = json.dumps(event_data)
     return ConsumerRecord(
         topic="test-topic",
@@ -158,9 +158,7 @@ async def test_first_time_event_processing(
 
     # Create idempotency config for v2 API
     config = IdempotencyConfig(
-        service_name="test-service",
-        default_ttl=3600,
-        enable_debug_logging=True
+        service_name="test-service", default_ttl=3600, enable_debug_logging=True
     )
 
     # Apply decorator to real handler
@@ -181,6 +179,7 @@ async def test_first_time_event_processing(
     assert set_call[0].startswith("huleedu:idempotency:v2:test-service:test_event_v1:")
     # Verify the value is JSON metadata (not just "1")
     import json
+
     value_data = json.loads(set_call[1])
     assert "processed_at" in value_data
     assert value_data["processed_by"] == "test-service"
@@ -203,17 +202,16 @@ async def test_duplicate_event_skipped(
     kafka_msg = create_mock_kafka_message(sample_event_data)
 
     # Create idempotency config for v2 API
-    config = IdempotencyConfig(
-        service_name="test-service",
-        default_ttl=3600
-    )
+    config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
     # Pre-populate Redis with the event key to simulate duplicate
     from huleedu_service_libs.event_utils import generate_deterministic_event_id
 
     deterministic_id = generate_deterministic_event_id(kafka_msg.value)
     # Use v2 key format: huleedu:idempotency:v2:{service}:{event_type}:{hash}
-    redis_key = config.generate_redis_key("test.event.v1", sample_event_data["event_id"], deterministic_id)
+    redis_key = config.generate_redis_key(
+        "test.event.v1", sample_event_data["event_id"], deterministic_id
+    )
     mock_redis_client.keys[redis_key] = '{"processed_at": 1234567890}'
 
     # Create call tracker for verification
@@ -246,10 +244,7 @@ async def test_processing_failure_releases_lock(
     kafka_msg = create_mock_kafka_message(sample_event_data)
 
     # Create idempotency config for v2 API
-    config = IdempotencyConfig(
-        service_name="test-service",
-        default_ttl=3600
-    )
+    config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
     # Apply decorator to real failing handler
     @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
@@ -282,10 +277,7 @@ async def test_redis_set_failure_fallback(
     kafka_msg = create_mock_kafka_message(sample_event_data)
 
     # Create idempotency config for v2 API
-    config = IdempotencyConfig(
-        service_name="test-service",
-        default_ttl=3600
-    )
+    config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
     # Apply decorator to real handler
     @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
@@ -314,10 +306,7 @@ async def test_redis_delete_failure_logged(
     kafka_msg = create_mock_kafka_message(sample_event_data)
 
     # Create idempotency config for v2 API
-    config = IdempotencyConfig(
-        service_name="test-service",
-        default_ttl=3600
-    )
+    config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
     # Apply decorator to real failing handler
     @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
@@ -387,10 +376,7 @@ async def test_deterministic_key_generation(mock_redis_client: MockRedisClient) 
     tracker = HandlerCallTracker()
 
     # Create idempotency config for v2 API
-    config = IdempotencyConfig(
-        service_name="test-service",
-        default_ttl=3600
-    )
+    config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
     # Apply decorator to real handler
     @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
@@ -423,11 +409,11 @@ async def test_different_data_generates_different_keys(mock_redis_client: MockRe
     # Create two different event payloads with different event_ids and data
     event_data_1 = {
         "event_id": str(uuid.uuid4()),
-        "data": {"batch_id": "batch-1", "value": "different"}
+        "data": {"batch_id": "batch-1", "value": "different"},
     }
     event_data_2 = {
-        "event_id": str(uuid.uuid4()), 
-        "data": {"batch_id": "batch-2", "value": "content"}
+        "event_id": str(uuid.uuid4()),
+        "data": {"batch_id": "batch-2", "value": "content"},
     }
 
     # Create messages
@@ -438,10 +424,7 @@ async def test_different_data_generates_different_keys(mock_redis_client: MockRe
     tracker = HandlerCallTracker()
 
     # Create idempotency config for v2 API
-    config = IdempotencyConfig(
-        service_name="test-service",
-        default_ttl=3600
-    )
+    config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
     # Apply decorator to real handler
     @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)

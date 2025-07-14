@@ -104,7 +104,9 @@ class TestKafkaConsumerIdempotency:
         assert len(mock_redis_client.set_calls) == 1
         assert len(mock_redis_client.delete_calls) == 1
         # V2 uses namespaced keys: huleedu:idempotency:v2:result-aggregator-service:event_type:hash
-        assert mock_redis_client.delete_calls[0].startswith("huleedu:idempotency:v2:result-aggregator-service:")
+        assert mock_redis_client.delete_calls[0].startswith(
+            "huleedu:idempotency:v2:result-aggregator-service:"
+        )
 
     async def test_idempotency_redis_failure_processes_message(
         self,

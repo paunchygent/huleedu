@@ -14,7 +14,6 @@ This test validates the complete pipeline using real student essays from
 Tests both phases with real orchestration and real student essays.
 """
 
-
 import pytest
 
 from tests.functional.client_pipeline_test_utils import publish_client_pipeline_request

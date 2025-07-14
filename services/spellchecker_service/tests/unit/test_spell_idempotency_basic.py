@@ -38,7 +38,7 @@ async def test_first_time_event_processing_success(
     kafka_msg = create_mock_kafka_message(sample_spellcheck_request_event)
 
     config = IdempotencyConfig(service_name="spell-checker-service")
-    
+
     @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
@@ -80,11 +80,16 @@ async def test_duplicate_event_skipped(
     kafka_msg = create_mock_kafka_message(sample_spellcheck_request_event)
     deterministic_id = generate_deterministic_event_id(kafka_msg.value)
     # Simulate v2 key format for duplicate detection
-    v2_key = f"huleedu:idempotency:v2:spell-checker-service:huleedu_essay_spellcheck_requested_v1:{deterministic_id}"
-    redis_client.keys[v2_key] = '{"processed_at": 1640995200, "processed_by": "spell-checker-service"}'
+    v2_key = (
+        f"huleedu:idempotency:v2:spell-checker-service:"
+        f"huleedu_essay_spellcheck_requested_v1:{deterministic_id}"
+    )
+    redis_client.keys[v2_key] = (
+        '{"processed_at": 1640995200, "processed_by": "spell-checker-service"}'
+    )
 
     config = IdempotencyConfig(service_name="spell-checker-service")
-    
+
     @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
         return await process_single_message(
@@ -121,7 +126,7 @@ async def test_processing_failure_keeps_lock(
     kafka_msg = create_mock_kafka_message(sample_spellcheck_request_event)
 
     config = IdempotencyConfig(service_name="spell-checker-service")
-    
+
     @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
@@ -186,7 +191,7 @@ async def test_deterministic_event_id_generation(
     kafka_msg2 = create_mock_kafka_message(event2)
 
     config = IdempotencyConfig(service_name="spell-checker-service")
-    
+
     @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
         return await process_single_message(

@@ -7,6 +7,7 @@ integrating with EssayStateMachine for proper state transitions.
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import nullcontext
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -338,11 +339,29 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             batch_status_summary = await self.repository.get_batch_status_summary(
                 result_data.entity_ref.entity_id
             )
+
+            # Safely create status summary for logging, handling potential mock issues
+            status_summary_for_log: dict[str, int] | str
+            try:
+                if (
+                    hasattr(batch_status_summary, "items")
+                    and not asyncio.iscoroutine(batch_status_summary)
+                    and isinstance(batch_status_summary, dict)
+                ):
+                    status_summary_for_log = {
+                        k.value if hasattr(k, "value") and not asyncio.iscoroutine(k) else str(k): v
+                        for k, v in batch_status_summary.items()
+                    }
+                else:
+                    status_summary_for_log = str(batch_status_summary)
+            except Exception:
+                status_summary_for_log = f"<unavailable: {type(batch_status_summary).__name__}>"
+
             logger.info(
                 "Batch status summary after CJ assessment processing",
                 extra={
                     "batch_id": result_data.entity_ref.entity_id,
-                    "status_summary": {k.value: v for k, v in batch_status_summary.items()},
+                    "status_summary": status_summary_for_log,
                     "correlation_id": str(correlation_id),
                 },
             )
@@ -358,7 +377,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                         )
                         if batch_representative_essay_state:
                             logger.info(
-                                f"Triggering batch completion check with essay {i+1}/{len(result_data.rankings)}",
+                                f"Triggering batch completion check with essay {i + 1}/{len(result_data.rankings)}",
                                 extra={
                                     "essay_id": essay_id_in_ranking,
                                     "essay_status": batch_representative_essay_state.current_status.value,

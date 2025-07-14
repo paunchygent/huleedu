@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 
-class TestEventIdFactory:
+class EventIdFactory:
     """Factory for generating unique test event IDs that prevent Redis collisions."""
 
     def __init__(self, test_run_id: str | None = None) -> None:
@@ -55,8 +55,10 @@ class TestEventIdFactory:
         hash_digest = hashlib.sha256(hash_input.encode()).hexdigest()
 
         # Convert hash to UUID format
-        uuid_str = (f"{hash_digest[:8]}-{hash_digest[8:12]}-{hash_digest[12:16]}-"
-                    f"{hash_digest[16:20]}-{hash_digest[20:32]}")
+        uuid_str = (
+            f"{hash_digest[:8]}-{hash_digest[8:12]}-{hash_digest[12:16]}-"
+            f"{hash_digest[16:20]}-{hash_digest[20:32]}"
+        )
         return uuid.UUID(uuid_str)
 
     def create_unique_correlation_id(self) -> uuid.UUID:
@@ -80,21 +82,21 @@ class TestEventIdFactory:
 
 
 # Global factory instance for tests
-_test_event_factory: TestEventIdFactory | None = None
+_test_event_factory: EventIdFactory | None = None
 
 
-def get_test_event_factory() -> TestEventIdFactory:
+def get_test_event_factory() -> EventIdFactory:
     """Get or create the global test event factory."""
     global _test_event_factory
     if _test_event_factory is None:
-        _test_event_factory = TestEventIdFactory()
+        _test_event_factory = EventIdFactory()
     return _test_event_factory
 
 
-def reset_test_event_factory() -> TestEventIdFactory:
+def reset_test_event_factory() -> EventIdFactory:
     """Reset the global test event factory with a new test run ID."""
     global _test_event_factory
-    _test_event_factory = TestEventIdFactory()
+    _test_event_factory = EventIdFactory()
     return _test_event_factory
 
 

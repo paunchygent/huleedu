@@ -171,6 +171,7 @@ async def test_first_time_event_processing_success(
     assert set_call[0].startswith("huleedu:idempotency:v2:essay-lifecycle-service:")
     # V2 stores JSON metadata instead of "1"
     import json
+
     stored_data = json.loads(set_call[1])
     assert "processed_at" in stored_data
     assert "processed_by" in stored_data
@@ -200,7 +201,9 @@ async def test_duplicate_event_skipped(
     deterministic_id = generate_deterministic_event_id(kafka_msg.value)
     event_type = sample_batch_registered_event["event_type"]
     safe_event_type = event_type.replace(".", "_")
-    redis_client.keys[f"huleedu:idempotency:v2:essay-lifecycle-service:{safe_event_type}:{deterministic_id}"] = '{"processed_at": 1640995200.0}'
+    redis_client.keys[
+        f"huleedu:idempotency:v2:essay-lifecycle-service:{safe_event_type}:{deterministic_id}"
+    ] = '{"processed_at": 1640995200.0}'
 
     # Configure v2 idempotency
     config = IdempotencyConfig(

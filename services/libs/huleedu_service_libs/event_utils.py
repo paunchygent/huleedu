@@ -66,7 +66,7 @@ def generate_deterministic_event_id(msg_value: bytes) -> str:
     """
     Generates a deterministic ID for an event based on its unique event_id and data payload.
 
-    This function creates a stable hash that includes both the `event_id` and `data` 
+    This function creates a stable hash that includes both the `event_id` and `data`
     fields from the event envelope. This ensures that:
     - The exact same event (same event_id) processed twice will be caught as a duplicate
     - Different events with similar data (different event_ids) can be processed normally
@@ -109,10 +109,7 @@ def generate_deterministic_event_id(msg_value: bytes) -> str:
         # Include event_id in the hash to ensure true uniqueness
         # If event_id is missing, fall back to data-only hash for backward compatibility
         if event_id:
-            hash_input = {
-                "event_id": event_id,
-                "data": data_payload
-            }
+            hash_input = {"event_id": event_id, "data": data_payload}
         else:
             # Backward compatibility: if no event_id, use data only
             hash_input = data_payload

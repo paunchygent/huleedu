@@ -18,24 +18,23 @@ from huleedu_service_libs.event_utils import (
 class TestGenerateDeterministicEventId:
     """Test cases for deterministic event ID generation."""
 
-    def test_identical_data_produces_same_id(self) -> None:
-        """Test that identical data payloads produce identical deterministic IDs."""
-        # Arrange
+    def test_identical_events_produce_same_id(self) -> None:
+        """Test that identical events (same event_id and data) produce identical IDs."""
+        # Arrange - Use the same event_id for true duplicate detection
+        event_id = str(uuid4())
         event_data = {
             "data": {"batch_id": "batch_123", "essay_count": 5, "status": "completed"},
-            "event_id": str(uuid4()),  # Different each time
-            "event_timestamp": "2024-01-15T10:30:00Z",  # Different each time
+            "event_id": event_id,  # Same event_id for true duplicates
+            "event_timestamp": "2024-01-15T10:30:00Z",
             "source_service": "batch_orchestrator_service",
         }
 
-        # Create two identical events with different transient metadata
+        # Create two identical events with same event_id but different timestamps
         event1 = event_data.copy()
-        event1["event_id"] = str(uuid4())
         event1["event_timestamp"] = "2024-01-15T10:30:00Z"
 
         event2 = event_data.copy()
-        event2["event_id"] = str(uuid4())  # Different UUID
-        event2["event_timestamp"] = "2024-01-15T10:31:00Z"  # Different timestamp
+        event2["event_timestamp"] = "2024-01-15T10:31:00Z"  # Different timestamp (metadata)
 
         msg1 = json.dumps(event1).encode("utf-8")
         msg2 = json.dumps(event2).encode("utf-8")
@@ -45,43 +44,69 @@ class TestGenerateDeterministicEventId:
         id2 = generate_deterministic_event_id(msg2)
 
         # Assert
-        assert id1 == id2, "Identical data should produce identical deterministic IDs"
+        assert id1 == id2, (
+            "Identical events (same event_id and data) should produce identical deterministic IDs"
+        )
         assert len(id1) == 64, "SHA256 hash should be 64 characters"
 
-    def test_different_data_produces_different_ids(self) -> None:
-        """Test that different data payloads produce different deterministic IDs."""
-        # Arrange
+    def test_different_events_produce_different_ids(self) -> None:
+        """Test that different events (different event_id or data) produce different IDs."""
+        # Arrange - Test both different event_id and different data cases
+
+        # Case 1: Same data, different event_id (should produce different IDs)
+        common_data = {"batch_id": "batch_123", "status": "completed"}
         event1 = {
-            "data": {"batch_id": "batch_123", "status": "completed"},
+            "data": common_data,
             "event_id": str(uuid4()),
         }
-
         event2 = {
-            "data": {"batch_id": "batch_456", "status": "completed"},  # Different batch_id
-            "event_id": str(uuid4()),
+            "data": common_data,
+            "event_id": str(uuid4()),  # Different event_id
+        }
+
+        # Case 2: Different data, same event_id (should also produce different IDs)
+        event_id = str(uuid4())
+        event3 = {
+            "data": {"batch_id": "batch_123", "status": "completed"},
+            "event_id": event_id,
+        }
+        event4 = {
+            "data": {"batch_id": "batch_456", "status": "completed"},  # Different data
+            "event_id": event_id,
         }
 
         msg1 = json.dumps(event1).encode("utf-8")
         msg2 = json.dumps(event2).encode("utf-8")
+        msg3 = json.dumps(event3).encode("utf-8")
+        msg4 = json.dumps(event4).encode("utf-8")
 
         # Act
         id1 = generate_deterministic_event_id(msg1)
         id2 = generate_deterministic_event_id(msg2)
+        id3 = generate_deterministic_event_id(msg3)
+        id4 = generate_deterministic_event_id(msg4)
 
         # Assert
-        assert id1 != id2, "Different data should produce different deterministic IDs"
+        assert id1 != id2, (
+            "Same data but different event_id should produce different deterministic IDs"
+        )
+        assert id3 != id4, (
+            "Same event_id but different data should produce different deterministic IDs"
+        )
+        assert len({id1, id2, id3, id4}) == 4, "All different events should produce unique IDs"
 
     def test_key_order_independence(self) -> None:
-        """Test that JSON key order doesn't affect the deterministic ID."""
-        # Arrange
+        """Test that JSON key order doesn't affect deterministic ID when event_id is the same."""
+        # Arrange - Use same event_id to test key order independence
+        event_id = str(uuid4())
         event1 = {
             "data": {"batch_id": "123", "essay_count": 5, "status": "completed"},
-            "event_id": str(uuid4()),
+            "event_id": event_id,  # Same event_id
         }
 
         event2 = {
             "data": {"status": "completed", "batch_id": "123", "essay_count": 5},  # Different order
-            "event_id": str(uuid4()),
+            "event_id": event_id,  # Same event_id
         }
 
         msg1 = json.dumps(event1).encode("utf-8")
@@ -92,7 +117,9 @@ class TestGenerateDeterministicEventId:
         id2 = generate_deterministic_event_id(msg2)
 
         # Assert
-        assert id1 == id2, "Key order should not affect deterministic ID"
+        assert id1 == id2, (
+            "Key order should not affect deterministic ID when event_id and data are the same"
+        )
 
     def test_nested_data_consistency(self) -> None:
         """Test deterministic ID generation with nested data structures."""

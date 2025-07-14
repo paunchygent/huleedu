@@ -69,8 +69,10 @@ class DistributedStateManager:
                     self.redis_container,
                     "redis-cli",
                     "EVAL",
-                    ("local keys = redis.call('keys', 'huleedu:events:seen:*') "
-                     "for i=1,#keys do redis.call('del', keys[i]) end return #keys"),
+                    (
+                        "local keys = redis.call('keys', 'huleedu:events:seen:*') "
+                        "for i=1,#keys do redis.call('del', keys[i]) end return #keys"
+                    ),
                     "0",
                 ]
                 result = subprocess.run(clear_cmd, capture_output=True, text=True, check=True)
@@ -86,7 +88,7 @@ class DistributedStateManager:
 
     async def _reset_kafka_consumer_offsets(self) -> None:
         """Reset Kafka consumer offsets to skip old events from previous test runs.
-        
+
         CRITICAL: We reset to 'latest' not 'earliest' because:
         - Old events in Kafka have event_ids from previous test runs
         - With proper idempotency (including event_id in hash), these would be rejected
@@ -147,7 +149,7 @@ class DistributedStateManager:
             "redis_sample_keys": [],
             "kafka_consumer_groups": [],
             "clean": True,
-            "verification_timestamp": time.time()
+            "verification_timestamp": time.time(),
         }
 
         try:
@@ -158,31 +160,36 @@ class DistributedStateManager:
             local total_count = 0
             local sample_keys = {}
             local max_samples = 5
-            
+
             repeat
                 local result = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', 100)
                 cursor = tonumber(result[1])
                 local keys = result[2]
                 total_count = total_count + #keys
-                
+
                 -- Collect sample keys for debugging
                 for i = 1, math.min(#keys, max_samples - #sample_keys) do
                     table.insert(sample_keys, keys[i])
                     if #sample_keys >= max_samples then break end
                 end
             until cursor == 0 or #sample_keys >= max_samples
-            
+
             return {total_count, sample_keys}
             """
 
             count_cmd = [
-                "docker", "exec", self.redis_container,
-                "redis-cli", "EVAL", verification_script, "0"
+                "docker",
+                "exec",
+                self.redis_container,
+                "redis-cli",
+                "EVAL",
+                verification_script,
+                "0",
             ]
             result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
 
             # Parse Redis response
-            output_lines = result.stdout.strip().split('\n')
+            output_lines = result.stdout.strip().split("\n")
             if len(output_lines) >= 1:
                 validation["redis_idempotency_keys"] = int(output_lines[0])
                 # Collect sample keys if present
@@ -192,7 +199,7 @@ class DistributedStateManager:
             key_count = validation["redis_idempotency_keys"]
             if isinstance(key_count, int) and key_count > 0:
                 validation["clean"] = False
-                sample_keys_raw = validation.get('redis_sample_keys', [])
+                sample_keys_raw = validation.get("redis_sample_keys", [])
                 if isinstance(sample_keys_raw, list):
                     sample_keys = sample_keys_raw[:3]
                     sample_info = f" (samples: {sample_keys})" if sample_keys else ""
@@ -209,7 +216,7 @@ class DistributedStateManager:
     async def ensure_verified_clean_state(self, test_name: str) -> dict[str, Any]:
         """
         Ensure clean state with post-cleaning verification and retry logic.
-        
+
         Returns:
             Validation results after ensuring clean state
         """
@@ -226,7 +233,10 @@ class DistributedStateManager:
             validation = await self.validate_clean_state()
 
             if validation["clean"]:
-                logger.info(f"✅ Verified clean state achieved for test: {test_name} (attempt {attempt + 1})")
+                logger.info(
+                    f"✅ Verified clean state achieved for test: {test_name} "
+                    f"(attempt {attempt + 1})"
+                )
                 return validation
             else:
                 logger.warning(f"⚠️ State not clean after attempt {attempt + 1}: {validation}")
@@ -235,7 +245,9 @@ class DistributedStateManager:
                     await asyncio.sleep(1.0)
 
         # Final attempt failed
-        raise RuntimeError(f"Failed to achieve clean state after {max_attempts} attempts: {validation}")
+        raise RuntimeError(
+            f"Failed to achieve clean state after {max_attempts} attempts: {validation}"
+        )
 
 
 # Global instance for test use

@@ -31,7 +31,7 @@ async def test_exception_failure_releases_lock(
     kafka_msg = create_mock_kafka_message(sample_spellcheck_request_event)
 
     config = IdempotencyConfig(service_name="spell-checker-service")
-    
+
     @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_with_exception(msg: ConsumerRecord) -> bool:
         raise RuntimeError("Unexpected infrastructure failure")
@@ -56,7 +56,7 @@ async def test_redis_failure_fallback(
     kafka_msg = create_mock_kafka_message(sample_spellcheck_request_event)
 
     config = IdempotencyConfig(service_name="spell-checker-service")
-    
+
     @idempotent_consumer_v2(redis_client=redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(

@@ -77,6 +77,7 @@ class ContentServiceClient(ContentServiceClientProtocol):
             url=url,
             correlation_id=correlation_id,
             timeout_seconds=self.config.http_config.default_timeout_seconds,
+            headers=None,
             **context,
         )
 

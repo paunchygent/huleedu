@@ -194,9 +194,12 @@ class ServiceTestManager:
 
         # Generate unique essay instructions to prevent idempotency collisions
         import datetime
-        timestamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         unique_id = uuid.uuid4().hex[:8]
-        unique_instructions = f"Test batch created by ServiceTestManager at {timestamp} (ID: {unique_id})"
+        unique_instructions = (
+            f"Test batch created by ServiceTestManager at {timestamp} (ID: {unique_id})"
+        )
 
         batch_request = {
             "course_code": course_code_enum.value,

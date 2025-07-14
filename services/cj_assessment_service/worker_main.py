@@ -92,7 +92,7 @@ async def main() -> None:
                 default_ttl=86400,  # 24 hours for complex AI processing
                 enable_debug_logging=True,  # Enable for AI workflow monitoring
             )
-            
+
             @idempotent_consumer_v2(redis_client=redis_client, config=config)
             async def handle_message_idempotently(msg: Any) -> bool:
                 return await process_single_message(

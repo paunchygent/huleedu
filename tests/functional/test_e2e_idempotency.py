@@ -23,7 +23,11 @@ import pytest
 import redis.asyncio as redis
 from aiokafka import ConsumerRecord
 from huleedu_service_libs.event_utils import generate_deterministic_event_id
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer, idempotent_consumer_v2
+from huleedu_service_libs.idempotency_v2 import (
+    IdempotencyConfig,
+    idempotent_consumer,
+    idempotent_consumer_v2,
+)
 
 from tests.utils.kafka_test_manager import KafkaTestManager, create_kafka_test_config
 from tests.utils.service_test_manager import ServiceTestManager
@@ -69,7 +73,7 @@ class RealRedisTestHelper:
 @pytest.mark.timeout(60)
 class TestAuthenticRedisIdempotency:
     """E2E tests using the real Redis instance from docker-compose.
-    
+
     These tests validate v2 idempotency behavior with real Redis infrastructure
     to ensure the new service-namespaced keys and TTL configurations work correctly.
     """
@@ -93,7 +97,7 @@ class TestAuthenticRedisIdempotency:
 
             # Create three events with identical structure for deterministic ID testing
             base_event = helper.create_test_event("huleedu.test.batch.ready.v1", event_data)
-            
+
             # Use the same base event multiple times to ensure identical JSON serialization
             events = [base_event.copy() for _ in range(3)]
 
@@ -111,7 +115,10 @@ class TestAuthenticRedisIdempotency:
 
             # Verify v2 Redis key pattern (service-namespaced)
             # Expected format: huleedu:idempotency:v2:{service}:{event_type}:{deterministic_hash}
-            expected_key_pattern = f"huleedu:idempotency:v2:test_service:huleedu_test_batch_ready_v1:{deterministic_ids[0]}"
+            expected_key_pattern = (
+                f"huleedu:idempotency:v2:test_service:"
+                f"huleedu_test_batch_ready_v1:{deterministic_ids[0]}"
+            )
             print(f"✅ Consistent deterministic ID generated: {deterministic_ids[0]}")
             print(f"✅ Expected v2 Redis key pattern: {expected_key_pattern}")
 
@@ -297,7 +304,7 @@ def sample_batch_event() -> dict[str, Any]:
 @pytest.mark.asyncio
 class TestControlledIdempotencyScenarios:
     """E2E tests using controlled mock scenarios for v2 idempotency edge cases.
-    
+
     Tests both the new v2 API with IdempotencyConfig and the backward-compatible wrapper
     to ensure seamless migration and proper functionality.
     """
@@ -320,9 +327,7 @@ class TestControlledIdempotencyScenarios:
 
             # Use v2 API with proper service configuration
             config = IdempotencyConfig(
-                service_name=service_name,
-                default_ttl=3600,
-                enable_debug_logging=True
+                service_name=service_name, default_ttl=3600, enable_debug_logging=True
             )
 
             @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
@@ -340,7 +345,9 @@ class TestControlledIdempotencyScenarios:
 
         # v2 Service Isolation: Both services should process successfully due to namespaced keys
         assert processing_results[0][1] is True, "First service should process successfully"
-        assert processing_results[1][1] is True, "Second service should also process successfully (v2 isolation)"
+        assert processing_results[1][1] is True, (
+            "Second service should also process successfully (v2 isolation)"
+        )
 
         # Verify Redis operations - each service creates its own namespaced key
         stats = mock_redis_client.get_stats()
@@ -362,9 +369,7 @@ class TestControlledIdempotencyScenarios:
 
         # Test v2 fail-open behavior with proper configuration
         config = IdempotencyConfig(
-            service_name="test_service",
-            default_ttl=3600,
-            enable_debug_logging=True
+            service_name="test_service", default_ttl=3600, enable_debug_logging=True
         )
 
         @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
@@ -396,9 +401,7 @@ class TestControlledIdempotencyScenarios:
 
         # Test cleanup behavior with backward-compatible API
         @idempotent_consumer(
-            redis_client=mock_redis_client, 
-            ttl_seconds=3600,
-            service_name="cleanup_test_service"
+            redis_client=mock_redis_client, ttl_seconds=3600, service_name="cleanup_test_service"
         )
         async def failing_process_event(msg: ConsumerRecord) -> bool:
             # Simulate processing failure
@@ -427,7 +430,7 @@ class TestControlledIdempotencyScenarios:
         """
         # Create multiple copies of the exact same event for deterministic ID testing
         base_event = sample_batch_event.copy()
-        
+
         # Use identical events to ensure consistent deterministic ID generation
         events = [base_event.copy() for _ in range(5)]
 
@@ -460,20 +463,21 @@ class TestControlledIdempotencyScenarios:
                 event_type_ttls={
                     "huleedu.batch.essays.ready.v1": 43200,  # 12 hours for batch events
                 },
-                enable_debug_logging=True
+                enable_debug_logging=True,
             ),
             IdempotencyConfig(
-                service_name="essay_lifecycle_service", 
+                service_name="essay_lifecycle_service",
                 event_type_ttls={
                     "huleedu.batch.essays.ready.v1": 3600,  # 1 hour for quick processing
                 },
-                enable_debug_logging=True
+                enable_debug_logging=True,
             ),
         ]
 
         processing_results = []
-        
+
         for i, config in enumerate(service_configs):
+
             @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
             async def process_with_service_config(msg: ConsumerRecord) -> str:
                 # Each service processes successfully in its own namespace
@@ -487,21 +491,21 @@ class TestControlledIdempotencyScenarios:
         assert len(processing_results) == 2, "Both services should process"
         assert processing_results[0][1] is not None, "First service should process successfully"
         assert processing_results[1][1] is not None, "Second service should process successfully"
-        
+
         # Verify that both services created their own namespaced keys
         stats = mock_redis_client.get_stats()
         assert stats["set_calls"] == 2, "Both services should set their own namespaced keys"
         assert stats["total_keys"] == 2, "Two separate keys should exist for different services"
-        
+
         # Verify TTL configuration was used correctly
         set_calls = mock_redis_client.set_calls
-        
+
         # First service (batch_orchestrator) should use 43200 seconds TTL
         assert set_calls[0][2] == 43200, f"Expected 43200s TTL, got {set_calls[0][2]}"
-        
-        # Second service (essay_lifecycle) should use 3600 seconds TTL  
+
+        # Second service (essay_lifecycle) should use 3600 seconds TTL
         assert set_calls[1][2] == 3600, f"Expected 3600s TTL, got {set_calls[1][2]}"
-        
+
         print(f"✅ v2 service isolation validated: {stats}")
         print(f"✅ TTL configuration validated: {[call[2] for call in set_calls]}")
 

@@ -73,7 +73,7 @@ def upgrade() -> None:
 
     # Update existing records to have default values for new columns (if any exist)
     op.execute("""
-        UPDATE batch_essay_trackers 
+        UPDATE batch_essay_trackers
         SET expected_essay_ids = '[]'::json,
             available_slots = '[]'::json,
             expected_count = total_slots,

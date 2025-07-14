@@ -98,7 +98,14 @@ async def register_comprehensive_batch(
 
     from common_core.domain_enums import CourseCode
 
-    available_courses = [CourseCode.ENG5, CourseCode.ENG6, CourseCode.ENG7, CourseCode.SV1, CourseCode.SV2, CourseCode.SV3]
+    available_courses = [
+        CourseCode.ENG5,
+        CourseCode.ENG6,
+        CourseCode.ENG7,
+        CourseCode.SV1,
+        CourseCode.SV2,
+        CourseCode.SV3,
+    ]
     selected_course = random.choice(available_courses)
 
     # Use ServiceTestManager's create_batch method for authentication

@@ -61,7 +61,7 @@ class CJAssessmentKafkaConsumer:
             default_ttl=86400,  # 24 hours for complex AI processing
             enable_debug_logging=True,  # Enable for AI workflow monitoring
         )
-        
+
         @idempotent_consumer_v2(redis_client=redis_client, config=config)
         async def process_message_idempotently(msg: Any) -> bool | None:
             return await process_single_message(

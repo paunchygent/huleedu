@@ -180,6 +180,7 @@ class TestBOSIdempotencyOutage:
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
         config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
+
         @idempotent_consumer_v2(redis_client=redis_client, config=config)
         async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
             consumer = BatchKafkaConsumer(
@@ -211,6 +212,7 @@ class TestBOSIdempotencyOutage:
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
         config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
+
         @idempotent_consumer_v2(redis_client=redis_client, config=config)
         async def handle_message_with_exception(msg: ConsumerRecord) -> bool:
             raise RuntimeError("Unhandled exception (e.g., network failure)")
@@ -221,7 +223,9 @@ class TestBOSIdempotencyOutage:
         assert len(redis_client.set_calls) == 1
         assert len(redis_client.delete_calls) == 1
         delete_call = redis_client.delete_calls[0]
-        assert delete_call.startswith("huleedu:idempotency:v2:batch-service:huleedu_batch_essays_ready_v1:")
+        assert delete_call.startswith(
+            "huleedu:idempotency:v2:batch-service:huleedu_batch_essays_ready_v1:"
+        )
 
     @pytest.mark.asyncio
     async def test_redis_failure_fallback_continues_processing(
@@ -239,6 +243,7 @@ class TestBOSIdempotencyOutage:
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
         config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
+
         @idempotent_consumer_v2(redis_client=redis_client, config=config)
         async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
             consumer = BatchKafkaConsumer(

@@ -164,10 +164,20 @@ class TestObservabilityFeatures:
         correlation_id = uuid4()
         tracer = trace.get_tracer("test-tracer")
 
-        # Configure content client to fail
-        content_error = HuleEduError(MagicMock())
-        content_error.error_detail.correlation_id = correlation_id
-        content_error.error_detail.error_code = ErrorCode.CONTENT_SERVICE_ERROR
+        # Configure content client to fail - create proper ErrorDetail
+        from huleedu_service_libs.error_handling.error_detail_factory import (
+            create_error_detail_with_context,
+        )
+
+        error_detail = create_error_detail_with_context(
+            error_code=ErrorCode.CONTENT_SERVICE_ERROR,
+            message="Content service unavailable for testing",
+            service="spellchecker_service",
+            operation="fetch_content",
+            correlation_id=correlation_id,
+            capture_stack=False,  # Don't capture stack in tests
+        )
+        content_error = HuleEduError(error_detail)
         boundary_mocks["content_client"].fetch_content.side_effect = content_error
 
         kafka_message = self.create_valid_kafka_message(correlation_id)

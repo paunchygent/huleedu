@@ -84,7 +84,7 @@ class BaseHttpClient(HttpClientProtocol):
             timeout = aiohttp.ClientTimeout(total=effective_timeout)
             async with self.session.get(url, timeout=timeout, headers=headers) as response:
                 response.raise_for_status()
-                content = await response.text()
+                content: str = await response.text()
 
                 logger.debug(
                     f"HTTP GET successful: {len(content)} chars",
@@ -166,7 +166,7 @@ class BaseHttpClient(HttpClientProtocol):
 
                 # Parse JSON response
                 try:
-                    result = await response.json()
+                    result: dict[str, Any] = await response.json()
 
                     logger.debug(
                         f"HTTP POST successful: {response.status}",
