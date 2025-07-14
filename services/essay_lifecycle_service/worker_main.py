@@ -13,9 +13,11 @@ import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from opentelemetry.trace import Tracer
 
-from aiokafka import AIOKafkaConsumer, ConsumerRecord
+from aiokafka import AIOKafkaConsumer, ConsumerRecord, TopicPartition
 from common_core.event_enums import ProcessingEvent, topic_name
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
@@ -101,11 +103,8 @@ async def run_consumer_loop(
     """Main message processing loop with idempotency support."""
     global should_stop
 
-    logger.info("Starting message processing loop with idempotency")
-
-    # Apply idempotency decorator to message processing
-    @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
+    # Define the base message handler
+    async def _process_message_wrapper(msg: ConsumerRecord) -> bool:
         return await process_single_message(
             msg=msg,
             batch_coordination_handler=batch_coordination_handler,
@@ -114,6 +113,28 @@ async def run_consumer_loop(
             tracer=tracer,
         )
 
+    # Create a wrapper that returns bool | None for non-idempotent case
+    async def _process_message_non_idempotent(msg: ConsumerRecord) -> bool | None:
+        # In non-idempotent mode, we never return None (no duplicates detected)
+        result = await _process_message_wrapper(msg)
+        return result
+
+    # Apply idempotency based on settings
+    handle_message_idempotently: Callable[[ConsumerRecord], Awaitable[bool | None]]
+
+    if settings.DISABLE_IDEMPOTENCY:
+        logger.info("Starting message processing loop WITHOUT idempotency (testing mode)")
+        handle_message_idempotently = _process_message_non_idempotent
+    else:
+        logger.info("Starting message processing loop with idempotency")
+        # Apply idempotency decorator
+        decorated_handler = idempotent_consumer(
+            redis_client=redis_client, ttl_seconds=86400
+        )(_process_message_wrapper)
+        # Explicitly define the handler with the expected signature
+        async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
+            return await decorated_handler(msg)
+
     try:
         async for msg in consumer:
             if should_stop:
@@ -121,30 +142,44 @@ async def run_consumer_loop(
                 break
 
             try:
+                # Log message details for redelivery diagnosis
+                logger.debug(
+                    "Received Kafka message for processing",
+                    extra={
+                        "topic": msg.topic,
+                        "partition": msg.partition,
+                        "offset": msg.offset,
+                        "timestamp": msg.timestamp,
+                        "key": msg.key,
+                    },
+                )
+
                 result = await handle_message_idempotently(msg)
 
-                # A result of `True` means success, `None` means duplicate (which is also a success state for commit)
-                if result is True or result is None:
-                    # Commit offset after successful processing or after skipping a duplicate
+                # Handle three cases: True (success), None (duplicate), False (failure)
+                if result is None:
+                    # Duplicate message - commit immediately to prevent redelivery
+                    tp = TopicPartition(msg.topic, msg.partition)
+                    await consumer.commit({tp: msg.offset + 1})
+                    logger.info(
+                        "Duplicate message skipped, offset committed immediately",
+                        extra={
+                            "topic": msg.topic,
+                            "partition": msg.partition,
+                            "offset": msg.offset,
+                        },
+                    )
+                elif result is True:
+                    # Success - commit after processing
                     await consumer.commit()
-                    if result:
-                        logger.debug(
-                            "Successfully processed and committed message",
-                            extra={
-                                "topic": msg.topic,
-                                "partition": msg.partition,
-                                "offset": msg.offset,
-                            },
-                        )
-                    else:
-                        logger.info(
-                            "Duplicate message skipped, offset committed",
-                            extra={
-                                "topic": msg.topic,
-                                "partition": msg.partition,
-                                "offset": msg.offset,
-                            },
-                        )
+                    logger.debug(
+                        "Successfully processed and committed message",
+                        extra={
+                            "topic": msg.topic,
+                            "partition": msg.partition,
+                            "offset": msg.offset,
+                        },
+                    )
                 else:  # result is False
                     logger.warning(
                         "Failed to process message, not committing offset",

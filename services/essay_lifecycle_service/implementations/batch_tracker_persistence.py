@@ -143,9 +143,7 @@ class BatchTrackerPersistence:
                     expectation = self.expectation_from_db(tracker_db)
                     expectations.append(expectation)
 
-                self._logger.info(
-                    f"Loaded {len(expectations)} active batches from database"
-                )
+                self._logger.info(f"Loaded {len(expectations)} active batches from database")
                 return expectations
 
         except Exception as e:

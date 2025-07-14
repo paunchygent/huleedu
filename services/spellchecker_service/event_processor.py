@@ -518,12 +518,16 @@ async def _publish_structured_error_event(
 ) -> None:
     """Publish a structured error event with proper error information."""
     try:
-        error_entity_ref = EntityReference(
-            entity_id=essay_id_for_logging,
-            entity_type="essay",
-        )
+        # Preserve entity reference from incoming request to maintain parent_id (batch_id)
         if request_envelope.data and request_envelope.data.entity_ref:
-            error_entity_ref = request_envelope.data.entity_ref
+            error_entity_ref = request_envelope.data.entity_ref.model_copy(
+                update={"entity_id": essay_id_for_logging}
+            )
+        else:
+            error_entity_ref = EntityReference(
+                entity_id=essay_id_for_logging,
+                entity_type="essay",
+            )
 
         # Create structured error info from ErrorDetail
         structured_error_info = {

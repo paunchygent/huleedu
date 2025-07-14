@@ -155,8 +155,12 @@ class DefaultSpellLogic(SpellLogicProtocol):
                 corrections_count=0,
             )
 
-        # Create entity reference for this essay
-        final_entity_ref = EntityReference(entity_id=essay_id or "unknown", entity_type="essay")
+        # Preserve entity reference from incoming request to maintain parent_id (batch_id)
+        final_entity_ref = (
+            initial_system_metadata.entity.model_copy(update={"entity_id": essay_id or "unknown"})
+            if initial_system_metadata.entity
+            else EntityReference(entity_id=essay_id or "unknown", entity_type="essay")
+        )
 
         # Update system_metadata for successful completion
         final_system_metadata = initial_system_metadata.model_copy(

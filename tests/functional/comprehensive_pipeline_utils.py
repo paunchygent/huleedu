@@ -89,13 +89,22 @@ async def register_comprehensive_batch(
     Returns:
         tuple[str, str]: (batch_id, actual_correlation_id_for_events)
     """
+
     if correlation_id is None:
         correlation_id = str(uuid.uuid4())
+
+    # Randomly select from available course codes to prevent idempotency collisions
+    import random
+
+    from common_core.domain_enums import CourseCode
+
+    available_courses = [CourseCode.ENG5, CourseCode.ENG6, CourseCode.ENG7, CourseCode.SV1, CourseCode.SV2, CourseCode.SV3]
+    selected_course = random.choice(available_courses)
 
     # Use ServiceTestManager's create_batch method for authentication
     batch_id, actual_correlation_id = await service_manager.create_batch(
         expected_essay_count=expected_essay_count,
-        course_code="ENG5",
+        course_code=selected_course,
         user=user,
         correlation_id=correlation_id,
         enable_cj_assessment=True,  # Enable CJ assessment for full pipeline

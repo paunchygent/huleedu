@@ -33,11 +33,11 @@ from services.essay_lifecycle_service.implementations.batch_coordination_handler
 from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
     DefaultBatchEssayTracker,
 )
-from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
-    BatchTrackerPersistence,
-)
 from services.essay_lifecycle_service.implementations.batch_phase_coordinator_impl import (
     DefaultBatchPhaseCoordinator,
+)
+from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
+    BatchTrackerPersistence,
 )
 from services.essay_lifecycle_service.implementations.cj_assessment_command_handler import (
     CJAssessmentCommandHandler,
@@ -304,9 +304,11 @@ class BatchCoordinationProvider(Provider):
     def provide_batch_tracker_persistence(self, engine: AsyncEngine) -> BatchTrackerPersistence:
         """Provide batch tracker persistence implementation."""
         return BatchTrackerPersistence(engine)
-    
+
     @provide(scope=Scope.APP)
-    async def provide_batch_essay_tracker(self, persistence: BatchTrackerPersistence) -> BatchEssayTracker:
+    async def provide_batch_essay_tracker(
+        self, persistence: BatchTrackerPersistence
+    ) -> BatchEssayTracker:
         """Provide batch essay tracker implementation with database persistence."""
         tracker = DefaultBatchEssayTracker(persistence)
         await tracker.initialize_from_database()

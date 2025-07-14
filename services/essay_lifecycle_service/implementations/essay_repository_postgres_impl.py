@@ -130,10 +130,21 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
     ) -> None:
         """Update essay state with new status, metadata, and optional storage reference."""
         async with self.session() as session:
-            # Get current state for update
-            current_state = await self.get_essay_state(essay_id)
-            if current_state is None:
+            # Use SELECT FOR UPDATE to prevent race conditions
+            stmt = select(EssayStateDB).where(EssayStateDB.essay_id == essay_id).with_for_update()
+            result = await session.execute(stmt)
+            db_essay = result.scalars().first()
+
+            if db_essay is None:
                 raise ValueError(f"Essay {essay_id} not found")
+
+            # Convert to ConcreteEssayState
+            current_state = self._db_to_essay_state(db_essay)
+            
+            # Log the transition for debugging
+            self.logger.debug(
+                f"Updating essay {essay_id} from {current_state.current_status.value} to {new_status.value}"
+            )
 
             # Update the state object
             current_state.update_status(new_status, metadata)

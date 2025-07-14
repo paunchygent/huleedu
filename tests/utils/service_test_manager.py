@@ -192,10 +192,16 @@ class ServiceTestManager:
         else:
             course_code_enum = course_code
 
+        # Generate unique essay instructions to prevent idempotency collisions
+        import datetime
+        timestamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+        unique_id = uuid.uuid4().hex[:8]
+        unique_instructions = f"Test batch created by ServiceTestManager at {timestamp} (ID: {unique_id})"
+
         batch_request = {
             "course_code": course_code_enum.value,
             "expected_essay_count": expected_essay_count,
-            "essay_instructions": "Test batch created by ServiceTestManager",
+            "essay_instructions": unique_instructions,
             "user_id": user.user_id,
             "enable_cj_assessment": enable_cj_assessment,
         }

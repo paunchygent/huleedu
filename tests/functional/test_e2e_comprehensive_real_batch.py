@@ -14,7 +14,6 @@ This test validates the complete pipeline using real student essays from
 Tests both phases with real orchestration and real student essays.
 """
 
-import uuid
 
 import pytest
 
@@ -26,8 +25,10 @@ from tests.functional.comprehensive_pipeline_utils import (
     upload_real_essays,
     watch_pipeline_progression_with_consumer,
 )
+from tests.utils.distributed_state_manager import ensure_clean_test_environment
 from tests.utils.service_test_manager import ServiceTestManager
 from tests.utils.test_auth_manager import AuthTestManager
+from tests.utils.test_event_factory import reset_test_event_factory
 
 
 @pytest.mark.e2e
@@ -47,6 +48,12 @@ async def test_comprehensive_real_batch_pipeline():
     Uses real student essays and follows actual event orchestration.
     Uses mock LLM for fast, cost-effective testing.
     """
+    # Ensure clean distributed system state before test execution
+    await ensure_clean_test_environment("test_comprehensive_real_batch_pipeline")
+
+    # Initialize unique event factory for this test run
+    event_factory = reset_test_event_factory()
+
     # Validate real test essays are available
     test_essays = await load_real_test_essays(max_essays=25)
 
@@ -64,8 +71,8 @@ async def test_comprehensive_real_batch_pipeline():
     kafka_manager = create_comprehensive_kafka_manager()
     print("✅ Kafka manager configured for comprehensive pipeline")
 
-    # Step 3: Generate a valid UUID for the correlation ID
-    test_correlation_id = str(uuid.uuid4())
+    # Step 3: Generate unique correlation ID using event factory
+    test_correlation_id = str(event_factory.create_unique_correlation_id())
     print(f"🔍 Test correlation ID: {test_correlation_id}")
 
     # Step 4: Set up consumer FIRST before any actions (critical timing fix)
@@ -176,7 +183,7 @@ async def test_comprehensive_real_batch_pipeline():
             batch_id,
             request_correlation_id,
             len(test_essays),
-            180,  # 3 minutes timeout for comprehensive pipeline
+            50,  # 50 seconds timeout for faster debugging
         )
 
         assert result is not None, "Pipeline did not complete"

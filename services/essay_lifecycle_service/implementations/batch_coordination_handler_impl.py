@@ -133,7 +133,10 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             # Persist slot assignment to database if successful
             if assigned_essay_id is not None:
                 await self.batch_tracker.persist_slot_assignment(
-                    event_data.batch_id, assigned_essay_id, event_data.text_storage_id, event_data.original_file_name
+                    event_data.batch_id,
+                    assigned_essay_id,
+                    event_data.text_storage_id,
+                    event_data.original_file_name,
                 )
 
             if assigned_essay_id is None:

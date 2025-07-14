@@ -34,17 +34,22 @@ class TestBatchEssayTracker:
     def tracker(self) -> BatchEssayTracker:
         """Fixture providing a fresh BatchEssayTracker instance with minimal mocking."""
         from unittest.mock import AsyncMock
-        from services.essay_lifecycle_service.implementations.batch_tracker_persistence import BatchTrackerPersistence
-        from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import DefaultBatchEssayTracker
-        
+
+        from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
+            DefaultBatchEssayTracker,
+        )
+        from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
+            BatchTrackerPersistence,
+        )
+
         # Create simple no-op persistence for testing (only mock database operations)
         persistence = AsyncMock(spec=BatchTrackerPersistence)
         persistence.get_batch_from_database.return_value = None  # No existing batch
         persistence.persist_batch_expectation.return_value = None  # No-op database write
-        persistence.persist_slot_assignment.return_value = None  # No-op database write  
+        persistence.persist_slot_assignment.return_value = None  # No-op database write
         persistence.remove_batch_from_database.return_value = None  # No-op database write
         persistence.initialize_from_database.return_value = []  # No existing batches
-        
+
         # Use real tracker with mocked database layer only
         return DefaultBatchEssayTracker(persistence)
 

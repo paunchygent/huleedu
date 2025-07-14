@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     PROMETHEUS_PORT: int = 9090
     ENABLE_METRICS: bool = True
 
+    # Testing Configuration
+    DISABLE_IDEMPOTENCY: bool = Field(
+        default=False, description="Disable idempotency for testing purposes"
+    )
+
     # Circuit Breaker Configuration
     CIRCUIT_BREAKER_ENABLED: bool = Field(
         default=True, description="Enable circuit breaker protection for external service calls"

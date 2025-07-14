@@ -27,7 +27,9 @@ from common_core.metadata_models import (
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.implementations.batch_expectation import BatchExpectation
-from services.essay_lifecycle_service.implementations.batch_tracker_persistence import BatchTrackerPersistence
+from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
+    BatchTrackerPersistence,
+)
 from services.essay_lifecycle_service.protocols import BatchEssayTracker
 
 
@@ -73,7 +75,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         # **Idempotency Check: Database existence first**
         existing_batch = await self._persistence.get_batch_from_database(batch_id)
-        
+
         if existing_batch is not None:
             # Batch already exists in database - handle idempotently
             self._logger.info(
@@ -83,22 +85,22 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                     "original_correlation_id": existing_batch.correlation_id,
                     "new_correlation_id": str(correlation_id),
                     "expected_count": existing_batch.expected_count,
-                }
+                },
             )
-            
+
             # Restore to memory if not present (recovery scenario)
             if batch_id not in self.batch_expectations:
                 expectation = self._persistence.expectation_from_db(existing_batch)
                 self.batch_expectations[batch_id] = expectation
-                
+
                 # Only start timeout monitoring if not already running
                 if expectation.timeout_task is None or expectation.timeout_task.done():
                     await self._start_timeout_monitoring(expectation)
-                    
+
                 self._logger.info(
                     f"Restored batch {batch_id} to memory from database during idempotent registration"
                 )
-            
+
             return
 
         # **New Batch Registration**
@@ -305,7 +307,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         try:
             expectations = await self._persistence.initialize_from_database()
-            
+
             for expectation in expectations:
                 self.batch_expectations[expectation.batch_id] = expectation
 
