@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaConnectionError
-from huleedu_service_libs.idempotency import idempotent_consumer
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 
@@ -55,8 +55,14 @@ class CJAssessmentKafkaConsumer:
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
 
-        # Create idempotent message processor with 24-hour TTL
-        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+        # Create idempotent message processor with v2 configuration for complex AI workflows
+        config = IdempotencyConfig(
+            service_name="cj-assessment-service",
+            default_ttl=86400,  # 24 hours for complex AI processing
+            enable_debug_logging=True,  # Enable for AI workflow monitoring
+        )
+        
+        @idempotent_consumer_v2(redis_client=redis_client, config=config)
         async def process_message_idempotently(msg: Any) -> bool | None:
             return await process_single_message(
                 msg=msg,

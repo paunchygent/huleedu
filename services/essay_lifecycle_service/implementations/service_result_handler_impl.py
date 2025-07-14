@@ -279,6 +279,15 @@ class DefaultServiceResultHandler(ServiceResultHandler):
 
                 # Attempt state transition
                 if state_machine.trigger(EVT_CJ_ASSESSMENT_SUCCEEDED):
+                    # Preserve existing commanded_phases metadata
+                    existing_commanded_phases = essay_state.processing_metadata.get(
+                        "commanded_phases", []
+                    )
+
+                    # Ensure cj_assessment is in commanded_phases
+                    if "cj_assessment" not in existing_commanded_phases:
+                        existing_commanded_phases.append("cj_assessment")
+
                     await self.repository.update_essay_status_via_machine(
                         essay_id=essay_id,
                         new_status=state_machine.current_status,
@@ -291,6 +300,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                 "ranking_data": ranking,
                             },
                             "current_phase": "cj_assessment",
+                            "commanded_phases": existing_commanded_phases,
                             "phase_outcome_status": "CJ_ASSESSMENT_SUCCESS",
                         },
                     )
@@ -314,19 +324,54 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     continue
 
             # After processing all essays in the CJ batch result
+            # Check batch completion for ALL essays, not just the first one
+            logger.info(
+                "Checking batch phase completion for CJ assessment",
+                extra={
+                    "batch_id": result_data.entity_ref.entity_id,
+                    "total_rankings": len(result_data.rankings),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+            # Get batch status summary to log
+            batch_status_summary = await self.repository.get_batch_status_summary(
+                result_data.entity_ref.entity_id
+            )
+            logger.info(
+                "Batch status summary after CJ assessment processing",
+                extra={
+                    "batch_id": result_data.entity_ref.entity_id,
+                    "status_summary": {k.value: v for k, v in batch_status_summary.items()},
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
             # We need a representative essay_state from the batch to trigger check_batch_completion
             if result_data.rankings:
-                first_essay_id_in_ranking = result_data.rankings[0].get("els_essay_id")
-                if first_essay_id_in_ranking:
-                    batch_representative_essay_state = await self.repository.get_essay_state(
-                        first_essay_id_in_ranking
-                    )
-                    if batch_representative_essay_state:
-                        await self.batch_coordinator.check_batch_completion(
-                            essay_state=batch_representative_essay_state,
-                            phase_name=PhaseName.CJ_ASSESSMENT,
-                            correlation_id=correlation_id,
+                # Try multiple essays in case the first one has metadata issues
+                for i, ranking in enumerate(result_data.rankings[:3]):  # Check first 3 essays
+                    essay_id_in_ranking = ranking.get("els_essay_id")
+                    if essay_id_in_ranking:
+                        batch_representative_essay_state = await self.repository.get_essay_state(
+                            essay_id_in_ranking
                         )
+                        if batch_representative_essay_state:
+                            logger.info(
+                                f"Triggering batch completion check with essay {i+1}/{len(result_data.rankings)}",
+                                extra={
+                                    "essay_id": essay_id_in_ranking,
+                                    "essay_status": batch_representative_essay_state.current_status.value,
+                                    "essay_metadata": batch_representative_essay_state.processing_metadata,
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                            await self.batch_coordinator.check_batch_completion(
+                                essay_state=batch_representative_essay_state,
+                                phase_name=PhaseName.CJ_ASSESSMENT,
+                                correlation_id=correlation_id,
+                            )
+                            break  # Only need to check once
 
             return True
 

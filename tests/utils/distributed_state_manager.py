@@ -85,7 +85,13 @@ class DistributedStateManager:
             logger.warning(f"⚠️ Unexpected error clearing Redis: {e}")
 
     async def _reset_kafka_consumer_offsets(self) -> None:
-        """Reset Kafka consumer offsets to allow event reprocessing."""
+        """Reset Kafka consumer offsets to skip old events from previous test runs.
+        
+        CRITICAL: We reset to 'latest' not 'earliest' because:
+        - Old events in Kafka have event_ids from previous test runs
+        - With proper idempotency (including event_id in hash), these would be rejected
+        - Tests should only process NEW events generated during the current test run
+        """
         try:
             # List of consumer groups to reset
             consumer_groups = [
@@ -97,7 +103,7 @@ class DistributedStateManager:
 
             for group in consumer_groups:
                 try:
-                    # Reset to earliest (reprocess all messages)
+                    # Reset to latest (skip old messages from previous runs)
                     reset_cmd = [
                         "docker",
                         "exec",
@@ -108,7 +114,7 @@ class DistributedStateManager:
                         "--group",
                         group,
                         "--reset-offsets",
-                        "--to-earliest",
+                        "--to-latest",
                         "--all-topics",
                         "--execute",
                     ]

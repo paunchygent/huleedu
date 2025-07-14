@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock
 import pytest
 from aiokafka import ConsumerRecord
 from huleedu_service_libs.event_utils import generate_deterministic_event_id
-from huleedu_service_libs.idempotency import idempotent_consumer
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
 from common_core.domain_enums import CourseCode, EssayComparisonWinner
 from services.cj_assessment_service.config import Settings
@@ -137,7 +137,13 @@ async def test_first_time_event_processing_success(
 
     kafka_msg = create_mock_kafka_message(sample_cj_request_event)
 
-    @idempotent_consumer(redis_client=mock_redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(
+        service_name="cj-assessment-service",
+        default_ttl=86400,
+        enable_debug_logging=True,
+    )
+    
+    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
             msg=msg,
@@ -155,8 +161,13 @@ async def test_first_time_event_processing_success(
     assert len(mock_redis_client.delete_calls) == 0
 
     set_call = mock_redis_client.set_calls[0]
-    assert set_call[0].startswith("huleedu:events:seen:")
-    assert set_call[1] == "1"
+    assert set_call[0].startswith("huleedu:idempotency:v2:cj-assessment-service:")
+    # V2 stores JSON metadata instead of "1"
+    import json
+    stored_data = json.loads(set_call[1])
+    assert "processed_at" in stored_data
+    assert "processed_by" in stored_data
+    assert stored_data["processed_by"] == "cj-assessment-service"
     assert set_call[2] == 86400
 
     content_client.fetch_content.assert_called()
@@ -177,9 +188,16 @@ async def test_duplicate_event_skipped(
     kafka_msg = create_mock_kafka_message(sample_cj_request_event)
 
     deterministic_id = generate_deterministic_event_id(kafka_msg.value)
-    mock_redis_client.keys[f"huleedu:events:seen:{deterministic_id}"] = "1"
+    # Update key format for v2
+    mock_redis_client.keys[f"huleedu:idempotency:v2:cj-assessment-service:huleedu_els_cj_assessment_requested_v1:{deterministic_id}"] = '{"processed_at": 1640995200.0}'
 
-    @idempotent_consumer(redis_client=mock_redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(
+        service_name="cj-assessment-service",
+        default_ttl=86400,
+        enable_debug_logging=True,
+    )
+    
+    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
         return await process_single_message(
             msg=msg,
@@ -247,7 +265,13 @@ async def test_deterministic_event_id_generation(
     kafka_msg1 = create_mock_kafka_message(event1)
     kafka_msg2 = create_mock_kafka_message(event2)
 
-    @idempotent_consumer(redis_client=mock_redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(
+        service_name="cj-assessment-service",
+        default_ttl=86400,
+        enable_debug_logging=True,
+    )
+    
+    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
         return await process_single_message(
             msg=msg,
@@ -270,8 +294,11 @@ async def test_deterministic_event_id_generation(
     key1 = mock_redis_client.set_calls[0][0]
     key2 = mock_redis_client.set_calls[1][0]
     assert key1 == key2
-    assert key1.startswith("huleedu:events:seen:")
-    assert len(key1.split(":")[3]) == 64
+    assert key1.startswith("huleedu:idempotency:v2:cj-assessment-service:")
+    # Key format: huleedu:idempotency:v2:service:event_type:hash
+    key_parts = key1.split(":")
+    assert len(key_parts) == 6  # prefix:idempotency:v2:service:event_type:hash
+    assert len(key_parts[5]) == 64  # SHA-256 hash is 64 chars
 
     assert content_client.fetch_content.call_count == 1
     event_publisher.publish_assessment_completed.assert_called_once()

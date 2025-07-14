@@ -19,7 +19,7 @@ from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.status_enums import EssayStatus, OperationStatus
-from huleedu_service_libs.idempotency import idempotent_consumer
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from services.batch_conductor_service.metrics import get_kafka_consumer_metrics
@@ -51,6 +51,32 @@ class BCSKafkaConsumer:
         self._consuming = False
         self._stop_event = asyncio.Event()
         self._metrics = get_kafka_consumer_metrics()
+
+        # Create idempotency configuration for Batch Conductor Service
+        # Coordination events require longer retention for batch workflow coordination
+        idempotency_config = IdempotencyConfig(
+            service_name="batch-conductor-service",
+            # Override specific TTLs for coordination events
+            event_type_ttls={
+                # SpellCheck completion events (24 hours - coordination requirements)
+                "SpellcheckResultDataV1": 86400,
+                "huleedu.essay.spellcheck.completed.v1": 86400,
+                # CJ Assessment completion events (24 hours - coordination requirements)
+                "CJAssessmentCompletedV1": 86400,
+                "huleedu.cj_assessment.completed.v1": 86400,
+                # AI Feedback completion events (24 hours - coordination requirements)
+                "huleedu.essay.aifeedback.completed.v1": 86400,
+            },
+            default_ttl=86400,  # 24 hours for coordination events
+            enable_debug_logging=True,  # Enhanced observability for coordination workflows
+        )
+
+        # Create idempotent message processor with v2 configuration
+        @idempotent_consumer_v2(redis_client=redis_client, config=idempotency_config)
+        async def handle_message_idempotently(msg: ConsumerRecord) -> None:
+            await self._handle_message(msg)
+
+        self._handle_message_idempotently = handle_message_idempotently
 
     async def start_consuming(self) -> None:
         """Start consuming Kafka events with topic subscription."""
@@ -118,12 +144,8 @@ class BCSKafkaConsumer:
                     break
 
                 try:
-                    # Apply idempotency decorator
-                    idempotent_handler = idempotent_consumer(
-                        redis_client=self.redis_client, ttl_seconds=86400
-                    )(self._handle_message)
-
-                    await idempotent_handler(msg)
+                    # Process message with idempotency v2
+                    await self._handle_message_idempotently(msg)
                     await self._consumer.commit()
                 except Exception as e:
                     logger.error(f"Error processing message: {e}", exc_info=True)

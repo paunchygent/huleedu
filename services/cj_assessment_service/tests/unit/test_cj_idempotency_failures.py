@@ -114,7 +114,7 @@ async def test_processing_failure_keeps_lock(
     mock_redis_client: MockRedisClient,
 ) -> None:
     """Test that business logic failures keep Redis lock to prevent infinite retries."""
-    from huleedu_service_libs.idempotency import idempotent_consumer
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
     database, content_client, event_publisher, llm_interaction, settings = mock_boundary_services
 
@@ -122,7 +122,13 @@ async def test_processing_failure_keeps_lock(
 
     kafka_msg = create_mock_kafka_message(sample_cj_request_event)
 
-    @idempotent_consumer(redis_client=mock_redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(
+        service_name="cj-assessment-service",
+        default_ttl=86400,
+        enable_debug_logging=True,
+    )
+    
+    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
             msg=msg,

@@ -64,47 +64,61 @@ def extract_correlation_id_as_string(correlation_id: Any) -> str | None:
 
 def generate_deterministic_event_id(msg_value: bytes) -> str:
     """
-    Generates a deterministic ID for an event based on its business data payload.
+    Generates a deterministic ID for an event based on its unique event_id and data payload.
 
-    This function creates a stable hash of the `data` field within an event
-    envelope. It ignores all envelope-level metadata (like `event_id`,
-    `correlation_id`, `event_timestamp`), ensuring that two events with
-    identical business data produce the same ID, which is critical for
-    idempotency.
+    This function creates a stable hash that includes both the `event_id` and `data` 
+    fields from the event envelope. This ensures that:
+    - The exact same event (same event_id) processed twice will be caught as a duplicate
+    - Different events with similar data (different event_ids) can be processed normally
 
-    To guarantee a consistent hash, the `data` dictionary is serialized into a
+    This is critical for proper idempotency - we want to prevent processing the same
+    event twice, not prevent processing similar events.
+
+    To guarantee a consistent hash, the combined payload is serialized into a
     canonical JSON string with sorted keys before hashing.
 
     Args:
         msg_value: The raw bytes of the Kafka message value (a JSON object).
 
     Returns:
-        A SHA256 hexdigest of the canonical data payload.
+        A SHA256 hexdigest of the event_id + data payload.
 
     Raises:
         ValueError: If the message is not valid JSON or is missing the `data` field.
 
     Examples:
-        >>> # Two events with same data but different metadata = SAME hash
+        >>> # Two events with same data but different event_ids = DIFFERENT hashes
         >>> event1 = b'{"event_id": "abc", "data": {"entity_id": "essay1", "status": "complete"}}'
         >>> event2 = b'{"event_id": "def", "data": {"entity_id": "essay1", "status": "complete"}}'
-        >>> generate_deterministic_event_id(event1) == generate_deterministic_event_id(event2)
+        >>> generate_deterministic_event_id(event1) != generate_deterministic_event_id(event2)
         True
 
-        >>> # Two events with different data = DIFFERENT hash
-        >>> event3 = b'{"event_id": "ghi", "data": {"entity_id": "essay2", "status": "complete"}}'
-        >>> generate_deterministic_event_id(event1) != generate_deterministic_event_id(event3)
+        >>> # Same event processed twice = SAME hash (true duplicate)
+        >>> event3 = b'{"event_id": "abc", "data": {"entity_id": "essay1", "status": "complete"}}'
+        >>> generate_deterministic_event_id(event1) == generate_deterministic_event_id(event3)
         True
     """
     try:
         event_dict = json.loads(msg_value)
         data_payload = event_dict.get("data")
+        event_id = event_dict.get("event_id")
 
         if data_payload is None:
             raise ValueError("Event message must contain a 'data' field.")
 
+        # Include event_id in the hash to ensure true uniqueness
+        # If event_id is missing, fall back to data-only hash for backward compatibility
+        if event_id:
+            hash_input = {
+                "event_id": event_id,
+                "data": data_payload
+            }
+        else:
+            # Backward compatibility: if no event_id, use data only
+            hash_input = data_payload
+
         # Create a canonical representation by sorting keys
-        canonical_data = json.dumps(data_payload, sort_keys=True).encode("utf-8")
+        canonical_data = json.dumps(hash_input, sort_keys=True).encode("utf-8")
 
         # Return the SHA256 hash of the canonical data
         return hashlib.sha256(canonical_data).hexdigest()

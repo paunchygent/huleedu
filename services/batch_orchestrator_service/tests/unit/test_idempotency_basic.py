@@ -193,13 +193,14 @@ class TestBOSIdempotencyBasic:
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that first-time BatchEssaysReady events are processed successfully."""
-        from huleedu_service_libs.idempotency import idempotent_consumer
+        from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
-        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+        config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
+        @idempotent_consumer_v2(redis_client=redis_client, config=config)
         async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
@@ -217,8 +218,11 @@ class TestBOSIdempotencyBasic:
         assert len(redis_client.set_calls) == 1
         assert len(redis_client.delete_calls) == 0
         set_call = redis_client.set_calls[0]
-        assert set_call[0].startswith("huleedu:events:seen:")
-        assert set_call[1] == "1"
+        assert set_call[0].startswith("huleedu:idempotency:v2:batch-service:huleedu_batch_essays_ready_v1:")
+        # v2 decorator stores JSON metadata, not just "1"
+        assert "processed_at" in set_call[1]
+        assert "processed_by" in set_call[1]
+        # TTL should be the default value since event type doesn't match specific config (86400 = 24 hours)
         assert set_call[2] == 86400
         # With new architecture, BatchEssaysReadyHandler only stores essays - no pipeline
         # state calls
@@ -234,15 +238,19 @@ class TestBOSIdempotencyBasic:
     ) -> None:
         """Test that duplicate BatchEssaysReady events are skipped."""
         from huleedu_service_libs.event_utils import generate_deterministic_event_id
-        from huleedu_service_libs.idempotency import idempotent_consumer
+        from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
         deterministic_id = generate_deterministic_event_id(kafka_msg.value)
-        redis_client.keys[f"huleedu:events:seen:{deterministic_id}"] = "1"
-
-        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+        
+        # Create v2 idempotency key for duplicate detection
+        config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
+        event_type = sample_batch_essays_ready_event["event_type"]
+        v2_key = config.generate_redis_key(event_type, "dummy", deterministic_id)
+        redis_client.keys[v2_key] = '{"processed_at": 123456789, "processed_by": "batch-service"}'
+        @idempotent_consumer_v2(redis_client=redis_client, config=config)
         async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
@@ -271,13 +279,14 @@ class TestBOSIdempotencyBasic:
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that first-time ELSBatchPhaseOutcome events are processed successfully."""
-        from huleedu_service_libs.idempotency import idempotent_consumer
+        from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
         kafka_msg = create_mock_kafka_message(sample_els_phase_outcome_event)
 
-        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+        config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
+        @idempotent_consumer_v2(redis_client=redis_client, config=config)
         async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",

@@ -25,7 +25,6 @@ from tests.functional.comprehensive_pipeline_utils import (
     upload_real_essays,
     watch_pipeline_progression_with_consumer,
 )
-from tests.utils.distributed_state_manager import ensure_clean_test_environment
 from tests.utils.service_test_manager import ServiceTestManager
 from tests.utils.test_auth_manager import AuthTestManager
 from tests.utils.test_event_factory import reset_test_event_factory
@@ -34,7 +33,7 @@ from tests.utils.test_event_factory import reset_test_event_factory
 @pytest.mark.e2e
 @pytest.mark.asyncio
 @pytest.mark.timeout(240)  # 4 minute timeout for complete pipeline with mock LLM
-async def test_comprehensive_real_batch_pipeline():
+async def test_comprehensive_real_batch_pipeline(verify_redis_is_pristine):
     """
     Test complete pipeline with real student essays through actual BOS orchestration.
 
@@ -47,9 +46,11 @@ async def test_comprehensive_real_batch_pipeline():
 
     Uses real student essays and follows actual event orchestration.
     Uses mock LLM for fast, cost-effective testing.
+
+    The verify_redis_is_pristine fixture ensures clean Redis state before test.
     """
-    # Ensure clean distributed system state before test execution
-    await ensure_clean_test_environment("test_comprehensive_real_batch_pipeline")
+    # Diagnostic fixture ensures clean Redis state - just reference it
+    _ = verify_redis_is_pristine
 
     # Initialize unique event factory for this test run
     event_factory = reset_test_event_factory()

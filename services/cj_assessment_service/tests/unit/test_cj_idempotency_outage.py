@@ -144,13 +144,19 @@ async def test_exception_failure_releases_lock(
     mock_redis_client: MockRedisClient,
 ) -> None:
     """Test that unhandled exceptions release Redis lock to allow retry."""
-    from huleedu_service_libs.idempotency import idempotent_consumer
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
     # Setup mock process with exception
     mock_process = AsyncMock(side_effect=Exception("Unhandled processing error"))
     kafka_msg = create_mock_kafka_message(sample_cj_request_event)
 
-    @idempotent_consumer(redis_client=mock_redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(
+        service_name="cj-assessment-service",
+        default_ttl=86400,
+        enable_debug_logging=True,
+    )
+    
+    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         await mock_process(msg)
         return True  # Should never reach this due to exception
@@ -173,7 +179,7 @@ async def test_redis_failure_fallback(
     mock_redis_client: MockRedisClient,
 ) -> None:
     """Test that Redis failures result in fail-open behavior."""
-    from huleedu_service_libs.idempotency import idempotent_consumer
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
     # Set the mock redis client to fail on set operation
     mock_redis_client.should_fail_set = True
@@ -182,7 +188,13 @@ async def test_redis_failure_fallback(
 
     kafka_msg = create_mock_kafka_message(sample_cj_request_event)
 
-    @idempotent_consumer(redis_client=mock_redis_client, ttl_seconds=86400)
+    config = IdempotencyConfig(
+        service_name="cj-assessment-service",
+        default_ttl=86400,
+        enable_debug_logging=True,
+    )
+    
+    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
         return await process_single_message(
             msg=msg,

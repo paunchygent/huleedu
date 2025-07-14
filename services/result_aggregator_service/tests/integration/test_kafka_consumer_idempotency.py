@@ -45,7 +45,8 @@ class TestKafkaConsumerIdempotency:
         # Assert
         assert result is True  # First time processing
         assert len(mock_redis_client.set_calls) == 1
-        assert mock_redis_client.set_calls[0][2] == 86400  # TTL check
+        # V2 uses event-specific TTLs: batch registration events use 43200 seconds (12 hours)
+        assert mock_redis_client.set_calls[0][2] == 43200  # TTL check for batch events
         mock_event_processor.process_batch_registered.assert_called_once()
 
     async def test_idempotency_duplicate_message_skipped(
@@ -102,7 +103,8 @@ class TestKafkaConsumerIdempotency:
         # Assert key was set then deleted
         assert len(mock_redis_client.set_calls) == 1
         assert len(mock_redis_client.delete_calls) == 1
-        assert mock_redis_client.delete_calls[0].startswith("huleedu:events:seen:")
+        # V2 uses namespaced keys: huleedu:idempotency:v2:result-aggregator-service:event_type:hash
+        assert mock_redis_client.delete_calls[0].startswith("huleedu:idempotency:v2:result-aggregator-service:")
 
     async def test_idempotency_redis_failure_processes_message(
         self,

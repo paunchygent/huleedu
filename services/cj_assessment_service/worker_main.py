@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 from aiokafka import AIOKafkaConsumer
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
-from huleedu_service_libs.idempotency import idempotent_consumer
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -86,8 +86,14 @@ async def main() -> None:
 
             logger.info("CJ Assessment Service worker ready with idempotency support")
 
-            # Apply idempotency decorator to message processing
-            @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+            # Apply idempotency decorator to message processing with v2 configuration
+            config = IdempotencyConfig(
+                service_name="cj-assessment-service",
+                default_ttl=86400,  # 24 hours for complex AI processing
+                enable_debug_logging=True,  # Enable for AI workflow monitoring
+            )
+            
+            @idempotent_consumer_v2(redis_client=redis_client, config=config)
             async def handle_message_idempotently(msg: Any) -> bool:
                 return await process_single_message(
                     msg=msg,

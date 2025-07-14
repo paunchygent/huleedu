@@ -21,7 +21,7 @@ from aiokafka import AIOKafkaConsumer, ConsumerRecord, TopicPartition
 from common_core.event_enums import ProcessingEvent, topic_name
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
-from huleedu_service_libs.idempotency import idempotent_consumer
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from opentelemetry.trace import Tracer
@@ -126,11 +126,18 @@ async def run_consumer_loop(
         logger.info("Starting message processing loop WITHOUT idempotency (testing mode)")
         handle_message_idempotently = _process_message_non_idempotent
     else:
-        logger.info("Starting message processing loop with idempotency")
-        # Apply idempotency decorator
-        decorated_handler = idempotent_consumer(
-            redis_client=redis_client, ttl_seconds=86400
+        logger.info("Starting message processing loop with enhanced idempotency v2")
+        # Configure advanced idempotency with service namespacing and event-type specific TTLs
+        idempotency_config = IdempotencyConfig(
+            service_name=settings.SERVICE_NAME,
+            enable_debug_logging=False,  # Production mode - reduced logging
+        )
+
+        # Apply v2 idempotency decorator
+        decorated_handler = idempotent_consumer_v2(
+            redis_client=redis_client, config=idempotency_config
         )(_process_message_wrapper)
+
         # Explicitly define the handler with the expected signature
         async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
             return await decorated_handler(msg)
@@ -142,18 +149,6 @@ async def run_consumer_loop(
                 break
 
             try:
-                # Log message details for redelivery diagnosis
-                logger.debug(
-                    "Received Kafka message for processing",
-                    extra={
-                        "topic": msg.topic,
-                        "partition": msg.partition,
-                        "offset": msg.offset,
-                        "timestamp": msg.timestamp,
-                        "key": msg.key,
-                    },
-                )
-
                 result = await handle_message_idempotently(msg)
 
                 # Handle three cases: True (success), None (duplicate), False (failure)
@@ -170,8 +165,9 @@ async def run_consumer_loop(
                         },
                     )
                 elif result is True:
-                    # Success - commit after processing
-                    await consumer.commit()
+                    # Success - commit specific offset after processing
+                    tp = TopicPartition(msg.topic, msg.partition)
+                    await consumer.commit({tp: msg.offset + 1})
                     logger.debug(
                         "Successfully processed and committed message",
                         extra={
@@ -181,8 +177,8 @@ async def run_consumer_loop(
                         },
                     )
                 else:  # result is False
-                    logger.warning(
-                        "Failed to process message, not committing offset",
+                    logger.error(
+                        "Message processing failed - offset not committed",
                         extra={
                             "topic": msg.topic,
                             "partition": msg.partition,
@@ -192,7 +188,8 @@ async def run_consumer_loop(
 
             except Exception as e:
                 logger.error(
-                    "Error processing message",
+                    "Unhandled exception in consumer loop",
+                    exc_info=True,
                     extra={
                         "error": str(e),
                         "topic": msg.topic,

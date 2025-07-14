@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Dict, List
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
-from huleedu_service_libs.idempotency import idempotent_consumer
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from pydantic import ValidationError
@@ -57,8 +57,28 @@ class ResultAggregatorKafkaConsumer:
             # "huleedu.essay.aifeedback.completed.v1",
         ]
 
-        # Create idempotent message processor with 24-hour TTL
-        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+        # Create idempotency configuration for Result Aggregator Service
+        # Aggregation operations need longer retention for batch completion workflows
+        idempotency_config = IdempotencyConfig(
+            service_name="result-aggregator-service",
+            # Override specific TTLs for result aggregator events by Pydantic class name
+            event_type_ttls={
+                # Batch registration and coordination events (12 hours)
+                "BatchEssaysRegistered": 43200,
+                "ELSBatchPhaseOutcomeV1": 43200,
+                # Processing completion events (24 hours)  
+                "SpellcheckResultDataV1": 86400,
+                "CJAssessmentCompletedV1": 86400,
+                # Aggregation completion events (72 hours for batch lifecycle)
+                "ResultAggregatorBatchCompletedV1": 259200,
+                "ResultAggregatorClassSummaryUpdatedV1": 259200,
+            },
+            default_ttl=86400,  # 24 hours for unknown events
+            enable_debug_logging=True,  # Enhanced observability for aggregation workflows
+        )
+
+        # Create idempotent message processor with v2 configuration
+        @idempotent_consumer_v2(redis_client=redis_client, config=idempotency_config)
         async def process_message_idempotently(msg: ConsumerRecord) -> bool:
             return await self._process_message_impl(msg)
 
@@ -261,4 +281,4 @@ class ResultAggregatorKafkaConsumer:
                 error=str(e),
                 exc_info=True,
             )
-            raise  # Re-raise to allow the idempotency decorator to handle it
+            raise  # Re-raise to allow the idempotency v2 decorator to handle it

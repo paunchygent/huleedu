@@ -169,7 +169,7 @@ class TestBOSIdempotencyOutage:
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that business logic failures release the lock for retry."""
-        from huleedu_service_libs.idempotency import idempotent_consumer
+        from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
         redis_client = MockRedisClient()
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
@@ -179,7 +179,8 @@ class TestBOSIdempotencyOutage:
         )
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
-        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+        config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
+        @idempotent_consumer_v2(redis_client=redis_client, config=config)
         async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
@@ -204,12 +205,13 @@ class TestBOSIdempotencyOutage:
         sample_batch_essays_ready_event: dict,
     ) -> None:
         """Test that unhandled exceptions release the idempotency lock for retry."""
-        from huleedu_service_libs.idempotency import idempotent_consumer
+        from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
         redis_client = MockRedisClient()
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
-        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+        config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
+        @idempotent_consumer_v2(redis_client=redis_client, config=config)
         async def handle_message_with_exception(msg: ConsumerRecord) -> bool:
             raise RuntimeError("Unhandled exception (e.g., network failure)")
 
@@ -219,7 +221,7 @@ class TestBOSIdempotencyOutage:
         assert len(redis_client.set_calls) == 1
         assert len(redis_client.delete_calls) == 1
         delete_call = redis_client.delete_calls[0]
-        assert delete_call.startswith("huleedu:events:seen:")
+        assert delete_call.startswith("huleedu:idempotency:v2:batch-service:huleedu_batch_essays_ready_v1:")
 
     @pytest.mark.asyncio
     async def test_redis_failure_fallback_continues_processing(
@@ -229,14 +231,15 @@ class TestBOSIdempotencyOutage:
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that Redis failures fall back to processing without idempotency."""
-        from huleedu_service_libs.idempotency import idempotent_consumer
+        from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
         redis_client = MockRedisClient()
         redis_client.should_fail_set = True
         batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
-        @idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+        config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
+        @idempotent_consumer_v2(redis_client=redis_client, config=config)
         async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
