@@ -349,10 +349,11 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         correlation_id: UUID,
         provider_override: Optional[str] = None,
         max_tokens_override: Optional[int] = None,
-    ) -> tuple[Optional[LLMComparisonAssessment], Optional[ErrorDetail]]:
+    ) -> Optional[LLMComparisonAssessment]:
         """
         Submit comparison request with callback topic.
-        Returns immediately - result arrives via Kafka callback.
+        Returns immediately with None (result arrives via Kafka callback).
+        Raises HuleEduError on failure.
         """
         
         # Build request with callback topic
@@ -405,30 +406,38 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                         "callback_topic": self.settings.LLM_PROVIDER_CALLBACK_TOPIC
                     }
                 )
-                return None, None  # No error, but no result yet
+                return None  # No result yet - will arrive via callback
                 
             else:
-                # Error response
-                    error_detail = ErrorDetail(
-                        error_code=self._map_status_to_error_code(response.status),
-                        message=f"LLM Provider error: {response.status}",
-                        correlation_id=correlation_id,
-                        timestamp=datetime.now(UTC),
-                        service="llm_provider_service",
-                        details={"status": response.status}
-                    )
-                    return None, error_detail
+                # Error response - raise structured error
+                from services.libs.huleedu_service_libs.error_handling import (
+                    raise_external_service_error
+                )
+                raise_external_service_error(
+                    service="cj_assessment_service",
+                    operation="generate_comparison",
+                    external_service="llm_provider_service",
+                    message=f"LLM Provider error: {response.status}",
+                    correlation_id=correlation_id,
+                    details={"status": response.status}
+                )
                     
+        except HuleEduError:
+            # Re-raise structured errors
+            raise
         except Exception as e:
-            error_detail = ErrorDetail(
-                error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+            # Convert unstructured errors
+            from services.libs.huleedu_service_libs.error_handling import (
+                raise_external_service_error
+            )
+            raise_external_service_error(
+                service="cj_assessment_service",
+                operation="generate_comparison",
+                external_service="llm_provider_service",
                 message=f"Failed to call LLM Provider: {str(e)}",
                 correlation_id=correlation_id,
-                timestamp=datetime.now(UTC),
-                service="cj_assessment_service",
                 details={"error_type": type(e).__name__}
             )
-            return None, error_detail
     
     # DELETE all polling methods:
     # - _handle_queued_response()
@@ -1351,7 +1360,7 @@ groups:
 ### LLM Provider Client
 - [ ] Remove all polling methods
 - [ ] Update generate_comparison to use callback topic
-- [ ] Implement proper error handling with ErrorDetail
+- [ ] Implement proper error handling with HuleEduError exceptions
 - [ ] Add request timeout handling
 - [ ] Update unit tests
 

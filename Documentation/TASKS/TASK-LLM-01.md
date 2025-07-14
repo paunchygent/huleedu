@@ -137,15 +137,15 @@ class LLMComparisonResultV1(BaseModel):
         has_error_field = self.error_detail is not None
         
         if has_success_fields and has_error_field:
-            raise ValueError("Cannot have both success fields and error_detail")
+            raise ValueError("Cannot have both success fields and error_detail")  # Internal validation error
         
         if not has_success_fields and not has_error_field:
-            raise ValueError("Must have either success fields or error_detail")
+            raise ValueError("Must have either success fields or error_detail")  # Internal validation error
         
         # If success, all success fields must be set
         if has_success_fields:
             if self.justification is None or self.confidence is None:
-                raise ValueError("All success fields (winner, justification, confidence) must be set together")
+                raise ValueError("All success fields (winner, justification, confidence) must be set together")  # Internal validation error
         
         return self
     
@@ -264,16 +264,78 @@ class QueuedRequest(BaseModel):
     # callback_url: Optional[str] = None  # DELETED
 ```
 
+### Phase 2.5: Add Missing Event Publisher Infrastructure (Day 2)
+
+#### 2.5.1 Update Event Publisher Protocol
+
+**File**: `services/llm_provider_service/protocols.py`
+
+```python
+class LLMEventPublisherProtocol(Protocol):
+    """Protocol for publishing LLM events to Kafka."""
+    
+    # ... existing methods ...
+    
+    async def publish_to_topic(
+        self,
+        topic: str,
+        envelope: EventEnvelope[Any],
+        key: Optional[str] = None
+    ) -> None:
+        """Publish event to specific topic."""
+        ...
+```
+
+#### 2.5.2 Implement publish_to_topic Method
+
+**File**: `services/llm_provider_service/implementations/event_publisher_impl.py`
+
+```python
+async def publish_to_topic(
+    self,
+    topic: str,
+    envelope: EventEnvelope[Any],
+    key: Optional[str] = None
+) -> None:
+    """Publish event to specific topic."""
+    try:
+        # Serialize the envelope
+        message_value = envelope.model_dump_json().encode('utf-8')
+        
+        # Send to Kafka
+        await self.producer.send_and_wait(
+            topic=topic,
+            value=message_value,
+            key=key.encode('utf-8') if key else None
+        )
+        
+        logger.debug(
+            f"Published event to topic {topic}",
+            extra={
+                "event_type": envelope.event_type,
+                "correlation_id": str(envelope.correlation_id),
+                "topic": topic
+            }
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to publish to topic {topic}: {e}",
+            extra={"correlation_id": str(envelope.correlation_id)},
+            exc_info=True
+        )
+        raise
+```
+
 ### Phase 3: Remove Polling Infrastructure (Day 2)
 
 #### 3.1 Delete Status/Results Endpoints
 
-**File**: `services/llm_provider_service/api/comparison_routes.py`
+**File**: `services/llm_provider_service/api/llm_routes.py`
 
 Remove entirely:
 
-- `@comparison_bp.route("/status/<queue_id>", methods=["GET"])`
-- `@comparison_bp.route("/results/<queue_id>", methods=["GET"])`
+- `@llm_bp.route("/status/<queue_id>", methods=["GET"])`
+- `@llm_bp.route("/results/<queue_id>", methods=["GET"])`
 
 #### 3.2 Remove Cache Storage Logic
 
@@ -305,7 +367,15 @@ async def _queue_request(
     # Validate callback topic is provided
     callback_topic = overrides.get("callback_topic")
     if not callback_topic:
-        raise ValueError("callback_topic is required for queued requests")
+        # Use structured error handling
+        from services.libs.huleedu_service_libs.error_handling import raise_validation_error
+        raise_validation_error(
+            service="llm_provider_service",
+            operation="queue_request",
+            field="callback_topic",
+            message="callback_topic is required for queued requests",
+            correlation_id=correlation_id
+        )
     
     # Create queued request
     request_data = LLMComparisonRequest(
@@ -392,12 +462,18 @@ async def _handle_request_failure(
         exc_info=True
     )
     
-    # Create error detail
-    error_detail = ErrorDetail(
-        error_code=error_code,  # Already an ErrorCode enum value
-        message=str(error)[:1000],  # Limit error message length
+    # Use structured error handling factory
+    from services.libs.huleedu_service_libs.error_handling import (
+        raise_llm_provider_service_error,
+        create_error_detail  # For cases where we need ErrorDetail without raising
+    )
+    
+    # Create error detail for the callback event
+    error_detail = create_error_detail(
+        error_code=error_code,
         service=self.settings.SERVICE_NAME,
-        timestamp=datetime.now(UTC),
+        operation="process_comparison",
+        message=str(error)[:1000],
         correlation_id=request.correlation_id,
         details={
             "request_id": request.queue_id,
