@@ -68,6 +68,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         essay_a: str,
         essay_b: str,
         correlation_id: UUID,
+        callback_topic: str | None = None,
         **overrides: Any,
     ) -> LLMOrchestratorResponse | LLMQueuedResult:
         """Perform LLM comparison with provider-first logic and queuing fallback.
@@ -125,6 +126,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 correlation_id=correlation_id,
                 overrides=overrides,
                 start_time=start_time,
+                callback_topic=callback_topic,
             )
 
         # Provider is available - make direct LLM request
@@ -147,8 +149,20 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         correlation_id: UUID,
         overrides: Dict[str, Any],
         start_time: float,
+        callback_topic: str | None = None,
     ) -> LLMQueuedResult:
         """Queue a request when provider is unavailable."""
+        # Validate callback_topic is provided
+        if not callback_topic:
+            raise_configuration_error(
+                service="llm_provider_service",
+                operation="orchestrator_queue_request",
+                config_key="callback_topic",
+                message="callback_topic is required for queued requests",
+                correlation_id=correlation_id,
+                details={"provider": provider.value},
+            )
+
         logger.warning(
             f"Provider {provider.value} is unavailable, queuing request. "
             f"correlation_id: {correlation_id}"
@@ -159,6 +173,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             user_prompt=user_prompt,
             essay_a=essay_a,
             essay_b=essay_b,
+            callback_topic=callback_topic,
             correlation_id=correlation_id,
             metadata=overrides,
         )
@@ -171,6 +186,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             priority=self._get_request_priority(overrides),
             ttl=timedelta(hours=self.settings.QUEUE_REQUEST_TTL_HOURS),
             correlation_id=correlation_id,
+            callback_topic=callback_topic,
             trace_context=trace_context,
             size_bytes=0,  # Will be calculated
         )

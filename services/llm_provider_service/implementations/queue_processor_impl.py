@@ -13,6 +13,8 @@ from typing import Any, Dict, Optional
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from common_core import LLMProviderType, QueueStatus
+from common_core.events.envelope import EventEnvelope
+from common_core.events.llm_provider_events import LLMComparisonResultV1, TokenUsage
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import (
     HuleEduError,
@@ -256,7 +258,6 @@ class QueueProcessorImpl:
             f"correlation_id: {request.request_data.correlation_id}"
         )
 
-
         # Update status to completed
         await self.queue_manager.update_status(
             queue_id=request.queue_id,
@@ -280,6 +281,9 @@ class QueueProcessorImpl:
                 ),
             },
         )
+
+        # Publish callback event for successful completion
+        await self._publish_callback_event(request, result)
 
         self._requests_processed += 1
 
@@ -339,6 +343,9 @@ class QueueProcessorImpl:
                 circuit_breaker_opened=False,
             )
 
+            # Publish callback event for error completion
+            await self._publish_callback_event_error(request, error)
+
     async def _handle_expired_request(self, request: QueuedRequest) -> None:
         """Handle an expired request.
 
@@ -368,8 +375,6 @@ class QueueProcessorImpl:
         expiry_time = request.queued_at + request.ttl
         return datetime.now(timezone.utc) > expiry_time
 
-
-
     async def _periodic_cleanup(self) -> None:
         """Perform periodic cleanup tasks."""
         current_time = time.time()
@@ -385,3 +390,131 @@ class QueueProcessorImpl:
 
         # Log processing stats
         logger.info(f"Queue processor stats - Processed: {self._requests_processed}")
+
+    async def _publish_callback_event(
+        self, request: QueuedRequest, result: LLMOrchestratorResponse
+    ) -> None:
+        """Publish callback event with successful LLM comparison result.
+
+        Args:
+            request: The processed request
+            result: The successful result
+        """
+        try:
+            # Create success callback event
+            callback_event = LLMComparisonResultV1(
+                request_id=str(request.queue_id),
+                correlation_id=request.correlation_id or request.queue_id,
+                winner=result.winner,
+                justification=(
+                    result.justification[:50] if result.justification else None
+                ),  # Enforce max length - 50 characters NOT 500!
+                confidence=result.confidence * 4 + 1,  # Convert 0-1 to 1-5 scale
+                error_detail=None,
+                provider=result.provider,
+                model=result.model,
+                response_time_ms=result.response_time_ms,
+                token_usage=TokenUsage(
+                    prompt_tokens=result.token_usage.get("prompt_tokens", 0),
+                    completion_tokens=result.token_usage.get("completion_tokens", 0),
+                    total_tokens=result.token_usage.get("total_tokens", 0),
+                ),
+                cost_estimate=result.cost_estimate,
+                requested_at=request.queued_at,
+                completed_at=datetime.now(timezone.utc),
+                trace_id=result.trace_id,
+                request_metadata=request.request_data.metadata or {},
+            )
+
+            # Create event envelope and publish
+            envelope = EventEnvelope[LLMComparisonResultV1](
+                event_type="LLMComparisonResultV1",
+                event_timestamp=datetime.now(timezone.utc),
+                source_service="llm_provider_service",
+                correlation_id=request.correlation_id or request.queue_id,
+                data=callback_event,
+            )
+
+            await self.event_publisher.publish_to_topic(
+                topic=request.callback_topic,
+                envelope=envelope,
+            )
+
+            logger.info(
+                f"Published success callback event for request {request.queue_id}, "
+                f"correlation_id: {request.correlation_id}, "
+                f"topic: {request.callback_topic}"
+            )
+
+        except Exception as e:
+            # Don't fail the request on publish failure - just log and continue
+            logger.error(
+                f"Failed to publish callback event for request {request.queue_id}: {e}, "
+                f"correlation_id: {request.correlation_id}",
+                exc_info=True,
+            )
+
+    async def _publish_callback_event_error(
+        self, request: QueuedRequest, error: HuleEduError
+    ) -> None:
+        """Publish callback event with error result.
+
+        Args:
+            request: The failed request
+            error: The HuleEduError that occurred
+        """
+        try:
+            # Get provider from error or use default
+            fallback_provider = LLMProviderType.OPENAI
+            if "provider" in error.error_detail.details:
+                try:
+                    fallback_provider = LLMProviderType(error.error_detail.details["provider"])
+                except ValueError:
+                    pass
+
+            # Create error callback event
+            callback_event = LLMComparisonResultV1(
+                request_id=str(request.queue_id),
+                correlation_id=request.correlation_id or request.queue_id,
+                winner=None,
+                justification=None,
+                confidence=None,
+                error_detail=error.error_detail,  # Use structured ErrorDetail
+                provider=fallback_provider,
+                model="unknown",
+                response_time_ms=0,
+                token_usage=TokenUsage(),  # Empty for errors
+                cost_estimate=0.0,
+                requested_at=request.queued_at,
+                completed_at=datetime.now(timezone.utc),
+                trace_id=None,
+                request_metadata=request.request_data.metadata or {},
+            )
+
+            # Create event envelope and publish
+            envelope = EventEnvelope[LLMComparisonResultV1](
+                event_type="LLMComparisonResultV1",
+                event_timestamp=datetime.now(timezone.utc),
+                source_service="llm_provider_service",
+                correlation_id=request.correlation_id or request.queue_id,
+                data=callback_event,
+            )
+
+            await self.event_publisher.publish_to_topic(
+                topic=request.callback_topic,
+                envelope=envelope,
+            )
+
+            logger.info(
+                f"Published error callback event for request {request.queue_id}, "
+                f"correlation_id: {request.correlation_id}, "
+                f"topic: {request.callback_topic}"
+            )
+
+        except Exception as e:
+            # Don't fail the request on publish failure - just log and continue
+            logger.error(
+                f"Failed to publish error callback event for request {request.queue_id}: {e}, "
+                f"correlation_id: {request.correlation_id}",
+                exc_info=True,
+            )

@@ -431,6 +431,7 @@ class TestRedisOptimizations:
                 user_prompt="Compare these essays",
                 essay_a=f"Essay A {i}",
                 essay_b=f"Essay B {i}",
+                callback_topic="test.callback.topic",
             )
             request = QueuedRequest(
                 queue_id=uuid4(),
@@ -441,6 +442,7 @@ class TestRedisOptimizations:
                 status=QueueStatus.QUEUED,
                 retry_count=0,
                 size_bytes=100,
+                callback_topic="test.callback.topic",
             )
             requests.append(request)
 

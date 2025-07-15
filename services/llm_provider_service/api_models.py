@@ -114,7 +114,7 @@ class UsageSummaryResponse(BaseModel):
 
 
 class LLMQueuedResponse(BaseModel):
-    """Response model when LLM request is queued."""
+    """Response model when LLM request is queued for callback delivery."""
 
     queue_id: UUID = Field(description="Unique queue identifier for tracking")
     status: str = Field(default="queued", description="Request status")
@@ -124,5 +124,3 @@ class LLMQueuedResponse(BaseModel):
     estimated_wait_minutes: int | None = Field(
         default=None, description="Estimated wait time in minutes"
     )
-    status_url: str = Field(description="URL to check request status")
-    retry_after: int = Field(default=60, description="Seconds before client should check status")

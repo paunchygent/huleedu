@@ -262,6 +262,7 @@ class TestInfrastructurePerformance:
                     user_prompt="Compare these essays",
                     essay_a=f"Queue test essay A {i}",
                     essay_b=f"Queue test essay B {i}",
+                    callback_topic="test.callback.topic",
                 )
                 request = QueuedRequest(
                     queue_id=uuid4(),
@@ -272,6 +273,7 @@ class TestInfrastructurePerformance:
                     status=QueueStatus.QUEUED,
                     retry_count=0,
                     size_bytes=len(f"Queue test essay A {i}") + len(f"Queue test essay B {i}"),
+                    callback_topic="test.callback.topic",
                 )
                 requests.append(request)
 

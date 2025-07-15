@@ -109,6 +109,7 @@ async def generate_comparison(
                     model_override=model_override,
                     temperature_override=temperature_override,
                     system_prompt_override=system_prompt_override,
+                    callback_topic=comparison_request.callback_topic,
                 )
             except HuleEduError as error:
                 # Track metrics for error
@@ -149,16 +150,16 @@ async def generate_comparison(
                     status="queued",
                 ).inc()
 
-                # Build queued response
+                # Build queued response - callback will be delivered to specified topic
                 queued_response = LLMQueuedResponse(
                     queue_id=result.queue_id,
                     status=result.status,
                     message=(
                         f"Request queued for processing. "
-                        f"Provider {result.provider.value} is currently unavailable."
+                        f"Provider {result.provider.value} is currently unavailable. "
+                        f"Result will be delivered via callback."
                     ),
                     estimated_wait_minutes=result.estimated_wait_minutes,
-                    retry_after=60,
                 )
 
                 logger.info(f"Request queued with ID: {result.queue_id}")
@@ -306,7 +307,3 @@ async def test_provider(
                 "details": str(e),
             }
         ), 500
-
-
-
-

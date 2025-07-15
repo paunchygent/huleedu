@@ -99,6 +99,7 @@ class TestRedisPerformance:
                 user_prompt="Compare these essays",
                 essay_a=f"Essay A {i}",
                 essay_b=f"Essay B {i}",
+                callback_topic="test.callback.topic",
             )
             request = QueuedRequest(
                 queue_id=uuid4(),
@@ -109,6 +110,7 @@ class TestRedisPerformance:
                 status=QueueStatus.QUEUED,
                 retry_count=0,
                 size_bytes=100,
+                callback_topic="test.callback.topic",
             )
             requests.append(request)
 
@@ -141,6 +143,7 @@ class TestRedisPerformance:
                     user_prompt="Compare these essays",
                     essay_a=f"Test essay A {i}",
                     essay_b=f"Test essay B {i}",
+                    callback_topic="test.callback.topic",
                 )
                 request = QueuedRequest(
                     queue_id=uuid4(),
@@ -151,6 +154,7 @@ class TestRedisPerformance:
                     status=QueueStatus.QUEUED,
                     retry_count=0,
                     size_bytes=100,
+                    callback_topic="test.callback.topic",
                 )
                 test_requests.append(request)
                 # Add to real Redis
@@ -185,6 +189,7 @@ class TestRedisPerformance:
                 user_prompt=f"Batch test prompt {i}",
                 essay_a=f"Batch essay A {i}",
                 essay_b=f"Batch essay B {i}",
+                callback_topic="test.callback.topic",
             )
             request = QueuedRequest(
                 queue_id=uuid4(),
@@ -195,6 +200,7 @@ class TestRedisPerformance:
                 status=QueueStatus.QUEUED,
                 retry_count=0,
                 size_bytes=150 + i * 5,  # Varying sizes
+                callback_topic="test.callback.topic",
             )
             requests.append(request)
 
@@ -228,6 +234,7 @@ class TestRedisPerformance:
                     user_prompt="Memory test",
                     essay_a=f"Memory essay A {i}",
                     essay_b=f"Memory essay B {i}",
+                    callback_topic="test.callback.topic",
                 )
                 request = QueuedRequest(
                     queue_id=uuid4(),
@@ -238,6 +245,7 @@ class TestRedisPerformance:
                     status=QueueStatus.QUEUED,
                     retry_count=0,
                     size_bytes=1024,  # 1KB per request
+                    callback_topic="test.callback.topic",
                 )
                 await queue_repo.add(request)
 
@@ -277,6 +285,7 @@ class TestRedisPerformance:
                 user_prompt=f"Concurrent test {operation_id}",
                 essay_a=f"Concurrent essay A {operation_id}",
                 essay_b=f"Concurrent essay B {operation_id}",
+                callback_topic="test.callback.topic",
             )
             request = QueuedRequest(
                 queue_id=uuid4(),
@@ -287,6 +296,7 @@ class TestRedisPerformance:
                 status=QueueStatus.QUEUED,
                 retry_count=0,
                 size_bytes=100,
+                callback_topic="test.callback.topic",
             )
 
             await queue_repo.add(request)
@@ -335,6 +345,7 @@ class TestRedisPerformance:
                     user_prompt=f"Resilience test {operation_id}",
                     essay_a=f"Resilience essay A {operation_id}",
                     essay_b=f"Resilience essay B {operation_id}",
+                    callback_topic="test.callback.topic",
                 )
                 request = QueuedRequest(
                     queue_id=uuid4(),
@@ -345,6 +356,7 @@ class TestRedisPerformance:
                     status=QueueStatus.QUEUED,
                     retry_count=0,
                     size_bytes=100,
+                    callback_topic="test.callback.topic",
                 )
 
                 result = await queue_repo.add(request)

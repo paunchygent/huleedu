@@ -50,6 +50,7 @@ async def test_comparison_request_model_validation() -> None:
         user_prompt="Compare these essays",
         essay_a="Essay A content",
         essay_b="Essay B content",
+        callback_topic="test.callback.topic",
     )
 
     # Assert
@@ -66,6 +67,7 @@ async def test_comparison_request_with_overrides() -> None:
         user_prompt="Compare",
         essay_a="A",
         essay_b="B",
+        callback_topic="test.callback.topic",
         llm_config_overrides=LLMConfigOverrides(
             provider_override=LLMProviderType.ANTHROPIC,
             model_override="claude-3",
