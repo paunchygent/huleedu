@@ -138,6 +138,17 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         max_tokens_override=max_tokens_override,
                     )
 
+                    # Handle async processing case - will be processed via callback in Phase 2
+                    if response_data is None:
+                        logger.info(
+                            f"Comparison for essays {task.essay_a.id} vs {task.essay_b.id} "
+                            "queued for async processing"
+                        )
+                        # For now, skip this comparison - Phase 2 will handle via callbacks
+                        raise ValueError(
+                            "Async comparison processing not yet implemented - Phase 2"
+                        )
+
                     # Record successful LLM API call metric
                     if llm_api_calls_metric:
                         llm_api_calls_metric.labels(

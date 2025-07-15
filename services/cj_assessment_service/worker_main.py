@@ -18,6 +18,7 @@ from huleedu_service_libs.logging_utils import configure_service_logging, create
 from huleedu_service_libs.protocols import RedisClientProtocol
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from services.cj_assessment_service.batch_monitor import BatchMonitor
 from services.cj_assessment_service.config import settings
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
 from services.cj_assessment_service.event_processor import process_single_message
@@ -34,6 +35,102 @@ logger = create_service_logger("worker_main")
 
 # Global shutdown flag
 shutdown_event = asyncio.Event()
+
+
+async def run_consumer(
+    consumer: AIOKafkaConsumer,
+    database: CJRepositoryProtocol,
+    content_client: ContentClientProtocol,
+    event_publisher: CJEventPublisherProtocol,
+    llm_interaction: LLMInteractionProtocol,
+    redis_client: RedisClientProtocol,
+    tracer: Tracer,
+) -> None:
+    """Run the Kafka consumer task."""
+    logger.info("Starting Kafka consumer task")
+
+    # Apply idempotency decorator to message processing with v2 configuration
+    config = IdempotencyConfig(
+        service_name="cj-assessment-service",
+        default_ttl=86400,  # 24 hours for complex AI processing
+        enable_debug_logging=True,  # Enable for AI workflow monitoring
+    )
+
+    @idempotent_consumer_v2(redis_client=redis_client, config=config)
+    async def handle_message_idempotently(msg: Any) -> bool:
+        return await process_single_message(
+            msg=msg,
+            database=database,
+            content_client=content_client,
+            event_publisher=event_publisher,
+            llm_interaction=llm_interaction,
+            settings_obj=settings,
+            tracer=tracer,
+        )
+
+    # Message consumption loop with idempotency support
+    try:
+        async for msg in consumer:
+            if shutdown_event.is_set():
+                logger.info("Consumer received shutdown signal, stopping...")
+                break
+
+            try:
+                result = await handle_message_idempotently(msg)
+
+                if result is not None:
+                    # Only commit if not a skipped duplicate
+                    if result:
+                        await consumer.commit()
+                        logger.debug(
+                            "Message committed: %s:%s:%s",
+                            msg.topic,
+                            msg.partition,
+                            msg.offset,
+                        )
+                    else:
+                        logger.warning(
+                            f"Message processing failed, not committing: "
+                            f"{msg.topic}:{msg.partition}:{msg.offset}",
+                        )
+                else:
+                    # Message was a duplicate and skipped
+                    logger.info(
+                        f"Duplicate message skipped, not committing offset: "
+                        f"{msg.topic}:{msg.partition}:{msg.offset}",
+                    )
+
+            except Exception as e:
+                logger.error(f"Error processing message: {e}", exc_info=True)
+
+    except asyncio.CancelledError:
+        logger.info("Consumer task cancelled")
+        raise
+    finally:
+        await consumer.stop()
+        logger.info("Kafka consumer stopped")
+
+
+async def run_monitor(batch_monitor: BatchMonitor) -> None:
+    """Run the batch monitoring task."""
+    logger.info("Starting batch monitor task")
+
+    try:
+        # The batch_monitor.check_stuck_batches() method already has its own loop
+        # We just need to run it and let it handle the monitoring
+        await batch_monitor.check_stuck_batches()
+
+    except asyncio.CancelledError:
+        logger.info("Monitor task cancelled")
+        raise
+    except Exception as e:
+        logger.error(
+            "Batch monitor task failed", extra={"error": str(e), "error_type": type(e).__name__}
+        )
+        raise
+    finally:
+        await batch_monitor.stop()
+        logger.info("Batch monitor stopped")
 
 
 async def main() -> None:
@@ -84,66 +181,66 @@ async def main() -> None:
             redis_client = await request_container.get(RedisClientProtocol)
             tracer = await request_container.get(Tracer)
 
-            logger.info("CJ Assessment Service worker ready with idempotency support")
+            # Initialize batch monitor
+            batch_monitor = BatchMonitor(
+                repository=database,
+                event_publisher=event_publisher,
+                settings=settings,
+            )
+            logger.info("Batch monitor initialized")
 
-            # Apply idempotency decorator to message processing with v2 configuration
-            config = IdempotencyConfig(
-                service_name="cj-assessment-service",
-                default_ttl=86400,  # 24 hours for complex AI processing
-                enable_debug_logging=True,  # Enable for AI workflow monitoring
+            logger.info(
+                "CJ Assessment Service worker ready with idempotency and monitoring support"
             )
 
-            @idempotent_consumer_v2(redis_client=redis_client, config=config)
-            async def handle_message_idempotently(msg: Any) -> bool:
-                return await process_single_message(
-                    msg=msg,
+            # Create tasks for consumer and monitor
+            consumer_task = asyncio.create_task(
+                run_consumer(
+                    consumer=consumer,
                     database=database,
                     content_client=content_client,
                     event_publisher=event_publisher,
                     llm_interaction=llm_interaction,
-                    settings_obj=settings,
+                    redis_client=redis_client,
                     tracer=tracer,
-                )
+                ),
+                name="consumer_task",
+            )
 
-            # Message consumption loop with idempotency support
+            monitor_task = asyncio.create_task(run_monitor(batch_monitor), name="monitor_task")
+
+            # Run both tasks concurrently
+            tasks = [consumer_task, monitor_task]
+            logger.info("Running consumer and monitor tasks concurrently")
+
             try:
-                async for msg in consumer:
-                    if shutdown_event.is_set():
-                        break
+                # Wait for shutdown or task failure
+                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
-                    try:
-                        result = await handle_message_idempotently(msg)
+                # Check if any task failed
+                for task in done:
+                    if task.exception():
+                        logger.error(
+                            f"Task {task.get_name()} failed with exception",
+                            exc_info=task.exception(),
+                        )
 
-                        if result is not None:
-                            # Only commit if not a skipped duplicate
-                            if result:
-                                await consumer.commit()
-                                logger.debug(
-                                    "Message committed: %s:%s:%s",
-                                    msg.topic,
-                                    msg.partition,
-                                    msg.offset,
-                                )
-                            else:
-                                logger.warning(
-                                    f"Message processing failed, not committing: "
-                                    f"{msg.topic}:{msg.partition}:{msg.offset}",
-                                )
-                        else:
-                            # Message was a duplicate and skipped
-                            logger.info(
-                                f"Duplicate message skipped, not committing offset: "
-                                f"{msg.topic}:{msg.partition}:{msg.offset}",
-                            )
+                # Cancel remaining tasks
+                logger.info("Cancelling remaining tasks...")
+                for task in pending:
+                    task.cancel()
 
-                    except Exception as e:
-                        logger.error(f"Error processing message: {e}", exc_info=True)
+                # Wait for cancellation to complete
+                await asyncio.gather(*pending, return_exceptions=True)
 
-            except asyncio.CancelledError:
-                logger.info("Message consumption cancelled")
-            finally:
-                await consumer.stop()
-                logger.info("Kafka consumer stopped")
+            except Exception as e:
+                logger.error(f"Error in main task coordination: {e}", exc_info=True)
+                # Cancel all tasks
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                raise
 
     except Exception as e:
         logger.error(f"Worker initialization failed: {e}", exc_info=True)
@@ -155,6 +252,7 @@ async def main() -> None:
 
 def signal_handler(signum: int, frame: Any) -> None:
     """Handle shutdown signals."""
+    _ = frame  # Unused but required by signal handler signature
     logger.info(f"Received signal {signum}, initiating shutdown...")
     shutdown_event.set()
 

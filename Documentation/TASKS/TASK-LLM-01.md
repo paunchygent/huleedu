@@ -7,7 +7,9 @@
 ## Technical Implementation Summary
 
 ### Event Infrastructure
+
 Created `common_core/src/common_core/events/llm_provider_events.py`:
+
 ```python
 class TokenUsage(BaseModel):
     prompt_tokens: int = Field(default=0, ge=0)
@@ -43,7 +45,9 @@ Added `LLMErrorCode` enum to `error_enums.py` (14 codes: PROVIDER_UNAVAILABLE, P
 Integrated `ProcessingEvent.LLM_COMPARISON_RESULT` → `huleedu.llm_provider.comparison_result.v1` topic mapping.
 
 ### API Contract Changes
+
 `services/llm_provider_service/api_models.py`:
+
 ```python
 class LLMComparisonRequest(BaseModel):
     callback_topic: str = Field(..., description="Kafka topic for result callback (required)")
@@ -55,6 +59,7 @@ class LLMQueuedResponse(BaseModel):
 ```
 
 `queue_models.py`:
+
 ```python
 class QueuedRequest(BaseModel):
     callback_topic: str = Field(..., description="Kafka topic for result delivery")
@@ -62,7 +67,9 @@ class QueuedRequest(BaseModel):
 ```
 
 ### Event Publisher Infrastructure
+
 `protocols.py` + `event_publisher_impl.py`:
+
 ```python
 async def publish_to_topic(self, topic: str, envelope: EventEnvelope[Any], key: Optional[str] = None) -> None:
     await self.kafka_bus.publish(topic, envelope, key)  # Leverages existing KafkaBus
@@ -70,18 +77,23 @@ async def publish_to_topic(self, topic: str, envelope: EventEnvelope[Any], key: 
 ```
 
 ### Polling Removal
+
 Deleted from `llm_routes.py`:
+
 - `get_queue_status()` - `GET /status/<uuid:queue_id>`
 - `get_queue_result()` - `GET /results/<uuid:queue_id>`
 
 Deleted from `queue_processor_impl.py`:
+
 - `_store_result()` - cache storage with capacity management
 - `get_result()` - cache retrieval
 - `_results_cache: Dict[UUID, LLMOrchestratorResponse]`
 - `_max_results_cache_size = 1000`
 
 ### Callback Implementation
+
 `queue_processor_impl.py` additions:
+
 ```python
 async def _publish_callback_event(self, request: QueuedRequest, result: LLMOrchestratorResponse):
     callback_event = LLMComparisonResultV1(
@@ -125,6 +137,7 @@ async def _publish_callback_event_error(self, request: QueuedRequest, error: Hul
 ```
 
 `llm_orchestrator_impl.py`:
+
 ```python
 # Added callback_topic validation
 if not callback_topic:
@@ -138,7 +151,9 @@ if not callback_topic:
 ```
 
 ### Testing
+
 Created `tests/unit/test_callback_publishing.py` (641 lines, 18 tests):
+
 - `TestSuccessCallbackPublishing` (5 tests): event creation, confidence scale, justification truncation, token usage, required fields
 - `TestErrorCallbackPublishing` (5 tests): error event creation, success fields None, structured ErrorDetail, defaults, provider extraction
 - `TestCallbackTopicValidation` (2 tests): orchestrator validation
@@ -146,7 +161,9 @@ Created `tests/unit/test_callback_publishing.py` (641 lines, 18 tests):
 - `TestPublishFailureHandling` (3 tests): resilience when Kafka fails
 
 ### Breaking Change Fixes
+
 Updated 18 test files adding `callback_topic="test.callback.topic"`:
+
 - `test_api_routes_simple.py` (2 instances)
 - `test_redis_performance.py` (12 instances)
 - `test_optimization_validation.py` (2 instances)
@@ -155,12 +172,14 @@ Updated 18 test files adding `callback_topic="test.callback.topic"`:
 Fixed architectural inconsistency: `LLMQueuedResponse` required `status_url` but endpoints deleted (Agent Gamma incomplete work).
 
 ### Quality Validation
+
 - MyPy: 510 files clean after fixing 19 errors
 - Ruff: All linting/formatting passed
 - Tests: 18/18 callback tests passing
 - Import validation: Correct patterns maintained
 
 ### Key Discoveries
+
 1. Confidence scale mismatch: LLM Provider uses 0-1, CJ Assessment expects 1-5 (fixed with `*4+1` conversion)
 2. Incomplete polling removal created hybrid state (fixed by removing response model fields)
 3. Justification field requires 50-char truncation (implemented in callback publishing)

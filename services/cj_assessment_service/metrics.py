@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 
 from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.logging_utils import create_service_logger
-from prometheus_client import REGISTRY, Counter, Histogram
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from common_core.observability_enums import MetricName
@@ -91,6 +91,79 @@ def _create_metrics(database_metrics: Optional[DatabaseMetrics] = None) -> dict[
                 "Latency between event timestamp and processing start",
                 registry=REGISTRY,
             ),
+            # Callback Processing Metrics
+            "cj_callbacks_processed_total": Counter(
+                "cj_callbacks_processed_total",
+                "Total CJ assessment callbacks processed",
+                ["status"],  # success/error
+                registry=REGISTRY,
+            ),
+            "cj_callback_latency_seconds": Histogram(
+                "cj_callback_latency_seconds",
+                "Time between LLM callback sent and received in seconds",
+                buckets=(0.1, 0.5, 1, 2, 5, 10, 30, 60, 120),
+                registry=REGISTRY,
+            ),
+            "cj_callback_processing_duration_seconds": Histogram(
+                "cj_callback_processing_duration_seconds",
+                "Duration of processing a single callback in seconds",
+                buckets=(0.01, 0.05, 0.1, 0.5, 1, 2, 5),
+                registry=REGISTRY,
+            ),
+            # Batch State Metrics
+            "cj_batch_state": Gauge(
+                "cj_batch_state",
+                "Current number of batches in each state",
+                ["state"],  # pending/active/completed/failed
+                registry=REGISTRY,
+            ),
+            "cj_batch_progress_percentage": Histogram(
+                "cj_batch_progress_percentage",
+                "Progress percentage when batch completes",
+                buckets=(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99, 100),
+                registry=REGISTRY,
+            ),
+            "cj_batch_processing_duration_seconds": Histogram(
+                "cj_batch_processing_duration_seconds",
+                "Total time to process a batch from start to completion in seconds",
+                buckets=(60, 120, 300, 600, 1200, 1800, 3600, 7200),
+                registry=REGISTRY,
+            ),
+            # Monitoring Metrics
+            "cj_stuck_batches_detected": Gauge(
+                "cj_stuck_batches_detected",
+                "Number of batches currently detected as stuck",
+                registry=REGISTRY,
+            ),
+            "cj_stuck_batches_recovered_total": Counter(
+                "cj_stuck_batches_recovered_total",
+                "Total number of stuck batches successfully recovered",
+                registry=REGISTRY,
+            ),
+            "cj_stuck_batches_failed_total": Counter(
+                "cj_stuck_batches_failed_total",
+                "Total number of stuck batches that failed due to timeout",
+                registry=REGISTRY,
+            ),
+            # Comparison Metrics
+            "cj_comparisons_total": Counter(
+                "cj_comparisons_total",
+                "Total number of comparisons performed",
+                ["status"],  # completed/failed
+                registry=REGISTRY,
+            ),
+            "cj_iterations_per_batch": Histogram(
+                "cj_iterations_per_batch",
+                "Number of iterations needed for stability per batch",
+                buckets=(1, 2, 3, 5, 10, 15, 20, 30, 50),
+                registry=REGISTRY,
+            ),
+            "cj_score_stability_changes": Histogram(
+                "cj_score_stability_changes",
+                "Maximum score change between iterations",
+                buckets=(0, 0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0),
+                registry=REGISTRY,
+            ),
         }
 
         # Add database metrics if provided
@@ -135,6 +208,22 @@ def _get_existing_metrics() -> dict[str, Any]:
         MetricName.PIPELINE_EXECUTION_TIME.value: "huleedu_cj_comparisons_made",
         "cj_assessment_duration_seconds": "huleedu_cj_assessment_duration_seconds",
         "kafka_queue_latency_seconds": "kafka_message_queue_latency_seconds",
+        # Callback Processing Metrics
+        "cj_callbacks_processed_total": "cj_callbacks_processed_total",
+        "cj_callback_latency_seconds": "cj_callback_latency_seconds",
+        "cj_callback_processing_duration_seconds": "cj_callback_processing_duration_seconds",
+        # Batch State Metrics
+        "cj_batch_state": "cj_batch_state",
+        "cj_batch_progress_percentage": "cj_batch_progress_percentage",
+        "cj_batch_processing_duration_seconds": "cj_batch_processing_duration_seconds",
+        # Monitoring Metrics
+        "cj_stuck_batches_detected": "cj_stuck_batches_detected",
+        "cj_stuck_batches_recovered_total": "cj_stuck_batches_recovered_total",
+        "cj_stuck_batches_failed_total": "cj_stuck_batches_failed_total",
+        # Comparison Metrics
+        "cj_comparisons_total": "cj_comparisons_total",
+        "cj_iterations_per_batch": "cj_iterations_per_batch",
+        "cj_score_stability_changes": "cj_score_stability_changes",
     }
 
     existing: dict[str, Any] = {}
@@ -169,6 +258,26 @@ def get_business_metrics() -> dict[str, Any]:
         "cj_assessment_duration_seconds": all_metrics.get("cj_assessment_duration_seconds"),
         "kafka_queue_latency_seconds": all_metrics.get("kafka_queue_latency_seconds"),
         "llm_api_calls": all_metrics.get("llm_api_calls"),
+        # Callback Processing Metrics
+        "cj_callbacks_processed_total": all_metrics.get("cj_callbacks_processed_total"),
+        "cj_callback_latency_seconds": all_metrics.get("cj_callback_latency_seconds"),
+        "cj_callback_processing_duration_seconds": all_metrics.get(
+            "cj_callback_processing_duration_seconds"
+        ),
+        # Batch State Metrics
+        "cj_batch_state": all_metrics.get("cj_batch_state"),
+        "cj_batch_progress_percentage": all_metrics.get("cj_batch_progress_percentage"),
+        "cj_batch_processing_duration_seconds": all_metrics.get(
+            "cj_batch_processing_duration_seconds"
+        ),
+        # Monitoring Metrics
+        "cj_stuck_batches_detected": all_metrics.get("cj_stuck_batches_detected"),
+        "cj_stuck_batches_recovered_total": all_metrics.get("cj_stuck_batches_recovered_total"),
+        "cj_stuck_batches_failed_total": all_metrics.get("cj_stuck_batches_failed_total"),
+        # Comparison Metrics
+        "cj_comparisons_total": all_metrics.get("cj_comparisons_total"),
+        "cj_iterations_per_batch": all_metrics.get("cj_iterations_per_batch"),
+        "cj_score_stability_changes": all_metrics.get("cj_score_stability_changes"),
     }
 
 

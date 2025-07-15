@@ -156,3 +156,16 @@ class CircuitBreakerState(str, Enum):
     CLOSED = "closed"  # Normal operation, requests allowed
     OPEN = "open"  # Failure threshold exceeded, requests blocked
     HALF_OPEN = "half_open"  # Testing if service recovered
+
+
+# --- CJ Assessment Batch State ---
+class CJBatchStateEnum(str, Enum):
+    """State machine for CJ assessment batch processing."""
+
+    INITIALIZING = "INITIALIZING"  # Batch created, essays being prepared
+    GENERATING_PAIRS = "GENERATING_PAIRS"  # Creating comparison pairs
+    WAITING_CALLBACKS = "WAITING_CALLBACKS"  # Comparisons sent, awaiting results
+    SCORING = "SCORING"  # Calculating Bradley-Terry scores
+    COMPLETED = "COMPLETED"  # Successfully processed
+    FAILED = "FAILED"  # Processing failed
+    CANCELLED = "CANCELLED"  # Manually stopped

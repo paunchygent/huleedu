@@ -72,30 +72,29 @@ class Settings(BaseSettings):
         description="Base URL for centralized LLM Provider Service",
     )
 
-    # Queue-based polling configuration for LLM Provider Service
-    LLM_QUEUE_POLLING_ENABLED: bool = Field(
-        default=True,
-        description="Enable polling for queued LLM requests (202 responses)",
+    # LLM callback configuration
+    LLM_PROVIDER_CALLBACK_TOPIC: str = Field(
+        default="huleedu.llm_provider.comparison_result.v1",
+        description="Kafka topic for LLM comparison callbacks",
     )
-    LLM_QUEUE_POLLING_INITIAL_DELAY_SECONDS: float = Field(
-        default=0.5,
-        description="Initial delay before first queue status check in seconds",
+
+    # Batch processing configuration
+    BATCH_TIMEOUT_HOURS: int = Field(
+        default=4, description="Hours before considering a batch stuck"
     )
-    LLM_QUEUE_POLLING_MAX_DELAY_SECONDS: float = Field(
-        default=10.0,
-        description="Maximum delay between queue status checks in seconds",
+    BATCH_MONITOR_INTERVAL_MINUTES: int = Field(
+        default=5, description="Interval for batch health checks"
     )
-    LLM_QUEUE_POLLING_EXPONENTIAL_BASE: float = Field(
-        default=1.2,
-        description="Exponential backoff base for queue polling delays",
+    MIN_SUCCESS_RATE_THRESHOLD: float = Field(
+        default=0.8, description="Minimum success rate before failing batch"
     )
-    LLM_QUEUE_POLLING_MAX_ATTEMPTS: int = Field(
-        default=30,
-        description="Maximum number of queue status polling attempts",
-    )
-    LLM_QUEUE_TOTAL_TIMEOUT_SECONDS: int = Field(
-        default=900,
-        description="Total timeout for queue processing in seconds (15 minutes)",
+
+    # Score stability configuration
+    MAX_ITERATIONS: int = Field(default=5, description="Maximum comparison iterations")
+
+    # Performance tuning
+    MAX_CONCURRENT_COMPARISONS: int = Field(
+        default=100, description="Max comparisons per batch in flight"
     )
 
     # Global LLM configuration defaults (used as fallbacks)

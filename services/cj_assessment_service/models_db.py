@@ -7,9 +7,11 @@ from uuid import UUID
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     DateTime,
     Float,
     ForeignKey,
+    Integer,
     String,
     Text,
     text,
@@ -20,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from common_core.error_enums import ErrorCode
+from common_core.status_enums import CJBatchStateEnum
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 
 
@@ -73,6 +76,13 @@ class CJBatchUpload(Base):
     comparison_pairs: Mapped[list[ComparisonPair]] = relationship(
         back_populates="cj_batch",
         cascade="all, delete-orphan",
+    )
+
+    # Add relationship to state
+    batch_state: Mapped["CJBatchState"] = relationship(
+        back_populates="batch_upload",
+        cascade="all, delete-orphan",
+        uselist=False,  # One-to-one
     )
 
 
@@ -147,6 +157,19 @@ class ComparisonPair(Base):
     # Comparison metadata
     prompt_text: Mapped[str] = mapped_column(Text, nullable=False)
 
+    # Add correlation tracking for callbacks
+    request_correlation_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), nullable=True, index=True, doc="Links to LLM provider callback"
+    )
+
+    # Add timing information
+    submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, doc="When sent to LLM provider"
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, doc="When result received"
+    )
+
     # Comparison results
     winner: Mapped[str | None] = mapped_column(
         String(20),
@@ -178,4 +201,79 @@ class ComparisonPair(Base):
     essay_b: Mapped[ProcessedEssay] = relationship(
         back_populates="comparison_pairs_b",
         foreign_keys=[essay_b_els_id],
+    )
+
+
+class CJBatchState(Base):
+    """
+    Real-time processing state for CJ assessment batches.
+    Single source of truth for batch progress and health.
+    """
+
+    __tablename__ = "cj_batch_states"
+
+    # Primary key linked to batch
+    batch_id: Mapped[int] = mapped_column(
+        ForeignKey("cj_batch_uploads.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+        doc="Links to the main batch record",
+    )
+
+    # Current state
+    state: Mapped[CJBatchStateEnum] = mapped_column(
+        SQLAlchemyEnum(
+            CJBatchStateEnum,
+            name="cj_batch_state_enum",
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
+        default=CJBatchStateEnum.INITIALIZING,
+        nullable=False,
+        index=True,
+        doc="Current processing state",
+    )
+
+    # Progress tracking
+    total_comparisons: Mapped[int] = mapped_column(
+        Integer, nullable=False, doc="Total comparisons to process"
+    )
+    submitted_comparisons: Mapped[int] = mapped_column(
+        Integer, default=0, doc="Comparisons sent to LLM provider"
+    )
+    completed_comparisons: Mapped[int] = mapped_column(
+        Integer, default=0, doc="Successfully completed comparisons"
+    )
+    failed_comparisons: Mapped[int] = mapped_column(
+        Integer, default=0, doc="Failed comparison attempts"
+    )
+
+    # Monitoring fields
+    last_activity_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("NOW()"),
+        onupdate=text("NOW()"),
+        nullable=False,
+        doc="For timeout detection",
+    )
+
+    # Partial completion support
+    partial_scoring_triggered: Mapped[bool] = mapped_column(
+        Boolean, default=False, doc="Prevents duplicate partial scoring"
+    )
+    completion_threshold_pct: Mapped[int] = mapped_column(
+        Integer, default=95, nullable=False, doc="Percentage threshold for partial completion"
+    )
+
+    # Processing metadata
+    current_iteration: Mapped[int] = mapped_column(
+        Integer, default=1, nullable=False, doc="Current comparison iteration"
+    )
+    processing_metadata: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True, doc="Stores previous scores, settings, etc."
+    )
+
+    # Relationships
+    batch_upload: Mapped["CJBatchUpload"] = relationship(
+        back_populates="batch_state",
+        lazy="joined",  # Always load with state
     )

@@ -70,7 +70,7 @@ class LLMProviderProtocol(Protocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         provider_override: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Generate a comparison assessment using the LLM.
 
         Args:

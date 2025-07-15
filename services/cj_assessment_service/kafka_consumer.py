@@ -20,7 +20,11 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.event_processor import process_single_message
+from services.cj_assessment_service.event_processor import (
+    # TODO: To be implemented by Agent Beta
+    process_llm_result,  # type: ignore
+    process_single_message,
+)
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
@@ -55,15 +59,16 @@ class CJAssessmentKafkaConsumer:
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
 
-        # Create idempotent message processor with v2 configuration for complex AI workflows
+        # Create idempotent message processors with v2 configuration for complex AI workflows
         config = IdempotencyConfig(
             service_name="cj-assessment-service",
             default_ttl=86400,  # 24 hours for complex AI processing
             enable_debug_logging=True,  # Enable for AI workflow monitoring
         )
 
+        # Processor for assessment request messages
         @idempotent_consumer_v2(redis_client=redis_client, config=config)
-        async def process_message_idempotently(msg: Any) -> bool | None:
+        async def process_assessment_request_idempotently(msg: Any) -> bool | None:
             return await process_single_message(
                 msg=msg,
                 database=self.database,
@@ -74,7 +79,20 @@ class CJAssessmentKafkaConsumer:
                 tracer=self.tracer,
             )
 
-        self._process_message_idempotently = process_message_idempotently
+        # Processor for LLM callback messages
+        @idempotent_consumer_v2(redis_client=redis_client, config=config)
+        async def process_llm_callback_idempotently(msg: Any) -> bool | None:
+            return await process_llm_result(
+                msg=msg,
+                database=self.database,
+                content_client=self.content_client,
+                event_publisher=self.event_publisher,
+                settings_obj=self.settings,
+                tracer=self.tracer,
+            )
+
+        self._process_assessment_request_idempotently = process_assessment_request_idempotently
+        self._process_llm_callback_idempotently = process_llm_callback_idempotently
 
     async def start_consumer(self) -> None:
         """Start the Kafka consumer and begin processing messages."""
@@ -82,13 +100,21 @@ class CJAssessmentKafkaConsumer:
         await self.database.initialize_db_schema()
         logger.info("Database schema initialized")
 
+        # Subscribe to BOTH topics
+        topics = [
+            self.settings.CJ_ASSESSMENT_REQUEST_TOPIC,  # Original requests
+            self.settings.LLM_PROVIDER_CALLBACK_TOPIC,  # LLM callbacks
+        ]
+
         # Create Kafka consumer
         self.consumer = AIOKafkaConsumer(
-            self.settings.CJ_ASSESSMENT_REQUEST_TOPIC,
+            *topics,
             bootstrap_servers=self.settings.KAFKA_BOOTSTRAP_SERVERS,
             group_id=self.settings.CONSUMER_GROUP_ID_CJ,
             auto_offset_reset="latest",
             enable_auto_commit=False,
+            max_poll_records=1,  # Process one at a time for consistency
+            session_timeout_ms=45000,
         )
 
         try:
@@ -96,7 +122,7 @@ class CJAssessmentKafkaConsumer:
             logger.info(
                 "CJ Assessment Kafka consumer started",
                 extra={
-                    "topic": self.settings.CJ_ASSESSMENT_REQUEST_TOPIC,
+                    "topics": topics,
                     "group_id": self.settings.CONSUMER_GROUP_ID_CJ,
                 },
             )
@@ -139,7 +165,20 @@ class CJAssessmentKafkaConsumer:
                         break
 
                     try:
-                        result = await self._process_message_idempotently(msg)
+                        # Route message based on topic
+                        if msg.topic == self.settings.CJ_ASSESSMENT_REQUEST_TOPIC:
+                            result = await self._process_assessment_request_idempotently(msg)
+                        elif msg.topic == self.settings.LLM_PROVIDER_CALLBACK_TOPIC:
+                            result = await self._process_llm_callback_idempotently(msg)
+                        else:
+                            logger.warning(
+                                f"Received message from unknown topic: {msg.topic}. "
+                                f"Expected topics: {self.settings.CJ_ASSESSMENT_REQUEST_TOPIC}, "
+                                f"{self.settings.LLM_PROVIDER_CALLBACK_TOPIC}"
+                            )
+                            # Skip unknown topic messages but still commit to avoid reprocessing
+                            await self.consumer.commit()
+                            continue
 
                         if result is not None:
                             # Only commit if not a skipped duplicate

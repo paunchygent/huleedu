@@ -2,7 +2,7 @@
 
 import json
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import aiohttp
@@ -26,13 +26,7 @@ def mock_settings() -> Settings:
     settings.DEFAULT_LLM_PROVIDER = LLMProviderType.ANTHROPIC
     settings.DEFAULT_LLM_MODEL = "claude-3-haiku"
     settings.DEFAULT_LLM_TEMPERATURE = 0.1
-    # Queue polling settings
-    settings.LLM_QUEUE_POLLING_ENABLED = True
-    settings.LLM_QUEUE_POLLING_INITIAL_DELAY_SECONDS = 0.1  # Short for tests
-    settings.LLM_QUEUE_POLLING_MAX_DELAY_SECONDS = 1.0
-    settings.LLM_QUEUE_POLLING_EXPONENTIAL_BASE = 1.5
-    settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS = 5  # Fewer for tests
-    settings.LLM_QUEUE_TOTAL_TIMEOUT_SECONDS = 10  # Shorter for tests
+    settings.LLM_PROVIDER_CALLBACK_TOPIC = "llm-provider-callbacks"
     return settings
 
 
@@ -301,10 +295,10 @@ Essay B content."""
             )
 
     # Queue-based response tests
-    async def test_generate_comparison_queued_success(
+    async def test_generate_comparison_queued_returns_none(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
     ) -> None:
-        """Test successful handling of queued response with polling."""
+        """Test that queued response (202) returns None for callback-based processing."""
         queue_id = str(uuid4())
 
         # Mock initial 202 response
@@ -321,69 +315,7 @@ Essay B content."""
             )
         )
 
-        # Mock status check responses (queued -> processing -> completed)
-        mock_status_responses = [
-            # First status check: queued
-            AsyncMock(
-                status=200,
-                text=AsyncMock(
-                    return_value=json.dumps(
-                        {
-                            "queue_id": queue_id,
-                            "status": "queued",
-                            "position_in_queue": 2,
-                        }
-                    )
-                ),
-            ),
-            # Second status check: processing
-            AsyncMock(
-                status=200,
-                text=AsyncMock(
-                    return_value=json.dumps(
-                        {
-                            "queue_id": queue_id,
-                            "status": "processing",
-                        }
-                    )
-                ),
-            ),
-            # Third status check: completed
-            AsyncMock(
-                status=200,
-                text=AsyncMock(
-                    return_value=json.dumps(
-                        {
-                            "queue_id": queue_id,
-                            "status": "completed",
-                            "result_available": True,
-                        }
-                    )
-                ),
-            ),
-        ]
-
-        # Mock result retrieval response
-        mock_result_response = AsyncMock()
-        mock_result_response.status = 200
-        mock_result_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "winner": "Essay B",
-                    "justification": "Essay B has superior argumentation",
-                    "confidence": 4.2,
-                    "provider": "anthropic",
-                    "model": "claude-3-haiku",
-                    "response_time_ms": 2500,
-                }
-            )
-        )
-
-        # Set up mock responses in order
         mock_session.post.return_value.__aenter__.return_value = mock_initial_response
-        mock_session.get.return_value.__aenter__.side_effect = mock_status_responses + [
-            mock_result_response
-        ]
 
         prompt = """Compare these two essays.
 Essay A (ID: 123):
@@ -401,203 +333,15 @@ Essay B content."""
         except HuleEduError as e:
             pytest.fail(f"Unexpected error: {e}")
 
-        # Verify successful result
-        assert result is not None
-        assert result["winner"] == "Essay B"
-        assert result["justification"] == "Essay B has superior argumentation"
-        assert result["confidence"] == 4.2
+        # Verify result is None for async processing
+        assert result is None
 
-        # Verify API calls were made
-        mock_session.post.assert_called_once()  # Initial comparison request
-        assert mock_session.get.call_count == 4  # 3 status checks + 1 result retrieval
-
-    async def test_generate_comparison_queued_failed(
-        self, client: LLMProviderServiceClient, mock_session: AsyncMock
-    ) -> None:
-        """Test handling of failed queue processing."""
-        queue_id = str(uuid4())
-
-        # Mock initial 202 response
-        mock_initial_response = AsyncMock()
-        mock_initial_response.status = 202
-        mock_initial_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "queued",
-                }
-            )
-        )
-
-        # Mock status check response showing failure
-        mock_status_response = AsyncMock()
-        mock_status_response.status = 200
-        mock_status_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "failed",
-                    "error_message": "Provider timeout",
-                }
-            )
-        )
-
-        mock_session.post.return_value.__aenter__.return_value = mock_initial_response
-        mock_session.get.return_value.__aenter__.return_value = mock_status_response
-
-        prompt = """Compare these two essays.
-Essay A (ID: 123):
-Essay A content.
-
-Essay B (ID: 456):
-Essay B content."""
-
-        correlation_id = uuid4()
-        with assert_raises_huleedu_error(
-            error_code=ErrorCode.PROCESSING_ERROR, message_contains="Queue processing failed"
-        ) as _:
-            await client.generate_comparison(
-                user_prompt=prompt,
-                correlation_id=correlation_id,
-            )
-
-    async def test_generate_comparison_queued_expired(
-        self, client: LLMProviderServiceClient, mock_session: AsyncMock
-    ) -> None:
-        """Test handling of expired queue requests."""
-        queue_id = str(uuid4())
-
-        # Mock initial 202 response
-        mock_initial_response = AsyncMock()
-        mock_initial_response.status = 202
-        mock_initial_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "queued",
-                }
-            )
-        )
-
-        # Mock status check response showing expiration
-        mock_status_response = AsyncMock()
-        mock_status_response.status = 200
-        mock_status_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "expired",
-                }
-            )
-        )
-
-        mock_session.post.return_value.__aenter__.return_value = mock_initial_response
-        mock_session.get.return_value.__aenter__.return_value = mock_status_response
-
-        prompt = """Compare these two essays.
-Essay A (ID: 123):
-Essay A content.
-
-Essay B (ID: 456):
-Essay B content."""
-
-        correlation_id = uuid4()
-        with assert_raises_huleedu_error(
-            error_code=ErrorCode.TIMEOUT, message_contains="Queue request expired"
-        ) as _:
-            await client.generate_comparison(
-                user_prompt=prompt,
-                correlation_id=correlation_id,
-            )
-
-    async def test_generate_comparison_queued_timeout(
-        self, client: LLMProviderServiceClient, mock_session: AsyncMock
-    ) -> None:
-        """Test handling of queue polling timeout."""
-        queue_id = str(uuid4())
-
-        # Mock initial 202 response
-        mock_initial_response = AsyncMock()
-        mock_initial_response.status = 202
-        mock_initial_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "queued",
-                }
-            )
-        )
-
-        # Mock status check response always returning "processing"
-        mock_status_response = AsyncMock()
-        mock_status_response.status = 200
-        mock_status_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "processing",
-                }
-            )
-        )
-
-        mock_session.post.return_value.__aenter__.return_value = mock_initial_response
-        mock_session.get.return_value.__aenter__.return_value = mock_status_response
-
-        prompt = """Compare these two essays.
-Essay A (ID: 123):
-Essay A content.
-
-Essay B (ID: 456):
-Essay B content."""
-
-        correlation_id = uuid4()
-        with assert_raises_huleedu_error(
-            error_code=ErrorCode.TIMEOUT, message_contains="Maximum polling attempts"
-        ) as _:
-            await client.generate_comparison(
-                user_prompt=prompt,
-                correlation_id=correlation_id,
-            )
-
-    async def test_generate_comparison_queued_polling_disabled(
-        self, client: LLMProviderServiceClient, mock_session: AsyncMock, mock_settings: Settings
-    ) -> None:
-        """Test handling when queue polling is disabled."""
-        # Disable queue polling
-        mock_settings.LLM_QUEUE_POLLING_ENABLED = False
-
-        queue_id = str(uuid4())
-
-        # Mock initial 202 response
-        mock_initial_response = AsyncMock()
-        mock_initial_response.status = 202
-        mock_initial_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "queued",
-                }
-            )
-        )
-
-        mock_session.post.return_value.__aenter__.return_value = mock_initial_response
-
-        prompt = """Compare these two essays.
-Essay A (ID: 123):
-Essay A content.
-
-Essay B (ID: 456):
-Essay B content."""
-
-        correlation_id = uuid4()
-        with assert_raises_huleedu_error(
-            error_code=ErrorCode.CONFIGURATION_ERROR,
-            message_contains="Request queued but polling is disabled",
-        ) as _:
-            await client.generate_comparison(
-                user_prompt=prompt,
-                correlation_id=correlation_id,
-            )
+        # Verify API call was made with callback topic
+        mock_session.post.assert_called_once()
+        call_args = mock_session.post.call_args
+        request_body = call_args[1]["json"]
+        assert "callback_topic" in request_body
+        assert request_body["callback_topic"] == client.settings.LLM_PROVIDER_CALLBACK_TOPIC
 
     async def test_generate_comparison_queued_no_queue_id(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -634,175 +378,29 @@ Essay B content."""
                 correlation_id=correlation_id,
             )
 
-    async def test_queue_status_check_not_found(
+    async def test_generate_comparison_callback_topic_required(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
     ) -> None:
-        """Test handling of queue status check returning 404."""
-        queue_id = str(uuid4())
-
-        # Mock initial 202 response
-        mock_initial_response = AsyncMock()
-        mock_initial_response.status = 202
-        mock_initial_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "queued",
-                }
-            )
-        )
-
-        # Mock status check response with 404
-        mock_status_response = AsyncMock()
-        mock_status_response.status = 404
-        mock_status_response.text = AsyncMock(return_value="Not found")
-
-        mock_session.post.return_value.__aenter__.return_value = mock_initial_response
-        mock_session.get.return_value.__aenter__.return_value = mock_status_response
-
-        prompt = """Compare these two essays.
-Essay A (ID: 123):
-Essay A content.
-
-Essay B (ID: 456):
-Essay B content."""
-
-        correlation_id = uuid4()
-        with assert_raises_huleedu_error(
-            error_code=ErrorCode.TIMEOUT, message_contains="Maximum polling attempts"
-        ) as _:
-            await client.generate_comparison(
-                user_prompt=prompt,
-                correlation_id=correlation_id,
-            )
-
-    async def test_result_retrieval_expired(
-        self, client: LLMProviderServiceClient, mock_session: AsyncMock
-    ) -> None:
-        """Test handling of result retrieval returning 410 (expired)."""
-        queue_id = str(uuid4())
-
-        # Mock initial 202 response
-        mock_initial_response = AsyncMock()
-        mock_initial_response.status = 202
-        mock_initial_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "queued",
-                }
-            )
-        )
-
-        # Mock status check response showing completion
-        mock_status_response = AsyncMock()
-        mock_status_response.status = 200
-        mock_status_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "completed",
-                }
-            )
-        )
-
-        # Mock result retrieval response with 410
-        mock_result_response = AsyncMock()
-        mock_result_response.status = 410
-        mock_result_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "error": "Result expired",
-                }
-            )
-        )
-
-        mock_session.post.return_value.__aenter__.return_value = mock_initial_response
-        mock_session.get.return_value.__aenter__.side_effect = [
-            mock_status_response,
-            mock_result_response,
-        ]
-
-        prompt = """Compare these two essays.
-Essay A (ID: 123):
-Essay A content.
-
-Essay B (ID: 456):
-Essay B content."""
-
-        correlation_id = uuid4()
-        with assert_raises_huleedu_error(
-            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR, message_contains="Queue result expired"
-        ) as _:
-            await client.generate_comparison(
-                user_prompt=prompt,
-                correlation_id=correlation_id,
-            )
-
-    @patch("asyncio.sleep")  # Mock sleep to speed up tests
-    async def test_exponential_backoff_timing(
-        self, mock_sleep: AsyncMock, client: LLMProviderServiceClient, mock_session: AsyncMock
-    ) -> None:
-        """Test that exponential backoff timing works correctly."""
-        queue_id = str(uuid4())
-
-        # Mock initial 202 response
-        mock_initial_response = AsyncMock()
-        mock_initial_response.status = 202
-        mock_initial_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "queued",
-                }
-            )
-        )
-
-        # Mock status check responses (processing -> completed)
-        mock_status_responses = [
-            AsyncMock(
-                status=200,
-                text=AsyncMock(
-                    return_value=json.dumps(
-                        {
-                            "queue_id": queue_id,
-                            "status": "processing",
-                        }
-                    )
-                ),
-            ),
-            AsyncMock(
-                status=200,
-                text=AsyncMock(
-                    return_value=json.dumps(
-                        {
-                            "queue_id": queue_id,
-                            "status": "completed",
-                        }
-                    )
-                ),
-            ),
-        ]
-
-        # Mock result response
-        mock_result_response = AsyncMock()
-        mock_result_response.status = 200
-        mock_result_response.text = AsyncMock(
+        """Test that callback topic is included in request for async processing."""
+        # Mock successful response
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(
             return_value=json.dumps(
                 {
                     "winner": "Essay A",
-                    "justification": "Test result",
-                    "confidence": 4.0,
+                    "justification": "Essay A has better structure",
+                    "confidence": 4.5,
                     "provider": "anthropic",
                     "model": "claude-3-haiku",
+                    "cached": False,
+                    "response_time_ms": 1500,
+                    "correlation_id": str(uuid4()),
                 }
             )
         )
 
-        mock_session.post.return_value.__aenter__.return_value = mock_initial_response
-        mock_session.get.return_value.__aenter__.side_effect = mock_status_responses + [
-            mock_result_response
-        ]
+        mock_session.post.return_value.__aenter__.return_value = mock_response
 
         prompt = """Compare these two essays.
 Essay A (ID: 123):
@@ -812,19 +410,14 @@ Essay B (ID: 456):
 Essay B content."""
 
         correlation_id = uuid4()
-        try:
-            result = await client.generate_comparison(
-                user_prompt=prompt,
-                correlation_id=correlation_id,
-            )
-        except HuleEduError as e:
-            pytest.fail(f"Unexpected error: {e}")
+        await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+        )
 
-        assert result is not None
-
-        # Verify sleep was called with exponential backoff
-        assert mock_sleep.call_count == 1  # One sleep before second status check
-        # First delay should be initial_delay * exponential_base = 0.1 * 1.5 = 0.15
-        # Use approximate equality due to floating point precision
-        call_args = mock_sleep.call_args[0][0]
-        assert abs(call_args - 0.15) < 0.01  # Close enough to 0.15
+        # Verify callback topic is included in request
+        mock_session.post.assert_called_once()
+        call_args = mock_session.post.call_args
+        request_body = call_args[1]["json"]
+        assert "callback_topic" in request_body
+        assert request_body["callback_topic"] == client.settings.LLM_PROVIDER_CALLBACK_TOPIC
