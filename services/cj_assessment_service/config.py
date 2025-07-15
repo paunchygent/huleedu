@@ -123,9 +123,7 @@ class Settings(BaseSettings):
     MAX_RETRY_ATTEMPTS: int = Field(
         default=3, description="Maximum retry attempts per failed comparison"
     )
-    RETRY_BATCH_SIZE: int = Field(
-        default=50, description="Size of retry batches (up to 200)"
-    )
+    RETRY_BATCH_SIZE: int = Field(default=50, description="Size of retry batches (up to 200)")
     RETRY_BATCH_PRIORITY: str = Field(
         default="high", description="Priority level for retry batches"
     )

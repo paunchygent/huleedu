@@ -290,6 +290,13 @@ def mock_settings() -> Settings:
     # Add missing attributes for LLM interaction tests
     settings.max_concurrent_llm_requests = 10
     settings.llm_request_timeout_seconds = 30
+
+    # Add failed pool configuration for retry logic tests
+    settings.ENABLE_FAILED_COMPARISON_RETRY = True
+    settings.FAILED_COMPARISON_RETRY_THRESHOLD = 5
+    settings.MAX_RETRY_ATTEMPTS = 3
+    settings.RETRY_BATCH_SIZE = 10
+
     return settings
 
 

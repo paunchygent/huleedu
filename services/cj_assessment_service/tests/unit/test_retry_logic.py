@@ -1,0 +1,595 @@
+"""Unit tests for retry logic and batch formation functionality."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
+import pytest
+
+if TYPE_CHECKING:
+    from unittest.mock import AsyncMock
+
+    from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+    from services.cj_assessment_service.config import Settings
+    from services.cj_assessment_service.models_api import ComparisonTask
+
+from services.cj_assessment_service.cj_core_logic.batch_processor import (
+    BatchSubmissionResult,
+)
+from services.cj_assessment_service.models_api import (
+    ComparisonTask,
+    EssayForComparison,
+    FailedComparisonEntry,
+    FailedComparisonPool,
+    FailedComparisonPoolStatistics,
+)
+from services.cj_assessment_service.models_db import CJBatchState
+
+# Import shared fixtures
+pytest_plugins = ["services.cj_assessment_service.tests.unit.conftest_pool"]
+
+
+class TestFailedComparisonPoolRetryCheck:
+    """Test checking if retry batch is needed."""
+
+    @pytest.mark.asyncio
+    async def test_check_retry_batch_needed_disabled(
+        self,
+        batch_processor: BatchProcessor,
+        mock_settings: Settings,
+    ) -> None:
+        """Test retry check when retry is disabled."""
+        # Arrange
+        mock_settings.ENABLE_FAILED_COMPARISON_RETRY = False
+        cj_batch_id = 123
+        correlation_id = uuid4()
+
+        # Act
+        result = await batch_processor.check_retry_batch_needed(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+        )
+
+        # Assert
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_check_retry_batch_needed_threshold_met(
+        self,
+        batch_processor: BatchProcessor,
+        mock_database: AsyncMock,
+    ) -> None:
+        """Test retry check when threshold is met."""
+        # Arrange
+        cj_batch_id = 123
+        correlation_id = uuid4()
+
+        # Create batch state with enough failures
+        failed_pool = FailedComparisonPool(
+            failed_comparison_pool=[
+                FailedComparisonEntry(
+                    essay_a_id=f"essay_a_{i}",
+                    essay_b_id=f"essay_b_{i}",
+                    comparison_task=ComparisonTask(
+                        essay_a=EssayForComparison(id=f"essay_a_{i}", text_content="Essay A"),
+                        essay_b=EssayForComparison(id=f"essay_b_{i}", text_content="Essay B"),
+                        prompt="Compare essays",
+                    ),
+                    failure_reason="timeout",
+                    failed_at=datetime.now(UTC),
+                    retry_count=0,
+                    original_batch_id="123",
+                    correlation_id=uuid4(),
+                )
+                for i in range(6)  # More than threshold of 5
+            ],
+            pool_statistics=FailedComparisonPoolStatistics(total_failed=6),
+        )
+
+        batch_state = MagicMock(spec=CJBatchState)
+        batch_state.processing_metadata = failed_pool.model_dump()
+
+        # Mock database session and batch state retrieval
+        mock_session = AsyncMock()
+        mock_database.session.return_value.__aenter__.return_value = mock_session
+        mock_database.session.return_value.__aexit__.return_value = None
+
+        # Act & Assert
+        with patch(
+            "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
+            new_callable=AsyncMock,
+        ) as mock_get_batch_state:
+            mock_get_batch_state.return_value = batch_state
+
+            result = await batch_processor.check_retry_batch_needed(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+            # Assert
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_check_retry_batch_needed_threshold_not_met(
+        self,
+        batch_processor: BatchProcessor,
+        mock_database: AsyncMock,
+    ) -> None:
+        """Test retry check when threshold is not met."""
+        # Arrange
+        cj_batch_id = 123
+        correlation_id = uuid4()
+
+        # Create batch state with insufficient failures
+        failed_pool = FailedComparisonPool(
+            failed_comparison_pool=[
+                FailedComparisonEntry(
+                    essay_a_id=f"essay_a_{i}",
+                    essay_b_id=f"essay_b_{i}",
+                    comparison_task=ComparisonTask(
+                        essay_a=EssayForComparison(id=f"essay_a_{i}", text_content="Essay A"),
+                        essay_b=EssayForComparison(id=f"essay_b_{i}", text_content="Essay B"),
+                        prompt="Compare essays",
+                    ),
+                    failure_reason="timeout",
+                    failed_at=datetime.now(UTC),
+                    retry_count=0,
+                    original_batch_id="123",
+                    correlation_id=uuid4(),
+                )
+                for i in range(3)  # Less than threshold of 5
+            ],
+            pool_statistics=FailedComparisonPoolStatistics(total_failed=3),
+        )
+
+        batch_state = MagicMock(spec=CJBatchState)
+        batch_state.processing_metadata = failed_pool.model_dump()
+
+        # Mock database session and batch state retrieval
+        mock_session = AsyncMock()
+        mock_database.session.return_value.__aenter__.return_value = mock_session
+        mock_database.session.return_value.__aexit__.return_value = None
+
+        # Act & Assert
+        with patch(
+            "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
+            new_callable=AsyncMock,
+        ) as mock_get_batch_state:
+            mock_get_batch_state.return_value = batch_state
+
+            result = await batch_processor.check_retry_batch_needed(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+            # Assert
+            assert result is False
+
+
+class TestFailedComparisonPoolRetryBatch:
+    """Test forming retry batches from failed pool."""
+
+    @pytest.mark.asyncio
+    async def test_form_retry_batch_success(
+        self,
+        batch_processor: BatchProcessor,
+        mock_database: AsyncMock,
+        sample_comparison_task: ComparisonTask,
+    ) -> None:
+        """Test successfully forming retry batch."""
+        # Arrange
+        cj_batch_id = 123
+        correlation_id = uuid4()
+
+        # Create batch state with enough failures
+        failed_pool = FailedComparisonPool(
+            failed_comparison_pool=[
+                FailedComparisonEntry(
+                    essay_a_id=f"essay_a_{i}",
+                    essay_b_id=f"essay_b_{i}",
+                    comparison_task=sample_comparison_task,
+                    failure_reason="timeout",
+                    failed_at=datetime.now(UTC),
+                    retry_count=0,
+                    original_batch_id="123",
+                    correlation_id=uuid4(),
+                )
+                for i in range(6)  # More than threshold of 5
+            ],
+            pool_statistics=FailedComparisonPoolStatistics(total_failed=6),
+        )
+
+        batch_state = MagicMock(spec=CJBatchState)
+        batch_state.processing_metadata = failed_pool.model_dump()
+
+        # Mock database session and batch state retrieval
+        mock_session = AsyncMock()
+        mock_database.session.return_value.__aenter__.return_value = mock_session
+        mock_database.session.return_value.__aexit__.return_value = None
+
+        # Act & Assert
+        with (
+            patch(
+                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
+                new_callable=AsyncMock,
+            ) as mock_get_batch_state,
+            patch(
+                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.update_batch_processing_metadata",
+                new_callable=AsyncMock,
+            ) as mock_update_metadata,
+        ):
+            mock_get_batch_state.return_value = batch_state
+            mock_update_metadata.return_value = None
+
+            retry_tasks = await batch_processor.form_retry_batch(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+            # Assert
+            assert retry_tasks is not None
+            assert len(retry_tasks) == 6  # All eligible failures should be included
+            assert all(isinstance(task, ComparisonTask) for task in retry_tasks)
+
+            # Check that metadata was updated
+            mock_update_metadata.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_form_retry_batch_max_retry_reached(
+        self,
+        batch_processor: BatchProcessor,
+        mock_database: AsyncMock,
+        sample_comparison_task: ComparisonTask,
+        mock_settings: Settings,
+    ) -> None:
+        """Test forming retry batch with comparisons at max retry limit."""
+        # Arrange
+        cj_batch_id = 123
+        correlation_id = uuid4()
+
+        # Create batch state with failures at max retry count
+        failed_pool = FailedComparisonPool(
+            failed_comparison_pool=[
+                FailedComparisonEntry(
+                    essay_a_id=f"essay_a_{i}",
+                    essay_b_id=f"essay_b_{i}",
+                    comparison_task=ComparisonTask(
+                        essay_a=EssayForComparison(id=f"essay_a_{i}", text_content="Essay A"),
+                        essay_b=EssayForComparison(id=f"essay_b_{i}", text_content="Essay B"),
+                        prompt="Compare essays",
+                    ),
+                    failure_reason="timeout",
+                    failed_at=datetime.now(UTC),
+                    retry_count=mock_settings.MAX_RETRY_ATTEMPTS,  # At max retries
+                    original_batch_id="123",
+                    correlation_id=uuid4(),
+                )
+                for i in range(6)
+            ],
+            pool_statistics=FailedComparisonPoolStatistics(total_failed=6),
+        )
+
+        batch_state = MagicMock(spec=CJBatchState)
+        batch_state.processing_metadata = failed_pool.model_dump()
+
+        # Mock database session and batch state retrieval
+        mock_session = AsyncMock()
+        mock_database.session.return_value.__aenter__.return_value = mock_session
+        mock_database.session.return_value.__aexit__.return_value = None
+
+        # Act & Assert
+        with patch(
+            "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
+            new_callable=AsyncMock,
+        ) as mock_get_batch_state:
+            mock_get_batch_state.return_value = batch_state
+
+            retry_tasks = await batch_processor.form_retry_batch(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+            # Assert
+            assert retry_tasks is None  # No eligible failures
+
+    @pytest.mark.asyncio
+    async def test_form_retry_batch_partial_eligibility(
+        self,
+        batch_processor: BatchProcessor,
+        mock_database: AsyncMock,
+        mock_settings: Settings,
+    ) -> None:
+        """Test forming retry batch when some comparisons are ineligible."""
+        # Arrange
+        cj_batch_id = 123
+        correlation_id = uuid4()
+
+        # Create mixed batch state: some eligible, some at max retries
+        sample_task = ComparisonTask(
+            essay_a=EssayForComparison(id="essay_a_1", text_content="Essay A"),
+            essay_b=EssayForComparison(id="essay_b_1", text_content="Essay B"),
+            prompt="Compare essays",
+        )
+
+        failed_pool = FailedComparisonPool(
+            failed_comparison_pool=[
+                # Eligible entries (retry_count < MAX_RETRY_ATTEMPTS)
+                FailedComparisonEntry(
+                    essay_a_id=f"essay_a_{i}",
+                    essay_b_id=f"essay_b_{i}",
+                    comparison_task=sample_task,
+                    failure_reason="timeout",
+                    failed_at=datetime.now(UTC),
+                    retry_count=1,  # Eligible
+                    original_batch_id="123",
+                    correlation_id=uuid4(),
+                )
+                for i in range(4)
+            ]
+            + [
+                # Ineligible entries (at max retry count)
+                FailedComparisonEntry(
+                    essay_a_id=f"essay_a_max_{i}",
+                    essay_b_id=f"essay_b_max_{i}",
+                    comparison_task=sample_task,
+                    failure_reason="timeout",
+                    failed_at=datetime.now(UTC),
+                    retry_count=mock_settings.MAX_RETRY_ATTEMPTS,  # Ineligible
+                    original_batch_id="123",
+                    correlation_id=uuid4(),
+                )
+                for i in range(3)
+            ],
+            pool_statistics=FailedComparisonPoolStatistics(total_failed=7),
+        )
+
+        batch_state = MagicMock(spec=CJBatchState)
+        batch_state.processing_metadata = failed_pool.model_dump()
+
+        # Mock database session and batch state retrieval
+        mock_session = AsyncMock()
+        mock_database.session.return_value.__aenter__.return_value = mock_session
+        mock_database.session.return_value.__aexit__.return_value = None
+
+        # Act & Assert
+        with patch(
+            "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
+            new_callable=AsyncMock,
+        ) as mock_get_batch_state:
+            mock_get_batch_state.return_value = batch_state
+
+            # Should return None because only 4 eligible (below threshold of 5)
+            retry_tasks = await batch_processor.form_retry_batch(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+            # Assert
+            assert retry_tasks is None  # Below threshold despite total count > 5
+
+
+class TestFailedComparisonPoolSubmitRetry:
+    """Test submitting retry batches."""
+
+    @pytest.mark.asyncio
+    async def test_submit_retry_batch_success(
+        self,
+        batch_processor: BatchProcessor,
+        sample_comparison_task: ComparisonTask,
+    ) -> None:
+        """Test successfully submitting retry batch."""
+        # Arrange
+        cj_batch_id = 123
+        correlation_id = uuid4()
+
+        # Mock form_retry_batch to return tasks
+        retry_tasks = [sample_comparison_task]
+        submission_result = BatchSubmissionResult(
+            batch_id=cj_batch_id,
+            total_submitted=1,
+            submitted_at=datetime.now(UTC),
+            all_submitted=True,
+            correlation_id=correlation_id,
+        )
+
+        with (
+            patch.object(
+                batch_processor, "form_retry_batch", new_callable=AsyncMock
+            ) as mock_form_retry,
+            patch.object(
+                batch_processor, "submit_comparison_batch", new_callable=AsyncMock
+            ) as mock_submit,
+        ):
+            mock_form_retry.return_value = retry_tasks
+            mock_submit.return_value = submission_result
+
+            # Act
+            result = await batch_processor.submit_retry_batch(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+            # Assert
+            assert result is not None
+            assert result.total_submitted == 1
+            mock_form_retry.assert_called_once()
+            mock_submit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_submit_retry_batch_disabled(
+        self,
+        batch_processor: BatchProcessor,
+        mock_settings: Settings,
+    ) -> None:
+        """Test submitting retry batch when retry is disabled."""
+        # Arrange
+        mock_settings.ENABLE_FAILED_COMPARISON_RETRY = False
+        cj_batch_id = 123
+        correlation_id = uuid4()
+
+        # Act
+        result = await batch_processor.submit_retry_batch(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+        )
+
+        # Assert
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_submit_retry_batch_no_tasks(
+        self,
+        batch_processor: BatchProcessor,
+    ) -> None:
+        """Test submitting retry batch when no tasks are available."""
+        # Arrange
+        cj_batch_id = 123
+        correlation_id = uuid4()
+
+        # Mock form_retry_batch to return None (no tasks)
+        with patch.object(
+            batch_processor, "form_retry_batch", new_callable=AsyncMock
+        ) as mock_form_retry:
+            mock_form_retry.return_value = None
+
+            # Act
+            result = await batch_processor.submit_retry_batch(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+            # Assert
+            assert result is None
+            mock_form_retry.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_submit_retry_batch_with_overrides(
+        self,
+        batch_processor: BatchProcessor,
+        sample_comparison_task: ComparisonTask,
+    ) -> None:
+        """Test submitting retry batch with model overrides."""
+        # Arrange
+        cj_batch_id = 123
+        correlation_id = uuid4()
+        model_override = "test-model"
+        temperature_override = 0.7
+        max_tokens_override = 1000
+
+        # Mock dependencies
+        retry_tasks = [sample_comparison_task]
+        submission_result = BatchSubmissionResult(
+            batch_id=cj_batch_id,
+            total_submitted=1,
+            submitted_at=datetime.now(UTC),
+            all_submitted=True,
+            correlation_id=correlation_id,
+        )
+
+        with (
+            patch.object(
+                batch_processor, "form_retry_batch", new_callable=AsyncMock
+            ) as mock_form_retry,
+            patch.object(
+                batch_processor, "submit_comparison_batch", new_callable=AsyncMock
+            ) as mock_submit,
+        ):
+            mock_form_retry.return_value = retry_tasks
+            mock_submit.return_value = submission_result
+
+            # Act
+            result = await batch_processor.submit_retry_batch(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+                model_override=model_override,
+                temperature_override=temperature_override,
+                max_tokens_override=max_tokens_override,
+            )
+
+            # Assert
+            assert result is not None
+            mock_submit.assert_called_once()
+
+            # Verify overrides were passed
+            call_args = mock_submit.call_args
+            assert call_args is not None
+            kwargs = call_args[1]
+            assert kwargs["model_override"] == model_override
+            assert kwargs["temperature_override"] == temperature_override
+            assert kwargs["max_tokens_override"] == max_tokens_override
+
+
+class TestRetryBatchSizing:
+    """Test retry batch sizing logic."""
+
+    @pytest.mark.asyncio
+    async def test_retry_batch_respects_size_limit(
+        self,
+        batch_processor: BatchProcessor,
+        mock_database: AsyncMock,
+        mock_settings: Settings,
+    ) -> None:
+        """Test that retry batch respects the RETRY_BATCH_SIZE setting."""
+        # Arrange
+        cj_batch_id = 123
+        correlation_id = uuid4()
+
+        # Set up many eligible failures (more than RETRY_BATCH_SIZE)
+        many_failures = 15  # More than RETRY_BATCH_SIZE (10)
+        sample_task = ComparisonTask(
+            essay_a=EssayForComparison(id="essay_a_1", text_content="Essay A"),
+            essay_b=EssayForComparison(id="essay_b_1", text_content="Essay B"),
+            prompt="Compare essays",
+        )
+
+        failed_pool = FailedComparisonPool(
+            failed_comparison_pool=[
+                FailedComparisonEntry(
+                    essay_a_id=f"essay_a_{i}",
+                    essay_b_id=f"essay_b_{i}",
+                    comparison_task=sample_task,
+                    failure_reason="timeout",
+                    failed_at=datetime.now(UTC),
+                    retry_count=0,
+                    original_batch_id="123",
+                    correlation_id=uuid4(),
+                )
+                for i in range(many_failures)
+            ],
+            pool_statistics=FailedComparisonPoolStatistics(total_failed=many_failures),
+        )
+
+        batch_state = MagicMock(spec=CJBatchState)
+        batch_state.processing_metadata = failed_pool.model_dump()
+
+        # Mock database session
+        mock_session = AsyncMock()
+        mock_database.session.return_value.__aenter__.return_value = mock_session
+        mock_database.session.return_value.__aexit__.return_value = None
+
+        # Act & Assert
+        with (
+            patch(
+                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
+                new_callable=AsyncMock,
+            ) as mock_get_batch_state,
+            patch(
+                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.update_batch_processing_metadata",
+                new_callable=AsyncMock,
+            ) as mock_update_metadata,
+        ):
+            mock_get_batch_state.return_value = batch_state
+            mock_update_metadata.return_value = None
+
+            retry_tasks = await batch_processor.form_retry_batch(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+            # Assert
+            assert retry_tasks is not None
+            assert len(retry_tasks) == mock_settings.RETRY_BATCH_SIZE  # Limited by RETRY_BATCH_SIZE
+            assert len(retry_tasks) < many_failures  # Not all failures processed

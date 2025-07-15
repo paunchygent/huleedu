@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -19,7 +19,6 @@ from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.exceptions import (
     AssessmentProcessingError,
     DatabaseOperationError,
-    LLMProviderError,
 )
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
@@ -255,14 +254,16 @@ class TestBatchProcessor:
         correlation_id = uuid4()
         sample_batch_state.state = CJBatchStateEnum.COMPLETED
 
-        # Mock the _get_batch_state method directly
-        batch_processor._get_batch_state = AsyncMock(return_value=sample_batch_state)
-
         # Act
-        is_complete = await batch_processor.check_batch_completion(
-            cj_batch_id=cj_batch_id,
-            correlation_id=correlation_id,
-        )
+        with patch(
+            "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
+            new_callable=AsyncMock,
+        ) as mock_get_batch_state:
+            mock_get_batch_state.return_value = sample_batch_state
+            is_complete = await batch_processor.check_batch_completion(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
 
         # Assert
         assert is_complete is True
@@ -280,14 +281,16 @@ class TestBatchProcessor:
         sample_batch_state.total_comparisons = 100
         sample_batch_state.completed_comparisons = 96  # 96% completion
 
-        # Mock the _get_batch_state method directly
-        batch_processor._get_batch_state = AsyncMock(return_value=sample_batch_state)
-
         # Act
-        is_complete = await batch_processor.check_batch_completion(
-            cj_batch_id=cj_batch_id,
-            correlation_id=correlation_id,
-        )
+        with patch(
+            "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
+            new_callable=AsyncMock,
+        ) as mock_get_batch_state:
+            mock_get_batch_state.return_value = sample_batch_state
+            is_complete = await batch_processor.check_batch_completion(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
 
         # Assert
         assert is_complete is True
@@ -305,14 +308,16 @@ class TestBatchProcessor:
         sample_batch_state.total_comparisons = 100
         sample_batch_state.completed_comparisons = 90  # 90% completion
 
-        # Mock the _get_batch_state method directly
-        batch_processor._get_batch_state = AsyncMock(return_value=sample_batch_state)
-
         # Act
-        is_complete = await batch_processor.check_batch_completion(
-            cj_batch_id=cj_batch_id,
-            correlation_id=correlation_id,
-        )
+        with patch(
+            "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
+            new_callable=AsyncMock,
+        ) as mock_get_batch_state:
+            mock_get_batch_state.return_value = sample_batch_state
+            is_complete = await batch_processor.check_batch_completion(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
 
         # Assert
         assert is_complete is False
@@ -326,18 +331,20 @@ class TestBatchProcessor:
         cj_batch_id = 1
         correlation_id = uuid4()
 
-        # Mock the _get_batch_state method to return None
-        batch_processor._get_batch_state = AsyncMock(return_value=None)
-
         # Act & Assert
-        with pytest.raises(DatabaseOperationError) as exc_info:
-            await batch_processor.check_batch_completion(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-            )
+        with patch(
+            "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
+            new_callable=AsyncMock,
+        ) as mock_get_batch_state:
+            mock_get_batch_state.return_value = None
+            with pytest.raises(DatabaseOperationError) as exc_info:
+                await batch_processor.check_batch_completion(
+                    cj_batch_id=cj_batch_id,
+                    correlation_id=correlation_id,
+                )
 
-        assert "Batch state not found" in str(exc_info.value)
-        assert exc_info.value.correlation_id == correlation_id
+            assert "Batch state not found" in str(exc_info.value)
+            assert exc_info.value.correlation_id == correlation_id
 
     async def test_handle_batch_submission_with_request_data(
         self,
@@ -383,112 +390,8 @@ class TestBatchProcessor:
         assert call_args.kwargs["temperature_override"] == 0.2
         assert call_args.kwargs["max_tokens_override"] == 1000
 
-    def test_get_effective_batch_size_with_override(
-        self,
-        batch_processor: BatchProcessor,
-    ) -> None:
-        """Test effective batch size calculation with override."""
-        # Arrange
-        config_overrides = BatchConfigOverrides(batch_size=75)
-
-        # Act
-        effective_size = batch_processor._get_effective_batch_size(config_overrides)
-
-        # Assert
-        assert effective_size == 75
-
-    def test_get_effective_batch_size_without_override(
-        self,
-        batch_processor: BatchProcessor,
-    ) -> None:
-        """Test effective batch size calculation without override."""
-        # Act
-        effective_size = batch_processor._get_effective_batch_size(None)
-
-        # Assert
-        assert effective_size == 50  # From settings default
-
-    def test_get_effective_threshold_with_override(
-        self,
-        batch_processor: BatchProcessor,
-        sample_batch_state: CJBatchState,
-    ) -> None:
-        """Test effective threshold calculation with override."""
-        # Arrange
-        config_overrides = BatchConfigOverrides(partial_completion_threshold=0.8)
-
-        # Act
-        effective_threshold = batch_processor._get_effective_threshold(
-            config_overrides, sample_batch_state
-        )
-
-        # Assert
-        assert effective_threshold == 0.8
-
-    def test_get_effective_threshold_without_override(
-        self,
-        batch_processor: BatchProcessor,
-        sample_batch_state: CJBatchState,
-    ) -> None:
-        """Test effective threshold calculation without override."""
-        # Act
-        effective_threshold = batch_processor._get_effective_threshold(None, sample_batch_state)
-
-        # Assert
-        assert effective_threshold == 0.95  # From batch state (95%)
-
-    async def test_submit_batch_chunk_success(
-        self,
-        batch_processor: BatchProcessor,
-        sample_comparison_tasks: list[ComparisonTask],
-        sample_comparison_results: list[ComparisonResult],
-        mock_llm_interaction: AsyncMock,
-    ) -> None:
-        """Test successful batch chunk submission."""
-        # Arrange
-        cj_batch_id = 1
-        correlation_id = uuid4()
-        mock_llm_interaction.perform_comparisons.return_value = sample_comparison_results
-
-        # Act
-        await batch_processor._submit_batch_chunk(
-            batch_tasks=sample_comparison_tasks,
-            cj_batch_id=cj_batch_id,
-            correlation_id=correlation_id,
-        )
-
-        # Assert
-        mock_llm_interaction.perform_comparisons.assert_called_once_with(
-            tasks=sample_comparison_tasks,
-            correlation_id=correlation_id,
-            model_override=None,
-            temperature_override=None,
-            max_tokens_override=None,
-        )
-
-    async def test_submit_batch_chunk_failure(
-        self,
-        batch_processor: BatchProcessor,
-        sample_comparison_tasks: list[ComparisonTask],
-        mock_llm_interaction: AsyncMock,
-    ) -> None:
-        """Test batch chunk submission failure."""
-        # Arrange
-        cj_batch_id = 1
-        correlation_id = uuid4()
-        mock_llm_interaction.perform_comparisons.side_effect = Exception("LLM error")
-
-        # Act & Assert
-        with pytest.raises(LLMProviderError) as exc_info:
-            await batch_processor._submit_batch_chunk(
-                batch_tasks=sample_comparison_tasks,
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-            )
-
-        assert "Failed to submit batch chunk" in str(exc_info.value)
-        assert exc_info.value.correlation_id == correlation_id
-        assert exc_info.value.details["is_retryable"] is True
+    # Note: Tests for _get_effective_batch_size, _get_effective_threshold, and _submit_batch_chunk
+    # have been removed as these methods were extracted to separate modules during refactoring.
 
 
 class TestBatchConfigOverrides:
