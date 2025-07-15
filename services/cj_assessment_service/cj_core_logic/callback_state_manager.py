@@ -7,7 +7,11 @@ database operations for the LLM callback processing system.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
@@ -27,7 +31,7 @@ async def update_comparison_result(
     database: CJRepositoryProtocol,
     correlation_id: UUID,
     settings: Settings,
-    batch_processor: "BatchProcessor | None" = None,  # type: ignore
+    batch_processor: BatchProcessor | None = None,
 ) -> int | None:
     """Update comparison pair with LLM callback result.
 
@@ -212,7 +216,7 @@ async def check_batch_completion_conditions(
 
 
 async def add_failed_comparison_to_pool(
-    batch_processor: "BatchProcessor",  # type: ignore
+    batch_processor: BatchProcessor,
     comparison_pair: ComparisonPair,
     comparison_result: LLMComparisonResultV1,
     correlation_id: UUID,
@@ -336,7 +340,7 @@ async def reconstruct_comparison_task(
 
 
 async def handle_successful_retry(
-    batch_processor: "BatchProcessor",  # type: ignore
+    batch_processor: BatchProcessor,
     comparison_pair: ComparisonPair,
     correlation_id: UUID,
 ) -> None:
@@ -353,8 +357,10 @@ async def handle_successful_retry(
         # track which comparisons were retries and update accordingly
 
         # Get current batch state and check if there's an active failed pool
+        from .batch_submission import get_batch_state
+        
         async with batch_processor.database.session() as session:
-            batch_state = await batch_processor._get_batch_state(
+            batch_state = await get_batch_state(
                 session=session,
                 cj_batch_id=comparison_pair.cj_batch_id,
                 correlation_id=correlation_id,
@@ -396,7 +402,9 @@ async def handle_successful_retry(
                         )
 
                     # Update batch state
-                    await batch_processor._update_batch_processing_metadata(
+                    from .batch_submission import update_batch_processing_metadata
+                    
+                    await update_batch_processing_metadata(
                         session=session,
                         cj_batch_id=comparison_pair.cj_batch_id,
                         metadata=failed_pool.model_dump(),

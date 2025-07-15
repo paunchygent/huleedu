@@ -6,7 +6,11 @@ proven workflow logic instead of creating a parallel workflow system.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
@@ -36,7 +40,7 @@ async def continue_cj_assessment_workflow(
     database: CJRepositoryProtocol,
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
-    batch_processor: "BatchProcessor | None" = None,  # type: ignore
+    batch_processor: BatchProcessor | None = None,
 ) -> None:
     """Process LLM callback and continue existing workflow.
 
@@ -182,7 +186,7 @@ async def trigger_existing_workflow_continuation(
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
     correlation_id: UUID,
-    batch_processor: "BatchProcessor | None" = None,  # type: ignore
+    batch_processor: BatchProcessor | None = None,
 ) -> None:
     """Trigger continuation of existing workflow logic.
 

@@ -354,8 +354,9 @@ class BatchPoolManager:
 
                 if force_retry_all:
                     logger.info(
-                        f"End-of-batch processing: Formed retry batch with {len(retry_tasks)} remaining failed comparisons "
-                        f"to ensure fair Bradley-Terry scoring. Pool now has {len(remaining_pool)} entries, "
+                        f"End-of-batch processing: Formed retry batch with {len(retry_tasks)} "
+                        f"remaining failed comparisons to ensure fair Bradley-Terry scoring. "
+                        f"Pool now has {len(remaining_pool)} entries, "
                         f"{permanently_failed_count} permanently failed",
                         extra={
                             "correlation_id": str(correlation_id),

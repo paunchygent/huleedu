@@ -85,7 +85,6 @@ class CJAssessmentKafkaConsumer:
             return await process_llm_result(
                 msg=msg,
                 database=self.database,
-                content_client=self.content_client,
                 event_publisher=self.event_publisher,
                 settings_obj=self.settings,
                 tracer=self.tracer,

@@ -100,7 +100,7 @@ def create_llm_callback_message(
         )
 
     # Wrap in event envelope
-    envelope = EventEnvelope(
+    envelope: EventEnvelope[LLMComparisonResultV1] = EventEnvelope(
         event_type="llm_comparison_result_v1",
         event_timestamp=datetime.now(UTC),
         source_service="llm_provider_service",

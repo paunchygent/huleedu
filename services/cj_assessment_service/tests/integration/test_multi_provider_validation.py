@@ -31,11 +31,6 @@ class TestMultiProviderValidation:
         settings = Settings()
         # Use local LLM Provider Service (must be running with USE_MOCK_LLM=False)
         settings.LLM_PROVIDER_SERVICE_URL = "http://localhost:8090/api/v1"
-        settings.LLM_QUEUE_POLLING_ENABLED = True
-        settings.LLM_QUEUE_POLLING_INITIAL_DELAY_SECONDS = 1.0
-        settings.LLM_QUEUE_POLLING_MAX_DELAY_SECONDS = 10.0
-        settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS = 15
-        settings.LLM_QUEUE_TOTAL_TIMEOUT_SECONDS = 120
         return settings
 
     @pytest.fixture

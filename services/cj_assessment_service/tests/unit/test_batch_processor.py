@@ -256,7 +256,7 @@ class TestBatchProcessor:
 
         # Act
         with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
+            "services.cj_assessment_service.cj_core_logic.batch_processor.get_batch_state",
             new_callable=AsyncMock,
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = sample_batch_state
@@ -283,7 +283,7 @@ class TestBatchProcessor:
 
         # Act
         with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
+            "services.cj_assessment_service.cj_core_logic.batch_processor.get_batch_state",
             new_callable=AsyncMock,
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = sample_batch_state
@@ -310,7 +310,7 @@ class TestBatchProcessor:
 
         # Act
         with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
+            "services.cj_assessment_service.cj_core_logic.batch_processor.get_batch_state",
             new_callable=AsyncMock,
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = sample_batch_state
@@ -333,7 +333,7 @@ class TestBatchProcessor:
 
         # Act & Assert
         with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
+            "services.cj_assessment_service.cj_core_logic.batch_processor.get_batch_state",
             new_callable=AsyncMock,
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = None

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -11,9 +12,12 @@ from common_core.status_enums import CJBatchStateEnum
 from services.cj_assessment_service.batch_monitor import BatchMonitor
 from services.cj_assessment_service.models_db import CJBatchState
 
+if TYPE_CHECKING:
+    pass
+
 
 @pytest.fixture
-def mock_repository():
+def mock_repository() -> AsyncMock:
     """Create a mock repository."""
     repo = AsyncMock()
     repo.session = MagicMock()
@@ -21,13 +25,13 @@ def mock_repository():
 
 
 @pytest.fixture
-def mock_event_publisher():
+def mock_event_publisher() -> AsyncMock:
     """Create a mock event publisher."""
     return AsyncMock()
 
 
 @pytest.fixture
-def mock_settings():
+def mock_settings() -> MagicMock:
     """Create mock settings."""
     settings = MagicMock()
     settings.BATCH_TIMEOUT_HOURS = 4
@@ -36,7 +40,9 @@ def mock_settings():
 
 
 @pytest.fixture
-def batch_monitor(mock_repository, mock_event_publisher, mock_settings):
+def batch_monitor(
+    mock_repository: AsyncMock, mock_event_publisher: AsyncMock, mock_settings: MagicMock
+) -> BatchMonitor:
     """Create a BatchMonitor instance."""
     return BatchMonitor(mock_repository, mock_event_publisher, mock_settings)
 
@@ -44,13 +50,15 @@ def batch_monitor(mock_repository, mock_event_publisher, mock_settings):
 class TestBatchMonitor:
     """Test cases for BatchMonitor."""
 
-    async def test_init(self, batch_monitor):
+    async def test_init(self, batch_monitor: BatchMonitor) -> None:
         """Test BatchMonitor initialization."""
         assert batch_monitor.timeout_hours == 4
         assert batch_monitor.monitor_interval_minutes == 5
         assert batch_monitor._running is True
 
-    async def test_handle_stuck_batch_high_progress(self, batch_monitor, mock_repository):
+    async def test_handle_stuck_batch_high_progress(
+        self, batch_monitor: BatchMonitor, mock_repository: AsyncMock
+    ) -> None:
         """Test handling stuck batch with >= 80% progress forces to SCORING."""
         # Create mock batch state with 85% progress
         mock_batch_state = MagicMock(spec=CJBatchState)
@@ -75,7 +83,9 @@ class TestBatchMonitor:
         assert mock_batch_state.state == CJBatchStateEnum.SCORING
         assert mock_session.commit.called
 
-    async def test_handle_stuck_batch_low_progress(self, batch_monitor, mock_repository):
+    async def test_handle_stuck_batch_low_progress(
+        self, batch_monitor: BatchMonitor, mock_repository: AsyncMock
+    ) -> None:
         """Test handling stuck batch with < 80% progress marks as FAILED."""
         # Create mock batch state with 50% progress
         mock_batch_state = MagicMock(spec=CJBatchState)
@@ -100,7 +110,7 @@ class TestBatchMonitor:
         assert mock_batch_state.state == CJBatchStateEnum.FAILED
         assert mock_session.commit.called
 
-    async def test_stop(self, batch_monitor):
+    async def test_stop(self, batch_monitor: BatchMonitor) -> None:
         """Test graceful shutdown."""
         assert batch_monitor._running is True
         await batch_monitor.stop()

@@ -312,17 +312,18 @@ async def _process_cj_assessment_impl(
         return True
 
     except Exception as e:
-        # Use structured error handling for processing failures
-        error_detail = _categorize_processing_error(e)
-
-        # Try to extract correlation_id if available
+        # Try to extract correlation_id if available for better error tracking
+        correlation_id_for_error = None
         try:
             envelope = EventEnvelope[ELS_CJAssessmentRequestV1].model_validate_json(
                 msg.value.decode("utf-8"),
             )
-            error_detail.correlation_id = envelope.correlation_id
+            correlation_id_for_error = envelope.correlation_id
         except Exception:
-            pass  # correlation_id remains None if envelope parsing fails
+            correlation_id_for_error = uuid4()  # Generate new correlation_id if parsing fails
+
+        # Use structured error handling for processing failures
+        error_detail = _categorize_processing_error(e, correlation_id_for_error)
 
         # Publish failure event
         try:
@@ -420,7 +421,9 @@ def _create_parsing_error_detail(error_message: str, exception_type: str) -> Err
     )
 
 
-def _categorize_processing_error(exception: Exception) -> ErrorDetail:
+def _categorize_processing_error(
+    exception: Exception, correlation_id: UUID | None = None
+) -> ErrorDetail:
     """Categorize processing exceptions into appropriate ErrorCode types."""
     if isinstance(exception, CJAssessmentError):
         # Already a structured CJ Assessment error - recreate with canonical model
@@ -429,7 +432,7 @@ def _categorize_processing_error(exception: Exception) -> ErrorDetail:
             message=exception.message,
             service="cj_assessment_service",
             operation="process_cj_assessment",
-            correlation_id=exception.correlation_id or uuid4(),
+            correlation_id=exception.correlation_id or correlation_id or uuid4(),
             capture_stack=False,  # Don't capture stack since it's already a structured error
             details=exception.details,
         )
@@ -451,7 +454,7 @@ def _categorize_processing_error(exception: Exception) -> ErrorDetail:
         message=f"CJ assessment processing failed: {str(exception)}",
         service="cj_assessment_service",
         operation="categorize_processing_error",
-        correlation_id=uuid4(),  # Generate correlation_id for generic processing error
+        correlation_id=correlation_id or uuid4(),  # Use provided correlation_id or generate new one
         details={
             "exception_type": type(exception).__name__,
             "processing_stage": "cj_assessment_workflow",
@@ -585,7 +588,7 @@ async def process_llm_result(
                         "is_error": comparison_result.is_error,
                     },
                 ):
-                    from services.cj_assessment_service.cj_core_logic.batch_callback_handler import (
+                    from services.cj_assessment_service.cj_core_logic.batch_callback_handler import (  # noqa: E501
                         continue_cj_assessment_workflow,
                     )
 

@@ -158,7 +158,7 @@ class TestLLMProviderServiceIntegration:
         )
 
         # Create event envelope
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[ELS_CJAssessmentRequestV1] = EventEnvelope(
             event_type=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED.value,
             source_service="test-integration",
             data=event_data,
@@ -460,14 +460,9 @@ class TestQueueIntegration:
             RetryManagerImpl,
         )
 
-        # Create settings with queue polling enabled
+        # Create settings for LLM provider integration
         settings = Settings()
         settings.LLM_PROVIDER_SERVICE_URL = "http://localhost:8090/api/v1"
-        settings.LLM_QUEUE_POLLING_ENABLED = True
-        settings.LLM_QUEUE_POLLING_INITIAL_DELAY_SECONDS = 1.0
-        settings.LLM_QUEUE_POLLING_MAX_DELAY_SECONDS = 5.0
-        settings.LLM_QUEUE_POLLING_MAX_ATTEMPTS = 10
-        settings.LLM_QUEUE_TOTAL_TIMEOUT_SECONDS = 60
 
         # Create retry manager
         retry_manager = RetryManagerImpl(settings)

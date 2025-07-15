@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from common_core import LLMProviderType
+from common_core import Environment, LLMProviderType
 
 
 class Settings(BaseSettings):
@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     # Basic service configuration
     LOG_LEVEL: str = "INFO"
     SERVICE_NAME: str = "cj_assessment_service"
+    ENVIRONMENT: Environment = Environment.DEVELOPMENT
 
     # Kafka configuration
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
@@ -79,6 +80,9 @@ class Settings(BaseSettings):
     )
 
     # Batch processing configuration
+    DEFAULT_BATCH_SIZE: int = Field(
+        default=50, description="Default batch size for comparison processing"
+    )
     BATCH_TIMEOUT_HOURS: int = Field(
         default=4, description="Hours before considering a batch stuck"
     )
