@@ -13,11 +13,9 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common_core import EssayComparisonWinner
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import (
-    ComparisonResult,
     ComparisonTask,
     EssayForComparison,
 )
@@ -27,6 +25,7 @@ from services.cj_assessment_service.protocols import (
 )
 
 from . import pair_generation, scoring_ranking
+from .batch_processor import BatchConfigOverrides, BatchProcessor
 
 logger = create_service_logger("cj_assessment_service.comparison_processing")
 
@@ -116,18 +115,22 @@ async def perform_iterative_comparisons(
                 cj_batch_id=cj_batch_id,
                 session=session,
                 llm_interaction=llm_interaction,
+                database=database,
+                request_data=request_data,
+                settings=settings,
                 model_override=model_override,
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
-                settings=settings,
                 current_iteration=current_iteration,
                 correlation_id=correlation_id,
                 log_extra=log_extra,
             )
 
             if not iteration_result:
+                # This could be either no tasks generated OR async processing initiated
+                # For async processing, workflow continues via callbacks
                 logger.info(
-                    "No new comparison tasks generated. Ending comparisons.",
+                    "Iteration processing initiated asynchronously or no tasks generated",
                     extra=log_extra,
                 )
                 break
@@ -170,10 +173,12 @@ async def _process_comparison_iteration(
     cj_batch_id: int,
     session: AsyncSession,
     llm_interaction: LLMInteractionProtocol,
+    database: CJRepositoryProtocol,
+    request_data: dict[str, Any],
+    settings: Settings,
     model_override: str | None,
     temperature_override: float | None,
     max_tokens_override: int | None,
-    settings: Settings,
     current_iteration: int,
     correlation_id: UUID,
     log_extra: dict[str, Any],
@@ -196,42 +201,41 @@ async def _process_comparison_iteration(
     if not comparison_tasks_for_llm:
         return None
 
-    # Process comparisons using LLMInteractionProtocol
-    perform_comparisons_coro = llm_interaction.perform_comparisons
-    llm_comparison_results: list[ComparisonResult] = await perform_comparisons_coro(
-        comparison_tasks_for_llm,
+    # Create batch processor and submit batch for async processing
+    batch_processor = BatchProcessor(
+        database=database,
+        llm_interaction=llm_interaction,
+        settings=settings,
+    )
+
+    # Extract batch config overrides from request_data if available
+    batch_config_overrides = None
+    if "batch_config_overrides" in request_data:
+        batch_config_overrides = BatchConfigOverrides(**request_data["batch_config_overrides"])
+
+    # Submit batch and update state to WAITING_CALLBACKS
+    submission_result = await batch_processor.submit_comparison_batch(
+        cj_batch_id=cj_batch_id,
+        comparison_tasks=comparison_tasks_for_llm,
+        correlation_id=correlation_id,
+        config_overrides=batch_config_overrides,
         model_override=model_override,
         temperature_override=temperature_override,
         max_tokens_override=max_tokens_override,
-        correlation_id=correlation_id,
     )
-
-    # Filter out tasks that resulted in an error from the LLM
-    valid_llm_results = [
-        res
-        for res in llm_comparison_results
-        if res.llm_assessment and res.llm_assessment.winner != EssayComparisonWinner.ERROR
-    ]
 
     logger.info(
-        f"Iteration {current_iteration}: Received {len(valid_llm_results)} valid LLM results "
-        f"from {len(llm_comparison_results)} tasks.",
-        extra=log_extra,
+        f"Batch submitted for async processing: {submission_result.total_submitted} tasks",
+        extra={
+            **log_extra,
+            "cj_batch_id": cj_batch_id,
+            "total_submitted": submission_result.total_submitted,
+            "all_submitted": submission_result.all_submitted,
+        },
     )
 
-    # Record valid results and update scores
-    record_scores = scoring_ranking.record_comparisons_and_update_scores
-    current_bt_scores_dict: dict[str, float] = await record_scores(
-        all_essays=essays_for_api_model,
-        comparison_results=valid_llm_results,
-        db_session=session,
-        cj_batch_id=cj_batch_id,
-        correlation_id=correlation_id,
-    )
-
-    return ComparisonIterationResult(
-        valid_results_count=len(valid_llm_results), updated_scores=current_bt_scores_dict
-    )
+    # Return None to indicate async processing - workflow continues via callbacks
+    return None
 
 
 def _check_iteration_stability(

@@ -116,6 +116,23 @@ class Settings(BaseSettings):
     COMPARISONS_PER_STABILITY_CHECK_ITERATION: int = 10
     SCORE_STABILITY_THRESHOLD: float = 0.05
 
+    # Failed Comparison Pool Configuration
+    FAILED_COMPARISON_RETRY_THRESHOLD: int = Field(
+        default=20, description="Minimum failed comparisons needed before retry batch creation"
+    )
+    MAX_RETRY_ATTEMPTS: int = Field(
+        default=3, description="Maximum retry attempts per failed comparison"
+    )
+    RETRY_BATCH_SIZE: int = Field(
+        default=50, description="Size of retry batches (up to 200)"
+    )
+    RETRY_BATCH_PRIORITY: str = Field(
+        default="high", description="Priority level for retry batches"
+    )
+    ENABLE_FAILED_COMPARISON_RETRY: bool = Field(
+        default=True, description="Enable automatic retry of failed comparisons"
+    )
+
     # Assessment prompt template
     ASSESSMENT_PROMPT_TEMPLATE: str = """
 Compare these two essays and determine which is better written.

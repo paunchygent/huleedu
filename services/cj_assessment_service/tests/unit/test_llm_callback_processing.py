@@ -128,7 +128,7 @@ class TestLLMCallbackProcessing:
     """Test cases for processing LLM comparison callbacks."""
 
     @patch(
-        "services.cj_assessment_service.cj_core_logic.workflow_logic.continue_cj_assessment_workflow"
+        "services.cj_assessment_service.cj_core_logic.batch_callback_handler.continue_cj_assessment_workflow"
     )
     async def test_process_llm_result_success(
         self,
@@ -176,7 +176,7 @@ class TestLLMCallbackProcessing:
         assert comparison_result.confidence == 4.8
 
     @patch(
-        "services.cj_assessment_service.cj_core_logic.workflow_logic.continue_cj_assessment_workflow"
+        "services.cj_assessment_service.cj_core_logic.batch_callback_handler.continue_cj_assessment_workflow"
     )
     async def test_process_llm_result_error_callback(
         self,
@@ -219,7 +219,7 @@ class TestLLMCallbackProcessing:
         assert comparison_result.error_detail is not None
 
     @patch(
-        "services.cj_assessment_service.cj_core_logic.workflow_logic.continue_cj_assessment_workflow"
+        "services.cj_assessment_service.cj_core_logic.batch_callback_handler.continue_cj_assessment_workflow"
     )
     async def test_process_llm_result_invalid_message(
         self,
@@ -260,7 +260,7 @@ class TestLLMCallbackProcessing:
         mock_continue_workflow.assert_not_called()
 
     @patch(
-        "services.cj_assessment_service.cj_core_logic.workflow_logic.continue_cj_assessment_workflow"
+        "services.cj_assessment_service.cj_core_logic.batch_callback_handler.continue_cj_assessment_workflow"
     )
     async def test_process_llm_result_workflow_error(
         self,
@@ -298,7 +298,7 @@ class TestLLMCallbackProcessing:
         mock_continue_workflow.assert_called_once()
 
     @patch(
-        "services.cj_assessment_service.cj_core_logic.workflow_logic.continue_cj_assessment_workflow"
+        "services.cj_assessment_service.cj_core_logic.batch_callback_handler.continue_cj_assessment_workflow"
     )
     async def test_process_llm_result_multiple_callbacks(
         self,

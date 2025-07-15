@@ -11,10 +11,14 @@ from .scoring_ranking import (
     get_essay_rankings,
     record_comparisons_and_update_scores,
 )
-from .workflow_logic import continue_cj_assessment_workflow
+from .batch_callback_handler import continue_cj_assessment_workflow
 from .workflow_orchestrator import run_cj_assessment_workflow
+from .batch_processor import BatchProcessor, BatchConfigOverrides, BatchSubmissionResult
 
 __all__ = [
+    "BatchProcessor",
+    "BatchConfigOverrides", 
+    "BatchSubmissionResult",
     "check_score_stability",
     "continue_cj_assessment_workflow",
     "generate_comparison_tasks",

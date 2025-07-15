@@ -78,3 +78,35 @@ class ErrorResponse(BaseModel):
 
     error: CanonicalErrorDetail
     status_code: int
+
+
+class FailedComparisonEntry(BaseModel):
+    """Represents a failed comparison in the retry pool."""
+
+    essay_a_id: str
+    essay_b_id: str
+    comparison_task: ComparisonTask
+    failure_reason: str
+    failed_at: datetime
+    retry_count: int = 0
+    original_batch_id: str
+    correlation_id: UUID
+
+
+class FailedComparisonPoolStatistics(BaseModel):
+    """Statistics for the failed comparison pool."""
+
+    total_failed: int = 0
+    retry_attempts: int = 0
+    last_retry_batch: str | None = None
+    successful_retries: int = 0
+    permanently_failed: int = 0
+
+
+class FailedComparisonPool(BaseModel):
+    """Complete failed comparison pool structure."""
+
+    failed_comparison_pool: list[FailedComparisonEntry] = Field(default_factory=list)
+    pool_statistics: FailedComparisonPoolStatistics = Field(
+        default_factory=FailedComparisonPoolStatistics
+    )

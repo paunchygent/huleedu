@@ -536,7 +536,8 @@ async def process_llm_result(
         ):  # Avoid negative values from clock skew
             callback_latency_metric.observe(callback_latency)
             logger.debug(
-                f"Recorded callback latency: {callback_latency:.3f}s for request {comparison_result.request_id}",
+                f"Recorded callback latency: {callback_latency:.3f}s for "
+                f"request {comparison_result.request_id}",
                 extra=log_extra,
             )
 
@@ -584,7 +585,7 @@ async def process_llm_result(
                         "is_error": comparison_result.is_error,
                     },
                 ):
-                    from services.cj_assessment_service.cj_core_logic.workflow_logic import (
+                    from services.cj_assessment_service.cj_core_logic.batch_callback_handler import (
                         continue_cj_assessment_workflow,
                     )
 
@@ -597,7 +598,7 @@ async def process_llm_result(
                     )
         else:
             # No parent context, process without it
-            from services.cj_assessment_service.cj_core_logic.workflow_logic import (
+            from services.cj_assessment_service.cj_core_logic.batch_callback_handler import (
                 continue_cj_assessment_workflow,
             )
 

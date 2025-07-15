@@ -164,6 +164,34 @@ def _create_metrics(database_metrics: Optional[DatabaseMetrics] = None) -> dict[
                 buckets=(0, 0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0),
                 registry=REGISTRY,
             ),
+            # Failed Comparison Pool Metrics
+            "cj_failed_comparisons_total": Counter(
+                "cj_failed_comparisons_total",
+                "Total failed comparisons added to retry pool",
+                ["failure_reason"],
+                registry=REGISTRY,
+            ),
+            "cj_retry_batches_submitted_total": Counter(
+                "cj_retry_batches_submitted_total",
+                "Total retry batches submitted",
+                registry=REGISTRY,
+            ),
+            "cj_successful_retries_total": Counter(
+                "cj_successful_retries_total",
+                "Total successful retries from failed pool",
+                registry=REGISTRY,
+            ),
+            "cj_permanently_failed_comparisons_total": Counter(
+                "cj_permanently_failed_comparisons_total",
+                "Comparisons that exhausted retry attempts",
+                registry=REGISTRY,
+            ),
+            "cj_failed_pool_size": Gauge(
+                "cj_failed_pool_size",
+                "Current number of comparisons in failed pool",
+                ["batch_id"],
+                registry=REGISTRY,
+            ),
         }
 
         # Add database metrics if provided
@@ -224,6 +252,12 @@ def _get_existing_metrics() -> dict[str, Any]:
         "cj_comparisons_total": "cj_comparisons_total",
         "cj_iterations_per_batch": "cj_iterations_per_batch",
         "cj_score_stability_changes": "cj_score_stability_changes",
+        # Failed Comparison Pool Metrics
+        "cj_failed_comparisons_total": "cj_failed_comparisons_total",
+        "cj_retry_batches_submitted_total": "cj_retry_batches_submitted_total",
+        "cj_successful_retries_total": "cj_successful_retries_total",
+        "cj_permanently_failed_comparisons_total": "cj_permanently_failed_comparisons_total",
+        "cj_failed_pool_size": "cj_failed_pool_size",
     }
 
     existing: dict[str, Any] = {}
@@ -278,6 +312,14 @@ def get_business_metrics() -> dict[str, Any]:
         "cj_comparisons_total": all_metrics.get("cj_comparisons_total"),
         "cj_iterations_per_batch": all_metrics.get("cj_iterations_per_batch"),
         "cj_score_stability_changes": all_metrics.get("cj_score_stability_changes"),
+        # Failed Comparison Pool Metrics
+        "cj_failed_comparisons_total": all_metrics.get("cj_failed_comparisons_total"),
+        "cj_retry_batches_submitted_total": all_metrics.get("cj_retry_batches_submitted_total"),
+        "cj_successful_retries_total": all_metrics.get("cj_successful_retries_total"),
+        "cj_permanently_failed_comparisons_total": all_metrics.get(
+            "cj_permanently_failed_comparisons_total"
+        ),
+        "cj_failed_pool_size": all_metrics.get("cj_failed_pool_size"),
     }
 
 
