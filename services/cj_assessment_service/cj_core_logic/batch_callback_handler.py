@@ -108,6 +108,7 @@ async def continue_cj_assessment_workflow(
                 event_publisher=event_publisher,
                 settings=settings,
                 correlation_id=correlation_id,
+                batch_processor=batch_processor,
             )
         else:
             logger.info(
@@ -293,6 +294,7 @@ async def _trigger_existing_workflow_continuation(
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
     correlation_id: UUID,
+    batch_processor: BatchProcessor | None = None,
 ) -> None:
     """Trigger continuation of existing workflow logic.
 
@@ -306,6 +308,7 @@ async def _trigger_existing_workflow_continuation(
         event_publisher: Event publisher protocol implementation
         settings: Application settings
         correlation_id: Request correlation ID for tracing
+        batch_processor: Optional batch processor for failed comparison handling
     """
     log_extra = {
         "correlation_id": str(correlation_id),
@@ -342,6 +345,51 @@ async def _trigger_existing_workflow_continuation(
             extra=log_extra,
         )
 
+        # Check if this batch is approaching completion
+        batch_is_completing = await _check_batch_completion_conditions(
+            batch_id=batch_id,
+            database=database,
+            session=session,
+            correlation_id=correlation_id,
+        )
+
+        if batch_is_completing and batch_processor:
+            logger.info(
+                f"Batch {batch_id} is completing, processing remaining failed comparisons "
+                f"for fairness",
+                extra=log_extra,
+            )
+
+            try:
+                # Process any remaining failed comparisons for fairness
+                remaining_result = await batch_processor.process_remaining_failed_comparisons(
+                    cj_batch_id=batch_id,
+                    correlation_id=correlation_id,
+                )
+
+                if remaining_result:
+                    logger.info(
+                        f"Processed {remaining_result.total_submitted} remaining failed "
+                        f"comparisons for batch {batch_id} to ensure fairness",
+                        extra={
+                            **log_extra,
+                            "remaining_comparisons_processed": remaining_result.total_submitted,
+                        },
+                    )
+                else:
+                    logger.info(
+                        f"No remaining failed comparisons to process for batch {batch_id}",
+                        extra=log_extra,
+                    )
+
+            except Exception as e:
+                logger.error(
+                    f"Failed to process remaining failed comparisons for batch {batch_id}: {e}",
+                    extra={**log_extra, "error": str(e)},
+                    exc_info=True,
+                )
+                # Continue with normal workflow despite failure
+
         # This is where we would integrate with existing workflow_orchestrator
         # patterns and use existing scoring_ranking.check_score_stability()
         # for proper score stability checking
@@ -363,6 +411,78 @@ async def _trigger_existing_workflow_continuation(
 
     # Suppress unused warnings - they will be used when full integration is implemented
     _ = (event_publisher, settings)
+
+
+async def _check_batch_completion_conditions(
+    batch_id: int,
+    database: CJRepositoryProtocol,
+    session,
+    correlation_id: UUID,
+) -> bool:
+    """Check if batch is approaching completion.
+
+    This is a simplified check for detecting when batch processing is ending.
+    In a complete implementation, this would check:
+    - Maximum comparisons limit reached
+    - Score stability achieved
+    - Batch state transitioning to COMPLETED or FAILED
+    - All submitted comparisons completed (successful + failed = total submitted)
+
+    Args:
+        batch_id: The CJ batch ID
+        database: Database access protocol implementation (unused in current implementation)
+        session: Database session
+        correlation_id: Request correlation ID for tracing
+
+    Returns:
+        True if batch is approaching completion, False otherwise
+    """
+    from services.cj_assessment_service.models_db import CJBatchState
+
+    # Suppress unused parameter warning
+    _ = database
+
+    try:
+        # Get batch state
+        stmt = select(CJBatchState).where(CJBatchState.batch_id == batch_id)
+        result = await session.execute(stmt)
+        batch_state = result.scalar_one_or_none()
+
+        if not batch_state:
+            return False
+
+        # Simple heuristic: check if batch has significant completion
+        # In practice, this would integrate with proper batch state management
+        if (
+            batch_state.total_comparisons > 0
+            and batch_state.completed_comparisons >= batch_state.total_comparisons * 0.8
+        ):
+            completion_rate = batch_state.completed_comparisons / batch_state.total_comparisons
+            logger.info(
+                f"Batch {batch_id} completion detected: "
+                f"{batch_state.completed_comparisons}/{batch_state.total_comparisons} "
+                f"comparisons completed (80%+ threshold reached)",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "batch_id": batch_id,
+                    "completion_rate": completion_rate,
+                },
+            )
+            return True
+
+        return False
+
+    except Exception as e:
+        logger.error(
+            f"Failed to check batch completion conditions for batch {batch_id}: {e}",
+            extra={
+                "correlation_id": str(correlation_id),
+                "batch_id": batch_id,
+                "error": str(e),
+            },
+            exc_info=True,
+        )
+        return False
 
 
 async def _add_failed_comparison_to_pool(
@@ -407,6 +527,7 @@ async def _add_failed_comparison_to_pool(
             retry_needed = await batch_processor.check_retry_batch_needed(
                 cj_batch_id=comparison_pair.cj_batch_id,
                 correlation_id=correlation_id,
+                force_retry_all=False,  # Use normal threshold-based checking during callbacks
             )
 
             if retry_needed:
@@ -557,7 +678,8 @@ async def _handle_successful_retry(
                     )
 
                     logger.info(
-                        f"Removed successful retry from failed pool for batch {comparison_pair.cj_batch_id}",
+                        f"Removed successful retry from failed pool for batch "
+                        f"{comparison_pair.cj_batch_id}",
                         extra={
                             "correlation_id": str(correlation_id),
                             "cj_batch_id": comparison_pair.cj_batch_id,
