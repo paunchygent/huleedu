@@ -11,43 +11,52 @@ The `services/libs/huleedu_service_libs/` package provides essential utilities t
 
 ```
 huleedu_service_libs/
-├── __init__.py
-├── logging_utils.py      # Centralized logging with correlation IDs
-├── kafka_bus.py         # Kafka producer/consumer abstractions
-├── metrics.py           # Prometheus metrics integration
-├── health_check.py      # Health check utilities
-├── error_handling.py    # Structured error handling
-├── circuit_breaker.py   # Circuit breaker patterns
-└── tracing.py          # Distributed tracing utilities
+├── __init__.py                    # Main exports (KafkaBus, RedisClient, HuleEduApp, tracing)
+├── logging_utils.py               # Structured logging with structlog
+├── kafka_client.py                # Kafka producer abstractions (KafkaBus)
+├── redis_client.py                # Redis operations with transactions
+├── metrics_middleware.py          # Prometheus metrics middleware for Quart
+├── quart_app.py                   # Type-safe HuleEduApp class
+├── event_utils.py                 # Event processing utilities
+├── idempotency_v2.py             # Advanced idempotency patterns
+├── observability/                 # Distributed tracing utilities
+├── error_handling/                # Structured error handling with factories
+├── middleware/                    # Framework-specific middleware
+├── database/                      # Database health checks and monitoring
+└── resilience/                    # Circuit breaker patterns
 ```
 
 ## Logging Integration (MANDATORY)
 
 ### Correct Logging Usage
 ```python
-# CORRECT - Use service library logging
-from huleedu_service_libs.logging_utils import get_logger
+# CORRECT - Use service library logging with structlog
+from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 
-logger = get_logger(__name__)
+# Configure once at service startup
+configure_service_logging(
+    service_name="content-service",
+    environment="production",  # or "development"
+    log_level="INFO"
+)
 
-# Standard logging with correlation ID
+# Create logger instance
+logger = create_service_logger(__name__)
+
+# Standard logging with structured context
 logger.info(
     "Processing started",
-    extra={
-        "essay_id": essay_id,
-        "batch_id": batch_id,
-        "correlation_id": correlation_id
-    }
+    essay_id=essay_id,
+    batch_id=batch_id,
+    correlation_id=correlation_id
 )
 
 # Error logging with context
 logger.error(
     "Processing failed",
-    extra={
-        "essay_id": essay_id,
-        "error_type": "ValidationError",
-        "correlation_id": correlation_id
-    },
+    essay_id=essay_id,
+    error_type="ValidationError",
+    correlation_id=correlation_id,
     exc_info=True
 )
 ```
@@ -66,9 +75,9 @@ logging.info("message")  # ❌ NEVER DO THIS
 
 ### Correct Kafka Usage
 ```python
-# CORRECT - Use service library KafkaBus
-from huleedu_service_libs.kafka_bus import KafkaBus
-from common_core.events import EventEnvelope
+# CORRECT - Use service library KafkaBus (producer only)
+from huleedu_service_libs import KafkaBus
+from common_core.events.envelope import EventEnvelope
 
 class EventPublisher:
     def __init__(self, kafka_bus: KafkaBus):
@@ -77,24 +86,21 @@ class EventPublisher:
     async def publish_event(self, event: EventEnvelope):
         await self.kafka_bus.publish(
             topic="essay-events",
-            event=event
+            envelope=event
         )
 
-# Service-specific Kafka consumer
+# For Kafka consumers, use service-specific implementations
+# KafkaBus is producer-only, consumers are service-specific
 class EssayEventConsumer:
-    def __init__(self, kafka_bus: KafkaBus, event_processor: EventProcessorProtocol):
-        self.kafka_bus = kafka_bus
-        self.event_processor = event_processor
+    def __init__(self, bootstrap_servers: str, group_id: str):
+        self.bootstrap_servers = bootstrap_servers
+        self.group_id = group_id
+        # Use aiokafka directly for consumers (this is allowed for consumers)
     
     async def start_consuming(self):
-        await self.kafka_bus.consume(
-            topics=["essay-events"],
-            group_id="essay-lifecycle-service",
-            handler=self._handle_event
-        )
-    
-    async def _handle_event(self, event: EventEnvelope):
-        await self.event_processor.process(event)
+        # Service-specific consumer implementation
+        # Each service implements its own consumer pattern
+        pass
 ```
 
 ### FORBIDDEN Kafka Patterns
@@ -110,33 +116,38 @@ producer = AIOKafkaProducer()  # ❌ NEVER DO THIS
 
 ### Standard Metrics Usage
 ```python
-# CORRECT - Use service library metrics
-from huleedu_service_libs.metrics import (
-    setup_metrics_middleware,
-    request_duration_histogram,
-    request_count_counter,
-    error_count_counter
-)
+# CORRECT - Use service library metrics middleware
+from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
+from prometheus_client import Counter, Histogram, generate_latest
 
 # In startup_setup.py
-def setup_service(app: Quart) -> None:
-    # Setup metrics middleware
-    setup_metrics_middleware(app)
+def setup_service(app: HuleEduApp) -> None:
+    # Setup standard metrics middleware
+    setup_standard_service_metrics_middleware(app, "content_service")
+    
+    # Create custom business metrics
+    metrics = {
+        "request_count": Counter("request_count", "Request count", ["method", "endpoint", "status_code"]),
+        "request_duration": Histogram("request_duration", "Request duration", ["method", "endpoint"]),
+        "essays_processed": Counter("essays_processed_total", "Essays processed", ["status"])
+    }
+    
+    # Store metrics in app extensions
+    app.extensions["metrics"] = metrics
     
     # Register metrics endpoint
     @app.route("/metrics")
-    async def metrics():
+    async def metrics_endpoint():
         return generate_latest()
 
-# In service implementation
-@request_duration_histogram.time()
-@request_count_counter.count()
+# In service implementation - metrics are automatically collected by middleware
+# Custom business metrics can be used directly
 async def process_essay(essay_id: str):
     try:
         # Processing logic
-        pass
+        app.extensions["metrics"]["essays_processed"].labels(status="success").inc()
     except Exception as e:
-        error_count_counter.inc(labels={"error_type": type(e).__name__})
+        app.extensions["metrics"]["essays_processed"].labels(status="error").inc()
         raise
 ```
 
@@ -144,37 +155,39 @@ async def process_essay(essay_id: str):
 
 ### Standard Health Check Implementation
 ```python
-from huleedu_service_libs.health_check import HealthChecker, DependencyCheck
+from huleedu_service_libs.database import DatabaseHealthChecker
+from quart import Blueprint, jsonify, current_app
+from datetime import datetime
 
-class ServiceHealthChecker(HealthChecker):
-    def __init__(self, db_manager: DatabaseManager, kafka_bus: KafkaBus):
-        self.db_manager = db_manager
-        self.kafka_bus = kafka_bus
-    
-    async def check_dependencies(self) -> List[DependencyCheck]:
-        checks = []
-        
-        # Database health
-        try:
-            await self.db_manager.health_check()
-            checks.append(DependencyCheck("database", True, "Connected"))
-        except Exception as e:
-            checks.append(DependencyCheck("database", False, str(e)))
-        
-        # Kafka health
-        try:
-            await self.kafka_bus.health_check()
-            checks.append(DependencyCheck("kafka", True, "Connected"))
-        except Exception as e:
-            checks.append(DependencyCheck("kafka", False, str(e)))
-        
-        return checks
+health_bp = Blueprint("health", __name__)
 
-# In API blueprint
 @health_bp.route("/healthz")
 async def health_check():
-    health_checker = await get_health_checker()
-    return await health_checker.get_health_response()
+    """Standard health check endpoint using service library utilities."""
+    
+    # Use the type-safe HuleEduApp to access guaranteed infrastructure
+    engine = current_app.database_engine  # Guaranteed to exist
+    
+    # Create health checker with database engine
+    health_checker = DatabaseHealthChecker(engine, "content_service")
+    
+    try:
+        # Get comprehensive health summary
+        health_summary = await health_checker.get_health_summary()
+        
+        # Add service-specific health checks
+        health_summary["timestamp"] = datetime.utcnow().isoformat()
+        health_summary["service_version"] = "1.0.0"
+        
+        status_code = 200 if health_summary["overall_status"] == "healthy" else 503
+        return jsonify(health_summary), status_code
+        
+    except Exception as e:
+        return jsonify({
+            "overall_status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }), 503
 ```
 
 ## Error Handling Integration
@@ -182,32 +195,33 @@ async def health_check():
 ### Structured Error Handling
 ```python
 from huleedu_service_libs.error_handling import (
-    ServiceError,
-    ErrorCode,
-    error_handler_middleware
+    HuleEduError,
+    register_error_handlers,
+    raise_resource_not_found,
+    raise_processing_error
 )
 
-# Custom service errors
-class EssayNotFoundError(ServiceError):
-    def __init__(self, essay_id: str):
-        super().__init__(
-            code=ErrorCode.NOT_FOUND,
-            message=f"Essay not found: {essay_id}",
-            details={"essay_id": essay_id}
-        )
+# Use existing error factories instead of custom classes
+async def get_essay(essay_id: str):
+    essay = await repository.get_by_id(essay_id)
+    if not essay:
+        raise_resource_not_found(f"Essay not found: {essay_id}", {"essay_id": essay_id})
+    return essay
 
-class EssayProcessingError(ServiceError):
-    def __init__(self, essay_id: str, reason: str):
-        super().__init__(
-            code=ErrorCode.PROCESSING_FAILED,
-            message=f"Essay processing failed: {reason}",
-            details={"essay_id": essay_id, "reason": reason}
+async def process_essay(essay_id: str):
+    try:
+        # Processing logic
+        pass
+    except Exception as e:
+        raise_processing_error(
+            f"Essay processing failed: {str(e)}", 
+            {"essay_id": essay_id, "original_error": str(e)}
         )
 
 # In startup_setup.py
-def setup_service(app: Quart) -> None:
-    # Setup error handling middleware
-    error_handler_middleware(app)
+def setup_service(app: HuleEduApp) -> None:
+    # Register error handlers for HuleEduError
+    register_error_handlers(app)
 ```
 
 ## Circuit Breaker Integration

@@ -9,12 +9,11 @@ import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-from sqlalchemy import select
 
 from common_core import LLMProviderType
 from common_core.domain_enums import CourseCode, EssayComparisonWinner
@@ -40,9 +39,7 @@ from services.cj_assessment_service.protocols import (
 )
 from services.cj_assessment_service.tests.fixtures.test_models_db import (
     TestCJBatchState,
-    TestCJBatchUpload,
     TestComparisonPair,
-    TestProcessedEssay,
 )
 
 if TYPE_CHECKING:
@@ -293,9 +290,10 @@ class TestBatchWorkflowIntegration:
         ):
             # Arrange - Create a real stuck batch using the database
             async with real_repository.session() as session:
-                from services.cj_assessment_service.enums_db import CJBatchStatusEnum
                 from datetime import timedelta
-                
+
+                from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+
                 # Create a batch that appears stuck
                 batch = await real_repository.create_new_cj_batch(
                     session=session,
@@ -368,11 +366,12 @@ class TestBatchWorkflowIntegration:
             batch_id = str(uuid4())
             correlation_id = uuid4()
             callback_count = 100
-            
+
             # Create real database state instead of mocks
             async with real_repository.session() as session:
+                from datetime import UTC, datetime
+
                 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-                from datetime import datetime, UTC
 
                 # Create a real batch
                 batch = await real_repository.create_new_cj_batch(
@@ -404,7 +403,7 @@ class TestBatchWorkflowIntegration:
                     # Create pairs using round-robin essay assignment
                     essay_a_idx = i % len(essays)
                     essay_b_idx = (i + 1) % len(essays)
-                    
+
                     pair_correlation_id = uuid4()
                     pair = TestComparisonPair(
                         cj_batch_id=batch.id,
@@ -464,11 +463,11 @@ class TestBatchWorkflowIntegration:
             # Assert - Verify all callbacks processed successfully
             successful_results = [r for r in results if r is True]
             failed_results = [r for r in results if isinstance(r, Exception)]
-            
+
             # Allow for some race condition effects but most should succeed
             assert len(successful_results) >= callback_count * 0.8  # At least 80% success
             assert len(failed_results) < callback_count * 0.2  # Less than 20% failures
-            
+
             # Verify database state reflects concurrent processing
             async with real_repository.session() as session:
                 # Check that batch state was updated
@@ -476,47 +475,100 @@ class TestBatchWorkflowIntegration:
                 assert batch_state_result is not None
                 assert batch_state_result.completed_comparisons > 0
 
+    @pytest.mark.expensive
     async def test_partial_batch_completion(
         self,
-        mock_repository: AsyncMock,
-        mock_event_publisher: AsyncMock,
+        postgres_repository: CJRepositoryProtocol,
+        mock_event_publisher: CJEventPublisherProtocol,
+        mock_content_client,
+        mock_llm_interaction,
         test_settings: Settings,
     ) -> None:
-        """Test partial completion threshold triggering."""
+        """Test partial completion threshold triggering using real PostgreSQL database."""
+        # No patching needed - using production models with real PostgreSQL
+        from datetime import UTC, datetime
+
+        from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+        from services.cj_assessment_service.models_db import CJBatchState, ComparisonPair
+
         # Arrange
-        batch_id = 1  # Use integer ID for internal batch
+        batch_id = str(uuid4())
         correlation_id = uuid4()
         total_pairs = 100
 
-        # Get the existing mock session from the fixture's context manager
-        mock_context_manager = mock_repository.session.return_value
-        mock_session = mock_context_manager.__aenter__.return_value
+        # Create real database state using production models
+        async with postgres_repository.session() as session:
+            # Create a real batch using production repository
+            batch = await postgres_repository.create_new_cj_batch(
+                session=session,
+                bos_batch_id=batch_id,
+                event_correlation_id=str(correlation_id),
+                language="en",
+                course_code="ENG5",
+                essay_instructions="Partial completion test",
+                initial_status=CJBatchStatusEnum.PENDING,
+                expected_essay_count=total_pairs,
+            )
 
-        # Mock batch state with 80% completion
-        mock_batch_state = MagicMock()
-        mock_batch_state.batch_id = batch_id
-        mock_batch_state.state = CJBatchStateEnum.WAITING_CALLBACKS
-        mock_batch_state.completed_comparisons = 80
-        mock_batch_state.total_comparisons = total_pairs
-        mock_batch_state.partial_scoring_triggered = False
-        mock_session.get = AsyncMock(return_value=mock_batch_state)
+            # Create essays for comparison pairs
+            essays = []
+            for i in range(total_pairs):
+                essay = await postgres_repository.create_or_update_cj_processed_essay(
+                    session=session,
+                    cj_batch_id=batch.id,
+                    els_essay_id=f"essay-{i}",
+                    text_storage_id=f"storage-{i}",
+                    assessment_input_text=f"Sample essay content {i}",
+                )
+                essays.append(essay)
 
-        # Mock comparison pair - ensure scalar_one_or_none returns a MagicMock, not a coroutine
-        mock_pair = MagicMock()
-        mock_pair.id = "pair-80"
-        mock_pair.cj_batch_id = batch_id
-        mock_pair.winner = None
-        mock_pair.completed_at = None
-        mock_pair.request_correlation_id = correlation_id
+            # Create 80 completed comparison pairs (80% completion)
+            for i in range(80):
+                pair = ComparisonPair(
+                    cj_batch_id=batch.id,
+                    essay_a_els_id=essays[i].els_essay_id,
+                    essay_b_els_id=essays[i + 1].els_essay_id,
+                    prompt_text="Compare these essays",
+                    request_correlation_id=uuid4(),
+                    submitted_at=datetime.now(UTC),
+                    completed_at=datetime.now(UTC),
+                    winner="essay_a",
+                )
+                session.add(pair)
 
-        # Set up the execute result chain
-        mock_execute_result = MagicMock()
-        mock_execute_result.scalar_one_or_none = MagicMock(return_value=mock_pair)
-        mock_session.execute = AsyncMock(return_value=mock_execute_result)
+            # Create one pending comparison pair (the 81st)
+            pending_pair = ComparisonPair(
+                cj_batch_id=batch.id,
+                essay_a_els_id=essays[80].els_essay_id,
+                essay_b_els_id=essays[81].els_essay_id,
+                prompt_text="Compare these essays",
+                request_correlation_id=correlation_id,
+                submitted_at=datetime.now(UTC),
+            )
+            session.add(pending_pair)
 
-        # Create callback for the 80th completion
+            # Create batch state with 80 completed comparisons
+            batch_state = CJBatchState(
+                batch_id=batch.id,
+                state=CJBatchStateEnum.WAITING_CALLBACKS,
+                total_comparisons=total_pairs,
+                completed_comparisons=80,
+                submitted_comparisons=81,
+                failed_comparisons=0,
+                partial_scoring_triggered=False,
+                completion_threshold_pct=80,
+                current_iteration=1,
+            )
+            session.add(batch_state)
+            await session.commit()
+
+            # Refresh to get the database-assigned ID
+            await session.refresh(pending_pair)
+
+        # Create callback for the 81st completion (triggering 80% threshold)
+        llm_request_id = f"llm-request-{pending_pair.id}"
         callback = self._create_callback_event(
-            request_id="pair-80",
+            request_id=llm_request_id,
             correlation_id=correlation_id,
             winner="essay_a",
         )
@@ -525,20 +577,32 @@ class TestBatchWorkflowIntegration:
         kafka_msg = self._create_kafka_message(
             callback,
             "llm_provider.comparison.completed.v1",
-            "pair-80",
+            llm_request_id,
         )
 
         # Act - Process the callback that triggers partial completion
         result = await process_llm_result(
             kafka_msg,
-            mock_repository,
+            postgres_repository,
             mock_event_publisher,
             test_settings,
         )
 
         # Assert - Verify callback processed and partial scoring triggered
         assert result is True
-        mock_session.commit.assert_called()
 
-        # Verify that the batch state would be updated (through database operations)
-        assert mock_session.execute.called
+        # Verify real database state reflects partial scoring trigger
+        async with postgres_repository.session() as session:
+            # First, check if the comparison pair was updated by the callback
+            updated_pair = await session.get(ComparisonPair, pending_pair.id)
+            assert updated_pair is not None
+            assert updated_pair.winner == "Essay A"
+            assert updated_pair.completed_at is not None
+
+            # Then check the batch state
+            batch_state_result = await session.get(CJBatchState, batch.id)
+            assert batch_state_result is not None
+
+            # The callback should have updated the completion count and triggered partial scoring
+            assert batch_state_result.completed_comparisons == 81
+            assert batch_state_result.partial_scoring_triggered is True
