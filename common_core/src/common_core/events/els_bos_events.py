@@ -7,7 +7,7 @@ and the Batch Orchestrator Service (BOS) for dynamic pipeline orchestration.
 
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from ..metadata_models import EssayProcessingInputRefV1
 from ..pipeline_models import PhaseName
@@ -71,11 +71,13 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
         description="Correlation ID for tracking related events across services",
     )
 
-    class Config:
-        """Pydantic configuration for the event model."""
+    @field_serializer("correlation_id")
+    def serialize_uuid(self, uuid_val: UUID) -> str:
+        """Serialize UUID to string."""
+        return str(uuid_val)
 
-        json_encoders = {UUID: str}
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "batch_id": "batch-123-456",
                 "phase_name": "spellcheck",
@@ -88,3 +90,4 @@ class ELSBatchPhaseOutcomeV1(BaseModel):
                 "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
             },
         }
+    )

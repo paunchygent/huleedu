@@ -340,20 +340,18 @@ class TestErrorHandlingIntegration:
             error_callbacks.append(error_callback)
 
         # Mock comparison pairs
-        def mock_pair_lookup(query: object) -> MagicMock:
-            # Create a comparison pair without a winner
-            mock_pair = MagicMock()
-            mock_pair.id = f"pair-{correlation_id}"
-            mock_pair.cj_batch_id = batch_id
-            mock_pair.winner = None  # No winner yet, so update will proceed
-            mock_pair.completed_at = None
-            mock_pair.request_correlation_id = correlation_id
-            
-            result = MagicMock()
-            result.scalar_one_or_none = MagicMock(return_value=mock_pair)
-            return result
+        # Create a single mock pair that will be reused
+        mock_pair = MagicMock()
+        mock_pair.id = f"pair-{correlation_id}"
+        mock_pair.cj_batch_id = batch_id
+        mock_pair.winner = None  # No winner yet, so update will proceed
+        mock_pair.completed_at = None
+        mock_pair.request_correlation_id = correlation_id
 
-        mock_session.execute = AsyncMock(side_effect=mock_pair_lookup)
+        # Configure the execute result chain properly
+        mock_execute_result = MagicMock()
+        mock_execute_result.scalar_one_or_none = MagicMock(return_value=mock_pair)
+        mock_session.execute = AsyncMock(return_value=mock_execute_result)
 
         # Act - Process all callbacks
         results = []
@@ -471,7 +469,7 @@ class TestErrorHandlingIntegration:
         mock_pair.winner = None
         mock_pair.completed_at = None
         mock_pair.request_correlation_id = correlation_id
-        
+
         # Set up the execute result chain properly
         mock_execute_result = MagicMock()
         mock_execute_result.scalar_one_or_none = MagicMock(return_value=mock_pair)

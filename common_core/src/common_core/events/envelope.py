@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from enum import Enum
 from typing import Any, Dict, Generic, Optional, TypeVar
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 T_EventData = TypeVar("T_EventData", bound=BaseModel)
 
@@ -22,7 +21,8 @@ class EventEnvelope(BaseModel, Generic[T_EventData]):
     metadata: Optional[Dict[str, Any]] = Field(
         default=None, description="Optional metadata for tracing and other cross-cutting concerns"
     )
-    model_config = {
-        "populate_by_name": True,
-        "json_encoders": {Enum: lambda v: v.value},
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        # In Pydantic v2, enums are automatically serialized to their values in JSON mode
+        # No need for json_encoders
+    )

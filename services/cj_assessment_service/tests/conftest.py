@@ -361,3 +361,7 @@ def opentelemetry_test_isolation() -> Generator[InMemorySpanExporter, None, None
         span_exporter.clear()
         # Note: TracerProvider doesn't have remove_span_processor,
         # but clearing the exporter is sufficient for test isolation
+
+
+# Import the database fixtures
+from services.cj_assessment_service.tests.fixtures.database_fixtures import *  # noqa: F401,F403,E402

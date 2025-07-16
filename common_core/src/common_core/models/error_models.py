@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from common_core.error_enums import ErrorCode
 
@@ -28,5 +28,4 @@ class ErrorDetail(BaseModel):
     trace_id: Optional[str] = None
     span_id: Optional[str] = None
 
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
