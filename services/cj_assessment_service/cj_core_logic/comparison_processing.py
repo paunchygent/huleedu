@@ -13,6 +13,9 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic import pair_generation, scoring_ranking
+from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfigOverrides
+from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import (
@@ -23,10 +26,6 @@ from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
     LLMInteractionProtocol,
 )
-
-from services.cj_assessment_service.cj_core_logic import pair_generation, scoring_ranking
-from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
-from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfigOverrides
 
 logger = create_service_logger("cj_assessment_service.comparison_processing")
 

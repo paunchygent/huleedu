@@ -6,10 +6,13 @@ proven workflow logic instead of creating a parallel workflow system.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
         BatchRetryProcessor,
     )
@@ -17,18 +20,28 @@ if TYPE_CHECKING:
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 
+from common_core.event_enums import ProcessingEvent
+from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
+from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1
+from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.status_enums import BatchStatus, CJBatchStateEnum, ProcessingStage
+from services.cj_assessment_service.cj_core_logic import (
+    batch_completion_checker,
+    scoring_ranking,
+)
+from services.cj_assessment_service.cj_core_logic.batch_submission import get_batch_state
+from services.cj_assessment_service.cj_core_logic.callback_state_manager import (
+    check_batch_completion_conditions,
+    update_comparison_result,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
+from services.cj_assessment_service.models_api import EssayForComparison
 from services.cj_assessment_service.models_db import ComparisonPair
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
-)
-
-from .callback_state_manager import (
-    check_batch_completion_conditions,
-    update_comparison_result,
 )
 
 # Import existing proven workflow logic for integration
@@ -285,24 +298,183 @@ async def trigger_existing_workflow_continuation(
                 )
                 # Continue with normal workflow despite failure
 
-        # This is where we would integrate with existing workflow_orchestrator
-        # patterns and use existing scoring_ranking.check_score_stability()
-        # for proper score stability checking
+        # Get batch state to retrieve config overrides
+        batch_state = await get_batch_state(session, batch_id, correlation_id)
+        if not batch_state:
+            logger.error(
+                f"Batch state not found for batch {batch_id}",
+                extra=log_extra,
+            )
+            return
 
-        # The key insight is that this callback handler should NOT
-        # implement its own workflow logic, but rather trigger the
-        # existing proven workflow continuation patterns
-
-        logger.info(
-            f"Workflow continuation delegated to existing proven logic for batch {batch_id}",
-            extra=log_extra,
+        # Check if batch has reached completion and trigger scoring if ready
+        completion_checker = batch_completion_checker.BatchCompletionChecker(
+            database=database,
         )
 
-        # Note: In a complete implementation, this would:
-        # 1. Calculate current scores using existing scoring_ranking.py
-        # 2. Check stability using existing scoring_ranking.check_score_stability()
-        # 3. Trigger completion/continuation using existing workflow_orchestrator patterns
-        # 4. Publish results using existing event publisher patterns
+        is_complete = await completion_checker.check_batch_completion(
+            cj_batch_id=batch_id,
+            correlation_id=correlation_id,
+            config_overrides=batch_state.config_overrides,
+        )
 
-    # Suppress unused warnings - they will be used when full integration is implemented
-    _ = (event_publisher, settings)
+        if is_complete:
+            logger.info(
+                f"Batch {batch_id} has reached completion threshold, triggering scoring",
+                extra=log_extra,
+            )
+
+            await _trigger_batch_scoring_completion(
+                batch_id=batch_id,
+                database=database,
+                event_publisher=event_publisher,
+                session=session,
+                correlation_id=correlation_id,
+                log_extra=log_extra,
+            )
+
+
+async def _trigger_batch_scoring_completion(
+    batch_id: int,
+    database: CJRepositoryProtocol,
+    event_publisher: CJEventPublisherProtocol,
+    session: AsyncSession,
+    correlation_id: UUID,
+    log_extra: dict[str, Any],
+) -> None:
+    """Trigger Bradley-Terry scoring and completion for a batch.
+
+    Args:
+        batch_id: The CJ batch ID
+        database: Database access protocol
+        event_publisher: Event publishing protocol
+        session: Active database session
+        correlation_id: Correlation ID for tracing
+        log_extra: Extra logging context
+    """
+    try:
+        # Update batch state to SCORING
+        await database.update_cj_batch_status(
+            session=session,
+            cj_batch_id=batch_id,
+            status=CJBatchStateEnum.SCORING,
+        )
+
+        # Get batch upload for BOS batch ID
+        from services.cj_assessment_service.models_db import CJBatchUpload
+
+        batch_upload = await session.get(CJBatchUpload, batch_id)
+        if not batch_upload:
+            logger.error(
+                f"Batch upload not found for batch {batch_id}",
+                extra={**log_extra, "batch_id": batch_id},
+            )
+            return
+
+        # Get all essays for scoring
+        essays = await database.get_essays_for_cj_batch(
+            session=session,
+            cj_batch_id=batch_id,
+        )
+
+        # Convert to API model format
+        essays_for_api = [
+            EssayForComparison(
+                id=essay.els_essay_id,
+                text_content=essay.content,
+                current_bt_score=essay.current_bt_score,
+            )
+            for essay in essays
+        ]
+
+        # Get all comparisons for this batch (already stored in DB)
+        comparisons: list[Any] = []  # Comparisons are already in DB from callbacks
+
+        # Calculate final Bradley-Terry scores
+        await scoring_ranking.record_comparisons_and_update_scores(
+            all_essays=essays_for_api,
+            comparison_results=comparisons,
+            db_session=session,
+            cj_batch_id=batch_id,
+            correlation_id=correlation_id,
+        )
+
+        # Update batch status to completed
+        await database.update_cj_batch_status(
+            session=session,
+            cj_batch_id=batch_id,
+            status=CJBatchStateEnum.COMPLETED,
+        )
+
+        # Get final rankings
+        rankings = await scoring_ranking.get_essay_rankings(session, batch_id, correlation_id)
+
+        # Create the event data
+        event_data = CJAssessmentCompletedV1(
+            event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
+            entity_ref=EntityReference(
+                entity_id=batch_upload.bos_batch_id,
+                entity_type="batch",
+            ),
+            status=BatchStatus.COMPLETED_SUCCESSFULLY,
+            system_metadata=SystemProcessingMetadata(
+                entity=EntityReference(
+                    entity_id=batch_upload.bos_batch_id,
+                    entity_type="batch",
+                ),
+                timestamp=datetime.now(UTC),
+                processing_stage=ProcessingStage.COMPLETED,
+                started_at=batch_upload.created_at,
+                completed_at=datetime.now(UTC),
+                event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
+            ),
+            cj_assessment_job_id=str(batch_id),
+            rankings=rankings,
+        )
+
+        # Wrap in EventEnvelope
+        completion_envelope = EventEnvelope[CJAssessmentCompletedV1](
+            event_type="cj_assessment.completed.v1",
+            event_timestamp=datetime.now(UTC),
+            source_service="cj_assessment_service",
+            correlation_id=correlation_id,
+            data=event_data,
+        )
+
+        # Publish completion event
+        await event_publisher.publish_assessment_completed(
+            completion_data=completion_envelope,
+            correlation_id=correlation_id,
+        )
+
+        logger.info(
+            f"Successfully completed scoring for batch {batch_id}",
+            extra={
+                **log_extra,
+                "essay_count": len(essays),
+                "status": "COMPLETED",
+            },
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Failed to trigger scoring completion for batch {batch_id}: {e}",
+            extra={
+                **log_extra,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+            exc_info=True,
+        )
+        # Update batch to failed state
+        try:
+            await database.update_cj_batch_status(
+                session=session,
+                cj_batch_id=batch_id,
+                status=CJBatchStateEnum.FAILED,
+            )
+        except Exception as update_error:
+            logger.error(
+                f"Failed to update batch status to FAILED: {update_error}",
+                extra={**log_extra, "update_error": str(update_error)},
+            )

@@ -22,6 +22,7 @@ from quart_dishka import inject
 
 from common_core.error_enums import ErrorCode
 from services.cj_assessment_service.models_api import ErrorResponse
+from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
 logger = create_service_logger("cj_assessment_service.api.health")
 health_bp = Blueprint("health_routes", __name__)
@@ -177,3 +178,121 @@ async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
             status_code=500,
         )
         return response
+
+
+@health_bp.route("/healthz/live")
+async def liveness_probe() -> tuple[Response, int]:
+    """Kubernetes liveness probe endpoint.
+
+    Simple check to verify the service is running.
+    Returns 200 if the service is alive, 503 otherwise.
+
+    This endpoint is intentionally lightweight and only checks
+    basic service responsiveness, not dependencies.
+    """
+    try:
+        # Basic check - if we can handle requests, we're alive
+        response = {
+            "status": "alive",
+            "service": "cj_assessment_service",
+            "message": "Service is responding",
+        }
+        return jsonify(response), 200
+    except Exception as e:
+        logger.error(f"Liveness probe failed: {e}")
+        return jsonify({"status": "dead", "error": str(e)}), 503
+
+
+@health_bp.route("/healthz/ready")
+@inject
+async def readiness_probe(
+    repository: FromDishka[CJRepositoryProtocol],
+) -> tuple[Response, int]:
+    """Kubernetes readiness probe endpoint.
+
+    Checks if the service is ready to accept traffic.
+    Returns 200 if ready, 503 if not ready.
+
+    Checks:
+    - Database connectivity
+    - Active batch monitoring
+    - Critical dependencies
+    """
+    try:
+        checks = {
+            "database": False,
+            "kafka": True,  # Assumed healthy if we got this far
+            "batch_monitoring": True,
+        }
+
+        # Check database readiness
+        try:
+            async with repository.session() as session:
+                # Simple query to verify DB connectivity
+                from sqlalchemy import text
+
+                result = await session.execute(text("SELECT 1"))
+                _ = result.scalar()
+                checks["database"] = True
+        except Exception as e:
+            logger.warning(f"Database readiness check failed: {e}")
+            checks["database"] = False
+
+        # Check for stuck batches (indicates monitoring is working)
+        try:
+            async with repository.session() as session:
+                from datetime import UTC, datetime, timedelta
+
+                from sqlalchemy import select
+
+                from common_core.status_enums import CJBatchStateEnum
+                from services.cj_assessment_service.models_db import CJBatchState
+
+                # Count active batches
+                active_states = [
+                    CJBatchStateEnum.INITIALIZING,
+                    CJBatchStateEnum.GENERATING_PAIRS,
+                    CJBatchStateEnum.WAITING_CALLBACKS,
+                    CJBatchStateEnum.SCORING,
+                ]
+
+                stmt = select(CJBatchState).where(CJBatchState.state.in_(active_states))
+                result = await session.execute(stmt)
+                active_batches = result.scalars().all()
+
+                # Check for stuck batches (no activity for > 2 hours)
+                stuck_threshold = datetime.now(UTC) - timedelta(hours=2)
+                stuck_count = sum(
+                    1 for batch in active_batches if batch.last_activity_at < stuck_threshold
+                )
+
+                # Warn if too many stuck batches
+                if stuck_count > 5:
+                    checks["batch_monitoring"] = False
+                    logger.warning(f"Too many stuck batches: {stuck_count}")
+
+        except Exception as e:
+            logger.warning(f"Batch monitoring check failed: {e}")
+            # Don't fail readiness for monitoring issues
+
+        # Overall readiness
+        is_ready = all(checks.values())
+
+        response = {
+            "status": "ready" if is_ready else "not_ready",
+            "service": "cj_assessment_service",
+            "checks": checks,
+            "message": "Service is ready to accept traffic" if is_ready else "Service is not ready",
+        }
+
+        return jsonify(response), 200 if is_ready else 503
+
+    except Exception as e:
+        logger.error(f"Readiness probe failed: {e}", exc_info=True)
+        return jsonify(
+            {
+                "status": "not_ready",
+                "error": str(e),
+                "message": "Readiness probe error",
+            }
+        ), 503

@@ -133,3 +133,33 @@ class TestAppCreation:
         # We'll test this indirectly by confirming the app doesn't crash
         # when created (error handlers are registered during creation)
         assert len(app.error_handler_spec) > 0
+
+    async def test_liveness_probe_endpoint(self) -> None:
+        """Test Kubernetes liveness probe endpoint."""
+        app = create_app()
+        test_client = app.test_client()
+
+        async with test_client as client:
+            response = await client.get("/healthz/live")
+
+            assert response.status_code == 200
+            data = await response.get_json()
+            assert data["status"] == "alive"
+            assert data["service"] == "cj_assessment_service"
+            assert "message" in data
+
+    async def test_readiness_probe_endpoint(self) -> None:
+        """Test Kubernetes readiness probe endpoint."""
+        app = create_app()
+        test_client = app.test_client()
+
+        async with test_client as client:
+            response = await client.get("/healthz/ready")
+
+            # Should return 200 or 503 depending on dependencies
+            assert response.status_code in [200, 503]
+            data = await response.get_json()
+            assert data["status"] in ["ready", "not_ready"]
+            assert data["service"] == "cj_assessment_service"
+            assert "checks" in data
+            assert "message" in data

@@ -495,7 +495,7 @@ class TestEndOfBatchFairnessScenarios:
             patch(
                 "services.cj_assessment_service.cj_core_logic.batch_pool_manager.update_batch_processing_metadata",
                 new_callable=AsyncMock,
-            ) as mock_update_metadata,
+            ),
             patch.object(
                 batch_retry_processor.batch_submitter,
                 "submit_comparison_batch",

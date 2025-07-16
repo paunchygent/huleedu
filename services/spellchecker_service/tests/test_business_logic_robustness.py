@@ -26,10 +26,10 @@ from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
 from common_core.error_enums import ErrorCode
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
-from common_core.models.error_models import ErrorDetail
 from common_core.event_enums import ProcessingEvent
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import EssayStatus, ProcessingStage
 from services.spellchecker_service.event_processor import process_single_message
 from services.spellchecker_service.implementations.spell_logic_impl import DefaultSpellLogic

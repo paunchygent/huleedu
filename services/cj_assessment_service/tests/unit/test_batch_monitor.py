@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID
 
 import pytest
 
@@ -67,6 +68,8 @@ class TestBatchMonitor:
         mock_batch_state.total_comparisons = 100
         mock_batch_state.completed_comparisons = 85
         mock_batch_state.last_activity_at = datetime.now(UTC) - timedelta(hours=5)
+        mock_batch_state.correlation_id = UUID("00000000-0000-0000-0000-000000000123")
+        mock_batch_state.processing_metadata = None
 
         # Mock database operations
         mock_session = AsyncMock()
@@ -94,6 +97,8 @@ class TestBatchMonitor:
         mock_batch_state.total_comparisons = 100
         mock_batch_state.completed_comparisons = 50
         mock_batch_state.last_activity_at = datetime.now(UTC) - timedelta(hours=5)
+        mock_batch_state.correlation_id = UUID("00000000-0000-0000-0000-000000000456")
+        mock_batch_state.processing_metadata = None
 
         # Mock database operations
         mock_session = AsyncMock()

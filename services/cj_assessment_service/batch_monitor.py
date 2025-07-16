@@ -8,16 +8,29 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import and_, select
+from sqlalchemy.orm import selectinload
 
-from common_core.status_enums import CJBatchStateEnum
+from common_core.event_enums import ProcessingEvent
+from common_core.events.cj_assessment_events import (
+    CJAssessmentCompletedV1,
+    CJAssessmentFailedV1,
+)
+from common_core.events.envelope import EventEnvelope
+from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.status_enums import BatchStatus, CJBatchStateEnum, ProcessingStage
+from services.cj_assessment_service.cj_core_logic import scoring_ranking
 from services.cj_assessment_service.metrics import get_business_metrics
-from services.cj_assessment_service.models_db import CJBatchState
+from services.cj_assessment_service.models_api import EssayForComparison
+from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from services.cj_assessment_service.config import Settings
     from services.cj_assessment_service.protocols import (
         CJEventPublisherProtocol,
@@ -83,10 +96,16 @@ class BatchMonitor:
 
                 async with self._repository.session() as session:
                     # Find potentially stuck batches
-                    stmt = select(CJBatchState).where(
-                        and_(
-                            CJBatchState.state.in_(monitored_states),
-                            CJBatchState.last_activity_at < stuck_threshold,
+                    stmt = (
+                        select(CJBatchState)
+                        .where(
+                            and_(
+                                CJBatchState.state.in_(monitored_states),
+                                CJBatchState.last_activity_at < stuck_threshold,
+                            )
+                        )
+                        .options(
+                            selectinload(CJBatchState.batch_upload)  # Eager load relationship
                         )
                     )
 
@@ -213,8 +232,12 @@ class BatchMonitor:
                     if self._stuck_batches_recovered:
                         self._stuck_batches_recovered.inc()
 
-                    # TODO: Trigger scoring process
-                    # await self._trigger_scoring(batch_id)
+                    # Trigger scoring process for forced batch
+                    await self._trigger_scoring(
+                        batch_id=batch_id,
+                        session=session,
+                        correlation_id=UUID(batch_state.batch_upload.event_correlation_id),
+                    )
 
                 else:
                     # Mark as failed if not enough progress
@@ -250,12 +273,50 @@ class BatchMonitor:
 
                     await session.commit()
 
-                    # TODO: Publish batch failure event
-                    # await self.publish_batch_failure(
-                    #     batch_id=batch_id,
-                    #     reason="stuck_timeout",
-                    #     progress_pct=progress_pct
-                    # )
+                    # Get batch upload for failure event
+                    batch_upload = await session.get(CJBatchUpload, batch_id)
+                    if batch_upload:
+                        # Create the failure event data
+                        failure_event_data = CJAssessmentFailedV1(
+                            event_name=ProcessingEvent.CJ_ASSESSMENT_FAILED,
+                            entity_ref=EntityReference(
+                                entity_id=batch_upload.bos_batch_id,
+                                entity_type="batch",
+                            ),
+                            status=BatchStatus.FAILED_CRITICALLY,
+                            system_metadata=SystemProcessingMetadata(
+                                entity=EntityReference(
+                                    entity_id=batch_upload.bos_batch_id,
+                                    entity_type="batch",
+                                ),
+                                timestamp=datetime.now(UTC),
+                                processing_stage=ProcessingStage.FAILED,
+                                started_at=batch_upload.created_at,
+                                completed_at=datetime.now(UTC),
+                                event=ProcessingEvent.CJ_ASSESSMENT_FAILED.value,
+                                error_info={
+                                    "reason": "stuck_timeout_insufficient_progress",
+                                    "progress_pct": progress_pct,
+                                    "batch_state": batch_state_db.state.value,
+                                },
+                            ),
+                            cj_assessment_job_id=str(batch_id),
+                        )
+
+                        # Wrap in EventEnvelope
+                        failure_envelope = EventEnvelope[CJAssessmentFailedV1](
+                            event_type="cj_assessment.failed.v1",
+                            event_timestamp=datetime.now(UTC),
+                            source_service="cj_assessment_service",
+                            correlation_id=UUID(batch_state.batch_upload.event_correlation_id),
+                            data=failure_event_data,
+                        )
+
+                        # Publish batch failure event
+                        await self._event_publisher.publish_assessment_failed(
+                            failure_data=failure_envelope,
+                            correlation_id=UUID(batch_state.batch_upload.event_correlation_id),
+                        )
 
                 # Increment metrics
                 if self._stuck_batches_failed:
@@ -275,3 +336,145 @@ class BatchMonitor:
         """Graceful shutdown signal."""
         logger.info("Stopping batch monitor")
         self._running = False
+
+    async def _trigger_scoring(
+        self,
+        batch_id: int,
+        session: AsyncSession,
+        correlation_id: UUID,
+    ) -> None:
+        """Trigger Bradley-Terry scoring for a stuck batch forced to SCORING state.
+
+        Args:
+            batch_id: The CJ batch ID
+            session: Active database session
+            correlation_id: Correlation ID for event tracing
+        """
+        try:
+            logger.info(
+                "Triggering Bradley-Terry scoring for forced batch",
+                extra={
+                    "batch_id": batch_id,
+                    "correlation_id": correlation_id,
+                },
+            )
+
+            # Get batch upload for BOS batch ID
+            batch_upload = await session.get(CJBatchUpload, batch_id)
+            if not batch_upload:
+                logger.error(
+                    "Batch upload not found for batch ID",
+                    extra={
+                        "batch_id": batch_id,
+                        "correlation_id": correlation_id,
+                    },
+                )
+                return
+
+            # Get all essays for this batch
+            essays = await self._repository.get_essays_for_cj_batch(
+                session=session,
+                cj_batch_id=batch_id,
+            )
+
+            if not essays:
+                logger.error(
+                    "No essays found for batch, cannot calculate scores",
+                    extra={
+                        "batch_id": batch_id,
+                        "correlation_id": correlation_id,
+                    },
+                )
+                return
+
+            # Convert to API model format for scoring function
+            essays_for_api = [
+                EssayForComparison(
+                    id=essay.els_essay_id,
+                    text_content=essay.content,
+                    current_bt_score=essay.current_bt_score,
+                )
+                for essay in essays
+            ]
+
+            # Get all existing comparisons (empty list if none)
+            comparisons: list[Any] = []
+
+            # Calculate final Bradley-Terry scores
+            await scoring_ranking.record_comparisons_and_update_scores(
+                all_essays=essays_for_api,
+                comparison_results=comparisons,
+                db_session=session,
+                cj_batch_id=batch_id,
+                correlation_id=correlation_id,
+            )
+
+            # Update batch status to completed
+            await self._repository.update_cj_batch_status(
+                session=session,
+                cj_batch_id=batch_id,
+                status=CJBatchStateEnum.COMPLETED,
+            )
+
+            # Get final rankings
+            rankings = await scoring_ranking.get_essay_rankings(session, batch_id, correlation_id)
+
+            # Create the event data
+            event_data = CJAssessmentCompletedV1(
+                event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
+                entity_ref=EntityReference(
+                    entity_id=batch_upload.bos_batch_id,
+                    entity_type="batch",
+                ),
+                status=BatchStatus.COMPLETED_SUCCESSFULLY,
+                system_metadata=SystemProcessingMetadata(
+                    entity=EntityReference(
+                        entity_id=batch_upload.bos_batch_id,
+                        entity_type="batch",
+                    ),
+                    timestamp=datetime.now(UTC),
+                    processing_stage=ProcessingStage.COMPLETED,
+                    started_at=batch_upload.created_at,
+                    completed_at=datetime.now(UTC),
+                    event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
+                ),
+                cj_assessment_job_id=str(batch_id),
+                rankings=rankings,
+            )
+
+            # Wrap in EventEnvelope
+            completion_envelope = EventEnvelope[CJAssessmentCompletedV1](
+                event_type="cj_assessment.completed.v1",
+                event_timestamp=datetime.now(UTC),
+                source_service="cj_assessment_service",
+                correlation_id=correlation_id,
+                data=event_data,
+            )
+
+            # Publish completion event
+            await self._event_publisher.publish_assessment_completed(
+                completion_data=completion_envelope,
+                correlation_id=correlation_id,
+            )
+
+            logger.info(
+                "Successfully triggered scoring and published completion for forced batch",
+                extra={
+                    "batch_id": batch_id,
+                    "correlation_id": correlation_id,
+                    "essay_count": len(essays),
+                    "status": "COMPLETED",
+                },
+            )
+
+        except Exception as e:
+            logger.error(
+                "Failed to trigger scoring for stuck batch",
+                extra={
+                    "batch_id": batch_id,
+                    "correlation_id": correlation_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+                exc_info=True,
+            )

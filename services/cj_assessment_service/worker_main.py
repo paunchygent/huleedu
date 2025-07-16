@@ -1,11 +1,19 @@
-"""Kafka consumer worker main for CJ Assessment Service."""
+"""Kafka consumer worker main for CJ Assessment Service.
+
+This worker implements graceful shutdown handling:
+- Responds to SIGTERM and SIGINT signals
+- Allows in-flight messages to complete processing
+- Stops accepting new messages immediately on shutdown
+- Provides a configurable grace period before forceful termination
+- Properly cleans up all resources (Kafka, database, monitoring)
+"""
 
 from __future__ import annotations
 
 import asyncio
 import signal
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Set
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
@@ -116,9 +124,26 @@ async def run_monitor(batch_monitor: BatchMonitor) -> None:
     logger.info("Starting batch monitor task")
 
     try:
-        # The batch_monitor.check_stuck_batches() method already has its own loop
-        # We just need to run it and let it handle the monitoring
-        await batch_monitor.check_stuck_batches()
+        # Create a task for the monitor loop so we can cancel it on shutdown
+        monitor_future = asyncio.create_task(batch_monitor.check_stuck_batches())
+
+        # Wait for either the monitor to complete or shutdown signal
+        shutdown_task = asyncio.create_task(shutdown_event.wait())
+
+        done: Set[asyncio.Task[Any]]
+        done, _ = await asyncio.wait(
+            [monitor_future, shutdown_task],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+        # If shutdown was triggered, cancel the monitor
+        if shutdown_task in done:
+            logger.info("Monitor received shutdown signal")
+            monitor_future.cancel()
+            try:
+                await monitor_future
+            except asyncio.CancelledError:
+                pass
 
     except asyncio.CancelledError:
         logger.info("Monitor task cancelled")
@@ -213,28 +238,69 @@ async def main() -> None:
             tasks = [consumer_task, monitor_task]
             logger.info("Running consumer and monitor tasks concurrently")
 
+            # Create shutdown monitoring task
+            shutdown_task = asyncio.create_task(shutdown_event.wait(), name="shutdown_task")
+            all_tasks = tasks + [shutdown_task]
+
             try:
-                # Wait for shutdown or task failure
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                # Wait for shutdown signal or task failure
+                done: Set[asyncio.Task[Any]]
+                pending: Set[asyncio.Task[Any]]
+                done, pending = await asyncio.wait(all_tasks, return_when=asyncio.FIRST_COMPLETED)
 
-                # Check if any task failed
-                for task in done:
-                    if task.exception():
-                        logger.error(
-                            f"Task {task.get_name()} failed with exception",
-                            exc_info=task.exception(),
+                # Check what completed first
+                if shutdown_task in done:
+                    logger.info("Shutdown signal received, initiating graceful shutdown...")
+
+                    # Signal tasks to stop
+                    shutdown_event.set()
+
+                    # Give tasks a grace period to finish
+                    grace_period = getattr(settings, "SHUTDOWN_GRACE_PERIOD_SECONDS", 30)
+                    logger.info(f"Allowing {grace_period} seconds for graceful shutdown...")
+
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.gather(
+                                *[t for t in tasks if not t.done()], return_exceptions=True
+                            ),
+                            timeout=grace_period,
                         )
+                        logger.info("All tasks completed gracefully")
+                    except asyncio.TimeoutError:
+                        logger.warning("Grace period expired, forcing shutdown...")
+                        # Cancel remaining tasks
+                        for task in tasks:
+                            if not task.done():
+                                task.cancel()
+                        await asyncio.gather(*tasks, return_exceptions=True)
+                else:
+                    # A task failed
+                    for task in done:
+                        if task != shutdown_task and task.exception():
+                            logger.error(
+                                f"Task {task.get_name()} failed with exception",
+                                exc_info=task.exception(),
+                            )
 
-                # Cancel remaining tasks
-                logger.info("Cancelling remaining tasks...")
-                for task in pending:
-                    task.cancel()
+                    # Signal shutdown
+                    shutdown_event.set()
 
-                # Wait for cancellation to complete
-                await asyncio.gather(*pending, return_exceptions=True)
+                    # Cancel remaining tasks
+                    logger.info("Cancelling remaining tasks due to failure...")
+                    for task in pending:
+                        if task != shutdown_task:
+                            task.cancel()
+
+                    # Wait for cancellation to complete
+                    await asyncio.gather(
+                        *[t for t in pending if t != shutdown_task], return_exceptions=True
+                    )
 
             except Exception as e:
                 logger.error(f"Error in main task coordination: {e}", exc_info=True)
+                # Signal shutdown
+                shutdown_event.set()
                 # Cancel all tasks
                 for task in tasks:
                     if not task.done():
@@ -246,7 +312,16 @@ async def main() -> None:
         logger.error(f"Worker initialization failed: {e}", exc_info=True)
         raise
     finally:
+        # Clean up resources
+        logger.info("Cleaning up resources...")
+
+        # Close the container
         await container.close()
+
+        # Dispose of the database engine
+        await engine.dispose()
+        logger.info("Database connections closed")
+
         logger.info("CJ Assessment Service worker shutdown complete")
 
 

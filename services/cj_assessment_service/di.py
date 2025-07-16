@@ -18,6 +18,14 @@ from prometheus_client import REGISTRY, CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from common_core import LLMProviderType
+
+# Import all business logic protocols
+from services.cj_assessment_service.cj_core_logic.batch_completion_checker import (
+    BatchCompletionChecker,
+)
+from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
+from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+from services.cj_assessment_service.cj_core_logic.batch_retry_processor import BatchRetryProcessor
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.config import settings as service_settings
 from services.cj_assessment_service.implementations.content_client_impl import ContentClientImpl
@@ -28,14 +36,6 @@ from services.cj_assessment_service.implementations.llm_provider_service_client 
     LLMProviderServiceClient,
 )
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
-
-# Import all business logic protocols
-from services.cj_assessment_service.cj_core_logic.batch_completion_checker import (
-    BatchCompletionChecker,
-)
-from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
-from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
-from services.cj_assessment_service.cj_core_logic.batch_retry_processor import BatchRetryProcessor
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
 from services.cj_assessment_service.metrics import setup_cj_assessment_database_monitoring
 from services.cj_assessment_service.protocols import (
