@@ -43,7 +43,7 @@ configure_service_logging(
 # Create logger instance
 logger = create_service_logger(__name__)
 
-# Standard logging with structured context
+# Standard logging with structured context (use keyword arguments, not extra={})
 logger.info(
     "Processing started",
     essay_id=essay_id,
@@ -201,21 +201,31 @@ from huleedu_service_libs.error_handling import (
     raise_processing_error
 )
 
-# Use existing error factories instead of custom classes
-async def get_essay(essay_id: str):
+# Use existing error factories with correct signature
+async def get_essay(essay_id: str, correlation_id: UUID):
     essay = await repository.get_by_id(essay_id)
     if not essay:
-        raise_resource_not_found(f"Essay not found: {essay_id}", {"essay_id": essay_id})
+        raise_resource_not_found(
+            service="content_service",
+            operation="get_essay",
+            resource_type="Essay",
+            resource_id=essay_id,
+            correlation_id=correlation_id
+        )
     return essay
 
-async def process_essay(essay_id: str):
+async def process_essay(essay_id: str, correlation_id: UUID):
     try:
         # Processing logic
         pass
     except Exception as e:
         raise_processing_error(
-            f"Essay processing failed: {str(e)}", 
-            {"essay_id": essay_id, "original_error": str(e)}
+            service="content_service",
+            operation="process_essay",
+            message=f"Essay processing failed: {str(e)}",
+            correlation_id=correlation_id,
+            essay_id=essay_id,
+            original_error=str(e)
         )
 
 # In startup_setup.py
@@ -228,17 +238,15 @@ def setup_service(app: HuleEduApp) -> None:
 
 ### External Service Protection
 ```python
-from huleedu_service_libs.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
+from huleedu_service_libs.resilience import CircuitBreaker, circuit_breaker
 
 class LLMServiceClient:
     def __init__(self, http_client: httpx.AsyncClient):
         self.http_client = http_client
         self.circuit_breaker = CircuitBreaker(
-            CircuitBreakerConfig(
-                failure_threshold=5,
-                timeout_seconds=30,
-                recovery_timeout=60
-            )
+            failure_threshold=5,
+            timeout_seconds=30,
+            recovery_timeout=60
         )
     
     async def generate_comparison(self, essay1: str, essay2: str) -> ComparisonResult:
@@ -248,6 +256,8 @@ class LLMServiceClient:
             essay2
         )
     
+    # Alternative: Use decorator pattern
+    @circuit_breaker(failure_threshold=5, timeout=30)
     async def _make_llm_request(self, essay1: str, essay2: str) -> ComparisonResult:
         # Actual LLM API call
         response = await self.http_client.post("/compare", json={
@@ -261,30 +271,37 @@ class LLMServiceClient:
 
 ### Service Library DI Registration
 ```python
-# In di.py
-from dishka import Container, make_container, Scope
-from huleedu_service_libs.kafka_bus import KafkaBus
-from huleedu_service_libs.logging_utils import get_logger
+# In di.py - Use Provider pattern (actual implementation)
+from dishka import Provider, Scope, provide
+from huleedu_service_libs import KafkaBus
+from huleedu_service_libs.logging_utils import create_service_logger
 
-def make_service_container(config: ServiceConfig) -> Container:
-    container = make_container()
+class ServiceProvider(Provider):
+    """DI provider for service dependencies."""
     
-    # Register service library components
-    container.register(
-        KafkaBus,
-        factory=lambda: KafkaBus(config.kafka_bootstrap_servers),
-        scope=Scope.SINGLETON
-    )
+    @provide(scope=Scope.APP)
+    def provide_kafka_bus(self, config: ServiceConfig) -> KafkaBus:
+        """Provide KafkaBus instance."""
+        return KafkaBus(
+            client_id=f"{config.service_name}-producer",
+            bootstrap_servers=config.kafka_bootstrap_servers
+        )
     
-    container.register(
-        DatabaseManager,
-        factory=lambda: DatabaseManager(config.database_url),
-        scope=Scope.SINGLETON
-    )
+    @provide(scope=Scope.APP)
+    def provide_database_engine(self, config: ServiceConfig) -> AsyncEngine:
+        """Provide database engine."""
+        return create_async_engine(config.database_url)
     
     # Register service-specific components
-    container.register(EssayService, scope=Scope.REQUEST)
-    container.register(EssayRepository, scope=Scope.REQUEST)
-    
+    @provide(scope=Scope.REQUEST)
+    def provide_essay_service(self, repository: EssayRepository) -> EssayService:
+        return EssayService(repository)
+
+# In startup_setup.py
+from dishka import make_async_container
+
+def create_di_container() -> AsyncContainer:
+    """Creates and returns the DI AsyncContainer."""
+    container = make_async_container(ServiceProvider())
     return container
 ```

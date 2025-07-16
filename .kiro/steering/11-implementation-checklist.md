@@ -52,27 +52,27 @@ service_name/
 These items have ZERO TOLERANCE for non-compliance:
 
 - [ ] **NO Direct Logging**: No `import logging` or `from logging import` statements
-- [ ] **Service Library Logging**: All logging via `huleedu_service_libs.logging_utils.get_logger`
-- [ ] **NO Direct Kafka**: No `aiokafka.AIOKafkaProducer` or `aiokafka.AIOKafkaConsumer` imports
-- [ ] **Service Library Kafka**: All Kafka operations via `huleedu_service_libs.kafka_bus.KafkaBus`
-- [ ] **Metrics Integration**: `huleedu_service_libs.metrics` setup in `startup_setup.py`
-- [ ] **Health Check Integration**: `huleedu_service_libs.health_check` implementation
-- [ ] **Error Handling**: `huleedu_service_libs.error_handling` middleware setup
+- [ ] **Service Library Logging**: All logging via `huleedu_service_libs.logging_utils.create_service_logger`
+- [ ] **NO Direct Kafka**: No `aiokafka.AIOKafkaProducer` or `aiokafka.AIOKafkaConsumer` imports for producers
+- [ ] **Service Library Kafka**: All Kafka producer operations via `huleedu_service_libs.kafka_client.KafkaBus`
+- [ ] **Metrics Integration**: `huleedu_service_libs.metrics_middleware` setup in `startup_setup.py`
+- [ ] **Health Check Integration**: `huleedu_service_libs.database.DatabaseHealthChecker` implementation
+- [ ] **Error Handling**: `huleedu_service_libs.error_handling` factories and middleware setup
 
 ### Service Library Import Validation
 ```python
 # CORRECT imports - these are REQUIRED
-from huleedu_service_libs.logging_utils import get_logger
-from huleedu_service_libs.kafka_bus import KafkaBus
-from huleedu_service_libs.metrics import setup_metrics_middleware
-from huleedu_service_libs.health_check import HealthChecker
-from huleedu_service_libs.error_handling import ServiceError
+from huleedu_service_libs.logging_utils import create_service_logger, configure_service_logging
+from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
+from huleedu_service_libs.database import DatabaseHealthChecker
+from huleedu_service_libs.error_handling import HuleEduError, raise_resource_not_found
 
 # FORBIDDEN imports - these will cause deployment failure
 import logging  # ❌ FORBIDDEN
 from logging import getLogger  # ❌ FORBIDDEN
-from aiokafka import AIOKafkaProducer  # ❌ FORBIDDEN
-from aiokafka import AIOKafkaConsumer  # ❌ FORBIDDEN
+from aiokafka import AIOKafkaProducer  # ❌ FORBIDDEN (for producers - use KafkaBus)
+from aiokafka import AIOKafkaConsumer  # ❌ FORBIDDEN (for producers - consumers can use aiokafka directly)
 ```
 
 ## HTTP Service Implementation Checklist
@@ -95,19 +95,19 @@ if __name__ == "__main__":
 # MANDATORY startup_setup.py structure
 from quart import Quart
 from dishka.integrations.quart import setup_dishka
-from huleedu_service_libs.metrics import setup_metrics_middleware
-from huleedu_service_libs.error_handling import error_handler_middleware
+from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
+from huleedu_service_libs.error_handling import register_error_handlers
 from api.service_api import service_bp
-from di import make_container
+from di import create_di_container
 
 def setup_service(app: Quart) -> None:
     # Setup DI container
-    container = make_container()
+    container = create_di_container()
     setup_dishka(container, app)
     
     # Setup service library middleware
-    setup_metrics_middleware(app)
-    error_handler_middleware(app)
+    setup_standard_service_metrics_middleware(app, "service_name")
+    register_error_handlers(app)
     
     # Register API blueprints
     app.register_blueprint(service_bp)
@@ -122,10 +122,10 @@ def setup_service(app: Quart) -> None:
 # CORRECT API blueprint structure
 from quart import Blueprint, request, jsonify
 from dishka.integrations.quart import inject
-from huleedu_service_libs.logging_utils import get_logger
+from huleedu_service_libs.logging_utils import create_service_logger
 from protocols import ServiceProtocol
 
-logger = get_logger(__name__)
+logger = create_service_logger(__name__)
 service_bp = Blueprint("service", __name__, url_prefix="/v1")
 
 @service_bp.route("/endpoint", methods=["POST"])
@@ -137,14 +137,16 @@ async def handle_request(service: ServiceProtocol):
         
         logger.info(
             "Request processed successfully",
-            extra={"endpoint": "/endpoint", "correlation_id": request.correlation_id}
+            endpoint="/endpoint",
+            correlation_id=getattr(request, 'correlation_id', None)
         )
         
         return jsonify(result.dict())
     except Exception as e:
         logger.error(
             "Request processing failed",
-            extra={"endpoint": "/endpoint", "error": str(e)},
+            endpoint="/endpoint",
+            error=str(e),
             exc_info=True
         )
         raise
@@ -157,11 +159,11 @@ async def handle_request(service: ServiceProtocol):
 # CORRECT worker.py structure
 import asyncio
 import signal
-from huleedu_service_libs.logging_utils import get_logger
-from di import make_container
+from huleedu_service_libs.logging_utils import create_service_logger
+from di import create_di_container
 from protocols import EventProcessorProtocol
 
-logger = get_logger(__name__)
+logger = create_service_logger(__name__)
 
 class WorkerService:
     def __init__(self, event_processor: EventProcessorProtocol):
@@ -185,7 +187,7 @@ class WorkerService:
         self.running = False
 
 async def main():
-    container = make_container()
+    container = create_di_container()
     async with container() as request_container:
         event_processor = await request_container.get(EventProcessorProtocol)
         worker = WorkerService(event_processor)

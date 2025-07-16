@@ -59,6 +59,8 @@ async def update_comparison_result(
         result = await session.execute(stmt)
         comparison_pair = result.scalar_one_or_none()
 
+        # DEBUG: Temporarily removed debug output
+
         if comparison_pair is None:
             return None
 
@@ -142,6 +144,14 @@ async def update_comparison_result(
                     comparison_pair=comparison_pair,
                     correlation_id=correlation_id,
                 )
+
+        # Update batch state aggregation counters - CRITICAL FOR BATCH COMPLETION TRACKING
+        await _update_batch_completion_counters(
+            session=session,
+            batch_id=comparison_pair.cj_batch_id,
+            is_error=comparison_result.is_error,
+            correlation_id=correlation_id,
+        )
 
         await session.commit()
         return comparison_pair.cj_batch_id
@@ -440,3 +450,54 @@ async def handle_successful_retry(
             exc_info=True,
         )
         # Don't re-raise - we don't want to fail the callback processing
+
+
+async def _update_batch_completion_counters(
+    session: AsyncSession,
+    batch_id: int,
+    is_error: bool,
+    correlation_id: UUID,
+) -> None:
+    """Update batch state aggregation counters for callback completion.
+
+    This is CRITICAL for batch completion tracking. Updates either
+    completed_comparisons or failed_comparisons atomically.
+    """
+    from services.cj_assessment_service.models_db import CJBatchState
+
+    try:
+        # Get current batch state using the SAME session (no separate locking)
+        stmt = select(CJBatchState).where(CJBatchState.batch_id == batch_id)
+        result = await session.execute(stmt)
+        batch_state = result.scalar_one_or_none()
+
+        if not batch_state:
+            logger.error(f"Batch state not found for batch {batch_id}")
+            return
+
+        # Atomically increment the appropriate counter
+        if is_error:
+            batch_state.failed_comparisons += 1
+            logger.info(f"Batch {batch_id} failed_comparisons: {batch_state.failed_comparisons}")
+        else:
+            batch_state.completed_comparisons += 1
+            logger.info(
+                f"Batch {batch_id} completed_comparisons: {batch_state.completed_comparisons}"
+            )
+
+        # Check for partial scoring trigger (80% completion threshold)
+        if (
+            batch_state.total_comparisons > 0
+            and not batch_state.partial_scoring_triggered
+            and batch_state.completed_comparisons
+            >= batch_state.total_comparisons * batch_state.completion_threshold_pct / 100
+        ):
+            batch_state.partial_scoring_triggered = True
+            logger.info(
+                f"Batch {batch_id} partial scoring triggered at {batch_state.completion_threshold_pct}% completion"
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Failed to update batch completion counters for batch {batch_id}: {e}", exc_info=True
+        )

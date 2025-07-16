@@ -33,13 +33,13 @@ from services.cj_assessment_service.event_processor import (
     process_llm_result,
     process_single_message,
 )
+from services.cj_assessment_service.models_db import (
+    CJBatchState,
+    ComparisonPair,
+)
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
-)
-from services.cj_assessment_service.tests.fixtures.test_models_db import (
-    TestCJBatchState,
-    TestComparisonPair,
 )
 
 if TYPE_CHECKING:
@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 class TestBatchWorkflowIntegration:
     """Test complete batch processing workflow with callbacks."""
 
-    # Using real_repository fixture from database_fixtures.py
+    # Using postgres_repository fixture from database_fixtures.py
 
     # No longer needed - using real database operations
 
@@ -69,12 +69,12 @@ class TestBatchWorkflowIntegration:
     @pytest.fixture
     def test_monitor(
         self,
-        real_repository: CJRepositoryProtocol,
+        postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
     ) -> BatchMonitor:
         """Create a batch monitor instance."""
-        return BatchMonitor(real_repository, mock_event_publisher, test_settings)
+        return BatchMonitor(postgres_repository, mock_event_publisher, test_settings)
 
     def _create_assessment_request(
         self,
@@ -221,7 +221,7 @@ class TestBatchWorkflowIntegration:
 
     async def test_full_batch_lifecycle(
         self,
-        real_repository: CJRepositoryProtocol,
+        postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         mock_content_client,
         mock_llm_interaction,
@@ -250,12 +250,12 @@ class TestBatchWorkflowIntegration:
         # Patch production models to use test models for SQLite compatibility
         with patch(
             "services.cj_assessment_service.models_db.CJBatchState",
-            TestCJBatchState,
+            CJBatchState,
         ):
             # Act - Process the request
             result = await process_single_message(
                 kafka_msg,
-                real_repository,
+                postgres_repository,
                 mock_content_client,
                 mock_event_publisher,
                 mock_llm_interaction,
@@ -278,7 +278,7 @@ class TestBatchWorkflowIntegration:
 
     async def test_batch_monitoring_recovery(
         self,
-        real_repository: CJRepositoryProtocol,
+        postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_monitor: BatchMonitor,
     ) -> None:
@@ -286,16 +286,16 @@ class TestBatchWorkflowIntegration:
         # Patch production models to use test models for SQLite compatibility
         with patch(
             "services.cj_assessment_service.models_db.CJBatchState",
-            TestCJBatchState,
+            CJBatchState,
         ):
             # Arrange - Create a real stuck batch using the database
-            async with real_repository.session() as session:
+            async with postgres_repository.session() as session:
                 from datetime import timedelta
 
                 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 
                 # Create a batch that appears stuck
-                batch = await real_repository.create_new_cj_batch(
+                batch = await postgres_repository.create_new_cj_batch(
                     session=session,
                     bos_batch_id=str(uuid4()),
                     event_correlation_id=str(uuid4()),
@@ -308,7 +308,7 @@ class TestBatchWorkflowIntegration:
 
                 # Create some essays
                 for i in range(10):
-                    await real_repository.create_or_update_cj_processed_essay(
+                    await postgres_repository.create_or_update_cj_processed_essay(
                         session=session,
                         cj_batch_id=batch.id,
                         els_essay_id=f"essay-{i}",
@@ -317,7 +317,7 @@ class TestBatchWorkflowIntegration:
                     )
 
                 # Update batch state to appear stuck (simulate old activity)
-                batch_state = TestCJBatchState(
+                batch_state = CJBatchState(
                     batch_id=batch.id,
                     state=CJBatchStateEnum.WAITING_CALLBACKS,
                     total_comparisons=45,
@@ -348,85 +348,90 @@ class TestBatchWorkflowIntegration:
             # The monitor should have detected the stuck batch
             assert sleep_call_count > 0
 
+    @pytest.mark.expensive
     async def test_concurrent_callback_processing(
         self,
-        real_repository: CJRepositoryProtocol,
+        postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         mock_content_client,
         mock_llm_interaction,
         test_settings: Settings,
     ) -> None:
-        """Test race conditions with concurrent callbacks using real database."""
-        # Patch production models to use test models for SQLite compatibility
-        with patch(
-            "services.cj_assessment_service.models_db.CJBatchState",
-            TestCJBatchState,
-        ):
-            # Arrange
-            batch_id = str(uuid4())
-            correlation_id = uuid4()
-            callback_count = 100
+        """Test race conditions with concurrent callbacks using real PostgreSQL database."""
+        # No patching needed - using production models with real PostgreSQL
+        from datetime import UTC, datetime
 
-            # Create real database state instead of mocks
-            async with real_repository.session() as session:
-                from datetime import UTC, datetime
+        from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+        from services.cj_assessment_service.models_db import CJBatchState
 
-                from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+        # Arrange
+        batch_id = str(uuid4())
+        correlation_id = uuid4()
+        callback_count = 100
 
-                # Create a real batch
-                batch = await real_repository.create_new_cj_batch(
+        # Create real database state using production models
+        async with postgres_repository.session() as session:
+            # Create a real batch using production repository
+            batch = await postgres_repository.create_new_cj_batch(
+                session=session,
+                bos_batch_id=batch_id,
+                event_correlation_id=str(correlation_id),
+                language="en",
+                course_code="ENG5",
+                essay_instructions="Concurrent callback test",
+                initial_status=CJBatchStatusEnum.PENDING,
+                expected_essay_count=callback_count,
+            )
+
+            # Create essays for comparison pairs
+            essays = []
+            for i in range(callback_count):
+                essay = await postgres_repository.create_or_update_cj_processed_essay(
                     session=session,
-                    bos_batch_id=batch_id,
-                    event_correlation_id=str(correlation_id),
-                    language="en",
-                    course_code="ENG5",
-                    essay_instructions="Concurrent callback test",
-                    initial_status=CJBatchStatusEnum.PENDING,
-                    expected_essay_count=callback_count,
+                    cj_batch_id=batch.id,
+                    els_essay_id=f"essay-{i}",
+                    text_storage_id=f"storage-{i}",
+                    assessment_input_text=f"Essay content {i}",
                 )
+                essays.append(essay)
 
-                # Create essays for comparison pairs
-                essays = []
-                for i in range(callback_count):
-                    essay = await real_repository.create_or_update_cj_processed_essay(
-                        session=session,
-                        cj_batch_id=batch.id,
-                        els_essay_id=f"essay-{i}",
-                        text_storage_id=f"storage-{i}",
-                        assessment_input_text=f"Essay content {i}",
-                    )
-                    essays.append(essay)
+            # Create comparison pairs for callbacks
+            pairs = []
+            for i in range(callback_count):
+                # Create pairs using round-robin essay assignment
+                essay_a_idx = i % len(essays)
+                essay_b_idx = (i + 1) % len(essays)
 
-                # Create comparison pairs for callbacks
-                pairs = []
-                for i in range(callback_count):
-                    # Create pairs using round-robin essay assignment
-                    essay_a_idx = i % len(essays)
-                    essay_b_idx = (i + 1) % len(essays)
-
-                    pair_correlation_id = uuid4()
-                    pair = TestComparisonPair(
-                        cj_batch_id=batch.id,
-                        essay_a_els_id=essays[essay_a_idx].els_essay_id,
-                        essay_b_els_id=essays[essay_b_idx].els_essay_id,
-                        prompt_text="Compare these essays",
-                        request_correlation_id=str(pair_correlation_id),
-                        submitted_at=datetime.now(UTC),
-                    )
-                    session.add(pair)
-                    pairs.append((pair, pair_correlation_id))
-
-                # Create batch state for concurrent processing
-                batch_state = TestCJBatchState(
-                    batch_id=batch.id,
-                    state=CJBatchStateEnum.WAITING_CALLBACKS,
-                    total_comparisons=callback_count,
-                    completed_comparisons=0,
-                    submitted_comparisons=callback_count,
-                    failed_comparisons=0,
+                pair_correlation_id = uuid4()
+                pair = ComparisonPair(
+                    cj_batch_id=batch.id,
+                    essay_a_els_id=essays[essay_a_idx].els_essay_id,
+                    essay_b_els_id=essays[essay_b_idx].els_essay_id,
+                    prompt_text="Compare these essays",
+                    request_correlation_id=str(pair_correlation_id),
+                    submitted_at=datetime.now(UTC),
                 )
-                session.add(batch_state)
-                await session.commit()
+                session.add(pair)
+                pairs.append((pair, pair_correlation_id))
+
+            # Create batch state for concurrent processing
+            batch_state = CJBatchState(
+                batch_id=batch.id,
+                state=CJBatchStateEnum.WAITING_CALLBACKS,
+                total_comparisons=callback_count,
+                completed_comparisons=0,
+                submitted_comparisons=callback_count,
+                failed_comparisons=0,
+                partial_scoring_triggered=False,
+                completion_threshold_pct=80,
+                current_iteration=1,
+            )
+            session.add(batch_state)
+            await session.commit()
+
+            # Refresh to get database-assigned IDs for pairs
+            for pair, _ in pairs:
+                await session.refresh(pair)
 
             # Create callback events for all pairs
             callback_events = []
@@ -451,7 +456,7 @@ class TestBatchWorkflowIntegration:
                 task = asyncio.create_task(
                     process_llm_result(
                         kafka_msg,
-                        real_repository,
+                        postgres_repository,
                         mock_event_publisher,
                         test_settings,
                     )
@@ -468,12 +473,12 @@ class TestBatchWorkflowIntegration:
             assert len(successful_results) >= callback_count * 0.8  # At least 80% success
             assert len(failed_results) < callback_count * 0.2  # Less than 20% failures
 
-            # Verify database state reflects concurrent processing
-            async with real_repository.session() as session:
-                # Check that batch state was updated
-                batch_state_result = await session.get(TestCJBatchState, batch.id)
-                assert batch_state_result is not None
-                assert batch_state_result.completed_comparisons > 0
+        # Verify real database state reflects concurrent processing
+        async with postgres_repository.session() as session:
+            # Check that batch state was updated
+            batch_state_result = await session.get(CJBatchState, batch.id)
+            assert batch_state_result is not None
+            assert batch_state_result.completed_comparisons > 0
 
     @pytest.mark.expensive
     async def test_partial_batch_completion(
@@ -489,7 +494,7 @@ class TestBatchWorkflowIntegration:
         from datetime import UTC, datetime
 
         from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-        from services.cj_assessment_service.models_db import CJBatchState, ComparisonPair
+        from services.cj_assessment_service.models_db import CJBatchState
 
         # Arrange
         batch_id = str(uuid4())

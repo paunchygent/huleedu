@@ -3,12 +3,13 @@
 import json
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Optional
-from unittest.mock import MagicMock, patch
+from typing import AsyncGenerator, Optional
+from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from common_core import LLMProviderType
 from common_core.domain_enums import EssayComparisonWinner
@@ -24,14 +25,13 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
 )
-from services.cj_assessment_service.tests.fixtures.test_models_db import TestCJBatchState
+
+# CJBatchState import removed - not used in this test file
 
 
 @pytest.mark.integration
 class TestErrorHandlingIntegration:
     """Test error scenarios and recovery mechanisms."""
-
-
 
     def _create_callback_event(
         self,
@@ -155,253 +155,289 @@ class TestErrorHandlingIntegration:
 
     async def test_callback_for_unknown_correlation_id(
         self,
-        real_repository: CJRepositoryProtocol,
+        postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
     ) -> None:
         """Test handling of orphaned callbacks."""
-        with patch("services.cj_assessment_service.models_db.CJBatchState", TestCJBatchState):
-            # Arrange - Use a correlation_id that has no corresponding comparison pair in database
-            unknown_correlation_id = uuid4()
-            request_id = str(uuid4())
+        # Arrange - Use a correlation_id that has no corresponding comparison pair in database
+        unknown_correlation_id = uuid4()
+        request_id = str(uuid4())
 
-            callback = self._create_callback_event(
-                request_id=request_id,
-                correlation_id=unknown_correlation_id,
-                winner="essay_a",
-            )
+        callback = self._create_callback_event(
+            request_id=request_id,
+            correlation_id=unknown_correlation_id,
+            winner="essay_a",
+        )
 
-            # Create Kafka message
-            kafka_msg = self._create_kafka_message(callback, request_id)
+        # Create Kafka message
+        kafka_msg = self._create_kafka_message(callback, request_id)
 
-            # Act - Should handle gracefully without any comparison pairs in database
-            result = await process_llm_result(
-                kafka_msg,
-                real_repository,
-                mock_event_publisher,
-                test_settings,
-            )
+        # Act - Should handle gracefully without any comparison pairs in database
+        result = await process_llm_result(
+            kafka_msg,
+            postgres_repository,
+            mock_event_publisher,
+            test_settings,
+        )
 
-            # Assert - Message acknowledged but no database changes made
-            assert result is True  # Acknowledged to prevent reprocessing
-            
-            # Verify database state - should have no comparison pairs
-            async with real_repository.session() as session:
-                from sqlalchemy import select
-                from services.cj_assessment_service.tests.fixtures.test_models_db import TestComparisonPair
-                
-                result_check = await session.execute(select(TestComparisonPair))
-                comparison_pairs = result_check.scalars().all()
-                assert len(comparison_pairs) == 0  # No database changes
+        # Assert - Message acknowledged but no database changes made
+        assert result is True  # Acknowledged to prevent reprocessing
+
+        # Verify database state - should have no comparison pairs
+        async with postgres_repository.session() as session:
+            from sqlalchemy import select
+
+            from services.cj_assessment_service.models_db import ComparisonPair
+
+            result_check = await session.execute(select(ComparisonPair))
+            comparison_pairs = result_check.scalars().all()
+            assert len(comparison_pairs) == 0  # No database changes
 
     async def test_duplicate_callback_idempotency(
         self,
-        real_repository: CJRepositoryProtocol,
+        postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
     ) -> None:
         """Test idempotent handling of duplicate callbacks."""
-        with patch("services.cj_assessment_service.models_db.CJBatchState", TestCJBatchState):
-            # Arrange - Create real database setup with incomplete comparison pair
-            correlation_id = uuid4()
-            request_id = "pair-123"
+        # Arrange - Create real database setup with incomplete comparison pair
+        correlation_id = uuid4()
+        request_id = "pair-123"
+
+        # Create real database state with incomplete comparison pair
+        async with postgres_repository.session() as session:
+            from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+
+            # Create batch using repository method
+            batch = await postgres_repository.create_new_cj_batch(
+                session=session,
+                bos_batch_id=str(uuid4()),
+                event_correlation_id=str(uuid4()),
+                language="en",
+                course_code="ENG5",
+                essay_instructions="Compare essays",
+                initial_status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
+                expected_essay_count=2,
+            )
+
+            # Create essays that will be referenced by comparison pair
+            essay_a = await postgres_repository.create_or_update_cj_processed_essay(
+                session=session,
+                cj_batch_id=batch.id,
+                els_essay_id="essay-a",
+                text_storage_id="storage-a",
+                assessment_input_text="Essay A content for comparison",
+            )
             
-            # Create real database state with incomplete comparison pair
-            async with real_repository.session() as session:
-                from services.cj_assessment_service.tests.fixtures.test_models_db import (
-                    TestCJBatchUpload, TestComparisonPair
+            essay_b = await postgres_repository.create_or_update_cj_processed_essay(
+                session=session,
+                cj_batch_id=batch.id,
+                els_essay_id="essay-b", 
+                text_storage_id="storage-b",
+                assessment_input_text="Essay B content for comparison",
+            )
+
+            # Create comparison pair using SQLAlchemy model (after essays exist)
+            from services.cj_assessment_service.models_db import ComparisonPair
+            
+            comparison_pair = ComparisonPair(
+                cj_batch_id=batch.id,
+                essay_a_els_id="essay-a",
+                essay_b_els_id="essay-b",
+                prompt_text="Compare these essays",
+                request_correlation_id=str(correlation_id),
+                winner=None,  # No winner yet
+                confidence=None,
+                completed_at=None,  # Not completed yet
+            )
+            session.add(comparison_pair)
+            await session.commit()
+
+        # Create callback event
+        callback = self._create_callback_event(
+            request_id=request_id,
+            correlation_id=correlation_id,
+            winner="essay_a",
+        )
+
+        # Create Kafka message
+        kafka_msg = self._create_kafka_message(callback, request_id)
+
+        # Act - Process same callback twice to test idempotency
+        result1 = await process_llm_result(
+            kafka_msg,
+            postgres_repository,
+            mock_event_publisher,
+            test_settings,
+        )
+        result2 = await process_llm_result(
+            kafka_msg,
+            postgres_repository,
+            mock_event_publisher,
+            test_settings,
+        )
+
+        # Assert - Both processed successfully (idempotent)
+        assert result1 is True
+        assert result2 is True
+
+        # Verify database state - comparison pair was updated by first callback
+        # and idempotent behavior means second callback didn't change it
+        async with postgres_repository.session() as session:
+            from sqlalchemy import select
+
+            from services.cj_assessment_service.models_db import ComparisonPair
+
+            result_check = await session.execute(
+                select(ComparisonPair).where(
+                    ComparisonPair.request_correlation_id == str(correlation_id)
                 )
-                from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-                
-                # Create batch
-                batch = TestCJBatchUpload(
-                    bos_batch_id=str(uuid4()),
-                    event_correlation_id=str(uuid4()),
-                    language="en",
-                    course_code="ENG5",
-                    essay_instructions="Compare essays",
-                    status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
-                    expected_essay_count=2,
-                )
-                session.add(batch)
-                await session.flush()
-                
-                # Create incomplete comparison pair
-                comparison_pair = TestComparisonPair(
+            )
+            pair = result_check.scalar_one()
+
+            # First callback should have updated the winner, second was idempotent
+            assert pair.winner == "Essay A"  # Updated by first callback
+            assert pair.confidence == 4.2  # Updated by first callback
+            assert pair.completed_at is not None  # Marked as completed
+
+    async def test_high_failure_rate_batch_termination(
+        self,
+        postgres_repository: CJRepositoryProtocol,
+        mock_event_publisher: CJEventPublisherProtocol,
+        test_settings: Settings,
+    ) -> None:
+        """Test batch failure when error rate exceeds threshold."""
+        # Arrange - Create real database setup with multiple comparison pairs
+        batch_correlation_id = uuid4()
+
+        # Create real database state with batch and comparison pairs
+        comparison_correlation_ids = []
+        async with postgres_repository.session() as session:
+            from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+            from services.cj_assessment_service.models_db import ComparisonPair
+
+            # Create batch using repository method
+            batch = await postgres_repository.create_new_cj_batch(
+                session=session,
+                bos_batch_id=str(uuid4()),
+                event_correlation_id=str(batch_correlation_id),
+                language="en",
+                course_code="ENG5",
+                essay_instructions="Compare essays",
+                initial_status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
+                expected_essay_count=10,
+            )
+
+            # Create essays first (before comparison pairs)
+            for i in range(10):
+                await postgres_repository.create_or_update_cj_processed_essay(
+                    session=session,
                     cj_batch_id=batch.id,
-                    essay_a_els_id="essay-a",
-                    essay_b_els_id="essay-b", 
+                    els_essay_id=f"essay-a-{i}",
+                    text_storage_id=f"storage-a-{i}",
+                    assessment_input_text=f"Essay A content {i}",
+                )
+                await postgres_repository.create_or_update_cj_processed_essay(
+                    session=session,
+                    cj_batch_id=batch.id,
+                    els_essay_id=f"essay-b-{i}",
+                    text_storage_id=f"storage-b-{i}",
+                    assessment_input_text=f"Essay B content {i}",
+                )
+
+            # Create 10 comparison pairs (no winners yet)
+            for i in range(10):
+                pair_correlation_id = uuid4()
+                comparison_correlation_ids.append(pair_correlation_id)
+
+                comparison_pair = ComparisonPair(
+                    cj_batch_id=batch.id,
+                    essay_a_els_id=f"essay-a-{i}",
+                    essay_b_els_id=f"essay-b-{i}",
                     prompt_text="Compare these essays",
-                    request_correlation_id=str(correlation_id),
+                    request_correlation_id=str(pair_correlation_id),
                     winner=None,  # No winner yet
                     confidence=None,
                     completed_at=None,  # Not completed yet
                 )
                 session.add(comparison_pair)
-                await session.commit()
 
-            # Create callback event
+            await session.commit()
+
+        # Test scenario: Process 10 callbacks, 5 success and 5 failures
+        # Create success callbacks (first 5)
+        success_results = []
+        for i in range(5):
             callback = self._create_callback_event(
-                request_id=request_id,
-                correlation_id=correlation_id,
+                request_id=f"pair-{i}",
+                correlation_id=comparison_correlation_ids[i],
                 winner="essay_a",
             )
+            kafka_msg = self._create_kafka_message(callback, f"pair-{i}")
 
-            # Create Kafka message
-            kafka_msg = self._create_kafka_message(callback, request_id)
-
-            # Act - Process same callback twice to test idempotency
-            result1 = await process_llm_result(
+            result = await process_llm_result(
                 kafka_msg,
-                real_repository,
+                postgres_repository,
                 mock_event_publisher,
                 test_settings,
             )
-            result2 = await process_llm_result(
+            success_results.append(result)
+
+        # Create error callbacks (next 5)
+        error_results = []
+        for i in range(5, 10):
+            error_callback = self._create_error_callback(
+                request_id=f"pair-{i}",
+                correlation_id=comparison_correlation_ids[i],
+                error_code="PROVIDER_ERROR",
+            )
+            kafka_msg = self._create_kafka_message(error_callback, f"pair-{i}")
+
+            result = await process_llm_result(
                 kafka_msg,
-                real_repository,
+                postgres_repository,
                 mock_event_publisher,
                 test_settings,
             )
+            error_results.append(result)
 
-            # Assert - Both processed successfully (idempotent)
-            assert result1 is True
-            assert result2 is True
+        # Assert - All callbacks processed (acknowledged)
+        assert all(result is True for result in success_results)
+        assert all(result is True for result in error_results)
 
-            # Verify database state - comparison pair exists but processing was gracefully handled
-            # Note: Due to model compatibility between test and production models,
-            # the callback handler currently cannot find the test comparison pairs,
-            # but it gracefully handles the "not found" case by returning True (acknowledged)
-            async with real_repository.session() as session:
-                from sqlalchemy import select
-                from services.cj_assessment_service.tests.fixtures.test_models_db import TestComparisonPair
-                
-                result_check = await session.execute(
-                    select(TestComparisonPair).where(
-                        TestComparisonPair.request_correlation_id == str(correlation_id)
-                    )
-                )
-                pair = result_check.scalar_one()
-                
-                # Comparison pair exists and maintains original state (not updated due to model mismatch)
-                assert pair.winner is None  # Not updated due to model compatibility issue
-                assert pair.completed_at is None  # Not updated due to model compatibility issue  
-                assert pair.confidence is None  # Not updated due to model compatibility issue
+        # Verify real database state - all comparison pairs exist but processing was gracefully
+        # handled
+        # Note: Due to model compatibility between test and production models,
+        # the callback handler currently cannot find the test comparison pairs,
+        # but it gracefully handles callbacks by returning True (acknowledged)
+        async with postgres_repository.session() as session:
+            from sqlalchemy import select
 
-    async def test_high_failure_rate_batch_termination(
-        self,
-        real_repository: CJRepositoryProtocol,
-        mock_event_publisher: CJEventPublisherProtocol,
-        test_settings: Settings,
-    ) -> None:
-        """Test batch failure when error rate exceeds threshold."""
-        with patch("services.cj_assessment_service.models_db.CJBatchState", TestCJBatchState):
-            # Arrange - Create real database setup with multiple comparison pairs
-            batch_correlation_id = uuid4()
-            
-            # Create real database state with batch and comparison pairs
-            comparison_correlation_ids = []
-            async with real_repository.session() as session:
-                from services.cj_assessment_service.tests.fixtures.test_models_db import (
-                    TestCJBatchUpload, TestComparisonPair
-                )
-                from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-                
-                # Create batch
-                batch = TestCJBatchUpload(
-                    bos_batch_id=str(uuid4()),
-                    event_correlation_id=str(batch_correlation_id),
-                    language="en",
-                    course_code="ENG5",
-                    essay_instructions="Compare essays",
-                    status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
-                    expected_essay_count=10,
-                )
-                session.add(batch)
-                await session.flush()
-                
-                # Create 10 comparison pairs (no winners yet)
-                for i in range(10):
-                    pair_correlation_id = uuid4()
-                    comparison_correlation_ids.append(pair_correlation_id)
-                    
-                    comparison_pair = TestComparisonPair(
-                        cj_batch_id=batch.id,
-                        essay_a_els_id=f"essay-a-{i}",
-                        essay_b_els_id=f"essay-b-{i}",
-                        prompt_text="Compare these essays",
-                        request_correlation_id=str(pair_correlation_id),
-                        winner=None,  # No winner yet
-                        confidence=None,
-                        completed_at=None,  # Not completed yet
-                    )
-                    session.add(comparison_pair)
-                    
-                await session.commit()
+            from services.cj_assessment_service.models_db import ComparisonPair
 
-            # Test scenario: Process 10 callbacks, 5 success and 5 failures
-            # Create success callbacks (first 5)
-            success_results = []
-            for i in range(5):
-                callback = self._create_callback_event(
-                    request_id=f"pair-{i}",
-                    correlation_id=comparison_correlation_ids[i],
-                    winner="essay_a",
-                )
-                kafka_msg = self._create_kafka_message(callback, f"pair-{i}")
-                
-                result = await process_llm_result(
-                    kafka_msg,
-                    real_repository,
-                    mock_event_publisher,
-                    test_settings,
-                )
-                success_results.append(result)
+            # Verify all 10 comparison pairs were created for this specific batch
+            batch_pairs = await session.execute(
+                select(ComparisonPair).where(ComparisonPair.cj_batch_id == batch.id)
+            )
+            batch_pairs_list = batch_pairs.scalars().all()
+            assert len(batch_pairs_list) == 10
 
-            # Create error callbacks (next 5)
-            error_results = []
-            for i in range(5, 10):
-                error_callback = self._create_error_callback(
-                    request_id=f"pair-{i}",
-                    correlation_id=comparison_correlation_ids[i],
-                    error_code="PROVIDER_ERROR",
-                )
-                kafka_msg = self._create_kafka_message(error_callback, f"pair-{i}")
-                
-                result = await process_llm_result(
-                    kafka_msg,
-                    real_repository,
-                    mock_event_publisher,
-                    test_settings,
-                )
-                error_results.append(result)
-
-            # Assert - All callbacks processed (acknowledged)
-            assert all(result is True for result in success_results)
-            assert all(result is True for result in error_results)
-
-            # Verify real database state - all comparison pairs exist but processing was gracefully handled
-            # Note: Due to model compatibility between test and production models,
-            # the callback handler currently cannot find the test comparison pairs,
-            # but it gracefully handles callbacks by returning True (acknowledged)
-            async with real_repository.session() as session:
-                from sqlalchemy import select
-                from services.cj_assessment_service.tests.fixtures.test_models_db import TestComparisonPair
-                
-                # Verify all 10 comparison pairs were created
-                all_pairs = await session.execute(select(TestComparisonPair))
-                all_pairs_list = all_pairs.scalars().all()
-                assert len(all_pairs_list) == 10
-                
-                # All pairs maintain original state (not updated due to model compatibility issue)
-                for pair in all_pairs_list:
-                    assert pair.winner is None  # Not updated due to model compatibility issue
-                    assert pair.completed_at is None  # Not updated due to model compatibility issue
-                    assert pair.confidence is None  # Not updated due to model compatibility issue
+            # Verify callbacks processed correctly:
+            # First 5 pairs: success callbacks, Last 5 pairs: error callbacks
+            for i, pair in enumerate(batch_pairs_list):
+                if i < 5:  # First 5 pairs had success callbacks
+                    assert pair.winner == "Essay A"  # Updated by success callback
+                    assert pair.confidence == 4.2  # Updated by success callback
+                    assert pair.completed_at is not None  # Marked as completed
+                else:  # Last 5 pairs had error callbacks
+                    assert pair.winner == "error"  # Updated with error state
+                    assert pair.error_code is not None  # Error code recorded
+                    assert pair.completed_at is not None  # Marked as completed with error
 
     async def test_malformed_callback_message(
         self,
-        real_repository: CJRepositoryProtocol,
+        postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
     ) -> None:
@@ -418,22 +454,22 @@ class TestErrorHandlingIntegration:
         kafka_msg.value = b"invalid json content"
 
         # Track database session creation to verify no calls
-        original_session = real_repository.session
+        original_session = postgres_repository.session
         session_call_count = 0
 
         @asynccontextmanager
-        async def tracked_session():
+        async def tracked_session() -> AsyncGenerator[AsyncSession, None]:
             nonlocal session_call_count
             session_call_count += 1
             async with original_session() as session:
                 yield session
 
-        real_repository.session = tracked_session
+        postgres_repository.session = tracked_session  # type: ignore[method-assign]
 
         # Act - Process malformed message
         result = await process_llm_result(
             kafka_msg,
-            real_repository,
+            postgres_repository,
             mock_event_publisher,
             test_settings,
         )
@@ -447,11 +483,11 @@ class TestErrorHandlingIntegration:
         )
 
         # Restore original session method
-        real_repository.session = original_session
+        postgres_repository.session = original_session  # type: ignore[method-assign]
 
     async def test_database_connection_failure(
         self,
-        real_repository: CJRepositoryProtocol,
+        postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
     ) -> None:
@@ -470,15 +506,15 @@ class TestErrorHandlingIntegration:
         )
 
         # Make repository session creation fail
-        original_session = real_repository.session
+        original_session = postgres_repository.session
 
         @asynccontextmanager
-        async def failing_session():
+        async def failing_session() -> AsyncGenerator[AsyncSession, None]:
             raise Exception("Database connection failed")
             # This yield is unreachable but needed for syntax
             yield  # pragma: no cover
 
-        real_repository.session = failing_session
+        postgres_repository.session = failing_session  # type: ignore[method-assign]
 
         # Create Kafka message
         kafka_msg = self._create_kafka_message(callback, request_id)
@@ -486,7 +522,7 @@ class TestErrorHandlingIntegration:
         # Act - Process callback with database failure
         result = await process_llm_result(
             kafka_msg,
-            real_repository,
+            postgres_repository,
             mock_event_publisher,
             test_settings,
         )
@@ -495,14 +531,14 @@ class TestErrorHandlingIntegration:
         assert result is True
 
         # Restore original session method
-        real_repository.session = original_session
+        postgres_repository.session = original_session  # type: ignore[method-assign]
 
         # Verify error was logged (in a real scenario)
         # The error would be logged by the error handling in process_llm_result
 
     async def test_event_publishing_failure(
         self,
-        real_repository: CJRepositoryProtocol,
+        postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
     ) -> None:
@@ -517,11 +553,11 @@ class TestErrorHandlingIntegration:
         batch_id = str(uuid4())
 
         # Create real batch and comparison pair in database
-        async with real_repository.session() as session:
+        async with postgres_repository.session() as session:
             from services.cj_assessment_service.models_db import ComparisonPair
 
             # Create batch
-            batch = await real_repository.create_new_cj_batch(
+            batch = await postgres_repository.create_new_cj_batch(
                 session=session,
                 bos_batch_id=batch_id,
                 event_correlation_id=str(correlation_id),
@@ -532,13 +568,30 @@ class TestErrorHandlingIntegration:
                 expected_essay_count=2,
             )
 
-            # Create comparison pair directly (simulates existing workflow state)
+            # Create essays BEFORE comparison pair (foreign key requirement)
+            await postgres_repository.create_or_update_cj_processed_essay(
+                session=session,
+                cj_batch_id=batch.id,
+                els_essay_id="essay-a",
+                text_storage_id="storage-a",
+                assessment_input_text="Essay A content for comparison",
+            )
+
+            await postgres_repository.create_or_update_cj_processed_essay(
+                session=session,
+                cj_batch_id=batch.id,
+                els_essay_id="essay-b",
+                text_storage_id="storage-b",
+                assessment_input_text="Essay B content for comparison",
+            )
+
+            # Create comparison pair after essays exist (foreign key satisfied)
             comparison_pair = ComparisonPair(
                 cj_batch_id=batch.id,
                 essay_a_els_id="essay-a",
                 essay_b_els_id="essay-b",
                 prompt_text="Compare these essays",
-                request_correlation_id=correlation_id,
+                request_correlation_id=str(correlation_id),
                 winner=None,  # Not yet completed
                 completed_at=None,
             )
@@ -553,7 +606,7 @@ class TestErrorHandlingIntegration:
         )
 
         # Mock event publisher to fail
-        mock_event_publisher.publish_assessment_completed.side_effect = Exception(
+        mock_event_publisher.publish_assessment_completed.side_effect = Exception(  # type: ignore[attr-defined]
             "Kafka publish failed"
         )
 
@@ -563,7 +616,7 @@ class TestErrorHandlingIntegration:
         # Act - Process callback with publishing failure
         result = await process_llm_result(
             kafka_msg,
-            real_repository,
+            postgres_repository,
             mock_event_publisher,
             test_settings,
         )
@@ -572,7 +625,7 @@ class TestErrorHandlingIntegration:
         assert result is True
 
         # Verify database operations completed successfully
-        async with real_repository.session() as session:
+        async with postgres_repository.session() as session:
             from sqlalchemy import select
 
             # Check that the comparison pair was updated with winner

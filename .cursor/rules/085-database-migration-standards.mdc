@@ -9,27 +9,31 @@ alwaysApply: true
 
 **Before ANY migration, MUST check state:**
 ```bash
-pdm run -p services/<service> migrate-current
+cd services/<service> && ../../.venv/bin/alembic current
 docker exec huleedu_<service>_db psql -U ${HULEEDU_DB_USER} -d <db> -c "\dt"
 ```
 
 ## 2. State Scenarios
 
-**Schema exists, no tracking:** `migrate-stamp <revision>` then `migrate-upgrade`
-**Clean state:** Direct `migrate-upgrade`
+**Schema exists, no tracking:** `../../.venv/bin/alembic stamp <revision>` then `../../.venv/bin/alembic upgrade head`
+**Clean state:** Direct `../../.venv/bin/alembic upgrade head`
 
 ## 3. Migration Commands (REQUIRED)
 
-**Use service-specific PDM scripts only:**
+**Use monorepo venv directly from service directory:**
 ```bash
-pdm run -p services/<service> migrate-upgrade
-pdm run -p services/<service> migrate-current
-pdm run -p services/<service> migrate-stamp <revision>
+cd services/<service>
+../../.venv/bin/alembic upgrade head
+../../.venv/bin/alembic current
+../../.venv/bin/alembic stamp <revision>
+../../.venv/bin/alembic revision --autogenerate -m "description"
 ```
 
 ## 4. Prohibited Practices
 
 **FORBIDDEN:**
+- PDM service-specific commands (`pdm run -p services/<service>`)
+- Service-specific venv usage
 - PYTHONPATH hacks
 - Manual SQL schema changes
 - Applying migrations without state analysis
@@ -39,7 +43,7 @@ pdm run -p services/<service> migrate-stamp <revision>
 
 **MUST verify after migration:**
 ```bash
-pdm run -p services/<service> migrate-current
+cd services/<service> && ../../.venv/bin/alembic current
 docker exec huleedu_<service>_db psql -U ${HULEEDU_DB_USER} -d <db> -c "\d <table>"
 ```
 

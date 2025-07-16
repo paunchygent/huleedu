@@ -7,6 +7,7 @@ inclusion: always
 ## HTTP Service Pattern (Quart-based)
 
 ### Standard HTTP Service Structure
+
 ```python
 # app.py - Service entry point
 from quart import Quart
@@ -20,6 +21,7 @@ if __name__ == "__main__":
 ```
 
 ### Blueprint Pattern for APIs
+
 ```python
 # api/content_api.py
 from quart import Blueprint, request, jsonify
@@ -35,15 +37,16 @@ async def store_content(content_service: ContentServiceProtocol):
 ```
 
 ### Startup Setup Pattern
+
 ```python
 # startup_setup.py
 from dishka.integrations.quart import setup_dishka
-from huleedu_service_libs.metrics import setup_metrics_middleware
+from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
 
 def setup_service(app: Quart) -> None:
-    container = make_container()
+    container = create_di_container()
     setup_dishka(container, app)
-    setup_metrics_middleware(app)
+    setup_standard_service_metrics_middleware(app, "service_name")
     # Register blueprints
     app.register_blueprint(content_bp)
 ```
@@ -51,13 +54,14 @@ def setup_service(app: Quart) -> None:
 ## Kafka Worker Pattern
 
 ### Worker Service Structure
+
 ```python
 # worker.py
 import asyncio
 import signal
-from huleedu_service_libs.logging_utils import get_logger
+from huleedu_service_libs.logging_utils import create_service_logger
 
-logger = get_logger(__name__)
+logger = create_service_logger(__name__)
 
 class WorkerService:
     def __init__(self, event_processor: EventProcessorProtocol):
@@ -67,21 +71,22 @@ class WorkerService:
     async def start(self):
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
-        
+
         try:
             await self.event_processor.start_processing()
         except Exception as e:
-            logger.critical(f"Worker failed to start: {e}")
+            logger.critical("Worker failed to start", error=str(e), exc_info=True)
             raise
 
     def _signal_handler(self, signum, frame):
-        logger.info(f"Received signal {signum}, shutting down...")
+        logger.info("Received shutdown signal", signal=signum)
         self.running = False
 ```
 
 ## Configuration Pattern
 
 ### Pydantic Settings
+
 ```python
 # config.py
 from pydantic import BaseSettings, Field
@@ -91,7 +96,7 @@ class ServiceConfig(BaseSettings):
     port: int = Field(default=8001, env="PORT")
     kafka_bootstrap_servers: str = Field(env="KAFKA_BOOTSTRAP_SERVERS")
     database_url: str = Field(env="DATABASE_URL")
-    
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -100,6 +105,7 @@ class ServiceConfig(BaseSettings):
 ## Error Handling Patterns
 
 ### Structured Error Responses
+
 ```python
 from huleedu_service_libs.error_handling import ServiceError, ErrorCode
 
@@ -113,8 +119,9 @@ class ContentNotFoundError(ServiceError):
 ```
 
 ### Circuit Breaker Pattern
+
 ```python
-from huleedu_service_libs.circuit_breaker import CircuitBreaker
+from huleedu_service_libs.resilience import circuit_breaker
 
 @circuit_breaker(failure_threshold=5, timeout=30)
 async def call_external_service():

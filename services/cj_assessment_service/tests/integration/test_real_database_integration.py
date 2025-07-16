@@ -3,7 +3,7 @@ Integration tests using real database implementations.
 
 This demonstrates the proper way to do integration testing:
 - Real database operations with SQLAlchemy
-- Real repository implementation 
+- Real repository implementation
 - Proper test isolation with transaction rollback
 - Mock only external boundaries (Content, LLM, Kafka)
 """
@@ -99,7 +99,7 @@ class TestRealDatabaseIntegration:
     ) -> ConsumerRecord:
         """Create a Kafka ConsumerRecord from an envelope."""
         from unittest.mock import MagicMock
-        
+
         message_value = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
         kafka_msg = MagicMock(spec=ConsumerRecord)
         kafka_msg.topic = topic
@@ -112,9 +112,10 @@ class TestRealDatabaseIntegration:
         kafka_msg.headers = []
         return kafka_msg
 
+    @pytest.mark.expensive
     async def test_full_batch_lifecycle_with_real_database(
         self,
-        real_repository: CJRepositoryProtocol,
+        postgres_repository: CJRepositoryProtocol,
         mock_content_client: ContentClientProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         mock_llm_interaction: LLMInteractionProtocol,
@@ -144,7 +145,7 @@ class TestRealDatabaseIntegration:
         # Act - Process the request using real database
         result = await process_single_message(
             kafka_msg,
-            real_repository,
+            postgres_repository,
             mock_content_client,
             mock_event_publisher,
             mock_llm_interaction,
@@ -155,9 +156,9 @@ class TestRealDatabaseIntegration:
         assert result is True
 
         # Verify database operations occurred
-        async with real_repository.session() as session:
+        async with postgres_repository.session() as session:
             # Verify batch was created
-            batches = await real_repository.get_essays_for_cj_batch(session, 1)
+            batches = await postgres_repository.get_essays_for_cj_batch(session, 1)
             assert len(batches) == essay_count
 
             # Verify essays were stored
@@ -177,19 +178,19 @@ class TestRealDatabaseIntegration:
 
     async def test_database_isolation_between_tests(
         self,
-        real_repository: CJRepositoryProtocol,
+        postgres_repository: CJRepositoryProtocol,
         db_verification_helpers,
     ) -> None:
         """Test that database transactions are properly isolated between tests."""
         # This test should start with a clean database
-        async with real_repository.session() as session:
+        async with postgres_repository.session() as session:
             # Verify no data leakage from previous tests
             assert await db_verification_helpers.verify_no_data_leakage(session)
 
             # Create some test data
             from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 
-            batch = await real_repository.create_new_cj_batch(
+            batch = await postgres_repository.create_new_cj_batch(
                 session=session,
                 bos_batch_id=str(uuid4()),
                 event_correlation_id=str(uuid4()),
@@ -280,17 +281,17 @@ class TestRealDatabaseIntegration:
         """Test that content client mock provides realistic data."""
         # Test the content client mock behavior
         correlation_id = uuid4()
-        
+
         # Test different storage IDs
         content_1 = await mock_content_client.fetch_content("storage-1", correlation_id)
         content_2 = await mock_content_client.fetch_content("storage-2", correlation_id)
         content_3 = await mock_content_client.fetch_content("storage-same", correlation_id)
-        
+
         # Verify content is returned and varies by storage ID
         assert content_1 != content_2
         assert len(content_1) > 50  # Realistic essay length
         assert len(content_2) > 50
-        
+
         # Same storage ID should return same content
         content_same = await mock_content_client.fetch_content("storage-same", correlation_id)
         assert content_3 == content_same
@@ -301,19 +302,11 @@ class TestRealDatabaseIntegration:
     ) -> None:
         """Test that LLM interaction mock uses all parameters meaningfully."""
         from services.cj_assessment_service.models_api import ComparisonTask, EssayForComparison
-        
+
         # Create mock tasks with proper model structure
-        essay_a = EssayForComparison(
-            id="essay-1",
-            text_content="Content A",
-            current_bt_score=None
-        )
-        essay_b = EssayForComparison(
-            id="essay-2", 
-            text_content="Content B",
-            current_bt_score=None
-        )
-        
+        essay_a = EssayForComparison(id="essay-1", text_content="Content A", current_bt_score=None)
+        essay_b = EssayForComparison(id="essay-2", text_content="Content B", current_bt_score=None)
+
         tasks = [
             ComparisonTask(
                 essay_a=essay_a,
@@ -321,15 +314,15 @@ class TestRealDatabaseIntegration:
                 prompt="Compare these essays",
             )
         ]
-        
+
         correlation_id = uuid4()
-        
+
         # Test with different parameters
         results_default = await mock_llm_interaction.perform_comparisons(
             tasks=tasks,
             correlation_id=correlation_id,
         )
-        
+
         results_with_overrides = await mock_llm_interaction.perform_comparisons(
             tasks=tasks,
             correlation_id=correlation_id,
@@ -337,22 +330,22 @@ class TestRealDatabaseIntegration:
             temperature_override=0.8,
             max_tokens_override=500,
         )
-        
+
         # Verify results are different based on parameters
         assert len(results_default) == 1
         assert len(results_with_overrides) == 1
-        
+
         # The mock should use parameters to influence results
         # (confidence, winner selection, etc.)
         result_default = results_default[0]
         result_override = results_with_overrides[0]
-        
+
         # Both should have assessments
         assert result_default.llm_assessment is not None
         assert result_override.llm_assessment is not None
-        
+
         # Parameters should influence the results in some way
-        # (This is verified by the fact that different parameters produce 
+        # (This is verified by the fact that different parameters produce
         # deterministic but different results based on the hash)
         assert result_default.llm_assessment.confidence > 0
         assert result_override.llm_assessment.confidence > 0

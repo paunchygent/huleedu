@@ -49,19 +49,17 @@ batch_size_gauge = Gauge(
 
 ### Structured Logging Pattern
 ```python
-from huleedu_service_libs.logging_utils import get_logger
+from huleedu_service_libs.logging_utils import create_service_logger
 
-logger = get_logger(__name__)
+logger = create_service_logger(__name__)
 
-# Standard log format with correlation ID
+# Standard log format with correlation ID (use keyword arguments, not extra={})
 logger.info(
     "Processing essay",
-    extra={
-        "essay_id": essay.id,
-        "batch_id": batch.id,
-        "processing_phase": "spellcheck",
-        "correlation_id": correlation_id
-    }
+    essay_id=essay.id,
+    batch_id=batch.id,
+    processing_phase="spellcheck",
+    correlation_id=correlation_id
 )
 ```
 
@@ -72,12 +70,10 @@ try:
 except Exception as e:
     logger.error(
         "Essay processing failed",
-        extra={
-            "essay_id": essay.id,
-            "error_type": type(e).__name__,
-            "error_message": str(e),
-            "correlation_id": correlation_id
-        },
+        essay_id=essay.id,
+        error_type=type(e).__name__,
+        error_message=str(e),
+        correlation_id=correlation_id,
         exc_info=True
     )
     raise
@@ -87,31 +83,39 @@ except Exception as e:
 
 ### Standard Health Endpoint
 ```python
-from quart import Blueprint, jsonify
-from huleedu_service_libs.health import HealthChecker
+from quart import Blueprint, jsonify, current_app
+from huleedu_service_libs.database import DatabaseHealthChecker
+from datetime import datetime
 
 health_bp = Blueprint("health", __name__)
 
 @health_bp.route("/healthz")
 async def health_check():
-    health_checker = HealthChecker()
+    """Standard health check endpoint using service library utilities."""
     
-    # Check dependencies
-    db_healthy = await health_checker.check_database()
-    kafka_healthy = await health_checker.check_kafka()
-    redis_healthy = await health_checker.check_redis()
+    # Use the type-safe HuleEduApp to access guaranteed infrastructure
+    engine = current_app.database_engine  # Guaranteed to exist
     
-    status = "healthy" if all([db_healthy, kafka_healthy, redis_healthy]) else "unhealthy"
+    # Create health checker with database engine
+    health_checker = DatabaseHealthChecker(engine, "service_name")
     
-    return jsonify({
-        "status": status,
-        "dependencies": {
-            "database": "healthy" if db_healthy else "unhealthy",
-            "kafka": "healthy" if kafka_healthy else "unhealthy",
-            "redis": "healthy" if redis_healthy else "unhealthy"
-        },
-        "timestamp": datetime.utcnow().isoformat()
-    })
+    try:
+        # Get comprehensive health summary
+        health_summary = await health_checker.get_health_summary()
+        
+        # Add service-specific health checks
+        health_summary["timestamp"] = datetime.utcnow().isoformat()
+        health_summary["service_version"] = "1.0.0"
+        
+        status_code = 200 if health_summary["overall_status"] == "healthy" else 503
+        return jsonify(health_summary), status_code
+        
+    except Exception as e:
+        return jsonify({
+            "overall_status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }), 503
 ```
 
 ## Distributed Tracing
