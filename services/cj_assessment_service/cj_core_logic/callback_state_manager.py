@@ -55,9 +55,7 @@ async def update_comparison_result(
     """
     async with database.session() as session:
         # Find comparison pair by request correlation ID
-        stmt = select(ComparisonPair).where(
-            ComparisonPair.request_correlation_id == UUID(comparison_result.request_id)
-        )
+        stmt = select(ComparisonPair).where(ComparisonPair.request_correlation_id == correlation_id)
         result = await session.execute(stmt)
         comparison_pair = result.scalar_one_or_none()
 

@@ -1,30 +1,23 @@
 """Integration tests for error handling and recovery scenarios."""
 
 import json
-from datetime import datetime, UTC
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
 
-from common_core.domain_enums import CourseCode
+from common_core import LLMProviderType
+from common_core.domain_enums import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
-from common_core.event_enums import ProcessingEvent
-from common_core.events.cj_assessment_events import (
-    CJAssessmentFailedV1,
-    ELS_CJAssessmentRequestV1,
-)
 from common_core.events.envelope import EventEnvelope
-from common_core.events.llm_provider_events import LLMComparisonResultV1
-from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1, SystemProcessingMetadata
+from common_core.events.llm_provider_events import LLMComparisonResultV1, TokenUsage
 from common_core.models.error_models import ErrorDetail
-from common_core.status_enums import BatchStatus, CJBatchStateEnum, ProcessingStage
+from common_core.status_enums import CJBatchStateEnum
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_llm_result
-from services.cj_assessment_service.exceptions import CJAssessmentError
-from services.cj_assessment_service.models_db import ComparisonPair
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
@@ -39,7 +32,26 @@ class TestErrorHandlingIntegration:
     def mock_repository(self) -> AsyncMock:
         """Create a mock repository."""
         repo = AsyncMock(spec=CJRepositoryProtocol)
-        repo.session = AsyncMock()
+
+        # Create a mock session that supports async context manager protocol
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        # Set up database query methods
+        mock_result = AsyncMock()
+        mock_result.scalar_one_or_none = lambda: None  # Not async
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.commit = AsyncMock()
+        mock_session.get = AsyncMock(return_value=None)
+
+        # Create async context manager that can be used directly
+        mock_context_manager = AsyncMock()
+        mock_context_manager.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+
+        # session() should return an async context manager directly (not a coroutine)
+        repo.session = MagicMock(return_value=mock_context_manager)
         return repo
 
     @pytest.fixture
@@ -54,7 +66,7 @@ class TestErrorHandlingIntegration:
     def test_settings(self) -> Settings:
         """Create test settings."""
         settings = Settings()
-        settings.MIN_SUCCESS_RATE_THRESHOLD = 0.8
+        # settings.MIN_SUCCESS_RATE_THRESHOLD = 0.8  # This field doesn't exist in Settings
         settings.SERVICE_NAME = "cj_assessment_service"
         settings.CJ_ASSESSMENT_COMPLETED_TOPIC = "huleedu.cj_assessment.completed.v1"
         settings.CJ_ASSESSMENT_FAILED_TOPIC = "huleedu.cj_assessment.failed.v1"
@@ -65,21 +77,23 @@ class TestErrorHandlingIntegration:
         request_id: str,
         correlation_id: UUID,
         winner: str,
-        confidence: float = 0.85,
+        confidence: float = 4.2,
         is_error: bool = False,
         error_detail: Optional[ErrorDetail] = None,
     ) -> EventEnvelope[LLMComparisonResultV1]:
         """Create an LLM comparison result callback event."""
-        from common_core import LLMProviderType
-        from common_core.events.llm_provider_events import ComparisonWinner, TokenUsage
-
         # Create winner enum value
         winner_enum = None
         if not is_error:
-            winner_enum = ComparisonWinner.ESSAY_A if winner == "essay_a" else ComparisonWinner.ESSAY_B
+            winner_enum = (
+                EssayComparisonWinner.ESSAY_A
+                if winner == "essay_a"
+                else EssayComparisonWinner.ESSAY_B
+            )
 
         result_data = LLMComparisonResultV1(
             request_id=request_id,
+            correlation_id=correlation_id,
             provider=LLMProviderType.ANTHROPIC,
             model="claude-3-haiku-20240307",
             winner=winner_enum,
@@ -87,12 +101,13 @@ class TestErrorHandlingIntegration:
             justification="Test justification" if not is_error else None,
             response_time_ms=1500,
             token_usage=TokenUsage(
-                input_tokens=100,
-                output_tokens=50,
+                prompt_tokens=100,
+                completion_tokens=50,
                 total_tokens=150,
             ),
             cost_estimate=0.001,
-            is_error=is_error,
+            requested_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
             error_detail=error_detail,
         )
 
@@ -116,7 +131,7 @@ class TestErrorHandlingIntegration:
         )
 
         error_detail = create_error_detail_with_context(
-            error_code=ErrorCode.PROVIDER_ERROR,
+            error_code=ErrorCode.LLM_PROVIDER_SERVICE_ERROR,
             message=f"LLM provider error: {error_code}",
             service="llm_provider_service",
             operation="generate_comparison",
@@ -149,9 +164,8 @@ class TestErrorHandlingIntegration:
 
     def _create_test_batch(
         self,
-        repository: AsyncMock,
         pair_count: int,
-        batch_id: str = None,
+        batch_id: Optional[str] = None,
     ) -> MagicMock:
         """Create a test batch with comparison pairs."""
         if batch_id is None:
@@ -195,9 +209,8 @@ class TestErrorHandlingIntegration:
             winner="essay_a",
         )
 
-        # Mock repository session
-        mock_session = AsyncMock()
-        mock_repository.session.return_value.__aenter__.return_value = mock_session
+        # Get the mock session from the fixture
+        mock_session = mock_repository.session().__aenter__.return_value
 
         # Mock comparison pair lookup to return None (not found)
         mock_session.execute.return_value.scalar_one_or_none.return_value = None
@@ -229,9 +242,8 @@ class TestErrorHandlingIntegration:
         correlation_id = uuid4()
         request_id = "pair-123"
 
-        # Mock repository session
-        mock_session = AsyncMock()
-        mock_repository.session.return_value.__aenter__.return_value = mock_session
+        # Get the mock session from the fixture
+        mock_session = mock_repository.session().__aenter__.return_value
 
         # Mock comparison pair that's already completed
         mock_pair = MagicMock()
@@ -288,14 +300,13 @@ class TestErrorHandlingIntegration:
     ) -> None:
         """Test batch failure when error rate exceeds threshold."""
         # Arrange
-        test_settings.MIN_SUCCESS_RATE_THRESHOLD = 0.8
+        # test_settings.MIN_SUCCESS_RATE_THRESHOLD = 0.8  # This field doesn't exist in Settings
         batch_id = str(uuid4())
         correlation_id = uuid4()
         total_pairs = 20
 
-        # Mock repository session
-        mock_session = AsyncMock()
-        mock_repository.session.return_value.__aenter__.return_value = mock_session
+        # Get the mock session from the fixture
+        mock_session = mock_repository.session().__aenter__.return_value
 
         # Mock batch state that tracks failures
         mock_batch_state = MagicMock()
@@ -322,20 +333,27 @@ class TestErrorHandlingIntegration:
 
             # Error callbacks
             error_callback = self._create_error_callback(
-                request_id=f"pair-{i+5}",
+                request_id=f"pair-{i + 5}",
                 correlation_id=correlation_id,
                 error_code="PROVIDER_ERROR",
             )
             error_callbacks.append(error_callback)
 
         # Mock comparison pairs
-        def mock_pair_lookup(query):
-            # Extract request_id from query (simplified)
+        def mock_pair_lookup(query: object) -> MagicMock:
+            # Create a comparison pair without a winner
+            mock_pair = MagicMock()
+            mock_pair.id = f"pair-{correlation_id}"
+            mock_pair.cj_batch_id = batch_id
+            mock_pair.winner = None  # No winner yet, so update will proceed
+            mock_pair.completed_at = None
+            mock_pair.request_correlation_id = correlation_id
+            
             result = MagicMock()
-            result.scalar_one_or_none.return_value = MagicMock()
+            result.scalar_one_or_none = MagicMock(return_value=mock_pair)
             return result
 
-        mock_session.execute.side_effect = mock_pair_lookup
+        mock_session.execute = AsyncMock(side_effect=mock_pair_lookup)
 
         # Act - Process all callbacks
         results = []
@@ -443,16 +461,21 @@ class TestErrorHandlingIntegration:
             winner="essay_a",
         )
 
-        # Mock repository session
-        mock_session = AsyncMock()
-        mock_repository.session.return_value.__aenter__.return_value = mock_session
+        # Get the mock session from the fixture
+        mock_session = mock_repository.session().__aenter__.return_value
 
         # Mock successful database operations
         mock_pair = MagicMock()
         mock_pair.id = request_id
+        mock_pair.cj_batch_id = str(uuid4())
         mock_pair.winner = None
         mock_pair.completed_at = None
-        mock_session.execute.return_value.scalar_one_or_none.return_value = mock_pair
+        mock_pair.request_correlation_id = correlation_id
+        
+        # Set up the execute result chain properly
+        mock_execute_result = MagicMock()
+        mock_execute_result.scalar_one_or_none = MagicMock(return_value=mock_pair)
+        mock_session.execute = AsyncMock(return_value=mock_execute_result)
 
         mock_batch_state = MagicMock()
         mock_batch_state.state = CJBatchStateEnum.COMPLETED
