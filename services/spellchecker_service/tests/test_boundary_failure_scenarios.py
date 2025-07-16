@@ -14,6 +14,7 @@ ULTRATHINK Requirements:
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from typing import Generator
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
@@ -25,6 +26,7 @@ from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
 from common_core.error_enums import ErrorCode
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
+from common_core.models.error_models import ErrorDetail
 from common_core.event_enums import ProcessingEvent
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
@@ -172,9 +174,15 @@ class TestBoundaryFailureScenarios:
         boundary_mocks["content_client"].fetch_content.return_value = "Test text with errors"
 
         # Configure result store boundary to fail connection
-        store_error = HuleEduError(MagicMock())
-        store_error.error_detail.correlation_id = correlation_id
-        store_error.error_detail.error_code = ErrorCode.CONNECTION_ERROR
+        error_detail = ErrorDetail(
+            error_code=ErrorCode.CONNECTION_ERROR,
+            message="Result store connection error for testing",
+            correlation_id=correlation_id,
+            timestamp=datetime.now(UTC),
+            service="spellchecker_service",
+            operation="test_result_store_connection_failure",
+        )
+        store_error = HuleEduError(error_detail)
         boundary_mocks["result_store"].store_content.side_effect = store_error
 
         kafka_message = self.create_valid_kafka_message(correlation_id)
@@ -267,9 +275,15 @@ class TestBoundaryFailureScenarios:
         correlation_id = uuid4()
 
         # Configure multiple boundary failures
-        content_error = HuleEduError(MagicMock())
-        content_error.error_detail.correlation_id = correlation_id
-        content_error.error_detail.error_code = ErrorCode.CONTENT_SERVICE_ERROR
+        error_detail = ErrorDetail(
+            error_code=ErrorCode.CONTENT_SERVICE_ERROR,
+            message="Content service error for testing",
+            correlation_id=correlation_id,
+            timestamp=datetime.now(UTC),
+            service="spellchecker_service",
+            operation="test_multiple_boundary_failures_cascade",
+        )
+        content_error = HuleEduError(error_detail)
         boundary_mocks["content_client"].fetch_content.side_effect = content_error
 
         # Additional failure in event publishing

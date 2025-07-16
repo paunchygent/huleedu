@@ -10,7 +10,9 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+    from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
+        BatchRetryProcessor,
+    )
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
@@ -40,7 +42,7 @@ async def continue_cj_assessment_workflow(
     database: CJRepositoryProtocol,
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
-    batch_processor: BatchProcessor | None = None,
+    retry_processor: BatchRetryProcessor | None = None,
 ) -> None:
     """Process LLM callback and continue existing workflow.
 
@@ -53,7 +55,7 @@ async def continue_cj_assessment_workflow(
         database: Database access protocol implementation
         event_publisher: Event publisher protocol implementation
         settings: Application settings
-        batch_processor: Optional batch processor for failed comparison handling
+        retry_processor: Optional retry processor for failed comparison handling
     """
     # Get business metrics
     business_metrics = get_business_metrics()
@@ -77,7 +79,8 @@ async def continue_cj_assessment_workflow(
             database=database,
             correlation_id=correlation_id,
             settings=settings,
-            batch_processor=batch_processor,
+            pool_manager=None,  # Will need proper injection
+            retry_processor=retry_processor,
         )
 
         if batch_id is None:
@@ -115,7 +118,7 @@ async def continue_cj_assessment_workflow(
                 event_publisher=event_publisher,
                 settings=settings,
                 correlation_id=correlation_id,
-                batch_processor=batch_processor,
+                retry_processor=retry_processor,
             )
         else:
             logger.info(
@@ -186,7 +189,7 @@ async def trigger_existing_workflow_continuation(
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
     correlation_id: UUID,
-    batch_processor: BatchProcessor | None = None,
+    retry_processor: BatchRetryProcessor | None = None,
 ) -> None:
     """Trigger continuation of existing workflow logic.
 
@@ -200,7 +203,7 @@ async def trigger_existing_workflow_continuation(
         event_publisher: Event publisher protocol implementation
         settings: Application settings
         correlation_id: Request correlation ID for tracing
-        batch_processor: Optional batch processor for failed comparison handling
+        retry_processor: Optional retry processor for failed comparison handling
     """
     log_extra = {
         "correlation_id": str(correlation_id),
@@ -245,7 +248,7 @@ async def trigger_existing_workflow_continuation(
             correlation_id=correlation_id,
         )
 
-        if batch_is_completing and batch_processor:
+        if batch_is_completing and retry_processor:
             logger.info(
                 f"Batch {batch_id} is completing, processing remaining failed comparisons "
                 f"for fairness",
@@ -254,7 +257,7 @@ async def trigger_existing_workflow_continuation(
 
             try:
                 # Process any remaining failed comparisons for fairness
-                remaining_result = await batch_processor.process_remaining_failed_comparisons(
+                remaining_result = await retry_processor.process_remaining_failed_comparisons(
                     cj_batch_id=batch_id,
                     correlation_id=correlation_id,
                 )

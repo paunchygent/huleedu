@@ -8,7 +8,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 if TYPE_CHECKING:
+    from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
     from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+    from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
+        BatchRetryProcessor,
+    )
     from services.cj_assessment_service.config import Settings
     from services.cj_assessment_service.models_api import (
         ComparisonTask,
@@ -16,11 +20,14 @@ if TYPE_CHECKING:
     )
     from services.cj_assessment_service.models_db import CJBatchState
     from services.cj_assessment_service.protocols import (
+        BatchProcessorProtocol,
         CJRepositoryProtocol,
         LLMInteractionProtocol,
     )
 
+from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
 from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+from services.cj_assessment_service.cj_core_logic.batch_retry_processor import BatchRetryProcessor
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import (
     ComparisonTask,
@@ -30,6 +37,7 @@ from services.cj_assessment_service.models_api import (
 )
 from services.cj_assessment_service.models_db import CJBatchState
 from services.cj_assessment_service.protocols import (
+    BatchProcessorProtocol,
     CJRepositoryProtocol,
     LLMInteractionProtocol,
 )
@@ -71,6 +79,42 @@ def batch_processor(
         database=mock_database,
         llm_interaction=mock_llm_interaction,
         settings=mock_settings,
+    )
+
+
+@pytest.fixture
+def batch_pool_manager(
+    mock_database: CJRepositoryProtocol,
+    mock_settings: Settings,
+) -> BatchPoolManager:
+    """Create BatchPoolManager instance with mocks."""
+    return BatchPoolManager(
+        database=mock_database,
+        settings=mock_settings,
+    )
+
+
+@pytest.fixture
+def mock_batch_submitter() -> AsyncMock:
+    """Create mock batch submitter protocol."""
+    return AsyncMock(spec=BatchProcessorProtocol)
+
+
+@pytest.fixture
+def batch_retry_processor(
+    mock_database: CJRepositoryProtocol,
+    mock_llm_interaction: LLMInteractionProtocol,
+    mock_settings: Settings,
+    batch_pool_manager: BatchPoolManager,
+    mock_batch_submitter: AsyncMock,
+) -> BatchRetryProcessor:
+    """Create BatchRetryProcessor instance with mocks."""
+    return BatchRetryProcessor(
+        database=mock_database,
+        llm_interaction=mock_llm_interaction,
+        settings=mock_settings,
+        pool_manager=batch_pool_manager,
+        batch_submitter=mock_batch_submitter,
     )
 
 

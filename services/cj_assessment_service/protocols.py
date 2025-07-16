@@ -6,10 +6,13 @@ enabling clean architecture and testability.
 
 from __future__ import annotations
 
-from typing import Any, AsyncContextManager, Awaitable, Callable, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, AsyncContextManager, Awaitable, Callable, Protocol, TypeVar
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+if TYPE_CHECKING:
+    from services.cj_assessment_service.cj_core_logic.batch_submission import BatchSubmissionResult
 
 T = TypeVar("T")
 
@@ -224,4 +227,71 @@ class LLMInteractionProtocol(Protocol):
         Returns:
             List of ComparisonResult objects
         """
+        ...
+
+
+class BatchProcessorProtocol(Protocol):
+    """Protocol for core batch submission orchestration."""
+
+    async def submit_comparison_batch(
+        self,
+        cj_batch_id: int,
+        comparison_tasks: list[Any],
+        correlation_id: UUID,
+        config_overrides: Any | None = None,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
+    ) -> "BatchSubmissionResult":
+        """Submit comparison batch with configurable batch size."""
+        ...
+
+    async def handle_batch_submission(
+        self,
+        cj_batch_id: int,
+        comparison_tasks: list[Any],
+        correlation_id: UUID,
+        request_data: dict[str, Any],
+    ) -> "BatchSubmissionResult":
+        """Handle batch submission with state tracking."""
+        ...
+
+
+class BatchCompletionCheckerProtocol(Protocol):
+    """Protocol for batch completion evaluation and threshold checking."""
+
+    async def check_batch_completion(
+        self,
+        cj_batch_id: int,
+        correlation_id: UUID,
+        config_overrides: Any | None = None,
+    ) -> bool:
+        """Check if batch is complete or has reached threshold."""
+        ...
+
+
+class BatchRetryProcessorProtocol(Protocol):
+    """Protocol for retry batch processing and end-of-batch fairness logic."""
+
+    async def submit_retry_batch(
+        self,
+        cj_batch_id: int,
+        correlation_id: UUID,
+        force_retry_all: bool = False,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
+    ) -> "BatchSubmissionResult | None":
+        """Submit retry batch if threshold reached."""
+        ...
+
+    async def process_remaining_failed_comparisons(
+        self,
+        cj_batch_id: int,
+        correlation_id: UUID,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
+    ) -> "BatchSubmissionResult | None":
+        """Process all remaining failed comparisons at end of batch."""
         ...

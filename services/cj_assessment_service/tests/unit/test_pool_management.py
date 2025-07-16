@@ -12,7 +12,7 @@ import pytest
 if TYPE_CHECKING:
     from unittest.mock import AsyncMock
 
-    from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+    from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
     from services.cj_assessment_service.models_api import (
         ComparisonTask,
         FailedComparisonPool,
@@ -37,7 +37,7 @@ class TestFailedComparisonPoolAdd:
     @pytest.mark.asyncio
     async def test_add_to_failed_pool_success(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
         sample_comparison_task: ComparisonTask,
         sample_batch_state: CJBatchState,
@@ -64,7 +64,7 @@ class TestFailedComparisonPoolAdd:
             mock_get_batch_state.return_value = sample_batch_state
             mock_update_metadata.return_value = None
 
-            await batch_processor.add_to_failed_pool(
+            await batch_pool_manager.add_to_failed_pool(
                 cj_batch_id=cj_batch_id,
                 comparison_task=sample_comparison_task,
                 failure_reason=failure_reason,
@@ -82,7 +82,7 @@ class TestFailedComparisonPoolAdd:
     @pytest.mark.asyncio
     async def test_add_to_failed_pool_no_batch_state(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
         sample_comparison_task: ComparisonTask,
     ) -> None:
@@ -106,7 +106,7 @@ class TestFailedComparisonPoolAdd:
             mock_get_batch_state.return_value = None
 
             with pytest.raises(DatabaseOperationError, match="Batch state not found"):
-                await batch_processor.add_to_failed_pool(
+                await batch_pool_manager.add_to_failed_pool(
                     cj_batch_id=cj_batch_id,
                     comparison_task=sample_comparison_task,
                     failure_reason=failure_reason,

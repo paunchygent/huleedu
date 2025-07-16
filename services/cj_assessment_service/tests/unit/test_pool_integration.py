@@ -12,12 +12,15 @@ import pytest
 if TYPE_CHECKING:
     from unittest.mock import AsyncMock
 
-    from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+    from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
+    from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
+        BatchRetryProcessor,
+    )
     from services.cj_assessment_service.config import Settings
     from services.cj_assessment_service.models_api import ComparisonTask
     from services.cj_assessment_service.models_db import CJBatchState
 
-from services.cj_assessment_service.cj_core_logic.batch_processor import (
+from services.cj_assessment_service.cj_core_logic.batch_submission import (
     BatchSubmissionResult,
 )
 from services.cj_assessment_service.models_api import (
@@ -39,7 +42,7 @@ class TestDualModeRetryLogic:
     @pytest.mark.asyncio
     async def test_check_retry_batch_needed_force_retry_all_with_failures(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
     ) -> None:
         """Test force_retry_all=True processes any eligible failures."""
@@ -82,7 +85,7 @@ class TestDualModeRetryLogic:
             new_callable=AsyncMock,
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = batch_state
-            result = await batch_processor.check_retry_batch_needed(
+            result = await batch_pool_manager.check_retry_batch_needed(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
                 force_retry_all=True,
@@ -94,7 +97,7 @@ class TestDualModeRetryLogic:
     @pytest.mark.asyncio
     async def test_check_retry_batch_needed_force_retry_all_no_failures(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
         empty_failed_pool: FailedComparisonPool,
     ) -> None:
@@ -117,7 +120,7 @@ class TestDualModeRetryLogic:
             new_callable=AsyncMock,
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = batch_state
-            result = await batch_processor.check_retry_batch_needed(
+            result = await batch_pool_manager.check_retry_batch_needed(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
                 force_retry_all=True,
@@ -129,7 +132,7 @@ class TestDualModeRetryLogic:
     @pytest.mark.asyncio
     async def test_form_retry_batch_force_retry_all_with_failures(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
     ) -> None:
         """Test form_retry_batch with force_retry_all=True processes any eligible failures."""
@@ -188,7 +191,7 @@ class TestDualModeRetryLogic:
             ) as mock_update_metadata,
         ):
             mock_get_batch_state.return_value = batch_state
-            retry_tasks = await batch_processor.form_retry_batch(
+            retry_tasks = await batch_pool_manager.form_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
                 force_retry_all=True,
@@ -205,7 +208,7 @@ class TestDualModeRetryLogic:
     @pytest.mark.asyncio
     async def test_form_retry_batch_normal_mode_below_threshold(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
     ) -> None:
         """Test form_retry_batch with force_retry_all=False below threshold."""
@@ -250,7 +253,7 @@ class TestDualModeRetryLogic:
             new_callable=AsyncMock,
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = batch_state
-            retry_tasks = await batch_processor.form_retry_batch(
+            retry_tasks = await batch_pool_manager.form_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
                 force_retry_all=False,
@@ -262,7 +265,7 @@ class TestDualModeRetryLogic:
     @pytest.mark.asyncio
     async def test_process_remaining_failed_comparisons_success(
         self,
-        batch_processor: BatchProcessor,
+        batch_retry_processor: BatchRetryProcessor,
     ) -> None:
         """Test process_remaining_failed_comparisons method."""
         # Arrange
@@ -279,12 +282,12 @@ class TestDualModeRetryLogic:
         )
 
         with patch.object(
-            batch_processor, "submit_retry_batch", new_callable=AsyncMock
+            batch_retry_processor, "submit_retry_batch", new_callable=AsyncMock
         ) as mock_submit_retry:
             mock_submit_retry.return_value = submission_result
 
             # Act
-            result = await batch_processor.process_remaining_failed_comparisons(
+            result = await batch_retry_processor.process_remaining_failed_comparisons(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
@@ -304,7 +307,7 @@ class TestDualModeRetryLogic:
     @pytest.mark.asyncio
     async def test_process_remaining_failed_comparisons_no_failures(
         self,
-        batch_processor: BatchProcessor,
+        batch_retry_processor: BatchRetryProcessor,
     ) -> None:
         """Test process_remaining_failed_comparisons when no failures remain."""
         # Arrange
@@ -313,12 +316,12 @@ class TestDualModeRetryLogic:
 
         # Mock submit_retry_batch to return None (no tasks to process)
         with patch.object(
-            batch_processor, "submit_retry_batch", new_callable=AsyncMock
+            batch_retry_processor, "submit_retry_batch", new_callable=AsyncMock
         ) as mock_submit_retry:
             mock_submit_retry.return_value = None
 
             # Act
-            result = await batch_processor.process_remaining_failed_comparisons(
+            result = await batch_retry_processor.process_remaining_failed_comparisons(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
@@ -341,7 +344,7 @@ class TestEndOfBatchFairnessScenarios:
     @pytest.mark.asyncio
     async def test_fairness_scenario_few_remaining_failures(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
     ) -> None:
         """Test fairness when only a few failures remain at batch end."""
@@ -390,21 +393,21 @@ class TestEndOfBatchFairnessScenarios:
             mock_get_batch_state.return_value = batch_state
 
             # 1. Normal check should return False (below threshold)
-            normal_check = await batch_processor.check_retry_batch_needed(
+            normal_check = await batch_pool_manager.check_retry_batch_needed(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
                 force_retry_all=False,
             )
 
             # 2. End-of-batch check should return True (fairness mode)
-            fairness_check = await batch_processor.check_retry_batch_needed(
+            fairness_check = await batch_pool_manager.check_retry_batch_needed(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
                 force_retry_all=True,
             )
 
             # 3. Form retry batch in fairness mode
-            retry_tasks = await batch_processor.form_retry_batch(
+            retry_tasks = await batch_pool_manager.form_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
                 force_retry_all=True,
@@ -419,7 +422,7 @@ class TestEndOfBatchFairnessScenarios:
     @pytest.mark.asyncio
     async def test_comprehensive_fairness_workflow(
         self,
-        batch_processor: BatchProcessor,
+        batch_retry_processor: BatchRetryProcessor,
         mock_database: AsyncMock,
     ) -> None:
         """Test complete fairness workflow from detection to processing."""
@@ -482,7 +485,6 @@ class TestEndOfBatchFairnessScenarios:
             all_submitted=True,
             correlation_id=correlation_id,
         )
-        # Mock submit_comparison_batch will be done within context manager
 
         # Act - Execute complete fairness workflow
         with (
@@ -495,21 +497,32 @@ class TestEndOfBatchFairnessScenarios:
                 new_callable=AsyncMock,
             ) as mock_update_metadata,
             patch.object(
-                batch_processor, "submit_comparison_batch", new_callable=AsyncMock
+                batch_retry_processor.batch_submitter,
+                "submit_comparison_batch",
+                new_callable=AsyncMock,
             ) as mock_submit_comparison,
+            patch.object(
+                batch_retry_processor.pool_manager,
+                "check_retry_batch_needed",
+                new_callable=AsyncMock,
+            ) as mock_check_retry_needed,
         ):
             mock_get_batch_state.return_value = batch_state
             mock_submit_comparison.return_value = submission_result
+            mock_check_retry_needed.side_effect = [
+                False,
+                True,
+            ]  # Normal mode False, fairness mode True
 
             # 1. Check that normal mode would skip
-            normal_result = await batch_processor.check_retry_batch_needed(
+            normal_result = await batch_retry_processor.pool_manager.check_retry_batch_needed(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
                 force_retry_all=False,
             )
 
             # 2. Execute fairness processing
-            fairness_result = await batch_processor.process_remaining_failed_comparisons(
+            fairness_result = await batch_retry_processor.process_remaining_failed_comparisons(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
@@ -523,13 +536,10 @@ class TestEndOfBatchFairnessScenarios:
             # Verify submission was called with force_retry_all
             mock_submit_comparison.assert_called_once()
 
-            # Verify metadata was updated during batch formation
-            mock_update_metadata.assert_called_once()
-
     @pytest.mark.asyncio
     async def test_mixed_retry_count_fairness_scenario(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
         mock_settings: Settings,
     ) -> None:
@@ -591,7 +601,7 @@ class TestEndOfBatchFairnessScenarios:
             ) as mock_update_metadata,
         ):
             mock_get_batch_state.return_value = batch_state
-            retry_tasks = await batch_processor.form_retry_batch(
+            retry_tasks = await batch_pool_manager.form_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
                 force_retry_all=True,

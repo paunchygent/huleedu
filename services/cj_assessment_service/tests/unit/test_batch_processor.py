@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -18,7 +18,6 @@ from services.cj_assessment_service.cj_core_logic.batch_processor import (
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.exceptions import (
     AssessmentProcessingError,
-    DatabaseOperationError,
 )
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
@@ -242,109 +241,6 @@ class TestBatchProcessor:
 
         assert "Batch submission failed" in str(exc_info.value)
         assert exc_info.value.correlation_id == correlation_id
-
-    async def test_check_batch_completion_completed_state(
-        self,
-        batch_processor: BatchProcessor,
-        sample_batch_state: CJBatchState,
-    ) -> None:
-        """Test batch completion check for completed state."""
-        # Arrange
-        cj_batch_id = 1
-        correlation_id = uuid4()
-        sample_batch_state.state = CJBatchStateEnum.COMPLETED
-
-        # Act
-        with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_processor.get_batch_state",
-            new_callable=AsyncMock,
-        ) as mock_get_batch_state:
-            mock_get_batch_state.return_value = sample_batch_state
-            is_complete = await batch_processor.check_batch_completion(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-            )
-
-        # Assert
-        assert is_complete is True
-
-    async def test_check_batch_completion_threshold_reached(
-        self,
-        batch_processor: BatchProcessor,
-        sample_batch_state: CJBatchState,
-    ) -> None:
-        """Test batch completion check with threshold reached."""
-        # Arrange
-        cj_batch_id = 1
-        correlation_id = uuid4()
-        sample_batch_state.state = CJBatchStateEnum.WAITING_CALLBACKS
-        sample_batch_state.total_comparisons = 100
-        sample_batch_state.completed_comparisons = 96  # 96% completion
-
-        # Act
-        with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_processor.get_batch_state",
-            new_callable=AsyncMock,
-        ) as mock_get_batch_state:
-            mock_get_batch_state.return_value = sample_batch_state
-            is_complete = await batch_processor.check_batch_completion(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-            )
-
-        # Assert
-        assert is_complete is True
-
-    async def test_check_batch_completion_threshold_not_reached(
-        self,
-        batch_processor: BatchProcessor,
-        sample_batch_state: CJBatchState,
-    ) -> None:
-        """Test batch completion check with threshold not reached."""
-        # Arrange
-        cj_batch_id = 1
-        correlation_id = uuid4()
-        sample_batch_state.state = CJBatchStateEnum.WAITING_CALLBACKS
-        sample_batch_state.total_comparisons = 100
-        sample_batch_state.completed_comparisons = 90  # 90% completion
-
-        # Act
-        with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_processor.get_batch_state",
-            new_callable=AsyncMock,
-        ) as mock_get_batch_state:
-            mock_get_batch_state.return_value = sample_batch_state
-            is_complete = await batch_processor.check_batch_completion(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-            )
-
-        # Assert
-        assert is_complete is False
-
-    async def test_check_batch_completion_batch_not_found(
-        self,
-        batch_processor: BatchProcessor,
-    ) -> None:
-        """Test batch completion check with batch not found."""
-        # Arrange
-        cj_batch_id = 1
-        correlation_id = uuid4()
-
-        # Act & Assert
-        with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_processor.get_batch_state",
-            new_callable=AsyncMock,
-        ) as mock_get_batch_state:
-            mock_get_batch_state.return_value = None
-            with pytest.raises(DatabaseOperationError) as exc_info:
-                await batch_processor.check_batch_completion(
-                    cj_batch_id=cj_batch_id,
-                    correlation_id=correlation_id,
-                )
-
-            assert "Batch state not found" in str(exc_info.value)
-            assert exc_info.value.correlation_id == correlation_id
 
     async def test_handle_batch_submission_with_request_data(
         self,

@@ -12,11 +12,14 @@ import pytest
 if TYPE_CHECKING:
     from unittest.mock import AsyncMock
 
-    from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+    from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
+    from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
+        BatchRetryProcessor,
+    )
     from services.cj_assessment_service.config import Settings
     from services.cj_assessment_service.models_api import ComparisonTask
 
-from services.cj_assessment_service.cj_core_logic.batch_processor import (
+from services.cj_assessment_service.cj_core_logic.batch_submission import (
     BatchSubmissionResult,
 )
 from services.cj_assessment_service.models_api import (
@@ -38,7 +41,7 @@ class TestFailedComparisonPoolRetryCheck:
     @pytest.mark.asyncio
     async def test_check_retry_batch_needed_disabled(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_settings: Settings,
     ) -> None:
         """Test retry check when retry is disabled."""
@@ -48,7 +51,7 @@ class TestFailedComparisonPoolRetryCheck:
         correlation_id = uuid4()
 
         # Act
-        result = await batch_processor.check_retry_batch_needed(
+        result = await batch_pool_manager.check_retry_batch_needed(
             cj_batch_id=cj_batch_id,
             correlation_id=correlation_id,
         )
@@ -59,7 +62,7 @@ class TestFailedComparisonPoolRetryCheck:
     @pytest.mark.asyncio
     async def test_check_retry_batch_needed_threshold_met(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
     ) -> None:
         """Test retry check when threshold is met."""
@@ -104,7 +107,7 @@ class TestFailedComparisonPoolRetryCheck:
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = batch_state
 
-            result = await batch_processor.check_retry_batch_needed(
+            result = await batch_pool_manager.check_retry_batch_needed(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
@@ -115,7 +118,7 @@ class TestFailedComparisonPoolRetryCheck:
     @pytest.mark.asyncio
     async def test_check_retry_batch_needed_threshold_not_met(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
     ) -> None:
         """Test retry check when threshold is not met."""
@@ -160,7 +163,7 @@ class TestFailedComparisonPoolRetryCheck:
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = batch_state
 
-            result = await batch_processor.check_retry_batch_needed(
+            result = await batch_pool_manager.check_retry_batch_needed(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
@@ -175,7 +178,7 @@ class TestFailedComparisonPoolRetryBatch:
     @pytest.mark.asyncio
     async def test_form_retry_batch_success(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
         sample_comparison_task: ComparisonTask,
     ) -> None:
@@ -224,7 +227,7 @@ class TestFailedComparisonPoolRetryBatch:
             mock_get_batch_state.return_value = batch_state
             mock_update_metadata.return_value = None
 
-            retry_tasks = await batch_processor.form_retry_batch(
+            retry_tasks = await batch_pool_manager.form_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
@@ -240,7 +243,7 @@ class TestFailedComparisonPoolRetryBatch:
     @pytest.mark.asyncio
     async def test_form_retry_batch_max_retry_reached(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
         sample_comparison_task: ComparisonTask,
         mock_settings: Settings,
@@ -287,7 +290,7 @@ class TestFailedComparisonPoolRetryBatch:
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = batch_state
 
-            retry_tasks = await batch_processor.form_retry_batch(
+            retry_tasks = await batch_pool_manager.form_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
@@ -298,7 +301,7 @@ class TestFailedComparisonPoolRetryBatch:
     @pytest.mark.asyncio
     async def test_form_retry_batch_partial_eligibility(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
         mock_settings: Settings,
     ) -> None:
@@ -362,7 +365,7 @@ class TestFailedComparisonPoolRetryBatch:
             mock_get_batch_state.return_value = batch_state
 
             # Should return None because only 4 eligible (below threshold of 5)
-            retry_tasks = await batch_processor.form_retry_batch(
+            retry_tasks = await batch_pool_manager.form_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
@@ -377,7 +380,7 @@ class TestFailedComparisonPoolSubmitRetry:
     @pytest.mark.asyncio
     async def test_submit_retry_batch_success(
         self,
-        batch_processor: BatchProcessor,
+        batch_retry_processor: BatchRetryProcessor,
         sample_comparison_task: ComparisonTask,
     ) -> None:
         """Test successfully submitting retry batch."""
@@ -397,17 +400,24 @@ class TestFailedComparisonPoolSubmitRetry:
 
         with (
             patch.object(
-                batch_processor, "form_retry_batch", new_callable=AsyncMock
+                batch_retry_processor.pool_manager, "form_retry_batch", new_callable=AsyncMock
             ) as mock_form_retry,
             patch.object(
-                batch_processor, "submit_comparison_batch", new_callable=AsyncMock
+                batch_retry_processor.batch_submitter,
+                "submit_comparison_batch",
+                new_callable=AsyncMock,
             ) as mock_submit,
+            patch(
+                "services.cj_assessment_service.metrics.get_business_metrics"
+            ) as mock_get_metrics,
         ):
             mock_form_retry.return_value = retry_tasks
             mock_submit.return_value = submission_result
+            mock_metric = MagicMock()
+            mock_get_metrics.return_value = {"cj_retry_batches_submitted_total": mock_metric}
 
             # Act
-            result = await batch_processor.submit_retry_batch(
+            result = await batch_retry_processor.submit_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
@@ -421,7 +431,7 @@ class TestFailedComparisonPoolSubmitRetry:
     @pytest.mark.asyncio
     async def test_submit_retry_batch_disabled(
         self,
-        batch_processor: BatchProcessor,
+        batch_retry_processor: BatchRetryProcessor,
         mock_settings: Settings,
     ) -> None:
         """Test submitting retry batch when retry is disabled."""
@@ -431,7 +441,7 @@ class TestFailedComparisonPoolSubmitRetry:
         correlation_id = uuid4()
 
         # Act
-        result = await batch_processor.submit_retry_batch(
+        result = await batch_retry_processor.submit_retry_batch(
             cj_batch_id=cj_batch_id,
             correlation_id=correlation_id,
         )
@@ -442,7 +452,7 @@ class TestFailedComparisonPoolSubmitRetry:
     @pytest.mark.asyncio
     async def test_submit_retry_batch_no_tasks(
         self,
-        batch_processor: BatchProcessor,
+        batch_retry_processor: BatchRetryProcessor,
     ) -> None:
         """Test submitting retry batch when no tasks are available."""
         # Arrange
@@ -451,12 +461,12 @@ class TestFailedComparisonPoolSubmitRetry:
 
         # Mock form_retry_batch to return None (no tasks)
         with patch.object(
-            batch_processor, "form_retry_batch", new_callable=AsyncMock
+            batch_retry_processor.pool_manager, "form_retry_batch", new_callable=AsyncMock
         ) as mock_form_retry:
             mock_form_retry.return_value = None
 
             # Act
-            result = await batch_processor.submit_retry_batch(
+            result = await batch_retry_processor.submit_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
@@ -468,7 +478,7 @@ class TestFailedComparisonPoolSubmitRetry:
     @pytest.mark.asyncio
     async def test_submit_retry_batch_with_overrides(
         self,
-        batch_processor: BatchProcessor,
+        batch_retry_processor: BatchRetryProcessor,
         sample_comparison_task: ComparisonTask,
     ) -> None:
         """Test submitting retry batch with model overrides."""
@@ -491,17 +501,24 @@ class TestFailedComparisonPoolSubmitRetry:
 
         with (
             patch.object(
-                batch_processor, "form_retry_batch", new_callable=AsyncMock
+                batch_retry_processor.pool_manager, "form_retry_batch", new_callable=AsyncMock
             ) as mock_form_retry,
             patch.object(
-                batch_processor, "submit_comparison_batch", new_callable=AsyncMock
+                batch_retry_processor.batch_submitter,
+                "submit_comparison_batch",
+                new_callable=AsyncMock,
             ) as mock_submit,
+            patch(
+                "services.cj_assessment_service.metrics.get_business_metrics"
+            ) as mock_get_metrics,
         ):
             mock_form_retry.return_value = retry_tasks
             mock_submit.return_value = submission_result
+            mock_metric = MagicMock()
+            mock_get_metrics.return_value = {"cj_retry_batches_submitted_total": mock_metric}
 
             # Act
-            result = await batch_processor.submit_retry_batch(
+            result = await batch_retry_processor.submit_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
                 model_override=model_override,
@@ -528,7 +545,7 @@ class TestRetryBatchSizing:
     @pytest.mark.asyncio
     async def test_retry_batch_respects_size_limit(
         self,
-        batch_processor: BatchProcessor,
+        batch_pool_manager: BatchPoolManager,
         mock_database: AsyncMock,
         mock_settings: Settings,
     ) -> None:
@@ -584,7 +601,7 @@ class TestRetryBatchSizing:
             mock_get_batch_state.return_value = batch_state
             mock_update_metadata.return_value = None
 
-            retry_tasks = await batch_processor.form_retry_batch(
+            retry_tasks = await batch_pool_manager.form_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )

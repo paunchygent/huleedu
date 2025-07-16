@@ -17,7 +17,7 @@ ULTRATHINK Requirements:
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Generator
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
@@ -33,6 +33,7 @@ from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 from common_core.event_enums import ProcessingEvent
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import EssayStatus, ProcessingStage
 from services.spellchecker_service.event_processor import (
     _categorize_processing_error,
@@ -231,9 +232,15 @@ class TestRealBusinessLogicWithBoundaryMocks:
         correlation_id = uuid4()
 
         # Configure content client boundary to fail
-        content_error = HuleEduError(MagicMock())
-        content_error.error_detail.correlation_id = correlation_id
-        content_error.error_detail.error_code = ErrorCode.CONTENT_SERVICE_ERROR
+        error_detail = ErrorDetail(
+            error_code=ErrorCode.CONTENT_SERVICE_ERROR,
+            message="Content service error for testing",
+            correlation_id=correlation_id,
+            timestamp=datetime.now(UTC),
+            service="spellchecker_service",
+            operation="test_content_service_errors_through_real_business_logic",
+        )
+        content_error = HuleEduError(error_detail)
         boundary_mocks["content_client"].fetch_content.side_effect = content_error
 
         # Create valid message

@@ -6,7 +6,12 @@ principle compliance.
 """
 
 from .batch_callback_handler import continue_cj_assessment_workflow
-from .batch_processor import BatchConfigOverrides, BatchProcessor, BatchSubmissionResult
+from .batch_completion_checker import BatchCompletionChecker
+from .batch_config import BatchConfigOverrides
+from .batch_pool_manager import BatchPoolManager
+from .batch_processor import BatchProcessor
+from .batch_retry_processor import BatchRetryProcessor
+from .batch_submission import BatchSubmissionResult
 from .pair_generation import generate_comparison_tasks
 from .scoring_ranking import (
     check_score_stability,
@@ -16,8 +21,11 @@ from .scoring_ranking import (
 from .workflow_orchestrator import run_cj_assessment_workflow
 
 __all__ = [
-    "BatchProcessor",
+    "BatchCompletionChecker",
     "BatchConfigOverrides",
+    "BatchPoolManager",
+    "BatchProcessor",
+    "BatchRetryProcessor",
     "BatchSubmissionResult",
     "check_score_stability",
     "continue_cj_assessment_workflow",

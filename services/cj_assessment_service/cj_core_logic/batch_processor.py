@@ -1,7 +1,8 @@
-"""Batch processor orchestrator for CJ Assessment Service.
+"""Core batch submission processor for CJ Assessment Service.
 
-This module provides the main BatchProcessor class that orchestrates batch submission logic
+This module provides the core BatchProcessor class focused on batch submission orchestration
 with configurable batch sizes, state management integration, and comprehensive error handling.
+Completion checking and retry processing are handled by dedicated modules.
 """
 
 from __future__ import annotations
@@ -27,12 +28,9 @@ from services.cj_assessment_service.protocols import (
 from .batch_config import (
     BatchConfigOverrides,
     get_effective_batch_size,
-    get_effective_threshold,
 )
-from .batch_pool_manager import BatchPoolManager
 from .batch_submission import (
     BatchSubmissionResult,
-    get_batch_state,
     submit_batch_chunk,
     update_batch_state_in_session,
     update_submitted_count_in_session,
@@ -42,7 +40,7 @@ logger = create_service_logger("cj_assessment_service.batch_processor")
 
 
 class BatchProcessor:
-    """Handles batch submission logic for CJ Assessment Service."""
+    """Handles core batch submission orchestration for CJ Assessment Service."""
 
     def __init__(
         self,
@@ -50,7 +48,7 @@ class BatchProcessor:
         llm_interaction: LLMInteractionProtocol,
         settings: Settings,
     ) -> None:
-        """Initialize batch processor.
+        """Initialize core batch processor.
 
         Args:
             database: Database access protocol implementation
@@ -60,7 +58,6 @@ class BatchProcessor:
         self.database = database
         self.llm_interaction = llm_interaction
         self.settings = settings
-        self.pool_manager = BatchPoolManager(database, settings)
 
     async def submit_comparison_batch(
         self,
@@ -213,94 +210,6 @@ class BatchProcessor:
                 processing_stage="batch_submission",
             )
 
-    async def check_batch_completion(
-        self,
-        cj_batch_id: int,
-        correlation_id: UUID,
-        config_overrides: BatchConfigOverrides | None = None,
-    ) -> bool:
-        """Check if batch is complete or has reached threshold.
-
-        Args:
-            cj_batch_id: CJ batch ID to check
-            correlation_id: Request correlation ID for tracing
-            config_overrides: Optional batch configuration overrides
-
-        Returns:
-            True if batch is complete or threshold reached, False otherwise
-
-        Raises:
-            DatabaseOperationError: On database operation failure
-        """
-        try:
-            async with self.database.session() as session:
-                # Get batch state from database
-                batch_state = await get_batch_state(
-                    session=session, cj_batch_id=cj_batch_id, correlation_id=correlation_id
-                )
-
-                if not batch_state:
-                    raise DatabaseOperationError(
-                        message="Batch state not found",
-                        correlation_id=correlation_id,
-                        operation="check_batch_completion",
-                        entity_id=str(cj_batch_id),
-                    )
-
-                # Check if batch is in a terminal state
-                if batch_state.state in [
-                    CJBatchStateEnum.COMPLETED,
-                    CJBatchStateEnum.FAILED,
-                    CJBatchStateEnum.CANCELLED,
-                ]:
-                    return True
-
-                # Check completion threshold
-                if batch_state.total_comparisons > 0:
-                    completion_rate = (
-                        batch_state.completed_comparisons / batch_state.total_comparisons
-                    )
-
-                    # Get effective threshold
-                    threshold = get_effective_threshold(config_overrides, batch_state)
-
-                    logger.info(
-                        f"Batch {cj_batch_id} completion check: "
-                        f"{batch_state.completed_comparisons}/{batch_state.total_comparisons} "
-                        f"({completion_rate:.2%}) vs threshold {threshold:.2%}",
-                        extra={
-                            "correlation_id": str(correlation_id),
-                            "cj_batch_id": cj_batch_id,
-                            "completion_rate": completion_rate,
-                            "threshold": threshold,
-                        },
-                    )
-
-                    return bool(completion_rate >= threshold)
-
-                return False
-
-        except Exception as e:
-            logger.error(
-                f"Failed to check batch completion for CJ batch {cj_batch_id}: {e}",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "cj_batch_id": cj_batch_id,
-                    "error": str(e),
-                },
-                exc_info=True,
-            )
-
-            if isinstance(e, DatabaseOperationError):
-                raise
-            else:
-                raise DatabaseOperationError(
-                    message=f"Failed to check batch completion: {str(e)}",
-                    correlation_id=correlation_id,
-                    operation="check_batch_completion",
-                    entity_id=str(cj_batch_id),
-                )
-
     async def handle_batch_submission(
         self,
         cj_batch_id: int,
@@ -347,186 +256,6 @@ class BatchProcessor:
             temperature_override=temperature_override,
             max_tokens_override=max_tokens_override,
         )
-
-    # Pool management delegation methods
-    async def add_to_failed_pool(
-        self,
-        cj_batch_id: int,
-        comparison_task: ComparisonTask,
-        failure_reason: str,
-        correlation_id: UUID,
-    ) -> None:
-        """Add a failed comparison to the retry pool."""
-        await self.pool_manager.add_to_failed_pool(
-            cj_batch_id, comparison_task, failure_reason, correlation_id
-        )
-
-    async def check_retry_batch_needed(
-        self,
-        cj_batch_id: int,
-        correlation_id: UUID,
-        force_retry_all: bool = False,
-    ) -> bool:
-        """Check if enough failures accumulated to warrant retry batch."""
-        return await self.pool_manager.check_retry_batch_needed(
-            cj_batch_id, correlation_id, force_retry_all
-        )
-
-    async def form_retry_batch(
-        self,
-        cj_batch_id: int,
-        correlation_id: UUID,
-        force_retry_all: bool = False,
-    ) -> list[ComparisonTask] | None:
-        """Form retry batch from failed pool and update statistics."""
-        return await self.pool_manager.form_retry_batch(
-            cj_batch_id, correlation_id, force_retry_all
-        )
-
-    async def submit_retry_batch(
-        self,
-        cj_batch_id: int,
-        correlation_id: UUID,
-        force_retry_all: bool = False,
-        model_override: str | None = None,
-        temperature_override: float | None = None,
-        max_tokens_override: int | None = None,
-    ) -> BatchSubmissionResult | None:
-        """Submit retry batch if threshold reached."""
-        if not self.settings.ENABLE_FAILED_COMPARISON_RETRY:
-            logger.info(
-                f"Failed comparison retry disabled for batch {cj_batch_id}",
-                extra={"correlation_id": str(correlation_id), "cj_batch_id": cj_batch_id},
-            )
-            return None
-
-        logger.info(
-            f"Checking retry batch submission for batch {cj_batch_id}",
-            extra={"correlation_id": str(correlation_id), "cj_batch_id": cj_batch_id},
-        )
-
-        try:
-            # Form retry batch
-            retry_tasks = await self.form_retry_batch(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-                force_retry_all=force_retry_all,
-            )
-
-            if not retry_tasks:
-                logger.info(
-                    f"No retry batch formed for batch {cj_batch_id}",
-                    extra={"correlation_id": str(correlation_id), "cj_batch_id": cj_batch_id},
-                )
-                return None
-
-            # Submit retry batch
-            result = await self.submit_comparison_batch(
-                cj_batch_id=cj_batch_id,
-                comparison_tasks=retry_tasks,
-                correlation_id=correlation_id,
-                config_overrides=None,  # Use defaults for retry
-                model_override=model_override,
-                temperature_override=temperature_override,
-                max_tokens_override=max_tokens_override,
-            )
-
-            if force_retry_all:
-                logger.info(
-                    f"End-of-batch processing: Successfully submitted {result.total_submitted} "
-                    f"remaining failed comparisons for batch {cj_batch_id} to ensure fairness",
-                    extra={
-                        "correlation_id": str(correlation_id),
-                        "cj_batch_id": cj_batch_id,
-                        "retry_tasks_submitted": result.total_submitted,
-                        "force_retry_all": force_retry_all,
-                    },
-                )
-            else:
-                logger.info(
-                    f"Threshold-based retry: Successfully submitted retry batch for batch "
-                    f"{cj_batch_id} with {result.total_submitted} tasks",
-                    extra={
-                        "correlation_id": str(correlation_id),
-                        "cj_batch_id": cj_batch_id,
-                        "retry_tasks_submitted": result.total_submitted,
-                        "force_retry_all": force_retry_all,
-                    },
-                )
-
-            # Record retry batch submission metric
-            from services.cj_assessment_service.metrics import get_business_metrics
-
-            business_metrics = get_business_metrics()
-            retry_batches_metric = business_metrics.get("cj_retry_batches_submitted_total")
-            if retry_batches_metric:
-                retry_batches_metric.inc()
-
-            return result
-
-        except Exception as e:
-            logger.error(
-                f"Failed to submit retry batch for batch {cj_batch_id}: {e}",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "cj_batch_id": cj_batch_id,
-                    "error": str(e),
-                },
-                exc_info=True,
-            )
-
-            raise AssessmentProcessingError(
-                message=f"Failed to submit retry batch: {str(e)}",
-                correlation_id=correlation_id,
-                batch_id=str(cj_batch_id),
-                processing_stage="retry_batch_submission",
-            )
-
-    async def process_remaining_failed_comparisons(
-        self,
-        cj_batch_id: int,
-        correlation_id: UUID,
-        model_override: str | None = None,
-        temperature_override: float | None = None,
-        max_tokens_override: int | None = None,
-    ) -> BatchSubmissionResult | None:
-        """Process all remaining failed comparisons at end of batch."""
-        logger.info(
-            f"Processing remaining failed comparisons for batch {cj_batch_id} to ensure fairness",
-            extra={
-                "correlation_id": str(correlation_id),
-                "cj_batch_id": cj_batch_id,
-            },
-        )
-
-        try:
-            # Force retry of ALL remaining eligible failures for fairness
-            return await self.submit_retry_batch(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-                force_retry_all=True,  # KEY: Force processing of all remaining failures
-                model_override=model_override,
-                temperature_override=temperature_override,
-                max_tokens_override=max_tokens_override,
-            )
-
-        except Exception as e:
-            logger.error(
-                f"Failed to process remaining failed comparisons for batch {cj_batch_id}: {e}",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "cj_batch_id": cj_batch_id,
-                    "error": str(e),
-                },
-                exc_info=True,
-            )
-
-            raise AssessmentProcessingError(
-                message=f"Failed to process remaining failed comparisons: {str(e)}",
-                correlation_id=correlation_id,
-                batch_id=str(cj_batch_id),
-                processing_stage="end_of_batch_retry_processing",
-            )
 
     # Private helper methods
     async def _update_batch_state(

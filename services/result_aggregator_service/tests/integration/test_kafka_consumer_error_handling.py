@@ -154,7 +154,7 @@ class TestKafkaConsumerErrorHandling:
             essay_instructions="Write an essay",
         )
 
-        valid_envelope1 = EventEnvelope(
+        valid_envelope1: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(
             event_id=uuid4(),
             event_type="BatchEssaysRegistered",
             event_timestamp=datetime.now(UTC),
@@ -203,7 +203,7 @@ class TestKafkaConsumerErrorHandling:
             ),
         )
 
-        valid_envelope2 = EventEnvelope(
+        valid_envelope2: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="SpellcheckResultDataV1",
             event_timestamp=datetime.now(UTC),

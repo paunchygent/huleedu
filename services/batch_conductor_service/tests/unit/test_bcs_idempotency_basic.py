@@ -680,7 +680,7 @@ async def test_deterministic_event_id_generation_consistency(
     )
 
     # Create two identical envelopes (true retry scenario)
-    envelope1 = EventEnvelope(
+    envelope1: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
         event_id=shared_event_id,
         event_type="SpellcheckResultDataV1",
         event_timestamp=shared_timestamp,
@@ -689,7 +689,7 @@ async def test_deterministic_event_id_generation_consistency(
         data=spellcheck_data,
     )
 
-    envelope2 = EventEnvelope(
+    envelope2: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
         event_id=shared_event_id,
         event_type="SpellcheckResultDataV1",
         event_timestamp=shared_timestamp,  # Same timestamp for true duplicate

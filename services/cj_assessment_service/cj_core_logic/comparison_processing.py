@@ -24,8 +24,9 @@ from services.cj_assessment_service.protocols import (
     LLMInteractionProtocol,
 )
 
-from . import pair_generation, scoring_ranking
-from .batch_processor import BatchConfigOverrides, BatchProcessor
+from services.cj_assessment_service.cj_core_logic import pair_generation, scoring_ranking
+from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfigOverrides
 
 logger = create_service_logger("cj_assessment_service.comparison_processing")
 

@@ -11,7 +11,10 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+    from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
+    from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
+        BatchRetryProcessor,
+    )
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
@@ -31,7 +34,8 @@ async def update_comparison_result(
     database: CJRepositoryProtocol,
     correlation_id: UUID,
     settings: Settings,
-    batch_processor: BatchProcessor | None = None,
+    pool_manager: BatchPoolManager | None = None,
+    retry_processor: BatchRetryProcessor | None = None,
 ) -> int | None:
     """Update comparison pair with LLM callback result.
 
@@ -43,7 +47,8 @@ async def update_comparison_result(
         database: Database access protocol implementation
         correlation_id: Request correlation ID for tracing
         settings: Application settings
-        batch_processor: Optional batch processor for failed comparison handling
+        pool_manager: Optional pool manager for failed comparison handling
+        retry_processor: Optional retry processor for failed comparison handling
 
     Returns:
         The batch_id of the updated comparison, or None if not found
@@ -91,10 +96,11 @@ async def update_comparison_result(
                 },
             )
 
-            # Add to failed comparison pool if batch processor is available
-            if batch_processor and settings.ENABLE_FAILED_COMPARISON_RETRY:
+            # Add to failed comparison pool if pool manager is available
+            if pool_manager and retry_processor and settings.ENABLE_FAILED_COMPARISON_RETRY:
                 await add_failed_comparison_to_pool(
-                    batch_processor=batch_processor,
+                    pool_manager=pool_manager,
+                    retry_processor=retry_processor,
                     comparison_pair=comparison_pair,
                     comparison_result=comparison_result,
                     correlation_id=correlation_id,
@@ -132,9 +138,9 @@ async def update_comparison_result(
             )
 
             # Check if this was a retry and update pool statistics
-            if batch_processor and settings.ENABLE_FAILED_COMPARISON_RETRY:
+            if pool_manager and settings.ENABLE_FAILED_COMPARISON_RETRY:
                 await handle_successful_retry(
-                    batch_processor=batch_processor,
+                    pool_manager=pool_manager,
                     comparison_pair=comparison_pair,
                     correlation_id=correlation_id,
                 )
@@ -216,7 +222,8 @@ async def check_batch_completion_conditions(
 
 
 async def add_failed_comparison_to_pool(
-    batch_processor: BatchProcessor,
+    pool_manager: BatchPoolManager,
+    retry_processor: BatchRetryProcessor,
     comparison_pair: ComparisonPair,
     comparison_result: LLMComparisonResultV1,
     correlation_id: UUID,
@@ -224,7 +231,8 @@ async def add_failed_comparison_to_pool(
     """Add failed comparison to the retry pool and check for retry batch need.
 
     Args:
-        batch_processor: Batch processor instance
+        pool_manager: Pool manager instance for failed comparison handling
+        retry_processor: Retry processor instance for batch submission
         comparison_pair: Failed comparison pair from database
         comparison_result: LLM comparison result with error
         correlation_id: Request correlation ID for tracing
@@ -246,7 +254,7 @@ async def add_failed_comparison_to_pool(
             )
 
             # Add to failed pool
-            await batch_processor.add_to_failed_pool(
+            await pool_manager.add_to_failed_pool(
                 cj_batch_id=comparison_pair.cj_batch_id,
                 comparison_task=comparison_task,
                 failure_reason=failure_reason,
@@ -254,7 +262,7 @@ async def add_failed_comparison_to_pool(
             )
 
             # Check if retry batch needed
-            retry_needed = await batch_processor.check_retry_batch_needed(
+            retry_needed = await pool_manager.check_retry_batch_needed(
                 cj_batch_id=comparison_pair.cj_batch_id,
                 correlation_id=correlation_id,
                 force_retry_all=False,  # Use normal threshold-based checking during callbacks
@@ -270,7 +278,7 @@ async def add_failed_comparison_to_pool(
                 )
 
                 # Submit retry batch
-                await batch_processor.submit_retry_batch(
+                await retry_processor.submit_retry_batch(
                     cj_batch_id=comparison_pair.cj_batch_id,
                     correlation_id=correlation_id,
                 )
@@ -340,14 +348,14 @@ async def reconstruct_comparison_task(
 
 
 async def handle_successful_retry(
-    batch_processor: BatchProcessor,
+    pool_manager: BatchPoolManager,
     comparison_pair: ComparisonPair,
     correlation_id: UUID,
 ) -> None:
     """Handle successful retry by updating pool statistics.
 
     Args:
-        batch_processor: Batch processor instance
+        pool_manager: Pool manager instance for failed comparison handling
         comparison_pair: Successful comparison pair from database
         correlation_id: Request correlation ID for tracing
     """
@@ -358,8 +366,8 @@ async def handle_successful_retry(
 
         # Get current batch state and check if there's an active failed pool
         from .batch_submission import get_batch_state
-        
-        async with batch_processor.database.session() as session:
+
+        async with pool_manager.database.session() as session:
             batch_state = await get_batch_state(
                 session=session,
                 cj_batch_id=comparison_pair.cj_batch_id,
@@ -403,7 +411,7 @@ async def handle_successful_retry(
 
                     # Update batch state
                     from .batch_submission import update_batch_processing_metadata
-                    
+
                     await update_batch_processing_metadata(
                         session=session,
                         cj_batch_id=comparison_pair.cj_batch_id,

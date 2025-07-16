@@ -59,7 +59,7 @@ class TestKafkaConsumerRouting:
             essay_instructions="Write an essay",
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(
             event_id=uuid4(),
             event_type="BatchEssaysRegistered",
             event_timestamp=datetime.now(UTC),
@@ -111,7 +111,7 @@ class TestKafkaConsumerRouting:
             ),
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="SpellcheckResultDataV1",
             event_timestamp=datetime.now(UTC),
@@ -162,7 +162,7 @@ class TestKafkaConsumerRouting:
             rankings=rankings,
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="CJAssessmentCompletedV1",
             event_timestamp=datetime.now(UTC),
@@ -206,7 +206,7 @@ class TestKafkaConsumerRouting:
             correlation_id=uuid4(),
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[ELSBatchPhaseOutcomeV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="ELSBatchPhaseOutcomeV1",
             event_timestamp=datetime.now(UTC),

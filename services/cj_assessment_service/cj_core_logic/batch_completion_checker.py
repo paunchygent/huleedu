@@ -1,0 +1,120 @@
+"""Batch completion checker for CJ Assessment Service.
+
+This module provides completion threshold evaluation and terminal state checking
+for CJ Assessment batches with configurable completion thresholds.
+"""
+
+from __future__ import annotations
+
+from uuid import UUID
+
+from huleedu_service_libs.logging_utils import create_service_logger
+
+from common_core.status_enums import CJBatchStateEnum
+from services.cj_assessment_service.exceptions import DatabaseOperationError
+from services.cj_assessment_service.protocols import CJRepositoryProtocol
+
+from .batch_config import BatchConfigOverrides, get_effective_threshold
+from .batch_submission import get_batch_state
+
+logger = create_service_logger("cj_assessment_service.batch_completion_checker")
+
+
+class BatchCompletionChecker:
+    """Handles batch completion evaluation and threshold checking."""
+
+    def __init__(self, database: CJRepositoryProtocol) -> None:
+        """Initialize batch completion checker.
+
+        Args:
+            database: Database access protocol implementation
+        """
+        self.database = database
+
+    async def check_batch_completion(
+        self,
+        cj_batch_id: int,
+        correlation_id: UUID,
+        config_overrides: BatchConfigOverrides | None = None,
+    ) -> bool:
+        """Check if batch is complete or has reached threshold.
+
+        Args:
+            cj_batch_id: CJ batch ID to check
+            correlation_id: Request correlation ID for tracing
+            config_overrides: Optional batch configuration overrides
+
+        Returns:
+            True if batch is complete or threshold reached, False otherwise
+
+        Raises:
+            DatabaseOperationError: On database operation failure
+        """
+        try:
+            async with self.database.session() as session:
+                # Get batch state from database
+                batch_state = await get_batch_state(
+                    session=session, cj_batch_id=cj_batch_id, correlation_id=correlation_id
+                )
+
+                if not batch_state:
+                    raise DatabaseOperationError(
+                        message="Batch state not found",
+                        correlation_id=correlation_id,
+                        operation="check_batch_completion",
+                        entity_id=str(cj_batch_id),
+                    )
+
+                # Check if batch is in a terminal state
+                if batch_state.state in [
+                    CJBatchStateEnum.COMPLETED,
+                    CJBatchStateEnum.FAILED,
+                    CJBatchStateEnum.CANCELLED,
+                ]:
+                    return True
+
+                # Check completion threshold
+                if batch_state.total_comparisons > 0:
+                    completion_rate = (
+                        batch_state.completed_comparisons / batch_state.total_comparisons
+                    )
+
+                    # Get effective threshold
+                    threshold = get_effective_threshold(config_overrides, batch_state)
+
+                    logger.info(
+                        f"Batch {cj_batch_id} completion check: "
+                        f"{batch_state.completed_comparisons}/{batch_state.total_comparisons} "
+                        f"({completion_rate:.2%}) vs threshold {threshold:.2%}",
+                        extra={
+                            "correlation_id": str(correlation_id),
+                            "cj_batch_id": cj_batch_id,
+                            "completion_rate": completion_rate,
+                            "threshold": threshold,
+                        },
+                    )
+
+                    return bool(completion_rate >= threshold)
+
+                return False
+
+        except Exception as e:
+            logger.error(
+                f"Failed to check batch completion for CJ batch {cj_batch_id}: {e}",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "cj_batch_id": cj_batch_id,
+                    "error": str(e),
+                },
+                exc_info=True,
+            )
+
+            if isinstance(e, DatabaseOperationError):
+                raise
+            else:
+                raise DatabaseOperationError(
+                    message=f"Failed to check batch completion: {str(e)}",
+                    correlation_id=correlation_id,
+                    operation="check_batch_completion",
+                    entity_id=str(cj_batch_id),
+                )

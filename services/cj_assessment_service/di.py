@@ -30,9 +30,18 @@ from services.cj_assessment_service.implementations.llm_provider_service_client 
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
 
 # Import all business logic protocols
+from services.cj_assessment_service.cj_core_logic.batch_completion_checker import (
+    BatchCompletionChecker,
+)
+from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
+from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+from services.cj_assessment_service.cj_core_logic.batch_retry_processor import BatchRetryProcessor
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
 from services.cj_assessment_service.metrics import setup_cj_assessment_database_monitoring
 from services.cj_assessment_service.protocols import (
+    BatchCompletionCheckerProtocol,
+    BatchProcessorProtocol,
+    BatchRetryProcessorProtocol,
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
     ContentClientProtocol,
@@ -214,6 +223,59 @@ class CJAssessmentServiceProvider(Provider):
     ) -> CJEventPublisherProtocol:
         """Provide event publisher."""
         return CJEventPublisherImpl(kafka_bus, settings)
+
+    # Batch processing modules with clean architecture
+    @provide(scope=Scope.APP)
+    def provide_batch_processor(
+        self,
+        database: CJRepositoryProtocol,
+        llm_interaction: LLMInteractionProtocol,
+        settings: Settings,
+    ) -> BatchProcessorProtocol:
+        """Provide core batch processor for submission orchestration."""
+        return BatchProcessor(
+            database=database,
+            llm_interaction=llm_interaction,
+            settings=settings,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_batch_completion_checker(
+        self,
+        database: CJRepositoryProtocol,
+    ) -> BatchCompletionCheckerProtocol:
+        """Provide batch completion checker for threshold evaluation."""
+        return BatchCompletionChecker(database=database)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_pool_manager(
+        self,
+        database: CJRepositoryProtocol,
+        settings: Settings,
+    ) -> BatchPoolManager:
+        """Provide batch pool manager for failed comparison handling."""
+        return BatchPoolManager(
+            database=database,
+            settings=settings,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_batch_retry_processor(
+        self,
+        database: CJRepositoryProtocol,
+        llm_interaction: LLMInteractionProtocol,
+        settings: Settings,
+        pool_manager: BatchPoolManager,
+        batch_submitter: BatchProcessorProtocol,
+    ) -> BatchRetryProcessorProtocol:
+        """Provide batch retry processor for end-of-batch fairness logic."""
+        return BatchRetryProcessor(
+            database=database,
+            llm_interaction=llm_interaction,
+            settings=settings,
+            pool_manager=pool_manager,
+            batch_submitter=batch_submitter,
+        )
 
     @provide(scope=Scope.APP)
     def provide_kafka_consumer(

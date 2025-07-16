@@ -171,7 +171,7 @@ class TestValidationEventConsumerIntegration:
     async def test_invalid_event_data_handling(self, mock_batch_tracker: Mock) -> None:
         """Test handling of invalid or malformed validation failure events."""
         # Create an envelope with incorrect event type but validation failure data
-        invalid_envelope = EventEnvelope(
+        invalid_envelope: EventEnvelope[EssayValidationFailedV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="essay.content.provisioned",  # Wrong event type
             event_timestamp=datetime.now(UTC),
@@ -222,7 +222,7 @@ class TestValidationEventConsumerIntegration:
         # Create envelope with specific timestamp
         test_timestamp = datetime.now(UTC)
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[EssayValidationFailedV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="essay.validation.failed",
             event_timestamp=test_timestamp,
@@ -247,7 +247,7 @@ class TestValidationEventConsumerIntegration:
             raw_file_storage_id="test_storage_id_consistency",
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[EssayValidationFailedV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="essay.validation.failed",
             event_timestamp=datetime.now(UTC),
@@ -296,7 +296,7 @@ class TestValidationEventConsumerIntegration:
     ) -> None:
         """Test validation of event source service."""
         # Create envelope from file service
-        file_service_envelope = EventEnvelope(
+        file_service_envelope: EventEnvelope[EssayValidationFailedV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="essay.validation.failed",
             event_timestamp=datetime.now(UTC),
@@ -314,7 +314,7 @@ class TestValidationEventConsumerIntegration:
         mock_batch_tracker.reset_mock()
 
         # Create envelope from unexpected service
-        unexpected_envelope = EventEnvelope(
+        unexpected_envelope: EventEnvelope[EssayValidationFailedV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="essay.validation.failed",
             event_timestamp=datetime.now(UTC),
