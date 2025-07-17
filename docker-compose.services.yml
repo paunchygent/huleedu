@@ -81,7 +81,9 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/result_aggregator
+      - RESULT_AGGREGATOR_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/result_aggregator
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - REDIS_URL=redis://redis:6379
       - INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
@@ -252,12 +254,15 @@ services:
       - ESSAY_LIFECYCLE_SERVICE_USE_MOCK_REPOSITORY=false
       - ESSAY_LIFECYCLE_SERVICE_DATABASE_PATH=/data/essay_lifecycle/essay_lifecycle.db
       # PostgreSQL configuration
+      - ESSAY_LIFECYCLE_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@essay_lifecycle_db:5432/essay_lifecycle
       - ELS_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@essay_lifecycle_db:5432/essay_lifecycle
       - ELS_DB_HOST=essay_lifecycle_db
       - ELS_DB_PORT=5432
       - ELS_DB_NAME=essay_lifecycle
       - ELS_DB_USER=${HULEEDU_DB_USER}
       - ELS_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - LOG_LEVEL=INFO
       - ESSAY_LIFECYCLE_SERVICE_REDIS_URL=redis://redis:6379
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
@@ -299,12 +304,15 @@ services:
       - ESSAY_LIFECYCLE_SERVICE_USE_MOCK_REPOSITORY=false
       - ESSAY_LIFECYCLE_SERVICE_DATABASE_PATH=/data/essay_lifecycle/essay_lifecycle.db
       # PostgreSQL configuration
+      - ESSAY_LIFECYCLE_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@essay_lifecycle_db:5432/essay_lifecycle
       - ELS_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@essay_lifecycle_db:5432/essay_lifecycle
       - ELS_DB_HOST=essay_lifecycle_db
       - ELS_DB_PORT=5432
       - ELS_DB_NAME=essay_lifecycle
       - ELS_DB_USER=${HULEEDU_DB_USER}
       - ELS_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - LOG_LEVEL=INFO
       - ESSAY_LIFECYCLE_SERVICE_REDIS_URL=redis://redis:6379
       - ESSAY_LIFECYCLE_SERVICE_DISABLE_IDEMPOTENCY=false
@@ -468,11 +476,14 @@ services:
       - ENVIRONMENT=production
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - LOG_LEVEL=INFO
+      - CLASS_MANAGEMENT_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@class_management_db:5432/huledu_class_management
       - CLASS_MANAGEMENT_SERVICE_DB_HOST=class_management_db
       - CLASS_MANAGEMENT_SERVICE_DB_PORT=5432
       - CLASS_MANAGEMENT_SERVICE_DB_NAME=huledu_class_management
       - CLASS_MANAGEMENT_SERVICE_DB_USER=${HULEEDU_DB_USER}
       - CLASS_MANAGEMENT_SERVICE_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - CLASS_MANAGEMENT_SERVICE_REDIS_URL=redis://redis:6379
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=class_management_service

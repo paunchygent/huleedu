@@ -100,7 +100,7 @@ class Settings(BaseSettings):
     )
 
     @property
-    def database_url(self) -> str:
+    def DATABASE_URL(self) -> str:
         """Return the PostgreSQL database URL for both runtime and migrations.
         
         Standardized PostgreSQL configuration following HuleEdu pattern.
