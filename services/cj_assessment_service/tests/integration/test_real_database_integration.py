@@ -111,7 +111,7 @@ class TestRealDatabaseIntegration:
         kafka_msg.headers = []
         return kafka_msg
 
-    @pytest.mark.expensive
+    @pytest.mark.slow
     async def test_full_batch_lifecycle_with_real_database(
         self,
         postgres_repository: CJRepositoryProtocol,
@@ -156,12 +156,19 @@ class TestRealDatabaseIntegration:
 
         # Verify database operations occurred
         async with postgres_repository.session() as session:
-            # Verify batch was created
-            batches = await postgres_repository.get_essays_for_cj_batch(session, 1)
+            # Find the actual CJ batch that was created using the BOS batch ID
+            cj_batch = await db_verification_helpers.find_batch_by_bos_id(session, batch_id)
+            assert cj_batch is not None, f"CJ batch not found for BOS batch ID: {batch_id}"
+            actual_cj_batch_id = cj_batch.id
+
+            # Verify batch was created with correct essay count
+            batches = await postgres_repository.get_essays_for_cj_batch(session, actual_cj_batch_id)
             assert len(batches) == essay_count
 
             # Verify essays were stored
-            essay_count_in_db = await db_verification_helpers.verify_essay_count(session, 1)
+            essay_count_in_db = await db_verification_helpers.verify_essay_count(
+                session, actual_cj_batch_id
+            )
             assert essay_count_in_db == essay_count
 
         # Verify external services were called
@@ -211,10 +218,15 @@ class TestRealDatabaseIntegration:
         postgres_repository: CJRepositoryProtocol,
         db_verification_helpers: Any,
     ) -> None:
-        """Test with PostgreSQL for production parity (marked as expensive)."""
-        # This test uses the postgres_repository fixture
+        """Test with PostgreSQL for production parity.
+
+        This test demonstrates proper database operations with explicit cleanup
+        via the clean_database_between_tests fixture, maintaining repository-managed
+        sessions per architectural standards.
+        """
+        # Test PostgreSQL-specific operations with repository-managed sessions
         async with postgres_repository.session() as session:
-            # Verify clean state
+            # Verify clean state (cleanup fixture ensures this)
             assert await db_verification_helpers.verify_no_data_leakage(session)
 
             # Test PostgreSQL-specific operations
@@ -244,7 +256,7 @@ class TestRealDatabaseIntegration:
                 )
                 essays.append(essay)
 
-            # Verify operations
+            # Verify operations within this session
             assert len(essays) == 5
             essay_count = await db_verification_helpers.verify_essay_count(session, batch.id)
             assert essay_count == 5
@@ -268,8 +280,11 @@ class TestRealDatabaseIntegration:
             for i in range(len(rankings) - 1):
                 assert rankings[i]["score"] >= rankings[i + 1]["score"]
 
-    # Mark this test as expensive since it requires PostgreSQL
-    test_real_database_operations_with_postgresql = pytest.mark.expensive(
+            # Session auto-commits here per repository pattern
+            # Cleanup fixture will truncate tables after test completes
+
+    # Mark this test as slow since it requires PostgreSQL testcontainers
+    test_real_database_operations_with_postgresql = pytest.mark.slow(
         test_real_database_operations_with_postgresql
     )
 

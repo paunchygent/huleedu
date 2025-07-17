@@ -207,6 +207,7 @@ def create_mock_essay_result(
     return mock_essay
 
 
+@pytest.mark.docker
 class TestHealthEndpoints:
     """Test cases for health check endpoints."""
 
@@ -235,6 +236,7 @@ class TestHealthEndpoints:
         assert "# TYPE" in data
 
 
+@pytest.mark.docker
 class TestQueryEndpoints:
     """Test cases for query API endpoints."""
 

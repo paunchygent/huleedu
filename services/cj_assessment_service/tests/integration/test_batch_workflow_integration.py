@@ -347,7 +347,7 @@ class TestBatchWorkflowIntegration:
             # The monitor should have detected the stuck batch
             assert sleep_call_count > 0
 
-    @pytest.mark.expensive
+    @pytest.mark.slow
     async def test_concurrent_callback_processing(
         self,
         postgres_repository: CJRepositoryProtocol,
@@ -479,7 +479,7 @@ class TestBatchWorkflowIntegration:
             assert batch_state_result is not None
             assert batch_state_result.completed_comparisons > 0
 
-    @pytest.mark.expensive
+    @pytest.mark.slow
     async def test_partial_batch_completion(
         self,
         postgres_repository: CJRepositoryProtocol,

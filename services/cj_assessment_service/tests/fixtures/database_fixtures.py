@@ -12,7 +12,7 @@ from typing import Any, AsyncGenerator, Generator
 from unittest.mock import AsyncMock
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
@@ -335,10 +335,44 @@ def db_verification_helpers() -> Any:
                 and len(list(essay_result.scalars().all())) == 0
             )
 
+        @staticmethod
+        async def find_batch_by_bos_id(session: AsyncSession, bos_batch_id: str) -> CJBatchUpload | None:
+            """Find CJ batch by BOS batch ID."""
+            result = await session.execute(
+                select(CJBatchUpload).where(CJBatchUpload.bos_batch_id == bos_batch_id)
+            )
+            return result.scalar_one_or_none()
+
     return DbVerificationHelpers()
 
 
-# ==================== Performance Testing Fixtures ====================
+# ==================== Database Cleanup Fixtures ====================
+
+
+@pytest.fixture(autouse=True)
+async def clean_database_between_tests(postgres_engine: AsyncEngine) -> Generator[None, None, None]:
+    """Clean database tables between tests for proper isolation.
+    
+    This fixture ensures test isolation by truncating tables after each test,
+    respecting the repository-managed sessions architectural pattern.
+    """
+    # Yield first to let the test run
+    yield
+    
+    # Clean up after test completes
+    from services.cj_assessment_service.models_db import CJBatchUpload, ProcessedEssay, ComparisonPair
+    
+    async with postgres_engine.begin() as conn:
+        # Disable foreign key checks for truncation
+        await conn.execute(text("SET session_replication_role = replica;"))
+        
+        # Truncate tables in dependency order (children first)
+        await conn.execute(text(f"TRUNCATE TABLE {ComparisonPair.__tablename__} CASCADE;"))
+        await conn.execute(text(f"TRUNCATE TABLE {ProcessedEssay.__tablename__} CASCADE;"))
+        await conn.execute(text(f"TRUNCATE TABLE {CJBatchUpload.__tablename__} CASCADE;"))
+        
+        # Re-enable foreign key checks
+        await conn.execute(text("SET session_replication_role = DEFAULT;"))
 
 
 @pytest.fixture

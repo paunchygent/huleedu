@@ -88,6 +88,7 @@ class RealKafkaMessage:
         self.offset = 123
 
 
+@pytest.mark.docker
 class TestBosElsPhaseCoordination:
     """Test BOS-ELS coordination using real business logic components."""
 

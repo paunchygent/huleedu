@@ -41,6 +41,7 @@ class TestEndToEndRealtimeNotifications:
         await client.stop()
 
     @pytest.mark.asyncio
+    @pytest.mark.docker
     async def test_event_publisher_to_redis_notification(
         self, redis_client: redis.Redis, redis_service_client: RedisClient
     ) -> None:
@@ -110,6 +111,7 @@ class TestEndToEndRealtimeNotifications:
         await pubsub.unsubscribe(channel_name)
 
     @pytest.mark.asyncio
+    @pytest.mark.docker
     async def test_user_id_extraction_utility(self) -> None:
         """Test that the user ID extraction utility works for various event types."""
         # Test with ClassCreatedV1 (has user_id field)
@@ -138,6 +140,7 @@ class TestEndToEndRealtimeNotifications:
         assert extracted_id is None
 
     @pytest.mark.asyncio
+    @pytest.mark.docker
     async def test_redis_channel_format(
         self, redis_service_client: RedisClient, redis_client: redis.Redis
     ) -> None:
@@ -179,6 +182,7 @@ class TestEndToEndRealtimeNotifications:
             await pubsub.aclose()
 
     @pytest.mark.asyncio
+    @pytest.mark.docker
     async def test_graceful_degradation_on_redis_failure(self) -> None:
         """Test that services continue to work even if Redis publishing fails."""
         # This test would be implemented in each service's test suite

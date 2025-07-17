@@ -76,6 +76,7 @@ def sample_message_data():
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_spellcheck_completion_processing(
     kafka_consumer, mock_batch_state_repo, sample_message_data
 ):
@@ -100,6 +101,7 @@ async def test_spellcheck_completion_processing(
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_spellcheck_missing_batch_id(
     kafka_consumer, mock_batch_state_repo, sample_message_data
 ):
@@ -121,6 +123,7 @@ async def test_spellcheck_missing_batch_id(
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_consumer_lifecycle(kafka_consumer):
     """Test consumer start/stop lifecycle management."""
 
@@ -132,6 +135,7 @@ async def test_consumer_lifecycle(kafka_consumer):
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_unknown_topic_handling(kafka_consumer):
     """Test handling of messages from unknown topics."""
 

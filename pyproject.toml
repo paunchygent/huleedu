@@ -243,7 +243,7 @@ pythonpath = [
 python_files = "test_*.py *_test.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-s -v --durations=10 --log-cli-level=INFO -m 'not expensive'"
+addopts = "-s -v --durations=10 --log-cli-level=INFO -m 'not (financial or slow or docker)'"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s:%(filename)s:%(lineno)s %(message)s"
@@ -251,8 +251,9 @@ log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 asyncio_mode = "auto"
 
 markers = [
-    "expensive: marks tests that make real API calls and incur costs",
+    "financial: marks tests that incur real monetary costs via external API calls",
     "slow: marks tests as slow running",
+    "performance: marks tests that perform load testing or performance benchmarking",
     "integration: marks tests requiring external services like Kafka",
     "docker: marks tests that need docker-compose setup",
     "kafka: marks tests requiring a Kafka instance",
@@ -280,8 +281,9 @@ typecheck-all = "mypy --config-file pyproject.toml ."
 test-all = "pytest"
 test-parallel = "pytest -n auto"
 test-sequential = "pytest -n 0"
-test-expensive = "pytest -m expensive -v --tb=short"
-test-providers = "pytest services/*/tests/integration/ -m expensive -v"
+test-expensive = "pytest -m 'financial or slow or docker' -v --tb=short"
+test-financial = "pytest -m financial -v --tb=short"
+test-providers = "pytest services/*/tests/integration/ -m 'financial or slow or docker' -v"
 
 # Docker convenience scripts - Development workflow
 # Quick commands

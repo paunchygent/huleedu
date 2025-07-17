@@ -21,7 +21,7 @@ from services.cj_assessment_service.implementations.llm_provider_service_client 
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
 
 
-@pytest.mark.expensive
+@pytest.mark.financial
 class TestMultiProviderValidation:
     """Test all providers with real API calls for comprehensive validation."""
 

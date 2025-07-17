@@ -16,6 +16,7 @@ from services.cj_assessment_service.di import CJAssessmentServiceProvider
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_redis_client_di_injection() -> None:
     """Test that RedisClient can be injected via DI container."""
     # Create test database engine
@@ -32,6 +33,7 @@ async def test_redis_client_di_injection() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_redis_client_lifecycle() -> None:
     """Test Redis client lifecycle management."""
     # Create client directly for testing
@@ -62,6 +64,7 @@ async def test_redis_client_lifecycle() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_redis_protocol_interface() -> None:
     """Test that RedisClient implements the protocol correctly."""
     redis_client = RedisClient(client_id="protocol-test", redis_url="redis://localhost:6379")

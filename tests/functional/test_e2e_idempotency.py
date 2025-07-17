@@ -69,6 +69,7 @@ class RealRedisTestHelper:
 
 
 @pytest.mark.e2e
+@pytest.mark.docker
 @pytest.mark.asyncio
 @pytest.mark.timeout(60)
 class TestAuthenticRedisIdempotency:

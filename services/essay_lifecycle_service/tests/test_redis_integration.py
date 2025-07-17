@@ -40,6 +40,7 @@ async def di_container(settings_override: Settings) -> AsyncGenerator[Any, None]
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_redis_client_injection_and_lifecycle(di_container: Any) -> None:
     """Test that RedisClient can be injected from DI container and manages lifecycle properly."""
     # Test DI injection of AtomicRedisClientProtocol
@@ -57,6 +58,7 @@ async def test_redis_client_injection_and_lifecycle(di_container: Any) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_atomic_redis_protocol_compliance(di_container: Any) -> None:
     """Test that injected client satisfies AtomicRedisClientProtocol interface."""
     redis_client = await di_container.get(AtomicRedisClientProtocol)
@@ -89,6 +91,7 @@ async def test_atomic_redis_protocol_compliance(di_container: Any) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_redis_idempotency_pattern(di_container: Any) -> None:
     """Test Redis SETNX idempotency pattern for event processing."""
     redis_client = await di_container.get(AtomicRedisClientProtocol)
@@ -111,6 +114,7 @@ async def test_redis_idempotency_pattern(di_container: Any) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_redis_pubsub_functionality(di_container: Any) -> None:
     """Test Redis pub/sub functionality for real-time updates."""
     redis_client = await di_container.get(AtomicRedisClientProtocol)
@@ -137,6 +141,7 @@ async def test_redis_pubsub_functionality(di_container: Any) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.docker
 async def test_redis_connection_management(di_container: Any) -> None:
     """Test Redis connection management and error handling."""
     redis_client = await di_container.get(AtomicRedisClientProtocol)

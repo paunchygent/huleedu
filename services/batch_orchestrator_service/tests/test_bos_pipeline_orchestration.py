@@ -28,6 +28,7 @@ from services.batch_orchestrator_service.implementations.els_batch_phase_outcome
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
 
 
+@pytest.mark.docker
 class TestBatchKafkaConsumerBusinessLogic:
     """Test BatchKafkaConsumer business logic without overmocking."""
 
