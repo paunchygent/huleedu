@@ -156,7 +156,7 @@ class TestProcessBatchRegistered:
             essay_instructions="Write an essay",
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(
             event_id=uuid4(),
             event_type="BatchEssaysRegistered",
             event_timestamp=datetime.now(timezone.utc),
@@ -206,7 +206,7 @@ class TestProcessBatchRegistered:
             essay_instructions="Write an essay",
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(
             event_id=uuid4(),
             event_type="BatchEssaysRegistered",
             event_timestamp=datetime.now(timezone.utc),
@@ -258,7 +258,7 @@ class TestProcessBatchRegistered:
             essay_instructions="Write an essay",
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(
             event_id=uuid4(),
             event_type="BatchEssaysRegistered",
             event_timestamp=datetime.now(timezone.utc),
@@ -300,7 +300,7 @@ class TestProcessBatchPhaseOutcome:
             correlation_id=uuid4(),
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[ELSBatchPhaseOutcomeV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="ELSBatchPhaseOutcomeV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -343,7 +343,7 @@ class TestProcessBatchPhaseOutcome:
             correlation_id=uuid4(),
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[ELSBatchPhaseOutcomeV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="ELSBatchPhaseOutcomeV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -383,7 +383,7 @@ class TestProcessBatchPhaseOutcome:
             correlation_id=uuid4(),
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[ELSBatchPhaseOutcomeV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="ELSBatchPhaseOutcomeV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -423,7 +423,7 @@ class TestProcessBatchPhaseOutcome:
             correlation_id=uuid4(),
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[ELSBatchPhaseOutcomeV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="ELSBatchPhaseOutcomeV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -483,7 +483,7 @@ class TestProcessSpellcheckCompleted:
             storage_metadata=storage_metadata,
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="SpellcheckResultDataV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -538,7 +538,7 @@ class TestProcessSpellcheckCompleted:
             storage_metadata=None,
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="SpellcheckResultDataV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -593,7 +593,7 @@ class TestProcessSpellcheckCompleted:
             storage_metadata=None,
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="SpellcheckResultDataV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -636,7 +636,7 @@ class TestProcessSpellcheckCompleted:
             system_metadata=mock_metadata,
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="SpellcheckResultDataV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -674,7 +674,7 @@ class TestProcessSpellcheckCompleted:
             system_metadata=system_metadata,
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="SpellcheckResultDataV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -733,7 +733,7 @@ class TestProcessCJAssessmentCompleted:
             system_metadata=system_metadata,
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="CJAssessmentCompletedV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -815,7 +815,7 @@ class TestProcessCJAssessmentCompleted:
             system_metadata=system_metadata,
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="CJAssessmentCompletedV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -867,7 +867,7 @@ class TestProcessCJAssessmentCompleted:
             system_metadata=system_metadata,
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="CJAssessmentCompletedV1",
             event_timestamp=datetime.now(timezone.utc),
@@ -918,7 +918,7 @@ class TestProcessCJAssessmentCompleted:
             system_metadata=system_metadata,
         )
 
-        envelope = EventEnvelope(
+        envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="CJAssessmentCompletedV1",
             event_timestamp=datetime.now(timezone.utc),

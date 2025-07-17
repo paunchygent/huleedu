@@ -49,8 +49,8 @@ WORKDIR /app
 RUN pip install --no-cache-dir pdm
 
 # Copy shared dependencies first
-COPY common_core/ /app/common_core/
-COPY services/libs/ /app/services/libs/
+COPY libs/common_core/ /app/libs/common_core/
+COPY libs/huleedu_service_libs/ /app/libs/huleedu_service_libs/
 
 # Copy service-specific code
 COPY services/{service_name}/ /app/services/{service_name}/

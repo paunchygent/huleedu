@@ -23,7 +23,7 @@ exclude = [
     ".ruff_cache",
     ".pdm-python",
     ".pdm-build",
-    "common_core/.venv",
+    "libs/common_core/.venv",
 ]
 ```
 

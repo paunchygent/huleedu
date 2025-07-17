@@ -286,7 +286,7 @@ class TestE2ESpellcheckWorkflows:
         )
 
         # Create EventEnvelope
-        event_envelope = EventEnvelope(
+        event_envelope: EventEnvelope[EssayLifecycleSpellcheckRequestV1] = EventEnvelope(
             event_id=uuid.uuid4(),
             event_type="huleedu.essay.spellcheck.requested.v1",
             event_timestamp=datetime.now(UTC),

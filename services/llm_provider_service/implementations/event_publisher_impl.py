@@ -68,7 +68,7 @@ class LLMEventPublisherImpl(LLMEventPublisherProtocol):
                 metadata=metadata,
             )
 
-            envelope = EventEnvelope(
+            envelope: EventEnvelope[LLMRequestStartedV1] = EventEnvelope(
                 event_type="llm_provider.request_started.v1",
                 source_service=self.settings.SERVICE_NAME,
                 correlation_id=correlation_id,
@@ -130,7 +130,7 @@ class LLMEventPublisherImpl(LLMEventPublisherProtocol):
                 metadata=metadata,
             )
 
-            envelope = EventEnvelope(
+            envelope: EventEnvelope[LLMRequestCompletedV1] = EventEnvelope(
                 event_type="llm_provider.request_completed.v1",
                 source_service=self.settings.SERVICE_NAME,
                 correlation_id=correlation_id,
@@ -194,7 +194,7 @@ class LLMEventPublisherImpl(LLMEventPublisherProtocol):
                 },
             )
 
-            envelope = EventEnvelope(
+            envelope: EventEnvelope[LLMProviderFailureV1] = EventEnvelope(
                 event_type="llm_provider.failure.v1",
                 source_service=self.settings.SERVICE_NAME,
                 correlation_id=correlation_id,

@@ -313,7 +313,7 @@ class TestE2ECJAssessmentWorkflows:
         )
 
         # Create EventEnvelope
-        event_envelope = EventEnvelope(
+        event_envelope: EventEnvelope[ELS_CJAssessmentRequestV1] = EventEnvelope(
             event_id=uuid.uuid4(),
             event_type=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
             event_timestamp=datetime.now(UTC),

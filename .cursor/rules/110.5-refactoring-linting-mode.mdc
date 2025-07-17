@@ -85,14 +85,14 @@ touch implementations/py.typed
 - **REQUIRED**: Add modules without type stubs to `pyproject.toml` MyPy external libraries section
 - **Example**: `"transitions.*"`, `"essay_state_machine"` with `ignore_missing_imports = true`
 
-### 4.2. MyPy Module Path Conflicts (services/libs)
+### 4.2. MyPy Module Path Conflicts (libs)
 **Problem**: Editable packages in monorepos cause module path conflicts:
 ```
 error: Source file found twice under different module names: 
-"services.libs.huleedu_service_libs" and "huleedu_service_libs"
+"libs.huleedu_service_libs" and "huleedu_service_libs"
 ```
 
-**Solution**: Create isolated `mypy.ini` in `services/libs/`:
+**Solution**: Create isolated `mypy.ini` in `libs/`:
 ```ini
 [mypy]
 explicit_package_bases = true
@@ -102,7 +102,7 @@ no_site_packages = true
 
 **Usage**: 
 ```bash
-cd services/libs && mypy huleedu_service_libs --show-error-codes
+cd libs && mypy huleedu_service_libs --show-error-codes
 ```
 
 **Root Cause**: PDM editable installs create dual import paths. See @086-mypy-configuration-standards.mdc for complete solution.

@@ -177,7 +177,7 @@ class TestPipelineResolutionIntegration:
         - Success event published to Kafka
         """
         # Create test event
-        test_event = EventEnvelope(
+        test_event: EventEnvelope[ClientBatchPipelineRequestV1] = EventEnvelope(
             event_id=uuid.uuid4(),
             event_type="huleedu.commands.batch.pipeline.v1",
             event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
@@ -232,7 +232,7 @@ class TestPipelineResolutionIntegration:
         # Configure repository to return None (batch not found)
         mock_batch_repository.get_batch_context.return_value = None
 
-        test_event = EventEnvelope(
+        test_event: EventEnvelope[ClientBatchPipelineRequestV1] = EventEnvelope(
             event_id=uuid.uuid4(),
             event_type="huleedu.commands.batch.pipeline.v1",
             event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
@@ -288,7 +288,7 @@ class TestPipelineResolutionIntegration:
         }
         mock_batch_repository.get_processing_pipeline_state.return_value = None
 
-        test_event = EventEnvelope(
+        test_event: EventEnvelope[ClientBatchPipelineRequestV1] = EventEnvelope(
             event_id=uuid.uuid4(),
             event_type="huleedu.commands.batch.pipeline.v1",
             event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
@@ -343,7 +343,7 @@ class TestPipelineResolutionIntegration:
             pipeline_request_handler.bcs_client, "resolve_pipeline", mock_resolve_pipeline
         )
 
-        test_event = EventEnvelope(
+        test_event: EventEnvelope[ClientBatchPipelineRequestV1] = EventEnvelope(
             event_id=uuid.uuid4(),
             event_type="huleedu.commands.batch.pipeline.v1",
             event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
@@ -400,7 +400,7 @@ class TestPipelineResolutionIntegration:
             "status": PipelineExecutionStatus.IN_PROGRESS,
         }
 
-        test_event = EventEnvelope(
+        test_event: EventEnvelope[ClientBatchPipelineRequestV1] = EventEnvelope(
             event_id=uuid.uuid4(),
             event_type="huleedu.commands.batch.pipeline.v1",
             event_timestamp=datetime.fromisoformat("2025-01-01T00:00:00Z".replace("Z", "+00:00")),
@@ -458,7 +458,7 @@ class TestPipelineResolutionIntegration:
         # Create multiple concurrent events
         concurrent_events = []
         for i in range(3):
-            event = EventEnvelope(
+            event: EventEnvelope[ClientBatchPipelineRequestV1] = EventEnvelope(
                 event_id=uuid.uuid4(),
                 event_type="huleedu.commands.batch.pipeline.v1",
                 event_timestamp=datetime.fromisoformat(

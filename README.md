@@ -8,7 +8,7 @@ The HuleEdu platform is built upon a set of core foundational principles to ensu
 
 * **Domain-Driven Design (DDD)**: Each microservice maps to a specific business domain (Bounded Context), owning its data and logic. Service boundaries are respected.
 * **Event-Driven Architecture (EDA)**: Asynchronous, event-driven communication via Kafka is the primary method for inter-service collaboration. Synchronous API calls between services are minimized.
-* **Explicit Contracts**: All inter-service data structures (event payloads, API DTOs) are defined as versioned Pydantic models residing in `common_core/src/common_core/`. The `EventEnvelope` structure is standardized for all events.
+* **Explicit Contracts**: All inter-service data structures (event payloads, API DTOs) are defined as versioned Pydantic models residing in `libs/common_core/src/common_core/`. The `EventEnvelope` structure is standardized for all events.
 * **Service Autonomy**: Microservices are designed to be independently deployable, scalable, and updatable. Each service owns its data store, and direct access to another service's datastore is not permitted.
 * **Async Operations**: Services are designed to use `async/await` for all I/O operations.
 * **Dependency Injection (DI)**: Services utilize the Dishka DI framework. Business logic depends on abstractions (`typing.Protocol`) defined in `<service_name>/protocols.py`, rather than concrete implementations directly. Providers are defined in `<service_name>/di.py`.
@@ -19,7 +19,7 @@ The HuleEdu platform is built upon a set of core foundational principles to ensu
 
 The project is organized as a monorepo managed by PDM:
 
-* **`common_core/`**: A shared Python package containing common Pydantic models for data contracts (events, API DTOs), enums, and shared metadata structures.
+* **`libs/common_core/`**: A shared Python package containing common Pydantic models for data contracts (events, API DTOs), enums, and shared metadata structures.
 * **`services/`**: Contains the individual microservices.
   * **`libs/`**: Shared utility libraries for services, such as Kafka client wrappers and logging utilities.
   * Each service has its own directory (e.g., `content_service/`, `spellchecker_service/`).

@@ -33,7 +33,7 @@ Service READMEs **MUST** include:
 ## 3. Library Documentation
 
 ### 3.1. Mandatory Library READMEs
-- Every shared library under `services/libs/` **MUST** have a comprehensive `README.md`
+- Every shared library under `libs/` **MUST** have a comprehensive `README.md`
 - Library documentation **MUST** be more detailed than service documentation due to wider usage
 
 ### 3.2. Library Documentation Requirements

@@ -104,7 +104,7 @@ async def postgres_session(postgres_engine: AsyncEngine) -> AsyncGenerator[Async
 
 
 @pytest.fixture
-def test_settings() -> Settings:
+def test_settings() -> Generator[Settings, None, None]:
     """Create test settings with database configuration."""
     import os
 

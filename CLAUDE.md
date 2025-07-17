@@ -132,7 +132,7 @@ All events transmitted via Kafka **MUST** be wrapped in the standardized `EventE
 <!-- end list -->
 
 ```python
-# Correct Pydantic Model from @common_core/src/common_core/events/envelope.py
+# Correct Pydantic Model from @libs/common_core/src/common_core/events/envelope.py
 class EventEnvelope(BaseModel, Generic[T_EventData]):
     event_id: UUID = Field(default_factory=uuid4)
     event_type: str

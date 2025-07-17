@@ -13,7 +13,7 @@ alwaysApply: true
 
 **Permitted Root Directories:**
 - `.git/`, `.venv/`, `.mypy_cache/`, `__pycache__/`, `.cursor/`, `.ruff_cache/`, `.windsurf/`
-- `common_core/`, `services/`, `scripts/`, `documentation/`
+- `libs/`, `services/`, `scripts/`, `documentation/`
 
 **FORBIDDEN**: Setup scripts, service-specific files, temporary files in root
 
@@ -100,7 +100,7 @@ services/essay_lifecycle_service/    # Hybrid HTTP + Kafka service
 ## 5. Common Core Structure
 
 ```
-common_core/
+libs/common_core/
 ├── src/
 │   └── common_core/
 │       ├── __init__.py
@@ -140,7 +140,7 @@ documentation/
 
 - **Root README.md**: Project overview and architecture
 - **Service README.md**: `services/{service_name}/README.md`
-- **Common Core README.md**: `common_core/README.md`
+- **Common Core README.md**: `libs/common_core/README.md`
 - **FORBIDDEN**: README.md files in separate documentation folders
 
 ## 8. File Creation Rules

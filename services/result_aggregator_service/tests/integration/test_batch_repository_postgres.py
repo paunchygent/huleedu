@@ -76,7 +76,7 @@ def test_settings(postgres_container: PostgresContainer) -> Settings:
         @property
         def DATABASE_URL(self) -> str:
             """Override to return test database URL."""
-            return object.__getattribute__(self, "_database_url")
+            return str(object.__getattribute__(self, "_database_url"))
 
     return TestSettings()
 

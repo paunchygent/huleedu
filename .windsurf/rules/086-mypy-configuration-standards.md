@@ -9,7 +9,7 @@ alwaysApply: false
 PDM editable installs create dual import paths causing MyPy errors:
 ```
 error: Source file found twice under different module names: 
-"services.libs.huleedu_service_libs" and "huleedu_service_libs"
+"libs.huleedu_service_libs" and "huleedu_service_libs"
 ```
 
 ## 2. Solution: Dual Configuration Pattern
@@ -18,11 +18,11 @@ error: Source file found twice under different module names:
 ```toml
 [tool.mypy]
 exclude = [
-    "services/libs/huleedu_service_libs/",  # Exclude file path version
+    "libs/huleedu_service_libs/",  # Exclude file path version
 ]
 ```
 
-### 2.2. Library MyPy (`services/libs/mypy.ini`)
+### 2.2. Library MyPy (`libs/mypy.ini`)
 ```ini
 [mypy]
 python_version = 3.11
@@ -60,7 +60,7 @@ ignore_missing_imports = true
 pdm run typecheck-all
 
 # Service libs checking  
-cd services/libs && mypy huleedu_service_libs --show-error-codes
+cd libs && mypy huleedu_service_libs --show-error-codes
 ```
 
 ## 4. Troubleshooting
@@ -68,7 +68,7 @@ cd services/libs && mypy huleedu_service_libs --show-error-codes
 ### Module Conflicts
 ```bash
 # Clear cache after config changes
-rm -rf .mypy_cache && cd services/libs && rm -rf .mypy_cache
+rm -rf .mypy_cache && cd libs && rm -rf .mypy_cache
 ```
 
 ### Import Verification
@@ -78,7 +78,7 @@ python -c "from huleedu_service_libs.database import DatabaseMetrics"
 ```
 
 ## 5. Standards
-- **MUST** exclude `services/libs/huleedu_service_libs/` in root config
+- **MUST** exclude `libs/huleedu_service_libs/` in root config
 - **MUST** use isolated `mypy.ini` for service libs  
 - **MUST** maintain both configurations for CI/CD
 
