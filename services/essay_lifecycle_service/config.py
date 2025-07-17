@@ -8,8 +8,12 @@ including Kafka connection settings, HTTP API configuration, and state persisten
 from __future__ import annotations
 
 from common_core.config_enums import Environment
+from dotenv import find_dotenv, load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env file from repository root, regardless of current working directory
+load_dotenv(find_dotenv(".env"))
 
 
 class Settings(BaseSettings):
@@ -48,15 +52,9 @@ class Settings(BaseSettings):
     DATABASE_POOL_SIZE: int = 20
 
     # PostgreSQL Configuration (production)
-    DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://huleedu_user:REDACTED_DEFAULT_PASSWORD@essay_lifecycle_db:5432/essay_lifecycle",
-        alias="ELS_DATABASE_URL",
-    )
     DATABASE_HOST: str = Field(default="essay_lifecycle_db", alias="ELS_DB_HOST")
     DATABASE_PORT: int = Field(default=5432, alias="ELS_DB_PORT")
     DATABASE_NAME: str = Field(default="essay_lifecycle", alias="ELS_DB_NAME")
-    DATABASE_USER: str = Field(default="huleedu_user", alias="HULEEDU_DB_USER")
-    DATABASE_PASSWORD: str = Field(default="REDACTED_DEFAULT_PASSWORD", alias="HULEEDU_DB_PASSWORD")
 
     # PostgreSQL Connection Pool Settings
     DATABASE_MAX_OVERFLOW: int = 20
@@ -103,7 +101,28 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        """Construct the PostgreSQL database URL from configuration settings."""
+        """Return the PostgreSQL database URL for both runtime and migrations.
+        
+        Standardized PostgreSQL configuration following HuleEdu pattern.
+        Uses environment-specific connection details.
+        """
+        import os
+
+        # Check for environment variable first (Docker environment)
+        env_url = os.getenv("ESSAY_LIFECYCLE_SERVICE_DATABASE_URL")
+        if env_url:
+            return env_url
+
+        # Fallback to local development configuration (loaded from .env via dotenv)
+        db_user = os.getenv("HULEEDU_DB_USER")
+        db_password = os.getenv("HULEEDU_DB_PASSWORD")
+        
+        if not db_user or not db_password:
+            raise ValueError(
+                "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
+                "HULEEDU_DB_PASSWORD are set in your .env file."
+            )
+        
         # For development/migration: map container names to localhost
         host = self.DATABASE_HOST
         port = self.DATABASE_PORT
@@ -113,7 +132,7 @@ class Settings(BaseSettings):
             host = "localhost"
             port = 5433  # External port from docker-compose
 
-        return f"postgresql+asyncpg://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}@{host}:{port}/{self.DATABASE_NAME}"
+        return f"postgresql+asyncpg://{db_user}:{db_password}@{host}:{port}/{self.DATABASE_NAME}"
 
 
 # Create a single instance for the application to use

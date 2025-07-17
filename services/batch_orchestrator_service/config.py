@@ -7,10 +7,14 @@ including environment-specific overrides and Pydantic-based settings validation.
 
 from __future__ import annotations
 
+from dotenv import find_dotenv, load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from common_core.config_enums import Environment
+
+# Load .env file from repository root, regardless of current working directory
+load_dotenv(find_dotenv(".env"))
 
 
 class Settings(BaseSettings):
@@ -39,15 +43,10 @@ class Settings(BaseSettings):
 
     # Database configuration
     DB_HOST: str = Field(default="localhost", validation_alias="BATCH_ORCHESTRATOR_DB_HOST")
-    DB_PORT: int = Field(default=5432, validation_alias="BATCH_ORCHESTRATOR_DB_PORT")
+    DB_PORT: int = Field(default=5438, validation_alias="BATCH_ORCHESTRATOR_DB_PORT")
     DB_NAME: str = Field(
         default="batch_orchestrator",
         validation_alias="BATCH_ORCHESTRATOR_DB_NAME",
-    )
-    DB_USER: str = Field(default="huleedu_user", validation_alias="BATCH_ORCHESTRATOR_DB_USER")
-    DB_PASSWORD: str = Field(
-        default="REDACTED_DEFAULT_PASSWORD",
-        validation_alias="BATCH_ORCHESTRATOR_DB_PASSWORD",
     )
     DB_POOL_SIZE: int = 5
     DB_MAX_OVERFLOW: int = 10
@@ -103,8 +102,31 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        """Construct the PostgreSQL database URL from configuration settings."""
-        return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        """Return the PostgreSQL database URL for both runtime and migrations.
+        
+        Standardized PostgreSQL configuration following HuleEdu pattern.
+        Uses environment-specific connection details.
+        """
+        import os
+
+        # Check for environment variable first (Docker environment)
+        env_url = os.getenv("BATCH_ORCHESTRATOR_SERVICE_DATABASE_URL")
+        if env_url:
+            return env_url
+
+        # Fallback to local development configuration (loaded from .env via dotenv)
+        import os
+        
+        db_user = os.getenv("HULEEDU_DB_USER")
+        db_password = os.getenv("HULEEDU_DB_PASSWORD")
+        
+        if not db_user or not db_password:
+            raise ValueError(
+                "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
+                "HULEEDU_DB_PASSWORD are set in your .env file."
+            )
+        
+        return f"postgresql+asyncpg://{db_user}:{db_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
 
 # Create a single instance for the application to use

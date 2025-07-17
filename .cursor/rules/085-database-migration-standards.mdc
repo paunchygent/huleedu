@@ -47,5 +47,62 @@ cd services/<service> && ../../.venv/bin/alembic current
 docker exec huleedu_<service>_db psql -U ${HULEEDU_DB_USER} -d <db> -c "\d <table>"
 ```
 
+## 6. Secure Configuration Pattern (MANDATORY)
+
+**All service config.py files MUST implement secure credential loading:**
+
+```python
+# Required imports at top of config.py
+from dotenv import find_dotenv, load_dotenv
+
+# Load .env file from repository root, regardless of current working directory
+load_dotenv(find_dotenv(".env"))
+
+# In database_url property
+@property
+def database_url(self) -> str:
+    """Return the PostgreSQL database URL for both runtime and migrations."""
+    import os
+
+    # Check for environment variable first (Docker environment)
+    env_url = os.getenv("SERVICE_DATABASE_URL")
+    if env_url:
+        return env_url
+
+    # Fallback to local development configuration (loaded from .env via dotenv)
+    db_user = os.getenv("HULEEDU_DB_USER")
+    db_password = os.getenv("HULEEDU_DB_PASSWORD")
+    
+    if not db_user or not db_password:
+        raise ValueError(
+            "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
+            "HULEEDU_DB_PASSWORD are set in your .env file."
+        )
+    
+    return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:{port}/{database}"
+```
+
+**Security Requirements:**
+- **NO hardcoded secrets** - Only example placeholder values allowed
+- **Automatic .env discovery** - Works from any working directory
+- **Clear error messages** - Guide developers to proper configuration
+- **Environment precedence** - Docker can override with specific URLs
+
+## 7. Operational Services (VERIFIED)
+
+**All 6 Alembic-enabled services are fully operational with secure configuration:**
+
+| Service | Database Port | Status | Security Status |
+|---------|---------------|--------|-----------------|
+| `cj_assessment_service` | 5434 | ✅ OPERATIONAL | ✅ SECURE |
+| `class_management_service` | 5435 | ✅ OPERATIONAL | ✅ SECURE |
+| `essay_lifecycle_service` | 5433 | ✅ OPERATIONAL | ✅ SECURE |
+| `batch_orchestrator_service` | 5438 | ✅ OPERATIONAL | ✅ SECURE |
+| `result_aggregator_service` | 5436 | ✅ OPERATIONAL | ✅ SECURE |
+| `spellchecker_service` | 5437 | ✅ OPERATIONAL | ✅ SECURE |
+
+**Integration verified:** All services successfully execute `../../.venv/bin/alembic current`
+**Security verified:** No hardcoded secrets in any configuration files
+
 ---
-**Understand state before changing. Use established tools.**
+**Understand state before changing. Use established tools. Never hardcode secrets.**

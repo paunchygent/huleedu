@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from dotenv import find_dotenv, load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env file from repository root, regardless of current working directory
+load_dotenv(find_dotenv(".env"))
 
 
 class Settings(BaseSettings):
@@ -19,10 +23,31 @@ class Settings(BaseSettings):
     HOST: str = Field(default="0.0.0.0")
     PORT: int = Field(default=4003)
 
-    # Database Configuration
-    DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://huledu:huledu_password@localhost:5436/result_aggregator"
-    )
+    @property
+    def DATABASE_URL(self) -> str:
+        """Return the PostgreSQL database URL for both runtime and migrations.
+        
+        Standardized PostgreSQL configuration following HuleEdu pattern.
+        Uses environment-specific connection details.
+        """
+        import os
+
+        # Check for environment variable first (Docker environment)
+        env_url = os.getenv("RESULT_AGGREGATOR_SERVICE_DATABASE_URL")
+        if env_url:
+            return env_url
+
+        # Fallback to local development configuration (loaded from .env via dotenv)
+        db_user = os.getenv("HULEEDU_DB_USER")
+        db_password = os.getenv("HULEEDU_DB_PASSWORD")
+        
+        if not db_user or not db_password:
+            raise ValueError(
+                "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
+                "HULEEDU_DB_PASSWORD are set in your .env file."
+            )
+        
+        return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5436/result_aggregator"
     DATABASE_POOL_SIZE: int = Field(default=20)
     DATABASE_MAX_OVERFLOW: int = Field(default=10)
 

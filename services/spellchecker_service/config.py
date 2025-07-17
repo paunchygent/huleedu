@@ -9,10 +9,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dotenv import find_dotenv, load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from common_core.config_enums import Environment
+
+# Load .env file from repository root, regardless of current working directory
+load_dotenv(find_dotenv(".env"))
 
 
 class Settings(BaseSettings):
@@ -31,8 +35,6 @@ class Settings(BaseSettings):
     # Database configuration
     DB_HOST: str = "spellchecker_db"
     DB_PORT: int = 5432
-    DB_USER: str = "huleedu_user"
-    DB_PASSWORD: str = "password"
     DB_NAME: str = "spellchecker"
 
     # Redis configuration for idempotency
@@ -116,18 +118,38 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        """Database URL for SQLAlchemy and Alembic."""
+        """Return the PostgreSQL database URL for both runtime and migrations.
+        
+        Standardized PostgreSQL configuration following HuleEdu pattern.
+        Uses environment-specific connection details.
+        """
         import os
 
-        # Check for environment variable first (Docker environment) - follows service naming pattern
+        # Check for environment variable first (Docker environment)
         env_url = os.getenv("SPELLCHECKER_SERVICE_DATABASE_URL")
         if env_url:
             return env_url
 
-        # Fallback to constructed URL for local development
-        db_user = os.getenv("HULEEDU_DB_USER", self.DB_USER)
-        db_password = os.getenv("HULEEDU_DB_PASSWORD", self.DB_PASSWORD)
-        return f"postgresql+asyncpg://{db_user}:{db_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        # Fallback to local development configuration (loaded from .env via dotenv)
+        db_user = os.getenv("HULEEDU_DB_USER")
+        db_password = os.getenv("HULEEDU_DB_PASSWORD")
+        
+        if not db_user or not db_password:
+            raise ValueError(
+                "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
+                "HULEEDU_DB_PASSWORD are set in your .env file."
+            )
+        
+        # For development/migration: map container names to localhost
+        host = self.DB_HOST
+        port = self.DB_PORT
+
+        # Map container database hosts to localhost for local development
+        if host == "spellchecker_db":
+            host = "localhost"
+            port = 5437  # External port from docker-compose
+
+        return f"postgresql+asyncpg://{db_user}:{db_password}@{host}:{port}/{self.DB_NAME}"
 
     model_config = SettingsConfigDict(
         env_file=".env",

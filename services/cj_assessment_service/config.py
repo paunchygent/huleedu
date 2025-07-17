@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from dotenv import find_dotenv, load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from common_core import Environment, LLMProviderType
+
+# Load .env file from repository root, regardless of current working directory
+load_dotenv(find_dotenv(".env"))
 
 
 class Settings(BaseSettings):
@@ -55,9 +59,16 @@ class Settings(BaseSettings):
         if env_url:
             return env_url
 
-        # Fallback to local development configuration
-        db_user = os.getenv("HULEEDU_DB_USER", "huleedu_user")
-        db_password = os.getenv("HULEEDU_DB_PASSWORD", "ted5?SUCwef3-JIVres6!DEK")
+        # Fallback to local development configuration (loaded from .env via dotenv)
+        db_user = os.getenv("HULEEDU_DB_USER")
+        db_password = os.getenv("HULEEDU_DB_PASSWORD")
+        
+        if not db_user or not db_password:
+            raise ValueError(
+                "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
+                "HULEEDU_DB_PASSWORD are set in your .env file."
+            )
+        
         return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5434/cj_assessment"
 
     # Default LLM provider for centralized service requests
