@@ -176,4 +176,4 @@ Circuit breakers protect Kafka publishing operations and are configured via `SPE
 
 ## License
 
-[Your License Here]
+Apache License 2.0

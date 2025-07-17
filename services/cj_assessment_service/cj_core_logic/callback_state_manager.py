@@ -494,7 +494,8 @@ async def _update_batch_completion_counters(
         ):
             batch_state.partial_scoring_triggered = True
             logger.info(
-                f"Batch {batch_id} partial scoring triggered at {batch_state.completion_threshold_pct}% completion"
+                f"Batch {batch_id} partial scoring triggered at "
+                f"{batch_state.completion_threshold_pct}% completion"
             )
 
     except Exception as e:

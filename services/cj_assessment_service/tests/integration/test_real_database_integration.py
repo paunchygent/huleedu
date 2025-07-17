@@ -10,7 +10,8 @@ This demonstrates the proper way to do integration testing:
 
 import json
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -29,10 +30,8 @@ from common_core.status_enums import BatchStatus, ProcessingStage
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.protocols import (
-    CJEventPublisherProtocol,
     CJRepositoryProtocol,
     ContentClientProtocol,
-    LLMInteractionProtocol,
 )
 
 if TYPE_CHECKING:
@@ -117,10 +116,10 @@ class TestRealDatabaseIntegration:
         self,
         postgres_repository: CJRepositoryProtocol,
         mock_content_client: ContentClientProtocol,
-        mock_event_publisher: CJEventPublisherProtocol,
-        mock_llm_interaction: LLMInteractionProtocol,
+        mock_event_publisher: AsyncMock,
+        mock_llm_interaction: AsyncMock,
         test_settings: Settings,
-        db_verification_helpers,
+        db_verification_helpers: Any,
     ) -> None:
         """Test complete batch lifecycle with real database operations."""
         # Arrange
@@ -179,7 +178,7 @@ class TestRealDatabaseIntegration:
     async def test_database_isolation_between_tests(
         self,
         postgres_repository: CJRepositoryProtocol,
-        db_verification_helpers,
+        db_verification_helpers: Any,
     ) -> None:
         """Test that database transactions are properly isolated between tests."""
         # This test should start with a clean database
@@ -210,7 +209,7 @@ class TestRealDatabaseIntegration:
     async def test_real_database_operations_with_postgresql(
         self,
         postgres_repository: CJRepositoryProtocol,
-        db_verification_helpers,
+        db_verification_helpers: Any,
     ) -> None:
         """Test with PostgreSQL for production parity (marked as expensive)."""
         # This test uses the postgres_repository fixture
@@ -298,7 +297,7 @@ class TestRealDatabaseIntegration:
 
     async def test_llm_interaction_parameter_usage(
         self,
-        mock_llm_interaction: LLMInteractionProtocol,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test that LLM interaction mock uses all parameters meaningfully."""
         from services.cj_assessment_service.models_api import ComparisonTask, EssayForComparison

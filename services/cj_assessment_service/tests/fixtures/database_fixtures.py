@@ -169,21 +169,25 @@ def mock_content_client() -> AsyncMock:
             "Climate change presents one of the greatest challenges of our time. "
             "Rising temperatures, extreme weather events, and ecosystem disruption "
             "demand immediate global action. "
-            "Sustainable solutions require cooperation between governments, businesses, and individuals."
+            "Sustainable solutions require cooperation between governments, "
+            "businesses, and individuals."
         ),
         (
             "The importance of mental health awareness cannot be overstated. "
-            "Breaking down stigmas and providing accessible support services are crucial steps toward a healthier society. "
+            "Breaking down stigmas and providing accessible support services "
+            "are crucial steps toward a healthier society. "
             "Early intervention and education play key roles in mental wellness."
         ),
         (
             "Artificial intelligence is reshaping industries across the globe. "
-            "From healthcare diagnostics to financial analysis, AI applications continue to expand. "
+            "From healthcare diagnostics to financial analysis, "
+            "AI applications continue to expand. "
             "However, ethical considerations and responsible development remain paramount concerns."
         ),
         (
             "Cultural diversity enriches our communities in countless ways. "
-            "Embracing different perspectives, traditions, and experiences fosters innovation and understanding. "
+            "Embracing different perspectives, traditions, and experiences "
+            "fosters innovation and understanding. "
             "Building inclusive societies requires ongoing effort and open dialogue."
         ),
     ]
@@ -262,7 +266,8 @@ def mock_llm_interaction() -> AsyncMock:
             assessment = LLMAssessmentResponseSchema(
                 winner=winner,
                 confidence=min(5.0, confidence_value),  # Cap at 5.0
-                justification=f"Essay {winner.value} demonstrates stronger argumentation and clarity.",
+                justification=f"Essay {winner.value} demonstrates stronger "
+                             f"argumentation and clarity.",
             )
 
             # Create comparison result
@@ -298,7 +303,7 @@ def mock_event_publisher() -> AsyncMock:
 
 
 @pytest.fixture
-def db_verification_helpers():
+def db_verification_helpers() -> Any:
     """Provide database verification helper functions using production models."""
     from services.cj_assessment_service.models_db import CJBatchUpload, ProcessedEssay
 
@@ -337,22 +342,22 @@ def db_verification_helpers():
 
 
 @pytest.fixture
-def performance_test_markers():
+def performance_test_markers() -> Any:
     """Provide performance test classification markers."""
 
     class PerformanceMarkers:
         @staticmethod
-        def mark_expensive():
+        def mark_expensive() -> Any:
             """Mark test as expensive (requires PostgreSQL)."""
             return pytest.mark.expensive
 
         @staticmethod
-        def mark_fast():
+        def mark_fast() -> Any:
             """Mark test as fast (uses SQLite)."""
             return pytest.mark.fast
 
         @staticmethod
-        def mark_integration():
+        def mark_integration() -> Any:
             """Mark test as integration."""
             return pytest.mark.integration
 

@@ -222,7 +222,7 @@ class TestErrorHandlingIntegration:
             )
 
             # Create essays that will be referenced by comparison pair
-            essay_a = await postgres_repository.create_or_update_cj_processed_essay(
+            await postgres_repository.create_or_update_cj_processed_essay(
                 session=session,
                 cj_batch_id=batch.id,
                 els_essay_id="essay-a",
@@ -230,7 +230,7 @@ class TestErrorHandlingIntegration:
                 assessment_input_text="Essay A content for comparison",
             )
 
-            essay_b = await postgres_repository.create_or_update_cj_processed_essay(
+            await postgres_repository.create_or_update_cj_processed_essay(
                 session=session,
                 cj_batch_id=batch.id,
                 els_essay_id="essay-b",

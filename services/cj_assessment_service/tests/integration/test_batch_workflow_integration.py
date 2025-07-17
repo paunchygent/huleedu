@@ -8,8 +8,8 @@ Migrated from over-mocked to real database implementation.
 import asyncio
 import json
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -38,7 +38,6 @@ from services.cj_assessment_service.models_db import (
     ComparisonPair,
 )
 from services.cj_assessment_service.protocols import (
-    CJEventPublisherProtocol,
     CJRepositoryProtocol,
 )
 
@@ -70,7 +69,7 @@ class TestBatchWorkflowIntegration:
     def test_monitor(
         self,
         postgres_repository: CJRepositoryProtocol,
-        mock_event_publisher: CJEventPublisherProtocol,
+        mock_event_publisher: AsyncMock,
         test_settings: Settings,
     ) -> BatchMonitor:
         """Create a batch monitor instance."""
@@ -222,9 +221,9 @@ class TestBatchWorkflowIntegration:
     async def test_full_batch_lifecycle(
         self,
         postgres_repository: CJRepositoryProtocol,
-        mock_event_publisher: CJEventPublisherProtocol,
-        mock_content_client,
-        mock_llm_interaction,
+        mock_event_publisher: AsyncMock,
+        mock_content_client: AsyncMock,
+        mock_llm_interaction: AsyncMock,
         test_settings: Settings,
     ) -> None:
         """Test batch from creation through callbacks to completion."""
@@ -279,7 +278,7 @@ class TestBatchWorkflowIntegration:
     async def test_batch_monitoring_recovery(
         self,
         postgres_repository: CJRepositoryProtocol,
-        mock_event_publisher: CJEventPublisherProtocol,
+        mock_event_publisher: AsyncMock,
         test_monitor: BatchMonitor,
     ) -> None:
         """Test stuck batch detection and recovery."""
@@ -331,7 +330,7 @@ class TestBatchWorkflowIntegration:
             # Act - Run batch monitor with mocked sleep
             sleep_call_count = 0
 
-            async def mock_sleep(duration):
+            async def mock_sleep(duration: Any) -> None:
                 nonlocal sleep_call_count
                 sleep_call_count += 1
                 # After the first sleep, let one iteration run then stop
@@ -352,9 +351,9 @@ class TestBatchWorkflowIntegration:
     async def test_concurrent_callback_processing(
         self,
         postgres_repository: CJRepositoryProtocol,
-        mock_event_publisher: CJEventPublisherProtocol,
-        mock_content_client,
-        mock_llm_interaction,
+        mock_event_publisher: AsyncMock,
+        mock_content_client: AsyncMock,
+        mock_llm_interaction: AsyncMock,
         test_settings: Settings,
     ) -> None:
         """Test race conditions with concurrent callbacks using real PostgreSQL database."""
@@ -484,9 +483,9 @@ class TestBatchWorkflowIntegration:
     async def test_partial_batch_completion(
         self,
         postgres_repository: CJRepositoryProtocol,
-        mock_event_publisher: CJEventPublisherProtocol,
-        mock_content_client,
-        mock_llm_interaction,
+        mock_event_publisher: AsyncMock,
+        mock_content_client: AsyncMock,
+        mock_llm_interaction: AsyncMock,
         test_settings: Settings,
     ) -> None:
         """Test partial completion threshold triggering using real PostgreSQL database."""

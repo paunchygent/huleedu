@@ -23,11 +23,6 @@ dependencies = [
     "PyJWT",  # For test authentication
 ]
 
-[tool.pdm]
-distribution = false
-
-# PDM configuration - using defaults (inherit_metadata=True is already default)
-
 [dependency-groups]
 # Tools for overall monorepo management - let PDM resolve latest compatible versions
 monorepo-tools = [
@@ -48,75 +43,8 @@ monorepo-tools = [
 
 # Install all services and common_core for unified development
 dev = [
-    "-e file:///${PROJECT_ROOT}/libs/common_core",
-    "-e file:///${PROJECT_ROOT}/libs/huleedu_service_libs",
-    "-e file:///${PROJECT_ROOT}/services/content_service",
-    "-e file:///${PROJECT_ROOT}/services/spellchecker_service",
-    "-e file:///${PROJECT_ROOT}/services/batch_orchestrator_service",
-    "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service",
-    "-e file:///${PROJECT_ROOT}/services/file_service",
-    "-e file:///${PROJECT_ROOT}/services/cj_assessment_service",
-    "-e file:///${PROJECT_ROOT}/services/class_management_service",
-    "-e file:///${PROJECT_ROOT}/services/api_gateway_service",
-    "-e file:///${PROJECT_ROOT}/services/result_aggregator_service",
-    "-e file:///${PROJECT_ROOT}/services/llm_provider_service"
+    "coverage>=7.9.2",
 ]
-
-[tool.pdm.scripts]
-# Monorepo-wide scripts
-format-all = "ruff format --force-exclude ."
-check-imports = "python scripts/check_import_patterns.py"
-lint-all = {composite = ["ruff check --force-exclude .", "python scripts/check_import_patterns.py"]}
-lint-fix = "ruff check --fix --force-exclude ."
-typecheck-all = "mypy --config-file pyproject.toml ."
-test-all = "pytest"
-test-parallel = "pytest -n auto"
-test-sequential = "pytest -n 0"
-test-expensive = "pytest -m expensive -v --tb=short"
-test-providers = "pytest services/*/tests/integration/ -m expensive -v"
-
-# Docker convenience scripts - Development workflow
-# Quick commands
-dc-up = "docker compose up -d"  # Start services (uses existing images)
-dc-build = "docker compose up -d --build"  # Rebuild and start services
-dc-down = "docker compose down --remove-orphans"  # Stop and clean up
-dc-logs = "docker compose logs --tail=100"  # Get logs with last 100 lines
-dc-ps = "docker compose ps"  # Show running services
-
-# Service-specific commands (use service names as arguments)
-dc-restart = "docker compose restart"  # Restart service: pdm run dc-restart api_gateway_service
-dc-rebuild = "docker compose up -d --build"  # Rebuild specific service: pdm run dc-rebuild batch_orchestrator_service
-dc-logs-service = "docker compose logs -f --tail=50"  # Logs for specific service: pdm run dc-logs-service content_service
-
-# Development workflow commands
-dev-up = "docker compose up -d"  # Start with volume mounts (uses override file)
-dev-build = "DOCKER_BUILDKIT=1 docker compose build --parallel"  # Fast parallel build
-dev-rebuild = {composite = ["docker compose down --remove-orphans", "DOCKER_BUILDKIT=1 docker compose build --parallel", "docker compose up -d"]}
-dev-fresh = "docker compose build --no-cache"  # Force fresh build (when caching issues occur)
-
-# System management
-docker-reset = {composite = ["docker compose down --remove-orphans --volumes", "docker compose build", "docker compose up -d"]}  # Full reset including volumes
-docker-clean = "docker system prune -af --volumes"  # Clean all unused Docker resources (use with caution!)
-
-# Individual service development
-dev-content = "pdm run -p services/content_service dev"
-dev-batch = "pdm run -p services/batch_orchestrator_service dev"
-dev-file = "pdm run -p services/file_service dev"
-run-spellchecker = "pdm run -p services/spellchecker_service start_worker"
-dev-gateway = "pdm run -p services/api_gateway_service dev"
-dev-aggregator = "pdm run -p services/result_aggregator_service dev"
-dev-llm = "pdm run -p services/llm_provider_service dev"
-
-# Build common_core wheel
-build-common-core = "pdm build -p libs/common_core"
-
-# Kafka infrastructure
-kafka-setup-topics = "python scripts/kafka_topic_bootstrap.py"
-
-# Observability is integrated into main stack - use standard docker compose commands
-obs-restart = "docker compose restart prometheus grafana loki jaeger promtail alertmanager"
-obs-logs = "docker compose logs -f prometheus grafana loki jaeger promtail alertmanager"
-obs-status = "docker compose ps prometheus grafana loki jaeger promtail alertmanager"
 
 [tool.ruff]
 line-length = 100
@@ -253,6 +181,47 @@ module = [
 ]
 ignore_missing_imports = true
 
+[tool.coverage.run]
+source = ["."] 
+omit = [
+    "*test*",
+    "*__pycache__*",
+    "*venv*",
+    "*.venv*",
+    "*migrations*",
+    "*setup.py",
+    "*__init__.py",
+    "*__dishka_*",
+    "*dist-packages*",
+    "*site-packages*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "raise ImportError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+    "if TYPE_CHECKING:",
+    "@overload",
+    "@abstractmethod",
+    "@property",
+    "@classmethod",
+    "@staticmethod",
+    "def __new__",
+    "def __init__",
+    "def __call__",
+    "raise NotImplemented",
+    "@pytest.fixture",
+    "@pytest.mark",
+    "@pytest.skip",
+    "@pytest.mark.skip",
+    "@pytest.mark.skipif",
+]
+
 [tool.pytest.ini_options]
 
 testpaths = [
@@ -297,6 +266,81 @@ filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources",
 ]
 
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.scripts]
+# Monorepo-wide scripts
+format-all = "ruff format --force-exclude ."
+check-imports = "python scripts/check_import_patterns.py"
+lint-all = {composite = ["ruff check --force-exclude .", "python scripts/check_import_patterns.py"]}
+lint-fix = "ruff check --fix --force-exclude ."
+typecheck-all = "mypy --config-file pyproject.toml ."
+test-all = "pytest"
+test-parallel = "pytest -n auto"
+test-sequential = "pytest -n 0"
+test-expensive = "pytest -m expensive -v --tb=short"
+test-providers = "pytest services/*/tests/integration/ -m expensive -v"
+
+# Docker convenience scripts - Development workflow
+# Quick commands
+dc-up = "docker compose up -d"  # Start services (uses existing images)
+dc-build = "docker compose up -d --build"  # Rebuild and start services
+dc-down = "docker compose down --remove-orphans"  # Stop and clean up
+dc-logs = "docker compose logs --tail=100"  # Get logs with last 100 lines
+dc-ps = "docker compose ps"  # Show running services
+
+# Service-specific commands (use service names as arguments)
+dc-restart = "docker compose restart"  # Restart service: pdm run dc-restart api_gateway_service
+dc-rebuild = "docker compose up -d --build"  # Rebuild specific service: pdm run dc-rebuild batch_orchestrator_service
+dc-logs-service = "docker compose logs -f --tail=50"  # Logs for specific service: pdm run dc-logs-service content_service
+
+# Development workflow commands
+dev-up = "docker compose up -d"  # Start with volume mounts (uses override file)
+dev-build = "DOCKER_BUILDKIT=1 docker compose build --parallel"  # Fast parallel build
+dev-rebuild = {composite = ["docker compose down --remove-orphans", "DOCKER_BUILDKIT=1 docker compose build --parallel", "docker compose up -d"]}
+dev-fresh = "docker compose build --no-cache"  # Force fresh build (when caching issues occur)
+
+# System management
+docker-reset = {composite = ["docker compose down --remove-orphans --volumes", "docker compose build", "docker compose up -d"]}  # Full reset including volumes
+docker-clean = "docker system prune -af --volumes"  # Clean all unused Docker resources (use with caution!)
+
+# Individual service development
+dev-content = "pdm run -p services/content_service dev"
+dev-batch = "pdm run -p services/batch_orchestrator_service dev"
+dev-file = "pdm run -p services/file_service dev"
+run-spellchecker = "pdm run -p services/spellchecker_service start_worker"
+dev-gateway = "pdm run -p services/api_gateway_service dev"
+dev-aggregator = "pdm run -p services/result_aggregator_service dev"
+dev-llm = "pdm run -p services/llm_provider_service dev"
+
+# Build common_core wheel
+build-common-core = "pdm build -p libs/common_core"
+
+# Kafka infrastructure
+kafka-setup-topics = "python scripts/kafka_topic_bootstrap.py"
+
+# Observability is integrated into main stack - use standard docker compose commands
+obs-restart = "docker compose restart prometheus grafana loki jaeger promtail alertmanager"
+obs-logs = "docker compose logs -f prometheus grafana loki jaeger promtail alertmanager"
+obs-status = "docker compose ps prometheus grafana loki jaeger promtail alertmanager"
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "-e file:///${PROJECT_ROOT}/libs/common_core",
+    "-e file:///${PROJECT_ROOT}/libs/huleedu_service_libs",
+    "-e file:///${PROJECT_ROOT}/services/content_service",
+    "-e file:///${PROJECT_ROOT}/services/spellchecker_service",
+    "-e file:///${PROJECT_ROOT}/services/batch_orchestrator_service",
+    "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service",
+    "-e file:///${PROJECT_ROOT}/services/file_service",
+    "-e file:///${PROJECT_ROOT}/services/cj_assessment_service",
+    "-e file:///${PROJECT_ROOT}/services/class_management_service",
+    "-e file:///${PROJECT_ROOT}/services/api_gateway_service",
+    "-e file:///${PROJECT_ROOT}/services/result_aggregator_service",
+    "-e file:///${PROJECT_ROOT}/services/llm_provider_service",
+]
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
