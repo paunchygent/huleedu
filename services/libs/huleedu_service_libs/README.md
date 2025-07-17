@@ -880,7 +880,7 @@ def create_app() -> HuleEduApp:
     app = HuleEduApp(__name__)
     
     # IMMEDIATE initialization - satisfies non-optional contract
-    app.database_engine = create_async_engine(DATABASE_URL)
+    app.database_engine = create_async_engine(settings.DATABASE_URL)
     app.container = make_async_container(ServiceProvider())
     
     # Extensions already initialized to empty dict
@@ -997,7 +997,7 @@ def create_app() -> HuleEduApp:
     app = HuleEduApp(__name__)
     
     # IMMEDIATE initialization - satisfies non-optional contract
-    app.database_engine = create_async_engine(DATABASE_URL)
+    app.database_engine = create_async_engine(settings.DATABASE_URL)
     app.container = make_async_container(ServiceProvider())
     
     return app
@@ -1350,7 +1350,7 @@ logger.info("Processing event", event_id=event_id, user_id=user_id)
 
 **Before**:
 ```python
-engine = create_async_engine(DATABASE_URL)
+engine = create_async_engine(settings.DATABASE_URL)
 # No monitoring
 ```
 
@@ -1358,7 +1358,7 @@ engine = create_async_engine(DATABASE_URL)
 ```python
 from huleedu_service_libs.database import setup_database_monitoring
 
-engine = create_async_engine(DATABASE_URL)
+engine = create_async_engine(settings.DATABASE_URL)
 db_metrics = setup_database_monitoring(engine, "my_service")
 # Automatic connection pool and query metrics
 ```

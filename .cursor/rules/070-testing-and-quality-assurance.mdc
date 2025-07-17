@@ -253,6 +253,51 @@ tests/performance/
 ├── test_database_bulk_*.py       # Database bulk operation patterns
 ```
 
+## 8. Database Configuration Standards
+
+### 8.1. DATABASE_URL Pattern Requirements
+- **MANDATORY**: All database configuration references **MUST** use UPPERCASE `DATABASE_URL` pattern
+- **Environment Variables**: `DATABASE_URL`, `SERVICE_DATABASE_URL`, `DATABASE_URL_CJ`
+- **Settings Access**: `settings.DATABASE_URL` (not `settings.database_url`)
+- **Test Overrides**: UPPERCASE field override pattern required
+
+### 8.2. Test Database Configuration
+```python
+# ✅ CORRECT - Test settings with UPPERCASE DATABASE_URL
+class TestSettings(Settings):
+    def __init__(self, database_url: str) -> None:
+        super().__init__()
+        object.__setattr__(self, '_database_url', database_url)
+
+    @property  
+    def DATABASE_URL(self) -> str:
+        return object.__getattribute__(self, '_database_url')
+```
+
+### 8.3. Database Configuration Anti-Patterns
+```python
+# ❌ FORBIDDEN - Lowercase database_url in environment context
+settings.database_url  # Wrong for environment variables
+
+# ❌ FORBIDDEN - Missing settings prefix in examples
+create_async_engine(DATABASE_URL)  # Wrong - missing settings.
+
+# ❌ FORBIDDEN - Mixed case environment variables
+Database_URL  # Wrong - use DATABASE_URL
+```
+
+### 8.4. Correct Database Configuration Patterns
+```python
+# ✅ CORRECT - Proper settings access
+create_async_engine(settings.DATABASE_URL)
+
+# ✅ CORRECT - Service-specific database URLs
+DATABASE_URL_CJ=postgresql+asyncpg://user:pass@host:5432/db
+
+# ✅ CORRECT - Test database configuration
+os.environ["SERVICE_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+```
+
 ---
 **Fix underlying issues, don't simplify tests.**
 ===

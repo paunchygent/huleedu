@@ -41,13 +41,20 @@ class FunctionalTestSettings(Settings):
     """Override settings for testing."""
 
     def __init__(self, database_url: str, redis_url: str) -> None:
+        # Initialize parent first to set up Pydantic machinery
         super().__init__()
-        self.DATABASE_URL = database_url
+        # Then set our custom attributes
+        object.__setattr__(self, '_database_url', database_url)
         self.REDIS_URL = redis_url
         self.CACHE_ENABLED = True
         self.REDIS_CACHE_TTL_SECONDS = 60  # Shorter TTL for testing
         self.INTERNAL_API_KEY = "test-api-key"
         self.ALLOWED_SERVICE_IDS = ["test-service"]
+
+    @property
+    def DATABASE_URL(self) -> str:
+        """Override to return test database URL."""
+        return object.__getattribute__(self, '_database_url')
 
 
 class FunctionalTestResultAggregatorApp(Quart):

@@ -207,6 +207,7 @@ async def test_orchestrator_queues_when_provider_unavailable(
         essay_a="A",
         essay_b="B",
         correlation_id=correlation_id,
+        callback_topic="huleedu.cj_assessment.completed.v1",
     )
 
     # Assert

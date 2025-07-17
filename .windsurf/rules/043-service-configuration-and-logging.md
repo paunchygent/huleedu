@@ -40,6 +40,32 @@ settings = Settings()
 - Use `settings.FIELD_NAME` instead of `os.getenv()`
 - Sensitive info **MUST NEVER** be hardcoded
 
+### 2.3. DATABASE_URL Naming Standards
+- **MANDATORY**: Database configuration **MUST** use UPPERCASE `DATABASE_URL` pattern
+- **Environment Variables**: `DATABASE_URL`, `SERVICE_DATABASE_URL`, `DATABASE_URL_CJ`
+- **Settings Access**: `settings.DATABASE_URL` (not `settings.database_url`)
+- **Code Examples**: `create_async_engine(settings.DATABASE_URL)`
+
+**Correct Pattern**:
+```python
+class Settings(BaseSettings):
+    DATABASE_URL: str = "postgresql+asyncpg://user:pass@localhost:5432/db"
+    # Service-specific variants allowed
+    DATABASE_URL_CJ: str = "postgresql+asyncpg://user:pass@localhost:5432/cj_db"
+```
+
+**Anti-Patterns**:
+```python
+# ❌ FORBIDDEN - Lowercase field names
+database_url: str  # Wrong - use DATABASE_URL
+
+# ❌ FORBIDDEN - Missing settings prefix
+create_async_engine(DATABASE_URL)  # Wrong - use settings.DATABASE_URL
+
+# ❌ FORBIDDEN - Mixed case
+Database_URL: str  # Wrong - use DATABASE_URL
+```
+
 ## 3. Logging
 
 ### 3.1. Centralized Logging Utility

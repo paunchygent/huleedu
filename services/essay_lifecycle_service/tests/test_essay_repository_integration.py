@@ -34,6 +34,22 @@ class TestPostgreSQLEssayRepositoryIntegration:
         yield container
         container.stop()
 
+    class PostgreSQLTestSettings(Settings):
+        """Test settings that override DATABASE_URL property."""
+        
+        def __init__(self, database_url: str) -> None:
+            super().__init__()
+            object.__setattr__(self, '_database_url', database_url)
+            self.DATABASE_POOL_SIZE = 2
+            self.DATABASE_MAX_OVERFLOW = 1
+            self.DATABASE_POOL_PRE_PING = True
+            self.DATABASE_POOL_RECYCLE = 3600
+        
+        @property
+        def DATABASE_URL(self) -> str:
+            """Override to return test database URL."""
+            return object.__getattribute__(self, '_database_url')
+
     @pytest.fixture
     def test_settings(self, postgres_container: PostgresContainer) -> Settings:
         """Create test settings pointing to the test container database."""
@@ -44,14 +60,8 @@ class TestPostgreSQLEssayRepositoryIntegration:
         elif "postgresql://" in connection_url:
             connection_url = connection_url.replace("postgresql://", "postgresql+asyncpg://")
 
-        # Create settings instance with test database configuration
-        settings = Settings()
-        settings.DATABASE_URL = connection_url
-        settings.DATABASE_POOL_SIZE = 2
-        settings.DATABASE_MAX_OVERFLOW = 1
-        settings.DATABASE_POOL_PRE_PING = True
-        settings.DATABASE_POOL_RECYCLE = 3600
-        return settings
+        # Create test settings instance with test database configuration
+        return self.PostgreSQLTestSettings(database_url=connection_url)
 
     @pytest.fixture
     def sample_entity_reference(self) -> EntityReference:

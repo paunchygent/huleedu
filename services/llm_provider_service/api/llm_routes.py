@@ -307,3 +307,49 @@ async def test_provider(
                 "details": str(e),
             }
         ), 500
+
+
+@llm_bp.route("/status/<string:queue_id>", methods=["GET"])
+@inject
+async def get_queue_status(
+    queue_id: str,
+    tracer: FromDishka[TraceContextManagerImpl],
+) -> Response | tuple[Response, int]:
+    """Get status of a queued request."""
+    correlation_id = uuid4()
+
+    try:
+        with tracer.start_api_request_span("get_queue_status", correlation_id):
+            # For now, return 404 for all queue IDs since queue persistence isn't implemented
+            return jsonify({"error": f"Queue ID {queue_id} not found"}), 404
+    except Exception as e:
+        logger.error(
+            "Error getting queue status",
+            error=str(e),
+            queue_id=queue_id,
+            correlation_id=str(correlation_id),
+        )
+        return jsonify({"error": f"Failed to get status: {e}"}), 500
+
+
+@llm_bp.route("/results/<string:queue_id>", methods=["GET"])
+@inject
+async def get_queue_results(
+    queue_id: str,
+    tracer: FromDishka[TraceContextManagerImpl],
+) -> Response | tuple[Response, int]:
+    """Get results of a queued request."""
+    correlation_id = uuid4()
+
+    try:
+        with tracer.start_api_request_span("get_queue_results", correlation_id):
+            # For now, return 404 for all queue IDs since queue persistence isn't implemented
+            return jsonify({"error": f"Queue ID {queue_id} not found"}), 404
+    except Exception as e:
+        logger.error(
+            "Error getting queue results",
+            error=str(e),
+            queue_id=queue_id,
+            correlation_id=str(correlation_id),
+        )
+        return jsonify({"error": f"Failed to get results: {e}"}), 500

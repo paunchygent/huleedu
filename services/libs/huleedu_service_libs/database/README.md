@@ -37,7 +37,7 @@ from huleedu_service_libs.database import setup_database_monitoring
 from sqlalchemy.ext.asyncio import create_async_engine
 
 # Setup database monitoring for a service
-engine = create_async_engine(database_url)
+engine = create_async_engine(settings.DATABASE_URL)
 db_metrics = setup_database_monitoring(engine, service_name="content_service")
 
 # Get metrics dictionary for service integration
