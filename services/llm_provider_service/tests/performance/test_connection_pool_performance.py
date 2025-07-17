@@ -9,8 +9,8 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
-
 from common_core import LLMProviderType
+
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.protocols import ConnectionPoolManagerProtocol
 

@@ -14,12 +14,12 @@ import uuid
 from typing import AsyncGenerator
 
 import pytest
+from common_core.domain_enums import CourseCode
+from common_core.metadata_models import PersonNameV1
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
-from common_core.domain_enums import CourseCode
-from common_core.metadata_models import PersonNameV1
 from services.class_management_service.api_models import (
     CreateClassRequest,
     CreateStudentRequest,

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from common_core.status_enums import CJBatchStateEnum
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core.status_enums import CJBatchStateEnum
 from services.cj_assessment_service.exceptions import DatabaseOperationError
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 

@@ -8,6 +8,7 @@ and compatibility with dependency injection patterns.
 from __future__ import annotations
 
 from common_core.error_enums import FileValidationErrorCode
+
 from services.file_service.protocols import ContentValidatorProtocol
 from services.file_service.validation_models import ValidationResult
 

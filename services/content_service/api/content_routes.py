@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from common_core.observability_enums import OperationType
+from common_core.status_enums import OperationStatus
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Blueprint, Response, jsonify, request, send_file
 from quart_dishka import inject
 
-from common_core.observability_enums import OperationType
-from common_core.status_enums import OperationStatus
 from services.content_service.protocols import ContentMetricsProtocol, ContentStoreProtocol
 
 logger = create_service_logger("content.api.content")

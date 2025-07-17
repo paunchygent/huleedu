@@ -10,16 +10,6 @@ if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
 
 from aiokafka import ConsumerRecord
-from huleedu_service_libs.error_handling.error_detail_factory import (
-    create_error_detail_with_context,
-)
-from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.observability import (
-    inject_trace_context,
-    trace_operation,
-    use_trace_context,
-)
-
 from common_core.error_enums import ErrorCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import (
@@ -32,6 +22,16 @@ from common_core.events.llm_provider_events import LLMComparisonResultV1
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import BatchStatus, ProcessingStage
+from huleedu_service_libs.error_handling.error_detail_factory import (
+    create_error_detail_with_context,
+)
+from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.observability import (
+    inject_trace_context,
+    trace_operation,
+    use_trace_context,
+)
+
 from services.cj_assessment_service.cj_core_logic import run_cj_assessment_workflow
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.exceptions import (

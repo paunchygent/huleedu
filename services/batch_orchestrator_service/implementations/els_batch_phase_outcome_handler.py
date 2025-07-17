@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from huleedu_service_libs.logging_utils import create_service_logger
-
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
+from huleedu_service_libs.logging_utils import create_service_logger
+
 from services.batch_orchestrator_service.protocols import PipelinePhaseCoordinatorProtocol
 
 logger = create_service_logger("bos.handlers.els_batch_phase_outcome")

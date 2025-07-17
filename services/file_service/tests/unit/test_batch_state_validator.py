@@ -7,8 +7,8 @@ from typing import Any, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from common_core.pipeline_models import PipelineExecutionStatus
+
 from services.file_service.implementations.batch_state_validator import BOSBatchStateValidator
 
 

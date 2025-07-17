@@ -20,10 +20,10 @@ from uuid import uuid4
 
 import aiohttp
 import pytest
+from common_core.error_enums import ErrorCode
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from pydantic import ValidationError
 
-from common_core.error_enums import ErrorCode
 from services.spellchecker_service.event_processor import _categorize_processing_error
 
 

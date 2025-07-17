@@ -9,8 +9,6 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from common_core import LLMProviderType
 from common_core.domain_enums import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
@@ -18,6 +16,8 @@ from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1, TokenUsage
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import CJBatchStateEnum
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.event_processor import process_llm_result
@@ -229,18 +229,18 @@ class TestErrorHandlingIntegration:
                 text_storage_id="storage-a",
                 assessment_input_text="Essay A content for comparison",
             )
-            
+
             essay_b = await postgres_repository.create_or_update_cj_processed_essay(
                 session=session,
                 cj_batch_id=batch.id,
-                els_essay_id="essay-b", 
+                els_essay_id="essay-b",
                 text_storage_id="storage-b",
                 assessment_input_text="Essay B content for comparison",
             )
 
             # Create comparison pair using SQLAlchemy model (after essays exist)
             from services.cj_assessment_service.models_db import ComparisonPair
-            
+
             comparison_pair = ComparisonPair(
                 cj_batch_id=batch.id,
                 essay_a_els_id="essay-a",

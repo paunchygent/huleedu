@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from common_core.pipeline_models import PhaseName
+from common_core.status_enums import BatchStatus
 from sqlalchemy import (
     JSON,
     DateTime,
@@ -17,8 +19,6 @@ from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from common_core.pipeline_models import PhaseName
-from common_core.status_enums import BatchStatus
 from services.batch_orchestrator_service.enums_db import (
     PhaseStatusEnum,
 )

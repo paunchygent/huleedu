@@ -11,9 +11,9 @@ import time
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
+from common_core import QueueStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core import QueueStatus
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.protocols import QueueRepositoryProtocol
 from services.llm_provider_service.queue_models import QueuedRequest, QueueHealthMetrics

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 from services.batch_orchestrator_service.enums_db import PhaseStatusEnum
 from services.batch_orchestrator_service.implementations.batch_database_infrastructure import (
     BatchDatabaseInfrastructure,

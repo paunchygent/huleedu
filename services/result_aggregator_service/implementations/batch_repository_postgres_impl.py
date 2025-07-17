@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncIterator, Dict, List, Optional
 
+from common_core.status_enums import BatchStatus, ProcessingStage
 from huleedu_service_libs.database import DatabaseMetricsProtocol
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
@@ -18,7 +19,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import selectinload
 
-from common_core.status_enums import BatchStatus, ProcessingStage
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.models_db import Base, BatchResult, EssayResult
 from services.result_aggregator_service.protocols import BatchRepositoryProtocol

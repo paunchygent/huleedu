@@ -30,8 +30,8 @@ build-backend = "pdm.backend"
 distribution = false
 
 [tool.pdm.resolution.overrides]
-huleedu-common-core = "file:///app/common_core"
-huleedu-service-libs = "file:///app/services/libs"
+huleedu-common-core = "file:///app/libs/common_core"
+huleedu-service-libs = "file:///app/libs/huleedu_service_libs"
 
 [tool.pdm.scripts]
 start = "hypercorn app:app --bind 0.0.0.0:8000"

@@ -5,13 +5,13 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional, Type, TypeVar, cast
 
+from common_core.domain_enums import CourseCode
 from huleedu_service_libs.database import DatabaseMetricsProtocol
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from common_core.domain_enums import CourseCode
 from services.class_management_service.api_models import (
     CreateClassRequest,
     CreateStudentRequest,

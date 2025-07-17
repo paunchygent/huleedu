@@ -4,6 +4,7 @@ import uuid
 from typing import Generic, Protocol, TypeVar
 
 from common_core.events.envelope import EventEnvelope
+
 from services.class_management_service.api_models import (
     CreateClassRequest,
     CreateStudentRequest,

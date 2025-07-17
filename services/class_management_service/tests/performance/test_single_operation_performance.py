@@ -11,9 +11,9 @@ import asyncio
 import time
 
 import pytest
-
 from common_core.domain_enums import CourseCode
 from common_core.metadata_models import PersonNameV1
+
 from services.class_management_service.api_models import CreateClassRequest, CreateStudentRequest
 from services.class_management_service.implementations.class_repository_postgres_impl import (
     PostgreSQLClassRepositoryImpl,

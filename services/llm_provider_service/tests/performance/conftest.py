@@ -11,10 +11,10 @@ from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
+from common_core import Environment
 from testcontainers.kafka import KafkaContainer
 from testcontainers.redis import RedisContainer
 
-from common_core import Environment
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.implementations.connection_pool_manager_impl import (
     ConnectionPoolManagerImpl,

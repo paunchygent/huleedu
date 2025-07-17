@@ -15,10 +15,6 @@ from uuid import uuid4
 import aiohttp
 import pytest
 from aiokafka import AIOKafkaProducer, ConsumerRecord
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 # CRITICAL: Import ALL enum types FIRST
 from common_core import LLMProviderType
@@ -43,6 +39,11 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 from common_core.status_enums import ProcessingStage
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.tests.unit.mocks import MockDatabase, MockRedisClient
 

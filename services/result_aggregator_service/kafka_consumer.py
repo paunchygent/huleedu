@@ -8,11 +8,6 @@ from datetime import UTC, datetime
 from typing import Dict, List
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
-from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.protocols import RedisClientProtocol
-from pydantic import ValidationError
-
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
     BatchEssaysRegistered,
@@ -21,6 +16,11 @@ from common_core.events import (
     EventEnvelope,
     SpellcheckResultDataV1,
 )
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.protocols import RedisClientProtocol
+from pydantic import ValidationError
+
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.metrics import ResultAggregatorMetrics
 from services.result_aggregator_service.protocols import EventProcessorProtocol

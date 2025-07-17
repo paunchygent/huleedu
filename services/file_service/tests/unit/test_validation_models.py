@@ -10,9 +10,9 @@ from __future__ import annotations
 import json
 
 import pytest
+from common_core.error_enums import FileValidationErrorCode
 from pydantic import ValidationError
 
-from common_core.error_enums import FileValidationErrorCode
 from services.file_service.validation_models import ValidationResult
 
 

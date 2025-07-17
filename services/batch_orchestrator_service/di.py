@@ -7,6 +7,7 @@ from typing import cast
 
 from aiohttp import ClientError, ClientSession
 from aiokafka.errors import KafkaError
+from common_core.pipeline_models import PhaseName
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
@@ -18,7 +19,6 @@ from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
 from huleedu_service_libs.resilience.resilient_client import make_resilient
 from prometheus_client import CollectorRegistry
 
-from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.config import Settings, settings
 from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import (
     AIFeedbackInitiatorImpl,

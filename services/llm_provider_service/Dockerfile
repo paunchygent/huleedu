@@ -20,8 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
     pip install --no-cache-dir pdm
 
 # Copy shared local dependencies first
-COPY common_core/ /app/common_core/
-COPY services/libs/ /app/services/libs/
+COPY libs/common_core/ /app/libs/common_core/
+COPY libs/huleedu_service_libs/ /app/libs/huleedu_service_libs/
 
 # Now, handle the specific service
 COPY services/llm_provider_service/ /app/services/llm_provider_service/

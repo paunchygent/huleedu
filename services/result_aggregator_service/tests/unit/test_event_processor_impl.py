@@ -8,8 +8,6 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
-
 from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events import (
@@ -27,6 +25,8 @@ from common_core.metadata_models import (
 )
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus, EssayStatus, ProcessingStage
+from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
+
 from services.result_aggregator_service.implementations.event_processor_impl import (
     EventProcessorImpl,
 )

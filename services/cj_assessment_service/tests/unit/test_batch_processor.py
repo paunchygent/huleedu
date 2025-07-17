@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
-
 from common_core import EssayComparisonWinner
 from common_core.status_enums import CJBatchStateEnum
+
 from services.cj_assessment_service.cj_core_logic.batch_processor import (
     BatchConfigOverrides,
     BatchProcessor,

@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
+from common_core.domain_enums import CourseCode, Language
+from common_core.metadata_models import PersonNameV1
 from sqlalchemy import (
     Column,
     DateTime,
@@ -17,9 +19,6 @@ from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
-from common_core.domain_enums import CourseCode, Language
-from common_core.metadata_models import PersonNameV1
 
 
 class Base(AsyncAttrs, DeclarativeBase):

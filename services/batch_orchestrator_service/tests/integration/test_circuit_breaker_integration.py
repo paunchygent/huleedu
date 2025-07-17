@@ -11,10 +11,10 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from aiohttp import ClientError, ClientSession
+from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerError
 from huleedu_service_libs.resilience.resilient_client import make_resilient
 
-from common_core.pipeline_models import PhaseName
 from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.implementations.batch_conductor_client_impl import (
     BatchConductorClientImpl,

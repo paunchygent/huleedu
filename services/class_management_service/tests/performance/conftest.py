@@ -15,13 +15,13 @@ from typing import Any, AsyncGenerator, Dict, List, Tuple
 from unittest.mock import Mock
 
 import pytest
+from common_core.domain_enums import CourseCode
+from common_core.metadata_models import PersonNameV1
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
-from common_core.domain_enums import CourseCode
-from common_core.metadata_models import PersonNameV1
 from services.class_management_service.api_models import CreateClassRequest, CreateStudentRequest
 from services.class_management_service.implementations.class_repository_postgres_impl import (
     PostgreSQLClassRepositoryImpl,

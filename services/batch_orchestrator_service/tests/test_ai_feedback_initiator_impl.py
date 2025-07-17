@@ -13,13 +13,13 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
-
 from common_core.batch_service_models import BatchServiceAIFeedbackInitiateCommandDataV1
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
+
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import (
     AIFeedbackInitiatorImpl,

@@ -11,10 +11,6 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import and_, select
-from sqlalchemy.orm import selectinload
-
 from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import (
     CJAssessmentCompletedV1,
@@ -23,6 +19,10 @@ from common_core.events.cj_assessment_events import (
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, CJBatchStateEnum, ProcessingStage
+from huleedu_service_libs.logging_utils import create_service_logger
+from sqlalchemy import and_, select
+from sqlalchemy.orm import selectinload
+
 from services.cj_assessment_service.cj_core_logic import scoring_ranking
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import EssayForComparison

@@ -36,19 +36,19 @@ class TestPostgreSQLEssayRepositoryIntegration:
 
     class PostgreSQLTestSettings(Settings):
         """Test settings that override DATABASE_URL property."""
-        
+
         def __init__(self, database_url: str) -> None:
             super().__init__()
-            object.__setattr__(self, '_database_url', database_url)
+            object.__setattr__(self, "_database_url", database_url)
             self.DATABASE_POOL_SIZE = 2
             self.DATABASE_MAX_OVERFLOW = 1
             self.DATABASE_POOL_PRE_PING = True
             self.DATABASE_POOL_RECYCLE = 3600
-        
+
         @property
         def DATABASE_URL(self) -> str:
             """Override to return test database URL."""
-            return object.__getattribute__(self, '_database_url')
+            return object.__getattribute__(self, "_database_url")
 
     @pytest.fixture
     def test_settings(self, postgres_container: PostgresContainer) -> Settings:

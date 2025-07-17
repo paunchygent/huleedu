@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+from common_core.config_enums import Environment
 from dotenv import find_dotenv, load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from common_core.config_enums import Environment
 
 # Load .env file from repository root, regardless of current working directory
 load_dotenv(find_dotenv(".env"))

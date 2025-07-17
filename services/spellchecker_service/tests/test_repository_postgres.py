@@ -10,6 +10,7 @@ from typing import AsyncGenerator
 from uuid import uuid4
 
 import pytest
+from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     async_sessionmaker,
@@ -17,7 +18,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from testcontainers.postgres import PostgresContainer
 
-from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
 from services.spellchecker_service.config import Settings
 from services.spellchecker_service.implementations.spell_repository_postgres_impl import (
     PostgreSQLSpellcheckRepository,

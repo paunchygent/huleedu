@@ -25,9 +25,6 @@ from uuid import UUID, uuid4
 import aiohttp
 import pytest
 from aiokafka import ConsumerRecord
-from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-from pydantic import ValidationError
-
 from common_core.error_enums import ErrorCode
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 from common_core.event_enums import ProcessingEvent
@@ -35,6 +32,9 @@ from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import EssayStatus, ProcessingStage
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
+from pydantic import ValidationError
+
 from services.spellchecker_service.event_processor import (
     _categorize_processing_error,
     process_single_message,

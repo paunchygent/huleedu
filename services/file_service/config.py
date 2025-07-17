@@ -7,11 +7,10 @@ including Kafka settings, Content Service URL, and service ports.
 
 from __future__ import annotations
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
 from common_core.config_enums import Environment
 from common_core.event_enums import ProcessingEvent, topic_name
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):

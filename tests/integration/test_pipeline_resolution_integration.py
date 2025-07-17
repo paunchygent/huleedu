@@ -22,9 +22,9 @@ from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
-
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
+
 from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
     ClientPipelineRequestHandler,
 )

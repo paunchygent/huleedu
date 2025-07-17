@@ -15,8 +15,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
-
 from common_core.domain_enums import CourseCode
+
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )

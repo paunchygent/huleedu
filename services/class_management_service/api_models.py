@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import uuid
 
-from pydantic import BaseModel, EmailStr, Field
-
 from common_core.domain_enums import CourseCode
 from common_core.metadata_models import ParsedNameMetadata, PersonNameV1
+from pydantic import BaseModel, EmailStr, Field
 
 # ====================================================================
 # Request Models

@@ -179,7 +179,7 @@ class ErrorDetail(BaseModel):
 
 ### 2. HuleEduError Exception
 
-**Location**: `services/libs/huleedu_service_libs/error_handling/huleedu_error.py`
+**Location**: `libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/huleedu_error.py`
 
 ```python
 """
@@ -225,7 +225,7 @@ class HuleEduError(Exception):
 
 ### 3. Centralized Error Factories
 
-**Location**: `services/libs/huleedu_service_libs/error_handling/factories.py`
+**Location**: `libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/factories.py`
 
 ```python
 """
@@ -389,7 +389,7 @@ def raise_file_validation_error(
 
 ### 4. Quart Error Handler Integration
 
-**Location**: `services/libs/huleedu_service_libs/error_handling/quart_handlers.py`
+**Location**: `libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/quart_handlers.py`
 
 ```python
 """
@@ -491,7 +491,7 @@ def register_error_handlers(app: Quart) -> None:
 
 ### 5. Testing Utilities
 
-**Location**: `services/libs/huleedu_service_libs/error_handling/testing.py`
+**Location**: `libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/testing.py`
 
 ```python
 """Testing utilities for exception-based error handling."""
@@ -735,9 +735,9 @@ async def get_by_id(self, id: str) -> Resource:
 ## 🔗 Key Files
 
 - `common_core/src/common_core/models/error_models.py` - Enhanced ErrorDetail
-- `services/libs/huleedu_service_libs/error_handling/huleedu_error.py` - HuleEduError
-- `services/libs/huleedu_service_libs/error_handling/factories.py` - Error factories
-- `services/libs/huleedu_service_libs/error_handling/quart_handlers.py` - Quart integration
+- `libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/huleedu_error.py` - HuleEduError
+- `libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/factories.py` - Error factories
+- `libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/quart_handlers.py` - Quart integration
 
 ## 🎯 **MIGRATION COMPLETION STATUS**
 

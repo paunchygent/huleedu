@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
+from common_core.status_enums import ProcessingStage
 from dishka import AsyncContainer, FromDishka, Provider, Scope, make_async_container, provide
 from huleedu_service_libs.protocols import RedisClientProtocol
 from quart import Quart
@@ -14,7 +15,6 @@ from quart_dishka import QuartDishka
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
-from common_core.status_enums import ProcessingStage
 from services.result_aggregator_service.api.health_routes import health_bp
 from services.result_aggregator_service.api.query_routes import query_bp
 from services.result_aggregator_service.config import Settings
@@ -44,7 +44,7 @@ class FunctionalTestSettings(Settings):
         # Initialize parent first to set up Pydantic machinery
         super().__init__()
         # Then set our custom attributes
-        object.__setattr__(self, '_database_url', database_url)
+        object.__setattr__(self, "_database_url", database_url)
         self.REDIS_URL = redis_url
         self.CACHE_ENABLED = True
         self.REDIS_CACHE_TTL_SECONDS = 60  # Shorter TTL for testing
@@ -54,7 +54,7 @@ class FunctionalTestSettings(Settings):
     @property
     def DATABASE_URL(self) -> str:
         """Override to return test database URL."""
-        return object.__getattribute__(self, '_database_url')
+        return object.__getattribute__(self, "_database_url")
 
 
 class FunctionalTestResultAggregatorApp(Quart):

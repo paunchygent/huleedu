@@ -6,11 +6,6 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import aiohttp
-from huleedu_service_libs.error_handling import (
-    raise_content_service_error,
-    raise_processing_error,
-)
-from huleedu_service_libs.logging_utils import create_service_logger
 
 # OpenTelemetry tracing handled by HuleEduError automatically
 from common_core.domain_enums import ContentType
@@ -22,6 +17,12 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 from common_core.status_enums import EssayStatus, ProcessingStage
+from huleedu_service_libs.error_handling import (
+    raise_content_service_error,
+    raise_processing_error,
+)
+from huleedu_service_libs.logging_utils import create_service_logger
+
 from services.spellchecker_service.core_logic import default_perform_spell_check_algorithm
 from services.spellchecker_service.protocols import ResultStoreProtocol, SpellLogicProtocol
 

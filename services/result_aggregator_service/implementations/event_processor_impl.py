@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from common_core.status_enums import BatchStatus, ProcessingStage
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core.status_enums import BatchStatus, ProcessingStage
 from services.result_aggregator_service.protocols import (
     BatchRepositoryProtocol,
     CacheManagerProtocol,

@@ -61,7 +61,7 @@ HuleEdu is a sophisticated microservice ecosystem built with:
 | **Spell Checker** | `services/spellchecker_service/` | Performs spell checking on essays |
 | **Essay Service** | `services/essay_service/` | 🚧 *Placeholder - Not yet implemented* |
 | **Common Core** | `common_core/` | Shared models, events, and utilities |
-| **Service Libraries** | `services/libs/` | Common service infrastructure |
+| **Service Libraries** | `libs/` | Common service infrastructure |
 
 ## Development Commands
 

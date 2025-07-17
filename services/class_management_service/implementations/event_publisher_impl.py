@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.event_utils import (
     extract_correlation_id_as_string,
     extract_user_id_from_event_data,
@@ -7,7 +8,6 @@ from huleedu_service_libs.event_utils import (
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
-from common_core.events.envelope import EventEnvelope
 from services.class_management_service.protocols import ClassEventPublisherProtocol
 
 logger = create_service_logger("class_management_service.event_publisher")

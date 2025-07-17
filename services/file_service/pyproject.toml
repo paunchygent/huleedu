@@ -40,8 +40,8 @@ dev = "quart --app app:app --debug run -p 7001"
 
 # Docker build overrides for containerized deployment
 [tool.pdm.resolution.overrides]
-huleedu-common-core = "file:///app/common_core"
-huleedu-service-libs = "file:///app/services/libs"
+huleedu-common-core = "file:///app/libs/common_core"
+huleedu-service-libs = "file:///app/libs/huleedu_service_libs"
 
 [tool.mypy]
 python_version = "3.11"

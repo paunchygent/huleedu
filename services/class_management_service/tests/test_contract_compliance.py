@@ -10,7 +10,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-
 from common_core.domain_enums import CourseCode
 from common_core.events.class_events import (
     ClassCreatedV1,

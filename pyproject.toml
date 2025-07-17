@@ -48,8 +48,8 @@ monorepo-tools = [
 
 # Install all services and common_core for unified development
 dev = [
-    "-e file:///${PROJECT_ROOT}/common_core",
-    "-e file:///${PROJECT_ROOT}/services/libs",
+    "-e file:///${PROJECT_ROOT}/libs/common_core",
+    "-e file:///${PROJECT_ROOT}/libs/huleedu_service_libs",
     "-e file:///${PROJECT_ROOT}/services/content_service",
     "-e file:///${PROJECT_ROOT}/services/spellchecker_service",
     "-e file:///${PROJECT_ROOT}/services/batch_orchestrator_service",
@@ -108,7 +108,7 @@ dev-aggregator = "pdm run -p services/result_aggregator_service dev"
 dev-llm = "pdm run -p services/llm_provider_service dev"
 
 # Build common_core wheel
-build-common-core = "pdm build -p common_core"
+build-common-core = "pdm build -p libs/common_core"
 
 # Kafka infrastructure
 kafka-setup-topics = "python scripts/kafka_topic_bootstrap.py"
@@ -153,7 +153,7 @@ ignore = [
 "services/*/app.py" = ["E402"]
 "services/*/worker.py" = ["E402"]
 # Union import needed for Pydantic model rebuilding (not directly used in file)
-"common_core/src/common_core/__init__.py" = ["F401"]
+"libs/common_core/src/common_core/__init__.py" = ["F401"]
 
 # Note: Import restrictions would be enforced through custom linting rules
 # For now, rely on type system and code review to prevent standard library logging
@@ -168,10 +168,10 @@ explicit_package_bases = true
 namespace_packages = true
 plugins = ["pydantic.mypy"]
 exclude = [
-    "common_core/src/",
+    "libs/common_core/src/",
     "cj_essay_assessment/",
     "scripts/",
-    "services/libs/huleedu_service_libs/",
+    "libs/huleedu_service_libs/",
     "services/batch_orchestrator_service/implementations/circuit_breaker_example.py",
 ]
 
@@ -179,7 +179,7 @@ exclude = [
 [[tool.mypy.overrides]]
 module = [
     "common_core.*",
-    "services.libs.*",
+    "libs.*",
     "services.content_service.*",
     "services.spellchecker_service.*",
     "services.batch_orchestrator_service.*",
@@ -257,7 +257,7 @@ ignore_missing_imports = true
 
 testpaths = [
     "tests",
-    "common_core/tests",
+    "libs/common_core/tests",
     "services/content_service/tests",
     "services/spellchecker_service/tests",
     "services/batch_orchestrator_service/tests",

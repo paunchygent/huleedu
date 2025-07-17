@@ -19,7 +19,6 @@ import sys
 
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 from aiokafka.errors import KafkaConnectionError, TopicAlreadyExistsError
-
 from common_core.event_enums import _TOPIC_MAPPING, topic_name
 
 

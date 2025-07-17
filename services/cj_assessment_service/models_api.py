@@ -11,11 +11,10 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
-
 from common_core import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
 from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
+from pydantic import BaseModel, Field
 
 
 class EssayForComparison(BaseModel):

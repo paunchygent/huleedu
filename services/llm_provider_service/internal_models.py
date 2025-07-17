@@ -3,10 +3,10 @@
 from typing import Any, Dict
 from uuid import UUID
 
-from pydantic import BaseModel, Field
-
 from common_core import EssayComparisonWinner, LLMProviderType
 from common_core.error_enums import ErrorCode
+from pydantic import BaseModel, Field
+
 from services.llm_provider_service.error_types import LLMProviderErrorType
 
 

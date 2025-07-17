@@ -12,6 +12,7 @@ from datetime import datetime
 
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
+
 from tests.utils.kafka_test_manager import KafkaTestManager
 
 

@@ -8,8 +8,8 @@ of file content according to business rules and requirements.
 from __future__ import annotations
 
 import pytest
-
 from common_core.error_enums import FileValidationErrorCode
+
 from services.file_service.content_validator import FileContentValidator
 
 

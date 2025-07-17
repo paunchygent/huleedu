@@ -15,6 +15,16 @@ if TYPE_CHECKING:
 
 import aiohttp
 from aiokafka import ConsumerRecord
+from common_core.error_enums import ErrorCode
+from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
+from common_core.event_enums import ProcessingEvent
+from common_core.events.envelope import EventEnvelope
+from common_core.events.spellcheck_models import (
+    SpellcheckResultDataV1,
+)
+from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.models.error_models import ErrorDetail
+from common_core.status_enums import EssayStatus, ProcessingStage
 from huleedu_service_libs.error_handling import (
     raise_content_service_error,
     raise_parsing_error,
@@ -33,16 +43,6 @@ from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from opentelemetry import trace
 from pydantic import ValidationError
 
-from common_core.error_enums import ErrorCode
-from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
-from common_core.event_enums import ProcessingEvent
-from common_core.events.envelope import EventEnvelope
-from common_core.events.spellcheck_models import (
-    SpellcheckResultDataV1,
-)
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
-from common_core.models.error_models import ErrorDetail
-from common_core.status_enums import EssayStatus, ProcessingStage
 from services.spellchecker_service.metrics import get_business_metrics
 from services.spellchecker_service.protocols import (
     ContentClientProtocol,

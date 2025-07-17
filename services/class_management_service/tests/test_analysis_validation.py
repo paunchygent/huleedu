@@ -13,7 +13,6 @@ import uuid
 from typing import get_type_hints
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 # Test all critical imports from analysis
 from common_core.domain_enums import CourseCode
@@ -24,6 +23,8 @@ from common_core.events.class_events import (
     StudentUpdatedV1,
 )
 from common_core.events.envelope import EventEnvelope
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+
 from services.class_management_service.api_models import CreateClassRequest, CreateStudentRequest
 from services.class_management_service.config import Settings
 from services.class_management_service.exceptions import (

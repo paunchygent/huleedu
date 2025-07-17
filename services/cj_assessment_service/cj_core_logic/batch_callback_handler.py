@@ -17,15 +17,15 @@ if TYPE_CHECKING:
         BatchRetryProcessor,
     )
 
-from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import select
-
 from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, CJBatchStateEnum, ProcessingStage
+from huleedu_service_libs.logging_utils import create_service_logger
+from sqlalchemy import select
+
 from services.cj_assessment_service.cj_core_logic import (
     batch_completion_checker,
     scoring_ranking,

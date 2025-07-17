@@ -11,10 +11,10 @@ from __future__ import annotations
 from typing import Any
 
 from aiokafka import AIOKafkaConsumer
+from common_core.event_enums import ProcessingEvent, topic_name
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 
-from common_core.event_enums import ProcessingEvent, topic_name
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )

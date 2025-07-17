@@ -6,12 +6,12 @@ import asyncio
 import uuid
 from typing import Any
 
+from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
 
-from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 from services.file_service.core_logic import process_single_file_upload
 from services.file_service.protocols import (
     BatchStateValidatorProtocol,

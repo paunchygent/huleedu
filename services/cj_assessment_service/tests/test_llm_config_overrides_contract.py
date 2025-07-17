@@ -10,13 +10,12 @@ from __future__ import annotations
 import json
 
 import pytest
-from pydantic import ValidationError
-
 from common_core.events.cj_assessment_events import (
     ELS_CJAssessmentRequestV1,
     LLMConfigOverrides,
 )
 from common_core.events.envelope import EventEnvelope
+from pydantic import ValidationError
 
 
 class TestLLMConfigOverridesContract:

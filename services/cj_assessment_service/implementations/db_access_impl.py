@@ -10,12 +10,12 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional
 
+from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import ComparisonResult

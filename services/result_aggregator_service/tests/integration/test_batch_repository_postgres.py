@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import AsyncGenerator, Optional
 
 import pytest
+from common_core.status_enums import BatchStatus, ProcessingStage
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
-from common_core.status_enums import BatchStatus, ProcessingStage
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.implementations.batch_repository_postgres_impl import (
     BatchRepositoryPostgresImpl,
@@ -71,12 +71,12 @@ def test_settings(postgres_container: PostgresContainer) -> Settings:
     class TestSettings(Settings):
         def __init__(self) -> None:
             super().__init__()
-            object.__setattr__(self, '_database_url', connection_url)
-        
+            object.__setattr__(self, "_database_url", connection_url)
+
         @property
         def DATABASE_URL(self) -> str:
             """Override to return test database URL."""
-            return object.__getattribute__(self, '_database_url')
+            return object.__getattribute__(self, "_database_url")
 
     return TestSettings()
 

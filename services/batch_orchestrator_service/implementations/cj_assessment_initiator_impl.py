@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from huleedu_service_libs.logging_utils import create_service_logger
-
 from common_core.batch_service_models import BatchServiceCJAssessmentInitiateCommandDataV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
+from huleedu_service_libs.logging_utils import create_service_logger
+
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,

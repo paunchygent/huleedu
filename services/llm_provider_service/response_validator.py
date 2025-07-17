@@ -11,10 +11,10 @@ import time
 from typing import Any, Dict
 from uuid import UUID
 
+from common_core import EssayComparisonWinner
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field, ValidationError
 
-from common_core import EssayComparisonWinner
 from services.llm_provider_service.exceptions import (
     raise_parsing_error,
     raise_validation_error,

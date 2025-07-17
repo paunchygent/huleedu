@@ -12,6 +12,7 @@ from typing import Any, Awaitable, Callable, TypeVar
 from uuid import uuid4
 
 import aiohttp
+from common_core.error_enums import ErrorCode
 from huleedu_service_libs.error_handling import (
     HuleEduError,
     raise_connection_error,
@@ -28,7 +29,6 @@ from tenacity import (
     wait_exponential,
 )
 
-from common_core.error_enums import ErrorCode
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import RetryManagerProtocol
 

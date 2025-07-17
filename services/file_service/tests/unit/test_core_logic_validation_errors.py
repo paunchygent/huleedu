@@ -11,8 +11,8 @@ import uuid
 from unittest.mock import AsyncMock
 
 import pytest
-
 from common_core.error_enums import FileValidationErrorCode
+
 from services.file_service.core_logic import process_single_file_upload
 from services.file_service.tests.unit.core_logic_validation_utils import (
     TEST_BATCH_IDS,

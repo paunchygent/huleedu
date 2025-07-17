@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, model_validator
-
 from common_core.domain_enums import CourseCode
+from pydantic import BaseModel, Field, model_validator
 
 
 class BatchRegistrationRequestV1(BaseModel):

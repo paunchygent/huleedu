@@ -12,12 +12,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiokafka import ConsumerRecord
-
 from common_core.events.cj_assessment_events import (
     ELS_CJAssessmentRequestV1,
     LLMConfigOverrides,
 )
 from common_core.events.envelope import EventEnvelope
+
 from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
     CJAssessmentWorkflowResult,
 )
@@ -50,6 +50,7 @@ class TestEventProcessorOverrides:
     def mock_llm_interaction(self, sample_comparison_results: list[dict[str, Any]]) -> AsyncMock:
         """Create mock LLM interaction protocol."""
         from common_core import EssayComparisonWinner
+
         from services.cj_assessment_service.models_api import (
             ComparisonResult,
             ComparisonTask,

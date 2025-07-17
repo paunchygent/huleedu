@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from aiohttp import ClientSession
-
 from common_core.status_enums import EssayStatus
+
 from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.protocols import EssayLifecycleClientProtocol
 

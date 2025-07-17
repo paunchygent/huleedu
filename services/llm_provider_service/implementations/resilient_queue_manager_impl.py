@@ -10,9 +10,9 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
+from common_core import QueueStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core import QueueStatus
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.implementations.local_queue_manager_impl import (
     LocalQueueManagerImpl,

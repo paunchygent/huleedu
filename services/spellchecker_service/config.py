@@ -9,11 +9,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from common_core.config_enums import Environment
 from dotenv import find_dotenv, load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from common_core.config_enums import Environment
 
 # Load .env file from repository root, regardless of current working directory
 load_dotenv(find_dotenv(".env"))
@@ -119,7 +118,7 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """Return the PostgreSQL database URL for both runtime and migrations.
-        
+
         Standardized PostgreSQL configuration following HuleEdu pattern.
         Uses environment-specific connection details.
         """
@@ -133,13 +132,13 @@ class Settings(BaseSettings):
         # Fallback to local development configuration (loaded from .env via dotenv)
         db_user = os.getenv("HULEEDU_DB_USER")
         db_password = os.getenv("HULEEDU_DB_PASSWORD")
-        
+
         if not db_user or not db_password:
             raise ValueError(
                 "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
                 "HULEEDU_DB_PASSWORD are set in your .env file."
             )
-        
+
         # For development/migration: map container names to localhost
         host = self.DB_HOST
         port = self.DB_PORT

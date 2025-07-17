@@ -12,12 +12,11 @@ from uuid import uuid4
 
 import pytest
 from aiokafka.errors import KafkaError
+from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 from pydantic import BaseModel
-
-from common_core.events.envelope import EventEnvelope
 
 
 class SpellCheckResultData(BaseModel):

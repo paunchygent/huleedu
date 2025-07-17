@@ -15,11 +15,6 @@ from uuid import uuid4
 import aiohttp
 import pytest
 from aiokafka import ConsumerRecord
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 from common_core.event_enums import ProcessingEvent
 
@@ -44,6 +39,10 @@ from common_core.metadata_models import (
 # Note: We need BatchStatus even though spell checker doesn't use it directly,
 # because ProcessingUpdate has Union["EssayStatus", "BatchStatus"] annotation
 from common_core.status_enums import EssayStatus, ProcessingStage
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 # Import idempotency test fixtures
 from .unit.spell_idempotency_test_utils import (

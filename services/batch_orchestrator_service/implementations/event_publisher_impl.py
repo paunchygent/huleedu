@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.observability import inject_trace_context
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
-from common_core.events.envelope import EventEnvelope
 from services.batch_orchestrator_service.protocols import BatchEventPublisherProtocol
 
 

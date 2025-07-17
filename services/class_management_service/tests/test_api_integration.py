@@ -8,16 +8,16 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from common_core.config_enums import Environment
+from common_core.domain_enums import CourseCode
+from common_core.events.class_events import ClassUpdatedV1, StudentUpdatedV1
+from common_core.events.envelope import EventEnvelope
 from dishka import Provider, Scope, make_async_container, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from prometheus_client import REGISTRY
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 
-from common_core.config_enums import Environment
-from common_core.domain_enums import CourseCode
-from common_core.events.class_events import ClassUpdatedV1, StudentUpdatedV1
-from common_core.events.envelope import EventEnvelope
 from services.class_management_service.app import app
 from services.class_management_service.config import Settings
 from services.class_management_service.di import MetricsProvider

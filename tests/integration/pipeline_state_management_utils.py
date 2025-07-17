@@ -29,8 +29,8 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
-
 from common_core.pipeline_models import PhaseName
+
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_repository_impl import (
     MockBatchRepositoryImpl,

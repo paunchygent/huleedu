@@ -15,9 +15,9 @@ import asyncio
 import json
 
 import pytest
-
 from common_core.events.batch_coordination_events import BatchEssaysReady
 from common_core.events.file_events import EssayValidationFailedV1
+
 from tests.functional.validation_coordination_utils import (
     TOPICS,
     VALIDATION_TIMEOUTS,

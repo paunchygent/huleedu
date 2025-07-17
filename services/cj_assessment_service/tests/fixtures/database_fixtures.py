@@ -213,6 +213,7 @@ def mock_content_client() -> AsyncMock:
 def mock_llm_interaction() -> AsyncMock:
     """Create mock LLM interaction for external service."""
     from common_core.domain_enums import EssayComparisonWinner
+
     from services.cj_assessment_service.models_api import (
         ComparisonResult,
         LLMAssessmentResponseSchema,

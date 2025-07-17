@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from common_core.metadata_models import ParsedNameMetadata, PersonNameV1
+
 from services.class_management_service.api_models import StudentParsingResult
 
 

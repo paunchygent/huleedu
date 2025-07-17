@@ -4,9 +4,9 @@ import json
 from uuid import UUID
 
 import aiohttp
+from common_core import EssayComparisonWinner, LLMProviderType
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core import EssayComparisonWinner, LLMProviderType
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import (
     raise_authentication_error,

@@ -6,8 +6,8 @@ from typing import List, Optional
 from unittest.mock import AsyncMock
 
 import pytest
-
 from common_core.status_enums import BatchStatus, ProcessingStage
+
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.implementations.aggregator_service_impl import (
     AggregatorServiceImpl,

@@ -8,12 +8,12 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from huleedu_service_libs.protocols import RedisClientProtocol
-
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import BatchEssaysRegistered, EventEnvelope
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from huleedu_service_libs.protocols import RedisClientProtocol
+
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
 

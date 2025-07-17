@@ -11,9 +11,9 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
-
 from common_core import LLMProviderType
 from common_core.error_enums import ErrorCode
+
 from services.cj_assessment_service.implementations.llm_interaction_impl import LLMInteractionImpl
 from services.cj_assessment_service.models_api import (
     ComparisonResult,

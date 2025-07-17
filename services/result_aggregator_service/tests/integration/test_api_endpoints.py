@@ -6,6 +6,7 @@ from typing import Dict, Generator, List, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from common_core.status_enums import BatchStatus, ProcessingStage
 from dishka import Provider, Scope, make_async_container, provide
 from huleedu_service_libs.protocols import RedisClientProtocol
 from huleedu_service_libs.quart_app import HuleEduApp
@@ -13,7 +14,6 @@ from prometheus_client import REGISTRY, CollectorRegistry
 from quart.testing import QuartClient
 from quart_dishka import QuartDishka
 
-from common_core.status_enums import BatchStatus, ProcessingStage
 from services.result_aggregator_service.api.health_routes import health_bp
 from services.result_aggregator_service.api.query_routes import query_bp
 from services.result_aggregator_service.config import Settings

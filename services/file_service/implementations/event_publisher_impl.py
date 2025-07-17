@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import uuid
 
-from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
-
 from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
+from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
+
 from services.file_service.config import Settings
 from services.file_service.protocols import EventPublisherProtocol
 

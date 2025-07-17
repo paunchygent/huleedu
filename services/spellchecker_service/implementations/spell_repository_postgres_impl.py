@@ -13,6 +13,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Iterable, Optional
 
+from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
 from huleedu_service_libs.database import DatabaseMetricsProtocol
 from huleedu_service_libs.error_handling import (
     raise_connection_error,
@@ -27,7 +28,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import selectinload
 
-from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
 from services.spellchecker_service.config import Settings
 from services.spellchecker_service.models_db import (
     Base,

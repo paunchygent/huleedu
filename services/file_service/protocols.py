@@ -13,6 +13,7 @@ from typing import Any, Protocol
 from common_core.domain_enums import ContentType
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
+
 from services.file_service.validation_models import ValidationResult
 
 

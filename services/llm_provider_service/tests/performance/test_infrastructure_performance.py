@@ -13,11 +13,11 @@ from typing import Any, AsyncGenerator, Dict, Generator, Tuple
 from uuid import UUID, uuid4
 
 import pytest
+from common_core import Environment, EssayComparisonWinner, LLMProviderType
 from dishka import Scope, make_async_container, provide
 from testcontainers.kafka import KafkaContainer
 from testcontainers.redis import RedisContainer
 
-from common_core import Environment, EssayComparisonWinner, LLMProviderType
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
 
@@ -247,6 +247,7 @@ class TestInfrastructurePerformance:
         from datetime import datetime, timedelta, timezone
 
         from common_core import QueueStatus
+
         from services.llm_provider_service.api_models import LLMComparisonRequest
         from services.llm_provider_service.queue_models import QueuedRequest
 

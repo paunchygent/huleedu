@@ -12,11 +12,11 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from huleedu_service_libs.logging_utils import create_service_logger
-
 from common_core.domain_enums import ContentType
 from common_core.error_enums import FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
+from huleedu_service_libs.logging_utils import create_service_logger
+
 from services.file_service.protocols import (
     ContentServiceClientProtocol,
     ContentValidatorProtocol,

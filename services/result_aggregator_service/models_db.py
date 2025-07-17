@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
+from common_core.status_enums import BatchStatus, ProcessingStage
 from sqlalchemy import (
     JSON,
     DateTime,
@@ -19,8 +20,6 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
-from common_core.status_enums import BatchStatus, ProcessingStage
 
 
 class Base(AsyncAttrs, DeclarativeBase):

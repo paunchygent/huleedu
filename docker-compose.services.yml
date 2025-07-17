@@ -6,11 +6,11 @@ services:
       dockerfile_inline: |
         FROM python:3.11-slim
         WORKDIR /app
-        COPY common_core/pyproject.toml common_core/pdm.lock* ./common_core/
-        COPY common_core/src ./common_core/src/
+        COPY libs/common_core/pyproject.toml libs/common_core/pdm.lock* ./libs/common_core/
+        COPY libs/common_core/src ./libs/common_core/src/
         COPY scripts/kafka_topic_bootstrap.py ./scripts/
         RUN pip install --no-cache-dir aiokafka>=0.10.0 && \
-            pip install -e ./common_core/
+            pip install -e ./libs/common_core/
         CMD ["python", "scripts/kafka_topic_bootstrap.py"]
     container_name: huleedu_kafka_topic_setup
     restart: "no"

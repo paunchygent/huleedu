@@ -16,10 +16,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.domain_enums import CourseCode, EssayComparisonWinner
 from huleedu_service_libs.event_utils import generate_deterministic_event_id
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
-from common_core.domain_enums import CourseCode, EssayComparisonWinner
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.models_api import ComparisonResult, LLMAssessmentResponseSchema

@@ -5,13 +5,13 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from huleedu_service_libs.logging_utils import create_service_logger
-
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 from common_core.pipeline_models import ProcessingPipelineState
+from huleedu_service_libs.logging_utils import create_service_logger
+
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.protocols import (

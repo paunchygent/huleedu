@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from common_core.events.envelope import EventEnvelope
+from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from huleedu_service_libs.error_handling import raise_kafka_publish_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
-from common_core.events.envelope import EventEnvelope
-from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from services.spellchecker_service.protocols import SpellcheckEventPublisherProtocol
 
 logger = create_service_logger("spellchecker_service.event_publisher_impl")

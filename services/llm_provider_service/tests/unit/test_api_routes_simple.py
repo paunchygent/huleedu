@@ -3,8 +3,8 @@
 from uuid import uuid4
 
 import pytest
-
 from common_core import EssayComparisonWinner, LLMProviderType
+
 from services.llm_provider_service.api_models import (
     LLMComparisonRequest,
     LLMComparisonResponse,

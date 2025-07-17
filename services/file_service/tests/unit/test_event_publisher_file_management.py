@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
-
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
+
 from services.file_service.config import Settings
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
 

@@ -12,11 +12,11 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
+from common_core.domain_enums import CourseCode
+from common_core.metadata_models import PersonNameV1
 from huleedu_service_libs.database import DatabaseMetricsProtocol
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from common_core.domain_enums import CourseCode
-from common_core.metadata_models import PersonNameV1
 from services.class_management_service.api_models import CreateClassRequest, CreateStudentRequest
 from services.class_management_service.implementations.class_repository_postgres_impl import (
     PostgreSQLClassRepositoryImpl,

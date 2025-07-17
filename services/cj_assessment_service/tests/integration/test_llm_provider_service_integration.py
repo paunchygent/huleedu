@@ -12,7 +12,6 @@ from uuid import uuid4
 import aiohttp
 import pytest
 from aiokafka import AIOKafkaProducer
-
 from common_core.config_enums import LLMProviderType
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name

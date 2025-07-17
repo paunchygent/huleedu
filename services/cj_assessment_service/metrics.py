@@ -8,12 +8,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from common_core.observability_enums import MetricName
 from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import REGISTRY, Counter, Gauge, Histogram
 from sqlalchemy.ext.asyncio import AsyncEngine
-
-from common_core.observability_enums import MetricName
 
 logger = create_service_logger("cj_assessment_service.metrics")
 

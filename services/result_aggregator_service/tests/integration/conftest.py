@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.events import EventEnvelope
 from prometheus_client import REGISTRY
 
-from common_core.events import EventEnvelope
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
 from services.result_aggregator_service.metrics import ResultAggregatorMetrics

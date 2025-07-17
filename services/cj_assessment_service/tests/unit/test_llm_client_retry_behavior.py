@@ -7,9 +7,9 @@ from uuid import uuid4
 
 import aiohttp
 import pytest
+from common_core.error_enums import ErrorCode
 from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
 
-from common_core.error_enums import ErrorCode
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,

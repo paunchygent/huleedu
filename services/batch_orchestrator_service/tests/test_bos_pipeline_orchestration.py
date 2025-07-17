@@ -11,11 +11,11 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
-from huleedu_service_libs.protocols import RedisClientProtocol
-
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
+from huleedu_service_libs.protocols import RedisClientProtocol
+
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )

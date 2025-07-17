@@ -11,11 +11,11 @@ from uuid import UUID
 
 import choix
 import numpy as np
+from common_core import EssayComparisonWinner
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common_core import EssayComparisonWinner
 from services.cj_assessment_service.models_api import ComparisonResult, EssayForComparison
 from services.cj_assessment_service.models_db import ComparisonPair as CJ_ComparisonPair
 from services.cj_assessment_service.models_db import ProcessedEssay as CJ_ProcessedEssay

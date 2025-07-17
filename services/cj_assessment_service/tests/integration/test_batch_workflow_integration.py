@@ -14,7 +14,6 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-
 from common_core import LLMProviderType
 from common_core.domain_enums import CourseCode, EssayComparisonWinner
 from common_core.event_enums import ProcessingEvent
@@ -27,6 +26,7 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 from common_core.status_enums import BatchStatus, CJBatchStateEnum, ProcessingStage
+
 from services.cj_assessment_service.batch_monitor import BatchMonitor
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import (

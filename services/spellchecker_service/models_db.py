@@ -16,6 +16,8 @@ import uuid
 from datetime import datetime
 from typing import Any, List
 
+# Import shared enum to avoid drift across services
+from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
 from sqlalchemy import (
     JSON,
     CheckConstraint,
@@ -32,9 +34,6 @@ from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.decl_api import DeclarativeBase
-
-# Import shared enum to avoid drift across services
-from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
 
 
 class Base(DeclarativeBase):

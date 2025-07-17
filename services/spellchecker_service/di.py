@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from aiohttp import ClientSession
 from aiokafka.errors import KafkaError
+from common_core.event_enums import ProcessingEvent, topic_name
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
@@ -17,7 +18,6 @@ from opentelemetry.trace import Tracer
 from prometheus_client import CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from common_core.event_enums import ProcessingEvent, topic_name
 from services.spellchecker_service.config import Settings, settings
 from services.spellchecker_service.implementations.content_client_impl import (
     DefaultContentClient,

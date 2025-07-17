@@ -12,12 +12,12 @@ from typing import Any, AsyncGenerator, Dict, Generator
 from uuid import uuid4
 
 import pytest
+from common_core import Environment, LLMProviderType
 from dishka import Scope, make_async_container, provide
 from huleedu_service_libs.resilience import CircuitBreakerRegistry
 from testcontainers.kafka import KafkaContainer
 from testcontainers.redis import RedisContainer
 
-from common_core import Environment, LLMProviderType
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
 from services.llm_provider_service.exceptions import HuleEduError

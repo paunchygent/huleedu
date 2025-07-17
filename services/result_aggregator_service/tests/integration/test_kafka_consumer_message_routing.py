@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from aiokafka import ConsumerRecord
-
 from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
@@ -26,6 +25,7 @@ from common_core.metadata_models import (
 )
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus, EssayStatus
+
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
 
 from .conftest import create_kafka_record

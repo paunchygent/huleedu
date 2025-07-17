@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
-
 from common_core.status_enums import CJBatchStateEnum
+
 from services.cj_assessment_service.batch_monitor import BatchMonitor
 from services.cj_assessment_service.models_db import CJBatchState
 

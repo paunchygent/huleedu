@@ -6,14 +6,14 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-from huleedu_service_libs.error_handling import create_error_detail_with_context
-
 from common_core import LLMProviderType
 from common_core.domain_enums import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
 from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1
 from common_core.models.error_models import ErrorDetail
+from huleedu_service_libs.error_handling import create_error_detail_with_context
+
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_llm_result
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol, CJRepositoryProtocol

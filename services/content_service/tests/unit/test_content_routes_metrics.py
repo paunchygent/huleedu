@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from quart import Quart
-
 from common_core.observability_enums import OperationType
 from common_core.status_enums import OperationStatus
+from quart import Quart
 
 
 class MockContentMetrics:

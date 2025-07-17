@@ -7,9 +7,8 @@ individual initiators to avoid circular imports.
 
 from __future__ import annotations
 
-from huleedu_service_libs.logging_utils import create_service_logger
-
 from common_core.domain_enums import CourseCode, Language, get_course_language
+from huleedu_service_libs.logging_utils import create_service_logger
 
 logger = create_service_logger("bos.language_utils")
 

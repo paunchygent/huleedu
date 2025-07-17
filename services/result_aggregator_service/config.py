@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         """Return the PostgreSQL database URL for both runtime and migrations.
-        
+
         Standardized PostgreSQL configuration following HuleEdu pattern.
         Uses environment-specific connection details.
         """
@@ -40,14 +40,15 @@ class Settings(BaseSettings):
         # Fallback to local development configuration (loaded from .env via dotenv)
         db_user = os.getenv("HULEEDU_DB_USER")
         db_password = os.getenv("HULEEDU_DB_PASSWORD")
-        
+
         if not db_user or not db_password:
             raise ValueError(
                 "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
                 "HULEEDU_DB_PASSWORD are set in your .env file."
             )
-        
+
         return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5436/result_aggregator"
+
     DATABASE_POOL_SIZE: int = Field(default=20)
     DATABASE_MAX_OVERFLOW: int = Field(default=10)
 

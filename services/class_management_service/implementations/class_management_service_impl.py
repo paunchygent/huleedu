@@ -10,6 +10,7 @@ from common_core.events.class_events import (
     StudentUpdatedV1,
 )
 from common_core.events.envelope import EventEnvelope
+
 from services.class_management_service.api_models import (
     CreateClassRequest,
     CreateStudentRequest,

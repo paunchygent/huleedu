@@ -7,6 +7,7 @@ from typing import Dict, cast
 
 from aiohttp import ClientError, ClientSession
 from aiokafka.errors import KafkaError
+from common_core import LLMProviderType
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
@@ -18,7 +19,6 @@ from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegist
 from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
 from huleedu_service_libs.resilience.resilient_client import make_resilient
 
-from common_core import LLMProviderType
 from services.llm_provider_service.config import Settings, settings
 from services.llm_provider_service.implementations.anthropic_provider_impl import (
     AnthropicProviderImpl,

@@ -215,7 +215,7 @@ All standard development tasks are executed via PDM scripts defined in the root 
 
 #### 2\. Static Analysis
 
-- `pdm run typecheck-all` from root: Runs MyPy on the entire codebase to perform static type checking. services/libs/ is special and needs to be checked using the method described in: .cursor/rules/086-mypy-configuration-standards.mdc
+- `pdm run typecheck-all` from root: Runs MyPy on the entire codebase to perform static type checking. libs/ is special and needs to be checked using the method described in: .cursor/rules/086-mypy-configuration-standards.mdc
 
 #### 3\. Testing
 

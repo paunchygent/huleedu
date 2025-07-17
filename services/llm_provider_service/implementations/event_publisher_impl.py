@@ -4,10 +4,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.observability import get_current_span, inject_trace_context
-
 from common_core import LLMProviderType
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
@@ -16,6 +12,10 @@ from common_core.events.llm_provider_events import (
     LLMRequestCompletedV1,
     LLMRequestStartedV1,
 )
+from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.observability import get_current_span, inject_trace_context
+
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.protocols import LLMEventPublisherProtocol
 

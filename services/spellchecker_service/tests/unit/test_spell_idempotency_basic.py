@@ -14,9 +14,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.status_enums import EssayStatus
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 
-from common_core.status_enums import EssayStatus
 from services.spellchecker_service.event_processor import process_single_message
 from services.spellchecker_service.protocols import SpellLogicProtocol
 

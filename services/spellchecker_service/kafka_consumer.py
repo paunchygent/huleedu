@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 import aiohttp
 from aiokafka import AIOKafkaConsumer, TopicPartition
 from aiokafka.errors import KafkaConnectionError
+from common_core.error_enums import ErrorCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from huleedu_service_libs.error_handling import (
     raise_connection_error,
     raise_initialization_failed,
@@ -29,8 +31,6 @@ from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_co
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import KafkaPublisherProtocol, RedisClientProtocol
 
-from common_core.error_enums import ErrorCode
-from common_core.event_enums import ProcessingEvent, topic_name
 from services.spellchecker_service.event_processor import process_single_message
 from services.spellchecker_service.protocols import (
     ContentClientProtocol,

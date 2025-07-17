@@ -15,12 +15,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 import redis.asyncio as redis
-from huleedu_service_libs.event_utils import extract_user_id_from_event_data
-from huleedu_service_libs.redis_client import RedisClient
-
 from common_core.domain_enums import CourseCode
 from common_core.events.class_events import ClassCreatedV1
 from common_core.events.envelope import EventEnvelope
+from huleedu_service_libs.event_utils import extract_user_id_from_event_data
+from huleedu_service_libs.redis_client import RedisClient
 
 
 class TestEndToEndRealtimeNotifications:

@@ -5,8 +5,8 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-
 from common_core.error_enums import ErrorCode
+
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.mock_provider_impl import MockProviderImpl

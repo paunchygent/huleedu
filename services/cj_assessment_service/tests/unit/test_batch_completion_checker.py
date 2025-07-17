@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
-
 from common_core.status_enums import CJBatchStateEnum
+
 from services.cj_assessment_service.cj_core_logic.batch_completion_checker import (
     BatchCompletionChecker,
 )

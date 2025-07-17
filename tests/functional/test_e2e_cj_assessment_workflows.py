@@ -14,7 +14,6 @@ from datetime import UTC
 from typing import Any
 
 import pytest
-
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
@@ -25,6 +24,7 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 from common_core.status_enums import BatchStatus, ProcessingStage
+
 from tests.utils.kafka_test_manager import kafka_event_monitor, kafka_manager
 from tests.utils.service_test_manager import ServiceTestManager
 

@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID
 
 import aiohttp
+from common_core.error_enums import ErrorCode
 from huleedu_service_libs.error_handling import (
     HuleEduError,
     raise_authentication_error,
@@ -26,7 +27,6 @@ from huleedu_service_libs.error_handling import (
 )
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from common_core.error_enums import ErrorCode
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.exceptions import map_status_to_error_code
 from services.cj_assessment_service.protocols import LLMProviderProtocol, RetryManagerProtocol

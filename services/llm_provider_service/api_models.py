@@ -3,9 +3,8 @@
 from typing import Any, Dict
 from uuid import UUID
 
-from pydantic import BaseModel, Field
-
 from common_core import EssayComparisonWinner, LLMProviderType
+from pydantic import BaseModel, Field
 
 
 class LLMConfigOverrides(BaseModel):

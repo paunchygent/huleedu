@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         """Return the PostgreSQL database URL for both runtime and migrations.
-        
+
         Standardized PostgreSQL configuration following HuleEdu pattern.
         Uses environment-specific connection details.
         """
@@ -116,13 +116,13 @@ class Settings(BaseSettings):
         # Fallback to local development configuration (loaded from .env via dotenv)
         db_user = os.getenv("HULEEDU_DB_USER")
         db_password = os.getenv("HULEEDU_DB_PASSWORD")
-        
+
         if not db_user or not db_password:
             raise ValueError(
                 "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
                 "HULEEDU_DB_PASSWORD are set in your .env file."
             )
-        
+
         # For development/migration: map container names to localhost
         host = self.DATABASE_HOST
         port = self.DATABASE_PORT

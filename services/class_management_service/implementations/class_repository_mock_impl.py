@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Type, TypeVar, cast
 
 from common_core.domain_enums import Language
+
 from services.class_management_service.api_models import (
     CreateClassRequest,
     CreateStudentRequest,

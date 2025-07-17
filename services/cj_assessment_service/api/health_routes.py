@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+from common_core.error_enums import ErrorCode
 from dishka import FromDishka
 from huleedu_service_libs.database import DatabaseHealthChecker
 from huleedu_service_libs.error_handling.error_detail_factory import (
@@ -20,7 +21,6 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry
 from quart import Blueprint, Response, current_app, jsonify
 from quart_dishka import inject
 
-from common_core.error_enums import ErrorCode
 from services.cj_assessment_service.models_api import ErrorResponse
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
@@ -243,9 +243,9 @@ async def readiness_probe(
             async with repository.session() as session:
                 from datetime import UTC, datetime, timedelta
 
+                from common_core.status_enums import CJBatchStateEnum
                 from sqlalchemy import select
 
-                from common_core.status_enums import CJBatchStateEnum
                 from services.cj_assessment_service.models_db import CJBatchState
 
                 # Count active batches

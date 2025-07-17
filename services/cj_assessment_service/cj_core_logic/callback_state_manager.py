@@ -16,11 +16,11 @@ if TYPE_CHECKING:
         BatchRetryProcessor,
     )
 
+from common_core.events.llm_provider_events import LLMComparisonResultV1
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common_core.events.llm_provider_events import LLMComparisonResultV1
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import ComparisonTask, EssayForComparison
 from services.cj_assessment_service.models_db import ComparisonPair

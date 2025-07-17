@@ -16,9 +16,9 @@ from typing import Any, AsyncGenerator, Generator
 from uuid import uuid4
 
 import pytest
+from common_core import Environment
 from dishka import Scope, provide
 
-from common_core import Environment
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
 from services.llm_provider_service.implementations.connection_pool_manager_impl import (
@@ -421,6 +421,7 @@ class TestRedisOptimizations:
         from uuid import uuid4
 
         from common_core import QueueStatus
+
         from services.llm_provider_service.api_models import LLMComparisonRequest
         from services.llm_provider_service.queue_models import QueuedRequest
 

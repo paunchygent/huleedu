@@ -6,6 +6,7 @@ from datetime import timedelta
 
 import aiohttp
 from aiokafka.errors import KafkaError
+from common_core import LLMProviderType
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
@@ -16,8 +17,6 @@ from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegist
 from opentelemetry.trace import Tracer
 from prometheus_client import REGISTRY, CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine
-
-from common_core import LLMProviderType
 
 # Import all business logic protocols
 from services.cj_assessment_service.cj_core_logic.batch_completion_checker import (
