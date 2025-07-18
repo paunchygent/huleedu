@@ -435,10 +435,10 @@ class TestAggregatorServiceImpl:
         # Arrange
         batch_id = "bos-fallback-batch"
         user_id = "test-user-456"
-        
+
         # Repository returns None (not found locally)
         mock_batch_repository.get_batch.return_value = None
-        
+
         # BOS client returns pipeline state data
         bos_pipeline_data = {
             "batch_id": batch_id,
@@ -453,7 +453,7 @@ class TestAggregatorServiceImpl:
             "last_updated": "2024-01-01T10:06:00Z",
         }
         aggregator_service.bos_client.get_pipeline_state.return_value = bos_pipeline_data
-        
+
         # BOS transformer returns transformed BatchResult
         transformed_batch = create_mock_batch_result(
             batch_id=batch_id,
@@ -462,7 +462,9 @@ class TestAggregatorServiceImpl:
             essay_count=2,
             essays=[],
         )
-        aggregator_service.bos_transformer.transform_bos_to_batch_result.return_value = transformed_batch
+        aggregator_service.bos_transformer.transform_bos_to_batch_result.return_value = (
+            transformed_batch
+        )
 
         # Act
         result = await aggregator_service.get_batch_status(batch_id)
@@ -490,10 +492,10 @@ class TestAggregatorServiceImpl:
         """Test BOS fallback when BOS data is missing user_id field."""
         # Arrange
         batch_id = "invalid-bos-batch"
-        
+
         # Repository returns None (not found locally)
         mock_batch_repository.get_batch.return_value = None
-        
+
         # BOS client returns data without user_id
         bos_pipeline_data = {
             "batch_id": batch_id,
@@ -511,7 +513,7 @@ class TestAggregatorServiceImpl:
 
         # Assert
         assert result is None
-        
+
         # Verify calls
         mock_batch_repository.get_batch.assert_called_once_with(batch_id)
         aggregator_service.bos_client.get_pipeline_state.assert_called_once_with(batch_id)
@@ -527,17 +529,19 @@ class TestAggregatorServiceImpl:
         """Test BOS fallback when BOS client raises an error."""
         # Arrange
         batch_id = "bos-error-batch"
-        
+
         # Repository returns None (not found locally)
         mock_batch_repository.get_batch.return_value = None
-        
+
         # BOS client raises an HTTP error
-        aggregator_service.bos_client.get_pipeline_state.side_effect = Exception("BOS connection failed")
+        aggregator_service.bos_client.get_pipeline_state.side_effect = Exception(
+            "BOS connection failed"
+        )
 
         # Act & Assert
         with pytest.raises(Exception, match="BOS connection failed"):
             await aggregator_service.get_batch_status(batch_id)
-        
+
         # Verify calls
         mock_batch_repository.get_batch.assert_called_once_with(batch_id)
         aggregator_service.bos_client.get_pipeline_state.assert_called_once_with(batch_id)
@@ -554,10 +558,10 @@ class TestAggregatorServiceImpl:
         # Arrange
         batch_id = "transformer-error-batch"
         user_id = "test-user-789"
-        
+
         # Repository returns None (not found locally)
         mock_batch_repository.get_batch.return_value = None
-        
+
         # BOS client returns valid data
         bos_pipeline_data = {
             "batch_id": batch_id,
@@ -569,7 +573,7 @@ class TestAggregatorServiceImpl:
             },
         }
         aggregator_service.bos_client.get_pipeline_state.return_value = bos_pipeline_data
-        
+
         # BOS transformer raises an error
         aggregator_service.bos_transformer.transform_bos_to_batch_result.side_effect = ValueError(
             "Invalid BOS data structure"
@@ -578,7 +582,7 @@ class TestAggregatorServiceImpl:
         # Act & Assert
         with pytest.raises(ValueError, match="Invalid BOS data structure"):
             await aggregator_service.get_batch_status(batch_id)
-        
+
         # Verify calls
         mock_batch_repository.get_batch.assert_called_once_with(batch_id)
         aggregator_service.bos_client.get_pipeline_state.assert_called_once_with(batch_id)
@@ -596,10 +600,10 @@ class TestAggregatorServiceImpl:
         # Arrange
         batch_id = "complex-bos-batch"
         user_id = "test-user-complex"
-        
+
         # Repository returns None (not found locally)
         mock_batch_repository.get_batch.return_value = None
-        
+
         # BOS client returns complex pipeline state data
         bos_pipeline_data = {
             "batch_id": batch_id,
@@ -620,7 +624,7 @@ class TestAggregatorServiceImpl:
             "last_updated": "2024-01-01T10:15:00Z",
         }
         aggregator_service.bos_client.get_pipeline_state.return_value = bos_pipeline_data
-        
+
         # BOS transformer returns transformed result with processing status
         transformed_batch = create_mock_batch_result(
             batch_id=batch_id,
@@ -632,7 +636,9 @@ class TestAggregatorServiceImpl:
         # Set additional fields that would be populated by transformer
         transformed_batch.completed_essay_count = 8  # 5 + 3 from both pipelines
         transformed_batch.requested_pipeline = "spellcheck,cj_assessment"
-        aggregator_service.bos_transformer.transform_bos_to_batch_result.return_value = transformed_batch
+        aggregator_service.bos_transformer.transform_bos_to_batch_result.return_value = (
+            transformed_batch
+        )
 
         # Act
         result = await aggregator_service.get_batch_status(batch_id)

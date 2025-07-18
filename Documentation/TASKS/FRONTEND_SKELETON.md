@@ -1,150 +1,640 @@
-# HuleEdu Frontend MVP: Product Requirements and Implementation Plan
+# REVISED: HuleEdu Frontend MVP - SvelteKit Implementation Plan
 
 ---
-**ID**: `FE-MVP-001`  
-**Status**: `Ready for Development`  
+
+**ID**: `FE-MVP-004`  
+**Status**: `Final`  
 **Author**: `CTO`  
-**Created**: `2025-07-18`  
-**Updated**: `2025-07-18`  
+**Revision Date**: `2025-07-18`
 ---
 
-## 1. Overview
+This document outlines the Product Requirements Document (PRD) and a phased implementation plan for the HuleEdu Frontend MVP. It has been **completely rewritten with full detail** to reflect the strategic architectural decision to build the frontend on **SvelteKit** instead of React.
 
-This document provides the Product Requirements (PRD) and a phased technical implementation plan for the HuleEdu Frontend MVP. It translates the user journey into a concrete architectural and feature roadmap, designed to integrate seamlessly with the HuleEdu microservices ecosystem.
+## ⚠️ CRITICAL PREREQUISITES
 
-### 1.1. Critical Prerequisite
+**IMPLEMENTATION DEPENDENCY**: This plan requires the completion of the API Gateway and WebSocket services and alignment with the Client Retry Framework.
 
-- **Backend Services**: This plan assumes all backend services, including the `api_gateway_service` and the newly independent `websocket_service`, are implemented and operational.
+**Sequence**: 1. ✅ Backend Services Complete → 2. ✅ Endpoints Verified → 3. ✅ CORS Updated → 4. 🔄 **START HERE**
 
-## 2. Part 1: Product Requirements (The "Why")
+---
 
-### 2.1. User Journey
+## Part 1: Project Setup & Foundation (The "Bulletproof" SvelteKit Base)
 
-1.  **Authentication**: A teacher registers for an account, confirms their email, and logs in using either a password or a magic link.
-2.  **Dashboard & Upload**: The teacher lands on a dashboard showing past essay batches. They initiate a new batch upload, providing metadata (class, course, instructions) and uploading essay files via drag-and-drop.
-3.  **Processing**: The teacher monitors the batch processing in real-time. The system provides live updates on the status of each essay.
-4.  **Retry & Correction**: If a processing step fails for a retryable reason, the teacher can initiate a retry for specific essays. They can also correct student-essay associations.
-5.  **Results**: The teacher views the results, including AI-generated feedback and NLP statistics.
-6.  **Management**: The teacher manages their classes, students, and account settings.
+### Objective
 
-### 2.2. Core Features
+To establish a modern, stable, and scalable SvelteKit project within the existing PDM monorepo, ensuring maintainability and a smooth development experience.
 
-- **Secure Authentication**: JWT-based login with email confirmation.
-- **Batch Management**: Create, view, and manage essay batches.
-- **File Handling**: Drag-and-drop file uploads with pre-submission validation.
-- **Real-Time Updates**: WebSocket-driven dashboard for live processing status.
-- **Client-Initiated Retries**: A cost-aware, user-friendly retry mechanism for failed processing steps.
-- **Class & Student Management**: UI for managing classes and student rosters.
-- **Results Visualization**: Clear presentation of AI feedback and analytics.
+### Checkpoint 1.1: Monorepo Integration & SvelteKit Scaffolding
 
-## 3. Part 2: Technical Implementation Plan (The "How")
+#### Objective
 
-### Phase 1: Foundation & Project Setup
+Correctly scaffold a new SvelteKit project and integrate it into the monorepo structure using pnpm.
 
-**Objective**: Establish a modern, scalable, and maintainable Vite + React + TypeScript project within the monorepo.
+#### Implementation Steps
 
-**Task 1.1: Scaffold Project**
-- Create a `frontend` directory in the monorepo root.
-- Use `pnpm create vite . --template react-ts` to initialize the project.
-- Configure `pnpm-workspace.yaml` in the root to include the `frontend` package.
+##### 1. Create Frontend Directory
 
-**Task 1.2: Install Core Dependencies**
-- **Routing**: `react-router-dom`
-- **State Management**: `@tanstack/react-query` (server state), `zustand` (client state)
-- **API Client**: `axios`
-- **Styling**: `tailwindcss`, `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`
-- **File Handling**: `react-dropzone`
-- **Authentication**: `js-cookie`
-- **Error Handling**: `react-error-boundary`
+In the monorepo root, create a new `frontend` directory.
 
-**Task 1.3: Configure Tooling**
-- Initialize Tailwind CSS and configure `tailwind.config.js` and `postcss.config.js`.
-- Create a `.env.local` file with the following variables:
-  ```
-  VITE_API_BASE_URL=http://localhost:4001
-  VITE_WEBSOCKET_URL=ws://localhost:4002/ws
-  ```
+```bash
+# Run from the root of the huledu-reboot repository
+mkdir frontend
+cd frontend
+```
 
-**Definition of Done:**
-- ✅ A functional Vite + React + TS project exists in the `frontend` directory.
-- ✅ All dependencies are installed and configured.
-- ✅ The Vite development server runs successfully.
-- ✅ The API Gateway and WebSocket service URLs are correctly configured.
+##### 2. Initialize with pnpm
 
-### Phase 2: Authentication & Layout
+Use `pnpm` for its superior performance in monorepo environments.
 
-**Objective**: Implement the application's authentication flow and the main authenticated layout.
+```bash
+npm install -g pnpm
+```
 
-**Task 2.1: Create Typed API Client**
-- Create an `apiClient` using `axios`.
-- Implement an interceptor to automatically attach the JWT from `js-cookie` to all outgoing requests.
-- Implement an interceptor to handle 401 Unauthorized responses by logging the user out.
+##### 3. Scaffold the SvelteKit Project
 
-**Task 2.2: Implement Authentication State**
-- Create a `useAuthStore` with `zustand` to manage the user's authentication state, user object, and JWT.
-- The store must handle login, logout, and initialization from the cookie.
+Use Svelte's official scaffolding tool.
 
-**Task 2.3: Build Authentication Pages and Layouts**
-- Create `LoginPage.tsx` and `RegisterPage.tsx`.
-- Create an `AuthLayout.tsx` for public-facing forms.
-- Create a `DashboardLayout.tsx` for the main authenticated application shell, including a sidebar and header.
-- Implement a `ProtectedRoute.tsx` component that redirects unauthenticated users to `/login`.
+```bash
+# Run this inside the 'frontend' directory
+pnpm create svelte@latest .
+```
 
-**Definition of Done:**
-- ✅ Users can register, log in, and log out.
-- ✅ JWTs are securely stored in cookies and managed by the `useAuthStore`.
-- ✅ Protected routes are inaccessible to unauthenticated users.
-- ✅ The main application layout is in place.
+When prompted, select the following options:
 
-### Phase 3: Core Feature Implementation
+- **App template**: Skeleton project
+- **Add type checking with**: TypeScript
+- **Select additional options**: ESLint, Prettier, Playwright for browser testing, Vitest for unit testing
 
-**Objective**: Implement the core user journey, from file upload to real-time processing.
+##### 4. Configure Monorepo Workspaces
 
-**Task 3.1: Implement Teacher Dashboard and File Upload**
-- Create a `TeacherDashboardPage.tsx` that displays a list of previous batches and a CTA to upload a new one.
-- Create a `FileUploadPage.tsx` with:
-  - A metadata form for batch details.
-  - A `react-dropzone` component for file uploads.
-  - Logic to first register the batch with the API Gateway and then upload the files to the returned `batch_id`.
+Create a `pnpm-workspace.yaml` file in the repository root.
 
-**Task 3.2: Implement Real-Time Processing Dashboard**
-- Create a `ProcessingDashboardPage.tsx`.
-- **Hydrate Data**: Use `useQuery` to fetch the initial batch status from the API Gateway.
-- **Real-Time Updates**: Create a `useWebSocketUpdates` hook that:
-  - Connects to the `websocket_service` using the URL from `.env.local`.
-  - Passes the JWT as a query parameter (`?token=...`).
-  - Listens for incoming messages and updates the React Query cache accordingly.
-- **Component Structure**:
-  - `FileList.tsx`: Displays the status of each essay in real-time.
-  - `PipelinePanel.tsx`: Allows the user to initiate processing pipelines.
+```yaml
+# file: pnpm-workspace.yaml
+packages:
+  - 'frontend'
+  - 'services/**'
+  - 'libs/**'
+```
 
-**Task 3.3: Implement Client-Initiated Retry**
-- Create a `RetryButton.tsx` component that:
-  - Only appears for essays with a retryable failure status.
-  - Uses `useMutation` to send a retry request to the API Gateway.
-  - Displays a cost-aware confirmation modal before retrying.
+##### 5. Update API Gateway CORS Configuration
 
-**Definition of Done:**
-- ✅ Teachers can create new essay batches and upload files.
-- ✅ The processing dashboard displays real-time status updates via WebSockets.
-- ✅ The client-initiated retry mechanism is fully functional.
+Update `services/api_gateway_service/config.py`.
 
-### Phase 4: Finalization & Type Safety
+```python
+CORS_ORIGINS: list[str] = Field(
+    default=["http://localhost:5173"], # Vite default
+    description="Allowed CORS origins for SvelteKit frontend",
+)
+```
 
-**Objective**: Ensure end-to-end type safety between the frontend and backend.
+#### Done When
 
-**Task 4.1: Automate API Type Generation**
-- Add the `openapi-typescript` package.
-- Create a `pnpm` script (`generate-types`) to fetch the OpenAPI specification from the `api_gateway_service` and generate a `schema.ts` file.
-- This script should be integrated into the CI/CD pipeline.
+✅ The `frontend` directory contains a functional SvelteKit project.
+✅ `pnpm install` inside `frontend` directory succeeds.
+✅ `pnpm dev` starts the SvelteKit development server.
+✅ API Gateway CORS is updated.
 
-**Task 4.2: Integrate Generated Types**
-- Refactor the `apiClient` and all related components to use the auto-generated types from `schema.ts` for all requests, responses, and data models.
+---
 
-**Task 4.3: Implement Global Error Handling**
-- Implement a top-level `ErrorBoundary` component to catch and gracefully handle unexpected application errors.
+### Checkpoint 1.2: Core Dependencies & Configuration
 
-**Definition of Done:**
-- ✅ The `generate-types` script successfully generates a complete and accurate type definition file.
-- ✅ The entire application is type-safe, using the generated types for all API interactions.
-- ✅ A global error boundary is in place to prevent application crashes.
+#### Objective
+
+Install and configure the core libraries for styling, state, and API communication.
+
+#### Implementation Steps
+
+##### 1. Install Core Libraries
+
+```bash
+cd frontend
+pnpm add @tanstack/svelte-query axios
+npx svelte-add@latest tailwindcss
+pnpm add class-variance-authority clsx tailwind-merge lucide-svelte
+pnpm add svelte-file-dropzone js-cookie
+pnpm add -D @types/js-cookie
+```
+
+##### 2. Configure Environment Variables
+
+Create a `.env` file in the `frontend` directory.
+
+```env
+# API Gateway and WebSocket Service configuration
+VITE_API_BASE_URL=http://localhost:4001
+VITE_WEBSOCKET_URL=ws://localhost:4002/ws
+```
+
+#### Rationale for Library Choices (SvelteKit Aligned)
+
+- **SvelteKit Router (Built-in)**: Replaces `react-router-dom`. File-based routing is more intuitive.
+- **Svelte Stores (Built-in)**: Replaces `zustand`. `writable` and `derived` stores are the idiomatic solution.
+- **`@tanstack/svelte-query`**: The official Svelte adapter for powerful server-state management.
+- **`axios`**: Kept for its excellent interceptor support for JWT handling.
+- **`svelte-file-dropzone`**: A direct Svelte equivalent for `react-dropzone`.
+- **SvelteKit Error Handling (Built-in)**: `+error.svelte` replaces `react-error-boundary`.
+
+#### Done When
+
+✅ All dependencies are in `frontend/package.json`.
+✅ A Tailwind class in a `.svelte` file correctly applies styles.
+✅ Environment variables are properly configured.
+
+---
+
+## Part 2: Feature Implementation Plan (The PRD)
+
+### Checkpoint 2.1: Authentication & Application Layout
+
+#### Objective
+
+Implement public pages and the main authenticated layout using SvelteKit's secure, server-side capabilities.
+
+#### Implementation Plan
+
+##### 1. API Client with JWT Integration (`src/lib/api/client.ts`)
+
+```typescript
+import axios, { type AxiosInstance } from 'axios';
+import Cookies from 'js-cookie';
+import { goto } from '$app/navigation';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
+
+class ApiClient {
+  private client: AxiosInstance;
+
+  constructor() {
+    this.client = axios.create({
+      baseURL: API_BASE_URL,
+      timeout: 10000,
+    });
+
+    this.client.interceptors.request.use((config) => {
+      const token = Cookies.get('auth_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          Cookies.remove('auth_token');
+          // Use SvelteKit's navigation for client-side redirect
+          if (typeof window !== 'undefined') {
+            goto('/login');
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
+  // ... API methods will be added here
+}
+
+export const apiClient = new ApiClient();
+```
+
+##### 2. Server-Side Route Protection
+
+```typescript
+// File: src/routes/dashboard/+layout.server.ts
+import { redirect } from '@sveltejs/kit';
+import type { LayoutServerLoad } from './$types';
+
+export const load: LayoutServerLoad = async ({ cookies }) => {
+    const token = cookies.get('auth_token');
+    if (!token) {
+        // Secure, server-side redirect before page renders.
+        throw redirect(303, '/login');
+    }
+    // TODO: Verify token with API gateway and return user data.
+    return { user: { /* user data from token */ } };
+};
+```
+
+##### 3. Client-Side State with Svelte Stores
+
+```typescript
+// File: src/lib/stores/authStore.ts
+import { writable } from 'svelte/store';
+import Cookies from 'js-cookie';
+
+interface User { id: string; email: string; name: string; }
+interface AuthState { user: User | null; isAuthenticated: boolean; token: string | null; }
+
+function createAuthStore() {
+    const { subscribe, set } = writable<AuthState>({ user: null, isAuthenticated: false, token: null });
+
+    return {
+        subscribe,
+        login: (token: string, user: User) => {
+            Cookies.set('auth_token', token, { secure: true, sameSite: 'strict', expires: 1 });
+            set({ user, isAuthenticated: true, token });
+        },
+        logout: () => {
+            Cookies.remove('auth_token');
+            set({ user: null, isAuthenticated: false, token: null });
+        },
+        initialize: () => {
+            const token = Cookies.get('auth_token');
+            if (token) {
+                // TODO: Decode token to get user data for initial state.
+                set({ user: { /* decoded user */ }, isAuthenticated: true, token });
+            }
+        }
+    };
+}
+export const authStore = createAuthStore();
+```
+
+#### Done When
+
+✅ Server-side redirects protect `/dashboard`.
+✅ Login sets the cookie and updates the `authStore`.
+✅ The `apiClient` correctly handles JWTs and 401 errors.
+
+---
+
+### Checkpoint 2.2: Processing Dashboard with Enhanced Retry Framework
+
+#### Objective
+
+Implement the real-time processing dashboard with comprehensive retry functionality.
+
+#### Implementation Plan
+
+##### 1. Type Definitions (`src/lib/types/retry.ts`)
+
+*The detailed TypeScript interfaces (`RetryMetadata`, `Essay`, `BatchStatus`, `RetryableErrorCategory`, etc.) from the original React plan are preserved here, as they are framework-agnostic.*
+
+```typescript
+export interface RetryMetadata {
+  retry_count: number;
+  first_attempt_at: string;
+  last_attempt_at?: string;
+  is_retryable: boolean;
+  retry_reason?: string;
+  max_retries_exceeded: boolean;
+}
+
+export enum RetryableErrorCategory {
+  TRANSIENT_NETWORK = "transient_network",
+  EXTERNAL_SERVICE = "external_service", 
+  VALIDATION_ERROR = "validation_error",
+  PROCESSING_ERROR = "processing_error",
+  UNKNOWN = "unknown"
+}
+
+export interface Essay {
+  essay_id: string;
+  filename: string;
+  status: string; // Should be a more specific enum
+  metadata?: {
+    is_retryable?: boolean;
+    retry_metadata?: RetryMetadata;
+    error_category?: RetryableErrorCategory;
+    failure_reason?: string;
+  };
+}
+
+export interface BatchStatus {
+  batch_id: string;
+  pipeline_state: any;
+  last_updated: string;
+  essays: Essay[];
+}
+```
+
+##### 2. WebSocket Integration
+
+```typescript
+// File: src/lib/websockets.ts
+import { type QueryClient } from '@tanstack/svelte-query';
+import { get } from 'svelte/store';
+import { authStore } from '$lib/stores/authStore';
+import type { Essay, BatchStatus } from '$lib/types/retry'; // Assuming types are defined
+
+const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL;
+
+export function connectToBatchUpdates(batchId: string, queryClient: QueryClient) {
+    const token = get(authStore).token;
+
+    if (!token || !batchId) return () => {};
+
+    const ws = new WebSocket(`${WEBSOCKET_URL}?token=${token}`);
+
+    ws.onmessage = (event) => {
+        const update = JSON.parse(event.data);
+
+        switch (update.event) {
+          case 'batch_phase_concluded':
+            queryClient.setQueryData(['batch', batchId], (oldData: BatchStatus | undefined) => {
+              if (!oldData) return oldData;
+              return {
+                ...oldData,
+                pipeline_state: { ...oldData.pipeline_state, [update.phase]: update.status },
+                last_updated: update.timestamp,
+              };
+            });
+            break;
+          case 'essay_status_updated':
+            queryClient.setQueryData(['batch', batchId], (oldData: BatchStatus | undefined) => {
+              if (!oldData) return oldData;
+              return {
+                ...oldData,
+                essays: oldData.essays.map((essay: Essay) =>
+                  essay.essay_id === update.essay_id
+                    ? { ...essay, status: update.status, metadata: update.metadata }
+                    : essay
+                ),
+                last_updated: update.timestamp,
+              };
+            });
+            break;
+        }
+    };
+
+    ws.onopen = () => console.log('WebSocket connected for batch:', batchId);
+    ws.onerror = (error) => console.error('WebSocket error:', error);
+    ws.onclose = () => console.log('WebSocket disconnected');
+
+    return () => ws.close(); // Return cleanup function
+}
+```
+
+##### 3. Processing Dashboard Component (`src/routes/dashboard/processing/[batchId]/+page.svelte`)
+
+```html
+<script lang="ts">
+    import { onMount } from 'svelte';
+    import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+    import { connectToBatchUpdates } from '$lib/websockets';
+    import { page } from '$app/stores';
+    import { apiClient } from '$lib/api/client';
+    import RetryButton from '$lib/components/RetryButton.svelte';
+
+    const batchId = $page.params.batchId;
+    const queryClient = useQueryClient();
+
+    const query = createQuery({
+        queryKey: ['batch', batchId],
+        queryFn: () => apiClient.getBatchStatus(batchId),
+    });
+
+    onMount(() => {
+        const cleanup = connectToBatchUpdates(batchId, queryClient);
+        return () => cleanup();
+    });
+</script>
+
+{#if $query.isLoading}
+    <p>Loading batch details...</p>
+{:else if $query.isError}
+    <p class="text-red-500">Error loading batch data.</p>
+{:else if $query.data}
+    <h1>Processing Dashboard for Batch: {batchId}</h1>
+    <!-- Render FileList, PipelinePanel, etc. -->
+    <table>
+        <thead>
+            <tr><th>Filename</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            {#each $query.data.essays as essay}
+                <tr>
+                    <td>{essay.filename}</td>
+                    <td>{essay.status}</td>
+                    <td>
+                        <RetryButton {essay} {batchId} pipeline={"SOME_PIPELINE"} />
+                    </td>
+                </tr>
+            {/each}
+        </tbody>
+    </table>
+{/if}
+```
+
+##### 4. Detailed Retry Logic Component
+
+```html
+<!-- src/lib/components/RetryButton.svelte -->
+<script lang="ts">
+    import { createMutation, useQueryClient } from '@tanstack/svelte-query';
+    import { apiClient } from '$lib/api/client';
+    import type { Essay } from '$lib/types/retry';
+
+    export let essay: Essay;
+    export let batchId: string;
+    export let pipeline: string;
+
+    let showConfirmation = false;
+    const queryClient = useQueryClient();
+
+    const isRetryable = essay.status?.includes('FAILED');
+    const isCJAssessment = pipeline === 'CJ_ASSESSMENT';
+
+    const retryMutation = createMutation({
+        mutationFn: (retryData: { requested_pipeline: string; is_retry: boolean; retry_reason: string; }) => 
+            apiClient.requestPipelineExecution(batchId, retryData), // This method needs to be added to apiClient
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
+            showConfirmation = false;
+        },
+    });
+
+    function handleRetry() {
+        $retryMutation.mutate({
+            requested_pipeline: pipeline.toLowerCase(),
+            is_retry: true,
+            retry_reason: "User initiated retry from UI",
+        });
+    }
+
+    function getConfirmationMessage() {
+        if (essay.metadata?.error_category === 'TRANSIENT_NETWORK') {
+            return "A network error occurred. Would you like to retry? (No additional cost)";
+        }
+        return "Retrying this pipeline may incur additional processing costs. Are you sure?";
+    }
+</script>
+
+{#if isRetryable && !isCJAssessment}
+    <button on:click={() => showConfirmation = true} class="px-3 py-1 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600">
+        Retry
+    </button>
+{/if}
+
+{#if showConfirmation}
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg max-w-md shadow-xl">
+            <h3 class="text-lg font-semibold mb-4">Confirm Retry</h3>
+            <p class="mb-4">{getConfirmationMessage()}</p>
+            <div class="flex justify-end gap-2">
+                <button on:click={() => showConfirmation = false} class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                    Cancel
+                </button>
+                <button on:click={handleRetry} disabled={$retryMutation.isPending} class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50">
+                    {#if $retryMutation.isPending} Retrying... {:else} Confirm Retry {/if}
+                </button>
+            </div>
+        </div>
+    </div>
+{/if}
+```
+
+#### Done When
+
+✅ Dashboard displays real-time status via WebSockets.
+✅ The detailed retry logic, including cost-aware modals and CJ Assessment restrictions, is fully functional in Svelte.
+
+---
+
+### Checkpoint 2.6: Enhanced Features (Student & Class Management)
+
+#### Objective
+
+Implement the remaining user journey features using SvelteKit patterns, preserving all original detail.
+
+#### Implementation
+
+##### 1. Student Parsing Results Component (`src/lib/components/StudentParsingResults.svelte`)
+
+*This component will translate the detailed JSX from the original plan into Svelte syntax. It will display confidence scores, allow selection via checkboxes bound to a local `Set`, and trigger a `createMutation` to confirm parsing results.*
+
+```html
+<!-- src/lib/components/StudentParsingResults.svelte -->
+<script lang="ts">
+    // ... imports for types and mutations
+    export let parsingResults: StudentParsingResult[];
+    export let batchId: string;
+
+    let selectedResults = new Set<string>();
+
+    const confirmParsingMutation = createMutation({ /* ... */ });
+
+    function toggleSelection(essayId: string) {
+        if (selectedResults.has(essayId)) {
+            selectedResults.delete(essayId);
+        } else {
+            selectedResults.add(essayId);
+        }
+        selectedResults = selectedResults; // Force Svelte reactivity
+    }
+</script>
+
+<div class="space-y-4">
+    <!-- ... header with high-confidence count -->
+    <div class="space-y-2">
+        {#each parsingResults as result (result.essay_id)}
+            <!-- ParsingResultCard.svelte component here -->
+            <div class="border rounded-md p-3 {selectedResults.has(result.essay_id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}">
+                <input type="checkbox" checked={selectedResults.has(result.essay_id)} on:change={() => toggleSelection(result.essay_id)} />
+                <!-- ... rest of the card details from original plan -->
+            </div>
+        {/each}
+    </div>
+    <button on:click={() => $confirmParsingMutation.mutate([...selectedResults])}>
+        Confirm Selected ({selectedResults.size})
+    </button>
+</div>
+```
+
+##### 2. File Management Panel (`src/lib/components/FileManagementPanel.svelte`)
+
+*This component will check the batch state to see if the panel should be locked. It will use two separate `createMutation` instances for adding and removing files, and the UI will be disabled based on their pending states.*
+
+```html
+<script lang="ts">
+    // ... imports
+    export let batchState: BatchStatus;
+    export let batchId: string;
+
+    const isLocked = batchState.pipeline_state?.SPELLCHECK?.status === 'COMPLETED' || batchState.pipeline_state?.SPELLCHECK?.status === 'IN_PROGRESS';
+
+    const addFilesMutation = createMutation({ /* ... */ });
+    const removeFileMutation = createMutation({ /* ... */ });
+</script>
+
+{#if isLocked}
+    <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+        <p class="text-yellow-800">Batch is locked for modifications.</p>
+    </div>
+{:else}
+    <div class="space-y-4">
+        <!-- FileDropzone component, disabled based on $addFilesMutation.isPending -->
+        <!-- FileList component, with remove buttons disabled based on $removeFileMutation.isPending -->
+    </div>
+{/if}
+```
+
+##### 3. Real-time Updates for Management
+
+*The `connectToBatchUpdates` function in `websockets.ts` will be expanded to handle events like `class.created`, `student.created`, `batch_file_added`, and `essay.student.association.updated`. These events will trigger `queryClient.invalidateQueries({ queryKey: ['user-classes'] })` or `queryClient.setQueryData(...)` to ensure all relevant parts of the UI are updated automatically.*
+
+#### Done When
+
+✅ All management UIs are functional and integrated with the API.
+✅ Real-time events correctly invalidate and refresh data across the application.
+
+---
+
+### Checkpoint 2.7: Type Safety & Finalization
+
+#### Objective
+
+Ensure robust, type-safe communication and graceful error handling.
+
+#### Implementation
+
+##### 1. Automated Type Generation
+
+*The `pnpm run generate-types` script using `openapi-typescript` remains unchanged.*
+
+##### 2. Fully Typed API Client
+
+*The `apiClient` in `src/lib/api/client.ts` will be updated to import and use the auto-generated types from `schema.ts` for all method signatures and return types, just as in the detailed React plan.*
+
+```typescript
+// src/lib/api/client.ts (Enhanced)
+import type { components, paths } from './schema'; // Auto-generated types
+
+type BatchStatus = components['schemas']['BatchStatusResponse'];
+type PipelineRequest = components['schemas']['PipelineExecutionRequest'];
+// ... and so on for all required types.
+
+class ApiClient {
+    // ...
+    async getBatchStatus(batchId: string): Promise<BatchStatus> {
+        const response = await this.client.get(`/v1/batches/${batchId}/status`);
+        return response.data;
+    }
+    // ... other typed methods
+}
+```
+
+##### 3. SvelteKit Error Handling
+
+*A global `src/routes/+error.svelte` file will be created to catch all unhandled exceptions.*
+
+```html
+<!-- src/routes/+error.svelte -->
+<script lang="ts">
+    import { page } from '$app/stores';
+</script>
+
+<div class="text-center p-10">
+    <h1 class="text-4xl font-bold text-red-600">{$page.status}</h1>
+    <p class="mt-4 text-lg">{$page.error?.message}</p>
+    <a href="/" class="mt-6 inline-block px-4 py-2 bg-blue-500 text-white rounded">Go Home</a>
+</div>
+```
+
+#### Done When
+
+✅ `generate-types` script works.
+✅ API client is fully typed.
+✅ A global `+error.svelte` page is implemented.

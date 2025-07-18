@@ -557,3 +557,39 @@ services:
       retries: 3
       start_period: 20s
 
+  websocket_service:
+    build:
+      context: .
+      dockerfile: services/websocket_service/Dockerfile
+    container_name: huleedu_websocket_service
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "8081:8080"
+    environment:
+      - ENV_TYPE=docker
+      - ENVIRONMENT=production
+      - SERVICE_NAME=websocket_service
+      - WEBSOCKET_PORT=8080
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      - JWT_ALGORITHM=HS256
+      - WEBSOCKET_MAX_CONNECTIONS_PER_USER=5
+      - WEBSOCKET_IDLE_TIMEOUT=300
+      - WEBSOCKET_PING_INTERVAL=30
+      - CORS_ORIGINS=["http://localhost:3000"]
+      - LOG_LEVEL=INFO
+      - ENABLE_METRICS=true
+      - ENABLE_TRACING=false
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+

@@ -91,7 +91,7 @@ async def get_batch_status(
                 "Result Aggregator Service error",
                 batch_id=batch_id,
                 status_code=e.response.status_code,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
             metrics.http_requests_total.labels(

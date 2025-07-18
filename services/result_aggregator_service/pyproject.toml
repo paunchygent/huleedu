@@ -1,5 +1,5 @@
 [project]
-name = "result-aggregator-service"
+name = "huleedu-result-aggregator-service"
 version = "0.1.0"
 description = "Service to aggregate and query batch processing results."
 authors = [

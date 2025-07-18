@@ -51,24 +51,17 @@ class AggregatorServiceImpl(BatchQueryServiceProtocol):
             # First try to get batch from local database
             batch_result = await self.batch_repository.get_batch(batch_id)
             if batch_result is not None:
-                logger.debug(
-                    "Found batch in local database",
-                    batch_id=batch_id
-                )
+                logger.debug("Found batch in local database", batch_id=batch_id)
                 return batch_result
 
             # Fallback to BOS for consistency
             logger.info(
-                "Batch not found in RAS database, querying BOS for consistency",
-                batch_id=batch_id
+                "Batch not found in RAS database, querying BOS for consistency", batch_id=batch_id
             )
 
             bos_data = await self.bos_client.get_pipeline_state(batch_id)
             if bos_data is None:
-                logger.info(
-                    "Batch not found in BOS either",
-                    batch_id=batch_id
-                )
+                logger.info("Batch not found in BOS either", batch_id=batch_id)
                 return None
 
             # Transform BOS data to RAS format
@@ -79,7 +72,7 @@ class AggregatorServiceImpl(BatchQueryServiceProtocol):
                 logger.error(
                     "BOS data missing user_id field",
                     batch_id=batch_id,
-                    bos_data_keys=list(bos_data.keys())
+                    bos_data_keys=list(bos_data.keys()),
                 )
                 return None
 
@@ -91,7 +84,7 @@ class AggregatorServiceImpl(BatchQueryServiceProtocol):
                 "Successfully transformed BOS data to BatchResult",
                 batch_id=batch_id,
                 status=transformed_batch.overall_status,
-                user_id=user_id
+                user_id=user_id,
             )
 
             return transformed_batch

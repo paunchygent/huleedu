@@ -1,0 +1,60 @@
+[project]
+name = "huleedu-websocket-service"
+version = "0.1.0"
+description = "WebSocket Service for real-time notifications in HuleEdu"
+authors = [{ name = "HuleEdu Team", email = "paunchygent@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "websockets",
+    "pydantic",
+    "pydantic-settings",
+    "dishka",
+    "PyJWT",
+    "python-dotenv",
+    "prometheus-client",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-instrumentation-fastapi",
+    "httpx",
+    "huleedu-common-core",
+    "huleedu-service-libs",
+]
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-mock",
+    "pytest-cov",
+    "respx",
+    "testcontainers[redis]",
+    "ruff",
+    "mypy",
+    "types-redis",
+]
+
+[tool.pdm.scripts]
+dev = "uvicorn services.websocket_service.main:app --reload --host 0.0.0.0 --port 8080"
+start = "uvicorn services.websocket_service.main:app --host 0.0.0.0 --port 8080"
+test = "pytest services/websocket_service/tests/ -v"
+test-cov = "pytest services/websocket_service/tests/ --cov=services.websocket_service --cov-report=html --cov-report=term"
+format = "ruff format services/websocket_service/"
+lint = "ruff check services/websocket_service/"
+lint-fix = "ruff check services/websocket_service/ --fix"
+typecheck = "mypy services/websocket_service/"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/libs/common_core"
+huleedu-service-libs = "file:///app/libs/huleedu_service_libs"

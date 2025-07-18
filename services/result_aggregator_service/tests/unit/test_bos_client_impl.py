@@ -51,7 +51,7 @@ def create_mock_bos_response(
     response = AsyncMock()
     response.status = status
     response.json.return_value = data or {}
-    
+
     # Configure raise_for_status behavior (it's a sync method in aiohttp)
     response.raise_for_status = Mock()
     if status >= 400 and status != 404:  # 404 is handled before raise_for_status is called
@@ -122,7 +122,9 @@ class TestBatchOrchestratorClientImpl:
         # Verify HTTP call
         mock_http_session.get.assert_called_once()
         call_args = mock_http_session.get.call_args
-        expected_url = f"{bos_client.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
+        expected_url = (
+            f"{bos_client.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
+        )
         assert call_args[0][0] == expected_url
 
         # Verify timeout configuration
@@ -279,8 +281,7 @@ class TestBatchOrchestratorClientImpl:
         # Assert
         call_args = mock_http_session.get.call_args
         expected_url = (
-            f"{bos_client.settings.BOS_URL}/internal/v1/batches/"
-            f"{batch_id}/pipeline-state"
+            f"{bos_client.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
         )
         assert call_args[0][0] == expected_url
 

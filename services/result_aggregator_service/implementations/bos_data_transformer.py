@@ -11,8 +11,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
-from common_core.status_enums import BatchClientStatus, BatchStatus
+from common_core.pipeline_models import PhaseName
+from common_core.status_enums import BatchStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.result_aggregator_service.models_db import BatchResult
@@ -23,9 +23,7 @@ logger = create_service_logger("result_aggregator.bos_data_transformer")
 class BOSDataTransformer:
     """Transforms BOS ProcessingPipelineState to RAS BatchResult format."""
 
-    def transform_bos_to_batch_result(
-        self, bos_data: Dict[str, Any], user_id: str
-    ) -> BatchResult:
+    def transform_bos_to_batch_result(self, bos_data: Dict[str, Any], user_id: str) -> BatchResult:
         """
         Transform BOS ProcessingPipelineState to RAS BatchResult.
 
@@ -52,7 +50,7 @@ class BOSDataTransformer:
 
             # Extract just the state data for status derivation
             pipeline_states = [state for _, state in pipeline_states_with_names]
-            
+
             # Derive aggregated status
             overall_status = self._derive_batch_status_from_pipelines(pipeline_states)
 
@@ -72,17 +70,17 @@ class BOSDataTransformer:
                 processing_started_at=self._get_earliest_start_time(pipeline_states),
                 processing_completed_at=self._get_latest_completion_time(pipeline_states),
                 batch_metadata={
-                    "source": "bos_fallback", 
+                    "source": "bos_fallback",
                     "transformed_at": datetime.utcnow().isoformat(),
-                    "current_phase": self._derive_current_phase(pipeline_states_with_names)
-                }
+                    "current_phase": self._derive_current_phase(pipeline_states_with_names),
+                },
             )
 
             logger.info(
                 "Successfully transformed BOS data to BatchResult",
                 batch_id=bos_data["batch_id"],
                 overall_status=overall_status,
-                essay_count=essay_counts.get("total", 0)
+                essay_count=essay_counts.get("total", 0),
             )
 
             return batch_result
@@ -92,11 +90,13 @@ class BOSDataTransformer:
                 "BOS data transformation failed",
                 batch_id=bos_data.get("batch_id", "unknown"),
                 error=str(e),
-                exc_info=True
+                exc_info=True,
             )
             raise ValueError(f"Invalid BOS data structure: {e}") from e
 
-    def _extract_pipeline_states(self, bos_data: Dict[str, Any]) -> List[tuple[str, Dict[str, Any]]]:
+    def _extract_pipeline_states(
+        self, bos_data: Dict[str, Any]
+    ) -> List[tuple[str, Dict[str, Any]]]:
         """Extract valid pipeline states from BOS data with their names."""
         # Use PhaseName enum values for type safety
         pipeline_names = [
@@ -111,7 +111,9 @@ class BOSDataTransformer:
             if name in bos_data and bos_data[name] is not None
         ]
 
-    def _derive_batch_status_from_pipelines(self, pipeline_states: List[Dict[str, Any]]) -> BatchStatus:
+    def _derive_batch_status_from_pipelines(
+        self, pipeline_states: List[Dict[str, Any]]
+    ) -> BatchStatus:
         """
         Derive BatchStatus from pipeline execution states.
 
@@ -120,7 +122,7 @@ class BOSDataTransformer:
         # Use enum string values for comparison with BOS data
         in_progress_statuses = {
             "DISPATCH_INITIATED",
-            "IN_PROGRESS", 
+            "IN_PROGRESS",
             "PENDING_DEPENDENCIES",
         }
         completed_statuses = {
@@ -144,7 +146,9 @@ class BOSDataTransformer:
         else:
             return BatchStatus.PROCESSING_PIPELINES  # Safe default
 
-    def _derive_current_phase(self, pipeline_states_with_names: List[tuple[str, Dict[str, Any]]]) -> Optional[str]:
+    def _derive_current_phase(
+        self, pipeline_states_with_names: List[tuple[str, Dict[str, Any]]]
+    ) -> Optional[str]:
         """
         Determine current processing phase from pipeline states.
 
@@ -216,9 +220,9 @@ class BOSDataTransformer:
         if isinstance(value, str):
             try:
                 # Try ISO format first
-                if value.endswith('Z'):
-                    value = value[:-1] + '+00:00'
-                return datetime.fromisoformat(value.replace('Z', '+00:00'))
+                if value.endswith("Z"):
+                    value = value[:-1] + "+00:00"
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
             except ValueError:
                 logger.warning(f"Failed to parse datetime: {value}")
                 return None

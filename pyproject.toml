@@ -117,6 +117,7 @@ module = [
     "services.class_management_service.*",
     "services.result_aggregator_service.*",
     "services.llm_provider_service.*",
+    "services.websocket_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true
@@ -145,6 +146,7 @@ module = [
     "fastapi.*",
     "starlette.*",
     "rich.*",       # Rich library for terminal formatting
+    "opentelemetry.*",  # OpenTelemetry instrumentation libraries
 ]
 ignore_missing_imports = true
 
@@ -235,7 +237,8 @@ testpaths = [
     "services/cj_assessment_service/tests",
     "services/class_management_service/tests",
     "services/result_aggregator_service/tests",
-    "services/llm_provider_service/tests"
+    "services/llm_provider_service/tests",
+    "services/websocket_service/tests"
 ]
 pythonpath = [
     "."
@@ -316,6 +319,7 @@ run-spellchecker = "pdm run -p services/spellchecker_service start_worker"
 dev-gateway = "pdm run -p services/api_gateway_service dev"
 dev-aggregator = "pdm run -p services/result_aggregator_service dev"
 dev-llm = "pdm run -p services/llm_provider_service dev"
+dev-websocket = "pdm run -p services/websocket_service dev"
 
 # Build common_core wheel
 build-common-core = "pdm build -p libs/common_core"
@@ -342,6 +346,7 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/api_gateway_service",
     "-e file:///${PROJECT_ROOT}/services/result_aggregator_service",
     "-e file:///${PROJECT_ROOT}/services/llm_provider_service",
+    "-e file:///${PROJECT_ROOT}/services/websocket_service",
 ]
 [build-system]
 requires = ["pdm-backend"]

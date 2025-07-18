@@ -198,7 +198,7 @@ files = [
 
 [[package]]
 name = "anthropic"
-version = "0.57.1"
+version = "0.58.2"
 requires_python = ">=3.8"
 summary = "The official Python library for the anthropic API"
 groups = ["dev"]
@@ -212,8 +212,8 @@ dependencies = [
     "typing-extensions<5,>=4.10",
 ]
 files = [
-    {file = "anthropic-0.57.1-py3-none-any.whl", hash = "sha256:33afc1f395af207d07ff1bffc0a3d1caac53c371793792569c5d2f09283ea306"},
-    {file = "anthropic-0.57.1.tar.gz", hash = "sha256:7815dd92245a70d21f65f356f33fc80c5072eada87fb49437767ea2918b2c4b0"},
+    {file = "anthropic-0.58.2-py3-none-any.whl", hash = "sha256:3742181c634c725f337b71096839b6404145e33a8e190c75387c4028b825864d"},
+    {file = "anthropic-0.58.2.tar.gz", hash = "sha256:86396cc45530a83acea25ae6bca9f86656af81e3d598b4d22a1300e0e4cf8df8"},
 ]
 
 [[package]]
@@ -595,8 +595,6 @@ summary = "Code coverage measurement for Python"
 groups = ["monorepo-tools"]
 dependencies = [
     "coverage==7.9.2",
-    "coverage==7.9.2",
-    "coverage==7.9.2",
     "tomli; python_full_version <= \"3.11.0a6\"",
 ]
 files = [
@@ -728,8 +726,6 @@ requires_python = ">=3.10"
 summary = "Cute DI framework with scopes and agreeable API"
 groups = ["dev"]
 dependencies = [
-    "dishka==1.6.0",
-    "dishka==1.6.0",
     "dishka==1.6.0",
 ]
 files = [
@@ -1007,8 +1003,6 @@ requires_python = ">=3.7"
 summary = "Google API client core library"
 groups = ["dev"]
 dependencies = [
-    "google-api-core==2.25.1",
-    "google-api-core==2.25.1",
     "google-api-core==2.25.1",
     "grpcio-status<2.0.0,>=1.33.2",
     "grpcio-status<2.0.0,>=1.49.1; python_version >= \"3.11\"",
@@ -2259,8 +2253,6 @@ groups = ["dev"]
 dependencies = [
     "bcrypt>=3.1.0",
     "passlib==1.7.4",
-    "passlib==1.7.4",
-    "passlib==1.7.4",
 ]
 files = [
     {file = "passlib-1.7.4-py2.py3-none-any.whl", hash = "sha256:aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1"},
@@ -2609,8 +2601,6 @@ groups = ["dev"]
 dependencies = [
     "email-validator>=2.0.0",
     "pydantic==2.11.7",
-    "pydantic==2.11.7",
-    "pydantic==2.11.7",
 ]
 files = [
     {file = "pydantic-2.11.7-py3-none-any.whl", hash = "sha256:dde5df002701f6de26248661f6835bbe296a47bf73990135c7d07ce741b9623b"},
@@ -2805,8 +2795,6 @@ groups = ["dev"]
 dependencies = [
     "cryptography>=3.4.0",
     "python-jose==3.5.0",
-    "python-jose==3.5.0",
-    "python-jose==3.5.0",
 ]
 files = [
     {file = "python_jose-3.5.0-py2.py3-none-any.whl", hash = "sha256:abd1202f23d34dfad2c3d28cb8617b90acf34132c7afd60abd0b0b7d3cb55771"},
@@ -2945,8 +2933,6 @@ summary = "Python client for Redis database and key-value store"
 groups = ["dev"]
 dependencies = [
     "hiredis>=3.2.0",
-    "redis==6.2.0",
-    "redis==6.2.0",
     "redis==6.2.0",
 ]
 files = [
@@ -3188,8 +3174,6 @@ groups = ["dev"]
 dependencies = [
     "greenlet>=1",
     "sqlalchemy==2.0.41",
-    "sqlalchemy==2.0.41",
-    "sqlalchemy==2.0.41",
 ]
 files = [
     {file = "sqlalchemy-2.0.41-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:6375cd674fe82d7aa9816d1cb96ec592bac1726c11e0cafbf40eeee9a4516b5f"},
@@ -3287,8 +3271,6 @@ summary = "Python library for throwaway instances of anything that can run in a 
 groups = ["monorepo-tools"]
 dependencies = [
     "redis",
-    "testcontainers==4.10.0",
-    "testcontainers==4.10.0",
     "testcontainers==4.10.0",
 ]
 files = [

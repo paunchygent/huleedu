@@ -31,7 +31,9 @@ def create_mock_bos_pipeline_state(
             "status": override_status,
             "essay_counts": essay_counts,
             "started_at": "2024-01-01T10:00:00Z",
-            "completed_at": "2024-01-01T10:05:00Z" if override_status == "COMPLETED_SUCCESSFULLY" else None,
+            "completed_at": "2024-01-01T10:05:00Z"
+            if override_status == "COMPLETED_SUCCESSFULLY"
+            else None,
         },
         "last_updated": "2024-01-01T10:06:00Z",
     }
@@ -66,7 +68,9 @@ class TestBOSDataTransformer:
         # Assert
         assert result.batch_id == "test-batch-123"
         assert result.user_id == "test-user-456"
-        assert result.overall_status.value == "processing_pipelines"  # One pipeline still in progress
+        assert (
+            result.overall_status.value == "processing_pipelines"
+        )  # One pipeline still in progress
         assert result.essay_count == 3
         assert result.completed_essay_count == 5  # Sum across pipelines (3 + 2)
         assert result.failed_essay_count == 0
@@ -132,7 +136,7 @@ class TestBOSDataTransformer:
         # Include valid pipeline data but missing batch_id to trigger KeyError->ValueError
         invalid_bos_data = {
             "user_id": "test",
-            "spellcheck": {"status": "COMPLETED_SUCCESSFULLY", "essay_counts": {"total": 1}}
+            "spellcheck": {"status": "COMPLETED_SUCCESSFULLY", "essay_counts": {"total": 1}},
         }  # Missing batch_id
 
         # Act & Assert
@@ -160,7 +164,7 @@ class TestBOSDataTransformer:
         assert "transformed_at" in result.batch_metadata
         # The transformed_at should be parseable as datetime
         transformed_at = result.batch_metadata["transformed_at"]
-        assert datetime.fromisoformat(transformed_at.replace('Z', '+00:00')) is not None
+        assert datetime.fromisoformat(transformed_at.replace("Z", "+00:00")) is not None
 
     def test_transform_invalid_datetime_format(self) -> None:
         """Test datetime parsing with invalid format."""

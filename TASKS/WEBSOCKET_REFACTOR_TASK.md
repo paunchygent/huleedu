@@ -2,8 +2,9 @@
 id: ARCH-001
 title: "Refactor WebSocket Handling to a Dedicated Microservice"
 author: "CTO"
-status: "Ready for Development"
+status: "In Progress - Phase 1 Complete"
 created_date: "2025-07-18"
+updated_date: "2025-07-18"
 ---
 
 ## 1. Objective
@@ -113,3 +114,76 @@ This phase ensures our documentation is aligned with the new architecture and pr
 ## 5. Final Recommendation
 
 This refactoring is a critical step in maturing our architecture. The "GO" decision is confirmed. Proceed with the implementation as outlined above.
+
+## 6. Implementation Status (Updated: 2025-07-18)
+
+### Phase 1: Create the New `websocket_service` ✅ COMPLETE
+
+**Completed Tasks:**
+- ✅ Task 1.1: Service scaffolding initialized with proper directory structure
+- ✅ Task 1.2: Core WebSocket logic implemented with JWT auth and Redis Pub/Sub
+- ✅ Task 1.3: Dependency injection configured with Dishka providers
+- ✅ Task 1.4: Configuration and Docker integration complete
+- ✅ Task 1.5: Testing suite implemented with unit and integration tests
+
+**Evidence of Completion:**
+- Service directory: `services/websocket_service/` fully populated
+- FastAPI app running on port 8004
+- WebSocket endpoint: `/ws` with JWT query parameter authentication
+- Redis integration using `AtomicRedisClientProtocol`
+- Docker service entry in `docker-compose.services.yml`
+- Test files created in `tests/` directory
+
+### Phase 2: Remove Legacy Implementation ❌ PENDING
+
+**Remaining Tasks:**
+- ❌ Task 2.1: Delete WebSocket code
+  - File `services/api_gateway_service/routers/websocket_routes.py` still exists
+  - Import and registration in `main.py` (lines 17, 54) still present
+  - Test file `services/api_gateway_service/tests/test_websocket_routes.py` still exists
+  - Additional file `services/api_gateway_service/WEBSOCKET_README.md` found
+- ❌ Task 2.2: Clean up dependencies (review after code removal)
+
+**Action Required:** Complete removal of all WebSocket-related code from API Gateway
+
+### Phase 3: Update Documentation ❌ PENDING
+
+**Remaining Tasks:**
+- ❌ Task 3.1: Document client-side contract changes
+  - New endpoint: `ws://websocket-service:8004/ws?token={jwt}`
+  - Old endpoint: `ws://api-gateway:8080/ws/v1/status/{client_id}`
+  - Authentication method change: header → query parameter
+- ❌ Task 3.2: Update service documentation
+  - Remove WebSocket references from API Gateway README
+  - Websocket service README exists but needs review
+
+### Phase 4: Verification and Validation ❌ PENDING
+
+**Remaining Tasks:**
+- ❌ Run all API Gateway tests post-removal
+- ❌ Run all WebSocket service tests
+- ❌ End-to-end notification flow test
+- ❌ Performance validation with multiple concurrent connections
+
+## 7. Technical Decisions Made
+
+1. **Authentication**: JWT passed as query parameter (`?token=xxx`) due to WebSocket upgrade limitations
+2. **Framework**: FastAPI chosen for consistency with API Gateway
+3. **Message Format**: Maintained existing format for backward compatibility
+4. **Channel Pattern**: Redis channels use `ws:{user_id}` format
+5. **Error Codes**: Using standard WebSocket close codes (1008 for policy violation)
+
+## 8. Known Issues and Considerations
+
+1. **Frontend Impact**: Client applications must update WebSocket connection URL and auth method
+2. **Monitoring**: Prometheus metrics need to be validated in new service
+3. **Scaling**: Horizontal scaling strategy needs testing with Redis backplane
+4. **Message Ordering**: Redis Pub/Sub doesn't guarantee order - acceptable for notifications
+
+## 9. Next Steps
+
+1. Complete Phase 2 by removing all legacy code from API Gateway
+2. Create frontend migration guide with clear examples
+3. Coordinate with frontend team for client updates
+4. Schedule load testing for new service
+5. Plan gradual rollout strategy if needed

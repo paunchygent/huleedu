@@ -42,19 +42,13 @@ class BatchOrchestratorClientImpl(BatchOrchestratorClientProtocol):
         try:
             bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
 
-            logger.info(
-                "Querying BOS for batch pipeline state",
-                batch_id=batch_id,
-                bos_url=bos_url
-            )
+            logger.info("Querying BOS for batch pipeline state", batch_id=batch_id, bos_url=bos_url)
 
             timeout = aiohttp.ClientTimeout(total=self.settings.BOS_TIMEOUT_SECONDS)
             async with self.http_session.get(bos_url, timeout=timeout) as response:
                 if response.status == 404:
                     logger.info(
-                        "Batch not found in BOS",
-                        batch_id=batch_id,
-                        status_code=response.status
+                        "Batch not found in BOS", batch_id=batch_id, status_code=response.status
                     )
                     return None
 
@@ -64,7 +58,7 @@ class BatchOrchestratorClientImpl(BatchOrchestratorClientProtocol):
                 logger.info(
                     "Successfully retrieved batch pipeline state from BOS",
                     batch_id=batch_id,
-                    status_code=response.status
+                    status_code=response.status,
                 )
 
                 return bos_data
@@ -73,7 +67,7 @@ class BatchOrchestratorClientImpl(BatchOrchestratorClientProtocol):
             logger.error(
                 "Timeout while querying BOS for batch",
                 batch_id=batch_id,
-                timeout_seconds=self.settings.BOS_TIMEOUT_SECONDS
+                timeout_seconds=self.settings.BOS_TIMEOUT_SECONDS,
             )
             raise
         except aiohttp.ClientError as e:
@@ -81,7 +75,7 @@ class BatchOrchestratorClientImpl(BatchOrchestratorClientProtocol):
                 "HTTP client error while querying BOS",
                 batch_id=batch_id,
                 error=str(e),
-                exc_info=True
+                exc_info=True,
             )
             raise
         except Exception as e:
@@ -89,6 +83,6 @@ class BatchOrchestratorClientImpl(BatchOrchestratorClientProtocol):
                 "Unexpected error while querying BOS",
                 batch_id=batch_id,
                 error=str(e),
-                exc_info=True
+                exc_info=True,
             )
             raise
