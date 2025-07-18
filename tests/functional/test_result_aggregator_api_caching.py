@@ -497,6 +497,8 @@ class TestAPIWithCaching:
         data = await response.get_json()
         assert data["error"] == "Batch not found"
 
+    @pytest.mark.slow
+    @pytest.mark.functional
     async def test_concurrent_cache_operations(
         self, client: QuartClient, auth_headers: dict[str, str], setup_test_data: BatchResult
     ) -> None:

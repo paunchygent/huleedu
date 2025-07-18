@@ -252,7 +252,7 @@ class TestJWTAuthentication:
             await get_current_user_id(token)
 
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-        assert "missing subject" in exc_info.value.detail.lower()
+        assert "subject must be a string" in exc_info.value.detail.lower()
 
     @pytest.mark.asyncio
     async def test_empty_subject_claim_handling(self):

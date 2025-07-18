@@ -38,7 +38,7 @@ async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> str:
 
         # Extract user ID
         user_id: str | None = payload.get("sub")
-        if user_id is None:
+        if user_id is None or user_id == "":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token payload: missing subject",
@@ -46,6 +46,9 @@ async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> str:
 
         return user_id
 
+    except HTTPException:
+        # Re-raise specific HTTPExceptions with their original error messages
+        raise
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired"

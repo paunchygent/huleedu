@@ -33,6 +33,12 @@ class UnifiedMockApiGatewayProvider(Provider):
 
     scope = Scope.APP
 
+    def __init__(self, redis_client_mock=None, kafka_bus_mock=None):
+        super().__init__()
+        # Accept mocks via constructor instead of storing internally
+        self._redis_client_mock = redis_client_mock
+        self._kafka_bus_mock = kafka_bus_mock
+
     @provide
     def get_config(self) -> Settings:
         """Provide real settings for test consistency."""
@@ -47,14 +53,31 @@ class UnifiedMockApiGatewayProvider(Provider):
     @provide
     async def get_redis_client(self) -> AsyncIterator[AtomicRedisClientProtocol]:
         """Provide mocked Redis client following Rule 070.1 (Protocol-based mocking)."""
-        client = AsyncMock(spec=RedisClient)
-        yield cast(AtomicRedisClientProtocol, client)
+        if self._redis_client_mock is None:
+            # Create default mock if none provided
+            client = AsyncMock(spec=RedisClient)
+            client.get_user_channel = AsyncMock(return_value="ws:test_user")
+            
+            mock_pubsub = AsyncMock()
+            mock_pubsub.get_message = AsyncMock(return_value=None)
+            
+            async def mock_subscribe(channel_name):
+                yield mock_pubsub
+            
+            client.subscribe = AsyncMock(side_effect=mock_subscribe)
+            client._mock_pubsub = mock_pubsub
+            self._redis_client_mock = client
+        
+        yield cast(AtomicRedisClientProtocol, self._redis_client_mock)
 
     @provide
     async def get_kafka_bus(self) -> AsyncIterator[KafkaBus]:
         """Provide mocked Kafka bus following Rule 070.1 (Protocol-based mocking)."""
-        bus = AsyncMock(spec=KafkaBus)
-        yield bus
+        if self._kafka_bus_mock is None:
+            # Create default mock if none provided
+            self._kafka_bus_mock = AsyncMock(spec=KafkaBus)
+        
+        yield self._kafka_bus_mock
 
     @provide(scope=Scope.APP)
     def provide_registry(self) -> CollectorRegistry:
@@ -68,14 +91,42 @@ class UnifiedMockApiGatewayProvider(Provider):
 
 
 @pytest.fixture
-async def unified_container():
+def mock_redis_client():
+    """Mock Redis client fixture for WebSocket and other tests."""
+    client = AsyncMock(spec=RedisClient)
+    client.get_user_channel = AsyncMock(return_value="ws:test_user")
+    
+    # Mock pubsub behavior
+    mock_pubsub = AsyncMock()
+    mock_pubsub.get_message = AsyncMock(return_value=None)
+    
+    async def mock_subscribe(_channel_name):
+        yield mock_pubsub
+    
+    client.subscribe = AsyncMock(side_effect=mock_subscribe)
+    client._mock_pubsub = mock_pubsub
+    return client
+
+
+@pytest.fixture
+def mock_kafka_bus():
+    """Mock Kafka bus fixture for batch and other tests."""
+    return AsyncMock(spec=KafkaBus)
+
+
+@pytest.fixture
+async def unified_container(mock_redis_client, mock_kafka_bus):
     """
     Unified DI container fixture for all API Gateway tests.
 
     Ensures consistent dependency injection setup across all test files,
     following Rule 042.2.1 (Protocol-based dependencies).
     """
-    test_container = make_async_container(UnifiedMockApiGatewayProvider())
+    provider = UnifiedMockApiGatewayProvider(
+        redis_client_mock=mock_redis_client,
+        kafka_bus_mock=mock_kafka_bus
+    )
+    test_container = make_async_container(provider)
     yield test_container
     await test_container.close()
 
