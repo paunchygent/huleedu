@@ -29,7 +29,9 @@ from tests.utils.test_auth_manager import AuthTestManager
 from tests.utils.test_event_factory import reset_test_event_factory
 
 
+@pytest.mark.slow
 @pytest.mark.e2e
+@pytest.mark.functional
 @pytest.mark.asyncio
 @pytest.mark.timeout(240)  # 4 minute timeout for complete pipeline with mock LLM
 async def test_comprehensive_real_batch_pipeline(verify_redis_is_pristine):

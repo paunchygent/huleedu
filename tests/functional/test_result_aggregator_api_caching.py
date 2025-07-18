@@ -295,6 +295,8 @@ async def setup_test_data(test_app: FunctionalTestResultAggregatorApp) -> BatchR
 class TestAPIWithCaching:
     """Functional tests for API endpoints with cache validation."""
 
+    @pytest.mark.slow
+    @pytest.mark.functional
     async def test_get_batch_status_cache_flow(
         self,
         client: QuartClient,

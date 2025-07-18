@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import Any
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
 
@@ -50,7 +51,7 @@ class BCSKafkaConsumer:
         self._consumer: AIOKafkaConsumer | None = None
         self._consuming = False
         self._stop_event = asyncio.Event()
-        self._metrics = get_kafka_consumer_metrics()
+        self._metrics: dict[str, Any] | None = get_kafka_consumer_metrics()
 
         # Create idempotency configuration for Batch Conductor Service
         # Coordination events require longer retention for batch workflow coordination
@@ -177,10 +178,20 @@ class BCSKafkaConsumer:
     def _extract_event_type_from_topic(self, topic: str) -> str:
         """Extract event type from Kafka topic name for metrics labeling."""
         # Convert topic name to event type for metrics
-        # e.g., "huleedu.essay.spellcheck.completed" -> "spellcheck_completed"
+        # e.g., "huleedu.essay.spellcheck.completed.v1" -> "spellcheck_completed"
+        # e.g., "huleedu.cj_assessment.completed.v1" -> "cj_assessment_completed"
+        # e.g., "huleedu.ai.feedback.completed.v1" -> "ai_feedback_completed"
         parts = topic.split(".")
         if len(parts) >= 4:
-            return f"{parts[-2]}_{parts[-1]}"  # e.g., "spellcheck_completed"
+            # Special handling for essay topics: skip "huleedu.essay"
+            if len(parts) >= 5 and parts[0] == "huleedu" and parts[1] == "essay":
+                # Skip first two parts (huleedu.essay) and last two parts (completed.v1)
+                service_parts = parts[2:-2]
+            else:
+                # Skip first part (huleedu) and last two parts (completed.v1)
+                service_parts = parts[1:-2]
+
+            return f"{'_'.join(service_parts)}_completed"
         return "unknown_event"
 
     async def _track_event_success(self, event_type: str) -> None:

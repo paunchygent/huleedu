@@ -292,8 +292,40 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                 "last_updated": self._get_current_timestamp(),
             }
 
-        # Convert completed_steps from list back to set
-        essay_data["completed_steps"] = set(essay_data.get("completed_steps", []))
+        # Validate and convert completed_steps from list back to set
+        completed_steps_raw = essay_data.get("completed_steps", [])
+
+        # Handle malformed data gracefully
+        if isinstance(completed_steps_raw, list):
+            # Validate that all items in the list are strings
+            if all(isinstance(item, str) for item in completed_steps_raw):
+                essay_data["completed_steps"] = set(completed_steps_raw)
+            else:
+                # Log malformed list data for observability
+                logger.warning(
+                    f"Malformed completed_steps data found in Redis key {essay_key}: "
+                    f"expected list of strings, got list with non-string items. "
+                    f"Defaulting to empty set.",
+                    extra={"redis_key": essay_key, "malformed_data": completed_steps_raw},
+                )
+                essay_data["completed_steps"] = set()
+        elif isinstance(completed_steps_raw, str):
+            # Log malformed data for observability
+            logger.warning(
+                f"Malformed completed_steps data found in Redis key {essay_key}: "
+                f"expected list, got string. Defaulting to empty set.",
+                extra={"redis_key": essay_key, "malformed_data": completed_steps_raw},
+            )
+            essay_data["completed_steps"] = set()
+        else:
+            # Log unknown data type
+            logger.warning(
+                f"Unknown completed_steps data type in Redis key {essay_key}: "
+                f"expected list, got {type(completed_steps_raw)}. Defaulting to empty set.",
+                extra={"redis_key": essay_key, "data_type": str(type(completed_steps_raw))},
+            )
+            essay_data["completed_steps"] = set()
+
         return essay_data
 
     async def _build_batch_summary(self, batch_id: str) -> dict[str, dict[str, int]]:

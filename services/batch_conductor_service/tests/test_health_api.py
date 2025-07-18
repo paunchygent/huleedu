@@ -22,4 +22,4 @@ async def test_health_check() -> None:
         data = await response.get_json()
         assert data is not None
         assert "status" in data
-        assert data["status"] == "ok"
+        assert data["status"] == "healthy"

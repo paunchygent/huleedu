@@ -143,6 +143,8 @@ class TestSingleRequestPerformance:
     """Tests for single request performance baseline with real infrastructure."""
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.performance
     async def test_single_request_performance(self, infrastructure_di_container: Any) -> None:
         """Test single request performance baseline with real infrastructure."""
         async with infrastructure_di_container() as request_container:

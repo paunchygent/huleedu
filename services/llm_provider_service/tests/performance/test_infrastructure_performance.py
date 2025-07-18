@@ -137,6 +137,8 @@ class TestInfrastructurePerformance:
     """Performance tests with real infrastructure containers using testcontainers."""
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.performance
     async def test_realistic_single_request_performance(
         self, infrastructure_di_container: Any
     ) -> None:

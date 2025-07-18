@@ -36,6 +36,61 @@ class KafkaDlqProducerImpl(DlqProducerProtocol):
     def __init__(self, kafka_bus: KafkaBus):
         self.kafka_bus = kafka_bus
 
+    def _extract_message_key(
+        self, failed_event_envelope: EventEnvelope[Any] | dict[Any, Any]
+    ) -> str | None:
+        """
+        Extract message key for Kafka partitioning from event envelope.
+
+        Priority order: batch_id > entity_ref.parent_id > entity_ref.entity_id
+
+        Args:
+            failed_event_envelope: EventEnvelope or dict containing event data
+
+        Returns:
+            Message key string for Kafka partitioning, or None if no suitable key found
+        """
+        try:
+            # Extract data from EventEnvelope or dict
+            if isinstance(failed_event_envelope, EventEnvelope):
+                data = failed_event_envelope.data
+                # Convert Pydantic model to dict if needed
+                if hasattr(data, "model_dump"):
+                    data = data.model_dump()
+                elif not isinstance(data, dict):
+                    return None
+            elif isinstance(failed_event_envelope, dict):
+                data = failed_event_envelope.get("data", {})
+            else:
+                return None
+
+            if not isinstance(data, dict):
+                return None
+
+            # Priority 1: Direct batch_id
+            if "batch_id" in data and data["batch_id"]:
+                return str(data["batch_id"])
+
+            # Priority 2: entity_ref.parent_id (typically batch identifier)
+            if "entity_ref" in data and isinstance(data["entity_ref"], dict):
+                entity_ref = data["entity_ref"]
+                if "parent_id" in entity_ref and entity_ref["parent_id"]:
+                    return str(entity_ref["parent_id"])
+
+                # Priority 3: entity_ref.entity_id (fallback)
+                if "entity_id" in entity_ref and entity_ref["entity_id"]:
+                    return str(entity_ref["entity_id"])
+
+            return None
+
+        except Exception as e:
+            logger.warning(
+                f"Failed to extract message key for partitioning: {e}",
+                extra={"error": str(e)},
+                exc_info=True,
+            )
+            return None
+
     async def publish_to_dlq(
         self,
         base_topic: str,
@@ -74,17 +129,8 @@ class KafkaDlqProducerImpl(DlqProducerProtocol):
             if additional_metadata:
                 dlq_message["additional_metadata"] = additional_metadata
 
-            # Use original event's key if available, otherwise use batch_id or entity_id
-            message_key = None
-            if hasattr(failed_event_envelope, "data") and failed_event_envelope.data:
-                # Try to extract batch_id or entity_id for partitioning
-                data = failed_event_envelope.data
-                if hasattr(data, "batch_id"):
-                    message_key = data.batch_id
-                elif hasattr(data, "entity_ref") and hasattr(data.entity_ref, "parent_id"):
-                    message_key = data.entity_ref.parent_id
-                elif hasattr(data, "entity_ref") and hasattr(data.entity_ref, "entity_id"):
-                    message_key = data.entity_ref.entity_id
+            # Extract message key for Kafka partitioning
+            message_key = self._extract_message_key(failed_event_envelope)
 
             # Publish to DLQ topic
             await self.kafka_bus.producer.send(

@@ -1,14 +1,17 @@
 """
-Unit tests for BCS Kafka consumer event processing.
+Comprehensive tests for BCS Kafka consumer event processing.
 
-Tests boundary behavior: Kafka message consumption, event deserialization,
-and BatchStateRepository integration with proper mocking of external systems only.
+Tests focus on business behavior and realistic scenarios rather than implementation details.
+Only mocks external protocol boundaries, never internal business logic.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
-from unittest.mock import AsyncMock, Mock
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, Mock, patch
+from uuid import uuid4
 
 import pytest
 
@@ -16,132 +19,649 @@ from common_core.status_enums import EssayStatus
 from services.batch_conductor_service.kafka_consumer import BCSKafkaConsumer
 
 
-@pytest.fixture
-def mock_batch_state_repo():
-    """Mock BatchStateRepository for boundary testing."""
-    mock = AsyncMock()
-    mock.record_essay_step_completion.return_value = True
-    return mock
+class TestBCSKafkaConsumerBehavior:
+    """Test business behavior of BCS Kafka consumer with realistic scenarios."""
 
+    @pytest.fixture
+    def mock_batch_state_repo(self) -> AsyncMock:
+        """Mock BatchStateRepository for boundary testing."""
+        mock = AsyncMock()
+        mock.record_essay_step_completion.return_value = True
+        return mock
 
-@pytest.fixture
-def mock_redis_client():
-    """Mock RedisClient for boundary testing."""
-    mock = AsyncMock()
-    mock.set_if_not_exists.return_value = True
-    return mock
+    @pytest.fixture
+    def mock_redis_client(self) -> AsyncMock:
+        """Mock RedisClient for boundary testing."""
+        mock = AsyncMock()
+        mock.set_if_not_exists.return_value = True
+        return mock
 
+    @pytest.fixture
+    def mock_kafka_consumer(self) -> AsyncMock:
+        """Mock AIOKafkaConsumer for testing consumer lifecycle."""
+        mock = AsyncMock()
+        mock.start.return_value = None
+        mock.stop.return_value = None
+        mock.commit.return_value = None
+        return mock
 
-@pytest.fixture
-def kafka_consumer(mock_batch_state_repo, mock_redis_client):
-    """Create BCSKafkaConsumer with mocked dependencies."""
-    return BCSKafkaConsumer(
-        kafka_bootstrap_servers="localhost:9092",
-        consumer_group="test-group",
-        batch_state_repo=mock_batch_state_repo,
-        redis_client=mock_redis_client,
-    )
+    @pytest.fixture
+    def kafka_consumer(
+        self, mock_batch_state_repo: AsyncMock, mock_redis_client: AsyncMock
+    ) -> BCSKafkaConsumer:
+        """Create BCSKafkaConsumer with mocked dependencies."""
+        return BCSKafkaConsumer(
+            kafka_bootstrap_servers="localhost:9092",
+            consumer_group="test-group",
+            batch_state_repo=mock_batch_state_repo,
+            redis_client=mock_redis_client,
+        )
 
-
-@pytest.fixture
-def sample_message_data():
-    """Create a sample event message that matches the expected structure."""
-    return {
-        "event_id": "550e8400-e29b-41d4-a716-446655440000",
-        "event_type": "huleedu.essay.spellcheck.completed.v1",
-        "event_timestamp": "2024-01-01T00:00:00Z",
-        "source_service": "spell-checker-service",
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
-        "data": {
-            "event_name": "essay.spellcheck.completed",
-            "entity_ref": {
-                "entity_id": "essay-123",
-                "entity_type": "essay",
-                "parent_id": "batch-456",
-            },
-            "status": EssayStatus.SPELLCHECKED_SUCCESS.value,
-            "system_metadata": {
-                "entity": {
+    @pytest.fixture
+    def sample_spellcheck_message_data(self) -> dict:
+        """Create a sample spellcheck event message that matches the expected structure."""
+        return {
+            "event_id": "550e8400-e29b-41d4-a716-446655440000",
+            "event_type": "huleedu.essay.spellcheck.completed.v1",
+            "event_timestamp": "2024-01-01T00:00:00Z",
+            "source_service": "spell-checker-service",
+            "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
+            "data": {
+                "event_name": "essay.spellcheck.completed",
+                "entity_ref": {
                     "entity_id": "essay-123",
                     "entity_type": "essay",
                     "parent_id": "batch-456",
                 },
-                "processing_stage": "completed",
-                "event": "essay.spellcheck.completed",
+                "status": EssayStatus.SPELLCHECKED_SUCCESS.value,
+                "system_metadata": {
+                    "entity": {
+                        "entity_id": "essay-123",
+                        "entity_type": "essay",
+                        "parent_id": "batch-456",
+                    },
+                    "processing_stage": "completed",
+                    "event": "essay.spellcheck.completed",
+                },
+                "original_text_storage_id": "text-storage-123",
+                "corrections_made": 5,
             },
-            "original_text_storage_id": "text-storage-123",
-            "corrections_made": 5,
-        },
-    }
+        }
 
+    @pytest.fixture
+    def sample_cj_assessment_message_data(self) -> dict:
+        """Create a sample CJ assessment event message."""
+        return {
+            "event_id": str(uuid4()),
+            "event_type": "huleedu.cj_assessment.completed.v1",
+            "event_timestamp": datetime.now(UTC).isoformat(),
+            "source_service": "cj-assessment-service",
+            "correlation_id": str(uuid4()),
+            "data": {
+                "event_name": "cj_assessment.completed",
+                "cj_assessment_job_id": "cj_job_789",
+                "entity_ref": {
+                    "entity_id": "batch-789",
+                    "entity_type": "batch",
+                    "parent_id": None,
+                },
+                "status": "completed_successfully",
+                "system_metadata": {
+                    "entity": {
+                        "entity_id": "batch-789",
+                        "entity_type": "batch",
+                        "parent_id": None,
+                    },
+                    "processing_stage": "completed",
+                    "event": "cj_assessment_completed",
+                },
+                "rankings": [
+                    {
+                        "els_essay_id": "essay-001",
+                        "rank": 1,
+                        "score": 0.95,
+                        "pair_wins": 8,
+                        "pair_losses": 2,
+                    },
+                    {
+                        "els_essay_id": "essay-002",
+                        "rank": 2,
+                        "score": 0.85,
+                        "pair_wins": 6,
+                        "pair_losses": 4,
+                    },
+                    {
+                        "els_essay_id": "essay-003",
+                        "rank": 3,
+                        "score": 0.75,
+                        "pair_wins": 4,
+                        "pair_losses": 6,
+                    },
+                ],
+            },
+        }
 
-@pytest.mark.asyncio
-@pytest.mark.docker
-async def test_spellcheck_completion_processing(
-    kafka_consumer, mock_batch_state_repo, sample_message_data
-):
-    """Test successful processing of spellcheck completion event."""
+    # Test Category 1: Spellcheck Event Processing
 
-    # Create mock Kafka message
-    mock_msg = Mock()
-    mock_msg.value = json.dumps(sample_message_data)
-    mock_msg.topic = "huleedu.development.essay.spellcheck"
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_spellcheck_completion_processing(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_spellcheck_message_data: dict,
+    ) -> None:
+        """Test successful processing of spellcheck completion event."""
+        # Arrange
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
 
-    # Process the message
-    await kafka_consumer._handle_spellcheck_completed(mock_msg)
+        # Act
+        await kafka_consumer._handle_spellcheck_completed(mock_msg)
 
-    # Verify BatchStateRepository was called correctly
-    mock_batch_state_repo.record_essay_step_completion.assert_called_once()
-    call_args = mock_batch_state_repo.record_essay_step_completion.call_args
+        # Assert
+        mock_batch_state_repo.record_essay_step_completion.assert_called_once()
+        call_args = mock_batch_state_repo.record_essay_step_completion.call_args
 
-    assert call_args[1]["batch_id"] == "batch-456"
-    assert call_args[1]["essay_id"] == "essay-123"
-    assert call_args[1]["step_name"] == "spellcheck"
-    assert call_args[1]["metadata"]["completion_status"] == "success"
+        assert call_args[1]["batch_id"] == "batch-456"
+        assert call_args[1]["essay_id"] == "essay-123"
+        assert call_args[1]["step_name"] == "spellcheck"
+        assert call_args[1]["metadata"]["completion_status"] == "success"
+        assert call_args[1]["metadata"]["status"] == EssayStatus.SPELLCHECKED_SUCCESS.value
 
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_spellcheck_failure_processing(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_spellcheck_message_data: dict,
+    ) -> None:
+        """Test processing of spellcheck failure event."""
+        # Arrange
+        sample_spellcheck_message_data["data"]["status"] = EssayStatus.SPELLCHECK_FAILED.value
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
 
-@pytest.mark.asyncio
-@pytest.mark.docker
-async def test_spellcheck_missing_batch_id(
-    kafka_consumer, mock_batch_state_repo, sample_message_data
-):
-    """Test handling of spellcheck event with missing batch_id."""
+        # Act
+        await kafka_consumer._handle_spellcheck_completed(mock_msg)
 
-    # Remove batch_id from the event
-    sample_message_data["data"]["entity_ref"]["parent_id"] = None
-    sample_message_data["data"]["system_metadata"]["entity"]["parent_id"] = None
+        # Assert
+        mock_batch_state_repo.record_essay_step_completion.assert_called_once()
+        call_args = mock_batch_state_repo.record_essay_step_completion.call_args
+        assert call_args[1]["metadata"]["completion_status"] == "failed"
 
-    mock_msg = Mock()
-    mock_msg.value = json.dumps(sample_message_data)
-    mock_msg.topic = "huleedu.development.essay.spellcheck"
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_spellcheck_missing_batch_id(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_spellcheck_message_data: dict,
+    ) -> None:
+        """Test handling of spellcheck event with missing batch_id."""
+        # Arrange
+        sample_spellcheck_message_data["data"]["entity_ref"]["parent_id"] = None
+        sample_spellcheck_message_data["data"]["system_metadata"]["entity"]["parent_id"] = None
 
-    # Process the message (should handle gracefully)
-    await kafka_consumer._handle_spellcheck_completed(mock_msg)
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
 
-    # Verify BatchStateRepository was NOT called due to missing batch_id
-    mock_batch_state_repo.record_essay_step_completion.assert_not_called()
+        # Act
+        await kafka_consumer._handle_spellcheck_completed(mock_msg)
 
+        # Assert
+        mock_batch_state_repo.record_essay_step_completion.assert_not_called()
 
-@pytest.mark.asyncio
-@pytest.mark.docker
-async def test_consumer_lifecycle(kafka_consumer):
-    """Test consumer start/stop lifecycle management."""
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_spellcheck_batch_id_from_system_metadata(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_spellcheck_message_data: dict,
+    ) -> None:
+        """Test batch_id extraction from system_metadata fallback."""
+        # Arrange - Remove batch_id from entity_ref but keep in system_metadata
+        sample_spellcheck_message_data["data"]["entity_ref"]["parent_id"] = None
+        sample_spellcheck_message_data["data"]["system_metadata"]["entity"]["parent_id"] = (
+            "batch-from-metadata"
+        )
 
-    # Test initial state
-    assert not await kafka_consumer.is_consuming()
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
 
-    # Test stop when not consuming (should handle gracefully)
-    await kafka_consumer.stop_consuming()
+        # Act
+        await kafka_consumer._handle_spellcheck_completed(mock_msg)
 
+        # Assert
+        mock_batch_state_repo.record_essay_step_completion.assert_called_once()
+        call_args = mock_batch_state_repo.record_essay_step_completion.call_args
+        assert call_args[1]["batch_id"] == "batch-from-metadata"
 
-@pytest.mark.asyncio
-@pytest.mark.docker
-async def test_unknown_topic_handling(kafka_consumer):
-    """Test handling of messages from unknown topics."""
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_spellcheck_deserialization_error(
+        self, kafka_consumer: BCSKafkaConsumer, mock_batch_state_repo: AsyncMock
+    ) -> None:
+        """Test handling of spellcheck message deserialization errors."""
+        # Arrange
+        mock_msg = Mock()
+        mock_msg.value = "invalid json"
+        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
 
-    mock_msg = Mock()
-    mock_msg.value = json.dumps({"test": "data"})
-    mock_msg.topic = "unknown.topic"
+        # Act & Assert
+        with pytest.raises(json.JSONDecodeError):
+            await kafka_consumer._handle_spellcheck_completed(mock_msg)
 
-    # Should handle gracefully without raising
-    await kafka_consumer._handle_message(mock_msg)
+        mock_batch_state_repo.record_essay_step_completion.assert_not_called()
+
+    # Test Category 2: CJ Assessment Event Processing
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_cj_assessment_completion_processing(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_cj_assessment_message_data: dict,
+    ) -> None:
+        """Test successful processing of CJ assessment completion event."""
+        # Arrange
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+
+        # Act
+        await kafka_consumer._handle_cj_assessment_completed(mock_msg)
+
+        # Assert - Should record completion for all 3 essays
+        assert mock_batch_state_repo.record_essay_step_completion.call_count == 3
+
+        # Verify first essay completion
+        first_call = mock_batch_state_repo.record_essay_step_completion.call_args_list[0]
+        assert first_call[1]["batch_id"] == "batch-789"
+        assert first_call[1]["essay_id"] == "essay-001"
+        assert first_call[1]["step_name"] == "cj_assessment"
+        assert first_call[1]["metadata"]["completion_status"] == "success"
+        assert first_call[1]["metadata"]["rank"] == 1
+        assert first_call[1]["metadata"]["score"] == 0.95
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_cj_assessment_empty_rankings(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_cj_assessment_message_data: dict,
+    ) -> None:
+        """Test handling of CJ assessment with empty rankings."""
+        # Arrange
+        sample_cj_assessment_message_data["data"]["rankings"] = []
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+
+        # Act
+        await kafka_consumer._handle_cj_assessment_completed(mock_msg)
+
+        # Assert - No completions should be recorded
+        mock_batch_state_repo.record_essay_step_completion.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_cj_assessment_missing_essay_id(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_cj_assessment_message_data: dict,
+    ) -> None:
+        """Test handling of CJ assessment ranking with missing essay_id."""
+        # Arrange
+        sample_cj_assessment_message_data["data"]["rankings"][0]["els_essay_id"] = None
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+
+        # Act
+        await kafka_consumer._handle_cj_assessment_completed(mock_msg)
+
+        # Assert - Should record completions for the 2 valid essays only
+        assert mock_batch_state_repo.record_essay_step_completion.call_count == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_cj_assessment_repository_failure(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_cj_assessment_message_data: dict,
+    ) -> None:
+        """Test handling of batch state repository failure during CJ assessment processing."""
+        # Arrange
+        mock_batch_state_repo.record_essay_step_completion.return_value = False
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+
+        # Act
+        await kafka_consumer._handle_cj_assessment_completed(mock_msg)
+
+        # Assert - Should attempt to record all completions despite failures
+        assert mock_batch_state_repo.record_essay_step_completion.call_count == 3
+
+    # Test Category 3: Consumer Lifecycle Management
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_consumer_initial_state(self, kafka_consumer: BCSKafkaConsumer) -> None:
+        """Test consumer initial state."""
+        # Assert
+        assert not await kafka_consumer.is_consuming()
+        assert kafka_consumer._consumer is None
+        assert not kafka_consumer._consuming
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_consumer_stop_when_not_consuming(self, kafka_consumer: BCSKafkaConsumer) -> None:
+        """Test stop when not consuming (should handle gracefully)."""
+        # Act
+        await kafka_consumer.stop_consuming()
+
+        # Assert - Should handle gracefully without errors
+        assert not await kafka_consumer.is_consuming()
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_consumer_start_already_consuming(self, kafka_consumer: BCSKafkaConsumer) -> None:
+        """Test starting consumer when already consuming raises error."""
+        # Arrange
+        kafka_consumer._consuming = True
+
+        # Act & Assert
+        with pytest.raises(RuntimeError, match="Consumer is already running"):
+            await kafka_consumer.start_consuming()
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_consumer_stop_with_exception(self, kafka_consumer: BCSKafkaConsumer) -> None:
+        """Test stop consuming with exception during shutdown."""
+        # Arrange
+        mock_consumer = AsyncMock()
+        mock_consumer.stop.side_effect = Exception("Shutdown error")
+        kafka_consumer._consumer = mock_consumer
+        kafka_consumer._consuming = True
+
+        # Act
+        await kafka_consumer.stop_consuming()
+
+        # Assert - Should handle exception gracefully
+        assert not kafka_consumer._consuming
+
+    # Test Category 4: Message Routing and Event Type Extraction
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_unknown_topic_handling(self, kafka_consumer: BCSKafkaConsumer) -> None:
+        """Test handling of messages from unknown topics."""
+        # Arrange
+        mock_msg = Mock()
+        mock_msg.value = json.dumps({"test": "data"})
+        mock_msg.topic = "unknown.topic"
+
+        # Act
+        await kafka_consumer._handle_message(mock_msg)
+
+        # Assert - Should handle gracefully without raising
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_event_type_extraction_from_topic(self, kafka_consumer: BCSKafkaConsumer) -> None:
+        """Test event type extraction from various topic formats."""
+        # Test cases
+        test_cases = [
+            ("huleedu.essay.spellcheck.completed.v1", "spellcheck_completed"),
+            ("huleedu.cj_assessment.completed.v1", "cj_assessment_completed"),
+            ("huleedu.ai.feedback.completed.v1", "ai_feedback_completed"),
+            ("short.topic", "unknown_event"),
+            ("single", "unknown_event"),
+        ]
+
+        for topic, expected_event_type in test_cases:
+            # Act
+            result = kafka_consumer._extract_event_type_from_topic(topic)
+
+            # Assert
+            assert result == expected_event_type
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_message_routing_spellcheck_topic(
+        self, kafka_consumer: BCSKafkaConsumer, sample_spellcheck_message_data: dict
+    ) -> None:
+        """Test message routing to spellcheck handler based on topic."""
+        # Arrange
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+
+        # Mock the handler to verify it's called
+        with patch.object(kafka_consumer, "_handle_spellcheck_completed") as mock_handler:
+            # Act
+            await kafka_consumer._handle_message(mock_msg)
+
+            # Assert
+            mock_handler.assert_called_once_with(mock_msg)
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_message_routing_cj_assessment_topic(
+        self, kafka_consumer: BCSKafkaConsumer, sample_cj_assessment_message_data: dict
+    ) -> None:
+        """Test message routing to CJ assessment handler based on topic."""
+        # Arrange
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+
+        # Mock the handler to verify it's called
+        with patch.object(kafka_consumer, "_handle_cj_assessment_completed") as mock_handler:
+            # Act
+            await kafka_consumer._handle_message(mock_msg)
+
+            # Assert
+            mock_handler.assert_called_once_with(mock_msg)
+
+    # Test Category 5: Error Handling and Resilience
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_batch_state_repo_failure_during_spellcheck(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_spellcheck_message_data: dict,
+    ) -> None:
+        """Test handling of batch state repository failure during spellcheck processing."""
+        # Arrange
+        mock_batch_state_repo.record_essay_step_completion.side_effect = Exception("Database error")
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+
+        # Act & Assert
+        with pytest.raises(Exception, match="Database error"):
+            await kafka_consumer._handle_spellcheck_completed(mock_msg)
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_message_handler_exception_propagation(
+        self, kafka_consumer: BCSKafkaConsumer, sample_spellcheck_message_data: dict
+    ) -> None:
+        """Test that exceptions from message handlers are properly propagated."""
+        # Arrange
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+
+        # Mock handler to raise exception
+        with patch.object(
+            kafka_consumer, "_handle_spellcheck_completed", side_effect=Exception("Handler error")
+        ):
+            # Act & Assert
+            with pytest.raises(Exception, match="Handler error"):
+                await kafka_consumer._handle_message(mock_msg)
+
+    # Test Category 6: Metrics and Observability
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_metrics_tracking_success(self, kafka_consumer: BCSKafkaConsumer) -> None:
+        """Test successful event processing metrics tracking."""
+        # Arrange
+        event_type = "spellcheck_completed"
+
+        # Mock metrics
+        mock_metrics = {"events_processed_total": Mock()}
+        mock_counter = Mock()
+        mock_metrics["events_processed_total"].labels.return_value = mock_counter
+        kafka_consumer._metrics = mock_metrics
+
+        # Act
+        await kafka_consumer._track_event_success(event_type)
+
+        # Assert
+        mock_metrics["events_processed_total"].labels.assert_called_once_with(
+            event_type=event_type, outcome="success"
+        )
+        mock_counter.inc.assert_called_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_metrics_tracking_failure(self, kafka_consumer: BCSKafkaConsumer) -> None:
+        """Test failed event processing metrics tracking."""
+        # Arrange
+        event_type = "spellcheck_completed"
+        failure_reason = "processing_error"
+
+        # Mock metrics
+        mock_metrics = {"events_processed_total": Mock()}
+        mock_counter = Mock()
+        mock_metrics["events_processed_total"].labels.return_value = mock_counter
+        kafka_consumer._metrics = mock_metrics
+
+        # Act
+        await kafka_consumer._track_event_failure(event_type, failure_reason)
+
+        # Assert
+        mock_metrics["events_processed_total"].labels.assert_called_once_with(
+            event_type=event_type, outcome=failure_reason
+        )
+        mock_counter.inc.assert_called_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_metrics_tracking_with_no_metrics(self, kafka_consumer: BCSKafkaConsumer) -> None:
+        """Test metrics tracking when metrics are not available."""
+        # Arrange
+        kafka_consumer._metrics = None
+
+        # Act - Should not raise exceptions
+        await kafka_consumer._track_event_success("test_event")
+        await kafka_consumer._track_event_failure("test_event", "test_failure")
+
+        # Assert - No exceptions should be raised
+
+    # Test Category 7: Integration and Real-world Scenarios
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_concurrent_message_processing(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_spellcheck_message_data: dict,
+    ) -> None:
+        """Test concurrent processing of multiple messages."""
+        # Arrange
+        messages = []
+        for i in range(3):
+            msg_data = sample_spellcheck_message_data.copy()
+            msg_data["data"]["entity_ref"]["entity_id"] = f"essay-{i}"
+            msg_data["event_id"] = str(uuid4())
+
+            mock_msg = Mock()
+            mock_msg.value = json.dumps(msg_data)
+            mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+            messages.append(mock_msg)
+
+        # Act
+        await asyncio.gather(
+            *[kafka_consumer._handle_spellcheck_completed(msg) for msg in messages]
+        )
+
+        # Assert
+        assert mock_batch_state_repo.record_essay_step_completion.call_count == 3
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_mixed_event_types_processing(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_spellcheck_message_data: dict,
+        sample_cj_assessment_message_data: dict,
+    ) -> None:
+        """Test processing of mixed event types in sequence."""
+        # Arrange
+        spellcheck_msg = Mock()
+        spellcheck_msg.value = json.dumps(sample_spellcheck_message_data)
+        spellcheck_msg.topic = "huleedu.development.essay.spellcheck"
+
+        cj_msg = Mock()
+        cj_msg.value = json.dumps(sample_cj_assessment_message_data)
+        cj_msg.topic = "huleedu.cj_assessment.completed"
+
+        # Act
+        await kafka_consumer._handle_spellcheck_completed(spellcheck_msg)
+        await kafka_consumer._handle_cj_assessment_completed(cj_msg)
+
+        # Assert - Should record completions for spellcheck + 3 CJ assessment essays
+        assert mock_batch_state_repo.record_essay_step_completion.call_count == 4
+
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_large_cj_assessment_batch(
+        self,
+        kafka_consumer: BCSKafkaConsumer,
+        mock_batch_state_repo: AsyncMock,
+        sample_cj_assessment_message_data: dict,
+    ) -> None:
+        """Test processing of CJ assessment with large number of essays."""
+        # Arrange - Create 50 essay rankings
+        rankings = []
+        for i in range(50):
+            rankings.append(
+                {
+                    "els_essay_id": f"essay-{i:03d}",
+                    "rank": i + 1,
+                    "score": 0.95 - (i * 0.01),
+                    "pair_wins": 25 - i,
+                    "pair_losses": i,
+                }
+            )
+
+        sample_cj_assessment_message_data["data"]["rankings"] = rankings
+        mock_msg = Mock()
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+
+        # Act
+        await kafka_consumer._handle_cj_assessment_completed(mock_msg)
+
+        # Assert
+        assert mock_batch_state_repo.record_essay_step_completion.call_count == 50

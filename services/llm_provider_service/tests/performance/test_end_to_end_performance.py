@@ -347,6 +347,8 @@ class TestEndToEndPerformance:
             overall_stats["successful_requests"] / overall_stats["total_requests"] >= 0.85
         )  # 85% success rate
 
+    @pytest.mark.slow
+    @pytest.mark.performance
     @pytest.mark.asyncio
     async def test_sustained_load_performance(self, infrastructure_di_container: Any) -> None:
         """Test performance under sustained load with real infrastructure."""

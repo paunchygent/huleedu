@@ -146,6 +146,8 @@ class TestConcurrentPerformance:
     """Tests for concurrent request handling performance with real infrastructure."""
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.performance
     async def test_concurrent_requests_performance(self, infrastructure_di_container: Any) -> None:
         """Test concurrent request performance with real infrastructure."""
         concurrent_requests = 15  # Reduced for real infrastructure
