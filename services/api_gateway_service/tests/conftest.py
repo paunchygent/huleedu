@@ -18,7 +18,6 @@ from prometheus_client import CollectorRegistry
 
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
-from huleedu_service_libs.redis_client import RedisClient
 from services.api_gateway_service.app.metrics import GatewayMetrics
 from services.api_gateway_service.config import Settings, settings
 
@@ -51,23 +50,32 @@ class UnifiedMockApiGatewayProvider(Provider):
             yield client
 
     @provide
-    async def get_redis_client(self) -> AsyncIterator[AtomicRedisClientProtocol]:
-        """Provide mocked Redis client following Rule 070.1 (Protocol-based mocking)."""
+    async def get_redis_client(self, config: Settings) -> AsyncIterator[AtomicRedisClientProtocol]:
+        """Provide mocked Redis client following Rule 070.1 (Protocol-based mocking).
+
+        Matches production provider signature exactly to ensure proper DI resolution.
+        """
+
         if self._redis_client_mock is None:
             # Create default mock if none provided
-            client = AsyncMock(spec=RedisClient)
-            client.get_user_channel = AsyncMock(return_value="ws:test_user")
-            
-            mock_pubsub = AsyncMock()
-            mock_pubsub.get_message = AsyncMock(return_value=None)
-            
-            async def mock_subscribe(channel_name):
-                yield mock_pubsub
-            
-            client.subscribe = AsyncMock(side_effect=mock_subscribe)
-            client._mock_pubsub = mock_pubsub
-            self._redis_client_mock = client
-        
+            class MockRedisClient:
+                def __init__(self):
+                    self.get_user_channel_calls = []
+                    self.subscribe_calls = []
+                    self._mock_pubsub = AsyncMock()
+                    self._mock_pubsub.get_message = AsyncMock(return_value=None)
+
+                def get_user_channel(self, user_id):
+                    self.get_user_channel_calls.append(user_id)
+                    return f"ws:{user_id}"
+
+                async def subscribe(self, channel_name):
+                    self.subscribe_calls.append(channel_name)
+                    yield self._mock_pubsub
+
+            self._redis_client_mock = MockRedisClient()
+
+        # Use AsyncIterator pattern to match production
         yield cast(AtomicRedisClientProtocol, self._redis_client_mock)
 
     @provide
@@ -76,7 +84,7 @@ class UnifiedMockApiGatewayProvider(Provider):
         if self._kafka_bus_mock is None:
             # Create default mock if none provided
             self._kafka_bus_mock = AsyncMock(spec=KafkaBus)
-        
+
         yield self._kafka_bus_mock
 
     @provide(scope=Scope.APP)
@@ -93,18 +101,24 @@ class UnifiedMockApiGatewayProvider(Provider):
 @pytest.fixture
 def mock_redis_client():
     """Mock Redis client fixture for WebSocket and other tests."""
-    client = AsyncMock(spec=RedisClient)
-    client.get_user_channel = AsyncMock(return_value="ws:test_user")
-    
-    # Mock pubsub behavior
-    mock_pubsub = AsyncMock()
-    mock_pubsub.get_message = AsyncMock(return_value=None)
-    
-    async def mock_subscribe(_channel_name):
-        yield mock_pubsub
-    
-    client.subscribe = AsyncMock(side_effect=mock_subscribe)
-    client._mock_pubsub = mock_pubsub
+
+    # Create a simple mock object that tracks calls manually
+    class MockRedisClient:
+        def __init__(self):
+            self.get_user_channel_calls = []
+            self.subscribe_calls = []
+            self._mock_pubsub = AsyncMock()
+            self._mock_pubsub.get_message = AsyncMock(return_value=None)
+
+        def get_user_channel(self, user_id):
+            self.get_user_channel_calls.append(user_id)
+            return f"ws:{user_id}"
+
+        async def subscribe(self, channel_name):
+            self.subscribe_calls.append(channel_name)
+            yield self._mock_pubsub
+
+    client = MockRedisClient()
     return client
 
 
@@ -123,8 +137,7 @@ async def unified_container(mock_redis_client, mock_kafka_bus):
     following Rule 042.2.1 (Protocol-based dependencies).
     """
     provider = UnifiedMockApiGatewayProvider(
-        redis_client_mock=mock_redis_client,
-        kafka_bus_mock=mock_kafka_bus
+        redis_client_mock=mock_redis_client, kafka_bus_mock=mock_kafka_bus
     )
     test_container = make_async_container(provider)
     yield test_container
