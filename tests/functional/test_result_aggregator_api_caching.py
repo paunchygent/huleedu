@@ -87,11 +87,22 @@ class FunctionalTestApiProvider(Provider):
         settings: FromDishka[Settings],
     ) -> BatchQueryServiceProtocol:
         """Provides the REAL implementation of the query service."""
+        from unittest.mock import AsyncMock
+
         from services.result_aggregator_service.implementations.aggregator_service_impl import (
             AggregatorServiceImpl,
         )
+        from services.result_aggregator_service.implementations.bos_data_transformer import (
+            BOSDataTransformer,
+        )
 
-        return AggregatorServiceImpl(batch_repository, cache_manager, settings)
+        # Use mock BOS client for functional tests
+        mock_bos_client = AsyncMock()
+        bos_transformer = BOSDataTransformer()
+
+        return AggregatorServiceImpl(
+            batch_repository, cache_manager, mock_bos_client, bos_transformer, settings
+        )
 
     @provide(scope=Scope.REQUEST)
     def provide_cache_manager(

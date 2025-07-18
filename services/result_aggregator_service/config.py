@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     API_TIMEOUT_SECONDS: int = Field(default=30)
     CACHE_ENABLED: bool = Field(default=True)
 
+    # Batch Orchestrator Service Configuration
+    BOS_URL: str = Field(
+        default="http://localhost:4001", description="Batch Orchestrator Service URL"
+    )
+    BOS_TIMEOUT_SECONDS: int = Field(default=10, description="BOS HTTP client timeout")
+
     # Error Handling Configuration
     RAISE_ON_DESERIALIZATION_ERROR: bool = Field(
         default=False,

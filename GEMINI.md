@@ -4,21 +4,20 @@
 
 Your operational process for **every task** is fixed and non-negotiable.
 
-### **Step 1: Ingest Core Architectural Knowledge (Mandatory First Action)**
+### **Step 1: Build Core Architectural Knowledge**
 
-Begin each conversation by reading the following files:
+#### **.cursor/rules/015-project-structure-standards.mdc MUST be RESPECTED**
+
+#### **Begin each conversation by the files referenced below, as they provide a good overview of the project structure and architecture. You can use the index in the .cursor/rules/000-rule-index.mdc to navigate to the relevant files here and any other files you need to understand the project.**
+
 .cursor/rules/010-foundational-principles.mdc
 .cursor/rules/020-architectural-mandates.mdc
 .cursor/rules/030-event-driven-architecture-eda-standards.mdc
 .cursor/rules/040-service-implementation-guidelines.mdc
-.cursor/rules/041-fastapi-integration-patterns.mdc
 .cursor/rules/041-http-service-blueprint.mdc
 .cursor/rules/042-async-patterns-and-di.mdc
-.cursor/rules/042-http-proxy-service-patterns.mdc
-.cursor/rules/043-service-configuration-and-logging.mdc
 .cursor/rules/044-service-debugging-and-troubleshooting.mdc
 .cursor/rules/050-python-coding-standards.mdc
-.cursor/rules/055-import-resolution-patterns.mdc
 .cursor/rules/080-repository-workflow-and-tooling.mdc
 .cursor/rules/100-terminology-and-definitions.mdc
 .cursor/rules/110.1-planning-mode.mdc
@@ -59,7 +58,7 @@ When encountering errors or architectural questions:
 
 ### **Step 3: Execution and Documentation**
 
-- **Document Progress:** As you complete meaningful work, update the relevant task document. Adhere to the standards in `/.cursor/rules/090-documentation-standards.mdc`.
+- **Document Progress:** As you complete meaningful work, update the relevant task document. Adhere to the standards in `/.cursor/rules/090-documentation-standards.mdc`. **NEVER CREATE FILES IN ROOT: FOLLOW THE APPROPRIATE FOLDER PATTERN**
 - **Update Rules:** If you identify outdated patterns or develop new best practices, you are required to propose updates to the rule files to ensure our architectural knowledge base remains current.
 - **Test and Verify:** All functional code changes require tests. Tests are only considered complete after they have been run at least once and confirmed as passing. Before concluding a task, run the appropriate test scope and verify that no regressions have been introduced.
 
@@ -133,7 +132,7 @@ All events transmitted via Kafka **MUST** be wrapped in the standardized `EventE
 <!-- end list -->
 
 ```python
-# Correct Pydantic Model from @common_core/src/common_core/events/envelope.py
+# Correct Pydantic Model from @libs/common_core/src/common_core/events/envelope.py
 class EventEnvelope(BaseModel, Generic[T_EventData]):
     event_id: UUID = Field(default_factory=uuid4)
     event_type: str
@@ -216,10 +215,14 @@ All standard development tasks are executed via PDM scripts defined in the root 
 
 #### 2\. Static Analysis
 
-- `pdm run typecheck-all`: Runs MyPy on the entire codebase to perform static type checking.
+- `pdm run typecheck-all` from root: Runs MyPy on the entire codebase to perform static type checking. libs/ is special and needs to be checked using the method described in: .cursor/rules/086-mypy-configuration-standards.mdc
 
 #### 3\. Testing
 
 - `pdm run test-all`: Runs the complete test suite using `pytest`. (See Rule 070 for scoping).
 - `pdm run test-parallel`: Runs tests in parallel across multiple CPU cores (`pytest -n auto`).
 - `pdm run -p services/<service_name> test`: Runs the specific test suite for an individual service.
+
+### **`Docker & Service Management Tips`**
+
+- **DO NOT RESTART SERVICES AFTER CODE CHANGES; ALWAYS `docker compose build --no-cache {service with code changes}`**

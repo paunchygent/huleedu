@@ -12,7 +12,6 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from services.api_gateway_service.config import settings
 
 from .. import auth
-from ..acl_transformers import transform_bos_state_to_ras_response
 from ..app.metrics import GatewayMetrics
 
 router = APIRouter(route_class=DishkaRoute)
@@ -86,66 +85,31 @@ async def get_batch_status(
             # Re-raise HTTPException without catching it
             raise
         except HTTPStatusError as e:
-            if e.response.status_code == 404 and settings.HANDLE_MISSING_BATCHES == "query_bos":
-                logger.info(f"Batch not in aggregator, checking BOS: {batch_id}")
-                bos_url = f"{settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
-                try:
-                    with metrics.downstream_service_call_duration_seconds.labels(
-                        service="batch_orchestrator",
-                        method="GET",
-                        endpoint="/internal/v1/batches/pipeline-state",
-                    ).time():
-                        bos_response = await http_client.get(bos_url)
-                        bos_response.raise_for_status()
-                        bos_data = bos_response.json()
+            # Pure proxy behavior - simply propagate downstream errors
+            # RAS now handles BOS fallback internally for consistency
+            logger.info(
+                "Result Aggregator Service error",
+                batch_id=batch_id,
+                status_code=e.response.status_code,
+                correlation_id=correlation_id
+            )
 
-                    metrics.downstream_service_calls_total.labels(
-                        service="batch_orchestrator",
-                        method="GET",
-                        endpoint="/internal/v1/batches/pipeline-state",
-                        status_code=str(bos_response.status_code),
-                    ).inc()
-
-                    if bos_data.get("user_id") != user_id:
-                        metrics.http_requests_total.labels(
-                            method="GET", endpoint=endpoint, http_status="403"
-                        ).inc()
-                        metrics.api_errors_total.labels(
-                            endpoint=endpoint, error_type="access_denied"
-                        ).inc()
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-                        )
-                    # Apply Anti-Corruption Layer transformation (Rule 020.3.1)
-                    transformed_data = transform_bos_state_to_ras_response(bos_data, user_id)
-
-                    metrics.http_requests_total.labels(
-                        method="GET", endpoint=endpoint, http_status="200"
-                    ).inc()
-                    return BatchStatusResponse(
-                        status=BatchClientStatus.PROCESSING, details=transformed_data
-                    )
-                except HTTPException:
-                    # Re-raise HTTPException without catching it
-                    raise
-                except HTTPStatusError as bos_e:
-                    logger.error(f"BOS fallback failed for batch {batch_id}: {bos_e}")
-                    metrics.http_requests_total.labels(
-                        method="GET", endpoint=endpoint, http_status="404"
-                    ).inc()
-                    metrics.api_errors_total.labels(endpoint=endpoint, error_type="not_found").inc()
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found"
-                    ) from bos_e
-
-            logger.error(f"Aggregator service error for batch {batch_id}: {e}")
             metrics.http_requests_total.labels(
                 method="GET", endpoint=endpoint, http_status=str(e.response.status_code)
             ).inc()
-            metrics.api_errors_total.labels(
-                endpoint=endpoint, error_type="downstream_service_error"
-            ).inc()
-            raise HTTPException(status_code=e.response.status_code, detail=e.response.text) from e
+
+            if e.response.status_code == 404:
+                metrics.api_errors_total.labels(endpoint=endpoint, error_type="not_found").inc()
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found"
+                ) from e
+            else:
+                metrics.api_errors_total.labels(
+                    endpoint=endpoint, error_type="downstream_service_error"
+                ).inc()
+                raise HTTPException(
+                    status_code=e.response.status_code, detail=e.response.text
+                ) from e
 
         except Exception as e:
             logger.error(f"Unexpected error for batch {batch_id}: {e}", exc_info=True)

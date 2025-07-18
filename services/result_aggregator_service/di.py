@@ -21,6 +21,12 @@ from services.result_aggregator_service.implementations.aggregator_service_impl 
 from services.result_aggregator_service.implementations.batch_repository_postgres_impl import (
     BatchRepositoryPostgresImpl,
 )
+from services.result_aggregator_service.implementations.bos_client_impl import (
+    BatchOrchestratorClientImpl,
+)
+from services.result_aggregator_service.implementations.bos_data_transformer import (
+    BOSDataTransformer,
+)
 from services.result_aggregator_service.implementations.cache_manager_impl import (
     CacheManagerImpl,
 )
@@ -37,6 +43,7 @@ from services.result_aggregator_service.metrics import (
     setup_result_aggregator_database_monitoring,
 )
 from services.result_aggregator_service.protocols import (
+    BatchOrchestratorClientProtocol,
     BatchQueryServiceProtocol,
     BatchRepositoryProtocol,
     CacheManagerProtocol,
@@ -183,14 +190,30 @@ class ServiceProvider(Provider):
         return EventProcessorImpl(batch_repository, state_store, cache_manager)
 
     @provide
+    def provide_bos_data_transformer(self) -> BOSDataTransformer:
+        """Provide BOS data transformer."""
+        return BOSDataTransformer()
+
+    @provide
+    def provide_bos_client(
+        self, settings: Settings, http_session: aiohttp.ClientSession
+    ) -> BatchOrchestratorClientProtocol:
+        """Provide BOS client implementation."""
+        return BatchOrchestratorClientImpl(settings, http_session)
+
+    @provide
     def provide_batch_query_service(
         self,
         batch_repository: BatchRepositoryProtocol,
         cache_manager: CacheManagerProtocol,
+        bos_client: BatchOrchestratorClientProtocol,
+        bos_transformer: BOSDataTransformer,
         settings: Settings,
     ) -> BatchQueryServiceProtocol:
         """Provide batch query service implementation."""
-        return AggregatorServiceImpl(batch_repository, cache_manager, settings)
+        return AggregatorServiceImpl(
+            batch_repository, cache_manager, bos_client, bos_transformer, settings
+        )
 
     @provide
     def provide_security_service(self, settings: Settings) -> SecurityServiceProtocol:

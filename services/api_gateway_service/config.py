@@ -73,14 +73,6 @@ class Settings(BaseSettings):
         default="http://result_aggregator_service:8000",
         description="Result Aggregator Service base URL",
     )
-    BOS_URL: str = Field(
-        default="http://batch_orchestrator_service:8000",
-        description="Batch Orchestrator Service base URL for fallback queries",
-    )
-    HANDLE_MISSING_BATCHES: str = Field(
-        default="query_bos",
-        description="Strategy for 404 batches: 'query_bos' or 'return_404'",
-    )
 
     # Redis configuration
     REDIS_URL: str = Field(

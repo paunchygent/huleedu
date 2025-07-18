@@ -181,3 +181,11 @@ class CacheManagerProtocol(Protocol):
     async def invalidate_user_batches(self, user_id: str) -> None:
         """Invalidate all cached user batch lists."""
         ...
+
+
+class BatchOrchestratorClientProtocol(Protocol):
+    """Protocol for communicating with Batch Orchestrator Service."""
+
+    async def get_pipeline_state(self, batch_id: str) -> Optional[Dict[str, Any]]:
+        """Get pipeline state from BOS for batch consistency fallback."""
+        ...

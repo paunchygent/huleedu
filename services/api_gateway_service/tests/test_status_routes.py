@@ -67,54 +67,13 @@ async def test_get_batch_status_ownership_failure(client: AsyncClient, respx_moc
 
 
 @pytest.mark.asyncio
-async def test_get_batch_status_not_found_fallback_success(
-    client: AsyncClient, respx_mock: MockRouter
-):
-    """Test fallback to BOS when batch is not in the aggregator."""
-    settings.HANDLE_MISSING_BATCHES = "query_bos"
+async def test_get_batch_status_not_found(client: AsyncClient, respx_mock: MockRouter):
+    """Test 404 response when batch is not found."""
     aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{BATCH_ID}/status"
-    bos_url = f"{settings.BOS_URL}/internal/v1/batches/{BATCH_ID}/pipeline-state"
 
     respx_mock.get(aggregator_url).mock(return_value=Response(404))
 
-    # Mock realistic BOS ProcessingPipelineState data
-    bos_data = {
-        "batch_id": BATCH_ID,
-        "user_id": USER_ID,
-        "requested_pipelines": ["spellcheck"],
-        "last_updated": "2024-01-15T10:30:00Z",
-        "spellcheck": {
-            "status": "in_progress",
-            "essay_counts": {
-                "total": 5,
-                "successful": 2,
-                "failed": 0,
-                "pending_dispatch_or_processing": 3,
-            },
-            "started_at": "2024-01-15T10:00:00Z",
-            "completed_at": None,
-        },
-    }
-
-    bos_mock = respx_mock.get(bos_url).mock(return_value=Response(200, json=bos_data))
-
     response = await client.get(f"/v1/batches/{BATCH_ID}/status")
 
-    assert response.status_code == 200
-    response_data = response.json()
-    assert response_data["status"] == "processing"
-
-    # Verify transformed data structure
-    details = response_data["details"]
-    assert details["batch_id"] == BATCH_ID
-    assert details["user_id"] == USER_ID
-    assert details["overall_status"] == "processing"  # BatchClientStatus.PROCESSING.value
-    assert details["essay_count"] == 5
-    assert details["completed_essay_count"] == 2
-    assert details["failed_essay_count"] == 0
-    assert details["requested_pipeline"] == "spellcheck"
-    assert details["current_phase"] == "SPELLCHECK"
-    assert details["essays"] == []  # Cannot populate from BOS
-    assert details["last_updated"] == "2024-01-15T10:30:00Z"
-
-    assert bos_mock.called
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Batch not found"
