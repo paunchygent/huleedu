@@ -140,6 +140,21 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
 
                 return {EssayStatus(row[0]): row[1] for row in rows}
 
+    async def get_batch_summary_with_essays(
+        self, batch_id: str
+    ) -> tuple[list[EssayState], dict[EssayStatus, int]]:
+        """Get both essays and status summary for a batch in single operation (prevents N+1 queries)."""
+        # Fetch essays once
+        essays = await self.list_essays_by_batch(batch_id)
+
+        # Compute status summary from already-fetched essays
+        summary: dict[EssayStatus, int] = {}
+        for essay in essays:
+            status = essay.current_status
+            summary[status] = summary.get(status, 0) + 1
+
+        return essays, summary  # type: ignore[return-value]
+
     async def get_essay_by_text_storage_id_and_batch_id(
         self, batch_id: str, text_storage_id: str
     ) -> EssayState | None:

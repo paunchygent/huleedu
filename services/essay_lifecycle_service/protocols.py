@@ -81,6 +81,12 @@ class EssayRepositoryProtocol(Protocol):
         """Get status count breakdown for a batch."""
         ...
 
+    async def get_batch_summary_with_essays(
+        self, batch_id: str
+    ) -> tuple[list[EssayState], dict[EssayStatus, int]]:
+        """Get both essays and status summary for a batch in single operation (prevents N+1 queries)."""
+        ...
+
     async def get_essay_by_text_storage_id_and_batch_id(
         self, batch_id: str, text_storage_id: str
     ) -> EssayState | None:

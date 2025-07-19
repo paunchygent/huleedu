@@ -265,15 +265,40 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             return essays
 
     async def get_batch_status_summary(self, batch_id: str) -> dict[EssayStatus, int]:
-        """Get status count breakdown for a batch."""
+        """Get status count breakdown for a batch using efficient SQL aggregation."""
+        from sqlalchemy import func
+
+        async with self.session() as session:
+            # Use SQL GROUP BY aggregation for optimal performance
+            stmt = (
+                select(EssayStateDB.current_status, func.count().label('count'))
+                .where(EssayStateDB.batch_id == batch_id)
+                .group_by(EssayStateDB.current_status)
+            )
+            result = await session.execute(stmt)
+            rows = result.all()
+
+            # Convert to dictionary with EssayStatus enum keys
+            summary: dict[EssayStatus, int] = {}
+            for status_value, count in rows:
+                summary[status_value] = count
+
+            return summary
+
+    async def get_batch_summary_with_essays(
+        self, batch_id: str
+    ) -> tuple[list[ConcreteEssayState], dict[EssayStatus, int]]:
+        """Get both essays and status summary for a batch in single operation (prevents N+1 queries)."""
+        # Fetch essays once
         essays = await self.list_essays_by_batch(batch_id)
 
+        # Compute status summary from already-fetched essays
         summary: dict[EssayStatus, int] = {}
         for essay in essays:
             status = essay.current_status
             summary[status] = summary.get(status, 0) + 1
 
-        return summary
+        return essays, summary  # type: ignore[return-value]
 
     async def get_essay_by_text_storage_id_and_batch_id(
         self, batch_id: str, text_storage_id: str

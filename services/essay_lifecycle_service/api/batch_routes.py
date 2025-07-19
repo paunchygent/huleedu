@@ -69,8 +69,12 @@ async def get_batch_status(
         )
         return jsonify(response.model_dump()), 404
 
-    # Get status breakdown
-    status_breakdown = await state_store.get_batch_status_summary(batch_id)
+    # Compute status breakdown from already-fetched essays (eliminates duplicate query)
+    status_breakdown: dict[EssayStatus, int] = {}
+    for essay in essays:
+        status = essay.current_status
+        status_breakdown[status] = status_breakdown.get(status, 0) + 1
+    
     total_essays = len(essays)
 
     # Calculate completion percentage
