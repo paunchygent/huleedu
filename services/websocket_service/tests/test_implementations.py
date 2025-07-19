@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import jwt
 import pytest
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from fastapi import WebSocket
 
 from services.websocket_service.implementations.jwt_validator import JWTValidator
@@ -178,9 +179,10 @@ class TestJWTValidator:
         }
         token = jwt.encode(payload, secret, algorithm="HS256")
 
-        user_id = await validator.validate_token(token)
-
-        assert user_id is None
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_token(token)
+        
+        assert "token has expired" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_validate_token_missing_exp(self) -> None:
@@ -192,9 +194,10 @@ class TestJWTValidator:
         payload = {"sub": "user123"}
         token = jwt.encode(payload, secret, algorithm="HS256")
 
-        user_id = await validator.validate_token(token)
-
-        assert user_id is None
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_token(token)
+        
+        assert "missing expiration" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_validate_token_missing_sub(self) -> None:
@@ -208,9 +211,10 @@ class TestJWTValidator:
         }
         token = jwt.encode(payload, secret, algorithm="HS256")
 
-        user_id = await validator.validate_token(token)
-
-        assert user_id is None
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_token(token)
+        
+        assert "missing subject" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_validate_invalid_signature(self) -> None:
@@ -224,18 +228,20 @@ class TestJWTValidator:
         }
         token = jwt.encode(payload, "wrong-secret", algorithm="HS256")
 
-        user_id = await validator.validate_token(token)
-
-        assert user_id is None
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_token(token)
+        
+        assert "signature verification failed" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_validate_malformed_token(self) -> None:
         """Test validation of malformed token."""
         validator = JWTValidator(secret_key="test-secret")
 
-        user_id = await validator.validate_token("not.a.jwt")
-
-        assert user_id is None
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_token("not.a.jwt")
+        
+        assert "invalid token" in exc_info.value.error_detail.message.lower()
 
 
 class TestRedisMessageListener:
@@ -280,7 +286,9 @@ class TestRedisMessageListener:
         }
 
         mock_pubsub = AsyncMock()
-        mock_pubsub.get_message = AsyncMock(side_effect=[test_message, None])
+        # Return test message once, then None forever to avoid StopAsyncIteration
+        message_calls = [test_message] + [None] * 100  # None forever after first message
+        mock_pubsub.get_message = AsyncMock(side_effect=message_calls)
 
         async def mock_subscribe(channel: str) -> AsyncIterator[Any]:
             yield mock_pubsub

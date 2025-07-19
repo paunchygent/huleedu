@@ -29,9 +29,11 @@ from huleedu_service_libs.error_handling import (
     raise_content_service_error,
     raise_parsing_error,
     raise_validation_error,
-    create_error_detail_with_context,
-    HuleEduError,
 )
+from huleedu_service_libs.error_handling.error_detail_factory import (
+    create_error_detail_with_context,
+)
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
 from huleedu_service_libs.observability import (
     trace_operation,

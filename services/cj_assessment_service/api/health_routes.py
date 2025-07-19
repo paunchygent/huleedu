@@ -12,7 +12,9 @@ from uuid import uuid4
 from common_core.error_enums import ErrorCode
 from dishka import FromDishka
 from huleedu_service_libs.database import DatabaseHealthChecker
-from huleedu_service_libs.error_handling import create_error_detail_with_context
+from huleedu_service_libs.error_handling.error_detail_factory import (
+    create_error_detail_with_context,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.quart_app import HuleEduApp
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry

@@ -87,7 +87,9 @@ class TestErrorHandlingIntegration:
         error_code: str,
     ) -> EventEnvelope[LLMComparisonResultV1]:
         """Create an error callback event."""
-        from huleedu_service_libs.error_handling import create_error_detail_with_context
+        from huleedu_service_libs.error_handling.error_detail_factory import (
+            create_error_detail_with_context,
+        )
 
         error_detail = create_error_detail_with_context(
             error_code=ErrorCode.LLM_PROVIDER_SERVICE_ERROR,

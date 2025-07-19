@@ -1,7 +1,6 @@
 """Service-specific error handling for LLM Provider Service."""
 
 from huleedu_service_libs.error_handling import (
-    HuleEduError,
     raise_authentication_error,
     raise_circuit_breaker_open,
     raise_configuration_error,
@@ -10,11 +9,6 @@ from huleedu_service_libs.error_handling import (
     raise_invalid_api_key,
     raise_invalid_request,
     raise_invalid_response,
-    raise_llm_model_not_found,
-    raise_llm_provider_error,
-    raise_llm_provider_service_error,
-    raise_llm_queue_full_error,
-    raise_llm_response_validation_error,
     raise_parsing_error,
     raise_processing_error,
     raise_quota_exceeded,
@@ -23,6 +17,14 @@ from huleedu_service_libs.error_handling import (
     raise_service_unavailable,
     raise_timeout_error,
     raise_validation_error,
+)
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
+from huleedu_service_libs.error_handling.llm_provider_factories import (
+    raise_llm_model_not_found,
+    raise_llm_provider_error,
+    raise_llm_provider_service_error,
+    raise_llm_queue_full_error,
+    raise_llm_response_validation_error,
 )
 
 __all__ = [

@@ -62,12 +62,11 @@ error_message: str fields
 ## Imports
 
 ```python
-# Core error handling (framework-agnostic)
+# Core error handling (framework-agnostic) - USE MAIN MODULE
 from common_core.error_enums import ErrorCode
 from common_core.models.error_models import ErrorDetail
-from huleedu_service_libs.error_handling import raise_*
 
-# Framework-specific error handlers
+# Framework-specific error handlers - USE FRAMEWORK SUBMODULES
 # FastAPI services:
 from huleedu_service_libs.error_handling.fastapi import register_error_handlers
 
