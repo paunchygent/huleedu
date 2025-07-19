@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 
 import pytest
 from common_core.domain_enums import ContentType
+from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import HuleEduError
 
@@ -51,11 +52,20 @@ class TestSQLiteEssayStateStore:
     ) -> None:
         """Test updating essay status via state machine with metadata."""
         # First create the essay record
-        await state_store.create_essay_record(
-            essay_id=sample_essay_state.essay_id,
-            batch_id=sample_essay_state.batch_id,
-            initial_status=sample_essay_state.current_status,
+        essay_ref = EntityReference(
+            entity_id=sample_essay_state.essay_id,
+            entity_type="essay",
+            parent_id=sample_essay_state.batch_id,
         )
+        await state_store.create_essay_record(essay_ref)
+
+        # Update to the desired initial status if different from default (UPLOADED)
+        if sample_essay_state.current_status != EssayStatus.UPLOADED:
+            await state_store.update_essay_state(
+                essay_id=sample_essay_state.essay_id,
+                new_status=sample_essay_state.current_status,
+                metadata=sample_essay_state.processing_metadata,
+            )
 
         # Test metadata for status update
         new_metadata = {
@@ -92,8 +102,17 @@ class TestSQLiteEssayStateStore:
 
         # Create essays with different phase configurations
         # Essay 1: In spellcheck phase, awaiting
-        await state_store.create_essay_record(
-            essay_id="essay-1", batch_id=batch_id, initial_status=EssayStatus.AWAITING_SPELLCHECK
+        essay_ref_1 = EntityReference(
+            entity_id="essay-1",
+            entity_type="essay",
+            parent_id=batch_id,
+        )
+        await state_store.create_essay_record(essay_ref_1)
+        # Update to desired status since create defaults to UPLOADED
+        await state_store.update_essay_state(
+            essay_id="essay-1",
+            new_status=EssayStatus.AWAITING_SPELLCHECK,
+            metadata={},
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-1",
@@ -102,8 +121,17 @@ class TestSQLiteEssayStateStore:
         )
 
         # Essay 2: In spellcheck phase, completed successfully
-        await state_store.create_essay_record(
-            essay_id="essay-2", batch_id=batch_id, initial_status=EssayStatus.SPELLCHECKED_SUCCESS
+        essay_ref_2 = EntityReference(
+            entity_id="essay-2",
+            entity_type="essay",
+            parent_id=batch_id,
+        )
+        await state_store.create_essay_record(essay_ref_2)
+        # Update to desired status since create defaults to UPLOADED
+        await state_store.update_essay_state(
+            essay_id="essay-2",
+            new_status=EssayStatus.SPELLCHECKED_SUCCESS,
+            metadata={},
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-2",
@@ -112,10 +140,17 @@ class TestSQLiteEssayStateStore:
         )
 
         # Essay 3: NOT in spellcheck phase - should be excluded
-        await state_store.create_essay_record(
+        essay_ref_3 = EntityReference(
+            entity_id="essay-3",
+            entity_type="essay",
+            parent_id=batch_id,
+        )
+        await state_store.create_essay_record(essay_ref_3)
+        # Update to desired status since create defaults to UPLOADED
+        await state_store.update_essay_state(
             essay_id="essay-3",
-            batch_id=batch_id,
-            initial_status=EssayStatus.CJ_ASSESSMENT_IN_PROGRESS,
+            new_status=EssayStatus.CJ_ASSESSMENT_IN_PROGRESS,
+            metadata={},
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-3",
@@ -143,8 +178,17 @@ class TestSQLiteEssayStateStore:
         batch_id = "test-batch-1"
 
         # Create essay with different phase
-        await state_store.create_essay_record(
-            essay_id="essay-1", batch_id=batch_id, initial_status=EssayStatus.READY_FOR_PROCESSING
+        essay_ref = EntityReference(
+            entity_id="essay-1",
+            entity_type="essay",
+            parent_id=batch_id,
+        )
+        await state_store.create_essay_record(essay_ref)
+        # Update to desired status since create defaults to UPLOADED
+        await state_store.update_essay_state(
+            essay_id="essay-1",
+            new_status=EssayStatus.READY_FOR_PROCESSING,
+            metadata={},
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-1",
@@ -173,10 +217,17 @@ class TestSQLiteEssayStateStore:
     ) -> None:
         """Test listing essays correctly filters by batch."""
         # Create essays in different batches
-        await state_store.create_essay_record(
+        essay_ref_batch1 = EntityReference(
+            entity_id="essay-batch1",
+            entity_type="essay",
+            parent_id="batch-1",
+        )
+        await state_store.create_essay_record(essay_ref_batch1)
+        # Update to desired status since create defaults to UPLOADED
+        await state_store.update_essay_state(
             essay_id="essay-batch1",
-            batch_id="batch-1",
-            initial_status=EssayStatus.AWAITING_SPELLCHECK,
+            new_status=EssayStatus.AWAITING_SPELLCHECK,
+            metadata={},
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-batch1",
@@ -184,10 +235,17 @@ class TestSQLiteEssayStateStore:
             metadata={"current_phase": "spellcheck", "commanded_phases": ["spellcheck"]},
         )
 
-        await state_store.create_essay_record(
+        essay_ref_batch2 = EntityReference(
+            entity_id="essay-batch2",
+            entity_type="essay",
+            parent_id="batch-2",
+        )
+        await state_store.create_essay_record(essay_ref_batch2)
+        # Update to desired status since create defaults to UPLOADED
+        await state_store.update_essay_state(
             essay_id="essay-batch2",
-            batch_id="batch-2",
-            initial_status=EssayStatus.AWAITING_SPELLCHECK,
+            new_status=EssayStatus.AWAITING_SPELLCHECK,
+            metadata={},
         )
         await state_store.update_essay_status_via_machine(
             essay_id="essay-batch2",
@@ -222,11 +280,20 @@ class TestSQLiteEssayStateStore:
     async def test_create_essay_record_minimal(self, state_store: SQLiteEssayStateStore) -> None:
         """Test creating essay record with minimal parameters."""
         # Execute
-        essay_state = await state_store.create_essay_record(
-            essay_id="test-essay",
-            batch_id="test-batch",
-            initial_status=EssayStatus.READY_FOR_PROCESSING,
+        essay_ref = EntityReference(
+            entity_id="test-essay",
+            entity_type="essay",
+            parent_id="test-batch",
         )
+        essay_state = await state_store.create_essay_record(essay_ref)
+        # Update to desired status since create defaults to UPLOADED
+        await state_store.update_essay_state(
+            essay_id="test-essay",
+            new_status=EssayStatus.READY_FOR_PROCESSING,
+            metadata={},
+        )
+        # Get the updated state for verification
+        essay_state = await state_store.get_essay_state("test-essay")
 
         # Verify
         assert essay_state.essay_id == "test-essay"
@@ -244,11 +311,20 @@ class TestSQLiteEssayStateStore:
     async def test_essay_state_timeline_tracking(self, state_store: SQLiteEssayStateStore) -> None:
         """Test that essay state timeline is correctly tracked during updates."""
         # Create essay
-        essay_state = await state_store.create_essay_record(
-            essay_id="timeline-test",
-            batch_id="test-batch",
-            initial_status=EssayStatus.READY_FOR_PROCESSING,
+        essay_ref = EntityReference(
+            entity_id="timeline-test",
+            entity_type="essay",
+            parent_id="test-batch",
         )
+        essay_state = await state_store.create_essay_record(essay_ref)
+        # Update to desired status since create defaults to UPLOADED
+        await state_store.update_essay_state(
+            essay_id="timeline-test",
+            new_status=EssayStatus.READY_FOR_PROCESSING,
+            metadata={},
+        )
+        # Get the updated state for timeline verification
+        essay_state = await state_store.get_essay_state("timeline-test")
 
         # Verify initial timeline
         initial_timeline_length = len(essay_state.timeline)

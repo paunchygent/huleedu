@@ -47,7 +47,7 @@ class TestBatchStatusPerformanceIntegration:
         @property
         def DATABASE_URL(self) -> str:
             """Override to return test database URL."""
-            return object.__getattribute__(self, "_database_url")
+            return str(object.__getattribute__(self, "_database_url"))
 
     @pytest.fixture
     async def postgres_repository(

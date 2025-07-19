@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Generator
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
@@ -36,23 +36,75 @@ from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
 
-class MockEventPublisher:
+from services.essay_lifecycle_service.protocols import EventPublisher
+from common_core.metadata_models import EntityReference
+from common_core.status_enums import EssayStatus
+
+
+class MockEventPublisher(EventPublisher):
     """Minimal event publisher for testing without Kafka complexity."""
 
     def __init__(self) -> None:
         self.published_events: list[tuple[str, Any, Any]] = []
 
-    async def publish_batch_essays_ready(self, event_data: Any, correlation_id: Any) -> None:
+    async def publish_status_update(
+        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID
+    ) -> None:
+        """Record status update events for verification."""
+        self.published_events.append(("status_update", (essay_ref, status), correlation_id))
+
+    async def publish_batch_phase_progress(
+        self,
+        batch_id: str,
+        phase: str,
+        completed_count: int,
+        failed_count: int,
+        total_essays_in_phase: int,
+        correlation_id: UUID,
+    ) -> None:
+        """Record batch phase progress events for verification."""
+        self.published_events.append(
+            (
+                "batch_phase_progress",
+                {
+                    "batch_id": batch_id,
+                    "phase": phase,
+                    "completed_count": completed_count,
+                    "failed_count": failed_count,
+                    "total_essays_in_phase": total_essays_in_phase,
+                },
+                correlation_id,
+            )
+        )
+
+    async def publish_batch_phase_concluded(
+        self,
+        batch_id: str,
+        phase: str,
+        status: str,
+        details: dict[str, Any],
+        correlation_id: UUID,
+    ) -> None:
+        """Record batch phase concluded events for verification."""
+        self.published_events.append(
+            (
+                "batch_phase_concluded",
+                {"batch_id": batch_id, "phase": phase, "status": status, "details": details},
+                correlation_id,
+            )
+        )
+
+    async def publish_batch_essays_ready(self, event_data: Any, correlation_id: UUID) -> None:
         """Record published events for verification."""
         self.published_events.append(("batch_essays_ready", event_data, correlation_id))
 
     async def publish_excess_content_provisioned(
-        self, event_data: Any, correlation_id: Any
+        self, event_data: Any, correlation_id: UUID
     ) -> None:
         """Record published events for verification."""
         self.published_events.append(("excess_content_provisioned", event_data, correlation_id))
 
-    async def publish_els_batch_phase_outcome(self, event_data: Any, correlation_id: Any) -> None:
+    async def publish_els_batch_phase_outcome(self, event_data: Any, correlation_id: UUID) -> None:
         """Record published events for verification."""
         self.published_events.append(("els_batch_phase_outcome", event_data, correlation_id))
 
@@ -151,7 +203,7 @@ class TestAtomicBatchCreationIntegration:
         self, test_settings: Settings, postgres_repository: PostgreSQLEssayRepository
     ) -> BatchTrackerPersistence:
         """Create real batch tracker persistence with PostgreSQL."""
-        return BatchTrackerPersistence(postgres_repository.async_session_maker)
+        return BatchTrackerPersistence(postgres_repository.engine)
 
     @pytest.fixture
     async def batch_tracker(

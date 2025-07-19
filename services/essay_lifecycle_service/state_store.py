@@ -89,13 +89,13 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
 
     async def create_essay_records_batch(
         self, essay_refs: list[EntityReference], correlation_id: UUID | None = None
-    ) -> list[EssayState]:
+    ) -> list[ProtocolEssayState]:
         """Create multiple essay records in single atomic transaction."""
         results = []
         for essay_ref in essay_refs:
             result = await self.crud_ops.create_essay_record(essay_ref=essay_ref)
             results.append(result)
-        return results
+        return results  # type: ignore[return-value]
 
     async def list_essays_by_batch(self, batch_id: str) -> list[ProtocolEssayState]:
         """List all essays in a batch."""
@@ -143,7 +143,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
 
     async def get_batch_summary_with_essays(
         self, batch_id: str
-    ) -> tuple[list[EssayState], dict[EssayStatus, int]]:
+    ) -> tuple[list[ProtocolEssayState], dict[EssayStatus, int]]:
         """Get both essays and status summary for a batch in single operation (prevents N+1 queries)."""
         # Fetch essays once
         essays = await self.list_essays_by_batch(batch_id)

@@ -119,7 +119,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             updated_at=db_essay.updated_at,
         )
 
-    def _essay_state_to_db_dict(self, essay_state: ConcreteEssayState) -> dict[str, Any]:
+    def _essay_state_to_db_dict(self, essay_state: EssayState) -> dict[str, Any]:
         """Convert EssayState to database dictionary."""
         return {
             "essay_id": essay_state.essay_id,
@@ -306,7 +306,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
     async def create_essay_records_batch(
         self, essay_refs: list[EntityReference], correlation_id: UUID | None = None
-    ) -> list[ConcreteEssayState]:
+    ) -> list[EssayState]:
         """Create multiple essay records in single atomic transaction."""
         # Generate correlation_id if not provided for error handling
         if correlation_id is None:
@@ -326,9 +326,9 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             )
 
             # Create essay states for all references
-            essay_states = []
+            essay_states: list[EssayState] = []
             for essay_ref in essay_refs:
-                essay_state = ConcreteEssayState(
+                essay_state: EssayState = ConcreteEssayState(
                     essay_id=essay_ref.entity_id,
                     batch_id=essay_ref.parent_id,
                     current_status=EssayStatus.UPLOADED,
@@ -403,7 +403,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
     async def get_batch_summary_with_essays(
         self, batch_id: str
-    ) -> tuple[list[ConcreteEssayState], dict[EssayStatus, int]]:
+    ) -> tuple[list[EssayState], dict[EssayStatus, int]]:
         """Get both essays and status summary for a batch in single operation (prevents N+1 queries)."""
         # Fetch essays once
         essays = await self.list_essays_by_batch(batch_id)
@@ -414,7 +414,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             status = essay.current_status
             summary[status] = summary.get(status, 0) + 1
 
-        return essays, summary  # type: ignore[return-value]
+        return essays, summary
 
     async def get_essay_by_text_storage_id_and_batch_id(
         self, batch_id: str, text_storage_id: str
