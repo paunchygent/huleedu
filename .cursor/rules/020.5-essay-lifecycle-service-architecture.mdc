@@ -84,10 +84,13 @@ alwaysApply: false
 
 ## 9. Error Handling
 
-**Database**: Connection failures, constraint violations
-**Kafka**: Consumer lag, deserialization errors
-**State**: Invalid transitions, missing entities
-**Response**: Structured error messages with correlation IDs
+**HuleEduError Integration**: All error scenarios use factory functions (`raise_resource_not_found()`, `raise_processing_error()`, `raise_kafka_publish_error()`) with structured error codes and correlation ID propagation for distributed tracing.
+
+**Structured Error Handling**: ErrorDetail model with timestamp, service, operation, correlation_id fields. OpenTelemetry integration automatically records exceptions in spans for distributed coordination debugging.
+
+**Contract Testing Infrastructure**: 14 comprehensive error contract tests validate ErrorDetail serialization, HuleEduError wrapping, correlation ID preservation, and cross-service propagation patterns.
+
+**Error Testing Utilities**: `services/essay_lifecycle_service/tests/conftest.py` provides `assert_huleedu_error()`, `expect_huleedu_error()`, and correlation validation utilities following Rule 070 protocol-based testing patterns.
 
 ## 10. Production Implementation Standards
 

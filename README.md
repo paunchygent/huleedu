@@ -50,7 +50,7 @@ The HuleEdu ecosystem currently comprises the following services:
   * **API**: `/v1/batches` endpoints for batch registration and coordination
 
 * **Essay Lifecycle Service (ELS)** ✅ **IMPLEMENTED**:
-  * **Description**: A dual-mode service (HTTP API + Kafka worker) that manages individual essay states via a formal state machine (`EssayStateMachine`). It is responsible for reporting batch-level phase outcomes (including updated `text_storage_id`s) to BOS, enabling dynamic pipeline progression.
+  * **Description**: A dual-mode service (HTTP API + Kafka worker) that manages individual essay states via a formal state machine (`EssayStateMachine`). Features structured error handling with HuleEduError integration, correlation ID propagation, and comprehensive contract testing. OpenTelemetry integration enables distributed tracing across multi-instance deployments. It is responsible for reporting batch-level phase outcomes (including updated `text_storage_id`s) to BOS, enabling dynamic pipeline progression.
   * **Ports**: 6001 (HTTP API), 9091 (Metrics)
   * **Location**: `services/essay_lifecycle_service/`
   * **Database**: Follows a dual-repository pattern. The production implementation uses **PostgreSQL**, while SQLite is used for local development and testing.
@@ -177,6 +177,9 @@ The entire HuleEdu system, including Kafka and all microservices, can be run loc
 
 🚀 **BCS Integration & Dynamic Pipeline Orchestration Achieved** - All phases of Dynamic Pipeline Orchestration are complete, including the full implementation and integration of the **Batch Conductor Service (BCS)** for intelligent pipeline dependency resolution. The system now features:
 
+* **✅ ELS Error Handling Modernization Complete** - Reference implementation for HuleEduError integration with structured error handling, correlation ID propagation, and OpenTelemetry distributed tracing
+* **🚀 ELS Distributed State Management Ready** - Foundation established for Redis-based coordination with 183 tests including contract testing and protocol-based mocking infrastructure
+
 * **BCS Production-Ready Implementation** ✅: Event-driven architecture with 24/24 tests passing, atomic Redis operations, DLQ production, and comprehensive error handling
 * **BOS ↔ BCS HTTP Integration** ✅: Complete HTTP client integration with pipeline resolution workflows validated through E2E tests
 * **Dynamic Pipeline Resolution** ✅: Intelligent dependency analysis, batch state-aware optimization, and prerequisite validation
@@ -187,7 +190,7 @@ BOS coordinates with the Batch Conductor Service (BCS) for intelligent pipeline 
   * **Content Service**: HTTP API with filesystem storage backend
   * **Spell Checker Service**: Event-driven worker with L2 + pyspellchecker pipeline, comprehensive tests
   * **Batch Orchestrator Service**: HTTP API with slot assignment and command processing
-  * **Essay Lifecycle Service**: Dual-mode service with slot coordination and command handling
+  * **Essay Lifecycle Service**: Dual-mode service with slot coordination, command handling, and modern error infrastructure (183 tests with contract testing and protocol-based mocking)
   * **File Service**: Content provisioning service with MD5 validation and event publishing
   * **Batch Conductor Service (BCS)**: ✅ **NEW** - Internal pipeline dependency resolution with event-driven batch state projection, atomic Redis operations, and intelligent dependency analysis
   * **Class Management Service**: CRUD operations for classes and students with PostgreSQL persistence
@@ -244,9 +247,9 @@ The HuleEdu platform continues evolving with dynamic pipeline orchestration. The
   * **NLP Metrics Service**: Detailed Natural Language Processing metrics extraction
   * **CJ (Comparative Judgement) Assessment Service**: ✅ **IMPLEMENTED** - AI-driven comparative judgement of essays with dynamic LLM configuration
 * **Future Architectural Components**:
-  * **LLM-Caller Gateway**: Centralized service for managing Large Language Model interactions
+  * **LLM-Provider Service**: Centralized service for managing Large Language Model interactions
   * **API Gateway and Websocket**: Single entry point for external clients
-  * **React Frontend**: Modern user interface for students and educators
+  * **Svelte Frontend**: Modern user interface for students and educators
   * **User Service**: Authentication, authorization, and user profiles
   * **Result Aggregator**: Processing results collection and presentation
 

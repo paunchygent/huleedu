@@ -232,3 +232,95 @@ create_async_engine(
     pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
     pool_recycle=settings.DATABASE_POOL_RECYCLE,
 )
+```
+
+## Error Handling Infrastructure
+
+ELS implements the HuleEdu error infrastructure with structured error codes, correlation ID propagation, and OpenTelemetry integration for distributed systems observability.
+
+### HuleEduError Integration
+
+All error scenarios use factory functions for consistent error handling:
+
+```python
+# Repository layer - services/essay_lifecycle_service/implementations/essay_repository_postgres_impl.py:156
+if not essay_record:
+    raise raise_resource_not_found(
+        correlation_id=correlation_id,
+        operation="get_essay_state",
+        details={"essay_id": essay_id}
+    )
+
+# Service layer - processing errors with context
+raise raise_processing_error(
+    correlation_id=correlation_id,
+    operation="batch_coordination",
+    details={"batch_id": batch_id, "phase": phase_name}
+)
+
+# Event publishing - Kafka failures
+raise raise_kafka_publish_error(
+    correlation_id=correlation_id,
+    operation="publish_batch_outcome",
+    details={"topic": topic_name, "event_type": event_type}
+)
+```
+
+### Correlation ID Propagation
+
+Distributed tracing chains maintained across service boundaries:
+
+```python
+# API layer extracts or generates correlation IDs
+correlation_id = extract_correlation_id_from_headers(request.headers)
+
+# Service operations propagate correlation context
+await self.repository.get_essay_state(essay_id, correlation_id=correlation_id)
+
+# OpenTelemetry spans automatically record correlation context
+```
+
+### Structured Error Codes
+
+Error scenarios mapped to specific error codes:
+
+- `RESOURCE_NOT_FOUND`: Essay/batch not found in database
+- `PROCESSING_ERROR`: State machine transitions, business logic failures  
+- `KAFKA_PUBLISH_ERROR`: Event publishing failures with circuit breaker integration
+- `CONNECTION_ERROR`: Database connection failures, Redis coordination errors
+- `VALIDATION_ERROR`: Input validation, constraint violations
+
+### Contract Testing
+
+Comprehensive error contract testing validates infrastructure compliance:
+
+```python
+# services/essay_lifecycle_service/tests/conftest.py error testing utilities
+def assert_huleedu_error(
+    exception: HuleEduError,
+    expected_code: str,
+    expected_correlation_id: UUID | None = None,
+) -> None:
+    """Validate HuleEduError structure and correlation propagation."""
+
+@asynccontextmanager
+async def expect_huleedu_error(expected_code: str) -> AsyncGenerator[None, None]:
+    """Context manager for exception-based testing patterns."""
+
+# Contract tests cover:
+# - ErrorDetail serialization round-trips
+# - HuleEduError wrapping and immutability  
+# - Correlation ID preservation across service boundaries
+# - OpenTelemetry span integration with exception recording
+```
+
+### Error Testing Utilities
+
+Test infrastructure follows Rule 070 protocol-based patterns:
+
+- `assert_huleedu_error()`: Validates error structure, correlation ID propagation, service attribution
+- `expect_huleedu_error()`: Async context manager for testing expected exceptions
+- `assert_correlation_id_propagated()`: Distributed tracing validation utility
+- `assert_error_detail_structure()`: Contract validation for ErrorDetail model compliance
+
+14 comprehensive error contract tests ensure infrastructure reliability and cross-service compatibility.
