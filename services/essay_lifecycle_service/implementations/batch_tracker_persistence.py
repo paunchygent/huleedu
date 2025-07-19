@@ -155,24 +155,17 @@ class BatchTrackerPersistence:
         # Create expectation
         expectation = BatchExpectation(
             batch_id=tracker_db.batch_id,
-            expected_essay_ids=tracker_db.expected_essay_ids,
+            expected_essay_ids=frozenset(tracker_db.expected_essay_ids),  # Convert list to immutable frozenset
+            expected_count=tracker_db.expected_count,  # Fixed: Added missing required field
             course_code=CourseCode(tracker_db.course_code),
             essay_instructions=tracker_db.essay_instructions,
             user_id=tracker_db.user_id,
             correlation_id=UUID(tracker_db.correlation_id),
+            created_at=tracker_db.created_at,  # Fixed: Added missing required field
             timeout_seconds=tracker_db.timeout_seconds,
         )
 
-        # Restore slot assignments from database
-        for slot_db in tracker_db.slot_assignments:
-            assignment = SlotAssignment(
-                internal_essay_id=slot_db.internal_essay_id,
-                text_storage_id=slot_db.text_storage_id,
-                original_file_name=slot_db.original_file_name,
-            )
-            expectation.slot_assignments[slot_db.internal_essay_id] = assignment
-            # Remove from available slots
-            if slot_db.internal_essay_id in expectation.available_slots:
-                expectation.available_slots.remove(slot_db.internal_essay_id)
-
+        # Note: Slot assignments are now tracked in Redis coordinator, not in memory
+        # The database slot assignments are used for persistence only
+        
         return expectation

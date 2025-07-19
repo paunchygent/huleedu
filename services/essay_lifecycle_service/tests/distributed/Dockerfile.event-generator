@@ -1,0 +1,27 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+# Install dependencies for event generation
+RUN pip install --no-cache-dir \
+    kafka-python==2.0.2 \
+    httpx==0.25.2 \
+    asyncio-mqtt==0.13.0 \
+    pydantic==2.5.2
+
+# Copy event generator script
+COPY event_generator.py /app/
+
+# Create entrypoint script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "Waiting for Kafka to be ready..."\n\
+python -c "import time; import kafka; time.sleep(10); kafka.KafkaProducer(bootstrap_servers=['"'"'kafka:9092'"'"'])" || exit 1\n\
+echo "Starting event generator..."\n\
+exec "$@"' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["python", "/app/event_generator.py"]

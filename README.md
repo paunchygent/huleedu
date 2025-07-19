@@ -1,133 +1,226 @@
-# HuleEdu Monorepo - Reboot to Microservices
+# HuleEdu Monorepo - Microservices Architecture
 
-Welcome to the HuleEdu Monorepo! This project is a reboot of the HuleEdu platform, transitioning towards a modern microservice-based architecture. This README provides an overview of the project, its architecture, development setup, current status, and planned enhancements.
+Welcome to the HuleEdu Monorepo! This project implements a modern, production-ready microservice-based architecture for the HuleEdu educational platform. The system provides comprehensive essay processing capabilities including content management, spell checking, comparative judgment assessment, and real-time client interactions through a complete web application stack.
 
 ## Core Architectural Principles
 
 The HuleEdu platform is built upon a set of core foundational principles to ensure scalability, maintainability, and architectural integrity:
 
-* **Domain-Driven Design (DDD)**: Each microservice maps to a specific business domain (Bounded Context), owning its data and logic. Service boundaries are respected.
-* **Event-Driven Architecture (EDA)**: Asynchronous, event-driven communication via Kafka is the primary method for inter-service collaboration. Synchronous API calls between services are minimized.
-* **Explicit Contracts**: All inter-service data structures (event payloads, API DTOs) are defined as versioned Pydantic models residing in `libs/common_core/src/common_core/`. The `EventEnvelope` structure is standardized for all events.
-* **Service Autonomy**: Microservices are designed to be independently deployable, scalable, and updatable. Each service owns its data store, and direct access to another service's datastore is not permitted.
-* **Async Operations**: Services are designed to use `async/await` for all I/O operations.
-* **Dependency Injection (DI)**: Services utilize the Dishka DI framework. Business logic depends on abstractions (`typing.Protocol`) defined in `<service_name>/protocols.py`, rather than concrete implementations directly. Providers are defined in `<service_name>/di.py`.
-* **Configuration**: Services use Pydantic `BaseSettings` for configuration, loaded from environment variables and `.env` files, as defined in `<service_name>/config.py`.
-* **Logging**: Services employ the centralized logging utility from `huleedu_service_libs.logging_utils`. Use of the standard library `logging` module directly in services is avoided. Correlation IDs are used for tracing.
+* **Domain-Driven Design (DDD)**: Each microservice maps to a specific business domain (Bounded Context), owning its data and logic. Service boundaries are strictly respected with zero tolerance for architectural deviations.
+* **Event-Driven Architecture (EDA)**: Asynchronous, event-driven communication via Kafka is the primary method for inter-service collaboration. Services communicate through standardized `EventEnvelope` structures with deterministic event ID generation for idempotency.
+* **Explicit Contracts**: All inter-service data structures (event payloads, API DTOs) are defined as versioned Pydantic models residing in `libs/common_core/src/common_core/`. Contract versioning follows semantic versioning with backward compatibility requirements.
+* **Service Autonomy**: Microservices are independently deployable, scalable, and updatable. Each service owns its data store with isolated schemas. Direct cross-service database access is strictly forbidden.
+* **Clean Architecture**: Services implement protocol-based dependency injection using `typing.Protocol` interfaces defined in `<service_name>/protocols.py`. Business logic depends on abstractions rather than concrete implementations.
+* **Dependency Injection (DI)**: All services utilize the Dishka DI framework with providers defined in `<service_name>/di.py`. DI containers manage service lifecycles, database connections, and external client sessions.
+* **Async-First Design**: Services are built with `async/await` for all I/O operations, utilizing frameworks like Quart (HTTP services) and FastAPI (client-facing APIs) for optimal performance.
+* **Configuration Management**: Services use Pydantic `BaseSettings` for type-safe configuration, loaded from environment variables and `.env` files as defined in `<service_name>/config.py`.
+* **Centralized Logging**: Services employ the centralized logging utility from `huleedu_service_libs.logging_utils` with correlation ID propagation. Direct use of the standard library `logging` module is forbidden.
+* **Observability**: Comprehensive monitoring through Prometheus metrics, structured logging, and distributed tracing with OpenTelemetry integration.
 
 ## Monorepo Structure Overview
 
 The project is organized as a monorepo managed by PDM:
 
-* **`libs/common_core/`**: A shared Python package containing common Pydantic models for data contracts (events, API DTOs), enums, and shared metadata structures.
-* **`services/`**: Contains the individual microservices.
-  * **`libs/`**: Shared utility libraries for services, such as Kafka client wrappers and logging utilities.
-  * Each service has its own directory (e.g., `content_service/`, `spellchecker_service/`).
-* **`scripts/`**: Project-level scripts for tasks like environment setup and Kafka topic bootstrapping.
-* **`Documentation/`**: Contains architectural documents, task tracking (like `TASKS/`), and setup guides.
-* **`.cursor/rules/`**: Contains the detailed development rules and standards. The [000-rule-index.mdc](.cursor/rules/000-rule-index.mdc) serves as an index to all rules.
+* **`libs/common_core/`**: A shared Python package containing common Pydantic models for data contracts (events, API DTOs), enums, and shared metadata structures. All inter-service communication contracts are centralized here.
+* **`services/`**: Contains the individual microservices, each implementing clean architecture with protocol-based dependency injection.
+  * **`services/libs/`**: Shared utility libraries (`huleedu_service_libs`) providing Kafka client wrappers, logging utilities, and common service patterns.
+  * Each service follows standardized structure with `protocols.py`, `di.py`, `config.py`, and `api/` directories for HTTP services.
+* **`scripts/`**: Project-level automation scripts including environment setup, Kafka topic bootstrapping, Docker operations, and validation utilities.
+* **`documentation/`**: Contains architectural documents, task tracking, operational guides, and setup documentation.
+* **`.cursor/rules/`**: Contains comprehensive development rules and standards. The [000-rule-index.md](.cursor/rules/000-rule-index.md) serves as an index to all rules covering architecture, coding standards, testing, and deployment.
 
 ## Services
 
-The HuleEdu ecosystem currently comprises the following services:
+The HuleEdu ecosystem comprises the following production-ready services:
+
+### Client-Facing Services
+
+* **API Gateway Service** ✅ **IMPLEMENTED**:
+  * **Description**: FastAPI-based client-facing HTTP service providing secure entry point for React frontend applications. Implements JWT authentication, rate limiting, CORS, and request validation while proxying to internal microservices.
+  * **Port**: 4001 (Client-facing HTTP API)
+  * **Location**: `services/api_gateway_service/`
+  * **API**: `/v1/batches`, `/v1/files`, `/v1/classes` endpoints with OpenAPI documentation
+  * **Features**: JWT authentication, rate limiting, CORS, batch ownership validation, complete Class Management Service proxy
+
+* **WebSocket Service** ✅ **IMPLEMENTED**:
+  * **Description**: FastAPI-based microservice providing real-time WebSocket connections with JWT authentication. Manages user-specific Redis pub/sub channels for real-time notifications to connected clients.
+  * **Port**: 8080 (WebSocket connections)
+  * **Location**: `services/websocket_service/`
+  * **Features**: JWT query parameter authentication, Redis pub/sub integration, connection management with configurable limits, health checks
+
+### Core Processing Services
 
 * **Content Service** ✅ **IMPLEMENTED**:
-  * **Description**: A Quart-based HTTP service responsible for content storage and retrieval, using a local filesystem backend.
-  * **Port**: 8001 (HTTP API)
+  * **Description**: Quart-based HTTP service responsible for content storage and retrieval using a local filesystem backend with MD5 validation and content integrity checks.
+  * **Port**: 8001 (Internal HTTP API)
   * **Location**: `services/content_service/`
   * **API**: `/v1/content` endpoints for storage and retrieval
 
 * **Spell Checker Service** ✅ **IMPLEMENTED**:
-  * **Description**: A Kafka consumer worker service that performs advanced spell checking on essays, including L2 error correction and standard spell checking using `pyspellchecker`. Integrated with Essay Lifecycle Service for essay slot coordination.
+  * **Description**: Kafka consumer worker service performing advanced spell checking on essays, including L2 error correction and standard spell checking using `pyspellchecker`. Features clean architecture with protocol-based DI and comprehensive test coverage.
   * **Port**: 8002 (Metrics)
   * **Location**: `services/spellchecker_service/`
-  * **Architecture**: Clean architecture with DI, protocols, language parameter support, and comprehensive test coverage
+  * **Architecture**: Protocol-based DI with Dishka, language parameter support, event-driven processing
 
-* **Batch Orchestrator Service** ✅ **IMPLEMENTED**:
-  * **Description**: A Quart-based HTTP service that acts as the central coordinator, dynamically orchestrating essay processing workflows using a flexible pipeline definition and various phase initiators.
-  * **Port**: 5001 (HTTP API)
+### Orchestration & Coordination Services
+
+* **Batch Orchestrator Service (BOS)** ✅ **IMPLEMENTED**:
+  * **Description**: Quart-based HTTP service acting as the central coordinator for essay processing workflows. Features dynamic pipeline orchestration, slot assignment patterns, and integration with Batch Conductor Service for intelligent dependency resolution.
+  * **Port**: 5001 (Internal HTTP API)
   * **Location**: `services/batch_orchestrator_service/`
-  * **API**: `/v1/batches` endpoints for batch registration and coordination
-
-* **Essay Lifecycle Service (ELS)** ✅ **IMPLEMENTED**:
-  * **Description**: A dual-mode service (HTTP API + Kafka worker) that manages individual essay states via a formal state machine (`EssayStateMachine`). Features structured error handling with HuleEduError integration, correlation ID propagation, and comprehensive contract testing. OpenTelemetry integration enables distributed tracing across multi-instance deployments. It is responsible for reporting batch-level phase outcomes (including updated `text_storage_id`s) to BOS, enabling dynamic pipeline progression.
-  * **Ports**: 6001 (HTTP API), 9091 (Metrics)
-  * **Location**: `services/essay_lifecycle_service/`
-  * **Database**: Follows a dual-repository pattern. The production implementation uses **PostgreSQL**, while SQLite is used for local development and testing.
-
-* **File Service** ✅ **IMPLEMENTED**:
-  * **Description**: A Quart-based HTTP service with Kafka event publishing for file upload handling, text extraction, and content ingestion coordination. Accepts multipart file uploads, processes files to extract text content, coordinates with Content Service for storage, and emits essay readiness events.
-  * **Port**: 7001 (HTTP API), 9094 (Metrics)
-  * **Location**: `services/file_service/`
-  * **API**: `POST /v1/files/batch` for batch file uploads
-  * **Status**: Fully implemented and integrated into the walking skeleton
-
-* **CJ Assessment Service** ✅ **IMPLEMENTED**:
-  * **Description**: A hybrid Kafka worker + HTTP API service for Comparative Judgment assessment of essays using Large Language Model (LLM) based pairwise comparisons. Integrates with centralized LLM Provider Service for queue-based resilience.
-  * **Port**: 9095 (Health API & Metrics)
-  * **Location**: `services/cj_assessment_service/`
-  * **API**: `/healthz` and `/metrics` endpoints for health checks and observability
-  * **Database**: The primary implementation uses **PostgreSQL**, provisioned via `docker-compose.yml` and configured in the service's DI provider.
-
-* **LLM Provider Service** ✅ **IMPLEMENTED**:
-  * **Description**: A centralized Quart-based HTTP service providing queue-based resilience for LLM provider interactions. Features circuit breakers, Redis primary/local fallback queuing, and multi-provider abstraction (Anthropic, OpenAI, Google, OpenRouter).
-  * **Port**: 8090 (HTTP API)
-  * **Location**: `services/llm_provider_service/`
-  * **API**: `/api/v1/comparison` (200/202 responses), `/api/v1/status/{queue_id}`, `/api/v1/results/{queue_id}`
-  * **Key Feature**: NO response caching - preserves psychometric validity with fresh responses
+  * **API**: `/v1/batches` endpoints for batch registration, pipeline execution, and coordination
+  * **Features**: Dynamic pipeline state management, command generation, event-driven phase progression
 
 * **Batch Conductor Service (BCS)** ✅ **IMPLEMENTED**:
-  * **Description**: An internal Quart-based microservice responsible for intelligent pipeline dependency resolution and batch state analysis. Features event-driven batch state projection via Kafka, atomic Redis operations for race condition safety, and comprehensive error handling with DLQ production.
+  * **Description**: Internal Quart-based microservice responsible for intelligent pipeline dependency resolution and batch state analysis. Features event-driven batch state projection via Kafka, atomic Redis operations for race condition safety, and comprehensive error handling with DLQ production.
   * **Port**: 4002 (Internal HTTP API)
   * **Location**: `services/batch_conductor_service/`
   * **API**: `/internal/v1/pipelines/define` for pipeline resolution, `/healthz` and `/metrics` endpoints
   * **Architecture**: Protocol-based DI with Dishka, event-driven architecture consuming spellcheck/CJ assessment completion events, Redis-cached state management with atomic WATCH/MULTI/EXEC operations
 
+* **Essay Lifecycle Service (ELS)** ✅ **IMPLEMENTED**:
+  * **Description**: Hybrid service (HTTP API + Kafka worker) managing individual essay states via formal state machine (`EssayStateMachine`). Features structured error handling with HuleEduError integration, correlation ID propagation, and OpenTelemetry distributed tracing. Reports batch-level phase outcomes to BOS for dynamic pipeline progression.
+  * **Ports**: 6001 (HTTP API), 9091 (Metrics)
+  * **Location**: `services/essay_lifecycle_service/`
+  * **Database**: Dual-repository pattern with PostgreSQL (production) and SQLite (development/testing)
+  * **Architecture**: 183 tests including contract testing and protocol-based mocking infrastructure
+
+### Content & File Management Services
+
+* **File Service** ✅ **IMPLEMENTED**:
+  * **Description**: Quart-based HTTP service handling multipart file uploads with text extraction and content ingestion coordination. Features MD5 validation, Kafka event publishing, and integration with Content Service for storage management.
+  * **Ports**: 7001 (Internal HTTP API), 9094 (Metrics)
+  * **Location**: `services/file_service/`
+  * **API**: `POST /v1/files/batch` for batch file uploads with validation
+  * **Features**: Text extraction, content provisioning flow, essay readiness event publishing
+
+### Assessment & AI Services
+
+* **CJ Assessment Service** ✅ **IMPLEMENTED**:
+  * **Description**: Hybrid Kafka worker + HTTP API service for Comparative Judgment assessment of essays using Large Language Model (LLM) based pairwise comparisons. Integrates with centralized LLM Provider Service for queue-based resilience and psychometric validity.
+  * **Port**: 9095 (Health API & Metrics)
+  * **Location**: `services/cj_assessment_service/`
+  * **API**: `/healthz` and `/metrics` endpoints for health checks and observability
+  * **Database**: PostgreSQL with DI-managed connections, provisioned via `docker-compose.yml`
+  * **Architecture**: Protocol-based DI with Dishka, event-driven processing, comprehensive error handling
+
+* **LLM Provider Service** ✅ **IMPLEMENTED**:
+  * **Description**: Centralized Quart-based HTTP service providing queue-based resilience for LLM provider interactions. Features circuit breakers, Redis primary/local fallback queuing, and multi-provider abstraction (Anthropic, OpenAI, Google, OpenRouter).
+  * **Port**: 8090 (Internal HTTP API)
+  * **Location**: `services/llm_provider_service/`
+  * **API**: `/api/v1/comparison` (200/202 responses), `/api/v1/status/{queue_id}`, `/api/v1/results/{queue_id}`
+  * **Key Feature**: NO response caching - preserves psychometric validity with fresh responses for each assessment
+
+### Data Management Services
+
 * **Class Management Service (CMS)** ✅ **IMPLEMENTED**:
-  * **Description**: A Quart-based HTTP service acting as the authoritative source for managing classes, students, and their relationships. Provides a synchronous API for data management.
+  * **Description**: FastAPI-based HTTP service acting as the authoritative source for managing classes, students, and their relationships. Provides synchronous API for data management with complete CRUD operations.
   * **Port**: 5002 (Internal HTTP API)
   * **Location**: `services/class_management_service/`
-  * **API**: `/v1/classes` and `/v1/students` for full CRUD operations.
+  * **API**: `/v1/classes` and `/v1/students` for full CRUD operations with PostgreSQL persistence
+  * **Features**: Student-class associations, batch validation, comprehensive data integrity
 
 * **Result Aggregator Service (RAS)** ✅ **IMPLEMENTED**:
-  * **Description**: A hybrid service (Kafka consumer + HTTP API) that aggregates processing results from all services into a materialized view. Provides fast, query-optimized access to batch and essay results for the API Gateway.
+  * **Description**: Hybrid service (Kafka consumer + HTTP API) aggregating processing results from all services into a materialized view. Provides fast, query-optimized access to batch and essay results for the API Gateway.
   * **Ports**: 4003 (Internal HTTP API), 9096 (Metrics)
   * **Location**: `services/result_aggregator_service/`
   * **API**: `/internal/v1/batches/{batch_id}/status` for comprehensive batch status queries
   * **Database**: PostgreSQL with normalized schema optimized for read queries
-  * **Architecture**: CQRS pattern with event sourcing, Redis caching, and service-to-service authentication
+  * **Architecture**: CQRS pattern with event sourcing, Redis caching, service-to-service authentication
 
 ## Key Technologies
 
-* **Python**: Version 3.11+
-* **PDM**: For Python dependency management and monorepo tooling.
-* **Docker & Docker Compose**: For containerization and local service orchestration.
-* **Quart**: Asynchronous web framework for HTTP-based services.
-* **Pydantic**: For data validation, serialization, and settings management.
-* **Kafka (via aiokafka)**: For event streaming and inter-service communication.
-* **Ruff**: For code formatting and linting.
-* **MyPy**: For static type checking.
-* **Pytest**: For testing (unit, integration, contract).
-* **Dishka**: For dependency injection.
-* **PostgreSQL / SQLite**: For service data persistence.
+### Core Platform
+
+* **Python**: Version 3.11+ with async/await patterns
+* **PDM**: Python dependency management and monorepo tooling with workspace support
+* **Docker & Docker Compose**: Containerization and local service orchestration
+
+### Web Frameworks
+
+* **Quart**: Asynchronous web framework for internal HTTP services
+* **FastAPI**: High-performance framework for client-facing APIs with OpenAPI support
+* **Pydantic**: Data validation, serialization, settings management, and contract definitions
+
+### Event Streaming & Communication
+
+* **Kafka (via aiokafka)**: Event streaming and inter-service communication
+* **Redis**: Pub/sub messaging, caching, and atomic operations for coordination
+* **WebSockets**: Real-time client communication via FastAPI/Starlette
+
+### Dependency Injection & Architecture
+
+* **Dishka**: Dependency injection framework with protocol-based abstractions
+* **typing.Protocol**: Behavioral contracts for clean architecture implementation
+* **Transitions**: State machine library for formal state management
+
+### Data Persistence
+
+* **PostgreSQL**: Primary database for production services with normalized schemas
+* **SQLite**: Development and testing database with dual-repository patterns
+* **SQLAlchemy**: ORM with async support and migration management
+
+### Development & Quality Assurance
+
+* **Ruff**: Code formatting and linting with project-wide standards
+* **MyPy**: Static type checking with strict configuration
+* **Pytest**: Testing framework supporting unit, integration, and contract tests
+* **OpenTelemetry**: Distributed tracing and observability
+
+### Monitoring & Observability
+
+* **Prometheus**: Metrics collection and monitoring
+* **Grafana**: Metrics visualization and alerting
+* **Structured Logging**: Centralized logging with correlation ID tracking
 
 ## Development Environment Setup
 
-1. **Prerequisites**:
-    * Python 3.11 or higher.
-    * PDM (Python Dependency Manager). If not installed, the setup script will attempt to install it.
+### Prerequisites
 
-2. **Automated Setup**:
-    Run the environment setup script from the project root:
+* **Python 3.11+**: Required for all services with async/await support
+* **PDM**: Python Dependency Manager for monorepo tooling (auto-installed by setup script)
+* **Docker & Docker Compose**: For containerized development and service orchestration
+* **Git**: Version control with proper `.gitignore` configuration
 
-    ```bash
-    ./scripts/setup_huledu_environment.sh
-    ```
+### Automated Setup
 
-    This script installs PDM (if needed), monorepo tools, and all services in editable mode.
+Run the comprehensive environment setup script from the project root:
 
-3. **IDE Configuration**:
-    For a consistent development experience, it is recommended to configure VS Code / Cursor AI according to the [Cursor AI IDE Setup Guide](Documentation/setup_environment/CURSOR_IDE_SETUP_GUIDE.md). This includes setting up Ruff and MyPy extensions to align with project standards.
+```bash
+./scripts/setup_huledu_environment.sh
+```
+
+This script performs:
+* PDM installation and configuration
+* Monorepo dependency installation in editable mode
+* Service library setup (`huleedu_service_libs`)
+* Development tool configuration (Ruff, MyPy, Pytest)
+* Docker environment preparation
+
+### IDE Configuration
+
+For optimal development experience, configure your IDE according to project standards:
+
+* **VS Code/Cursor AI**: Follow the [IDE Setup Guide](documentation/setup_environment/CURSOR_IDE_SETUP_GUIDE.md)
+* **Ruff Extension**: Automatic formatting and linting aligned with `.windsurf/rules/`
+* **MyPy Extension**: Static type checking with strict configuration
+* **Python Path**: Ensure proper module resolution for monorepo structure
+
+### Verification
+
+Verify your setup by running:
+
+```bash
+# Check code quality
+pdm run lint-all
+pdm run typecheck-all
+
+# Run tests
+pdm run test-all
+
+# Start services
+pdm run docker-up
+```
 
 ## Development Workflow & Tooling
 
@@ -173,102 +266,149 @@ The entire HuleEdu system, including Kafka and all microservices, can be run loc
 
     This command will start all services defined in `docker-compose.yml` in detached mode. It includes Zookeeper, Kafka, the `kafka_topic_setup` one-shot service for automatic topic creation, and all HuleEdu microservices.
 
-## Current Development Status & Focus (BCS Integration & Dynamic Pipeline Orchestration ✅ COMPLETED)
+## Current Development Status
 
-🚀 **BCS Integration & Dynamic Pipeline Orchestration Achieved** - All phases of Dynamic Pipeline Orchestration are complete, including the full implementation and integration of the **Batch Conductor Service (BCS)** for intelligent pipeline dependency resolution. The system now features:
+### Production-Ready Microservices Architecture ✅ COMPLETED
 
-* **✅ ELS Error Handling Modernization Complete** - Reference implementation for HuleEduError integration with structured error handling, correlation ID propagation, and OpenTelemetry distributed tracing
-* **🚀 ELS Distributed State Management Ready** - Foundation established for Redis-based coordination with 183 tests including contract testing and protocol-based mocking infrastructure
+The HuleEdu platform has achieved a **complete, production-ready microservices architecture** with comprehensive essay processing capabilities. All core services are implemented, tested, and integrated:
 
-* **BCS Production-Ready Implementation** ✅: Event-driven architecture with 24/24 tests passing, atomic Redis operations, DLQ production, and comprehensive error handling
-* **BOS ↔ BCS HTTP Integration** ✅: Complete HTTP client integration with pipeline resolution workflows validated through E2E tests
-* **Dynamic Pipeline Resolution** ✅: Intelligent dependency analysis, batch state-aware optimization, and prerequisite validation
+### Complete Service Ecosystem ✅
 
-BOS coordinates with the Batch Conductor Service (BCS) for intelligent pipeline dependency resolution when clients request pipeline execution, while ELS manages individual essay states via a formal state machine and reports phase outcomes to BOS. Current status includes:
+* **Client-Facing Layer**: API Gateway Service (FastAPI) and WebSocket Service for real-time React frontend integration
+* **Processing Services**: Content Service, Spell Checker Service, CJ Assessment Service with LLM Provider Service integration
+* **Orchestration Layer**: Batch Orchestrator Service (BOS) with Batch Conductor Service (BCS) for intelligent pipeline dependency resolution
+* **State Management**: Essay Lifecycle Service (ELS) with formal state machine and distributed tracing
+* **Data Services**: File Service, Class Management Service, Result Aggregator Service with CQRS patterns
+* **Infrastructure**: Comprehensive Docker Compose setup with Kafka, Redis, PostgreSQL
 
-* **Core Services Implemented** ✅:
-  * **Content Service**: HTTP API with filesystem storage backend
-  * **Spell Checker Service**: Event-driven worker with L2 + pyspellchecker pipeline, comprehensive tests
-  * **Batch Orchestrator Service**: HTTP API with slot assignment and command processing
-  * **Essay Lifecycle Service**: Dual-mode service with slot coordination, command handling, and modern error infrastructure (183 tests with contract testing and protocol-based mocking)
-  * **File Service**: Content provisioning service with MD5 validation and event publishing
-  * **Batch Conductor Service (BCS)**: ✅ **NEW** - Internal pipeline dependency resolution with event-driven batch state projection, atomic Redis operations, and intelligent dependency analysis
-  * **Class Management Service**: CRUD operations for classes and students with PostgreSQL persistence
-  * **Result Aggregator Service**: ✅ **NEW** - CQRS-based materialized view service aggregating results from all processing services with query-optimized PostgreSQL schema
-* **Essay ID Coordination Architecture** ✅:
-  * **Slot Assignment Pattern**: BOS generates internal essay ID slots, ELS assigns content to slots
-  * **Content Provisioning Flow**: File Service → ELS slot assignment → BOS essay storage → Client pipeline request → BOS command generation → ELS service dispatch
-  * **Command Processing**: Complete client-triggered BOS→ELS→SpellChecker command flow with actual essay IDs, text_storage_ids, and language support
-  * **Event-Driven Coordination**: `EssayContentProvisionedV1`, `BatchEssaysReady`, `BatchSpellcheckInitiateCommand` events
-  * **Persistent Storage**: Essay metadata and storage references stored in PostgreSQL database for data persistence across service restarts
-* **Foundational Architecture** ✅:
-  * **Clean Architecture**: Protocol-based DI across all services with Dishka
-  * **Event-Driven Communication**: Standardized EventEnvelope with Kafka integration
-  * **Contract Management**: Comprehensive Pydantic models in common_core
-  * **Testing Infrastructure**: Unit, integration, and contract tests with comprehensive coverage
-  * **Observability**: Prometheus metrics endpoints across services
-  * **Docker Integration**: Full containerization with automated topic setup
-* **Development Standards** ✅:
-  * **Code Quality**: Ruff formatting, MyPy type checking, 400 LOC file limits
-  * **Configuration**: Standardized Pydantic BaseSettings across services
-  * **Logging**: Centralized correlation ID tracking and structured logging
-  * **Dependency Management**: PDM monorepo with proper version resolution
+### Architectural Achievements ✅
 
-* **Dynamic Pipeline Orchestration** ✅:
-  * **Phase 4: All phase initiators (Spellcheck, CJ Assessment, AI Feedback, NLP) implemented and integrated into BOS dynamic orchestration framework.**
-  * **Phase 1**: Common core event contracts (`ELSBatchPhaseOutcomeV1`, topic mapping, enums)
-  * **Phase 2**: ELS State Machine (transitions library, `EssayStateMachine`, state validation)
-  * **Phase 3**: BOS Dynamic Pipeline Orchestration (pipeline state management, Kafka consumer updates)
-  * **Event Architecture**: `ELSBatchPhaseOutcomeV1` and various `BatchService<Phase>InitiateCommandDataV1` commands are key for this dynamic flow.
-  * **Pipeline Sequences**: Support for flexible pipeline definitions (Spellcheck → CJ Assessment, etc.)
+* **Clean Architecture**: Protocol-based dependency injection (`typing.Protocol`) with Dishka across all services
+* **Event-Driven Communication**: Standardized `EventEnvelope` with deterministic event ID generation for idempotency
+* **Dynamic Pipeline Orchestration**: BOS ↔ BCS integration enabling intelligent dependency resolution and batch state analysis
+* **State Machine Integration**: Formal essay state transitions using `transitions` library with comprehensive error handling
+* **Distributed Observability**: OpenTelemetry tracing, Prometheus metrics, structured logging with correlation ID propagation
+* **Contract Management**: Comprehensive Pydantic models in `common_core` with versioned schemas
 
-* **Architecture Enhancements** ✅:
-  * **State Machine Integration**: Formal state transitions using transitions library in ELS
-  * **Pipeline State Management**: `ProcessingPipelineState` tracking through multi-phase sequences
-  * **Event-Driven Orchestration**: BOS consumes phase outcomes and triggers next-phase commands
-  * **Phase 4 Testing Ready**: Foundation tests (7/7) and testing strategy documented
+### Testing & Quality Assurance ✅
 
-For detailed implementation and testing history, refer to:
+* **Comprehensive Test Coverage**: Unit, integration, and contract tests across all services
+* **ELS Reference Implementation**: 183 tests including protocol-based mocking infrastructure
+* **BCS Production Validation**: Event-driven architecture with atomic Redis operations and DLQ production
+* **E2E Validation**: Complete pipeline testing from file upload through assessment completion
+* **Code Quality**: Ruff formatting, MyPy type checking, 400 LOC file limits enforced
 
-* `Documentation/TASKS/ELS_AND_BOS_STATE_MACHINE_TASK_TICKET.md` (Current implementation status)
-* `Documentation/TASKS/PHASE_4_TESTING_STRATEGY.md` (E2E testing approach)
+### Key Processing Flows ✅
 
-## Planned Services and Enhancements
+* **Content Provisioning**: File Service → ELS slot assignment → Content Service storage → Pipeline initiation
+* **Essay Processing**: Dynamic pipeline orchestration (Spellcheck → CJ Assessment) with state persistence
+* **Real-Time Updates**: WebSocket notifications via Redis pub/sub for client applications
+* **Result Aggregation**: CQRS-based materialized views with query-optimized PostgreSQL schemas
 
-The HuleEdu platform continues evolving with dynamic pipeline orchestration. The following capabilities are planned for future development:
+### Development Infrastructure ✅
 
-* **Phase 4 - End-to-End Validation (In Progress)**: ✅ **IMPLEMENTED**
-  * Enhanced E2E testing framework following walking skeleton methodology
-  * Multi-pipeline sequence validation (Spellcheck → CJ Assessment, etc.)
-  * Partial success scenario testing and essay filtering validation
+* **Monorepo Management**: PDM with workspace support and automated dependency resolution
+* **Containerization**: Complete Docker Compose setup with health checks and automated topic creation
+* **Development Standards**: Comprehensive rules in `.windsurf/rules/` covering architecture, coding, testing, and deployment
+* **CI/CD Ready**: Automated linting, type checking, and testing workflows
 
-* **Future Enhancements - Extended Pipeline Services**:
-  * **AI Feedback Service**: AI-generated feedback on student essays  
-  * **NLP Metrics Service**: Detailed Natural Language Processing metrics extraction
-  * **CJ (Comparative Judgement) Assessment Service**: ✅ **IMPLEMENTED** - AI-driven comparative judgement of essays with dynamic LLM configuration
-* **Future Architectural Components**:
-  * **LLM-Provider Service**: Centralized service for managing Large Language Model interactions
-  * **API Gateway and Websocket**: Single entry point for external clients
-  * **Svelte Frontend**: Modern user interface for students and educators
-  * **User Service**: Authentication, authorization, and user profiles
-  * **Result Aggregator**: Processing results collection and presentation
+### Current Focus: Production Deployment & Scaling
+
+With the core architecture complete, current development focuses on:
+
+* **Production Hardening**: Performance optimization and resource management
+* **Monitoring Enhancement**: Advanced Grafana dashboards and alerting
+* **Security Hardening**: JWT authentication, rate limiting, and input validation
+* **Documentation**: Comprehensive API documentation and operational guides
+
+## Future Enhancements
+
+With the core microservices architecture complete, future development focuses on advanced features and platform expansion:
+
+### Advanced Processing Services
+
+* **AI Feedback Service**: Intelligent essay feedback generation using advanced LLM capabilities
+  * Integration with LLM Provider Service for scalable AI interactions
+  * Personalized feedback based on student performance history
+  * Multi-language support for diverse educational contexts
+
+* **NLP Metrics Service**: Comprehensive Natural Language Processing analytics
+  * Advanced linguistic analysis (readability, complexity, coherence)
+  * Writing quality metrics and improvement suggestions
+  * Integration with existing assessment pipelines
+
+### Frontend & User Experience
+
+* **Svelte Frontend Application**: Modern, responsive web application
+  * Real-time updates via WebSocket Service integration
+  * Comprehensive essay management and assessment workflows
+  * Teacher dashboards and student progress tracking
+
+* **User Authentication Service**: Centralized identity and access management
+  * JWT-based authentication with role-based access control
+  * Integration with educational institution SSO systems
+  * User profile management and preferences
+
+### Platform Scaling & Operations
+
+* **Advanced Monitoring**: Enhanced observability and alerting
+  * Grafana dashboards for service health and performance metrics
+  * Automated alerting for system anomalies and performance degradation
+  * Distributed tracing visualization and analysis
+
+* **Performance Optimization**: System-wide performance enhancements
+  * Database query optimization and connection pooling
+  * Caching strategies for frequently accessed data
+  * Load balancing and horizontal scaling capabilities
+
+### Integration & Extensibility
+
+* **Plugin Architecture**: Extensible framework for custom processing modules
+  * Third-party assessment tool integration
+  * Custom grading algorithms and rubrics
+  * Educational platform API integrations (Canvas, Blackboard, etc.)
 
 ## Project Rules & Documentation
 
-* **Development Standards**: Development adheres to the rules defined in the `.cursor/rules/` directory. The [000-rule-index.mdc](.cursor/rules/000-rule-index.mdc) provides a comprehensive index to these rules.
-* **Architectural Blueprints & Task Tracking**: Further design documents, PRDs, and detailed task breakdowns can be found in the `Documentation/` folder.
-* **Service-Specific READMEs**: Each service in the `services/` directory contains its own `README.md` with more detailed information about its specific functionality, API (if any), and local development.
+### Development Standards
 
-## How to Use
+* **Comprehensive Rules**: Development adheres to the rules defined in the `.windsurf/rules/` directory
+* **Rule Index**: The [000-rule-index.md](.windsurf/rules/000-rule-index.md) provides a comprehensive index to all development rules
+* **Zero Tolerance**: Architectural deviations and "vibe coding" are strictly forbidden with mandatory refactoring requirements
+* **AI Agent Modes**: Specialized interaction modes (planning, coding, testing, debugging, refactoring) defined in rules 110.x series
 
-1. **Pull the Repository**: Clone the repository to your local machine.
-2. **Install Dependencies**: Run `setup_huledu_environment.sh` to install PDM and set up the project's dependencies.
-3. **Understand the Architecture**: It is helpful to be familiar with the core principles and service boundaries. Currently, we need help developing the statistical analysis tools, which will act as a check and balance system for the CJ Essay Service Rankings.
-4. **Adhere to Standards**: Development activities align with the coding standards, testing practices, and architectural mandates defined in `.cursor/rules/`.
-5. **Write Tests**: New features and bug fixes are typically accompanied by relevant tests (unit, integration, contract).
-6. **Update Documentation**: READMEs, docstrings, and architectural documents are kept up-to-date with changes.
-7. **Communicate**: Proposed changes, especially those affecting service contracts or shared code, are generally discussed with the team.
+### Documentation Structure
+
+* **Service Documentation**: Each service in `services/` contains detailed `README.md` with functionality, APIs, and development instructions
+* **Library Documentation**: Shared libraries in `services/libs/` have comprehensive documentation with usage patterns and integration guides
+* **Architectural Documentation**: Design documents, PRDs, and task tracking in `documentation/` directory
+* **Contract Documentation**: Pydantic models in `libs/common_core/` serve as the source of truth for all inter-service contracts
+
+## Getting Started
+
+### Quick Start
+
+1. **Clone Repository**: `git clone <repository-url>`
+2. **Environment Setup**: Run `./scripts/setup_huledu_environment.sh` for automated PDM and dependency installation
+3. **Start Services**: Use `pdm run docker-up` to launch the complete system with Docker Compose
+4. **Verify Setup**: Run `pdm run test-all` to ensure all tests pass
+
+### Development Workflow
+
+1. **Understand Architecture**: Review core principles and service boundaries defined in `.windsurf/rules/`
+2. **Follow Standards**: Adhere to coding standards, testing practices, and architectural mandates
+3. **Protocol-Based Development**: Use `typing.Protocol` interfaces and Dishka DI for clean architecture
+4. **Comprehensive Testing**: Write unit, integration, and contract tests for all changes
+5. **Update Documentation**: Keep READMEs, docstrings, and architectural documents current
+6. **Code Quality**: Use `pdm run lint-all` and `pdm run typecheck-all` before committing
+
+### Key Resources
+
+* **Service READMEs**: Detailed service-specific documentation in each `services/` directory
+* **Development Rules**: Comprehensive standards in `.windsurf/rules/` covering all aspects of development
+* **Common Core**: Shared contracts and models in `libs/common_core/` with full API documentation
+* **Scripts**: Automation tools in `scripts/` for environment setup, testing, and deployment
 
 ---
 
-This README provides a high-level guide to the HuleEdu Monorepo. For more detailed information, please consult the specific documentation linked throughout this document and within the respective service directories.
+**HuleEdu Monorepo** - A production-ready microservices architecture for comprehensive essay processing and educational assessment. For detailed information, consult the service-specific documentation and development rules referenced throughout this document.

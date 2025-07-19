@@ -129,36 +129,13 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 },
             )
 
-            # **Step 1: Idempotency Check**
-            existing_essay = await self.repository.get_essay_by_text_storage_id_and_batch_id(
-                event_data.batch_id, event_data.text_storage_id
-            )
-
-            if existing_essay is not None:
-                logger.warning(
-                    "Content already assigned to slot, acknowledging idempotently",
-                    extra={
-                        "batch_id": event_data.batch_id,
-                        "text_storage_id": event_data.text_storage_id,
-                        "assigned_essay_id": existing_essay.essay_id,
-                        "correlation_id": str(correlation_id),
-                    },
-                )
-                return True
-
-            # **Step 2: Slot Assignment**
+            # **ELS-002 Phase 1: Atomic Content Provisioning**
+            # Replace non-atomic idempotency check + slot assignment with database-level atomicity
+            
+            # Step 1: Try slot assignment first (maintains existing batch tracker logic)
             assigned_essay_id = self.batch_tracker.assign_slot_to_content(
                 event_data.batch_id, event_data.text_storage_id, event_data.original_file_name
             )
-
-            # Persist slot assignment to database if successful
-            if assigned_essay_id is not None:
-                await self.batch_tracker.persist_slot_assignment(
-                    event_data.batch_id,
-                    assigned_essay_id,
-                    event_data.text_storage_id,
-                    event_data.original_file_name,
-                )
 
             if assigned_essay_id is None:
                 # No slots available - publish ExcessContentProvisionedV1 event
@@ -192,33 +169,57 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
 
                 return True
 
-            # **Step 3: Persist Slot Assignment**
+            # Step 2: Atomic content provisioning with database-level idempotency
             from common_core.status_enums import EssayStatus
 
-            await self.repository.create_or_update_essay_state_for_slot_assignment(
-                internal_essay_id=assigned_essay_id,
+            essay_data = {
+                "internal_essay_id": assigned_essay_id,
+                "initial_status": EssayStatus.READY_FOR_PROCESSING,
+                "original_file_name": event_data.original_file_name,
+                "file_size": event_data.file_size_bytes,
+                "content_hash": event_data.content_md5_hash,
+            }
+
+            was_created, final_essay_id = await self.repository.create_essay_state_with_content_idempotency(
                 batch_id=event_data.batch_id,
                 text_storage_id=event_data.text_storage_id,
-                original_file_name=event_data.original_file_name,
-                file_size=event_data.file_size_bytes,
-                content_hash=event_data.content_md5_hash,
-                initial_status=EssayStatus.READY_FOR_PROCESSING,
+                essay_data=essay_data,
                 correlation_id=correlation_id,
             )
 
-            logger.info(
-                "Successfully assigned content to slot",
-                extra={
-                    "assigned_essay_id": assigned_essay_id,
-                    "batch_id": event_data.batch_id,
-                    "text_storage_id": event_data.text_storage_id,
-                    "correlation_id": str(correlation_id),
-                },
-            )
+            if was_created:
+                # New assignment - persist to batch tracker
+                await self.batch_tracker.persist_slot_assignment(
+                    event_data.batch_id,
+                    assigned_essay_id,
+                    event_data.text_storage_id,
+                    event_data.original_file_name,
+                )
 
-            # **Step 4: Check Batch Completion**
+                logger.info(
+                    "Successfully assigned content to slot with atomic creation",
+                    extra={
+                        "assigned_essay_id": final_essay_id,
+                        "batch_id": event_data.batch_id,
+                        "text_storage_id": event_data.text_storage_id,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+            else:
+                # Idempotent case - content already assigned
+                logger.info(
+                    "Content already assigned to slot, acknowledging idempotently",
+                    extra={
+                        "batch_id": event_data.batch_id,
+                        "text_storage_id": event_data.text_storage_id,
+                        "assigned_essay_id": final_essay_id,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+
+            # **Step 3: Check Batch Completion**
             batch_completion_result = self.batch_tracker.mark_slot_fulfilled(
-                event_data.batch_id, assigned_essay_id, event_data.text_storage_id
+                event_data.batch_id, final_essay_id, event_data.text_storage_id
             )
 
             # **Step 5: Publish BatchEssaysReady if complete**

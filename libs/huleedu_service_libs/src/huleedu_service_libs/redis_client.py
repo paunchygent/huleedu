@@ -461,3 +461,232 @@ class RedisClient:
                 exc_info=True,
             )
             raise
+
+    # Set operations for atomic batch coordination
+    async def sadd(self, key: str, *members: str) -> int:
+        """Add one or more members to a Redis set."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.sadd(key, *members)
+
+            if self._transaction_pipeline is None:
+                added_count = int(result)
+                logger.debug(
+                    f"Redis SADD by '{self.client_id}': key='{key}' added={added_count} members"
+                )
+                return added_count
+            else:
+                logger.debug(f"Redis SADD queued by '{self.client_id}': key='{key}'")
+                return 0  # Command queued, actual count determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis SADD operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def spop(self, key: str) -> str | None:
+        """Remove and return a random member from a Redis set."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.spop(key)
+
+            if self._transaction_pipeline is None:
+                member = result.decode() if isinstance(result, bytes) else result
+                logger.debug(
+                    f"Redis SPOP by '{self.client_id}': key='{key}' "
+                    f"result={'MEMBER' if member else 'EMPTY'}"
+                )
+                return member
+            else:
+                logger.debug(f"Redis SPOP queued by '{self.client_id}': key='{key}'")
+                return None  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis SPOP operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def scard(self, key: str) -> int:
+        """Get the number of members in a Redis set."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.scard(key)
+
+            if self._transaction_pipeline is None:
+                count = int(result)
+                logger.debug(f"Redis SCARD by '{self.client_id}': key='{key}' count={count}")
+                return count
+            else:
+                logger.debug(f"Redis SCARD queued by '{self.client_id}': key='{key}'")
+                return 0  # Command queued, actual count determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis SCARD operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def smembers(self, key: str) -> set[str]:
+        """Get all members of a Redis set."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.smembers(key)
+
+            if self._transaction_pipeline is None:
+                members = set(result) if result else set()
+                logger.debug(
+                    f"Redis SMEMBERS by '{self.client_id}': key='{key}' "
+                    f"returned {len(members)} members"
+                )
+                return members
+            else:
+                logger.debug(f"Redis SMEMBERS queued by '{self.client_id}': key='{key}'")
+                return set()  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis SMEMBERS operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    # Hash operations for metadata storage
+    async def hset(self, key: str, field: str, value: str) -> int:
+        """Set field in a Redis hash."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.hset(key, field, value)
+
+            if self._transaction_pipeline is None:
+                is_new = int(result)
+                logger.debug(
+                    f"Redis HSET by '{self.client_id}': key='{key}' field='{field}' "
+                    f"result={'NEW' if is_new else 'UPDATED'}"
+                )
+                return is_new
+            else:
+                logger.debug(f"Redis HSET queued by '{self.client_id}': key='{key}' field='{field}'")
+                return 0  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis HSET operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def hget(self, key: str, field: str) -> str | None:
+        """Get field value from a Redis hash."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.hget(key, field)
+
+            if self._transaction_pipeline is None:
+                value = result.decode() if isinstance(result, bytes) else result
+                logger.debug(
+                    f"Redis HGET by '{self.client_id}': key='{key}' field='{field}' "
+                    f"result={'FOUND' if value else 'NOT_FOUND'}"
+                )
+                return value
+            else:
+                logger.debug(f"Redis HGET queued by '{self.client_id}': key='{key}' field='{field}'")
+                return None  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis HGET operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def hlen(self, key: str) -> int:
+        """Get the number of fields in a Redis hash."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.hlen(key)
+
+            if self._transaction_pipeline is None:
+                count = int(result)
+                logger.debug(f"Redis HLEN by '{self.client_id}': key='{key}' count={count}")
+                return count
+            else:
+                logger.debug(f"Redis HLEN queued by '{self.client_id}': key='{key}'")
+                return 0  # Command queued, actual count determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis HLEN operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def hgetall(self, key: str) -> dict[str, str]:
+        """Get all fields and values from a Redis hash."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.hgetall(key)
+
+            if self._transaction_pipeline is None:
+                data = dict(result) if result else {}
+                logger.debug(
+                    f"Redis HGETALL by '{self.client_id}': key='{key}' "
+                    f"returned {len(data)} fields"
+                )
+                return data
+            else:
+                logger.debug(f"Redis HGETALL queued by '{self.client_id}': key='{key}'")
+                return {}  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis HGETALL operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def expire(self, key: str, ttl_seconds: int) -> bool:
+        """Set TTL for a Redis key."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.expire(key, ttl_seconds)
+
+            if self._transaction_pipeline is None:
+                success = bool(result)
+                logger.debug(
+                    f"Redis EXPIRE by '{self.client_id}': key='{key}' ttl={ttl_seconds}s "
+                    f"result={'SUCCESS' if success else 'FAILED'}"
+                )
+                return success
+            else:
+                logger.debug(f"Redis EXPIRE queued by '{self.client_id}': key='{key}' ttl={ttl_seconds}s")
+                return True  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis EXPIRE operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise

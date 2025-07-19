@@ -39,6 +39,9 @@ from services.essay_lifecycle_service.implementations.batch_phase_coordinator_im
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
 )
+from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
+    RedisBatchCoordinator,
+)
 from services.essay_lifecycle_service.implementations.cj_assessment_command_handler import (
     CJAssessmentCommandHandler,
 )
@@ -306,11 +309,20 @@ class BatchCoordinationProvider(Provider):
         return BatchTrackerPersistence(engine)
 
     @provide(scope=Scope.APP)
+    def provide_redis_batch_coordinator(
+        self, redis_client: AtomicRedisClientProtocol, settings: Settings
+    ) -> RedisBatchCoordinator:
+        """Provide Redis batch coordinator for distributed slot assignment."""
+        return RedisBatchCoordinator(redis_client, settings)
+
+    @provide(scope=Scope.APP)
     async def provide_batch_essay_tracker(
-        self, persistence: BatchTrackerPersistence
+        self, 
+        persistence: BatchTrackerPersistence,
+        redis_coordinator: RedisBatchCoordinator
     ) -> BatchEssayTracker:
-        """Provide batch essay tracker implementation with database persistence."""
-        tracker = DefaultBatchEssayTracker(persistence)
+        """Provide batch essay tracker implementation with Redis coordinator and database persistence."""
+        tracker = DefaultBatchEssayTracker(persistence, redis_coordinator)
         await tracker.initialize_from_database()
         return tracker
 

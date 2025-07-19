@@ -1,0 +1,253 @@
+version: '3.8'
+
+# Distributed testing infrastructure for Essay Lifecycle Service
+# This compose file creates multiple ELS instances sharing Redis and PostgreSQL
+# to test distributed coordination and race condition prevention
+
+services:
+  # Redis for distributed coordination
+  redis:
+    image: redis:7-alpine
+    container_name: els_distributed_test_redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - els_distributed_test
+
+  # PostgreSQL for shared essay state
+  postgres:
+    image: postgres:15
+    container_name: els_distributed_test_postgres
+    environment:
+      - POSTGRES_DB=els_distributed_test
+      - POSTGRES_USER=testuser
+      - POSTGRES_PASSWORD=testpass
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d els_distributed_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    networks:
+      - els_distributed_test
+
+  # Kafka for event coordination
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    container_name: els_distributed_test_zookeeper
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - els_distributed_test
+
+  kafka:
+    image: bitnami/kafka:3.7
+    container_name: els_distributed_test_kafka
+    depends_on:
+      - zookeeper
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
+    ports:
+      - "19092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - els_distributed_test
+
+  # Build base ELS image
+  els_base_build:
+    build:
+      context: ../../../..
+      dockerfile: services/essay_lifecycle_service/Dockerfile
+    image: essay_lifecycle_service:distributed-test
+    command: ["echo", "Base image built for distributed testing"]
+
+  # ELS Worker Instance 1
+  els_worker_1:
+    image: essay_lifecycle_service:distributed-test
+    container_name: els_distributed_test_worker_1
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+      - els_base_build
+    environment:
+      - ENV_TYPE=docker
+      - DATABASE_URL=postgresql+asyncpg://testuser:testpass@postgres:5432/els_distributed_test
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - LOG_LEVEL=DEBUG
+      - INSTANCE_ID=worker_1
+      - HTTP_PORT=6000
+      - PROMETHEUS_PORT=9090
+    ports:
+      - "16000:6000"
+      - "19090:9090"
+    command: ["pdm", "run", "start_worker"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - els_distributed_test
+
+  # ELS Worker Instance 2
+  els_worker_2:
+    image: essay_lifecycle_service:distributed-test
+    container_name: els_distributed_test_worker_2
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+      - els_base_build
+    environment:
+      - ENV_TYPE=docker
+      - DATABASE_URL=postgresql+asyncpg://testuser:testpass@postgres:5432/els_distributed_test
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - LOG_LEVEL=DEBUG
+      - INSTANCE_ID=worker_2
+      - HTTP_PORT=6000
+      - PROMETHEUS_PORT=9090
+    ports:
+      - "16001:6000"
+      - "19091:9090"
+    command: ["pdm", "run", "start_worker"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - els_distributed_test
+
+  # ELS Worker Instance 3
+  els_worker_3:
+    image: essay_lifecycle_service:distributed-test
+    container_name: els_distributed_test_worker_3
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+      - els_base_build
+    environment:
+      - ENV_TYPE=docker
+      - DATABASE_URL=postgresql+asyncpg://testuser:testpass@postgres:5432/els_distributed_test
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - LOG_LEVEL=DEBUG
+      - INSTANCE_ID=worker_3
+      - HTTP_PORT=6000
+      - PROMETHEUS_PORT=9090
+    ports:
+      - "16002:6000"
+      - "19092:9090"
+    command: ["pdm", "run", "start_worker"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - els_distributed_test
+
+  # Load balancer for distributing events
+  nginx_load_balancer:
+    image: nginx:alpine
+    container_name: els_distributed_test_nginx
+    depends_on:
+      - els_worker_1
+      - els_worker_2
+      - els_worker_3
+    ports:
+      - "16080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - els_distributed_test
+
+  # Event generator for testing concurrent scenarios
+  event_generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.event-generator
+    container_name: els_distributed_test_event_generator
+    depends_on:
+      - kafka
+      - nginx_load_balancer
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - ELS_LOAD_BALANCER_URL=http://nginx_load_balancer
+      - CONCURRENT_EVENTS=20
+      - TEST_DURATION_SECONDS=60
+    command: ["python", "/app/event_generator.py"]
+    networks:
+      - els_distributed_test
+
+  # Monitoring and observability
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: els_distributed_test_prometheus
+    ports:
+      - "19099:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - els_distributed_test
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: els_distributed_test_grafana
+    ports:
+      - "13000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_test_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - els_distributed_test
+
+volumes:
+  postgres_test_data:
+  grafana_test_data:
+
+networks:
+  els_distributed_test:
+    driver: bridge

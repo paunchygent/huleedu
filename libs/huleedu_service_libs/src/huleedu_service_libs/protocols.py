@@ -191,6 +191,121 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         """Convenience method to publish structured notifications to user-specific channels."""
         pass
 
+    # Set operations for atomic batch coordination
+    async def sadd(self, key: str, *members: str) -> int:
+        """
+        Add one or more members to a Redis set.
+        
+        Args:
+            key: Redis key for the set
+            members: One or more string values to add
+            
+        Returns:
+            Number of elements added to the set
+        """
+        pass
+
+    async def spop(self, key: str) -> str | None:
+        """
+        Remove and return a random member from a Redis set.
+        
+        Args:
+            key: Redis key for the set
+            
+        Returns:
+            Random member from the set, or None if set is empty
+        """
+        pass
+
+    async def scard(self, key: str) -> int:
+        """
+        Get the number of members in a Redis set.
+        
+        Args:
+            key: Redis key for the set
+            
+        Returns:
+            Number of members in the set
+        """
+        pass
+
+    async def smembers(self, key: str) -> set[str]:
+        """
+        Get all members of a Redis set.
+        
+        Args:
+            key: Redis key for the set
+            
+        Returns:
+            Set of all members
+        """
+        pass
+
+    # Hash operations for metadata storage
+    async def hset(self, key: str, field: str, value: str) -> int:
+        """
+        Set field in a Redis hash.
+        
+        Args:
+            key: Redis key for the hash
+            field: Field name
+            value: Field value
+            
+        Returns:
+            1 if field is new, 0 if field was updated
+        """
+        pass
+
+    async def hget(self, key: str, field: str) -> str | None:
+        """
+        Get field value from a Redis hash.
+        
+        Args:
+            key: Redis key for the hash
+            field: Field name
+            
+        Returns:
+            Field value or None if field doesn't exist
+        """
+        pass
+
+    async def hlen(self, key: str) -> int:
+        """
+        Get the number of fields in a Redis hash.
+        
+        Args:
+            key: Redis key for the hash
+            
+        Returns:
+            Number of fields in the hash
+        """
+        pass
+
+    async def hgetall(self, key: str) -> dict[str, str]:
+        """
+        Get all fields and values from a Redis hash.
+        
+        Args:
+            key: Redis key for the hash
+            
+        Returns:
+            Dictionary of all field-value pairs
+        """
+        pass
+
+    async def expire(self, key: str, ttl_seconds: int) -> bool:
+        """
+        Set TTL for a Redis key.
+        
+        Args:
+            key: Redis key
+            ttl_seconds: TTL in seconds
+            
+        Returns:
+            True if TTL was set successfully
+        """
+        pass
+
 
 class KafkaPublisherProtocol(Protocol):
     """

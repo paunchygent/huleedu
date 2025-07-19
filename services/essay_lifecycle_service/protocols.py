@@ -117,6 +117,23 @@ class EssayRepositoryProtocol(Protocol):
         """List all essays in a batch that are part of a specific processing phase."""
         ...
 
+    async def create_essay_state_with_content_idempotency(
+        self,
+        batch_id: str,
+        text_storage_id: str,
+        essay_data: dict[str, Any],
+        correlation_id: UUID,
+    ) -> tuple[bool, str | None]:
+        """
+        Create essay state with atomic idempotency check for content provisioning.
+        
+        Returns tuple of (was_created, essay_id) where was_created indicates if this
+        was a new creation (True) or idempotent case (False).
+        
+        Addresses ELS-002 Phase 1 requirements for database-level race condition prevention.
+        """
+        ...
+
 
 class EventPublisher(Protocol):
     """Protocol for publishing events to Kafka."""

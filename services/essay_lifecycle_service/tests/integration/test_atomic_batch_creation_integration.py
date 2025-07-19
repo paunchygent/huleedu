@@ -207,10 +207,24 @@ class TestAtomicBatchCreationIntegration:
 
     @pytest.fixture
     async def batch_tracker(
-        self, batch_tracker_persistence: BatchTrackerPersistence
+        self, batch_tracker_persistence: BatchTrackerPersistence, redis_client
     ) -> DefaultBatchEssayTracker:
-        """Create real batch tracker with PostgreSQL persistence."""
-        return DefaultBatchEssayTracker(persistence=batch_tracker_persistence)
+        """Create real batch tracker with PostgreSQL persistence and Redis coordinator."""
+        from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
+            RedisBatchCoordinator,
+        )
+        from services.essay_lifecycle_service.config import Settings
+        
+        # Create settings mock
+        settings = Settings()
+        
+        # Create Redis coordinator with real Redis client
+        redis_coordinator = RedisBatchCoordinator(redis_client, settings)
+        
+        return DefaultBatchEssayTracker(
+            persistence=batch_tracker_persistence, 
+            redis_coordinator=redis_coordinator
+        )
 
     @pytest.fixture
     def event_publisher(self) -> MockEventPublisher:

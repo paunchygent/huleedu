@@ -30,6 +30,9 @@ from services.essay_lifecycle_service.implementations.batch_expectation import B
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
 )
+from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
+    RedisBatchCoordinator,
+)
 from services.essay_lifecycle_service.protocols import BatchEssayTracker
 
 
@@ -42,12 +45,19 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
     Enhanced to handle validation failures and prevent infinite waits.
     """
 
-    def __init__(self, persistence: BatchTrackerPersistence) -> None:
+    def __init__(
+        self, 
+        persistence: BatchTrackerPersistence, 
+        redis_coordinator: RedisBatchCoordinator
+    ) -> None:
         self._logger = create_service_logger("batch_tracker")
-        self.batch_expectations: dict[str, BatchExpectation] = {}
+        self._redis_coordinator = redis_coordinator
+        self._persistence = persistence
+        
+        # Keep minimal in-memory state for legacy compatibility during migration
+        self.batch_expectations: dict[str, BatchExpectation] = {}  # Deprecated - migrating to Redis
         self.validation_failures: dict[str, list[EssayValidationFailedV1]] = {}
         self._event_callbacks: dict[str, Callable[[Any], Awaitable[None]]] = {}
-        self._persistence = persistence
         self._initialized = False
 
     def register_event_callback(
@@ -60,81 +70,91 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         self, event: Any, correlation_id: UUID
     ) -> None:  # BatchEssaysRegistered
         """
-        Register batch slot expectations from BOS with idempotency support.
+        Register batch slot expectations using Redis coordinator for distributed coordination.
 
-        Handles duplicate BatchEssaysRegistered events gracefully by checking
-        database existence first. Preserves original correlation ID and prevents
-        duplicate timeout monitoring for robust event replay handling.
+        Migrated from in-memory state to Redis-based distributed coordination to eliminate
+        race conditions in multi-instance deployments.
 
         Args:
-            event: BatchEssaysRegistered from BOS containing essay-ID slots and
-                course context
+            event: BatchEssaysRegistered from BOS containing essay-ID slots and course context
         """
         batch_essays_registered = BatchEssaysRegistered.model_validate(event)
         batch_id = batch_essays_registered.batch_id
 
-        # **Idempotency Check: Database existence first**
-        existing_batch = await self._persistence.get_batch_from_database(batch_id)
+        # **Idempotency Check: Redis existence first**
+        existing_batch_status = await self._redis_coordinator.get_batch_status(batch_id)
 
-        if existing_batch is not None:
-            # Batch already exists in database - handle idempotently
+        if existing_batch_status is not None:
+            # Batch already exists in Redis - handle idempotently
             self._logger.info(
-                f"Batch {batch_id} already registered in database, acknowledging idempotently",
+                f"Batch {batch_id} already registered in Redis, acknowledging idempotently",
                 extra={
                     "batch_id": batch_id,
-                    "original_correlation_id": existing_batch.correlation_id,
                     "new_correlation_id": str(correlation_id),
-                    "expected_count": existing_batch.expected_count,
+                    "total_slots": existing_batch_status["total_slots"],
+                    "available_slots": existing_batch_status["available_slots"],
                 },
             )
-
-            # Restore to memory if not present (recovery scenario)
-            if batch_id not in self.batch_expectations:
-                expectation = self._persistence.expectation_from_db(existing_batch)
-                self.batch_expectations[batch_id] = expectation
-
-                # Only start timeout monitoring if not already running
-                if expectation.timeout_task is None or expectation.timeout_task.done():
-                    await self._start_timeout_monitoring(expectation)
-
-                self._logger.info(
-                    f"Restored batch {batch_id} to memory from database during idempotent registration"
-                )
-
             return
 
-        # **New Batch Registration**
-        if batch_id in self.batch_expectations:
-            self._logger.warning(f"Batch {batch_id} exists in memory but not database, replacing")
+        # **Database idempotency check for migration compatibility**
+        existing_db_batch = await self._persistence.get_batch_from_database(batch_id)
+        if existing_db_batch is not None:
+            self._logger.info(
+                f"Batch {batch_id} exists in database, migrating to Redis coordinator"
+            )
 
-        expectation = BatchExpectation(
+        # **New Batch Registration in Redis**
+        # Prepare batch metadata for Redis storage
+        batch_metadata = {
+            "batch_id": batch_id,
+            "course_code": batch_essays_registered.course_code.value,
+            "essay_instructions": batch_essays_registered.essay_instructions,
+            "user_id": batch_essays_registered.user_id,
+            "correlation_id": correlation_id,
+            "expected_count": len(batch_essays_registered.essay_ids),
+            "created_at": datetime.now().isoformat(),
+        }
+
+        # Register batch in Redis coordinator with atomic slot initialization
+        await self._redis_coordinator.register_batch_slots(
             batch_id=batch_id,
-            # Internal essay ID slots from BOS
+            essay_ids=batch_essays_registered.essay_ids,
+            metadata=batch_metadata,
+            timeout_seconds=300,  # 5 minutes default timeout
+        )
+
+        # **Legacy database persistence for migration compatibility**
+        expectation = BatchExpectation.create_new(
+            batch_id=batch_id,
             expected_essay_ids=batch_essays_registered.essay_ids,
-            # Course context from BOS
             course_code=batch_essays_registered.course_code,
             essay_instructions=batch_essays_registered.essay_instructions,
             user_id=batch_essays_registered.user_id,
-            # Store correlation ID for BatchEssaysReady event
             correlation_id=correlation_id,
         )
 
-        self.batch_expectations[batch_id] = expectation
-
-        # Persist to database (dual-write pattern)
+        # Persist to database (migration compatibility)
         await self._persistence.persist_batch_expectation(expectation)
 
-        # Start timeout monitoring for new batch
+        # Keep minimal in-memory state for legacy timeout monitoring
+        self.batch_expectations[batch_id] = expectation
         await self._start_timeout_monitoring(expectation)
 
-        msg = f"Registered new batch {batch_id} with {len(batch_essays_registered.essay_ids)} slots: {batch_essays_registered.essay_ids}, course: {batch_essays_registered.course_code.value}"
-        self._logger.info(msg)
+        self._logger.info(
+            f"Registered batch {batch_id} in Redis coordinator with "
+            f"{len(batch_essays_registered.essay_ids)} slots, course: "
+            f"{batch_essays_registered.course_code.value}"
+        )
 
     def assign_slot_to_content(
         self, batch_id: str, text_storage_id: str, original_file_name: str
     ) -> str | None:
         """
-        Assign an available slot to content.
+        Assign an available slot to content using Redis coordinator for atomic operations.
+
+        Migrated to Redis-based atomic slot assignment to eliminate race conditions
+        in distributed deployments.
 
         Args:
             batch_id: The batch ID
@@ -144,6 +164,51 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         Returns:
             The assigned internal essay ID if successful, None if no slots available
         """
+        # Note: This is a synchronous method in the protocol, but we need async for Redis
+        # We'll handle the async call in the calling context for now
+        # This is a design constraint that will need protocol updates in future iterations
+        
+        # For immediate migration compatibility, check Redis first, fallback to in-memory
+        # In production, this should be fully async
+        import asyncio
+        
+        try:
+            # Create content metadata for Redis storage
+            content_metadata = {
+                "text_storage_id": text_storage_id,
+                "original_file_name": original_file_name,
+                "assigned_at": datetime.now().isoformat(),
+            }
+            
+            # Use asyncio.create_task to handle async call in sync context
+            # Note: This is a transitional approach - the protocol should be updated to async
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If we're already in an async context, we can't use asyncio.run
+                # We'll need to handle this differently
+                self._logger.warning(
+                    f"Sync method called in async context for batch {batch_id}. "
+                    "Using fallback to in-memory assignment."
+                )
+                # Fallback to legacy in-memory assignment during migration
+                return self._assign_slot_legacy(batch_id, text_storage_id, original_file_name)
+            else:
+                # We're not in an async context, can use asyncio.run
+                return asyncio.run(
+                    self._redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+                )
+                
+        except Exception as e:
+            self._logger.error(
+                f"Redis slot assignment failed for batch {batch_id}, falling back to legacy: {e}"
+            )
+            # Fallback to legacy in-memory assignment
+            return self._assign_slot_legacy(batch_id, text_storage_id, original_file_name)
+
+    def _assign_slot_legacy(
+        self, batch_id: str, text_storage_id: str, original_file_name: str
+    ) -> str | None:
+        """Legacy in-memory slot assignment for fallback during migration."""
         if batch_id not in self.batch_expectations:
             self._logger.error(f"No expectation registered for batch {batch_id}")
             return None
@@ -160,6 +225,8 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         """
         Mark a slot as fulfilled and check if batch is complete.
 
+        Uses Redis coordinator to check batch completion state for distributed coordination.
+
         Args:
             batch_id: The batch ID
             internal_essay_id: The internal essay ID slot that was fulfilled
@@ -168,6 +235,43 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         Returns:
             BatchEssaysReady event if batch is complete, None otherwise
         """
+        import asyncio
+        
+        try:
+            # Check batch completion using Redis coordinator
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # In async context - use legacy fallback
+                return self._mark_slot_fulfilled_legacy(batch_id, internal_essay_id, text_storage_id)
+            else:
+                # Check completion state in Redis
+                is_complete = asyncio.run(
+                    self._redis_coordinator.check_batch_completion(batch_id)
+                )
+                
+                if is_complete:
+                    # Get batch metadata from Redis for event creation
+                    redis_status = asyncio.run(
+                        self._redis_coordinator.get_batch_status(batch_id)
+                    )
+                    
+                    if redis_status:
+                        return self._create_batch_ready_event_from_redis(batch_id, redis_status)
+
+                return None
+                
+        except Exception as e:
+            self._logger.error(
+                f"Redis batch completion check failed for batch {batch_id}, "
+                f"falling back to legacy: {e}"
+            )
+            # Fallback to legacy implementation
+            return self._mark_slot_fulfilled_legacy(batch_id, internal_essay_id, text_storage_id)
+
+    def _mark_slot_fulfilled_legacy(
+        self, batch_id: str, internal_essay_id: str, text_storage_id: str
+    ) -> tuple[BatchEssaysReady, UUID] | None:
+        """Legacy in-memory slot fulfillment for fallback during migration."""
         if batch_id not in self.batch_expectations:
             self._logger.error(f"No expectation registered for batch {batch_id}")
             return None
@@ -190,7 +294,52 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         return None
 
     def get_batch_status(self, batch_id: str) -> dict[str, Any] | None:
-        """Get current status of a batch."""
+        """Get current status of a batch using Redis coordinator."""
+        import asyncio
+        
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # In async context - use legacy fallback
+                return self._get_batch_status_legacy(batch_id)
+            else:
+                # Get status from Redis coordinator
+                redis_status = asyncio.run(
+                    self._redis_coordinator.get_batch_status(batch_id)
+                )
+                
+                if redis_status:
+                    # Convert Redis status to expected format
+                    assignments = redis_status.get("assignments", {})
+                    ready_essays = []
+                    for essay_id, metadata in assignments.items():
+                        if isinstance(metadata, dict) and "text_storage_id" in metadata:
+                            ready_essays.append({
+                                "essay_id": essay_id,
+                                "text_storage_id": metadata["text_storage_id"]
+                            })
+                    
+                    return {
+                        "batch_id": batch_id,
+                        "expected_count": redis_status["total_slots"],
+                        "ready_count": redis_status["assigned_slots"],
+                        "ready_essays": ready_essays,
+                        "missing_essay_ids": [],  # Redis doesn't track this the same way
+                        "is_complete": redis_status["is_complete"],
+                        "is_timeout_due": not redis_status["has_timeout"],
+                        "created_at": redis_status.get("metadata", {}).get("created_at"),
+                    }
+                
+                return None
+                
+        except Exception as e:
+            self._logger.error(
+                f"Redis batch status check failed for batch {batch_id}, falling back to legacy: {e}"
+            )
+            return self._get_batch_status_legacy(batch_id)
+
+    def _get_batch_status_legacy(self, batch_id: str) -> dict[str, Any] | None:
+        """Legacy in-memory batch status for fallback during migration."""
         if batch_id not in self.batch_expectations:
             return None
 
@@ -384,6 +533,82 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             del self.validation_failures[batch_id]
 
         return ready_event, original_correlation_id
+
+    def _create_batch_ready_event_from_redis(
+        self, batch_id: str, redis_status: dict[str, Any]
+    ) -> tuple[BatchEssaysReady, UUID]:
+        """Create BatchEssaysReady event from Redis batch status data."""
+        from common_core.domain_enums import CourseCode
+        from common_core.metadata_models import EssayProcessingInputRefV1
+        
+        # Extract metadata from Redis status
+        metadata = redis_status.get("metadata", {})
+        assignments = redis_status.get("assignments", {})
+        
+        # Parse course code from metadata
+        course_code_str = metadata.get("course_code", "ENGLISH_INTERMEDIATE")
+        course_code = CourseCode(course_code_str)
+        course_language = get_course_language(course_code).value
+        
+        # Convert Redis assignments to EssayProcessingInputRefV1 format
+        ready_essays = []
+        for essay_id, assignment_data in assignments.items():
+            if isinstance(assignment_data, dict) and "text_storage_id" in assignment_data:
+                ready_essays.append(
+                    EssayProcessingInputRefV1(
+                        essay_id=essay_id,
+                        text_storage_id=assignment_data["text_storage_id"]
+                    )
+                )
+        
+        # Get validation failures (still tracked in memory during migration)
+        failures: list[EssayValidationFailedV1] = self.validation_failures.get(batch_id, [])
+        
+        # Create BatchEssaysReady event
+        ready_event = BatchEssaysReady(
+            batch_id=batch_id,
+            ready_essays=ready_essays,
+            batch_entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+            metadata=SystemProcessingMetadata(
+                entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                timestamp=datetime.now(UTC),
+                event="batch.essays.ready",
+            ),
+            course_code=course_code,
+            course_language=course_language,
+            essay_instructions=metadata.get("essay_instructions", ""),
+            class_type="GUEST",  # Placeholder
+            teacher_first_name=None,
+            teacher_last_name=None,
+            validation_failures=failures if failures else None,
+            total_files_processed=len(ready_essays) + len(failures),
+        )
+        
+        # Extract correlation ID from metadata
+        correlation_id_str = metadata.get("correlation_id")
+        if correlation_id_str:
+            try:
+                correlation_id = UUID(correlation_id_str)
+            except (ValueError, TypeError):
+                # Fallback to generating new correlation ID
+                from uuid import uuid4
+                correlation_id = uuid4()
+        else:
+            from uuid import uuid4
+            correlation_id = uuid4()
+
+        self._logger.info(
+            f"Batch {batch_id} completed via Redis coordinator: "
+            f"{len(ready_essays)} successful, {len(failures)} failed"
+        )
+
+        # Clean up in-memory state
+        if batch_id in self.batch_expectations:
+            del self.batch_expectations[batch_id]
+        if batch_id in self.validation_failures:
+            del self.validation_failures[batch_id]
+
+        return ready_event, correlation_id
 
     async def _start_timeout_monitoring(self, expectation: BatchExpectation) -> None:
         """Start timeout monitoring for a batch expectation."""

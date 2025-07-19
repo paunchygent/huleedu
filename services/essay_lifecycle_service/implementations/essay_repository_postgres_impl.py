@@ -24,6 +24,7 @@ from huleedu_service_libs.error_handling import (
 )
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from services.essay_lifecycle_service.config import Settings
@@ -558,3 +559,153 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 essays.append(essay_state)  # type: ignore[arg-type]
 
             return essays
+
+    async def create_essay_state_with_content_idempotency(
+        self,
+        batch_id: str,
+        text_storage_id: str,
+        essay_data: dict[str, Any],
+        correlation_id: UUID,
+    ) -> tuple[bool, str | None]:
+        """
+        Create essay state with atomic idempotency check for content provisioning.
+        
+        This method addresses ELS-002 Phase 1 requirements by providing database-level
+        atomicity for content provisioning to prevent race conditions.
+        
+        Args:
+            batch_id: The batch identifier
+            text_storage_id: The content storage identifier
+            essay_data: Dictionary containing essay creation data including internal_essay_id
+            correlation_id: Correlation ID for distributed tracing
+            
+        Returns:
+            tuple[bool, str | None]: (was_created, essay_id)
+                - (True, essay_id) for new creation
+                - (False, existing_essay_id) for idempotent case where content already assigned
+                
+        Raises:
+            HuleEduError: For database errors or constraint violations
+        """
+        try:
+            async with self.session() as session:
+                # Use SELECT FOR UPDATE for row-level locking to prevent concurrent assignments
+                # First check if this content is already assigned to any essay in this batch
+                stmt = (
+                    select(EssayStateDB)
+                    .where(
+                        EssayStateDB.batch_id == batch_id,
+                        EssayStateDB.text_storage_id == text_storage_id,
+                    )
+                    .with_for_update()
+                )
+                result = await session.execute(stmt)
+                existing_essay = result.scalars().first()
+                
+                if existing_essay is not None:
+                    # Content already assigned - idempotent success case
+                    self.logger.info(
+                        "Content already assigned to essay, returning existing assignment",
+                        extra={
+                            "batch_id": batch_id,
+                            "text_storage_id": text_storage_id,
+                            "existing_essay_id": existing_essay.essay_id,
+                            "correlation_id": str(correlation_id),
+                        },
+                    )
+                    return False, existing_essay.essay_id
+                
+                # Create new essay state with atomic constraint checking
+                internal_essay_id = essay_data["internal_essay_id"]
+                initial_status = essay_data.get("initial_status", EssayStatus.READY_FOR_PROCESSING)
+                
+                essay_state = ConcreteEssayState(
+                    essay_id=internal_essay_id,
+                    batch_id=batch_id,
+                    current_status=initial_status,
+                    processing_metadata={
+                        "text_storage_id": text_storage_id,
+                        "original_file_name": essay_data.get("original_file_name", ""),
+                        "file_size": essay_data.get("file_size", 0),
+                        "content_hash": essay_data.get("content_hash"),
+                        "slot_assignment_timestamp": datetime.now(UTC).isoformat(),
+                    },
+                    storage_references={ContentType.ORIGINAL_ESSAY: text_storage_id},
+                    timeline={initial_status.value: datetime.now(UTC)},
+                )
+                
+                # Convert to database format
+                db_data = self._essay_state_to_db_dict(essay_state)
+                # Explicitly set text_storage_id for the constraint
+                db_data["text_storage_id"] = text_storage_id
+                
+                db_essay = EssayStateDB(**db_data)
+                session.add(db_essay)
+                
+                # Commit will trigger the unique constraint check
+                await session.commit()
+                
+                self.logger.info(
+                    "Successfully created essay state with content assignment",
+                    extra={
+                        "batch_id": batch_id,
+                        "text_storage_id": text_storage_id,
+                        "essay_id": internal_essay_id,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+                return True, internal_essay_id
+                
+        except IntegrityError as e:
+            # Handle unique constraint violation as idempotent success
+            # Check for both our specific constraint name and general unique violation
+            if ("uq_essay_content_idempotency" in str(e) or 
+                ("duplicate key" in str(e) and "batch_id" in str(e) and "text_storage_id" in str(e))):
+                # Another concurrent process assigned this content - find the existing assignment
+                async with self.session() as session:
+                    stmt = select(EssayStateDB).where(
+                        EssayStateDB.batch_id == batch_id,
+                        EssayStateDB.text_storage_id == text_storage_id,
+                    )
+                    result = await session.execute(stmt)
+                    existing_essay = result.scalars().first()
+                    
+                    if existing_essay:
+                        self.logger.info(
+                            "Concurrent content assignment detected, returning existing assignment",
+                            extra={
+                                "batch_id": batch_id,
+                                "text_storage_id": text_storage_id,
+                                "existing_essay_id": existing_essay.essay_id,
+                                "correlation_id": str(correlation_id),
+                            },
+                        )
+                        return False, existing_essay.essay_id
+            
+            # Re-raise as processing error for other integrity violations
+            raise_processing_error(
+                service="essay_lifecycle_service",
+                operation="create_essay_state_with_content_idempotency",
+                message=f"Database constraint violation: {e.__class__.__name__}",
+                correlation_id=correlation_id,
+                batch_id=batch_id,
+                text_storage_id=text_storage_id,
+                error_type=e.__class__.__name__,
+                error_details=str(e),
+            )
+            
+        except Exception as e:
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_processing_error(
+                    service="essay_lifecycle_service",
+                    operation="create_essay_state_with_content_idempotency",
+                    message=f"Database error during atomic content provisioning: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
+                    text_storage_id=text_storage_id,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )

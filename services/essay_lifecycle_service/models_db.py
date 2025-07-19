@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any
 
 from common_core.status_enums import EssayStatus
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, ForeignKeyConstraint, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import ENUM as SQLAlchemyEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -57,6 +57,9 @@ class EssayStateDB(Base):
     # Storage references as JSON
     storage_references: Mapped[dict[str, str]] = mapped_column(JSON, nullable=False, default=dict)
 
+    # Extracted text storage ID for content idempotency (ELS-002 Phase 1)
+    text_storage_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+
     # Version field for optimistic locking
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
@@ -64,6 +67,13 @@ class EssayStateDB(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("NOW()"), onupdate=text("NOW()")
+    )
+    
+    # Table-level constraints for data integrity (ELS-002 Phase 1)
+    __table_args__ = (
+        UniqueConstraint('batch_id', 'text_storage_id', name='uq_essay_content_idempotency'),
+        ForeignKeyConstraint(['batch_id'], ['batch_essay_trackers.batch_id'], 
+                           name='fk_essay_states_batch_id', ondelete='SET NULL'),
     )
 
 

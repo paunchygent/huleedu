@@ -39,6 +39,9 @@ class TestBatchEssayTracker:
         from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
             BatchTrackerPersistence,
         )
+        from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
+            RedisBatchCoordinator,
+        )
 
         # Create simple no-op persistence for testing (only mock database operations)
         persistence = AsyncMock(spec=BatchTrackerPersistence)
@@ -48,8 +51,15 @@ class TestBatchEssayTracker:
         persistence.remove_batch_from_database.return_value = None  # No-op database write
         persistence.initialize_from_database.return_value = []  # No existing batches
 
-        # Use real tracker with mocked database layer only
-        return DefaultBatchEssayTracker(persistence)
+        # Create mock Redis coordinator for testing (fallback to legacy in-memory behavior)
+        redis_coordinator = AsyncMock(spec=RedisBatchCoordinator)
+        redis_coordinator.get_batch_status.return_value = None  # No Redis state - use legacy
+        redis_coordinator.register_batch_slots.return_value = None  # No-op Redis registration
+        redis_coordinator.assign_slot_atomic.return_value = None  # Fallback to legacy assignment
+        redis_coordinator.check_batch_completion.return_value = False  # Use legacy completion check
+
+        # Use real tracker with mocked database layer and Redis coordinator
+        return DefaultBatchEssayTracker(persistence, redis_coordinator)
 
     @pytest.fixture
     def sample_batch_registration(self) -> BatchEssaysRegistered:

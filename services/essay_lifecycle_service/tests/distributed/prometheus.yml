@@ -1,0 +1,49 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+rule_files:
+  # - "first.rules"
+  # - "second.rules"
+
+scrape_configs:
+  # ELS Worker Instance 1
+  - job_name: 'els-worker-1'
+    static_configs:
+      - targets: ['els_worker_1:9090']
+    scrape_interval: 5s
+    metrics_path: /metrics
+    scheme: http
+
+  # ELS Worker Instance 2  
+  - job_name: 'els-worker-2'
+    static_configs:
+      - targets: ['els_worker_2:9090']
+    scrape_interval: 5s
+    metrics_path: /metrics
+    scheme: http
+
+  # ELS Worker Instance 3
+  - job_name: 'els-worker-3'
+    static_configs:
+      - targets: ['els_worker_3:9090']
+    scrape_interval: 5s
+    metrics_path: /metrics
+    scheme: http
+
+  # Redis metrics (if redis_exporter is added)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 10s
+
+  # PostgreSQL metrics (if postgres_exporter is added)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    scrape_interval: 10s
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
