@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import uuid4
 
 from fastapi import WebSocket
+from huleedu_service_libs.error_handling import (
+    raise_connection_error,
+    raise_external_service_error,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
@@ -64,6 +69,7 @@ class RedisMessageListener:
     async def _redis_listener(self, user_id: str, websocket: WebSocket) -> None:
         """Internal method to listen to Redis and forward messages."""
         channel_name = self._redis_client.get_user_channel(user_id)
+        correlation_id = uuid4()
 
         try:
             async for pubsub in self._redis_client.subscribe(channel_name):
@@ -89,14 +95,34 @@ class RedisMessageListener:
                 extra={"user_id": user_id},
             )
             raise
+        except ConnectionError as e:
+            logger.error(
+                f"Redis connection error for user {user_id}: {e}",
+                exc_info=True,
+                extra={"user_id": user_id},
+            )
+            raise_connection_error(
+                service="websocket_service",
+                operation="redis_subscribe",
+                target="redis",
+                message=f"Redis connection failed: {str(e)}",
+                correlation_id=correlation_id,
+            )
         except Exception as e:
             logger.error(
-                f"Error in Redis listener for user {user_id}: {e}",
+                f"Unexpected error in Redis listener for user {user_id}: {e}",
                 exc_info=True,
                 extra={"user_id": user_id},
             )
             # Close the WebSocket on unexpected errors
             await websocket.close(code=1011)  # Internal error
+            raise_external_service_error(
+                service="websocket_service",
+                operation="redis_listener",
+                external_service="redis",
+                message=f"Unexpected error in Redis listener: {str(e)}",
+                correlation_id=correlation_id,
+            )
         finally:
             logger.info(
                 f"Redis listener for user {user_id} is shutting down",

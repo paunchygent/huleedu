@@ -7,45 +7,22 @@ authentication, rate limiting, and error handling.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
-
 import pytest
-from dishka import Provider, Scope, make_async_container, provide
+from dishka import make_async_container
+from dishka.integrations.fastapi import FastapiProvider, setup_dishka
 from fastapi.testclient import TestClient
-from prometheus_client import CollectorRegistry
 
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.kafka_client import KafkaBus
 from services.api_gateway_service.app.main import create_app
-from services.api_gateway_service.app.metrics import GatewayMetrics
-from services.api_gateway_service.auth import get_current_user_id
+from services.api_gateway_service.tests.test_provider import (
+    TestApiGatewayProvider,
+    TestAuthProvider,
+)
 
-
-class MockProvider(Provider):
-    """Test provider with mock dependencies."""
-
-    scope = Scope.APP
-
-    def __init__(self):
-        super().__init__()
-        self.mock_kafka_bus = AsyncMock()
-        self.mock_kafka_bus.publish = AsyncMock()
-
-    @provide
-    def get_kafka_bus(self) -> KafkaBus:
-        return self.mock_kafka_bus
-
-    @provide
-    def provide_metrics(self) -> GatewayMetrics:
-        return GatewayMetrics()
-
-    @provide
-    def provide_registry(self) -> CollectorRegistry:
-        from prometheus_client import REGISTRY
-
-        return REGISTRY
+USER_ID = "test_user_123"
 
 
 @pytest.fixture(autouse=True)
@@ -60,53 +37,35 @@ def _clear_prometheus_registry():
 
 
 @pytest.fixture
-def mock_provider():
-    """Create mock provider for testing."""
-    return MockProvider()
-
-
-@pytest.fixture
-def mock_kafka_bus(mock_provider):
-    """Get mock KafkaBus from provider."""
-    return mock_provider.mock_kafka_bus
-
-
-@pytest.fixture
-async def container(mock_provider):
-    """Create test container with mock dependencies."""
-    container = make_async_container(mock_provider)
+async def container():
+    """Create test container with standardized test providers."""
+    container = make_async_container(
+        TestApiGatewayProvider(),
+        TestAuthProvider(user_id=USER_ID),
+        FastapiProvider(),  # Required for Request context
+    )
     yield container
     await container.close()
 
 
 @pytest.fixture
-def mock_auth():
-    """Mock authentication to return test user."""
-
-    def get_test_user():
-        return "test_user_123"
-
-    return get_test_user
+async def mock_kafka_bus(container):
+    """Get mock KafkaBus from container."""
+    async with container() as request_container:
+        kafka_bus = await request_container.get(KafkaBus)
+        yield kafka_bus
 
 
 @pytest.fixture
-def client_with_mocks(container, mock_auth):
-    """Create test client with mocked dependencies."""
+def client_with_mocks(container):
+    """Create test client with pure Dishka container."""
     app = create_app()
 
-    # Override authentication
-    app.dependency_overrides[get_current_user_id] = mock_auth
-
-    # Set up Dishka with test container
-    from dishka.integrations.fastapi import setup_dishka
-
+    # Set up Dishka with test container - this replaces the production container
     setup_dishka(container, app)
 
     with TestClient(app) as client:
         yield client
-
-    # Clean up overrides
-    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio

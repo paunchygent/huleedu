@@ -693,3 +693,10 @@ async def test_websocket_service_startup():
 - Update documentation as you go
 - Ensure backward compatibility for frontend clients
 - **Important**: The error handling and observability infrastructure is mature - use it, don't reinvent it
+
+## Update: API Gateway Authentication Issue
+
+During implementation, a critical issue was discovered with Dishka + FastAPI authentication integration:
+- Mixing `FromDishka[]` with `Depends()` causes parameter validation errors
+- See `/TASKS/API_GATEWAY_DISHKA_AUTH_SESSION_PROMPT.md` for next session
+- The API Gateway needs a clean authentication solution before other improvements

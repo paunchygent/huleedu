@@ -7,6 +7,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from huleedu_service_libs.error_handling.fastapi import register_error_handlers as register_fastapi_error_handlers
 from services.api_gateway_service.app.startup_setup import (
     create_di_container,
     setup_dependency_injection,
@@ -16,6 +17,7 @@ from services.api_gateway_service.config import settings
 
 from ..routers import batch_routes, class_routes, file_routes, status_routes
 from ..routers.health_routes import router as health_router
+from .middleware import CorrelationIDMiddleware
 from .rate_limiter import limiter
 
 
@@ -24,6 +26,12 @@ def create_app() -> FastAPI:
         title=settings.SERVICE_NAME,
         version="1.0.0",
     )
+
+    # Register error handlers
+    register_fastapi_error_handlers(app)
+
+    # Add Correlation ID Middleware (must be early in chain)
+    app.add_middleware(CorrelationIDMiddleware)
 
     # Add Rate Limiting Middleware
     app.state.limiter = limiter

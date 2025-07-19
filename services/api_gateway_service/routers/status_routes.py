@@ -1,21 +1,43 @@
 from __future__ import annotations
 
-from uuid import uuid4
+from uuid import UUID
 
-from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from httpx import AsyncClient, HTTPStatusError
+from dishka.integrations.fastapi import FromDishka, inject
+from fastapi import APIRouter
+from httpx import HTTPStatusError
 from pydantic import BaseModel, Field
 
 from common_core.status_enums import BatchClientStatus
+from huleedu_service_libs.error_handling import (
+    raise_authorization_error,
+    raise_external_service_error,
+    raise_resource_not_found,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 from services.api_gateway_service.config import settings
+from services.api_gateway_service.protocols import HttpClientProtocol, MetricsProtocol
 
-from .. import auth
-from ..app.metrics import GatewayMetrics
-
-router = APIRouter(route_class=DishkaRoute)
+router = APIRouter()
 logger = create_service_logger("api_gateway.status_routes")
+
+
+@router.get("/test/no-auth")
+@inject
+async def test_no_auth(
+    http_client: FromDishka[HttpClientProtocol],
+    metrics: FromDishka[MetricsProtocol],
+):
+    """Test endpoint without authentication."""
+    return {"message": "Success - no auth required"}
+
+
+@router.get("/test/with-auth")
+@inject
+async def test_with_auth(
+    user_id: FromDishka[str],
+):
+    """Test endpoint with authentication."""
+    return {"message": f"Success - authenticated as {user_id}"}
 
 
 class BatchStatusResponse(BaseModel):
@@ -26,19 +48,19 @@ class BatchStatusResponse(BaseModel):
 
 
 @router.get("/batches/{batch_id}/status", response_model=BatchStatusResponse)
+@inject
 async def get_batch_status(
-    request: Request,
     batch_id: str,
-    http_client: FromDishka[AsyncClient],
-    metrics: FromDishka[GatewayMetrics],
-    user_id: str = Depends(auth.get_current_user_id),
+    http_client: FromDishka[HttpClientProtocol],
+    metrics: FromDishka[MetricsProtocol],
+    user_id: FromDishka[str],  # Provided by AuthProvider.provide_user_id
+    correlation_id: FromDishka[UUID],  # Provided by AuthProvider.provide_correlation_id
 ):
     """Get batch status with strict ownership enforcement.
-    
+
     Acts as a pure proxy to the Result Aggregator Service which handles all
     status aggregation and any necessary fallback logic internally.
     """
-    correlation_id = getattr(request.state, "correlation_id", str(uuid4()))
     endpoint = f"/batches/{batch_id}/status"
 
     logger.info(
@@ -76,7 +98,15 @@ async def get_batch_status(
                     method="GET", endpoint=endpoint, http_status="403"
                 ).inc()
                 metrics.api_errors_total.labels(endpoint=endpoint, error_type="access_denied").inc()
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+                raise_authorization_error(
+                    service="api_gateway_service",
+                    operation="get_batch_status",
+                    message="Ownership violation: batch does not belong to user",
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
+                    requested_by=user_id,
+                    actual_owner=data.get("user_id"),
+                )
 
             # Remove internal user_id from client response
             data.pop("user_id", None)
@@ -85,9 +115,6 @@ async def get_batch_status(
             ).inc()
             return BatchStatusResponse(status=BatchClientStatus.AVAILABLE, details=data)
 
-        except HTTPException:
-            # Re-raise HTTPException without catching it
-            raise
         except HTTPStatusError as e:
             # Pure proxy behavior - simply propagate downstream errors
             # RAS now handles BOS fallback internally for consistency
@@ -104,23 +131,23 @@ async def get_batch_status(
 
             if e.response.status_code == 404:
                 metrics.api_errors_total.labels(endpoint=endpoint, error_type="not_found").inc()
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found"
-                ) from e
+                raise_resource_not_found(
+                    service="api_gateway_service",
+                    operation="get_batch_status",
+                    resource_type="batch",
+                    resource_id=batch_id,
+                    correlation_id=correlation_id,
+                )
             else:
                 metrics.api_errors_total.labels(
                     endpoint=endpoint, error_type="downstream_service_error"
                 ).inc()
-                raise HTTPException(
-                    status_code=e.response.status_code, detail=e.response.text
-                ) from e
+                raise_external_service_error(
+                    service="api_gateway_service",
+                    operation="get_batch_status",
+                    external_service="result_aggregator",
+                    message=f"Downstream service error: {e.response.text}",
+                    correlation_id=correlation_id,
+                    status_code=e.response.status_code,
+                )
 
-        except Exception as e:
-            logger.error(f"Unexpected error for batch {batch_id}: {e}", exc_info=True)
-            metrics.http_requests_total.labels(
-                method="GET", endpoint=endpoint, http_status="500"
-            ).inc()
-            metrics.api_errors_total.labels(endpoint=endpoint, error_type="internal_error").inc()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
-            ) from e

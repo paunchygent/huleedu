@@ -6,31 +6,43 @@ Implements secure file upload proxy to the File Service with proper authenticati
 
 from __future__ import annotations
 
+from uuid import UUID
+
 import httpx
-from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from dishka.integrations.fastapi import FromDishka, inject
+from fastapi import APIRouter, Request
+from starlette.datastructures import UploadFile
 from fastapi.responses import JSONResponse
 
+from huleedu_service_libs.error_handling import (
+    HuleEduError,
+    raise_authentication_error,
+    raise_connection_error,
+    raise_external_service_error,
+    raise_resource_not_found,
+    raise_timeout_error,
+    raise_unknown_error,
+    raise_validation_error,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 from services.api_gateway_service.config import settings
+from services.api_gateway_service.protocols import HttpClientProtocol, MetricsProtocol
 
-from ..app.metrics import GatewayMetrics
 from ..app.rate_limiter import limiter
-from ..auth import get_current_user_id
 
-router = APIRouter(route_class=DishkaRoute)
+router = APIRouter()
 logger = create_service_logger("api_gateway.file_routes")
 
 
 @router.post("/files/batch", status_code=201)
 @limiter.limit("5/minute")  # Lower limit for file uploads
+@inject
 async def upload_batch_files(
-    request: Request,  # Required for rate limiting
-    http_client: FromDishka[httpx.AsyncClient],
-    metrics: FromDishka[GatewayMetrics],
-    batch_id: str = Form(...),  # noqa: B008
-    files: list[UploadFile] = File(...),  # noqa: B008
-    user_id: str = Depends(get_current_user_id),  # noqa: B008
+    request: Request,  # Required for rate limiting and form parsing
+    http_client: FromDishka[HttpClientProtocol],
+    metrics: FromDishka[MetricsProtocol],
+    user_id: FromDishka[str],  # Provided by AuthProvider.provide_user_id
+    correlation_id: FromDishka[UUID],  # Provided by AuthProvider.provide_correlation_id
 ):
     """
     Proxy file uploads to the File Service with authentication and rate limiting.
@@ -38,7 +50,54 @@ async def upload_batch_files(
     Streams multipart/form-data directly to the File Service while adding
     authentication headers and comprehensive error handling.
     """
-    correlation_id = request.headers.get("x-correlation-id", "gateway-file-upload")
+    # Parse form data using FastAPI's native capabilities (not Dishka DI)
+    try:
+        form = await request.form()
+
+        # Extract and validate batch_id
+        batch_id = form.get("batch_id")
+        if not batch_id:
+            raise_validation_error(
+                service="api_gateway_service",
+                operation="upload_batch_files",
+                field="batch_id",
+                message="batch_id is required in form data",
+                correlation_id=correlation_id,
+            )
+
+        # Extract and validate files from form
+        files: list[UploadFile] = []
+        
+        # Get all files from the form - FastAPI can handle multiple files under same field name
+        form_files = form.getlist("files")
+        for file_item in form_files:
+            if isinstance(file_item, UploadFile):
+                files.append(file_item)
+
+        if not files:
+            raise_validation_error(
+                service="api_gateway_service",
+                operation="upload_batch_files",
+                field="files",
+                message="At least one file is required",
+                correlation_id=correlation_id,
+            )
+
+    except HuleEduError:
+        # Re-raise our structured errors
+        raise
+    except Exception as e:
+        # Wrap unexpected form parsing errors
+        logger.error(f"Form parsing failed: {e}", exc_info=True)
+        raise_validation_error(
+            service="api_gateway_service",
+            operation="upload_batch_files",
+            field="form",
+            message=f"Failed to parse form data: {str(e)}",
+            correlation_id=correlation_id,
+            error_type=type(e).__name__,
+        )
+
     endpoint = "/files/batch"
 
     logger.info(
@@ -54,17 +113,26 @@ async def upload_batch_files(
                 # Read file content - this could be memory intensive for large files
                 # In production, consider streaming implementation
                 content = await file.read()
-                files_data.append(("files", (file.filename, content, file.content_type)))
+                files_data.append(
+                    (
+                        "files",
+                        (
+                            file.filename or "unnamed",
+                            content,
+                            file.content_type or "application/octet-stream",
+                        ),
+                    )
+                )
 
             # Prepare form data
             form_data = {
-                "batch_id": batch_id,
+                "batch_id": str(batch_id),
             }
 
             # Add authentication header for file service
             headers = {
                 "X-User-ID": user_id,
-                "X-Correlation-ID": correlation_id,
+                "X-Correlation-ID": str(correlation_id),
             }
 
             # Forward request to file service
@@ -113,8 +181,12 @@ async def upload_batch_files(
                 metrics.api_errors_total.labels(
                     endpoint=endpoint, error_type="validation_error"
                 ).inc()
-                raise HTTPException(
-                    status_code=400, detail=error_data.get("detail", "File validation failed")
+                raise_validation_error(
+                    service="api_gateway_service",
+                    operation="upload_batch_files",
+                    field="files",
+                    message=error_data.get("detail", "File validation failed"),
+                    correlation_id=correlation_id,
                 )
             elif response.status_code == 403:
                 logger.warning(
@@ -124,9 +196,14 @@ async def upload_batch_files(
                     method="POST", endpoint=endpoint, http_status="403"
                 ).inc()
                 metrics.api_errors_total.labels(endpoint=endpoint, error_type="access_denied").inc()
-                raise HTTPException(
-                    status_code=403,
-                    detail="Access denied: You don't have permission to upload files to this batch",
+                raise_authentication_error(
+                    service="api_gateway_service",
+                    operation="upload_batch_files",
+                    message="Access denied: You don't have permission to upload files to this batch",
+                    correlation_id=correlation_id,
+                    reason="permission_denied",
+                    batch_id=batch_id,
+                    user_id=user_id,
                 )
             elif response.status_code == 404:
                 logger.warning(
@@ -136,7 +213,13 @@ async def upload_batch_files(
                     method="POST", endpoint=endpoint, http_status="404"
                 ).inc()
                 metrics.api_errors_total.labels(endpoint=endpoint, error_type="not_found").inc()
-                raise HTTPException(status_code=404, detail="Batch not found")
+                raise_resource_not_found(
+                    service="api_gateway_service",
+                    operation="upload_batch_files",
+                    resource_type="batch",
+                    resource_id=str(batch_id),
+                    correlation_id=correlation_id,
+                )
             else:
                 logger.error(
                     f"File service error: status={response.status_code}, "
@@ -148,7 +231,14 @@ async def upload_batch_files(
                 metrics.api_errors_total.labels(
                     endpoint=endpoint, error_type="downstream_service_error"
                 ).inc()
-                raise HTTPException(status_code=503, detail="File service temporarily unavailable")
+                raise_external_service_error(
+                    service="api_gateway_service",
+                    operation="upload_batch_files",
+                    external_service="file_service",
+                    message="File service temporarily unavailable",
+                    correlation_id=correlation_id,
+                    status_code=response.status_code,
+                )
 
         except httpx.TimeoutException:
             logger.error(
@@ -159,9 +249,13 @@ async def upload_batch_files(
                 method="POST", endpoint=endpoint, http_status="504"
             ).inc()
             metrics.api_errors_total.labels(endpoint=endpoint, error_type="timeout").inc()
-            raise HTTPException(
-                status_code=504, detail="File upload timeout - please try again with smaller files"
-            ) from None
+            raise_timeout_error(
+                service="api_gateway_service",
+                operation="upload_batch_files",
+                timeout_seconds=60.0,
+                message="File upload timeout - please try again with smaller files",
+                correlation_id=correlation_id,
+            )
         except httpx.RequestError as e:
             logger.error(
                 f"File service connection error: batch_id='{batch_id}', "
@@ -171,9 +265,15 @@ async def upload_batch_files(
                 method="POST", endpoint=endpoint, http_status="503"
             ).inc()
             metrics.api_errors_total.labels(endpoint=endpoint, error_type="connection_error").inc()
-            raise HTTPException(status_code=503, detail="File service connection failed") from e
-        except HTTPException:
-            # Re-raise HTTPException without wrapping it
+            raise_connection_error(
+                service="api_gateway_service",
+                operation="upload_batch_files",
+                target="file_service",
+                message=f"File service connection failed: {str(e)}",
+                correlation_id=correlation_id,
+            )
+        except HuleEduError:
+            # Re-raise HuleEduError without wrapping it
             raise
         except Exception as e:
             logger.error(
@@ -185,6 +285,11 @@ async def upload_batch_files(
                 method="POST", endpoint=endpoint, http_status="500"
             ).inc()
             metrics.api_errors_total.labels(endpoint=endpoint, error_type="internal_error").inc()
-            raise HTTPException(
-                status_code=500, detail="Internal server error during file upload"
-            ) from e
+            raise_unknown_error(
+                service="api_gateway_service",
+                operation="upload_batch_files",
+                message="Internal server error during file upload",
+                correlation_id=correlation_id,
+                error_type=type(e).__name__,
+                error_details=str(e),
+            )

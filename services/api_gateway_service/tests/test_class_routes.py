@@ -1,52 +1,19 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from unittest.mock import AsyncMock
-
-import httpx
 import pytest
-from dishka import Provider, Scope, make_async_container, provide
+from dishka import make_async_container
+from dishka.integrations.fastapi import FastapiProvider, setup_dishka
 from httpx import ASGITransport, AsyncClient, Response
-from prometheus_client import CollectorRegistry
 from respx import MockRouter
 
-from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.redis_client import RedisClient
 from services.api_gateway_service.app.main import create_app
-from services.api_gateway_service.app.metrics import GatewayMetrics
-from services.api_gateway_service.auth import get_current_user_id
 from services.api_gateway_service.config import settings
+from services.api_gateway_service.tests.test_provider import (
+    TestApiGatewayProvider,
+    TestAuthProvider,
+)
 
 USER_ID = "test-user-123"
-
-
-class MockApiGatewayProvider(Provider):
-    scope = Scope.APP
-
-    @provide
-    async def get_http_client(self) -> AsyncIterator[httpx.AsyncClient]:
-        async with httpx.AsyncClient() as client:
-            yield client
-
-    @provide
-    async def get_redis_client(self) -> AsyncIterator[RedisClient]:
-        client = AsyncMock(spec=RedisClient)
-        yield client
-
-    @provide
-    async def get_kafka_bus(self) -> AsyncIterator[KafkaBus]:
-        bus = AsyncMock(spec=KafkaBus)
-        yield bus
-
-    @provide
-    def provide_metrics(self) -> GatewayMetrics:
-        return GatewayMetrics()
-
-    @provide
-    def provide_registry(self) -> CollectorRegistry:
-        from prometheus_client import REGISTRY
-
-        return REGISTRY
 
 
 @pytest.fixture(autouse=True)
@@ -62,31 +29,26 @@ def _clear_prometheus_registry():
 
 @pytest.fixture
 async def container():
-    container = make_async_container(MockApiGatewayProvider())
+    """Create test container with standardized test providers."""
+    container = make_async_container(
+        TestApiGatewayProvider(),
+        TestAuthProvider(user_id=USER_ID),
+        FastapiProvider(),  # Required for Request context
+    )
     yield container
     await container.close()
 
 
 @pytest.fixture
-def mock_auth():
-    def get_test_user():
-        return USER_ID
-
-    return get_test_user
-
-
-@pytest.fixture
-async def client(container, mock_auth):
+async def client(container):
+    """Create test client with pure Dishka container."""
     app = create_app()
-    app.dependency_overrides[get_current_user_id] = mock_auth
-    from dishka.integrations.fastapi import setup_dishka
 
+    # Set up Dishka with test container - this replaces the production container
     setup_dishka(container, app)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
-
-    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio

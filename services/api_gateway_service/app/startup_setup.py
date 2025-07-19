@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dishka import make_async_container
-from dishka.integrations.fastapi import setup_dishka
+from dishka.integrations.fastapi import FastapiProvider, setup_dishka
 from fastapi import FastAPI
 
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import create_service_logger
+from services.api_gateway_service.app.auth_provider import AuthProvider
 from services.api_gateway_service.app.di import ApiGatewayProvider
 
 logger = create_service_logger("api_gateway_service.startup")
@@ -17,7 +18,11 @@ def create_di_container():
     """Create and configure the DI container."""
     try:
         logger.info("Creating DI container...")
-        container = make_async_container(ApiGatewayProvider())
+        container = make_async_container(
+            ApiGatewayProvider(),
+            AuthProvider(),
+            FastapiProvider(),  # Provides Request object to context
+        )
         logger.info("DI container created successfully")
         return container
     except Exception as e:

@@ -14,6 +14,7 @@ from huleedu_service_libs.error_handling.error_detail_factory import (
 from huleedu_service_libs.error_handling.factories import (
     raise_ai_feedback_service_error,
     raise_authentication_error,
+    raise_authorization_error,
     raise_circuit_breaker_open,
     raise_cj_assessment_service_error,
     raise_configuration_error,
@@ -40,6 +41,9 @@ from huleedu_service_libs.error_handling.factories import (
     raise_unknown_error,
     raise_validation_error,
 )
+# Framework-specific handlers moved to submodules:
+# - FastAPI handlers: from huleedu_service_libs.error_handling.fastapi import register_error_handlers
+# - Quart handlers: from huleedu_service_libs.error_handling.quart import register_error_handlers
 from huleedu_service_libs.error_handling.file_validation_factories import (
     raise_content_too_long,
     raise_content_too_short,
@@ -50,11 +54,7 @@ from huleedu_service_libs.error_handling.file_validation_factories import (
 )
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.error_handling.logging_utils import format_error_for_logging
-from huleedu_service_libs.error_handling.quart_handlers import (
-    create_error_response,
-    extract_correlation_id,
-    register_error_handlers,
-)
+# Quart handlers moved to submodule (see comment above)
 from huleedu_service_libs.error_handling.spellchecker_factories import (
     raise_spell_event_correlation_error,
 )
@@ -92,6 +92,7 @@ __all__ = [
     "raise_rate_limit_error",
     "raise_quota_exceeded",
     "raise_authentication_error",
+    "raise_authorization_error",
     "raise_invalid_api_key",
     "raise_invalid_request",
     "raise_invalid_response",
@@ -115,10 +116,7 @@ __all__ = [
     "raise_unknown_validation_error",
     # Spellchecker error factories
     "raise_spell_event_correlation_error",
-    # Quart integration
-    "register_error_handlers",
-    "create_error_response",
-    "extract_correlation_id",
+    # Framework-specific handlers moved to submodules (see imports above)
     # Testing utilities
     "assert_raises_huleedu_error",
     "ErrorCapture",

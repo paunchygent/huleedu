@@ -1,37 +1,63 @@
 from __future__ import annotations
 
 import pytest
+from dishka import make_async_container
+from dishka.integrations.fastapi import FastapiProvider, setup_dishka
 from httpx import ASGITransport, AsyncClient, Response
 from respx import MockRouter
 
-from services.api_gateway_service.app.main import create_app
-from services.api_gateway_service.auth import get_current_user_id
 from services.api_gateway_service.config import settings
+from services.api_gateway_service.tests.test_provider import (
+    TestApiGatewayProvider,
+    TestAuthProvider,
+)
 
 USER_ID = "test-user-123"
 BATCH_ID = "test-batch-abc-123"
 
 
 @pytest.fixture
-def mock_auth():
-    def get_test_user():
-        return USER_ID
+async def client():
+    """Create test client with pure Dishka container and test providers."""
+    # Create test container with all required providers
+    container = make_async_container(
+        TestApiGatewayProvider(),
+        TestAuthProvider(user_id=USER_ID),
+        FastapiProvider(),  # Required for Request context
+    )
 
-    return get_test_user
+    # Create app manually to have full control over setup
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
 
+    from huleedu_service_libs.error_handling.fastapi import register_error_handlers as register_fastapi_error_handlers
 
-@pytest.fixture
-async def client(unified_container, mock_auth):
-    app = create_app()
-    app.dependency_overrides[get_current_user_id] = mock_auth
-    from dishka.integrations.fastapi import setup_dishka
+    app = FastAPI(title="api_gateway_service_test")
+    register_fastapi_error_handlers(app)
 
-    setup_dishka(unified_container, app)
+    # Add middleware
+    from services.api_gateway_service.app.middleware import CorrelationIDMiddleware
+    app.add_middleware(CorrelationIDMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Include routers
+    from services.api_gateway_service.routers import status_routes
+
+    app.include_router(status_routes.router, prefix="/v1", tags=["Status"])
+
+    # Setup Dishka with test container
+    setup_dishka(container, app)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
-    app.dependency_overrides.clear()
+    await container.close()
 
 
 @pytest.mark.asyncio
@@ -63,7 +89,10 @@ async def test_get_batch_status_ownership_failure(client: AsyncClient, respx_moc
     response = await client.get(f"/v1/batches/{BATCH_ID}/status")
 
     assert response.status_code == 403
-    assert response.json() == {"detail": "Access denied"}
+    response_data = response.json()
+    assert "error" in response_data
+    assert response_data["error"]["code"] == "AUTHORIZATION_ERROR"
+    assert "ownership violation" in response_data["error"]["message"].lower()
 
 
 @pytest.mark.asyncio
@@ -76,4 +105,7 @@ async def test_get_batch_status_not_found(client: AsyncClient, respx_mock: MockR
     response = await client.get(f"/v1/batches/{BATCH_ID}/status")
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "Batch not found"
+    response_data = response.json()
+    assert "error" in response_data
+    assert response_data["error"]["code"] == "RESOURCE_NOT_FOUND"
+    assert "batch" in response_data["error"]["message"].lower() and "not found" in response_data["error"]["message"].lower()

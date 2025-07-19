@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from uuid import UUID, uuid4
+
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, Request
 from httpx import AsyncClient
 from starlette.responses import StreamingResponse
 
+from huleedu_service_libs.error_handling import raise_external_service_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from services.api_gateway_service.config import settings
 
@@ -79,7 +82,21 @@ async def proxy_class_requests(
                 f"Error proxying {request.method} request to {endpoint}: {e}", exc_info=True
             )
             metrics.http_requests_total.labels(
-                method=request.method, endpoint=endpoint, http_status="500"
+                method=request.method, endpoint=endpoint, http_status="503"
             ).inc()
             metrics.api_errors_total.labels(endpoint=endpoint, error_type="proxy_error").inc()
-            raise
+
+            correlation_id_str = request.headers.get("x-correlation-id", str(uuid4()))
+            try:
+                correlation_id = UUID(correlation_id_str)
+            except ValueError:
+                correlation_id = uuid4()
+            raise_external_service_error(
+                service="api_gateway_service",
+                operation=f"proxy_{request.method.lower()}_class_request",
+                external_service="class_management",
+                message=f"Error proxying request to class management service: {str(e)}",
+                correlation_id=correlation_id,
+                path=path,
+                method=request.method,
+            )

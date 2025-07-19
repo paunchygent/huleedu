@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from common_core import CircuitBreakerState, LLMProviderType
 from dishka import FromDishka
-from huleedu_service_libs.error_handling.quart_handlers import create_error_response
+from huleedu_service_libs.error_handling.quart import create_error_response
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.resilience import CircuitBreakerError, CircuitBreakerRegistry
 from quart import Blueprint, Response, jsonify, request

@@ -12,6 +12,7 @@ from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from services.api_gateway_service.app.metrics import GatewayMetrics
 from services.api_gateway_service.config import Settings, settings
+from services.api_gateway_service.protocols import HttpClientProtocol, MetricsProtocol
 
 
 class ApiGatewayProvider(Provider):
@@ -22,11 +23,11 @@ class ApiGatewayProvider(Provider):
         return settings
 
     @provide
-    async def get_http_client(self) -> AsyncIterator[httpx.AsyncClient]:
+    async def get_http_client(self, config: Settings) -> AsyncIterator[HttpClientProtocol]:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(
-                settings.HTTP_CLIENT_TIMEOUT_SECONDS,
-                connect=settings.HTTP_CLIENT_CONNECT_TIMEOUT_SECONDS,
+                config.HTTP_CLIENT_TIMEOUT_SECONDS,
+                connect=config.HTTP_CLIENT_CONNECT_TIMEOUT_SECONDS,
             )
         ) as client:
             yield client
@@ -48,7 +49,7 @@ class ApiGatewayProvider(Provider):
         await kafka_bus.stop()
 
     @provide(scope=Scope.APP)
-    def provide_metrics(self) -> GatewayMetrics:
+    def provide_metrics(self) -> MetricsProtocol:
         return GatewayMetrics()
 
     @provide(scope=Scope.APP)

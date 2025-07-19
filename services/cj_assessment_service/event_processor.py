@@ -22,9 +22,7 @@ from common_core.events.llm_provider_events import LLMComparisonResultV1
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import BatchStatus, ProcessingStage
-from huleedu_service_libs.error_handling.error_detail_factory import (
-    create_error_detail_with_context,
-)
+from huleedu_service_libs.error_handling import create_error_detail_with_context
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import (
     inject_trace_context,

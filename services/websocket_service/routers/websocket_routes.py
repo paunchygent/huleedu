@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
 import time
+from uuid import uuid4
 
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
+from huleedu_service_libs.error_handling import HuleEduError, raise_quota_exceeded
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.websocket_service.config import settings
 from services.websocket_service.metrics import WebSocketMetrics
 from services.websocket_service.protocols import (
     JWTValidatorProtocol,
@@ -35,15 +39,26 @@ async def websocket_endpoint(
     """
     start_time = time.time()
     user_id = None
+    correlation_id = uuid4()
 
     try:
         # Validate JWT token
-        user_id = await jwt_validator.validate_token(token)
-        if not user_id:
-            logger.warning("WebSocket connection rejected: invalid token")
+        try:
+            user_id = await jwt_validator.validate_token(token)
+        except HuleEduError as e:
+            logger.warning(f"WebSocket connection rejected: {e.error_detail.message}")
             metrics.jwt_validation_total.labels(result="invalid").inc()
             metrics.websocket_connections_total.labels(status="rejected").inc()
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
+
+            # Serialize error for WebSocket close reason (max 123 bytes)
+            error_json = json.dumps(
+                {
+                    "error_code": e.error_detail.error_code.value,
+                    "message": e.error_detail.message[:50],  # Truncate for size
+                    "correlation_id": str(e.error_detail.correlation_id),
+                }
+            )
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=error_json[:123])
             return
 
         metrics.jwt_validation_total.labels(result="success").inc()
@@ -52,8 +67,29 @@ async def websocket_endpoint(
         await websocket.accept()
         metrics.websocket_connections_total.labels(status="accepted").inc()
 
-        # Register the connection
-        await websocket_manager.connect(websocket, user_id)
+        # Register the connection - check for connection limit
+        success = await websocket_manager.connect(websocket, user_id)
+        if not success:
+            # Connection limit exceeded
+            try:
+                raise_quota_exceeded(
+                    service="websocket_service",
+                    operation="websocket_connect",
+                    quota_type="concurrent_connections",
+                    limit=settings.WEBSOCKET_MAX_CONNECTIONS_PER_USER,
+                    message=f"User {user_id} exceeded connection limit",
+                    correlation_id=correlation_id,
+                )
+            except HuleEduError as e:
+                error_json = json.dumps(
+                    {
+                        "error_code": e.error_detail.error_code.value,
+                        "message": "Connection limit exceeded",
+                    }
+                )
+                await websocket.close(code=4000, reason=error_json[:123])
+                return
+
         metrics.websocket_active_connections.labels(user_id=user_id).inc()
 
         logger.info(

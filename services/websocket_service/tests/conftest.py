@@ -37,7 +37,7 @@ class MockRedisClient:
         self.publish_calls: list[tuple[str, str, dict[str, Any]]] = []
         self._mock_pubsub = AsyncMock()
         self._mock_pubsub.get_message = AsyncMock(return_value=None)
-        
+
         # Add required AtomicRedisClientProtocol methods
         self.set_if_not_exists = AsyncMock(return_value=True)
         self.delete_key = AsyncMock(return_value=1)
@@ -60,7 +60,9 @@ class MockRedisClient:
         self.subscribe_calls.append(channel)
         yield self._mock_pubsub
 
-    async def publish_user_notification(self, user_id: str, event_type: str, data: dict[str, Any]) -> int:
+    async def publish_user_notification(
+        self, user_id: str, event_type: str, data: dict[str, Any]
+    ) -> int:
         """Mock publishing notifications."""
         self.publish_calls.append((user_id, event_type, data))
         return 1
@@ -139,7 +141,9 @@ class MockJWTValidator:
 class MockMessageListener:
     """Mock message listener for testing."""
 
-    def __init__(self, redis_client: AtomicRedisClientProtocol, websocket_manager: WebSocketManagerProtocol) -> None:
+    def __init__(
+        self, redis_client: AtomicRedisClientProtocol, websocket_manager: WebSocketManagerProtocol
+    ) -> None:
         self.redis_client = redis_client
         self.websocket_manager = websocket_manager
         self.start_listening_calls: list[tuple[str, Any]] = []
@@ -159,7 +163,12 @@ class MockWebSocketServiceProvider(Provider):
 
     scope = Scope.APP
 
-    def __init__(self, redis_client: MockRedisClient | None = None, websocket_manager: MockWebSocketManager | None = None, jwt_validator: MockJWTValidator | None = None) -> None:
+    def __init__(
+        self,
+        redis_client: MockRedisClient | None = None,
+        websocket_manager: MockWebSocketManager | None = None,
+        jwt_validator: MockJWTValidator | None = None,
+    ) -> None:
         super().__init__()
         self._redis_client = redis_client or MockRedisClient()
         self._websocket_manager = websocket_manager or MockWebSocketManager()
@@ -229,7 +238,11 @@ def mock_jwt_validator() -> MockJWTValidator:
 
 
 @pytest.fixture
-async def test_container(mock_redis_client: MockRedisClient, mock_websocket_manager: MockWebSocketManager, mock_jwt_validator: MockJWTValidator) -> AsyncIterator[AsyncContainer]:
+async def test_container(
+    mock_redis_client: MockRedisClient,
+    mock_websocket_manager: MockWebSocketManager,
+    mock_jwt_validator: MockJWTValidator,
+) -> AsyncIterator[AsyncContainer]:
     """Create test DI container with mocks."""
     provider = MockWebSocketServiceProvider(
         redis_client=mock_redis_client,

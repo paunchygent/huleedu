@@ -6,23 +6,23 @@ Implements secure batch command processing using proper common_core contracts.
 
 from __future__ import annotations
 
-from uuid import uuid4
+from uuid import UUID
 
-from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from dishka.integrations.fastapi import FromDishka, inject
+from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, Field
 
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
 from common_core.pipeline_models import PhaseName
+from huleedu_service_libs.error_handling import raise_kafka_publish_error, raise_validation_error
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from ..app.metrics import GatewayMetrics
 from ..app.rate_limiter import limiter
-from ..auth import get_current_user_id
 
-router = APIRouter(route_class=DishkaRoute)
+router = APIRouter()
 logger = create_service_logger("api_gateway.batch_routes")
 
 
@@ -56,13 +56,15 @@ class BatchPipelineRequest(BaseModel):
 
 @router.post("/batches/{batch_id}/pipelines", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("10/minute")
+@inject
 async def request_pipeline_execution(
     request: Request,  # Required for rate limiting
     batch_id: str,
     pipeline_request: BatchPipelineRequest,
     kafka_bus: FromDishka[KafkaBus],
     metrics: FromDishka[GatewayMetrics],
-    user_id: str = Depends(get_current_user_id),  # noqa: B008
+    user_id: FromDishka[str],  # Provided by AuthProvider.provide_user_id
+    correlation_id: FromDishka[UUID],  # Provided by AuthProvider.provide_correlation_id
 ):
     """
     Request pipeline execution for a batch with comprehensive validation and security.
@@ -70,7 +72,6 @@ async def request_pipeline_execution(
     Uses proper ClientBatchPipelineRequestV1 contract from common_core and publishes
     events in EventEnvelope format to the correct Kafka topic.
     """
-    correlation_id = uuid4()
     endpoint = f"/batches/{batch_id}/pipelines"
 
     # Start request timing
@@ -88,9 +89,14 @@ async def request_pipeline_execution(
                 metrics.api_errors_total.labels(
                     endpoint=endpoint, error_type="validation_error"
                 ).inc()
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Batch ID in path must match batch ID in request body",
+                raise_validation_error(
+                    service="api_gateway_service",
+                    operation="request_pipeline_execution",
+                    field="batch_id",
+                    message="Batch ID in path must match batch ID in request body",
+                    correlation_id=correlation_id,
+                    value=pipeline_request.batch_id,
+                    expected=batch_id,
                 )
 
             # Construct ClientBatchPipelineRequestV1 with authenticated user_id
@@ -150,9 +156,6 @@ async def request_pipeline_execution(
                 "correlation_id": str(correlation_id),
             }
 
-        except HTTPException:
-            # Re-raise HTTPException without wrapping it
-            raise
         except Exception as e:
             logger.error(
                 f"Failed to publish pipeline request: batch_id='{batch_id}', "
@@ -165,7 +168,12 @@ async def request_pipeline_execution(
             metrics.api_errors_total.labels(
                 endpoint=endpoint, error_type="kafka_publish_error"
             ).inc()
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Failed to process pipeline request",
-            ) from e
+            raise_kafka_publish_error(
+                service="api_gateway_service",
+                operation="request_pipeline_execution",
+                topic="huleedu.commands.batch.pipeline.v1",
+                message=f"Failed to publish pipeline request: {str(e)}",
+                correlation_id=correlation_id,
+                batch_id=batch_id,
+                user_id=user_id,
+            )
