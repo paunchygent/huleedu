@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class WebSocketManagerProtocol(Protocol):
@@ -8,11 +8,11 @@ class WebSocketManagerProtocol(Protocol):
     Protocol for managing WebSocket connections.
     """
 
-    async def connect(self, websocket, user_id: str) -> None:
+    async def connect(self, websocket: Any, user_id: str) -> None:
         """Add a new WebSocket connection for a user."""
         ...
 
-    async def disconnect(self, websocket, user_id: str) -> None:
+    async def disconnect(self, websocket: Any, user_id: str) -> None:
         """Remove a WebSocket connection for a user."""
         ...
 
@@ -50,7 +50,7 @@ class MessageListenerProtocol(Protocol):
     Protocol for listening to messages from Redis pub/sub.
     """
 
-    async def start_listening(self, user_id: str, websocket) -> None:
+    async def start_listening(self, user_id: str, websocket: Any) -> None:
         """
         Start listening for messages for a specific user and forward them to the WebSocket.
         This should handle the entire lifecycle of the listener.

@@ -7,7 +7,9 @@ Tests the core implementations: WebSocketManager, JWTValidator, and MessageListe
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import jwt
@@ -23,7 +25,7 @@ class TestWebSocketManager:
     """Test suite for WebSocket connection manager."""
 
     @pytest.mark.asyncio
-    async def test_connect_new_user(self):
+    async def test_connect_new_user(self) -> None:
         """Test connecting a new user."""
         manager = WebSocketManager(max_connections_per_user=3)
         ws = AsyncMock(spec=WebSocket)
@@ -34,7 +36,7 @@ class TestWebSocketManager:
         assert manager.get_total_connections() == 1
 
     @pytest.mark.asyncio
-    async def test_connect_multiple_connections_same_user(self):
+    async def test_connect_multiple_connections_same_user(self) -> None:
         """Test multiple connections for the same user."""
         manager = WebSocketManager(max_connections_per_user=3)
         ws1 = AsyncMock(spec=WebSocket)
@@ -49,7 +51,7 @@ class TestWebSocketManager:
         assert manager.get_total_connections() == 3
 
     @pytest.mark.asyncio
-    async def test_connect_exceeds_limit(self):
+    async def test_connect_exceeds_limit(self) -> None:
         """Test connection limit enforcement."""
         manager = WebSocketManager(max_connections_per_user=2)
         ws1 = AsyncMock(spec=WebSocket)
@@ -65,7 +67,7 @@ class TestWebSocketManager:
         assert manager.get_connection_count("user123") == 2
 
     @pytest.mark.asyncio
-    async def test_disconnect_existing_connection(self):
+    async def test_disconnect_existing_connection(self) -> None:
         """Test disconnecting an existing connection."""
         manager = WebSocketManager()
         ws = AsyncMock(spec=WebSocket)
@@ -77,7 +79,7 @@ class TestWebSocketManager:
         assert manager.get_total_connections() == 0
 
     @pytest.mark.asyncio
-    async def test_disconnect_non_existent_connection(self):
+    async def test_disconnect_non_existent_connection(self) -> None:
         """Test disconnecting a non-existent connection."""
         manager = WebSocketManager()
         ws = AsyncMock(spec=WebSocket)
@@ -88,7 +90,7 @@ class TestWebSocketManager:
         assert manager.get_connection_count("user123") == 0
 
     @pytest.mark.asyncio
-    async def test_send_message_to_user_with_connections(self):
+    async def test_send_message_to_user_with_connections(self) -> None:
         """Test sending message to user with active connections."""
         manager = WebSocketManager()
         ws1 = AsyncMock(spec=WebSocket)
@@ -104,7 +106,7 @@ class TestWebSocketManager:
         ws2.send_text.assert_called_once_with("test message")
 
     @pytest.mark.asyncio
-    async def test_send_message_to_user_no_connections(self):
+    async def test_send_message_to_user_no_connections(self) -> None:
         """Test sending message to user with no connections."""
         manager = WebSocketManager()
 
@@ -113,7 +115,7 @@ class TestWebSocketManager:
         assert sent_count == 0
 
     @pytest.mark.asyncio
-    async def test_send_message_with_failed_connection(self):
+    async def test_send_message_with_failed_connection(self) -> None:
         """Test sending message when some connections fail."""
         manager = WebSocketManager()
         ws1 = AsyncMock(spec=WebSocket)
@@ -129,7 +131,7 @@ class TestWebSocketManager:
         assert manager.get_connection_count("user123") == 1
 
     @pytest.mark.asyncio
-    async def test_multiple_users_isolation(self):
+    async def test_multiple_users_isolation(self) -> None:
         """Test that different users' connections are isolated."""
         manager = WebSocketManager()
         ws1 = AsyncMock(spec=WebSocket)
@@ -147,7 +149,7 @@ class TestJWTValidator:
     """Test suite for JWT token validator."""
 
     @pytest.mark.asyncio
-    async def test_validate_valid_token(self):
+    async def test_validate_valid_token(self) -> None:
         """Test validation of a valid JWT token."""
         secret = "test-secret"
         validator = JWTValidator(secret_key=secret)
@@ -164,7 +166,7 @@ class TestJWTValidator:
         assert user_id == "user123"
 
     @pytest.mark.asyncio
-    async def test_validate_expired_token(self):
+    async def test_validate_expired_token(self) -> None:
         """Test validation of an expired token."""
         secret = "test-secret"
         validator = JWTValidator(secret_key=secret)
@@ -181,7 +183,7 @@ class TestJWTValidator:
         assert user_id is None
 
     @pytest.mark.asyncio
-    async def test_validate_token_missing_exp(self):
+    async def test_validate_token_missing_exp(self) -> None:
         """Test validation of token without expiration."""
         secret = "test-secret"
         validator = JWTValidator(secret_key=secret)
@@ -195,7 +197,7 @@ class TestJWTValidator:
         assert user_id is None
 
     @pytest.mark.asyncio
-    async def test_validate_token_missing_sub(self):
+    async def test_validate_token_missing_sub(self) -> None:
         """Test validation of token without subject."""
         secret = "test-secret"
         validator = JWTValidator(secret_key=secret)
@@ -211,7 +213,7 @@ class TestJWTValidator:
         assert user_id is None
 
     @pytest.mark.asyncio
-    async def test_validate_invalid_signature(self):
+    async def test_validate_invalid_signature(self) -> None:
         """Test validation of token with invalid signature."""
         validator = JWTValidator(secret_key="correct-secret")
 
@@ -227,7 +229,7 @@ class TestJWTValidator:
         assert user_id is None
 
     @pytest.mark.asyncio
-    async def test_validate_malformed_token(self):
+    async def test_validate_malformed_token(self) -> None:
         """Test validation of malformed token."""
         validator = JWTValidator(secret_key="test-secret")
 
@@ -240,7 +242,7 @@ class TestRedisMessageListener:
     """Test suite for Redis message listener."""
 
     @pytest.mark.asyncio
-    async def test_start_listening_successful(self):
+    async def test_start_listening_successful(self) -> None:
         """Test successful message listening setup."""
         redis_client = MagicMock()
         redis_client.get_user_channel.return_value = "ws:user123"
@@ -249,7 +251,7 @@ class TestRedisMessageListener:
         mock_pubsub = AsyncMock()
         mock_pubsub.get_message = AsyncMock(return_value=None)
 
-        async def mock_subscribe(channel):
+        async def mock_subscribe(channel: str) -> AsyncIterator[Any]:
             yield mock_pubsub
 
         redis_client.subscribe = mock_subscribe
@@ -266,7 +268,7 @@ class TestRedisMessageListener:
         redis_client.get_user_channel.assert_called_with("user123")
 
     @pytest.mark.asyncio
-    async def test_message_forwarding(self):
+    async def test_message_forwarding(self) -> None:
         """Test forwarding messages from Redis to WebSocket."""
         redis_client = MagicMock()
         redis_client.get_user_channel.return_value = "ws:user123"
@@ -280,7 +282,7 @@ class TestRedisMessageListener:
         mock_pubsub = AsyncMock()
         mock_pubsub.get_message = AsyncMock(side_effect=[test_message, None])
 
-        async def mock_subscribe(channel):
+        async def mock_subscribe(channel: str) -> AsyncIterator[Any]:
             yield mock_pubsub
 
         redis_client.subscribe = mock_subscribe

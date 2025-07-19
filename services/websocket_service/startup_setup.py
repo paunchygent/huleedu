@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
+
 from dishka import make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from huleedu_service_libs.logging_utils import create_service_logger
+
 try:
     from opentelemetry import trace
     from opentelemetry.exporter.jaeger.thrift import JaegerExporter
@@ -11,6 +14,7 @@ try:
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
     TRACING_AVAILABLE = True
 except ImportError:
     TRACING_AVAILABLE = False
@@ -21,20 +25,20 @@ from services.websocket_service.di import WebSocketServiceProvider
 logger = create_service_logger("websocket.startup")
 
 
-def create_di_container():
+def create_di_container() -> Any:
     """Create the dependency injection container."""
     logger.info("Creating DI container")
     container = make_async_container(WebSocketServiceProvider())
     return container
 
 
-def setup_dependency_injection(app: FastAPI, container):
+def setup_dependency_injection(app: FastAPI, container: Any) -> None:
     """Setup Dishka dependency injection for FastAPI."""
     logger.info("Setting up dependency injection")
     setup_dishka(container, app)
 
 
-def setup_tracing(app: FastAPI):
+def setup_tracing(app: FastAPI) -> None:
     """Setup distributed tracing with Jaeger."""
     logger.info("Setting up distributed tracing")
 

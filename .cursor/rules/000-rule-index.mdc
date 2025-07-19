@@ -21,10 +21,11 @@ alwaysApply: false
   - [020.7-cj-assessment-service.mdc](mdc:020.7-cj-assessment-service.mdc): CJ Assessment Service
   - [020.8-batch-conductor-service.mdc](mdc:020.8-batch-conductor-service.mdc): Batch Conductor Service
   - [020.9-class-management-service.mdc](mdc:020.9-class-management-service.mdc): Class Management Service
-  - [020.10-api-gateway-and-websocket-service.mdc](mdc:020.10-api-gateway-and-websocket-service.mdc): API Gateway & WebSocket Service
+  - [020.10-api-gateway.mdc](mdc:020.10-api-gateway.mdc): API Gateway Service
   - [020.11-service-libraries-architecture.mdc](mdc:020.11-service-libraries-architecture.mdc): Service Libraries (Kafka, Redis, Logging)
   - [020.12-result-aggregator-service-architecture.mdc](mdc:020.12-result-aggregator-service-architecture.mdc): Result Aggregator Service
   - [020.13-llm-provider-service-architecture.mdc](mdc:020.13-llm-provider-service-architecture.mdc): LLM Provider Service (Centralized provider abstraction with queue resilience)
+  - [020.14-websocket-service.mdc](mdc:020.14-websocket-service.mdc): WebSocket Service
 - [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc): Event-driven communication standards
 
 ## Implementation & Coding Standards

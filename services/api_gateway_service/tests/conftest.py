@@ -67,7 +67,7 @@ class UnifiedMockApiGatewayProvider(Provider):
 
                 def get_user_channel(self, user_id):
                     self.get_user_channel_calls.append(user_id)
-                    return f"ws:{user_id}"
+                    return f"user:{user_id}"
 
                 async def subscribe(self, channel_name):
                     self.subscribe_calls.append(channel_name)
@@ -100,7 +100,7 @@ class UnifiedMockApiGatewayProvider(Provider):
 
 @pytest.fixture
 def mock_redis_client():
-    """Mock Redis client fixture for WebSocket and other tests."""
+    """Mock Redis client fixture for tests."""
 
     # Create a simple mock object that tracks calls manually
     class MockRedisClient:
@@ -112,7 +112,7 @@ def mock_redis_client():
 
         def get_user_channel(self, user_id):
             self.get_user_channel_calls.append(user_id)
-            return f"ws:{user_id}"
+            return f"user:{user_id}"
 
         async def subscribe(self, channel_name):
             self.subscribe_calls.append(channel_name)

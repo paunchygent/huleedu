@@ -42,12 +42,6 @@ class GatewayMetrics:
             ["service", "method", "endpoint"],
             registry=registry,
         )
-        self.websocket_connections_total = Counter(
-            "gateway_websocket_connections_total",
-            "Total number of WebSocket connections established.",
-            ["status"],
-            registry=registry,
-        )
         self.api_errors_total = Counter(
             "gateway_api_errors_total",
             "Total number of API errors.",

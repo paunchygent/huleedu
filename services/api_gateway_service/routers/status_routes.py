@@ -33,7 +33,11 @@ async def get_batch_status(
     metrics: FromDishka[GatewayMetrics],
     user_id: str = Depends(auth.get_current_user_id),
 ):
-    """Get batch status with strict ownership enforcement."""
+    """Get batch status with strict ownership enforcement.
+    
+    Acts as a pure proxy to the Result Aggregator Service which handles all
+    status aggregation and any necessary fallback logic internally.
+    """
     correlation_id = getattr(request.state, "correlation_id", str(uuid4()))
     endpoint = f"/batches/{batch_id}/status"
 

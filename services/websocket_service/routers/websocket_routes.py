@@ -26,7 +26,7 @@ async def websocket_endpoint(
     message_listener: FromDishka[MessageListenerProtocol],
     metrics: FromDishka[WebSocketMetrics],
     token: str = Query(..., description="JWT token for authentication"),
-):
+) -> None:
     """
     Main WebSocket endpoint for real-time notifications.
 

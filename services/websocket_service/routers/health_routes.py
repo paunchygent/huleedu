@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
+from typing import Any
 
 from dishka.integrations.fastapi import FromDishka, inject
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, HTTPException, Response
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
-from prometheus_client import REGISTRY, generate_latest
+from prometheus_client import CollectorRegistry, generate_latest
 
 from services.websocket_service.config import settings
 from services.websocket_service.protocols import WebSocketManagerProtocol
@@ -18,7 +19,7 @@ SERVICE_START_TIME = time.time()
 
 
 @router.get("/healthz")
-async def health_check():
+async def health_check() -> dict[str, Any]:
     """Basic health check endpoint."""
     return {
         "service": settings.SERVICE_NAME,
@@ -33,7 +34,7 @@ async def health_check():
 @inject
 async def redis_health(
     redis_client: FromDishka[AtomicRedisClientProtocol],
-):
+) -> dict[str, Any]:
     """Check Redis connectivity health."""
     try:
         # Test Redis connectivity
@@ -47,13 +48,13 @@ async def redis_health(
             ),  # Mask credentials
         }
     except Exception as e:
-        return Response(
-            content={
+        raise HTTPException(
+            status_code=503,
+            detail={
                 "service": "redis",
                 "status": "unhealthy",
                 "error": str(e),
             },
-            status_code=503,
         )
 
 
@@ -61,7 +62,7 @@ async def redis_health(
 @inject
 async def websocket_health(
     websocket_manager: FromDishka[WebSocketManagerProtocol],
-):
+) -> dict[str, Any]:
     """Check WebSocket manager health."""
     total_connections = websocket_manager.get_total_connections()
 
@@ -74,9 +75,12 @@ async def websocket_health(
 
 
 @router.get("/metrics")
-async def get_metrics():
+@inject
+async def get_metrics(
+    registry: FromDishka[CollectorRegistry],
+) -> Response:
     """Prometheus metrics endpoint."""
     return Response(
-        generate_latest(REGISTRY),
+        generate_latest(registry),
         media_type="text/plain",
     )

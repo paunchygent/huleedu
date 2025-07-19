@@ -8,19 +8,28 @@ connection management, and error scenarios.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any, AsyncIterator, Callable
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from fastapi.websockets import WebSocketDisconnect
+
+if TYPE_CHECKING:
+    from services.websocket_service.tests.conftest import (
+        MockJWTValidator,
+        MockRedisClient,
+        MockWebSocketManager,
+    )
 
 
 class TestWebSocketRoutes:
     """Test suite for WebSocket routes with comprehensive coverage."""
 
     def test_websocket_successful_connection_with_valid_token(
-        self, create_test_app, mock_redis_client, mock_websocket_manager, mock_jwt_validator
-    ):
+        self, create_test_app: Callable[[], FastAPI], mock_redis_client: MockRedisClient, mock_websocket_manager: MockWebSocketManager, mock_jwt_validator: MockJWTValidator
+    ) -> None:
         """Test successful WebSocket connection with valid JWT token."""
         app = create_test_app()
 
@@ -40,7 +49,7 @@ class TestWebSocketRoutes:
         assert "test_user" in mock_redis_client.get_user_channel_calls
         assert "ws:test_user" in mock_redis_client.subscribe_calls
 
-    def test_websocket_rejection_with_invalid_token(self, create_test_app, mock_jwt_validator):
+    def test_websocket_rejection_with_invalid_token(self, create_test_app: Callable[[], FastAPI], mock_jwt_validator: MockJWTValidator) -> None:
         """Test WebSocket connection rejection with invalid JWT token."""
         app = create_test_app()
 
@@ -55,7 +64,7 @@ class TestWebSocketRoutes:
         # Verify JWT validation was attempted
         assert "invalid_token" in mock_jwt_validator.validate_calls
 
-    def test_websocket_rejection_with_missing_token(self, create_test_app):
+    def test_websocket_rejection_with_missing_token(self, create_test_app: Callable[[], FastAPI]) -> None:
         """Test WebSocket connection rejection when token is missing."""
         app = create_test_app()
 
@@ -66,8 +75,8 @@ class TestWebSocketRoutes:
                     pass
 
     def test_websocket_message_forwarding_from_redis(
-        self, create_test_app, mock_redis_client, mock_websocket_manager
-    ):
+        self, create_test_app: Callable[[], FastAPI], mock_redis_client: MockRedisClient, mock_websocket_manager: MockWebSocketManager
+    ) -> None:
         """Test message forwarding from Redis to WebSocket client."""
         app = create_test_app()
 
@@ -88,7 +97,7 @@ class TestWebSocketRoutes:
         # Note: Due to async nature and mocking, actual message forwarding
         # is tested in integration tests
 
-    def test_websocket_connection_limit_per_user(self, create_test_app, mock_websocket_manager):
+    def test_websocket_connection_limit_per_user(self, create_test_app: Callable[[], FastAPI], mock_websocket_manager: MockWebSocketManager) -> None:
         """Test connection limit enforcement per user."""
         app = create_test_app()
 
@@ -103,8 +112,8 @@ class TestWebSocketRoutes:
         assert len(mock_websocket_manager.connect_calls) == 1
 
     def test_websocket_graceful_disconnect_cleanup(
-        self, create_test_app, mock_websocket_manager, mock_redis_client
-    ):
+        self, create_test_app: Callable[[], FastAPI], mock_websocket_manager: MockWebSocketManager, mock_redis_client: MockRedisClient
+    ) -> None:
         """Test proper resource cleanup on WebSocket disconnect."""
         app = create_test_app()
 
@@ -117,18 +126,18 @@ class TestWebSocketRoutes:
         assert len(mock_websocket_manager.disconnect_calls) == 1
         assert mock_websocket_manager.disconnect_calls[0][1] == "test_user"
 
-    def test_websocket_redis_connection_error_handling(self, create_test_app, mock_redis_client):
+    def test_websocket_redis_connection_error_handling(self, create_test_app: Callable[[], FastAPI], mock_redis_client: MockRedisClient) -> None:
         """Test handling of Redis connection errors."""
         app = create_test_app()
 
         # Configure Redis to fail
-        async def failing_subscribe(channel_name):
+        async def failing_subscribe(channel_name: str) -> AsyncIterator[Any]:
             mock_redis_client.subscribe_calls.append(channel_name)
             if False:
                 yield
             raise ConnectionError("Redis connection failed")
 
-        mock_redis_client.subscribe = failing_subscribe
+        setattr(mock_redis_client, 'subscribe', failing_subscribe)
 
         with TestClient(app) as client:
             # Connection should handle Redis errors gracefully
@@ -138,7 +147,7 @@ class TestWebSocketRoutes:
         # Verify subscription was attempted
         assert "ws:test_user" in mock_redis_client.subscribe_calls
 
-    def test_websocket_concurrent_connections(self, create_test_app, mock_websocket_manager):
+    def test_websocket_concurrent_connections(self, create_test_app: Callable[[], FastAPI], mock_websocket_manager: MockWebSocketManager) -> None:
         """Test handling of multiple concurrent connections for same user."""
         app = create_test_app()
 
@@ -154,13 +163,13 @@ class TestWebSocketRoutes:
         assert all(call[1] == "test_user" for call in mock_websocket_manager.connect_calls)
 
     def test_websocket_different_users_isolation(
-        self, create_test_app, mock_websocket_manager, mock_jwt_validator, mock_redis_client
-    ):
+        self, create_test_app: Callable[[], FastAPI], mock_websocket_manager: MockWebSocketManager, mock_jwt_validator: MockJWTValidator, mock_redis_client: MockRedisClient
+    ) -> None:
         """Test that different users have isolated channels."""
         app = create_test_app()
 
         # Configure validator to return different users
-        async def multi_user_validate(token):
+        async def multi_user_validate(token: str) -> str | None:
             mock_jwt_validator.validate_calls.append(token)
             if token == "token1":
                 return "user1"
@@ -168,7 +177,7 @@ class TestWebSocketRoutes:
                 return "user2"
             return None
 
-        mock_jwt_validator.validate_token = multi_user_validate
+        setattr(mock_jwt_validator, 'validate_token', multi_user_validate)
 
         with TestClient(app) as client:
             with client.websocket_connect("/ws/?token=token1") as ws1:
@@ -182,7 +191,7 @@ class TestWebSocketRoutes:
         assert "ws:user1" in mock_redis_client.subscribe_calls
         assert "ws:user2" in mock_redis_client.subscribe_calls
 
-    def test_websocket_metrics_tracking(self, create_test_app, mock_jwt_validator):
+    def test_websocket_metrics_tracking(self, create_test_app: Callable[[], FastAPI], mock_jwt_validator: MockJWTValidator) -> None:
         """Test that WebSocket metrics are properly tracked."""
         app = create_test_app()
 

@@ -9,24 +9,22 @@ The API Gateway Service is a FastAPI-based microservice that provides client-fac
 - **Framework**: FastAPI + uvicorn (client-facing optimization)
 - **Communication**: HTTP API for React frontend, Kafka for batch commands, HTTP proxy for file uploads
 - **Port**: 4001 (client-facing)
-- **Features**: CORS, OpenAPI docs, rate limiting, JWT authentication, WebSocket support, Anti-Corruption Layer
+- **Features**: CORS, OpenAPI docs, rate limiting, JWT authentication
 
 ## Key Responsibilities
 
 1. **Client API**: Secure HTTP endpoints for React frontend
 2. **Batch Commands**: Kafka event publishing using proper `ClientBatchPipelineRequestV1` contracts
 3. **File Upload Proxy**: Secure file upload proxy to File Service with authentication headers
-4. **Real-time Updates**: WebSocket connections for live batch status updates
-5. **Class Management Proxy**: Complete proxy to Class Management Service API
-6. **Security**: Authentication, rate limiting, CORS, input validation
-7. **Anti-Corruption Layer**: Transforms internal backend schemas to stable client contracts
+4. **Class Management Proxy**: Complete proxy to Class Management Service API
+5. **Security**: Authentication, rate limiting, CORS, input validation
 
 ## API Endpoints
 
 ### Batch Management
 
 - `POST /v1/batches/{batch_id}/pipelines` - Request pipeline execution (uses `ClientBatchPipelineRequestV1`)
-- `GET /v1/batches/{batch_id}/status` - Get batch status with ownership validation and ACL transformation
+- `GET /v1/batches/{batch_id}/status` - Get batch status with ownership validation (proxy to Result Aggregator Service)
 - `GET /v1/batches/{batch_id}/validation-status` - Get validation status for student associations
 
 ### File Operations  
@@ -39,10 +37,6 @@ The API Gateway Service is a FastAPI-based microservice that provides client-fac
   - Supports all HTTP methods (GET, POST, PUT, DELETE)
   - Headers and query parameters are forwarded
   - Authentication headers are passed through
-
-### Real-time Communication
-
-- `WebSocket /ws/v1/status/{client_id}` - Real-time batch status updates (requires JWT token in query parameter)
 
 ### Service Management
 
@@ -57,7 +51,6 @@ The API Gateway Service is a FastAPI-based microservice that provides client-fac
 
 - All endpoints require valid JWT tokens
 - User ownership validation for batch operations
-- Secure WebSocket authentication via query parameters
 
 ### Rate Limiting
 
@@ -79,24 +72,13 @@ Uses proper shared contracts from `common_core`:
 - **Pipeline Commands**: `ClientBatchPipelineRequestV1` with user context and retry support
 - **Event Publishing**: `EventEnvelope` format to `huleedu.commands.batch.pipeline.v1` topic
 - **Validation**: Student association handling for class-based batches
-- **ACL Transformation**: Converts BOS `ProcessingPipelineState` to RAS `BatchStatusResponse` during fallback
 
-## React Frontend Integration
+## Svelte Frontend Integration
 
 ### CORS Configuration
 
 - Development: `http://localhost:3000`, `http://localhost:3001`
 - Production: Configurable via `API_GATEWAY_CORS_ORIGINS`
-
-### WebSocket Integration
-
-```javascript
-const ws = new WebSocket(`ws://localhost:4001/ws?token=${jwtToken}`);
-ws.onmessage = (event) => {
-  const update = JSON.parse(event.data);
-  // Handle batch_phase_concluded, file_added, etc.
-};
-```
 
 ### File Upload
 
@@ -173,10 +155,6 @@ Environment variables (prefix: `API_GATEWAY_`):
 - File Service: `/v1/files/batch` (file uploads)
 - Class Management Service: `/v1/classes/*` (all class operations)
 
-**Real-time**:
-
-- Redis Pub/Sub: User-specific channels for WebSocket updates
-
 **Consumed by**: React Frontend Applications
 
 ## Monitoring
@@ -189,4 +167,4 @@ Environment variables (prefix: `API_GATEWAY_`):
 ---
 
 **Status**: ✅ **IMPLEMENTATION COMPLETE**  
-**Features**: Batch commands, file uploads, class management proxy, WebSocket support, comprehensive testing
+**Features**: Batch commands, file uploads, class management proxy, comprehensive testing

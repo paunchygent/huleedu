@@ -38,7 +38,7 @@ class WebSocketServiceProvider(Provider):
             redis_url=config.REDIS_URL,
         )
         await client.start()
-        # RedisClient implements all AtomicRedisClientProtocol methods
+        # RedisClient implements AtomicRedisClientProtocol
         yield cast(AtomicRedisClientProtocol, client)
         await client.stop()
 
@@ -55,7 +55,7 @@ class WebSocketServiceProvider(Provider):
             algorithm=config.JWT_ALGORITHM,
         )
 
-    @provide(scope=Scope.REQUEST)
+    @provide(scope=Scope.SESSION)
     def provide_message_listener(
         self,
         redis_client: AtomicRedisClientProtocol,
@@ -68,11 +68,11 @@ class WebSocketServiceProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    def provide_metrics(self) -> WebSocketMetrics:
-        """Provide Prometheus metrics collector."""
-        return WebSocketMetrics()
-
-    @provide(scope=Scope.APP)
     def provide_registry(self) -> CollectorRegistry:
         """Provide Prometheus registry."""
         return REGISTRY
+
+    @provide(scope=Scope.APP)
+    def provide_metrics(self, registry: CollectorRegistry) -> WebSocketMetrics:
+        """Provide Prometheus metrics collector."""
+        return WebSocketMetrics(registry=registry)

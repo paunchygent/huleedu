@@ -6,12 +6,13 @@ Implements protocol-based mocking following HuleEdu testing standards.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from typing import cast
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
+from typing import Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
-from dishka import Provider, Scope, make_async_container, provide
+from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
+from fastapi import FastAPI
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from prometheus_client import CollectorRegistry
 
@@ -27,27 +28,39 @@ from services.websocket_service.protocols import (
 class MockRedisClient:
     """Mock Redis client for testing WebSocket functionality."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.client = AsyncMock()
         self.client.ping = AsyncMock(return_value=True)
         self.ping = AsyncMock(return_value=True)
-        self.get_user_channel_calls = []
-        self.subscribe_calls = []
-        self.publish_calls = []
+        self.get_user_channel_calls: list[str] = []
+        self.subscribe_calls: list[str] = []
+        self.publish_calls: list[tuple[str, str, dict[str, Any]]] = []
         self._mock_pubsub = AsyncMock()
         self._mock_pubsub.get_message = AsyncMock(return_value=None)
+        
+        # Add required AtomicRedisClientProtocol methods
+        self.set_if_not_exists = AsyncMock(return_value=True)
+        self.delete_key = AsyncMock(return_value=1)
+        self.get = AsyncMock(return_value=None)
+        self.setex = AsyncMock(return_value=True)
+        self.watch = AsyncMock(return_value=True)
+        self.multi = AsyncMock(return_value=True)
+        self.exec = AsyncMock(return_value=[])
+        self.unwatch = AsyncMock(return_value=True)
+        self.scan_pattern = AsyncMock(return_value=[])
+        self.publish = AsyncMock(return_value=1)
 
     def get_user_channel(self, user_id: str) -> str:
         """Track channel name generation."""
         self.get_user_channel_calls.append(user_id)
         return f"ws:{user_id}"
 
-    async def subscribe(self, channel_name: str):
+    async def subscribe(self, channel: str) -> AsyncGenerator[Any, None]:
         """Mock subscription to Redis channel."""
-        self.subscribe_calls.append(channel_name)
+        self.subscribe_calls.append(channel)
         yield self._mock_pubsub
 
-    async def publish_user_notification(self, user_id: str, event_type: str, data: dict) -> int:
+    async def publish_user_notification(self, user_id: str, event_type: str, data: dict[str, Any]) -> int:
         """Mock publishing notifications."""
         self.publish_calls.append((user_id, event_type, data))
         return 1
@@ -56,20 +69,20 @@ class MockRedisClient:
 class MockWebSocketManager:
     """Mock WebSocket manager for testing."""
 
-    def __init__(self):
-        self.connections = {}
-        self.connect_calls = []
-        self.disconnect_calls = []
-        self.send_message_calls = []
+    def __init__(self) -> None:
+        self.connections: dict[str, list[Any]] = {}
+        self.connect_calls: list[tuple[Any, str]] = []
+        self.disconnect_calls: list[tuple[Any, str]] = []
+        self.send_message_calls: list[tuple[str, str]] = []
 
-    async def connect(self, websocket, user_id: str) -> None:
+    async def connect(self, websocket: Any, user_id: str) -> None:
         """Track connection calls."""
         self.connect_calls.append((websocket, user_id))
         if user_id not in self.connections:
             self.connections[user_id] = []
         self.connections[user_id].append(websocket)
 
-    async def disconnect(self, websocket, user_id: str) -> None:
+    async def disconnect(self, websocket: Any, user_id: str) -> None:
         """Track disconnection calls."""
         self.disconnect_calls.append((websocket, user_id))
         if user_id in self.connections:
@@ -97,7 +110,7 @@ class MockWebSocketManager:
 class MockJWTValidator:
     """Mock JWT validator for testing."""
 
-    def __init__(self, valid_users: list[str] | None = None):
+    def __init__(self, valid_users: list[str] | None = None) -> None:
         self.valid_users = valid_users or ["test_user", "user123"]
         self.validate_calls: list[str] = []
 
@@ -126,16 +139,19 @@ class MockJWTValidator:
 class MockMessageListener:
     """Mock message listener for testing."""
 
-    def __init__(self, redis_client, websocket_manager):
+    def __init__(self, redis_client: AtomicRedisClientProtocol, websocket_manager: WebSocketManagerProtocol) -> None:
         self.redis_client = redis_client
         self.websocket_manager = websocket_manager
-        self.start_listening_calls = []
+        self.start_listening_calls: list[tuple[str, Any]] = []
 
-    async def start_listening(self, user_id: str, websocket) -> None:
+    async def start_listening(self, user_id: str, websocket: Any) -> None:
         """Mock listening to Redis messages."""
         self.start_listening_calls.append((user_id, websocket))
-        # Simulate immediate return for tests
-        return
+        # Simulate the behavior of the real listener
+        channel = self.redis_client.get_user_channel(user_id)
+        async for _ in self.redis_client.subscribe(channel):
+            # In tests, we immediately break to avoid infinite loop
+            break
 
 
 class MockWebSocketServiceProvider(Provider):
@@ -143,7 +159,7 @@ class MockWebSocketServiceProvider(Provider):
 
     scope = Scope.APP
 
-    def __init__(self, redis_client=None, websocket_manager=None, jwt_validator=None):
+    def __init__(self, redis_client: MockRedisClient | None = None, websocket_manager: MockWebSocketManager | None = None, jwt_validator: MockJWTValidator | None = None) -> None:
         super().__init__()
         self._redis_client = redis_client or MockRedisClient()
         self._websocket_manager = websocket_manager or MockWebSocketManager()
@@ -174,7 +190,7 @@ class MockWebSocketServiceProvider(Provider):
         """Provide mock JWT validator."""
         return self._jwt_validator
 
-    @provide(scope=Scope.REQUEST)
+    @provide(scope=Scope.SESSION)
     def provide_message_listener(
         self,
         redis_client: AtomicRedisClientProtocol,
@@ -184,36 +200,36 @@ class MockWebSocketServiceProvider(Provider):
         return MockMessageListener(redis_client, websocket_manager)
 
     @provide(scope=Scope.APP)
-    def provide_metrics(self) -> WebSocketMetrics:
-        """Provide metrics with isolated registry."""
-        return WebSocketMetrics()
-
-    @provide(scope=Scope.APP)
     def provide_registry(self) -> CollectorRegistry:
         """Provide isolated registry for tests."""
         return CollectorRegistry()
 
+    @provide(scope=Scope.APP)
+    def provide_metrics(self, registry: CollectorRegistry) -> WebSocketMetrics:
+        """Provide metrics with isolated registry."""
+        return WebSocketMetrics(registry=registry)
+
 
 @pytest.fixture
-def mock_redis_client():
+def mock_redis_client() -> MockRedisClient:
     """Fixture for mock Redis client."""
     return MockRedisClient()
 
 
 @pytest.fixture
-def mock_websocket_manager():
+def mock_websocket_manager() -> MockWebSocketManager:
     """Fixture for mock WebSocket manager."""
     return MockWebSocketManager()
 
 
 @pytest.fixture
-def mock_jwt_validator():
+def mock_jwt_validator() -> MockJWTValidator:
     """Fixture for mock JWT validator."""
     return MockJWTValidator()
 
 
 @pytest.fixture
-async def test_container(mock_redis_client, mock_websocket_manager, mock_jwt_validator):
+async def test_container(mock_redis_client: MockRedisClient, mock_websocket_manager: MockWebSocketManager, mock_jwt_validator: MockJWTValidator) -> AsyncIterator[AsyncContainer]:
     """Create test DI container with mocks."""
     provider = MockWebSocketServiceProvider(
         redis_client=mock_redis_client,
@@ -226,12 +242,12 @@ async def test_container(mock_redis_client, mock_websocket_manager, mock_jwt_val
 
 
 @pytest.fixture
-def create_test_app(test_container):
+def create_test_app(test_container: AsyncContainer) -> Callable[[], FastAPI]:
     """Create test FastAPI app with mocked dependencies."""
     from dishka.integrations.fastapi import setup_dishka
     from fastapi import FastAPI
 
-    def _create_app():
+    def _create_app() -> FastAPI:
         app = FastAPI()
         setup_dishka(test_container, app)
 
