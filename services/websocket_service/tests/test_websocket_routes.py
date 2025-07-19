@@ -146,14 +146,18 @@ class TestWebSocketRoutes:
         self, create_test_app: Callable[[], FastAPI], mock_redis_client: MockRedisClient
     ) -> None:
         """Test handling of Redis connection errors."""
+        from contextlib import asynccontextmanager
+
         app = create_test_app()
 
-        # Configure Redis to fail
+        # Configure Redis to fail with proper async context manager
+        @asynccontextmanager
         async def failing_subscribe(channel_name: str) -> AsyncIterator[Any]:
             mock_redis_client.subscribe_calls.append(channel_name)
-            if False:
-                yield
+            # Raise ConnectionError when context manager is entered
             raise ConnectionError("Redis connection failed")
+            # This yield will never be reached, but needed for async generator
+            yield None  # pragma: no cover
 
         setattr(mock_redis_client, "subscribe", failing_subscribe)
 

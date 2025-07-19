@@ -7,12 +7,15 @@ Implements protocol-based mocking following HuleEdu testing standards.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, AsyncIterator, Callable
-from typing import Any, cast
+from typing import Any
 from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
+import redis.client
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from fastapi import FastAPI
+from huleedu_service_libs.error_handling import raise_authentication_error
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from prometheus_client import CollectorRegistry
 
@@ -23,6 +26,19 @@ from services.websocket_service.protocols import (
     MessageListenerProtocol,
     WebSocketManagerProtocol,
 )
+
+
+class MockPubSubContextManager:
+    """Mock async context manager for Redis PubSub subscription."""
+
+    def __init__(self, mock_pubsub: AsyncMock) -> None:
+        self._mock_pubsub = mock_pubsub
+
+    async def __aenter__(self) -> Any:
+        return self._mock_pubsub
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        pass
 
 
 class MockRedisClient:
@@ -55,8 +71,8 @@ class MockRedisClient:
         self.get_user_channel_calls.append(user_id)
         return f"ws:{user_id}"
 
-    async def subscribe(self, channel: str) -> AsyncGenerator[Any, None]:
-        """Mock subscription to Redis channel."""
+    async def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
+        """Mock subscription to Redis channel with proper async generator."""
         self.subscribe_calls.append(channel)
         yield self._mock_pubsub
 
@@ -77,12 +93,16 @@ class MockWebSocketManager:
         self.disconnect_calls: list[tuple[Any, str]] = []
         self.send_message_calls: list[tuple[str, str]] = []
 
-    async def connect(self, websocket: Any, user_id: str) -> None:
-        """Track connection calls."""
+    async def connect(self, websocket: Any, user_id: str) -> bool:
+        """Track connection calls and return success status."""
         self.connect_calls.append((websocket, user_id))
         if user_id not in self.connections:
             self.connections[user_id] = []
         self.connections[user_id].append(websocket)
+
+        # Return False if user already has max connections (for testing connection limits)
+        max_connections = 5  # Match the test setting
+        return len(self.connections[user_id]) <= max_connections
 
     async def disconnect(self, websocket: Any, user_id: str) -> None:
         """Track disconnection calls."""
@@ -116,26 +136,54 @@ class MockJWTValidator:
         self.valid_users = valid_users or ["test_user", "user123"]
         self.validate_calls: list[str] = []
 
-    async def validate_token(self, token: str) -> str | None:
-        """Mock token validation."""
+    async def validate_token(self, token: str) -> str:
+        """Mock token validation with HuleEduError for invalid tokens."""
         self.validate_calls.append(token)
+        correlation_id = uuid4()
 
         # Simple mock validation logic
         if token == "invalid_token":
-            return None
+            raise_authentication_error(
+                service="websocket_service",
+                operation="validate_token",
+                message="Invalid token provided",
+                correlation_id=correlation_id,
+                reason="invalid_token",
+            )
         if token == "expired_token":
-            return None
+            raise_authentication_error(
+                service="websocket_service",
+                operation="validate_token",
+                message="Token has expired",
+                correlation_id=correlation_id,
+                reason="token_expired",
+            )
         if token.startswith("valid_"):
             # Extract user from token (e.g., "valid_user123" -> "user123")
             user_id = token.replace("valid_", "")
             if user_id in self.valid_users:
                 return user_id
+            else:
+                raise_authentication_error(
+                    service="websocket_service",
+                    operation="validate_token",
+                    message="User not found in valid users",
+                    correlation_id=correlation_id,
+                    reason="user_not_found",
+                )
 
         # Default behavior for tests
         if token == "test_token":
             return "test_user"
 
-        return None
+        # Any other token is invalid
+        raise_authentication_error(
+            service="websocket_service",
+            operation="validate_token",
+            message="Unrecognized token format",
+            correlation_id=correlation_id,
+            reason="unrecognized_token",
+        )
 
 
 class MockMessageListener:
@@ -149,12 +197,22 @@ class MockMessageListener:
         self.start_listening_calls: list[tuple[str, Any]] = []
 
     async def start_listening(self, user_id: str, websocket: Any) -> None:
-        """Mock listening to Redis messages."""
+        """Mock listening to Redis messages with proper Redis method calls."""
         self.start_listening_calls.append((user_id, websocket))
-        # Simulate the behavior of the real listener
-        channel = self.redis_client.get_user_channel(user_id)
-        async for _ in self.redis_client.subscribe(channel):
-            # In tests, we immediately break to avoid infinite loop
+
+        # Simulate the behavior of the real listener - must call Redis methods
+        channel = self.redis_client.get_user_channel(user_id)  # This will track the call
+
+        # Use the async generator properly
+        async for pubsub in self.redis_client.subscribe(channel):  # This will track the call
+            # In tests, we process one message iteration to track calls
+            message = await pubsub.get_message(timeout=0.001)  # Quick timeout for tests
+            if message and message.get("type") == "message":
+                # Would normally forward message to WebSocket
+                await self.websocket_manager.send_message_to_user(
+                    user_id, message["data"].decode("utf-8")
+                )
+            # Exit immediately to avoid infinite loop in tests
             break
 
 
@@ -186,8 +244,9 @@ class MockWebSocketServiceProvider(Provider):
     @provide
     async def get_redis_client(self) -> AsyncIterator[AtomicRedisClientProtocol]:
         """Provide mock Redis client."""
-        # MockRedisClient implements the protocol methods for testing
-        yield cast(AtomicRedisClientProtocol, self._redis_client)
+        # MockRedisClient provides the necessary interface for testing
+        # The typing conflict with subscribe method is handled by MyPy's structural typing
+        yield self._redis_client  # MyPy will accept this due to structural typing compatibility
 
     @provide(scope=Scope.APP)
     def provide_websocket_manager(self) -> WebSocketManagerProtocol:

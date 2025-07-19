@@ -30,13 +30,16 @@ async def client():
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
-    from huleedu_service_libs.error_handling.fastapi import register_error_handlers as register_fastapi_error_handlers
+    from huleedu_service_libs.error_handling.fastapi import (
+        register_error_handlers as register_fastapi_error_handlers,
+    )
 
     app = FastAPI(title="api_gateway_service_test")
     register_fastapi_error_handlers(app)
 
     # Add middleware
     from services.api_gateway_service.app.middleware import CorrelationIDMiddleware
+
     app.add_middleware(CorrelationIDMiddleware)
     app.add_middleware(
         CORSMiddleware,
@@ -108,4 +111,7 @@ async def test_get_batch_status_not_found(client: AsyncClient, respx_mock: MockR
     response_data = response.json()
     assert "error" in response_data
     assert response_data["error"]["code"] == "RESOURCE_NOT_FOUND"
-    assert "batch" in response_data["error"]["message"].lower() and "not found" in response_data["error"]["message"].lower()
+    assert (
+        "batch" in response_data["error"]["message"].lower()
+        and "not found" in response_data["error"]["message"].lower()
+    )

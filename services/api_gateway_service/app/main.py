@@ -7,7 +7,9 @@ from slowapi.middleware import SlowAPIMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from huleedu_service_libs.error_handling.fastapi import register_error_handlers as register_fastapi_error_handlers
+from huleedu_service_libs.error_handling.fastapi import (
+    register_error_handlers as register_fastapi_error_handlers,
+)
 from services.api_gateway_service.app.startup_setup import (
     create_di_container,
     setup_dependency_injection,

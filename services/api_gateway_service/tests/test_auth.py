@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import jwt
 import pytest
-from fastapi import HTTPException, Request, status
+from fastapi import Request
 
 from services.api_gateway_service.app.auth_provider import AuthProvider
 from services.api_gateway_service.config import settings
@@ -52,11 +52,10 @@ class TestJWTAuthentication:
     ) -> str:
         """Test authentication following proper error handling patterns."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-        from services.api_gateway_service.app.auth_provider import AuthProvider
 
         # Test AuthProvider directly - no container needed for this unit test
         auth_provider = AuthProvider()
-        
+
         if expected_exception:
             with pytest.raises(HuleEduError):
                 bearer_token = auth_provider.extract_bearer_token(mock_request)
@@ -81,7 +80,7 @@ class TestJWTAuthentication:
     async def test_expired_token_rejection(self):
         """Test rejection of expired JWT token."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-        
+
         user_id = "test_user_123"
         # Create token that expired 1 hour ago
         token = self.create_test_token(user_id, exp_delta=timedelta(hours=-1))
@@ -89,7 +88,7 @@ class TestJWTAuthentication:
 
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request, expected_exception=True)
-        
+
         # Verify the error contains expected information
         assert "expired" in exc_info.value.error_detail.message.lower()
 
@@ -97,34 +96,34 @@ class TestJWTAuthentication:
     async def test_token_without_expiration_claim(self):
         """Test rejection of token missing expiration claim."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-        
+
         user_id = "test_user_123"
         token = self.create_token_without_exp(user_id)
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request, expected_exception=True)
-        
+
         assert "missing expiration claim" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_token_without_subject_claim(self):
         """Test rejection of token missing subject claim."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-        
+
         token = self.create_token_without_sub()
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request, expected_exception=True)
-        
+
         assert "missing subject" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_invalid_token_signature(self):
         """Test rejection of token with invalid signature."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-        
+
         user_id = "test_user_123"
         # Create token with wrong secret key
         payload = {"sub": user_id, "exp": datetime.now(UTC) + timedelta(hours=1)}
@@ -133,51 +132,51 @@ class TestJWTAuthentication:
 
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request, expected_exception=True)
-        
+
         assert "could not validate credentials" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_malformed_token(self):
         """Test rejection of malformed JWT token."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-        
+
         malformed_token = "not.a.valid.jwt.token"
         mock_request = self._create_mock_request(f"Bearer {malformed_token}")
 
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request, expected_exception=True)
-        
+
         assert "could not validate credentials" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_missing_authorization_header(self):
         """Test rejection when Authorization header is missing."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-        
+
         mock_request = self._create_mock_request()
 
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request, expected_exception=True)
-        
+
         assert "not authenticated" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_invalid_authorization_format(self):
         """Test rejection of invalid authorization format."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-        
+
         mock_request = self._create_mock_request("InvalidFormat token123")
 
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request, expected_exception=True)
-        
+
         assert "invalid authentication format" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_token_with_wrong_algorithm(self):
         """Test rejection of token created with wrong algorithm."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-        
+
         user_id = "test_user_123"
         payload = {"sub": user_id, "exp": datetime.now(UTC) + timedelta(hours=1)}
         # Create token with different algorithm
@@ -186,7 +185,7 @@ class TestJWTAuthentication:
 
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request, expected_exception=True)
-        
+
         assert "could not validate credentials" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
@@ -228,26 +227,26 @@ class TestJWTAuthentication:
     async def test_null_subject_claim_handling(self):
         """Test handling of null subject claim in JWT payload."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-        
+
         payload = {"sub": None, "exp": datetime.now(UTC) + timedelta(hours=1)}
         token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request, expected_exception=True)
-        
+
         assert "missing subject" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_empty_subject_claim_handling(self):
         """Test handling of empty string subject claim in JWT payload."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-        
+
         payload = {"sub": "", "exp": datetime.now(UTC) + timedelta(hours=1)}
         token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request, expected_exception=True)
-        
+
         assert "missing subject" in exc_info.value.error_detail.message.lower()

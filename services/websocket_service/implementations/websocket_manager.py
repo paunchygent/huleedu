@@ -20,8 +20,11 @@ class WebSocketManager:
         self._max_connections_per_user = max_connections_per_user
         self._lock = asyncio.Lock()
 
-    async def connect(self, websocket: WebSocket, user_id: str) -> None:
-        """Add a new WebSocket connection for a user."""
+    async def connect(self, websocket: WebSocket, user_id: str) -> bool:
+        """
+        Add a new WebSocket connection for a user.
+        Returns True if connection was successful, False if connection limit exceeded.
+        """
         async with self._lock:
             user_connections = self._connections[user_id]
 
@@ -34,15 +37,8 @@ class WebSocketManager:
                         "current_connections": len(user_connections),
                     },
                 )
-                # Remove oldest connection
-                oldest = user_connections.pop(0)
-                try:
-                    await oldest.close()
-                except Exception as e:
-                    logger.error(
-                        f"Error closing oldest connection for user {user_id}: {e}",
-                        extra={"user_id": user_id},
-                    )
+                # Reject the new connection instead of removing old ones
+                return False
 
             self._connections[user_id].append(websocket)
             total_conns = len(self._connections[user_id])
@@ -50,6 +46,7 @@ class WebSocketManager:
                 f"WebSocket connected for user {user_id}. Total connections: {total_conns}",
                 extra={"user_id": user_id, "total_connections": total_conns},
             )
+            return True
 
     async def disconnect(self, websocket: WebSocket, user_id: str) -> None:
         """Remove a WebSocket connection for a user."""

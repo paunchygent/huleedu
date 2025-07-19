@@ -8,7 +8,7 @@ Gateway to Result Aggregator Service while maintaining proper service boundaries
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import aiohttp
@@ -44,15 +44,15 @@ def integration_test_settings() -> Settings:
 
 
 @pytest.fixture
-def bos_response_factory():
+def bos_response_factory() -> Any:
     """Factory for creating realistic BOS ProcessingPipelineState responses."""
 
     def create_spellcheck_only(
-        self,  # Accept self parameter explicitly for bound methods
+        self: Any,  # Accept self parameter explicitly for bound methods
         batch_id: str = "test-batch",
         user_id: str = "test-user",
         status: str = "COMPLETED_SUCCESSFULLY",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create BOS response with only spellcheck pipeline."""
         return {
             "batch_id": batch_id,
@@ -70,12 +70,12 @@ def bos_response_factory():
         }
 
     def create_multi_pipeline(
-        self,  # Accept self parameter explicitly for bound methods
+        self: Any,  # Accept self parameter explicitly for bound methods
         batch_id: str = "test-batch",
         user_id: str = "test-user",
         spellcheck_status: str = "COMPLETED_SUCCESSFULLY",
         cj_status: str = "IN_PROGRESS",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create BOS response with multiple pipelines."""
         return {
             "batch_id": batch_id,
@@ -97,11 +97,11 @@ def bos_response_factory():
         }
 
     def create_large_batch(
-        self,  # Accept self parameter explicitly for bound methods
+        self: Any,  # Accept self parameter explicitly for bound methods
         batch_id: str = "large-batch",
         user_id: str = "test-user",
         essay_count: int = 100,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create BOS response with large essay count for performance testing."""
         return {
             "batch_id": batch_id,
@@ -128,7 +128,7 @@ def bos_response_factory():
 
 
 @pytest.fixture
-def mock_batch_repository():
+def mock_batch_repository() -> Mock:
     """Mock repository that simulates database miss (triggers BOS fallback)."""
     mock_repo = Mock(spec=BatchRepositoryProtocol)
     # By default, return None to trigger BOS fallback
@@ -136,7 +136,7 @@ def mock_batch_repository():
     return mock_repo
 
 
-def create_mock_http_session(bos_data: Dict[str, Any], status_code: int = 200) -> AsyncMock:
+def create_mock_http_session(bos_data: dict[str, Any], status_code: int = 200) -> AsyncMock:
     """Create a properly mocked aiohttp.ClientSession for BOS client testing."""
     # Create mock session
     mock_session = AsyncMock(spec=aiohttp.ClientSession)
@@ -231,8 +231,8 @@ class TestBOSIntegrationHappyPath:
     async def test_bos_fallback_single_pipeline_success(
         self,
         integration_test_settings: Settings,
-        bos_response_factory,
-        mock_batch_repository,
+        bos_response_factory: Any,
+        mock_batch_repository: Mock,
     ) -> None:
         """
         Scenario: Database miss triggers BOS fallback with single pipeline
@@ -293,8 +293,8 @@ class TestBOSIntegrationHappyPath:
     async def test_bos_fallback_multiple_pipelines_success(
         self,
         integration_test_settings: Settings,
-        bos_response_factory,
-        mock_batch_repository,
+        bos_response_factory: Any,
+        mock_batch_repository: Mock,
     ) -> None:
         """
         Scenario: Database miss triggers BOS fallback with multiple pipelines
@@ -340,6 +340,7 @@ class TestBOSIntegrationHappyPath:
         assert result.completed_essay_count == 8  # 5 from spellcheck + 3 from CJ assessment
         assert result.failed_essay_count == 0
         assert result.requested_pipeline == "spellcheck,cj_assessment"
+        assert result.batch_metadata is not None
         assert result.batch_metadata["source"] == "bos_fallback"
         assert result.batch_metadata["current_phase"] == "CJ_ASSESSMENT"  # Active pipeline
 
@@ -409,7 +410,7 @@ class TestBOSIntegrationErrorHandling:
     async def test_bos_service_unavailable_connection_refused(
         self,
         integration_test_settings: Settings,
-        mock_batch_repository,
+        mock_batch_repository: Mock,
     ) -> None:
         """
         Scenario: BOS service completely unavailable (connection refused)
@@ -448,7 +449,7 @@ class TestBOSIntegrationErrorHandling:
     async def test_bos_service_timeout_slow_response(
         self,
         integration_test_settings: Settings,
-        mock_batch_repository,
+        mock_batch_repository: Mock,
     ) -> None:
         """
         Scenario: BOS service responds slowly causing timeout
@@ -492,7 +493,7 @@ class TestBOSIntegrationErrorHandling:
     async def test_bos_service_returns_404_batch_not_found(
         self,
         integration_test_settings: Settings,
-        mock_batch_repository,
+        mock_batch_repository: Mock,
     ) -> None:
         """
         Scenario: BOS service returns 404 (batch not found anywhere)
@@ -531,7 +532,7 @@ class TestBOSIntegrationErrorHandling:
     async def test_bos_service_returns_500_internal_error(
         self,
         integration_test_settings: Settings,
-        mock_batch_repository,
+        mock_batch_repository: Mock,
     ) -> None:
         """
         Scenario: BOS service returns 500 internal server error
@@ -568,7 +569,7 @@ class TestBOSIntegrationErrorHandling:
     async def test_bos_returns_malformed_json(
         self,
         integration_test_settings: Settings,
-        mock_batch_repository,
+        mock_batch_repository: Mock,
     ) -> None:
         """
         Scenario: BOS service returns invalid JSON response
@@ -605,7 +606,7 @@ class TestBOSIntegrationErrorHandling:
     async def test_bos_returns_valid_json_missing_user_id(
         self,
         integration_test_settings: Settings,
-        mock_batch_repository,
+        mock_batch_repository: Mock,
     ) -> None:
         """
         Scenario: BOS returns valid JSON but missing required user_id field
@@ -659,8 +660,8 @@ class TestBOSIntegrationPerformance:
     async def test_large_bos_response_handling(
         self,
         integration_test_settings: Settings,
-        bos_response_factory,
-        mock_batch_repository,
+        bos_response_factory: Any,
+        mock_batch_repository: Mock,
     ) -> None:
         """
         Scenario: BOS returns very large response payload
@@ -708,8 +709,8 @@ class TestBOSIntegrationPerformance:
     async def test_concurrent_bos_fallback_requests(
         self,
         integration_test_settings: Settings,
-        bos_response_factory,
-        mock_batch_repository,
+        bos_response_factory: Any,
+        mock_batch_repository: Mock,
     ) -> None:
         """
         Scenario: Multiple simultaneous requests for different batches

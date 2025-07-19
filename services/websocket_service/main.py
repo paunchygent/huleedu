@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from huleedu_service_libs.error_handling.fastapi import register_error_handlers as register_fastapi_error_handlers
+from huleedu_service_libs.error_handling.fastapi import (
+    register_error_handlers as register_fastapi_error_handlers,
+)
 
 from services.websocket_service.config import settings
 from services.websocket_service.routers import health_routes, websocket_routes

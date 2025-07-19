@@ -11,8 +11,8 @@ from uuid import UUID
 import httpx
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, Request
-from starlette.datastructures import UploadFile
 from fastapi.responses import JSONResponse
+from starlette.datastructures import UploadFile
 
 from huleedu_service_libs.error_handling import (
     HuleEduError,
@@ -67,7 +67,7 @@ async def upload_batch_files(
 
         # Extract and validate files from form
         files: list[UploadFile] = []
-        
+
         # Get all files from the form - FastAPI can handle multiple files under same field name
         form_files = form.getlist("files")
         for file_item in form_files:

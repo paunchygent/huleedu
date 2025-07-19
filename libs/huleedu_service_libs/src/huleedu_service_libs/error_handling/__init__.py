@@ -41,6 +41,7 @@ from huleedu_service_libs.error_handling.factories import (
     raise_unknown_error,
     raise_validation_error,
 )
+
 # Framework-specific handlers moved to submodules:
 # - FastAPI handlers: from huleedu_service_libs.error_handling.fastapi import register_error_handlers
 # - Quart handlers: from huleedu_service_libs.error_handling.quart import register_error_handlers
@@ -54,6 +55,7 @@ from huleedu_service_libs.error_handling.file_validation_factories import (
 )
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.error_handling.logging_utils import format_error_for_logging
+
 # Quart handlers moved to submodule (see comment above)
 from huleedu_service_libs.error_handling.spellchecker_factories import (
     raise_spell_event_correlation_error,

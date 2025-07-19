@@ -59,9 +59,11 @@ async def websocket_endpoint(
                 }
             )
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=error_json[:123])
-            return
+            return None
 
         metrics.jwt_validation_total.labels(result="success").inc()
+
+        # At this point, user_id is guaranteed to be a string (JWT validation succeeded)
 
         # Accept the WebSocket connection
         await websocket.accept()
@@ -88,7 +90,7 @@ async def websocket_endpoint(
                     }
                 )
                 await websocket.close(code=4000, reason=error_json[:123])
-                return
+                return None
 
         metrics.websocket_active_connections.labels(user_id=user_id).inc()
 

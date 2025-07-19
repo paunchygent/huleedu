@@ -107,23 +107,23 @@ class TestApiGatewayProvider(Provider):
         """Provide mocked metrics following protocol-based testing patterns."""
         from typing import cast
         from unittest.mock import Mock
-        
+
         mock_metrics = Mock(spec=GatewayMetrics)
-        
+
         # Create mock Counter and Histogram objects with labels() method
         def create_mock_counter():
             mock_counter = Mock()
             mock_counter.labels.return_value = mock_counter
             mock_counter.inc.return_value = None
             return mock_counter
-            
+
         def create_mock_histogram():
             mock_histogram = Mock()
             mock_histogram.labels.return_value = mock_histogram
             mock_histogram.time.return_value.__enter__ = Mock()
             mock_histogram.time.return_value.__exit__ = Mock(return_value=None)
             return mock_histogram
-        
+
         # Configure all protocol properties
         mock_metrics.http_requests_total = create_mock_counter()
         mock_metrics.http_request_duration_seconds = create_mock_histogram()
@@ -131,7 +131,7 @@ class TestApiGatewayProvider(Provider):
         mock_metrics.downstream_service_calls_total = create_mock_counter()
         mock_metrics.downstream_service_call_duration_seconds = create_mock_histogram()
         mock_metrics.api_errors_total = create_mock_counter()
-        
+
         return cast(MetricsProtocol, mock_metrics)
 
     @provide

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -17,16 +17,18 @@ def create_mock_bos_pipeline_state(
     user_id: str = "test-user",
     override_status: str = "COMPLETED_SUCCESSFULLY",
     include_all_pipelines: bool = True,
-    essay_counts: Dict[str, int] = None,
-) -> Dict[str, Any]:
+    essay_counts: dict[str, int] | None = None,
+) -> dict[str, Any]:
     """Create realistic BOS ProcessingPipelineState data."""
     if essay_counts is None:
         essay_counts = {"total": 3, "successful": 3, "failed": 0}
 
+    requested_pipelines: list[str] = ["spellcheck"]
+
     data = {
         "batch_id": batch_id,
         "user_id": user_id,
-        "requested_pipelines": ["spellcheck"],
+        "requested_pipelines": requested_pipelines,
         "spellcheck": {
             "status": override_status,
             "essay_counts": essay_counts,
@@ -39,7 +41,7 @@ def create_mock_bos_pipeline_state(
     }
 
     if include_all_pipelines:
-        data["requested_pipelines"].append("cj_assessment")
+        requested_pipelines.append("cj_assessment")
         data["cj_assessment"] = {
             "status": "IN_PROGRESS",
             "essay_counts": {"total": 3, "successful": 2, "failed": 0},
@@ -75,6 +77,7 @@ class TestBOSDataTransformer:
         assert result.completed_essay_count == 5  # Sum across pipelines (3 + 2)
         assert result.failed_essay_count == 0
         assert result.requested_pipeline == "spellcheck,cj_assessment"
+        assert result.batch_metadata is not None
         assert result.batch_metadata["current_phase"] == "CJ_ASSESSMENT"
         assert result.essays == []  # Cannot populate from BOS
         assert result.batch_metadata["source"] == "bos_fallback"
@@ -100,6 +103,7 @@ class TestBOSDataTransformer:
         assert result.completed_essay_count == 3
         assert result.failed_essay_count == 0
         assert result.requested_pipeline == "spellcheck"
+        assert result.batch_metadata is not None
         assert result.batch_metadata["current_phase"] is None  # No active pipeline
 
     def test_transform_failed_pipeline_status(self) -> None:
@@ -275,7 +279,7 @@ class TestBOSDataTransformer:
         """Test essay count aggregation across pipelines."""
         # Arrange
         transformer = BOSDataTransformer()
-        pipeline_states = [
+        pipeline_states: list[dict[str, Any]] = [
             {
                 "status": "COMPLETED_SUCCESSFULLY",
                 "essay_counts": {"successful": 5, "failed": 1},
@@ -298,7 +302,7 @@ class TestBOSDataTransformer:
         """Test essay count calculation with missing essay_counts field."""
         # Arrange
         transformer = BOSDataTransformer()
-        pipeline_states = [
+        pipeline_states: list[dict[str, Any]] = [
             {"status": "COMPLETED_SUCCESSFULLY"},  # Missing essay_counts
             {
                 "status": "IN_PROGRESS",
@@ -339,7 +343,7 @@ class TestBOSDataTransformer:
         """Test earliest start time calculation."""
         # Arrange
         transformer = BOSDataTransformer()
-        pipeline_states = [
+        pipeline_states: list[dict[str, Any]] = [
             {"started_at": "2024-01-01T10:05:00Z"},
             {"started_at": "2024-01-01T10:00:00Z"},  # Earliest
             {"started_at": "2024-01-01T10:10:00Z"},
@@ -356,7 +360,7 @@ class TestBOSDataTransformer:
         """Test latest completion time calculation."""
         # Arrange
         transformer = BOSDataTransformer()
-        pipeline_states = [
+        pipeline_states: list[dict[str, Any]] = [
             {"completed_at": "2024-01-01T10:15:00Z"},
             {"completed_at": "2024-01-01T10:20:00Z"},  # Latest
             {"completed_at": None},  # Not completed
@@ -373,7 +377,7 @@ class TestBOSDataTransformer:
         """Test completion time when no pipelines are completed."""
         # Arrange
         transformer = BOSDataTransformer()
-        pipeline_states = [
+        pipeline_states: list[dict[str, Any]] = [
             {"completed_at": None},
             {"completed_at": None},
         ]

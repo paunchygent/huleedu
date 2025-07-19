@@ -14,8 +14,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import jwt
 import pytest
-from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from fastapi import WebSocket
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
 from services.websocket_service.implementations.jwt_validator import JWTValidator
 from services.websocket_service.implementations.message_listener import RedisMessageListener
@@ -59,13 +59,24 @@ class TestWebSocketManager:
         ws2 = AsyncMock(spec=WebSocket)
         ws3 = AsyncMock(spec=WebSocket)
 
-        await manager.connect(ws1, "user123")
-        await manager.connect(ws2, "user123")
-        await manager.connect(ws3, "user123")
+        # First two connections should succeed
+        result1 = await manager.connect(ws1, "user123")
+        result2 = await manager.connect(ws2, "user123")
+        assert result1 is True
+        assert result2 is True
 
-        # Should have closed the oldest connection
-        ws1.close.assert_called_once()
+        # Third connection should be rejected
+        result3 = await manager.connect(ws3, "user123")
+        assert result3 is False
+
+        # No connections should be closed automatically
+        ws1.close.assert_not_called()
+        ws2.close.assert_not_called()
+        ws3.close.assert_not_called()
+
+        # Should still have only 2 connections (third was rejected)
         assert manager.get_connection_count("user123") == 2
+        assert manager.get_total_connections() == 2
 
     @pytest.mark.asyncio
     async def test_disconnect_existing_connection(self) -> None:
@@ -181,7 +192,7 @@ class TestJWTValidator:
 
         with pytest.raises(HuleEduError) as exc_info:
             await validator.validate_token(token)
-        
+
         assert "token has expired" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
@@ -196,7 +207,7 @@ class TestJWTValidator:
 
         with pytest.raises(HuleEduError) as exc_info:
             await validator.validate_token(token)
-        
+
         assert "missing expiration" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
@@ -213,7 +224,7 @@ class TestJWTValidator:
 
         with pytest.raises(HuleEduError) as exc_info:
             await validator.validate_token(token)
-        
+
         assert "missing subject" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
@@ -230,7 +241,7 @@ class TestJWTValidator:
 
         with pytest.raises(HuleEduError) as exc_info:
             await validator.validate_token(token)
-        
+
         assert "signature verification failed" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
@@ -240,7 +251,7 @@ class TestJWTValidator:
 
         with pytest.raises(HuleEduError) as exc_info:
             await validator.validate_token("not.a.jwt")
-        
+
         assert "invalid token" in exc_info.value.error_detail.message.lower()
 
 

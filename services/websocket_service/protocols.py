@@ -8,8 +8,11 @@ class WebSocketManagerProtocol(Protocol):
     Protocol for managing WebSocket connections.
     """
 
-    async def connect(self, websocket: Any, user_id: str) -> None:
-        """Add a new WebSocket connection for a user."""
+    async def connect(self, websocket: Any, user_id: str) -> bool:
+        """
+        Add a new WebSocket connection for a user.
+        Returns True if connection was successful, False if connection limit exceeded.
+        """
         ...
 
     async def disconnect(self, websocket: Any, user_id: str) -> None:
@@ -37,10 +40,10 @@ class JWTValidatorProtocol(Protocol):
     Protocol for JWT token validation.
     """
 
-    async def validate_token(self, token: str) -> str | None:
+    async def validate_token(self, token: str) -> str:
         """
         Validate a JWT token and return the user ID if valid.
-        Returns None if the token is invalid.
+        Raises HuleEduError if the token is invalid.
         """
         ...
 

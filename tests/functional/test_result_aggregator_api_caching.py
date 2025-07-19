@@ -98,6 +98,15 @@ class FunctionalTestApiProvider(Provider):
 
         # Use mock BOS client for functional tests
         mock_bos_client = AsyncMock()
+
+        # Configure mock to return None for non-existent batches (simulating BOS 404 response)
+        async def mock_get_pipeline_state(batch_id: str):
+            if batch_id == "non-existent-batch":
+                return None  # Simulates BOS returning 404, converted to None by client
+            # For other test batches, you would return appropriate test data
+            return None  # Default to not found for functional tests
+
+        mock_bos_client.get_pipeline_state.side_effect = mock_get_pipeline_state
         bos_transformer = BOSDataTransformer()
 
         return AggregatorServiceImpl(

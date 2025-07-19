@@ -150,4 +150,3 @@ async def get_batch_status(
                     correlation_id=correlation_id,
                     status_code=e.response.status_code,
                 )
-
