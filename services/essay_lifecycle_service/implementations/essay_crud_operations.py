@@ -15,6 +15,7 @@ import aiosqlite
 from common_core.domain_enums import ContentType
 from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
+from huleedu_service_libs.error_handling import raise_resource_not_found
 
 from services.essay_lifecycle_service.implementations.essay_state_model import EssayState
 
@@ -73,7 +74,15 @@ class SQLiteEssayCrudOperations:
             # First, get the current state
             current_state = await self.get_essay_state(essay_id)
             if current_state is None:
-                raise ValueError(f"Essay {essay_id} not found")
+                from uuid import uuid4
+
+                raise_resource_not_found(
+                    service="essay_lifecycle_service",
+                    operation="update_essay_state",
+                    resource_type="Essay",
+                    resource_id=essay_id,
+                    correlation_id=uuid4(),
+                )
 
             # Update the state
             current_state.update_status(new_status, metadata)

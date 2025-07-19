@@ -13,8 +13,10 @@ from typing import Any
 
 import pytest
 from common_core.domain_enums import ContentType
+from common_core.error_enums import ErrorCode
 from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
+from huleedu_service_libs.error_handling import HuleEduError
 from testcontainers.postgres import PostgresContainer
 
 from services.essay_lifecycle_service.config import Settings
@@ -295,11 +297,18 @@ class TestPostgreSQLEssayRepositoryIntegration:
         essay = await postgres_repository.get_essay_state(nonexistent_id)
         assert essay is None
 
-        # Test update (should raise error)
-        with pytest.raises(ValueError, match="not found"):
+        # Test update (should raise HuleEduError with RESOURCE_NOT_FOUND)
+        with pytest.raises(HuleEduError) as exc_info:
             await postgres_repository.update_essay_state(
                 nonexistent_id, EssayStatus.AWAITING_SPELLCHECK, {}
             )
+
+        # Validate error structure
+        error = exc_info.value
+        assert error.error_detail.error_code == ErrorCode.RESOURCE_NOT_FOUND
+        assert "nonexistent-essay-123" in error.error_detail.message
+        assert error.error_detail.service == "essay_lifecycle_service"
+        assert error.error_detail.operation == "update_essay_state"
 
         # Test idempotency check with nonexistent batch/storage
         found_essay = await postgres_repository.get_essay_by_text_storage_id_and_batch_id(
@@ -353,9 +362,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
         batch_id = "atomic-test-batch"
         essay_refs = [
             EntityReference(
-                entity_id=f"atomic-essay-{i:03d}",
-                entity_type="essay",
-                parent_id=batch_id
+                entity_id=f"atomic-essay-{i:03d}", entity_type="essay", parent_id=batch_id
             )
             for i in range(1, 4)  # 3 essays
         ]
@@ -365,7 +372,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
 
         # Assert - All essays created successfully
         assert len(created_essays) == 3
-        
+
         # Verify each essay has correct data
         for i, essay in enumerate(created_essays, 1):
             assert essay.essay_id == f"atomic-essay-{i:03d}"
@@ -408,9 +415,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
         """Test that batch creation is truly atomic - all or nothing."""
         # Arrange - Create one essay to test for duplicate key constraint
         existing_ref = EntityReference(
-            entity_id="duplicate-essay-001",
-            entity_type="essay", 
-            parent_id="atomicity-test-batch"
+            entity_id="duplicate-essay-001", entity_type="essay", parent_id="atomicity-test-batch"
         )
         await postgres_repository.create_essay_record(existing_ref)
 
@@ -419,22 +424,18 @@ class TestPostgreSQLEssayRepositoryIntegration:
             EntityReference(
                 entity_id="duplicate-essay-001",  # This will cause constraint violation
                 entity_type="essay",
-                parent_id="atomicity-test-batch"
+                parent_id="atomicity-test-batch",
             ),
             EntityReference(
-                entity_id="new-essay-002",
-                entity_type="essay", 
-                parent_id="atomicity-test-batch"
+                entity_id="new-essay-002", entity_type="essay", parent_id="atomicity-test-batch"
             ),
             EntityReference(
-                entity_id="new-essay-003",
-                entity_type="essay",
-                parent_id="atomicity-test-batch"
-            )
+                entity_id="new-essay-003", entity_type="essay", parent_id="atomicity-test-batch"
+            ),
         ]
 
         # Act & Assert - Batch creation should fail completely
-        with pytest.raises(Exception):  # Will be IntegrityError or similar
+        with pytest.raises(HuleEduError):
             await postgres_repository.create_essay_records_batch(batch_refs)
 
         # Assert - No new essays should exist (atomic rollback)

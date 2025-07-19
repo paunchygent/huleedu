@@ -5,13 +5,21 @@ within this directory, ensuring a clean and consistent testing environment.
 
 Public API:
     - _clear_prometheus_registry: Fixture to clear the global Prometheus registry.
+    - assert_huleedu_error: Function to assert HuleEduError has expected structure and values.
+    - expect_huleedu_error: Context manager for expecting HuleEduError with validation.
+    - assert_correlation_id_propagated: Validate correlation ID is properly propagated in error.
+    - assert_error_detail_structure: Validate error_detail has required fields and structure.
 """
 
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Callable, Generator
+from contextlib import _AsyncGeneratorContextManager, asynccontextmanager
+from typing import Any
+from uuid import UUID
 
 import pytest
+from huleedu_service_libs.error_handling import HuleEduError
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -74,3 +82,214 @@ def opentelemetry_test_isolation() -> Generator[InMemorySpanExporter, None, None
         span_exporter.clear()
         # Note: TracerProvider doesn't have remove_span_processor,
         # but clearing the exporter is sufficient for test isolation
+
+
+# Error Testing Utilities following Rule 048 exception-based patterns
+
+
+def assert_huleedu_error(
+    exception: HuleEduError,
+    expected_code: str,
+    expected_correlation_id: UUID | None = None,
+    expected_service: str = "essay_lifecycle_service",
+) -> None:
+    """Assert HuleEduError has expected structure and values.
+
+    This utility validates that a caught HuleEduError follows the Rule 048
+    exception-based pattern and contains the expected error code, service,
+    and optionally correlation ID.
+
+    Args:
+        exception: The HuleEduError instance to validate
+        expected_code: Expected error code value (string, e.g., "VALIDATION_ERROR")
+        expected_correlation_id: Optional expected correlation ID
+        expected_service: Expected service name (defaults to "essay_lifecycle_service")
+
+    Raises:
+        AssertionError: If any validation fails
+
+    Example:
+        try:
+            await service.some_operation()
+        except HuleEduError as e:
+            assert_huleedu_error(e, "RESOURCE_NOT_FOUND", correlation_id)
+    """
+    # Validate exception type
+    assert isinstance(exception, HuleEduError), f"Expected HuleEduError, got {type(exception)}"
+
+    # Validate error_detail exists and has proper structure
+    assert hasattr(exception, "error_detail"), "HuleEduError missing error_detail attribute"
+    error_detail = exception.error_detail
+
+    # Validate error_detail structure
+    assert_error_detail_structure(error_detail.model_dump())
+
+    # Validate error code
+    assert error_detail.error_code.value == expected_code, (
+        f"Expected error code '{expected_code}', got '{error_detail.error_code.value}'"
+    )
+
+    # Validate service
+    assert error_detail.service == expected_service, (
+        f"Expected service '{expected_service}', got '{error_detail.service}'"
+    )
+
+    # Validate correlation ID if provided
+    if expected_correlation_id is not None:
+        assert_correlation_id_propagated(exception, expected_correlation_id)
+
+
+@asynccontextmanager
+async def expect_huleedu_error(
+    expected_code: str,
+    expected_correlation_id: UUID | None = None,
+) -> AsyncGenerator[None, None]:
+    """Context manager for expecting HuleEduError with validation.
+
+    This async context manager validates that a HuleEduError is raised
+    with the expected error code and optionally correlation ID. It follows
+    the Rule 048 exception-based pattern for testing.
+
+    Args:
+        expected_code: Expected error code value (string, e.g., "VALIDATION_ERROR")
+        expected_correlation_id: Optional expected correlation ID
+
+    Yields:
+        None - Context for the test code that should raise the error
+
+    Raises:
+        AssertionError: If no error is raised or error doesn't match expected values
+
+    Example:
+        async with expect_huleedu_error("RESOURCE_NOT_FOUND", correlation_id):
+            await service.get_nonexistent_essay("invalid-id")
+
+        # Error has been validated by the context manager
+    """
+    try:
+        yield
+        # If we reach here, no exception was raised
+        raise AssertionError(
+            f"Expected HuleEduError with code '{expected_code}' but no error was raised"
+        )
+    except HuleEduError as e:
+        # Validate the error matches expectations
+        assert_huleedu_error(e, expected_code, expected_correlation_id)
+    except Exception as e:
+        # Any other exception type is unexpected
+        raise AssertionError(f"Expected HuleEduError but got {type(e).__name__}: {str(e)}") from e
+
+
+def assert_correlation_id_propagated(
+    error: HuleEduError,
+    expected_correlation_id: UUID,
+) -> None:
+    """Validate correlation ID is properly propagated in error.
+
+    This utility ensures that the correlation ID is correctly propagated
+    through the error handling chain, which is critical for distributed
+    tracing and request correlation.
+
+    Args:
+        error: The HuleEduError to validate
+        expected_correlation_id: The expected correlation ID
+
+    Raises:
+        AssertionError: If correlation ID doesn't match or is missing
+
+    Example:
+        correlation_id = uuid4()
+        try:
+            await service.operation_with_correlation(correlation_id)
+        except HuleEduError as e:
+            assert_correlation_id_propagated(e, correlation_id)
+    """
+    assert error.error_detail.correlation_id == expected_correlation_id, (
+        f"Expected correlation_id '{expected_correlation_id}', "
+        f"got '{error.error_detail.correlation_id}'"
+    )
+
+
+def assert_error_detail_structure(error_detail: dict[str, Any]) -> None:
+    """Validate error_detail has required fields and structure.
+
+    This utility validates that an error_detail dictionary contains all
+    required fields according to the ErrorDetail model and Rule 048 standards.
+    Works with both raw model_dump() output and serialized JSON data.
+
+    Args:
+        error_detail: The error detail dictionary to validate
+
+    Raises:
+        AssertionError: If any required field is missing or has wrong type
+
+    Example:
+        error_dict = error.error_detail.model_dump()
+        assert_error_detail_structure(error_dict)
+    """
+    from datetime import datetime
+    from uuid import UUID
+
+    from common_core.error_enums import ErrorCode
+
+    # Required fields with their acceptable types
+    required_fields = {
+        "error_code": (ErrorCode, str),  # Enum or serialized string
+        "message": (str,),
+        "correlation_id": (UUID, str),  # UUID object or serialized string
+        "timestamp": (datetime, str),  # datetime object or serialized string
+        "service": (str,),
+        "operation": (str,),
+        "details": (dict,),
+    }
+
+    # Check all required fields are present
+    for field_name, expected_types in required_fields.items():
+        assert field_name in error_detail, f"Missing required field: {field_name}"
+
+        field_value = error_detail[field_name]
+
+        # Special handling for details field (can be empty dict)
+        if field_name == "details":
+            assert isinstance(field_value, dict), (
+                f"Field '{field_name}' must be dict, got {type(field_value)}"
+            )
+        else:
+            # All other fields must be non-empty and of correct type
+            assert field_value is not None, f"Field '{field_name}' cannot be None"
+            assert isinstance(field_value, expected_types), (
+                f"Field '{field_name}' must be one of {expected_types}, got {type(field_value)}"
+            )
+
+            # Additional validation for string fields
+            if isinstance(field_value, str) and field_name in ("message", "service", "operation"):
+                assert field_value.strip(), f"Field '{field_name}' cannot be empty string"
+
+
+# Make error testing utilities available as pytest fixtures for test dependency injection
+
+
+@pytest.fixture
+def huleedu_error_validator() -> Callable[[HuleEduError, str, UUID | None, str], None]:
+    """Provide assert_huleedu_error as a pytest fixture."""
+    return assert_huleedu_error
+
+
+@pytest.fixture
+def huleedu_error_expecter() -> Callable[
+    [str, UUID | None], _AsyncGeneratorContextManager[None, None]
+]:
+    """Provide expect_huleedu_error as a pytest fixture."""
+    return expect_huleedu_error
+
+
+@pytest.fixture
+def correlation_id_validator() -> Callable[[HuleEduError, UUID], None]:
+    """Provide assert_correlation_id_propagated as a pytest fixture."""
+    return assert_correlation_id_propagated
+
+
+@pytest.fixture
+def error_detail_validator() -> Callable[[dict[str, Any]], None]:
+    """Provide assert_error_detail_structure as a pytest fixture."""
+    return assert_error_detail_structure

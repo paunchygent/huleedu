@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 import aiosqlite
 from common_core.domain_enums import ContentType
@@ -64,6 +65,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         new_status: EssayStatus,
         metadata: dict[str, Any],
         storage_reference: tuple[ContentType, str] | None = None,
+        correlation_id: UUID | None = None,
     ) -> None:
         """Update essay state with new status and metadata."""
         await self.crud_ops.update_essay_state(essay_id, new_status, metadata)
@@ -74,27 +76,26 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         new_status: EssayStatus,
         metadata: dict[str, Any],
         storage_reference: tuple[ContentType, str] | None = None,
+        correlation_id: UUID | None = None,
     ) -> None:
         """Update essay state using status from state machine."""
         await self.crud_ops.update_essay_state(essay_id, new_status, metadata)
 
     async def create_essay_record(
-        self,
-        essay_ref: EntityReference | None = None,
-        *,
-        essay_id: str | None = None,
-        slot_assignment: str | None = None,
-        batch_id: str | None = None,
-        initial_status: EssayStatus | None = None,
+        self, essay_ref: EntityReference, correlation_id: UUID | None = None
     ) -> EssayState:
-        """Create new essay record from entity reference or keyword arguments."""
-        return await self.crud_ops.create_essay_record(
-            essay_ref=essay_ref,
-            essay_id=essay_id,
-            slot_assignment=slot_assignment,
-            batch_id=batch_id,
-            initial_status=initial_status,
-        )
+        """Create new essay record from entity reference."""
+        return await self.crud_ops.create_essay_record(essay_ref=essay_ref)
+
+    async def create_essay_records_batch(
+        self, essay_refs: list[EntityReference], correlation_id: UUID | None = None
+    ) -> list[EssayState]:
+        """Create multiple essay records in single atomic transaction."""
+        results = []
+        for essay_ref in essay_refs:
+            result = await self.crud_ops.create_essay_record(essay_ref=essay_ref)
+            results.append(result)
+        return results
 
     async def list_essays_by_batch(self, batch_id: str) -> list[ProtocolEssayState]:
         """List all essays in a batch."""
@@ -197,6 +198,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         file_size: int,
         content_hash: str | None,
         initial_status: EssayStatus,
+        correlation_id: UUID | None = None,
     ) -> EssayState:
         """Create or update essay state for slot assignment with content metadata."""
         # Check if essay already exists

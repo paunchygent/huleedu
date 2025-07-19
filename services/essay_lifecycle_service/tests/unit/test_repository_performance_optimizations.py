@@ -32,12 +32,11 @@ class TestRepositoryPerformanceOptimizations:
         await store.initialize()
         return store
 
-
     @pytest.fixture
     def sample_essays(self) -> list[EssayState]:
         """Create sample essays with different statuses for testing."""
         base_time = datetime.now(UTC)
-        
+
         return [
             EssayState(
                 essay_id="essay-1",
@@ -50,7 +49,7 @@ class TestRepositoryPerformanceOptimizations:
                 updated_at=base_time,
             ),
             EssayState(
-                essay_id="essay-2", 
+                essay_id="essay-2",
                 batch_id="test-batch",
                 current_status=EssayStatus.UPLOADED,
                 processing_metadata={},
@@ -61,7 +60,7 @@ class TestRepositoryPerformanceOptimizations:
             ),
             EssayState(
                 essay_id="essay-3",
-                batch_id="test-batch", 
+                batch_id="test-batch",
                 current_status=EssayStatus.SPELLCHECKED_SUCCESS,
                 processing_metadata={},
                 timeline={
@@ -74,7 +73,6 @@ class TestRepositoryPerformanceOptimizations:
             ),
         ]
 
-
     async def test_sqlite_get_batch_summary_with_essays_single_fetch(
         self, sqlite_store: SQLiteEssayStateStore, sample_essays: list[EssayState]
     ) -> None:
@@ -82,23 +80,25 @@ class TestRepositoryPerformanceOptimizations:
         # Create test essays with initial UPLOADED status
         for essay in sample_essays:
             await sqlite_store.create_essay_record(
-                EntityReference(entity_id=essay.essay_id, entity_type="essay", parent_id=essay.batch_id)
+                EntityReference(
+                    entity_id=essay.essay_id, entity_type="essay", parent_id=essay.batch_id
+                )
             )
 
         # Update one essay to SPELLCHECKED_SUCCESS status
         await sqlite_store.update_essay_state(
-            "essay-3", 
-            EssayStatus.SPELLCHECKED_SUCCESS, 
-            {"updated_for_test": True}
+            "essay-3", EssayStatus.SPELLCHECKED_SUCCESS, {"updated_for_test": True}
         )
 
         # Mock list_essays_by_batch to track calls
-        with patch.object(sqlite_store, 'list_essays_by_batch', wraps=sqlite_store.list_essays_by_batch) as mock_list:
+        with patch.object(
+            sqlite_store, "list_essays_by_batch", wraps=sqlite_store.list_essays_by_batch
+        ) as mock_list:
             essays, status_summary = await sqlite_store.get_batch_summary_with_essays("test-batch")
 
             # Verify list_essays_by_batch was called exactly once
             assert mock_list.call_count == 1
-            
+
             # Verify we got the expected results
             assert len(essays) == 3
             assert status_summary == {
@@ -106,13 +106,14 @@ class TestRepositoryPerformanceOptimizations:
                 EssayStatus.SPELLCHECKED_SUCCESS: 1,
             }
 
-
     async def test_batch_summary_with_essays_empty_batch(
         self, sqlite_store: SQLiteEssayStateStore
     ) -> None:
         """Test combined method handles empty batches correctly."""
-        essays, status_summary = await sqlite_store.get_batch_summary_with_essays("nonexistent-batch")
-        
+        essays, status_summary = await sqlite_store.get_batch_summary_with_essays(
+            "nonexistent-batch"
+        )
+
         assert essays == []
         assert status_summary == {}
 
@@ -123,26 +124,28 @@ class TestRepositoryPerformanceOptimizations:
         # Create test essays with initial UPLOADED status
         for essay in sample_essays:
             await sqlite_store.create_essay_record(
-                EntityReference(entity_id=essay.essay_id, entity_type="essay", parent_id=essay.batch_id)
+                EntityReference(
+                    entity_id=essay.essay_id, entity_type="essay", parent_id=essay.batch_id
+                )
             )
 
         # Update one essay to SPELLCHECKED_SUCCESS status to create variation
         await sqlite_store.update_essay_state(
-            "essay-3", 
-            EssayStatus.SPELLCHECKED_SUCCESS, 
-            {"updated_for_test": True}
+            "essay-3", EssayStatus.SPELLCHECKED_SUCCESS, {"updated_for_test": True}
         )
 
         # Get results from both methods
         individual_essays = await sqlite_store.list_essays_by_batch("test-batch")
         individual_summary = await sqlite_store.get_batch_status_summary("test-batch")
-        
-        combined_essays, combined_summary = await sqlite_store.get_batch_summary_with_essays("test-batch")
-        
+
+        combined_essays, combined_summary = await sqlite_store.get_batch_summary_with_essays(
+            "test-batch"
+        )
+
         # Verify consistency
         assert len(individual_essays) == len(combined_essays)
         assert individual_summary == combined_summary
-        
+
         # Verify essay IDs match (order might differ)
         individual_ids = {essay.essay_id for essay in individual_essays}
         combined_ids = {essay.essay_id for essay in combined_essays}

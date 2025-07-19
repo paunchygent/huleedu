@@ -49,6 +49,7 @@ class EssayRepositoryProtocol(Protocol):
         new_status: EssayStatus,
         metadata: dict[str, Any],
         storage_reference: tuple[ContentType, str] | None = None,
+        correlation_id: UUID | None = None,
     ) -> None:
         """Update essay state with new status and metadata."""
         ...
@@ -59,16 +60,19 @@ class EssayRepositoryProtocol(Protocol):
         new_status: EssayStatus,
         metadata: dict[str, Any],
         storage_reference: tuple[ContentType, str] | None = None,
+        correlation_id: UUID | None = None,
     ) -> None:
         """Update essay state using status from state machine."""
         ...
 
-    async def create_essay_record(self, essay_ref: EntityReference) -> EssayState:
+    async def create_essay_record(
+        self, essay_ref: EntityReference, correlation_id: UUID | None = None
+    ) -> EssayState:
         """Create new essay record from entity reference."""
         ...
 
     async def create_essay_records_batch(
-        self, essay_refs: list[EntityReference]
+        self, essay_refs: list[EntityReference], correlation_id: UUID | None = None
     ) -> list[EssayState]:
         """Create multiple essay records in single atomic transaction."""
         ...
@@ -102,6 +106,7 @@ class EssayRepositoryProtocol(Protocol):
         file_size: int,
         content_hash: str | None,
         initial_status: EssayStatus,
+        correlation_id: UUID | None = None,
     ) -> EssayState:
         """Create or update essay state for slot assignment with content metadata."""
         ...

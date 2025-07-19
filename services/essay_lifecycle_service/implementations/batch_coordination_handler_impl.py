@@ -13,6 +13,9 @@ if TYPE_CHECKING:
     from common_core.events.batch_coordination_events import BatchEssaysRegistered
     from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 
+from huleedu_service_libs.error_handling import (
+    raise_processing_error,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.protocols import (
@@ -68,7 +71,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     "correlation_id": str(correlation_id),
                 },
             )
-            
+
             # Create all essay references for atomic batch operation
             essay_refs = [
                 EntityReference(
@@ -76,9 +79,11 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 )
                 for essay_id in event_data.essay_ids
             ]
-            
+
             # Create all essay records in single atomic transaction
-            await self.repository.create_essay_records_batch(essay_refs)
+            await self.repository.create_essay_records_batch(
+                essay_refs, correlation_id=correlation_id
+            )
 
             logger.info(
                 "Successfully created initial essay records for batch",
@@ -91,11 +96,21 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             return True
 
         except Exception as e:
-            logger.error(
-                "Error handling BatchEssaysRegistered event",
-                extra={"error": str(e), "correlation_id": str(correlation_id)},
-            )
-            return False
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_processing_error(
+                    service="essay_lifecycle_service",
+                    operation="handle_batch_essays_registered",
+                    message=f"Failed to process batch essays registration: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    batch_id=event_data.batch_id,
+                    expected_count=event_data.expected_essay_count,
+                    essay_count=len(event_data.essay_ids),
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
 
     async def handle_essay_content_provisioned(
         self,
@@ -188,6 +203,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 file_size=event_data.file_size_bytes,
                 content_hash=event_data.content_md5_hash,
                 initial_status=EssayStatus.READY_FOR_PROCESSING,
+                correlation_id=correlation_id,
             )
 
             logger.info(
@@ -232,11 +248,21 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             return True
 
         except Exception as e:
-            logger.error(
-                "Error handling EssayContentProvisionedV1 event",
-                extra={"error": str(e), "correlation_id": str(correlation_id)},
-            )
-            return False
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_processing_error(
+                    service="essay_lifecycle_service",
+                    operation="handle_essay_content_provisioned",
+                    message=f"Failed to process essay content provisioning: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    batch_id=event_data.batch_id,
+                    text_storage_id=event_data.text_storage_id,
+                    original_file_name=event_data.original_file_name,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
 
     async def handle_essay_validation_failed(
         self,
@@ -290,8 +316,18 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             return True
 
         except Exception as e:
-            logger.error(
-                "Error handling EssayValidationFailedV1 event",
-                extra={"error": str(e), "correlation_id": str(correlation_id)},
-            )
-            return False
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_processing_error(
+                    service="essay_lifecycle_service",
+                    operation="handle_essay_validation_failed",
+                    message=f"Failed to process essay validation failure: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    batch_id=event_data.batch_id,
+                    original_file_name=event_data.original_file_name,
+                    validation_error_code=event_data.validation_error_code,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )

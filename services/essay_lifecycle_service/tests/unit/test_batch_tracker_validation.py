@@ -22,16 +22,14 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 
-from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
-    DefaultBatchEssayTracker as BatchEssayTracker,
-)
+from services.essay_lifecycle_service.protocols import BatchEssayTracker
 
 
 class TestBatchEssayTracker:
     """Test suite for BatchEssayTracker with validation failure handling."""
 
     @pytest.fixture
-    def tracker(self) -> BatchEssayTracker:
+    def tracker(self):
         """Fixture providing a fresh BatchEssayTracker instance with minimal mocking."""
         from unittest.mock import AsyncMock
 

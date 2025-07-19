@@ -12,7 +12,7 @@ from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import Counter
 from pydantic import BaseModel
-from quart import Blueprint, Response, jsonify
+from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
 
 from services.essay_lifecycle_service.config import settings
@@ -31,6 +31,18 @@ def set_essay_operations_metric(metric: Counter) -> None:
     ESSAY_OPERATIONS = metric
 
 
+def _extract_correlation_id() -> UUID:
+    """Extract correlation ID from request headers or generate new one."""
+    correlation_header = request.headers.get("X-Correlation-ID")
+    if correlation_header:
+        try:
+            return UUID(correlation_header)
+        except ValueError:
+            # Invalid UUID format, generate new one
+            pass
+    return uuid4()
+
+
 class EssayStatusResponse(BaseModel):
     """Response model for essay status queries."""
 
@@ -42,14 +54,6 @@ class EssayStatusResponse(BaseModel):
     storage_references: dict[ContentType, str]
     created_at: datetime
     updated_at: datetime
-
-
-class ErrorResponse(BaseModel):
-    """Standard error response model."""
-
-    error: str
-    detail: str | None = None
-    correlation_id: UUID
 
 
 def _calculate_processing_progress(current_status: EssayStatus) -> dict[str, bool]:
@@ -78,22 +82,35 @@ def _calculate_processing_progress(current_status: EssayStatus) -> dict[str, boo
 async def get_essay_status(
     essay_id: str,
     state_store: FromDishka[EssayRepositoryProtocol],
-) -> Response | tuple[Response, int]:
+) -> Response:
     """Get current status of an essay."""
-    logger.info(f"Getting status for essay {essay_id}")
+    # Extract correlation ID from request headers or generate new one
+    correlation_id = _extract_correlation_id()
 
+    logger.info(
+        f"Getting status for essay {essay_id}",
+        extra={"essay_id": essay_id, "correlation_id": str(correlation_id)},
+    )
+
+    # Get essay state - let HuleEduError exceptions bubble up to Quart error handlers
     essay_state = await state_store.get_essay_state(essay_id)
     if essay_state is None:
+        # Import here to avoid circular imports
+        from huleedu_service_libs.error_handling import raise_resource_not_found
+
         if ESSAY_OPERATIONS:
             ESSAY_OPERATIONS.labels(
                 operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
             ).inc()
-        error_response = ErrorResponse(
-            error="Essay Not Found",
-            correlation_id=uuid4(),
-            detail=f"Essay with ID {essay_id} does not exist",
+
+        # Raise structured error instead of manual ErrorResponse
+        raise_resource_not_found(
+            service="essay_lifecycle_service",
+            operation="get_essay_status",
+            resource_type="Essay",
+            resource_id=essay_id,
+            correlation_id=correlation_id,
         )
-        return jsonify(error_response.model_dump()), 404
 
     # Calculate processing progress
     processing_progress = _calculate_processing_progress(essay_state.current_status)
@@ -121,22 +138,35 @@ async def get_essay_status(
 async def get_essay_timeline(
     essay_id: str,
     state_store: FromDishka[EssayRepositoryProtocol],
-) -> Response | tuple[Response, int]:
+) -> Response:
     """Get detailed timeline for an essay."""
-    logger.info(f"Getting timeline for essay {essay_id}")
+    # Extract correlation ID from request headers or generate new one
+    correlation_id = _extract_correlation_id()
 
+    logger.info(
+        f"Getting timeline for essay {essay_id}",
+        extra={"essay_id": essay_id, "correlation_id": str(correlation_id)},
+    )
+
+    # Get essay state - let HuleEduError exceptions bubble up to Quart error handlers
     essay_state = await state_store.get_essay_state(essay_id)
     if essay_state is None:
+        # Import here to avoid circular imports
+        from huleedu_service_libs.error_handling import raise_resource_not_found
+
         if ESSAY_OPERATIONS:
             ESSAY_OPERATIONS.labels(
                 operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
             ).inc()
-        response = ErrorResponse(
-            error="Essay Not Found",
-            correlation_id=uuid4(),
-            detail=f"Essay with ID {essay_id} does not exist",
+
+        # Raise structured error instead of manual ErrorResponse
+        raise_resource_not_found(
+            service="essay_lifecycle_service",
+            operation="get_essay_timeline",
+            resource_type="Essay",
+            resource_id=essay_id,
+            correlation_id=correlation_id,
         )
-        return jsonify(response.model_dump()), 404
 
     # Return just the timeline and metadata
     timeline_response = {

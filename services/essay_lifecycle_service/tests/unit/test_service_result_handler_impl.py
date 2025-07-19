@@ -18,6 +18,10 @@ from common_core.status_enums import EssayStatus
 from services.essay_lifecycle_service.implementations.service_result_handler_impl import (
     DefaultServiceResultHandler,
 )
+from services.essay_lifecycle_service.protocols import (
+    BatchPhaseCoordinator,
+    EssayRepositoryProtocol,
+)
 
 
 class TestDefaultServiceResultHandler:
@@ -25,13 +29,13 @@ class TestDefaultServiceResultHandler:
 
     @pytest.fixture
     def mock_essay_repository(self) -> AsyncMock:
-        """Mock EssayStateStore for testing."""
-        return AsyncMock()
+        """Mock EssayRepositoryProtocol for testing using protocol-based mocking."""
+        return AsyncMock(spec=EssayRepositoryProtocol)
 
     @pytest.fixture
     def mock_batch_coordinator(self) -> AsyncMock:
-        """Mock BatchPhaseCoordinator for testing."""
-        return AsyncMock()
+        """Mock BatchPhaseCoordinator for testing using protocol-based mocking."""
+        return AsyncMock(spec=BatchPhaseCoordinator)
 
     @pytest.fixture
     def handler(

@@ -7,15 +7,15 @@ essay processing workflows.
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
-
 from huleedu_service_libs import init_tracing
+from huleedu_service_libs.error_handling import HuleEduError
+from huleedu_service_libs.error_handling.quart import create_error_response
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
 from huleedu_service_libs.quart_app import HuleEduApp
 from pydantic import ValidationError
-from quart import Response, jsonify
+from quart import Response
 
 # Import Blueprints
 # Import local modules using absolute imports for containerized deployment
@@ -41,24 +41,6 @@ app.extensions["tracer"] = tracer
 setup_tracing_middleware(app, tracer)
 
 
-class ErrorResponse:
-    """Standard error response model."""
-
-    def __init__(self, error: str, correlation_id: UUID, detail: str | None = None):
-        self.error = error
-        self.detail = detail
-        self.correlation_id = correlation_id
-
-    def model_dump(self) -> dict:
-        """Convert to dictionary for JSON response."""
-        result = {"error": self.error}
-        if self.detail:
-            result["detail"] = self.detail
-        if self.correlation_id:
-            result["correlation_id"] = str(self.correlation_id)
-        return result
-
-
 @app.before_serving
 async def startup() -> None:
     """Initialize services and middleware."""
@@ -81,30 +63,47 @@ async def shutdown() -> None:
         logger.error(f"Error during service shutdown: {e}", exc_info=True)
 
 
+@app.errorhandler(HuleEduError)
+async def handle_huleedu_error(error: HuleEduError) -> Response | tuple[Response, int]:
+    """Handle HuleEduError exceptions with proper status mapping."""
+    # Use the Quart error handler from huleedu_service_libs
+    return create_error_response(error.error_detail)
+
+
 @app.errorhandler(ValidationError)
 async def handle_validation_error(error: ValidationError) -> Response | tuple[Response, int]:
     """Handle Pydantic validation errors."""
+    from uuid import uuid4
+
+    from huleedu_service_libs.error_handling import raise_validation_error
+
     logger.warning(f"Validation error: {error}")
-    response = ErrorResponse(error="Validation Error", correlation_id=uuid4(), detail=str(error))
-    return jsonify(response.model_dump()), 400
-
-
-@app.errorhandler(ValueError)
-async def handle_value_error(error: ValueError) -> Response | tuple[Response, int]:
-    """Handle value errors."""
-    logger.warning(f"Value error: {error}")
-    response = ErrorResponse(error="Invalid Value", correlation_id=uuid4(), detail=str(error))
-    return jsonify(response.model_dump()), 400
+    raise_validation_error(
+        service="essay_lifecycle_service",
+        operation="request_validation",
+        field="request_body",
+        message=str(error),
+        correlation_id=uuid4(),
+        validation_errors=str(error),
+    )
 
 
 @app.errorhandler(Exception)
 async def handle_general_error(error: Exception) -> Response | tuple[Response, int]:
     """Handle general exceptions."""
-    logger.error(f"Unexpected error: {error}")
-    response = ErrorResponse(
-        error="Internal Server Error", correlation_id=uuid4(), detail="An unexpected error occurred"
+    from uuid import uuid4
+
+    from huleedu_service_libs.error_handling import raise_processing_error
+
+    logger.error(f"Unexpected error: {error}", exc_info=True)
+    raise_processing_error(
+        service="essay_lifecycle_service",
+        operation="request_processing",
+        message="An unexpected error occurred during request processing",
+        correlation_id=uuid4(),
+        error_type=error.__class__.__name__,
+        error_details=str(error),
     )
-    return jsonify(response.model_dump()), 500
 
 
 # Register Blueprints

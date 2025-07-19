@@ -18,6 +18,10 @@ if TYPE_CHECKING:
     from services.essay_lifecycle_service.config import Settings
 
 from common_core.domain_enums import CourseCode, Language
+from huleedu_service_libs.error_handling import (
+    raise_cj_assessment_service_error,
+    raise_spellcheck_service_error,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
 
@@ -114,14 +118,22 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 )
 
             except Exception as e:
-                logger.error(
-                    f"Failed to dispatch spellcheck request for essay {essay_ref.essay_id}",
-                    extra={
-                        "error": str(e),
-                        "essay_id": essay_ref.essay_id,
-                        "correlation_id": str(correlation_id),
-                    },
-                )
+                # Re-raise HuleEduError as-is, or wrap other exceptions
+                if hasattr(e, "error_detail"):
+                    raise
+                else:
+                    raise_spellcheck_service_error(
+                        service="essay_lifecycle_service",
+                        operation="dispatch_spellcheck_requests",
+                        message=f"Failed to dispatch spellcheck request for essay {essay_ref.essay_id}: {e.__class__.__name__}",
+                        correlation_id=correlation_id,
+                        essay_id=essay_ref.essay_id,
+                        text_storage_id=essay_ref.text_storage_id,
+                        language=language.value,
+                        batch_id=batch_id,
+                        error_type=e.__class__.__name__,
+                        error_details=str(e),
+                    )
 
         logger.info(
             "Completed dispatching spellcheck requests",
@@ -244,11 +256,19 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
             )
 
         except Exception as e:
-            logger.error(
-                "Failed to dispatch CJ assessment request",
-                extra={
-                    "error": str(e),
-                    "essay_count": len(essays_to_process),
-                    "correlation_id": str(correlation_id),
-                },
-            )
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_cj_assessment_service_error(
+                    service="essay_lifecycle_service",
+                    operation="dispatch_cj_assessment_requests",
+                    message=f"Failed to dispatch CJ assessment request: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
+                    essay_count=len(essays_to_process),
+                    language=language.value,
+                    course_code=course_code.value,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )

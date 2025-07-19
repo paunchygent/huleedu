@@ -12,8 +12,10 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
+from common_core.error_enums import ErrorCode
 from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
+from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
 from services.essay_lifecycle_service.implementations.event_publisher import DefaultEventPublisher
@@ -156,12 +158,20 @@ class TestRedisNotifications:
             "Redis connection failed"
         )
 
-        # Act - should not raise exception
+        # Act - should raise HuleEduError with EXTERNAL_SERVICE_ERROR
         correlation_id = uuid4()
-        await event_publisher.publish_status_update(essay_ref, status, correlation_id)
+        with pytest.raises(HuleEduError) as exc_info:
+            await event_publisher.publish_status_update(essay_ref, status, correlation_id)
 
         # Assert - Redis call was attempted
         mock_redis_client.publish_user_notification.assert_called_once()
+
+        # Validate error structure
+        error = exc_info.value
+        assert error.error_detail.error_code == ErrorCode.EXTERNAL_SERVICE_ERROR
+        assert "Redis" in error.error_detail.message
+        assert error.error_detail.service == "essay_lifecycle_service"
+        assert error.error_detail.operation == "_publish_essay_status_to_redis"
 
     async def test_batch_tracker_lookup_method(
         self,

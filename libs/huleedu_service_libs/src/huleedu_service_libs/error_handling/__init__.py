@@ -43,8 +43,8 @@ from huleedu_service_libs.error_handling.factories import (
 )
 
 # Framework-specific handlers moved to submodules:
-# - FastAPI handlers: from huleedu_service_libs.error_handling.fastapi import register_error_handlers
-# - Quart handlers: from huleedu_service_libs.error_handling.quart import register_error_handlers
+# - FastAPI: from huleedu_service_libs.error_handling.fastapi import register_error_handlers
+# - Quart: from huleedu_service_libs.error_handling.quart import register_error_handlers
 from huleedu_service_libs.error_handling.file_validation_factories import (
     raise_content_too_long,
     raise_content_too_short,

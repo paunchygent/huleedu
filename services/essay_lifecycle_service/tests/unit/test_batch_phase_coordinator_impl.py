@@ -18,6 +18,10 @@ from common_core.status_enums import BatchStatus, EssayStatus
 from services.essay_lifecycle_service.implementations.batch_phase_coordinator_impl import (
     DefaultBatchPhaseCoordinator,
 )
+from services.essay_lifecycle_service.protocols import (
+    EssayRepositoryProtocol,
+    EventPublisher,
+)
 
 
 class TestDefaultBatchPhaseCoordinator:
@@ -25,13 +29,13 @@ class TestDefaultBatchPhaseCoordinator:
 
     @pytest.fixture
     def mock_essay_repository(self) -> AsyncMock:
-        """Mock EssayStateStore for testing."""
-        return AsyncMock()
+        """Mock EssayRepositoryProtocol for testing using protocol-based mocking."""
+        return AsyncMock(spec=EssayRepositoryProtocol)
 
     @pytest.fixture
     def mock_event_publisher(self) -> AsyncMock:
-        """Mock EventPublisher for testing."""
-        return AsyncMock()
+        """Mock EventPublisher for testing using protocol-based mocking."""
+        return AsyncMock(spec=EventPublisher)
 
     @pytest.fixture
     def coordinator(

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -17,20 +17,16 @@ from common_core.error_enums import FileValidationErrorCode
 from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayValidationFailedV1
 
-from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
-    DefaultBatchEssayTracker as BatchEssayTracker,
-)
+from services.essay_lifecycle_service.protocols import BatchEssayTracker
 
 
 class TestValidationEventConsumerIntegration:
     """Test suite for validation event consumer integration with ELS."""
 
     @pytest.fixture
-    def mock_batch_tracker(self) -> Mock:
-        """Fixture providing a mocked BatchEssayTracker."""
-        tracker = Mock(spec=BatchEssayTracker)
-        tracker.handle_validation_failure = AsyncMock()
-        return tracker
+    def mock_batch_tracker(self) -> AsyncMock:
+        """Fixture providing a mocked BatchEssayTracker using protocol-based mocking."""
+        return AsyncMock(spec=BatchEssayTracker)
 
     @pytest.fixture
     def sample_validation_failure_event(self) -> EssayValidationFailedV1:
@@ -60,7 +56,9 @@ class TestValidationEventConsumerIntegration:
         )
 
     async def test_validation_failure_event_processing(
-        self, mock_batch_tracker: Mock, sample_validation_failure_event: EssayValidationFailedV1
+        self,
+        mock_batch_tracker: AsyncMock,
+        sample_validation_failure_event: EssayValidationFailedV1,
     ) -> None:
         """Test processing of validation failure events by ELS consumer."""
         # Simulate event processor handling validation failure
@@ -108,7 +106,7 @@ class TestValidationEventConsumerIntegration:
         )
 
     async def test_consumer_event_routing(
-        self, mock_batch_tracker: Mock, sample_event_envelope: EventEnvelope
+        self, mock_batch_tracker: AsyncMock, sample_event_envelope: EventEnvelope
     ) -> None:
         """Test that the ELS consumer routes validation failure events correctly."""
         # Simulate the consumer's event routing logic
@@ -123,7 +121,7 @@ class TestValidationEventConsumerIntegration:
         # Verify the routing occurred
         mock_batch_tracker.handle_validation_failure.assert_called_once_with(event_data)
 
-    async def test_multiple_validation_failure_events(self, mock_batch_tracker: Mock) -> None:
+    async def test_multiple_validation_failure_events(self, mock_batch_tracker: AsyncMock) -> None:
         """Test processing multiple validation failure events for the same batch."""
         # Create multiple validation failure events
         validation_failures = [
@@ -146,7 +144,7 @@ class TestValidationEventConsumerIntegration:
         assert mock_batch_tracker.handle_validation_failure.call_count == 3
 
     async def test_validation_failure_with_correlation_tracking(
-        self, mock_batch_tracker: Mock
+        self, mock_batch_tracker: AsyncMock
     ) -> None:
         """Test that correlation IDs are preserved through event processing."""
         correlation_id = uuid4()
@@ -168,7 +166,7 @@ class TestValidationEventConsumerIntegration:
         call_args = mock_batch_tracker.handle_validation_failure.call_args[0][0]
         assert call_args.correlation_id == correlation_id
 
-    async def test_invalid_event_data_handling(self, mock_batch_tracker: Mock) -> None:
+    async def test_invalid_event_data_handling(self, mock_batch_tracker: AsyncMock) -> None:
         """Test handling of invalid or malformed validation failure events."""
         # Create an envelope with incorrect event type but validation failure data
         invalid_envelope: EventEnvelope[EssayValidationFailedV1] = EventEnvelope(
@@ -194,7 +192,7 @@ class TestValidationEventConsumerIntegration:
         # Should not have been called due to mismatched event type
         mock_batch_tracker.handle_validation_failure.assert_not_called()
 
-    async def test_consumer_error_handling(self, mock_batch_tracker: Mock) -> None:
+    async def test_consumer_error_handling(self, mock_batch_tracker: AsyncMock) -> None:
         """Test error handling in validation failure event processing."""
         # Configure mock to raise an exception
         mock_batch_tracker.handle_validation_failure.side_effect = Exception("Processing error")
@@ -234,7 +232,7 @@ class TestValidationEventConsumerIntegration:
         assert envelope.event_timestamp == test_timestamp
         assert envelope.data.timestamp is not None
 
-    async def test_batch_id_consistency_validation(self, mock_batch_tracker: Mock) -> None:
+    async def test_batch_id_consistency_validation(self, mock_batch_tracker: AsyncMock) -> None:
         """Test validation of batch ID consistency between envelope and data."""
         batch_id = "batch_consistency_test"
 
@@ -263,7 +261,7 @@ class TestValidationEventConsumerIntegration:
         assert envelope.data.batch_id == batch_id
         assert call_args.batch_id == batch_id
 
-    async def test_concurrent_event_processing(self, mock_batch_tracker: Mock) -> None:
+    async def test_concurrent_event_processing(self, mock_batch_tracker: AsyncMock) -> None:
         """Test concurrent processing of validation failure events."""
         import asyncio
 
@@ -292,7 +290,9 @@ class TestValidationEventConsumerIntegration:
         assert mock_batch_tracker.handle_validation_failure.call_count == 5
 
     async def test_event_source_service_validation(
-        self, mock_batch_tracker: Mock, sample_validation_failure_event: EssayValidationFailedV1
+        self,
+        mock_batch_tracker: AsyncMock,
+        sample_validation_failure_event: EssayValidationFailedV1,
     ) -> None:
         """Test validation of event source service."""
         # Create envelope from file service
@@ -326,7 +326,7 @@ class TestValidationEventConsumerIntegration:
         await mock_batch_tracker.handle_validation_failure(unexpected_envelope.data)
         mock_batch_tracker.handle_validation_failure.assert_called_once()
 
-    async def test_validation_error_code_preservation(self, mock_batch_tracker: Mock) -> None:
+    async def test_validation_error_code_preservation(self, mock_batch_tracker: AsyncMock) -> None:
         """Test that validation error codes are preserved through event processing."""
         error_codes = [
             FileValidationErrorCode.EMPTY_CONTENT,

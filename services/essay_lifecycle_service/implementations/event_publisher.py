@@ -16,6 +16,10 @@ if TYPE_CHECKING:
 
     from services.essay_lifecycle_service.config import Settings
 
+from huleedu_service_libs.error_handling import (
+    raise_external_service_error,
+    raise_kafka_publish_error,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
 
@@ -77,8 +81,25 @@ class DefaultEventPublisher(EventPublisher):
             inject_trace_context(envelope.metadata)
 
         # Publish to Kafka using KafkaBus.publish()
-        topic = "essay.status.events"
-        await self.kafka_bus.publish(topic, envelope)
+        try:
+            topic = "essay.status.events"
+            await self.kafka_bus.publish(topic, envelope)
+        except Exception as e:
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_kafka_publish_error(
+                    service="essay_lifecycle_service",
+                    operation="publish_status_update",
+                    message=f"Failed to publish essay status update to Kafka: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    topic=topic,
+                    essay_id=essay_ref.entity_id,
+                    status=status.value,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
 
         # Publish to Redis for real-time updates
         await self._publish_essay_status_to_redis(essay_ref, status, correlation_id)
@@ -129,14 +150,22 @@ class DefaultEventPublisher(EventPublisher):
                 )
 
         except Exception as e:
-            logger.error(
-                f"Error publishing essay status to Redis: {e}",
-                extra={
-                    "essay_id": essay_ref.entity_id,
-                    "correlation_id": str(correlation_id),
-                },
-                exc_info=True,
-            )
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_external_service_error(
+                    service="essay_lifecycle_service",
+                    operation="_publish_essay_status_to_redis",
+                    external_service="Redis",
+                    message=f"Failed to publish essay status to Redis: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    essay_id=essay_ref.entity_id,
+                    user_id=user_id if "user_id" in locals() else None,
+                    status=status.value,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
 
     async def publish_batch_phase_progress(
         self,
@@ -184,8 +213,28 @@ class DefaultEventPublisher(EventPublisher):
             inject_trace_context(envelope.metadata)
 
         # Publish to Batch Service topic
-        topic = "batch.phase.progress.events"
-        await self.kafka_bus.publish(topic, envelope)
+        try:
+            topic = "batch.phase.progress.events"
+            await self.kafka_bus.publish(topic, envelope)
+        except Exception as e:
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_kafka_publish_error(
+                    service="essay_lifecycle_service",
+                    operation="publish_batch_phase_progress",
+                    message=f"Failed to publish batch phase progress to Kafka: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    topic=topic,
+                    batch_id=batch_id,
+                    phase=phase,
+                    completed_count=completed_count,
+                    failed_count=failed_count,
+                    total_essays_in_phase=total_essays_in_phase,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
 
     async def publish_batch_phase_concluded(
         self,
@@ -231,8 +280,26 @@ class DefaultEventPublisher(EventPublisher):
             inject_trace_context(envelope.metadata)
 
         # Publish to Batch Service topic
-        topic = "batch.phase.concluded.events"
-        await self.kafka_bus.publish(topic, envelope)
+        try:
+            topic = "batch.phase.concluded.events"
+            await self.kafka_bus.publish(topic, envelope)
+        except Exception as e:
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_kafka_publish_error(
+                    service="essay_lifecycle_service",
+                    operation="publish_batch_phase_concluded",
+                    message=f"Failed to publish batch phase conclusion to Kafka: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    topic=topic,
+                    batch_id=batch_id,
+                    phase=phase,
+                    status=status,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
 
     def _get_topic_for_event_type(self, event_type: str) -> str:
         """Map event type to appropriate Kafka topic."""
@@ -273,8 +340,25 @@ class DefaultEventPublisher(EventPublisher):
             inject_trace_context(envelope.metadata)
 
         # Publish to the correct topic
-        topic = topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
-        await self.kafka_bus.publish(topic, envelope)
+        try:
+            topic = topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
+            await self.kafka_bus.publish(topic, envelope)
+        except Exception as e:
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_kafka_publish_error(
+                    service="essay_lifecycle_service",
+                    operation="publish_excess_content_provisioned",
+                    message=f"Failed to publish excess content provisioned event to Kafka: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    topic=topic,
+                    batch_id=getattr(event_data, "batch_id", "unknown"),
+                    text_storage_id=getattr(event_data, "text_storage_id", "unknown"),
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
 
     async def publish_batch_essays_ready(
         self,
@@ -304,8 +388,25 @@ class DefaultEventPublisher(EventPublisher):
             inject_trace_context(envelope.metadata)
 
         # Publish to the correct topic
-        topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
-        await self.kafka_bus.publish(topic, envelope)
+        try:
+            topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
+            await self.kafka_bus.publish(topic, envelope)
+        except Exception as e:
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_kafka_publish_error(
+                    service="essay_lifecycle_service",
+                    operation="publish_batch_essays_ready",
+                    message=f"Failed to publish batch essays ready event to Kafka: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    topic=topic,
+                    batch_id=getattr(event_data, "batch_id", "unknown"),
+                    ready_count=len(getattr(event_data, "ready_essays", [])),
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
 
     async def publish_els_batch_phase_outcome(
         self,
@@ -335,5 +436,23 @@ class DefaultEventPublisher(EventPublisher):
             inject_trace_context(envelope.metadata)
 
         # Publish to the correct topic
-        topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
-        await self.kafka_bus.publish(topic, envelope)
+        try:
+            topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
+            await self.kafka_bus.publish(topic, envelope)
+        except Exception as e:
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_kafka_publish_error(
+                    service="essay_lifecycle_service",
+                    operation="publish_els_batch_phase_outcome",
+                    message=f"Failed to publish ELS batch phase outcome event to Kafka: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    topic=topic,
+                    batch_id=getattr(event_data, "batch_id", "unknown"),
+                    phase=getattr(event_data, "phase", "unknown"),
+                    outcome=getattr(event_data, "outcome", "unknown"),
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )

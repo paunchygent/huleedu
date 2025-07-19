@@ -15,11 +15,10 @@ from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
+from common_core.error_enums import ErrorCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
-from common_core.metadata_models import SystemProcessingMetadata, EntityReference
-from testcontainers.postgres import PostgresContainer
-from testcontainers.redis import RedisContainer
-
+from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from huleedu_service_libs.error_handling import HuleEduError
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
     DefaultBatchCoordinationHandler,
@@ -33,22 +32,26 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
+from testcontainers.postgres import PostgresContainer
+from testcontainers.redis import RedisContainer
 
 
 class MockEventPublisher:
     """Minimal event publisher for testing without Kafka complexity."""
-    
+
     def __init__(self) -> None:
         self.published_events: list[tuple[str, Any, Any]] = []
-    
+
     async def publish_batch_essays_ready(self, event_data: Any, correlation_id: Any) -> None:
         """Record published events for verification."""
         self.published_events.append(("batch_essays_ready", event_data, correlation_id))
-    
-    async def publish_excess_content_provisioned(self, event_data: Any, correlation_id: Any) -> None:
+
+    async def publish_excess_content_provisioned(
+        self, event_data: Any, correlation_id: Any
+    ) -> None:
         """Record published events for verification."""
         self.published_events.append(("excess_content_provisioned", event_data, correlation_id))
-    
+
     async def publish_els_batch_phase_outcome(self, event_data: Any, correlation_id: Any) -> None:
         """Record published events for verification."""
         self.published_events.append(("els_batch_phase_outcome", event_data, correlation_id))
@@ -119,9 +122,8 @@ class TestAtomicBatchCreationIntegration:
 
         # Clean up any existing data to ensure test isolation
         async with repository.session() as session:
+            from services.essay_lifecycle_service.models_db import BatchEssayTracker, EssayStateDB
             from sqlalchemy import delete
-
-            from services.essay_lifecycle_service.models_db import EssayStateDB, BatchEssayTracker
 
             await session.execute(delete(EssayStateDB))
             await session.execute(delete(BatchEssayTracker))
@@ -133,10 +135,10 @@ class TestAtomicBatchCreationIntegration:
     async def redis_client(self, test_settings: Settings) -> AsyncGenerator[Any, None]:
         """Create real Redis client for testing."""
         from huleedu_service_libs.redis_client import RedisClient
-        
+
         client = RedisClient(client_id="test-els", redis_url=test_settings.REDIS_URL)
         await client.start()
-        
+
         try:
             # Clear any existing data using underlying Redis client
             await client.client.flushdb()
@@ -222,6 +224,7 @@ class TestAtomicBatchCreationIntegration:
             assert essay.batch_id == sample_batch_event.batch_id
             # Verify all essays have the expected initial status
             from common_core.status_enums import EssayStatus
+
             assert essay.current_status == EssayStatus.UPLOADED
 
         # Assert - Batch listing returns all essays
@@ -252,12 +255,17 @@ class TestAtomicBatchCreationIntegration:
         correlation_id = uuid4()
 
         # Act & Assert - Handler should fail due to constraint violation
-        result = await coordination_handler.handle_batch_essays_registered(
-            sample_batch_event, correlation_id
-        )
+        with pytest.raises(HuleEduError) as exc_info:
+            await coordination_handler.handle_batch_essays_registered(
+                sample_batch_event, correlation_id
+            )
 
-        # Handler should return False due to exception
-        assert result is False
+        # Validate error structure
+        error = exc_info.value
+        assert error.error_detail.error_code == ErrorCode.PROCESSING_ERROR
+        assert "Database error during batch essay creation" in error.error_detail.message
+        assert error.error_detail.service == "essay_lifecycle_service"
+        assert error.error_detail.operation == "create_essay_records_batch"
 
         # Assert - Only the manually created essay should exist (atomic rollback)
         existing_essay = await postgres_repository.get_essay_state("essay_001")
@@ -301,7 +309,9 @@ class TestAtomicBatchCreationIntegration:
         correlation_id = uuid4()
 
         # Act - Process empty batch event
-        result = await coordination_handler.handle_batch_essays_registered(empty_event, correlation_id)
+        result = await coordination_handler.handle_batch_essays_registered(
+            empty_event, correlation_id
+        )
 
         # Assert - Handler succeeded
         assert result is True

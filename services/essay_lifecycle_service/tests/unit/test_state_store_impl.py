@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 import pytest
 from common_core.domain_enums import ContentType
 from common_core.status_enums import EssayStatus
+from huleedu_service_libs.error_handling import HuleEduError
 
 from state_store import EssayState, SQLiteEssayStateStore
 
@@ -211,7 +212,7 @@ class TestSQLiteEssayStateStore:
     ) -> None:
         """Test updating status for nonexistent essay raises error."""
         # Execute and verify exception
-        with pytest.raises(ValueError, match="Essay nonexistent-essay not found"):
+        with pytest.raises(HuleEduError):
             await state_store.update_essay_status_via_machine(
                 essay_id="nonexistent-essay",
                 new_status=EssayStatus.SPELLCHECKED_SUCCESS,

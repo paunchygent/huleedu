@@ -2,7 +2,7 @@
 Unit tests for DefaultBatchCommandHandler implementation.
 
 Tests the batch command handler's delegation to service-specific handlers
-and proper error handling.
+and proper error handling using protocol-based mocking following Rule 070.
 """
 
 from __future__ import annotations

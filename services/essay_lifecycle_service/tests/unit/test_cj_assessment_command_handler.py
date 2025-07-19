@@ -28,6 +28,11 @@ from services.essay_lifecycle_service.essay_state_machine import (
 from services.essay_lifecycle_service.implementations.cj_assessment_command_handler import (
     CJAssessmentCommandHandler,
 )
+from services.essay_lifecycle_service.protocols import (
+    EssayRepositoryProtocol,
+    EventPublisher,
+    SpecializedServiceRequestDispatcher,
+)
 
 if TYPE_CHECKING:
     pass
@@ -53,23 +58,18 @@ class TestCJAssessmentCommandHandler:
 
     @pytest.fixture
     def mock_repository(self) -> AsyncMock:
-        """Mock essay repository protocol."""
-        mock = AsyncMock()
-        mock.get_essay_state = AsyncMock()
-        mock.update_essay_status_via_machine = AsyncMock()
-        return mock
+        """Mock essay repository protocol using protocol-based mocking."""
+        return AsyncMock(spec=EssayRepositoryProtocol)
 
     @pytest.fixture
     def mock_request_dispatcher(self) -> AsyncMock:
-        """Mock specialized service request dispatcher protocol."""
-        mock = AsyncMock()
-        mock.dispatch_cj_assessment_requests = AsyncMock()
-        return mock
+        """Mock specialized service request dispatcher protocol using protocol-based mocking."""
+        return AsyncMock(spec=SpecializedServiceRequestDispatcher)
 
     @pytest.fixture
     def mock_event_publisher(self) -> AsyncMock:
-        """Mock event publisher protocol."""
-        return AsyncMock()
+        """Mock event publisher protocol using protocol-based mocking."""
+        return AsyncMock(spec=EventPublisher)
 
     @pytest.fixture
     def cj_assessment_handler(

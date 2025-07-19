@@ -28,7 +28,7 @@ class TestBatchCommandIntegration:
     @pytest.mark.asyncio
     async def test_command_handler_processes_spellcheck_command(self) -> None:
         """Test that command handler can process a spellcheck command."""
-        # Create mocked service handlers
+        # Create mocked service handlers using protocol-based mocking principles
         mock_spellcheck_handler = AsyncMock()
         mock_cj_assessment_handler = AsyncMock()
         mock_future_services_handler = AsyncMock()
@@ -68,7 +68,7 @@ class TestBatchCommandIntegration:
     @pytest.mark.asyncio
     async def test_command_handler_handles_missing_essay_gracefully(self) -> None:
         """Test that command handler handles missing essays gracefully."""
-        # Create mocked service handlers
+        # Create mocked service handlers using protocol-based mocking principles
         mock_spellcheck_handler = AsyncMock()
         mock_cj_assessment_handler = AsyncMock()
         mock_future_services_handler = AsyncMock()

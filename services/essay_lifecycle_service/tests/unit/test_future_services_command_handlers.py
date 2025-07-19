@@ -14,6 +14,11 @@ import pytest
 from services.essay_lifecycle_service.implementations.future_services_command_handlers import (
     FutureServicesCommandHandler,
 )
+from services.essay_lifecycle_service.protocols import (
+    EssayRepositoryProtocol,
+    EventPublisher,
+    SpecializedServiceRequestDispatcher,
+)
 
 
 class TestFutureServicesCommandHandler:
@@ -21,11 +26,11 @@ class TestFutureServicesCommandHandler:
 
     @pytest.fixture
     def future_services_handler(self) -> FutureServicesCommandHandler:
-        """Create FutureServicesCommandHandler instance."""
-        # Future services handler doesn't need real dependencies for stub tests
-        mock_repo = AsyncMock()
-        mock_dispatcher = AsyncMock()
-        mock_publisher = AsyncMock()
+        """Create FutureServicesCommandHandler instance using protocol-based mocking."""
+        # Future services handler with protocol-based mocks for stub tests
+        mock_repo = AsyncMock(spec=EssayRepositoryProtocol)
+        mock_dispatcher = AsyncMock(spec=SpecializedServiceRequestDispatcher)
+        mock_publisher = AsyncMock(spec=EventPublisher)
         return FutureServicesCommandHandler(mock_repo, mock_dispatcher, mock_publisher)
 
     @pytest.fixture
