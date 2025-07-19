@@ -57,7 +57,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             # Register batch with tracker, preserving correlation ID
             await self.batch_tracker.register_batch(event_data, correlation_id)
 
-            # Create initial essay records in the database
+            # Create initial essay records in the database (atomic batch operation)
             from common_core.metadata_models import EntityReference
 
             logger.info(
@@ -68,11 +68,17 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     "correlation_id": str(correlation_id),
                 },
             )
-            for essay_id in event_data.essay_ids:
-                essay_ref = EntityReference(
+            
+            # Create all essay references for atomic batch operation
+            essay_refs = [
+                EntityReference(
                     entity_id=essay_id, entity_type="essay", parent_id=event_data.batch_id
                 )
-                await self.repository.create_essay_record(essay_ref)
+                for essay_id in event_data.essay_ids
+            ]
+            
+            # Create all essay records in single atomic transaction
+            await self.repository.create_essay_records_batch(essay_refs)
 
             logger.info(
                 "Successfully created initial essay records for batch",

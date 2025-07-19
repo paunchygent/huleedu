@@ -212,6 +212,44 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             self.logger.info(f"Created essay record {essay_ref.entity_id}")
             return essay_state
 
+    async def create_essay_records_batch(
+        self, essay_refs: list[EntityReference]
+    ) -> list[ConcreteEssayState]:
+        """Create multiple essay records in single atomic transaction."""
+        if not essay_refs:
+            return []
+
+        # Log batch creation start
+        batch_id = essay_refs[0].parent_id if essay_refs else "unknown"
+        essay_ids = [ref.entity_id for ref in essay_refs]
+        self.logger.info(
+            f"Creating batch of {len(essay_refs)} essay records for batch {batch_id}: {essay_ids}"
+        )
+
+        # Create essay states for all references
+        essay_states = []
+        for essay_ref in essay_refs:
+            essay_state = ConcreteEssayState(
+                essay_id=essay_ref.entity_id,
+                batch_id=essay_ref.parent_id,
+                current_status=EssayStatus.UPLOADED,
+                timeline={EssayStatus.UPLOADED.value: datetime.now(UTC)},
+            )
+            essay_states.append(essay_state)
+
+        # Single atomic transaction for all essay records
+        async with self.session() as session:
+            for essay_state in essay_states:
+                db_data = self._essay_state_to_db_dict(essay_state)
+                db_essay = EssayStateDB(**db_data)
+                session.add(db_essay)
+
+            # All essays are committed together in a single transaction
+            self.logger.info(
+                f"Successfully created batch of {len(essay_states)} essay records for batch {batch_id}"
+            )
+            return essay_states
+
     async def list_essays_by_batch(self, batch_id: str) -> list[EssayState]:
         """List all essays in a batch."""
         async with self.session() as session:

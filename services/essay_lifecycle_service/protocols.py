@@ -67,6 +67,12 @@ class EssayRepositoryProtocol(Protocol):
         """Create new essay record from entity reference."""
         ...
 
+    async def create_essay_records_batch(
+        self, essay_refs: list[EntityReference]
+    ) -> list[EssayState]:
+        """Create multiple essay records in single atomic transaction."""
+        ...
+
     async def list_essays_by_batch(self, batch_id: str) -> list[EssayState]:
         """List all essays in a batch."""
         ...

@@ -343,3 +343,111 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # Check metadata is preserved
         assert final_essay.processing_metadata["step"] == "completed"
         assert final_essay.processing_metadata["data"]["final_score"] == 85
+
+    @pytest.mark.asyncio
+    async def test_atomic_batch_essay_creation_success(
+        self, postgres_repository: PostgreSQLEssayRepository
+    ) -> None:
+        """Test successful atomic batch creation of multiple essays."""
+        # Arrange - Create batch of entity references
+        batch_id = "atomic-test-batch"
+        essay_refs = [
+            EntityReference(
+                entity_id=f"atomic-essay-{i:03d}",
+                entity_type="essay",
+                parent_id=batch_id
+            )
+            for i in range(1, 4)  # 3 essays
+        ]
+
+        # Act - Create all essays in atomic batch operation
+        created_essays = await postgres_repository.create_essay_records_batch(essay_refs)
+
+        # Assert - All essays created successfully
+        assert len(created_essays) == 3
+        
+        # Verify each essay has correct data
+        for i, essay in enumerate(created_essays, 1):
+            assert essay.essay_id == f"atomic-essay-{i:03d}"
+            assert essay.batch_id == batch_id
+            assert essay.current_status == EssayStatus.UPLOADED
+            assert EssayStatus.UPLOADED.value in essay.timeline
+            assert isinstance(essay.created_at, datetime)
+            assert isinstance(essay.updated_at, datetime)
+
+        # Verify all essays can be retrieved from database
+        for i in range(1, 4):
+            essay_id = f"atomic-essay-{i:03d}"
+            retrieved_essay = await postgres_repository.get_essay_state(essay_id)
+            assert retrieved_essay is not None
+            assert retrieved_essay.essay_id == essay_id
+            assert retrieved_essay.batch_id == batch_id
+
+        # Verify batch listing returns all essays
+        batch_essays = await postgres_repository.list_essays_by_batch(batch_id)
+        assert len(batch_essays) == 3
+        batch_essay_ids = {essay.essay_id for essay in batch_essays}
+        expected_ids = {f"atomic-essay-{i:03d}" for i in range(1, 4)}
+        assert batch_essay_ids == expected_ids
+
+    @pytest.mark.asyncio
+    async def test_atomic_batch_essay_creation_empty_list(
+        self, postgres_repository: PostgreSQLEssayRepository
+    ) -> None:
+        """Test atomic batch creation with empty list returns empty result."""
+        # Act - Create batch with empty list
+        created_essays = await postgres_repository.create_essay_records_batch([])
+
+        # Assert - Empty list returned
+        assert created_essays == []
+
+    @pytest.mark.asyncio
+    async def test_atomic_batch_essay_creation_preserves_atomicity(
+        self, postgres_repository: PostgreSQLEssayRepository
+    ) -> None:
+        """Test that batch creation is truly atomic - all or nothing."""
+        # Arrange - Create one essay to test for duplicate key constraint
+        existing_ref = EntityReference(
+            entity_id="duplicate-essay-001",
+            entity_type="essay", 
+            parent_id="atomicity-test-batch"
+        )
+        await postgres_repository.create_essay_record(existing_ref)
+
+        # Arrange - Create batch that includes the duplicate
+        batch_refs = [
+            EntityReference(
+                entity_id="duplicate-essay-001",  # This will cause constraint violation
+                entity_type="essay",
+                parent_id="atomicity-test-batch"
+            ),
+            EntityReference(
+                entity_id="new-essay-002",
+                entity_type="essay", 
+                parent_id="atomicity-test-batch"
+            ),
+            EntityReference(
+                entity_id="new-essay-003",
+                entity_type="essay",
+                parent_id="atomicity-test-batch"
+            )
+        ]
+
+        # Act & Assert - Batch creation should fail completely
+        with pytest.raises(Exception):  # Will be IntegrityError or similar
+            await postgres_repository.create_essay_records_batch(batch_refs)
+
+        # Assert - No new essays should exist (atomic rollback)
+        # The existing essay should still be there
+        existing_essay = await postgres_repository.get_essay_state("duplicate-essay-001")
+        assert existing_essay is not None
+
+        # But the new essays should NOT exist (transaction rolled back)
+        new_essay_2 = await postgres_repository.get_essay_state("new-essay-002")
+        new_essay_3 = await postgres_repository.get_essay_state("new-essay-003")
+        assert new_essay_2 is None
+        assert new_essay_3 is None
+
+        # Verify batch count is still 1 (only the original essay)
+        batch_essays = await postgres_repository.list_essays_by_batch("atomicity-test-batch")
+        assert len(batch_essays) == 1
