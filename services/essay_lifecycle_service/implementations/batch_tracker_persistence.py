@@ -16,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from services.essay_lifecycle_service.implementations.batch_expectation import BatchExpectation
-from services.essay_lifecycle_service.implementations.slot_assignment import SlotAssignment
 from services.essay_lifecycle_service.models_db import (
     BatchEssayTracker as BatchEssayTrackerDB,
 )
@@ -52,7 +51,7 @@ class BatchTrackerPersistence:
                 tracker_db = BatchEssayTrackerDB(
                     batch_id=expectation.batch_id,
                     expected_essay_ids=list(expectation.expected_essay_ids),
-                    available_slots=list(expectation.available_slots),
+                    available_slots=list(expectation.expected_essay_ids),  # Initialize with all slots available
                     expected_count=expectation.expected_count,
                     course_code=expectation.course_code.value,
                     essay_instructions=expectation.essay_instructions,
@@ -155,7 +154,9 @@ class BatchTrackerPersistence:
         # Create expectation
         expectation = BatchExpectation(
             batch_id=tracker_db.batch_id,
-            expected_essay_ids=frozenset(tracker_db.expected_essay_ids),  # Convert list to immutable frozenset
+            expected_essay_ids=frozenset(
+                tracker_db.expected_essay_ids
+            ),  # Convert list to immutable frozenset
             expected_count=tracker_db.expected_count,  # Fixed: Added missing required field
             course_code=CourseCode(tracker_db.course_code),
             essay_instructions=tracker_db.essay_instructions,
@@ -167,5 +168,5 @@ class BatchTrackerPersistence:
 
         # Note: Slot assignments are now tracked in Redis coordinator, not in memory
         # The database slot assignments are used for persistence only
-        
+
         return expectation

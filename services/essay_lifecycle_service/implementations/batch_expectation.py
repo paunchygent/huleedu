@@ -18,13 +18,13 @@ from common_core.domain_enums import CourseCode
 class BatchExpectation:
     """
     Pure immutable data class for batch metadata.
-    
+
     Contains only the batch registration information from BOS.
     NO business logic or mutable state - all operations handled by Redis coordinator.
-    
+
     This is a value object representing the initial batch configuration.
     """
-    
+
     batch_id: str
     expected_essay_ids: frozenset[str]  # Immutable set of internal essay ID slots from BOS
     expected_count: int

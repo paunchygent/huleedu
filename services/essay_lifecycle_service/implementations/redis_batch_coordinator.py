@@ -21,10 +21,10 @@ from services.essay_lifecycle_service.config import Settings
 class RedisBatchCoordinator:
     """
     Redis-based distributed batch coordinator using atomic operations.
-    
+
     Implements distributed slot assignment using Redis SET operations to eliminate
     race conditions present in the in-memory implementation.
-    
+
     Redis Key Structure:
     - batch:{batch_id}:available_slots -> SET of essay_ids available for assignment
     - batch:{batch_id}:assignments -> HASH of essay_id -> content_metadata JSON
@@ -55,15 +55,15 @@ class RedisBatchCoordinator:
         return f"batch:{batch_id}:timeout"
 
     async def register_batch_slots(
-        self, 
-        batch_id: str, 
-        essay_ids: list[str], 
+        self,
+        batch_id: str,
+        essay_ids: list[str],
         metadata: dict[str, Any],
-        timeout_seconds: int | None = None
+        timeout_seconds: int | None = None,
     ) -> None:
         """
         Initialize available slots for batch with metadata.
-        
+
         Args:
             batch_id: The batch identifier
             essay_ids: List of essay IDs to use as slots
@@ -74,7 +74,7 @@ class RedisBatchCoordinator:
             raise ValueError("Cannot register batch with empty essay_ids")
 
         timeout = timeout_seconds or self._default_timeout
-        
+
         try:
             # Use Redis pipeline for atomic batch initialization
             await self._redis.multi()
@@ -87,7 +87,7 @@ class RedisBatchCoordinator:
             metadata_key = self._get_metadata_key(batch_id)
             for field, value in metadata.items():
                 # Convert values to strings for Redis storage
-                if isinstance(value, (dict, list)):
+                if isinstance(value, dict | list):
                     value_str = json.dumps(value)
                 elif isinstance(value, UUID):
                     value_str = str(value)
@@ -103,35 +103,29 @@ class RedisBatchCoordinator:
 
             # Execute atomic transaction
             results = await self._redis.exec()
-            
+
             if results is None:
                 raise RuntimeError(f"Batch registration transaction failed for batch {batch_id}")
 
             self._logger.info(
-                f"Registered batch {batch_id} with {len(essay_ids)} slots, "
-                f"timeout: {timeout}s"
+                f"Registered batch {batch_id} with {len(essay_ids)} slots, timeout: {timeout}s"
             )
 
         except Exception as e:
             await self._redis.unwatch()  # Clean up on error
-            self._logger.error(
-                f"Failed to register batch {batch_id}: {e}",
-                exc_info=True
-            )
+            self._logger.error(f"Failed to register batch {batch_id}: {e}", exc_info=True)
             raise
 
     async def assign_slot_atomic(
-        self, 
-        batch_id: str, 
-        content_metadata: dict[str, Any]
+        self, batch_id: str, content_metadata: dict[str, Any]
     ) -> str | None:
         """
         Atomically assign an available slot to content using Redis SPOP.
-        
+
         Args:
             batch_id: The batch identifier
             content_metadata: Content metadata including text_storage_id, original_file_name
-            
+
         Returns:
             The assigned internal essay ID if successful, None if no slots available
         """
@@ -145,7 +139,7 @@ class RedisBatchCoordinator:
 
             # Atomically pop a slot from available set
             essay_id = await self._redis.spop(slots_key)
-            
+
             if essay_id is None:
                 # No slots available - abort transaction
                 await self._redis.unwatch()
@@ -158,7 +152,7 @@ class RedisBatchCoordinator:
 
             # Execute atomic transaction
             results = await self._redis.exec()
-            
+
             if results is None:
                 # Transaction was discarded due to key changes
                 self._logger.warning(
@@ -175,58 +169,54 @@ class RedisBatchCoordinator:
 
         except Exception as e:
             await self._redis.unwatch()  # Clean up on error
-            self._logger.error(
-                f"Failed to assign slot for batch {batch_id}: {e}",
-                exc_info=True
-            )
+            self._logger.error(f"Failed to assign slot for batch {batch_id}: {e}", exc_info=True)
             raise
 
     async def check_batch_completion(self, batch_id: str) -> bool:
         """
         Check if batch is complete using Redis state.
-        
+
         A batch is complete when there are no remaining available slots.
-        
+
         Args:
             batch_id: The batch identifier
-            
+
         Returns:
             True if batch is complete (no available slots)
         """
         try:
             slots_key = self._get_available_slots_key(batch_id)
             available_count = await self._redis.scard(slots_key)
-            
+
             is_complete = available_count == 0
-            
+
             self._logger.debug(
                 f"Batch {batch_id} completion check: {available_count} slots remaining, "
                 f"complete: {is_complete}"
             )
-            
+
             return is_complete
 
         except Exception as e:
             self._logger.error(
-                f"Failed to check batch completion for {batch_id}: {e}",
-                exc_info=True
+                f"Failed to check batch completion for {batch_id}: {e}", exc_info=True
             )
             raise
 
     async def get_batch_assignments(self, batch_id: str) -> dict[str, dict[str, Any]]:
         """
         Get all current slot assignments for a batch.
-        
+
         Args:
             batch_id: The batch identifier
-            
+
         Returns:
             Dictionary mapping essay_id to content metadata
         """
         try:
             assignments_key = self._get_assignments_key(batch_id)
             assignments_data = await self._redis.hgetall(assignments_key)
-            
+
             # Parse JSON metadata for each assignment
             assignments = {}
             for essay_id, metadata_json in assignments_data.items():
@@ -239,30 +229,29 @@ class RedisBatchCoordinator:
                     )
                     # Skip corrupted entries rather than failing entirely
                     continue
-            
+
             return assignments
 
         except Exception as e:
             self._logger.error(
-                f"Failed to get batch assignments for {batch_id}: {e}",
-                exc_info=True
+                f"Failed to get batch assignments for {batch_id}: {e}", exc_info=True
             )
             raise
 
     async def get_batch_metadata(self, batch_id: str) -> dict[str, Any] | None:
         """
         Get batch metadata from Redis.
-        
+
         Args:
             batch_id: The batch identifier
-            
+
         Returns:
             Batch metadata dictionary or None if batch not found
         """
         try:
             metadata_key = self._get_metadata_key(batch_id)
             metadata_data = await self._redis.hgetall(metadata_key)
-            
+
             if not metadata_data:
                 return None
 
@@ -275,23 +264,20 @@ class RedisBatchCoordinator:
                 except json.JSONDecodeError:
                     # Fall back to string value
                     metadata[field] = value_str
-            
+
             return metadata
 
         except Exception as e:
-            self._logger.error(
-                f"Failed to get batch metadata for {batch_id}: {e}",
-                exc_info=True
-            )
+            self._logger.error(f"Failed to get batch metadata for {batch_id}: {e}", exc_info=True)
             raise
 
     async def get_batch_status(self, batch_id: str) -> dict[str, Any] | None:
         """
         Get comprehensive batch status from Redis.
-        
+
         Args:
             batch_id: The batch identifier
-            
+
         Returns:
             Status dictionary with slots, assignments, and metadata or None if not found
         """
@@ -304,11 +290,11 @@ class RedisBatchCoordinator:
             # Get slot counts and assignments
             slots_key = self._get_available_slots_key(batch_id)
             assignments_key = self._get_assignments_key(batch_id)
-            
+
             available_count = await self._redis.scard(slots_key)
             assignment_count = await self._redis.hlen(assignments_key)
             assignments = await self.get_batch_assignments(batch_id)
-            
+
             # Check if timeout marker still exists
             timeout_key = self._get_timeout_key(batch_id)
             timeout_exists = await self._redis.get(timeout_key) is not None
@@ -325,16 +311,13 @@ class RedisBatchCoordinator:
             }
 
         except Exception as e:
-            self._logger.error(
-                f"Failed to get batch status for {batch_id}: {e}",
-                exc_info=True
-            )
+            self._logger.error(f"Failed to get batch status for {batch_id}: {e}", exc_info=True)
             raise
 
     async def cleanup_batch(self, batch_id: str) -> None:
         """
         Clean up all Redis keys for a completed batch.
-        
+
         Args:
             batch_id: The batch identifier
         """
@@ -344,6 +327,7 @@ class RedisBatchCoordinator:
                 self._get_assignments_key(batch_id),
                 self._get_metadata_key(batch_id),
                 self._get_timeout_key(batch_id),
+                self._get_validation_failures_key(batch_id),
             ]
 
             for key in keys_to_delete:
@@ -352,26 +336,23 @@ class RedisBatchCoordinator:
             self._logger.info(f"Cleaned up Redis keys for completed batch {batch_id}")
 
         except Exception as e:
-            self._logger.error(
-                f"Failed to cleanup batch {batch_id}: {e}",
-                exc_info=True
-            )
+            self._logger.error(f"Failed to cleanup batch {batch_id}: {e}", exc_info=True)
             raise
 
     async def handle_batch_timeout(self, batch_id: str) -> dict[str, Any] | None:
         """
         Handle batch timeout by returning current state and cleaning up.
-        
+
         Args:
             batch_id: The batch identifier
-            
+
         Returns:
             Final batch status before cleanup, or None if batch not found
         """
         try:
             # Get final status before cleanup
             final_status = await self.get_batch_status(batch_id)
-            
+
             if final_status is None:
                 self._logger.warning(f"Batch {batch_id} not found during timeout handling")
                 return None
@@ -387,19 +368,16 @@ class RedisBatchCoordinator:
             return final_status
 
         except Exception as e:
-            self._logger.error(
-                f"Failed to handle timeout for batch {batch_id}: {e}",
-                exc_info=True
-            )
+            self._logger.error(f"Failed to handle timeout for batch {batch_id}: {e}", exc_info=True)
             raise
-    
+
     async def get_assigned_count(self, batch_id: str) -> int:
         """
         Get count of assigned slots for a batch.
-        
+
         Args:
             batch_id: The batch identifier
-            
+
         Returns:
             Number of assigned slots
         """
@@ -407,50 +385,48 @@ class RedisBatchCoordinator:
             assignments_key = self._get_assignments_key(batch_id)
             count = await self._redis.hlen(assignments_key)
             return count or 0
-            
+
         except Exception as e:
             self._logger.error(
-                f"Failed to get assigned count for batch {batch_id}: {e}",
-                exc_info=True
+                f"Failed to get assigned count for batch {batch_id}: {e}", exc_info=True
             )
             raise
-    
+
     async def get_assigned_essays(self, batch_id: str) -> list[dict[str, Any]]:
         """
         Get all assigned essay metadata for a batch.
-        
+
         Args:
             batch_id: The batch identifier
-            
+
         Returns:
             List of essay metadata dictionaries with internal_essay_id included
         """
         try:
             assignments = await self.get_batch_assignments(batch_id)
-            
+
             # Add internal_essay_id to each assignment metadata
             essays = []
             for essay_id, metadata in assignments.items():
                 essay_data = metadata.copy()
-                essay_data['internal_essay_id'] = essay_id
+                essay_data["internal_essay_id"] = essay_id
                 essays.append(essay_data)
-                
+
             return essays
-            
+
         except Exception as e:
             self._logger.error(
-                f"Failed to get assigned essays for batch {batch_id}: {e}",
-                exc_info=True
+                f"Failed to get assigned essays for batch {batch_id}: {e}", exc_info=True
             )
             raise
-    
+
     async def get_missing_slots(self, batch_id: str) -> list[str]:
         """
         Get list of unassigned slot IDs for a batch.
-        
+
         Args:
             batch_id: The batch identifier
-            
+
         Returns:
             List of available (unassigned) essay IDs
         """
@@ -458,10 +434,174 @@ class RedisBatchCoordinator:
             slots_key = self._get_available_slots_key(batch_id)
             slots = await self._redis.smembers(slots_key)
             return list(slots) if slots else []
-            
+
         except Exception as e:
             self._logger.error(
-                f"Failed to get missing slots for batch {batch_id}: {e}",
-                exc_info=True
+                f"Failed to get missing slots for batch {batch_id}: {e}", exc_info=True
             )
+            raise
+
+    def _get_validation_failures_key(self, batch_id: str) -> str:
+        """Get Redis key for validation failures list."""
+        return f"batch:{batch_id}:validation_failures"
+
+    async def track_validation_failure(self, batch_id: str, failure: dict[str, Any]) -> None:
+        """
+        Track a validation failure for a batch.
+
+        Args:
+            batch_id: The batch identifier
+            failure: Validation failure data (will be JSON-encoded)
+        """
+        try:
+            failures_key = self._get_validation_failures_key(batch_id)
+            failure_json = json.dumps(failure)
+
+            # Add to list of failures
+            await self._redis.rpush(failures_key, failure_json)
+
+            # Set TTL to match batch timeout
+            timeout_key = self._get_timeout_key(batch_id)
+            timeout_exists = await self._redis.get(timeout_key) is not None
+            if timeout_exists:
+                # Match TTL to batch timeout
+                ttl = await self._redis.ttl(timeout_key)
+                if ttl > 0:
+                    await self._redis.expire(failures_key, ttl)
+
+            self._logger.info(
+                f"Tracked validation failure for batch {batch_id}: "
+                f"{failure.get('original_file_name', 'unknown')}"
+            )
+
+        except Exception as e:
+            self._logger.error(
+                f"Failed to track validation failure for batch {batch_id}: {e}", exc_info=True
+            )
+            raise
+
+    async def get_validation_failures(self, batch_id: str) -> list[dict[str, Any]]:
+        """
+        Get all validation failures for a batch.
+
+        Args:
+            batch_id: The batch identifier
+
+        Returns:
+            List of validation failure dictionaries
+        """
+        try:
+            failures_key = self._get_validation_failures_key(batch_id)
+            failure_jsons = await self._redis.lrange(failures_key, 0, -1)
+
+            if not failure_jsons:
+                return []
+
+            # Parse JSON failures
+            failures = []
+            for failure_json in failure_jsons:
+                try:
+                    failures.append(json.loads(failure_json))
+                except json.JSONDecodeError as e:
+                    self._logger.warning(
+                        f"Failed to parse validation failure for batch {batch_id}: {e}"
+                    )
+                    # Skip corrupted entries
+                    continue
+
+            return failures
+
+        except Exception as e:
+            self._logger.error(
+                f"Failed to get validation failures for batch {batch_id}: {e}", exc_info=True
+            )
+            raise
+
+    async def get_validation_failure_count(self, batch_id: str) -> int:
+        """
+        Get count of validation failures for a batch.
+
+        Args:
+            batch_id: The batch identifier
+
+        Returns:
+            Number of validation failures
+        """
+        try:
+            failures_key = self._get_validation_failures_key(batch_id)
+            count = await self._redis.llen(failures_key)
+            return count or 0
+
+        except Exception as e:
+            self._logger.error(
+                f"Failed to get validation failure count for batch {batch_id}: {e}", exc_info=True
+            )
+            raise
+
+    async def list_active_batch_ids(self) -> list[str]:
+        """
+        List all active batch IDs by scanning Redis metadata keys.
+
+        Returns:
+            List of active batch IDs
+        """
+        try:
+            metadata_keys = await self._redis.scan_pattern("batch:*:metadata")
+            batch_ids = []
+            
+            for key in metadata_keys:
+                # Extract batch_id from key pattern: batch:{batch_id}:metadata
+                key_parts = key.split(":")
+                if len(key_parts) >= 3 and key_parts[0] == "batch" and key_parts[-1] == "metadata":
+                    batch_id = ":".join(key_parts[1:-1])  # Handle batch_ids that contain colons
+                    batch_ids.append(batch_id)
+            
+            self._logger.debug(f"Found {len(batch_ids)} active batches in Redis")
+            return batch_ids
+
+        except Exception as e:
+            self._logger.error(f"Failed to list active batch IDs: {e}", exc_info=True)
+            raise
+
+    async def find_batch_for_essay(self, essay_id: str) -> tuple[str, str] | None:
+        """
+        Find the batch and user_id for a given essay by scanning batch assignments.
+
+        Args:
+            essay_id: The internal essay ID to search for
+
+        Returns:
+            Tuple of (batch_id, user_id) if found, None otherwise
+        """
+        try:
+            # Get all active batch IDs
+            batch_ids = await self.list_active_batch_ids()
+            
+            # Search through each batch's assignments
+            for batch_id in batch_ids:
+                assignments_key = self._get_assignments_key(batch_id)
+                
+                # Check if this essay_id exists in this batch's assignments
+                assignment_exists = await self._redis.hexists(assignments_key, essay_id)
+                
+                if assignment_exists:
+                    # Get the batch metadata to extract user_id
+                    metadata = await self.get_batch_metadata(batch_id)
+                    if metadata and "user_id" in metadata:
+                        user_id = metadata["user_id"]
+                        self._logger.debug(
+                            f"Found essay {essay_id} in batch {batch_id} for user {user_id}"
+                        )
+                        return (batch_id, user_id)
+                    else:
+                        self._logger.warning(
+                            f"Found essay {essay_id} in batch {batch_id} but no user_id in metadata"
+                        )
+            
+            # Essay not found in any batch
+            self._logger.debug(f"Essay {essay_id} not found in any active batch")
+            return None
+
+        except Exception as e:
+            self._logger.error(f"Failed to find batch for essay {essay_id}: {e}", exc_info=True)
             raise

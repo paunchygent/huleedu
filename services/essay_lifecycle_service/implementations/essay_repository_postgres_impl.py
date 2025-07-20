@@ -569,21 +569,21 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
     ) -> tuple[bool, str | None]:
         """
         Create essay state with atomic idempotency check for content provisioning.
-        
+
         This method addresses ELS-002 Phase 1 requirements by providing database-level
         atomicity for content provisioning to prevent race conditions.
-        
+
         Args:
             batch_id: The batch identifier
             text_storage_id: The content storage identifier
             essay_data: Dictionary containing essay creation data including internal_essay_id
             correlation_id: Correlation ID for distributed tracing
-            
+
         Returns:
             tuple[bool, str | None]: (was_created, essay_id)
                 - (True, essay_id) for new creation
                 - (False, existing_essay_id) for idempotent case where content already assigned
-                
+
         Raises:
             HuleEduError: For database errors or constraint violations
         """
@@ -601,7 +601,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 )
                 result = await session.execute(stmt)
                 existing_essay = result.scalars().first()
-                
+
                 if existing_essay is not None:
                     # Content already assigned - idempotent success case
                     self.logger.info(
@@ -614,11 +614,11 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                         },
                     )
                     return False, existing_essay.essay_id
-                
+
                 # Create new essay state with atomic constraint checking
                 internal_essay_id = essay_data["internal_essay_id"]
                 initial_status = essay_data.get("initial_status", EssayStatus.READY_FOR_PROCESSING)
-                
+
                 essay_state = ConcreteEssayState(
                     essay_id=internal_essay_id,
                     batch_id=batch_id,
@@ -633,18 +633,18 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                     storage_references={ContentType.ORIGINAL_ESSAY: text_storage_id},
                     timeline={initial_status.value: datetime.now(UTC)},
                 )
-                
+
                 # Convert to database format
                 db_data = self._essay_state_to_db_dict(essay_state)
                 # Explicitly set text_storage_id for the constraint
                 db_data["text_storage_id"] = text_storage_id
-                
+
                 db_essay = EssayStateDB(**db_data)
                 session.add(db_essay)
-                
+
                 # Commit will trigger the unique constraint check
                 await session.commit()
-                
+
                 self.logger.info(
                     "Successfully created essay state with content assignment",
                     extra={
@@ -655,12 +655,13 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                     },
                 )
                 return True, internal_essay_id
-                
+
         except IntegrityError as e:
             # Handle unique constraint violation as idempotent success
             # Check for both our specific constraint name and general unique violation
-            if ("uq_essay_content_idempotency" in str(e) or 
-                ("duplicate key" in str(e) and "batch_id" in str(e) and "text_storage_id" in str(e))):
+            if "uq_essay_content_idempotency" in str(e) or (
+                "duplicate key" in str(e) and "batch_id" in str(e) and "text_storage_id" in str(e)
+            ):
                 # Another concurrent process assigned this content - find the existing assignment
                 async with self.session() as session:
                     stmt = select(EssayStateDB).where(
@@ -669,7 +670,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                     )
                     result = await session.execute(stmt)
                     existing_essay = result.scalars().first()
-                    
+
                     if existing_essay:
                         self.logger.info(
                             "Concurrent content assignment detected, returning existing assignment",
@@ -681,7 +682,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                             },
                         )
                         return False, existing_essay.essay_id
-            
+
             # Re-raise as processing error for other integrity violations
             raise_processing_error(
                 service="essay_lifecycle_service",
@@ -693,7 +694,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 error_type=e.__class__.__name__,
                 error_details=str(e),
             )
-            
+
         except Exception as e:
             # Re-raise HuleEduError as-is, or wrap other exceptions
             if hasattr(e, "error_detail"):

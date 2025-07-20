@@ -11,7 +11,18 @@ from datetime import datetime
 from typing import Any
 
 from common_core.status_enums import EssayStatus
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, ForeignKeyConstraint, Integer, String, Text, UniqueConstraint, text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import ENUM as SQLAlchemyEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -68,12 +79,16 @@ class EssayStateDB(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("NOW()"), onupdate=text("NOW()")
     )
-    
+
     # Table-level constraints for data integrity (ELS-002 Phase 1)
     __table_args__ = (
-        UniqueConstraint('batch_id', 'text_storage_id', name='uq_essay_content_idempotency'),
-        ForeignKeyConstraint(['batch_id'], ['batch_essay_trackers.batch_id'], 
-                           name='fk_essay_states_batch_id', ondelete='SET NULL'),
+        UniqueConstraint("batch_id", "text_storage_id", name="uq_essay_content_idempotency"),
+        ForeignKeyConstraint(
+            ["batch_id"],
+            ["batch_essay_trackers.batch_id"],
+            name="fk_essay_states_batch_id",
+            ondelete="SET NULL",
+        ),
     )
 
 

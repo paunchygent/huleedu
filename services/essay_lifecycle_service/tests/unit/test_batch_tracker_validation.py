@@ -57,6 +57,11 @@ class TestBatchEssayTracker:
         redis_coordinator.register_batch_slots.return_value = None  # No-op Redis registration
         redis_coordinator.assign_slot_atomic.return_value = None  # Fallback to legacy assignment
         redis_coordinator.check_batch_completion.return_value = False  # Use legacy completion check
+        # Add realistic mock responses for new scanning methods
+        redis_coordinator.list_active_batch_ids.return_value = []  # No active batches in tests
+        redis_coordinator.find_batch_for_essay.return_value = None  # Essay not found in tests
+        redis_coordinator.track_validation_failure.return_value = None  # No-op validation tracking
+        redis_coordinator.get_validation_failure_count.return_value = 0  # No validation failures
 
         # Use real tracker with mocked database layer and Redis coordinator
         return DefaultBatchEssayTracker(persistence, redis_coordinator)
@@ -102,7 +107,7 @@ class TestBatchEssayTracker:
 
         # The protocol doesn't expose internal state directly
         # Instead we test that the tracker can handle validation failures properly
-        batch_status = tracker.get_batch_status("nonexistent_batch")
+        batch_status = await tracker.get_batch_status("nonexistent_batch")
         assert batch_status is None  # No batch registered yet
 
     async def test_handle_single_validation_failure(
@@ -122,7 +127,7 @@ class TestBatchEssayTracker:
         # Verify failure handling through protocol interface
         # The protocol doesn't expose internal validation_failures directly
         # Instead we verify the batch status reflects the failure handling
-        batch_status = tracker.get_batch_status("batch_test")
+        batch_status = await tracker.get_batch_status("batch_test")
         assert batch_status is not None
         assert batch_status["batch_id"] == "batch_test"
         assert batch_status["expected_count"] == 5
@@ -141,7 +146,7 @@ class TestBatchEssayTracker:
         # Should still handle the failure gracefully
         # We can't directly check internal state via protocol, but we can verify
         # that subsequent batch registration works properly
-        batch_status = tracker.get_batch_status("batch_test")
+        batch_status = await tracker.get_batch_status("batch_test")
         assert batch_status is None  # No batch registered, so no status available
 
     async def test_early_batch_completion_trigger(
@@ -154,7 +159,7 @@ class TestBatchEssayTracker:
 
         # Assign 3 slots successfully
         for i in range(1, 4):
-            slot_id = tracker.assign_slot_to_content(
+            slot_id = await tracker.assign_slot_to_content(
                 "batch_test", f"content_{i:03d}", f"essay_{i}.txt"
             )
             assert slot_id is not None
@@ -210,13 +215,13 @@ class TestBatchEssayTracker:
 
         # Assign 24 slots successfully
         for i in range(1, 25):
-            slot_id = tracker.assign_slot_to_content(
+            slot_id = await tracker.assign_slot_to_content(
                 "batch_24_of_25", f"content_{i:03d}", f"essay_{i}.txt"
             )
             assert slot_id is not None
 
         # Verify no early completion yet (24 < 25)
-        batch_status = tracker.get_batch_status("batch_24_of_25")
+        batch_status = await tracker.get_batch_status("batch_24_of_25")
         assert batch_status is not None
         assert not batch_status["is_complete"]
         assert batch_status["ready_count"] == 24
@@ -242,7 +247,7 @@ class TestBatchEssayTracker:
         assert len(ready_event.validation_failures) == 1
 
         # Batch should be cleaned up after completion
-        batch_status = tracker.get_batch_status("batch_24_of_25")
+        batch_status = await tracker.get_batch_status("batch_24_of_25")
         assert batch_status is None
 
     async def test_multiple_validation_failures_for_same_batch(
@@ -270,7 +275,7 @@ class TestBatchEssayTracker:
             await tracker.handle_validation_failure(failure)
 
         # Verify batch handling through protocol interface
-        batch_status = tracker.get_batch_status("batch_test")
+        batch_status = await tracker.get_batch_status("batch_test")
         assert batch_status is not None
         assert batch_status["batch_id"] == "batch_test"
         assert batch_status["expected_count"] == 5
@@ -285,7 +290,7 @@ class TestBatchEssayTracker:
 
         # Assign 3 slots successfully
         for i in range(1, 4):
-            tracker.assign_slot_to_content("batch_test", f"content_{i:03d}", f"essay_{i}.txt")
+            await tracker.assign_slot_to_content("batch_test", f"content_{i:03d}", f"essay_{i}.txt")
 
         # Create 1 validation failure (not enough to trigger completion)
         failure = EssayValidationFailedV1(
@@ -371,7 +376,7 @@ class TestBatchEssayTracker:
         assert len(ready_event.validation_failures) == 3
 
         # Since the batch is completed, it should no longer be tracked
-        batch_status = tracker.get_batch_status("batch_all_failed")
+        batch_status = await tracker.get_batch_status("batch_all_failed")
         assert batch_status is None  # Batch completed and cleaned up
 
     async def test_validation_failure_with_correlation_ids(
@@ -395,7 +400,7 @@ class TestBatchEssayTracker:
         await tracker.handle_validation_failure(failure)
 
         # Verify failure was handled properly through protocol interface
-        batch_status = tracker.get_batch_status("batch_test")
+        batch_status = await tracker.get_batch_status("batch_test")
         assert batch_status is not None
         assert batch_status["batch_id"] == "batch_test"
         # Internal correlation ID handling is not exposed through protocol
@@ -409,10 +414,10 @@ class TestBatchEssayTracker:
 
         # Assign 4 slots (1 short of completion)
         for i in range(1, 5):
-            tracker.assign_slot_to_content("batch_test", f"content_{i:03d}", f"essay_{i}.txt")
+            await tracker.assign_slot_to_content("batch_test", f"content_{i:03d}", f"essay_{i}.txt")
 
         # Verify not complete yet
-        batch_status = tracker.get_batch_status("batch_test")
+        batch_status = await tracker.get_batch_status("batch_test")
         assert batch_status is not None
         assert not batch_status["is_complete"]
         assert batch_status["ready_count"] == 4
@@ -470,7 +475,7 @@ class TestBatchEssayTracker:
 
         # Assign 3 essays successfully
         for i in range(1, 4):
-            tracker.assign_slot_to_content("batch_test", f"content_{i:03d}", f"essay_{i}.txt")
+            await tracker.assign_slot_to_content("batch_test", f"content_{i:03d}", f"essay_{i}.txt")
 
         # Add 1 validation failure (not enough to trigger completion yet)
         failure = EssayValidationFailedV1(
@@ -484,7 +489,7 @@ class TestBatchEssayTracker:
         await tracker.handle_validation_failure(failure)
 
         # Verify metrics can be calculated through protocol interface
-        batch_status = tracker.get_batch_status("batch_test")
+        batch_status = await tracker.get_batch_status("batch_test")
         assert batch_status is not None
 
         assigned_count = batch_status["ready_count"]
@@ -506,7 +511,7 @@ class TestBatchEssayTracker:
         await tracker.handle_validation_failure(failure2)
 
         # After completion, batch should be cleaned up
-        batch_status = tracker.get_batch_status("batch_test")
+        batch_status = await tracker.get_batch_status("batch_test")
         assert batch_status is None  # Batch completed and cleaned up
 
     async def test_concurrent_validation_failures(

@@ -25,7 +25,7 @@ alwaysApply: true
 - **MUST** type-annotate all public functions, methods, class attributes
 - **MUST** use `from __future__ import annotations`
 - **MUST** prefer precise types over `typing.Any`
-- **MUST** pass `pdm run mypy` (run from repository root to catch complex multi-level issues)
+- **MUST** pass `typecheck all` (run from repository root to catch complex multi-level issues)
 - **FORBIDDEN**: `typing.Any` where precise type possible
 
 ### 3.2. Execution Patterns

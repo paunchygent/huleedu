@@ -131,9 +131,9 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
 
             # **ELS-002 Phase 1: Atomic Content Provisioning**
             # Replace non-atomic idempotency check + slot assignment with database-level atomicity
-            
+
             # Step 1: Try slot assignment first (maintains existing batch tracker logic)
-            assigned_essay_id = self.batch_tracker.assign_slot_to_content(
+            assigned_essay_id = await self.batch_tracker.assign_slot_to_content(
                 event_data.batch_id, event_data.text_storage_id, event_data.original_file_name
             )
 
@@ -180,7 +180,10 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 "content_hash": event_data.content_md5_hash,
             }
 
-            was_created, final_essay_id = await self.repository.create_essay_state_with_content_idempotency(
+            (
+                was_created,
+                final_essay_id,
+            ) = await self.repository.create_essay_state_with_content_idempotency(
                 batch_id=event_data.batch_id,
                 text_storage_id=event_data.text_storage_id,
                 essay_data=essay_data,
@@ -218,7 +221,13 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 )
 
             # **Step 3: Check Batch Completion**
-            batch_completion_result = self.batch_tracker.mark_slot_fulfilled(
+            # At this point, final_essay_id should always be valid
+            if final_essay_id is None:
+                raise ValueError(
+                    f"Unexpected None essay_id after content provisioning for batch {event_data.batch_id}"
+                )
+
+            batch_completion_result = await self.batch_tracker.mark_slot_fulfilled(
                 event_data.batch_id, final_essay_id, event_data.text_storage_id
             )
 

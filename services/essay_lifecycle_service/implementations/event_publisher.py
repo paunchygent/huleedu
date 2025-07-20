@@ -115,7 +115,7 @@ class DefaultEventPublisher(EventPublisher):
             from datetime import UTC, datetime
 
             # Look up the user_id for this essay from batch context
-            user_id = self.batch_tracker.get_user_id_for_essay(essay_ref.entity_id)
+            user_id = await self.batch_tracker.get_user_id_for_essay(essay_ref.entity_id)
 
             if user_id:
                 # Publish real-time notification to user-specific Redis channel

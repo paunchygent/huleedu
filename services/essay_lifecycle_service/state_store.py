@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import aiosqlite
 from common_core.domain_enums import ContentType
@@ -96,6 +96,60 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
             result = await self.crud_ops.create_essay_record(essay_ref=essay_ref)
             results.append(result)
         return results  # type: ignore[return-value]
+
+    async def create_essay_state_with_content_idempotency(
+        self,
+        batch_id: str,
+        text_storage_id: str,
+        essay_data: dict[str, Any],
+        correlation_id: UUID,
+    ) -> tuple[bool, str | None]:
+        """
+        Create essay state with atomic idempotency check for content provisioning.
+
+        Returns tuple of (was_created, essay_id) where was_created indicates if this
+        was a new creation (True) or idempotent case (False).
+
+        SQLite implementation - for testing only. Production uses PostgreSQL.
+        """
+        # Check if essay already exists for this batch and text_storage_id
+        async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
+            db.row_factory = aiosqlite.Row
+            
+            # Check for existing essay with same batch_id and text_storage_id
+            async with db.execute(
+                "SELECT essay_id FROM essay_states WHERE batch_id = ? AND storage_references LIKE ?",
+                (batch_id, f'%"{text_storage_id}"%')
+            ) as cursor:
+                existing = await cursor.fetchone()
+                if existing:
+                    return (False, existing["essay_id"])
+            
+            # Create new essay
+            essay_id = essay_data.get("internal_essay_id", str(uuid4()))
+            storage_refs = json.dumps({"ORIGINAL_ESSAY": text_storage_id})
+            
+            await db.execute(
+                """
+                INSERT INTO essay_states (
+                    essay_id, batch_id, current_status, storage_references,
+                    original_file_name, file_size, content_hash, correlation_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    essay_id,
+                    batch_id,
+                    essay_data.get("initial_status", "UPLOADED"),
+                    storage_refs,
+                    essay_data.get("original_file_name", ""),
+                    essay_data.get("file_size", 0),
+                    essay_data.get("content_hash", ""),
+                    str(correlation_id),
+                ),
+            )
+            await db.commit()
+            
+            return (True, essay_id)
 
     async def list_essays_by_batch(self, batch_id: str) -> list[ProtocolEssayState]:
         """List all essays in a batch."""

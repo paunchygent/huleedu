@@ -126,10 +126,10 @@ class EssayRepositoryProtocol(Protocol):
     ) -> tuple[bool, str | None]:
         """
         Create essay state with atomic idempotency check for content provisioning.
-        
+
         Returns tuple of (was_created, essay_id) where was_created indicates if this
         was a new creation (True) or idempotent case (False).
-        
+
         Addresses ELS-002 Phase 1 requirements for database-level race condition prevention.
         """
         ...
@@ -360,23 +360,23 @@ class BatchEssayTracker(Protocol):
         """Register batch expectations from BOS."""
         ...
 
-    def assign_slot_to_content(
+    async def assign_slot_to_content(
         self, batch_id: str, text_storage_id: str, original_file_name: str
     ) -> str | None:
         """Assign an available slot to content and return assigned internal essay ID."""
         ...
 
-    def mark_slot_fulfilled(
+    async def mark_slot_fulfilled(
         self, batch_id: str, internal_essay_id: str, text_storage_id: str
     ) -> Any | None:  # BatchEssaysReady | None
         """Mark a slot as fulfilled and check if batch is complete."""
         ...
 
-    def get_batch_status(self, batch_id: str) -> dict[str, Any] | None:
+    async def get_batch_status(self, batch_id: str) -> dict[str, Any] | None:
         """Get current status of a batch."""
         ...
 
-    def list_active_batches(self) -> list[str]:
+    async def list_active_batches(self) -> list[str]:
         """Get list of currently tracked batch IDs."""
         ...
 
@@ -392,7 +392,7 @@ class BatchEssayTracker(Protocol):
         """Handle validation failure event for batch coordination."""
         ...
 
-    def get_user_id_for_essay(self, essay_id: str) -> str | None:
+    async def get_user_id_for_essay(self, essay_id: str) -> str | None:
         """Look up user_id for a given essay by searching through batch expectations."""
         ...
 

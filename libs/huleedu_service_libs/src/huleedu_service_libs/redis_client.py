@@ -16,6 +16,7 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_pubsub import RedisPubSub
 
 logger = create_service_logger("redis-client")  # Use structured logger
@@ -23,7 +24,7 @@ logger = create_service_logger("redis-client")  # Use structured logger
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
 
-class RedisClient:
+class RedisClient(AtomicRedisClientProtocol):
     """HuleEdu Redis client with lifecycle management for idempotency operations."""
 
     def __init__(self, *, client_id: str, redis_url: str = REDIS_URL):
@@ -581,7 +582,9 @@ class RedisClient:
                 )
                 return is_new
             else:
-                logger.debug(f"Redis HSET queued by '{self.client_id}': key='{key}' field='{field}'")
+                logger.debug(
+                    f"Redis HSET queued by '{self.client_id}': key='{key}' field='{field}'"
+                )
                 return 0  # Command queued, actual result determined by EXEC
         except Exception as e:
             logger.error(
@@ -607,7 +610,9 @@ class RedisClient:
                 )
                 return value
             else:
-                logger.debug(f"Redis HGET queued by '{self.client_id}': key='{key}' field='{field}'")
+                logger.debug(
+                    f"Redis HGET queued by '{self.client_id}': key='{key}' field='{field}'"
+                )
                 return None  # Command queued, actual result determined by EXEC
         except Exception as e:
             logger.error(
@@ -651,8 +656,7 @@ class RedisClient:
             if self._transaction_pipeline is None:
                 data = dict(result) if result else {}
                 logger.debug(
-                    f"Redis HGETALL by '{self.client_id}': key='{key}' "
-                    f"returned {len(data)} fields"
+                    f"Redis HGETALL by '{self.client_id}': key='{key}' returned {len(data)} fields"
                 )
                 return data
             else:
@@ -682,11 +686,137 @@ class RedisClient:
                 )
                 return success
             else:
-                logger.debug(f"Redis EXPIRE queued by '{self.client_id}': key='{key}' ttl={ttl_seconds}s")
+                logger.debug(
+                    f"Redis EXPIRE queued by '{self.client_id}': key='{key}' ttl={ttl_seconds}s"
+                )
                 return True  # Command queued, actual result determined by EXEC
         except Exception as e:
             logger.error(
                 f"Error in Redis EXPIRE operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def rpush(self, key: str, *values: str) -> int:
+        """Append values to a Redis list."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.rpush(key, *values)
+
+            if self._transaction_pipeline is None:
+                length = int(result)
+                logger.debug(
+                    f"Redis RPUSH by '{self.client_id}': key='{key}' "
+                    f"values={len(values)} new_length={length}"
+                )
+                return length
+            else:
+                logger.debug(f"Redis RPUSH queued by '{self.client_id}': key='{key}'")
+                return 0  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis RPUSH operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def lrange(self, key: str, start: int, stop: int) -> list[str]:
+        """Get range of elements from a Redis list."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.lrange(key, start, stop)
+
+            if self._transaction_pipeline is None:
+                elements = result or []
+                logger.debug(
+                    f"Redis LRANGE by '{self.client_id}': key='{key}' "
+                    f"range=({start},{stop}) count={len(elements)}"
+                )
+                return elements
+            else:
+                logger.debug(f"Redis LRANGE queued by '{self.client_id}': key='{key}'")
+                return []  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis LRANGE operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def llen(self, key: str) -> int:
+        """Get the length of a Redis list."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.llen(key)
+
+            if self._transaction_pipeline is None:
+                length = int(result)
+                logger.debug(f"Redis LLEN by '{self.client_id}': key='{key}' length={length}")
+                return length
+            else:
+                logger.debug(f"Redis LLEN queued by '{self.client_id}': key='{key}'")
+                return 0  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis LLEN operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def ttl(self, key: str) -> int:
+        """Get time to live for a key in seconds."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.ttl(key)
+
+            if self._transaction_pipeline is None:
+                ttl_seconds = int(result)
+                logger.debug(f"Redis TTL by '{self.client_id}': key='{key}' ttl={ttl_seconds}s")
+                return ttl_seconds
+            else:
+                logger.debug(f"Redis TTL queued by '{self.client_id}': key='{key}'")
+                return -1  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis TTL operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def exists(self, key: str) -> int:
+        """Check if a key exists."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.exists(key)
+
+            if self._transaction_pipeline is None:
+                exists_count = int(result)
+                logger.debug(
+                    f"Redis EXISTS by '{self.client_id}': key='{key}' "
+                    f"exists={'YES' if exists_count > 0 else 'NO'}"
+                )
+                return exists_count
+            else:
+                logger.debug(f"Redis EXISTS queued by '{self.client_id}': key='{key}'")
+                return 0  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis EXISTS operation by '{self.client_id}' for key '{key}': {e}",
                 exc_info=True,
             )
             raise

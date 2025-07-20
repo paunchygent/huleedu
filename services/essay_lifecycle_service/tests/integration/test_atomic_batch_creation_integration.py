@@ -18,7 +18,12 @@ from common_core.domain_enums import CourseCode
 from common_core.error_enums import ErrorCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import HuleEduError
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from testcontainers.postgres import PostgresContainer
+from testcontainers.redis import RedisContainer
+
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
     DefaultBatchCoordinationHandler,
@@ -32,13 +37,7 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
-from testcontainers.postgres import PostgresContainer
-from testcontainers.redis import RedisContainer
-
-
 from services.essay_lifecycle_service.protocols import EventPublisher
-from common_core.metadata_models import EntityReference
-from common_core.status_enums import EssayStatus
 
 
 class MockEventPublisher(EventPublisher):
@@ -174,8 +173,9 @@ class TestAtomicBatchCreationIntegration:
 
         # Clean up any existing data to ensure test isolation
         async with repository.session() as session:
-            from services.essay_lifecycle_service.models_db import BatchEssayTracker, EssayStateDB
             from sqlalchemy import delete
+
+            from services.essay_lifecycle_service.models_db import BatchEssayTracker, EssayStateDB
 
             await session.execute(delete(EssayStateDB))
             await session.execute(delete(BatchEssayTracker))
@@ -207,23 +207,22 @@ class TestAtomicBatchCreationIntegration:
 
     @pytest.fixture
     async def batch_tracker(
-        self, batch_tracker_persistence: BatchTrackerPersistence, redis_client
+        self, batch_tracker_persistence: BatchTrackerPersistence, redis_client: AtomicRedisClientProtocol
     ) -> DefaultBatchEssayTracker:
         """Create real batch tracker with PostgreSQL persistence and Redis coordinator."""
+        from services.essay_lifecycle_service.config import Settings
         from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
             RedisBatchCoordinator,
         )
-        from services.essay_lifecycle_service.config import Settings
-        
+
         # Create settings mock
         settings = Settings()
-        
+
         # Create Redis coordinator with real Redis client
         redis_coordinator = RedisBatchCoordinator(redis_client, settings)
-        
+
         return DefaultBatchEssayTracker(
-            persistence=batch_tracker_persistence, 
-            redis_coordinator=redis_coordinator
+            persistence=batch_tracker_persistence, redis_coordinator=redis_coordinator
         )
 
     @pytest.fixture
@@ -387,7 +386,7 @@ class TestAtomicBatchCreationIntegration:
         assert len(batch_essays) == 0
 
         # Assert - Batch expectation was registered in tracker
-        batch_status = batch_tracker.get_batch_status("empty-batch")
+        batch_status = await batch_tracker.get_batch_status("empty-batch")
         assert batch_status is not None
         assert batch_status["expected_count"] == 0
 
@@ -412,7 +411,7 @@ class TestAtomicBatchCreationIntegration:
         assert result is True
 
         # Assert - Batch tracker registered the batch expectation
-        batch_status = batch_tracker.get_batch_status(sample_batch_event.batch_id)
+        batch_status = await batch_tracker.get_batch_status(sample_batch_event.batch_id)
         assert batch_status is not None
         assert batch_status["expected_count"] == 3
         assert batch_status["ready_count"] == 0  # No content assigned yet

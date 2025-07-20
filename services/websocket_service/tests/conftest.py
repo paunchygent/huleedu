@@ -41,30 +41,117 @@ class MockPubSubContextManager:
         pass
 
 
-class MockRedisClient:
+class MockRedisClient(AtomicRedisClientProtocol):
     """Mock Redis client for testing WebSocket functionality."""
 
     def __init__(self) -> None:
         self.client = AsyncMock()
         self.client.ping = AsyncMock(return_value=True)
-        self.ping = AsyncMock(return_value=True)
         self.get_user_channel_calls: list[str] = []
         self.subscribe_calls: list[str] = []
         self.publish_calls: list[tuple[str, str, dict[str, Any]]] = []
         self._mock_pubsub = AsyncMock()
         self._mock_pubsub.get_message = AsyncMock(return_value=None)
 
-        # Add required AtomicRedisClientProtocol methods
-        self.set_if_not_exists = AsyncMock(return_value=True)
-        self.delete_key = AsyncMock(return_value=1)
-        self.get = AsyncMock(return_value=None)
-        self.setex = AsyncMock(return_value=True)
-        self.watch = AsyncMock(return_value=True)
-        self.multi = AsyncMock(return_value=True)
-        self.exec = AsyncMock(return_value=[])
-        self.unwatch = AsyncMock(return_value=True)
-        self.scan_pattern = AsyncMock(return_value=[])
-        self.publish = AsyncMock(return_value=1)
+    async def ping(self) -> bool:
+        """Mock ping method for health checks."""
+        return True
+
+    async def set_if_not_exists(self, key: str, value: Any, ttl_seconds: int | None = None) -> bool:
+        """Mock set_if_not_exists method."""
+        return True
+
+    async def delete_key(self, key: str) -> int:
+        """Mock delete_key method."""
+        return 1
+
+    async def get(self, key: str) -> str | None:
+        """Mock get method."""
+        return None
+
+    async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
+        """Mock setex method."""
+        return True
+
+    async def watch(self, *keys: str) -> bool:
+        """Mock watch method for transactions."""
+        return True
+
+    async def multi(self) -> bool:
+        """Mock multi method for transactions."""
+        return True
+
+    async def exec(self) -> list[Any] | None:
+        """Mock exec method for transactions."""
+        return []
+
+    async def unwatch(self) -> bool:
+        """Mock unwatch method for transactions."""
+        return True
+
+    async def scan_pattern(self, pattern: str) -> list[str]:
+        """Mock scan_pattern method."""
+        return []
+
+    async def publish(self, channel: str, message: str) -> int:
+        """Mock publish method."""
+        return 1
+
+    async def sadd(self, key: str, *members: str) -> int:
+        """Mock sadd method for set operations."""
+        return 1
+
+    async def spop(self, key: str) -> str | None:
+        """Mock spop method for set operations."""
+        return None
+
+    async def scard(self, key: str) -> int:
+        """Mock scard method for set operations."""
+        return 0
+
+    async def smembers(self, key: str) -> set[str]:
+        """Mock smembers method for set operations."""
+        return set()
+
+    async def hset(self, key: str, field: str, value: str) -> int:
+        """Mock hset method for hash operations."""
+        return 1
+
+    async def hget(self, key: str, field: str) -> str | None:
+        """Mock hget method for hash operations."""
+        return None
+
+    async def hlen(self, key: str) -> int:
+        """Mock hlen method for hash operations."""
+        return 0
+
+    async def hgetall(self, key: str) -> dict[str, str]:
+        """Mock hgetall method for hash operations."""
+        return {}
+
+    async def expire(self, key: str, ttl_seconds: int) -> bool:
+        """Mock expire method for key operations."""
+        return True
+
+    async def ttl(self, key: str) -> int:
+        """Mock ttl method for key operations."""
+        return -1
+
+    async def exists(self, key: str) -> int:
+        """Mock exists method for key operations."""
+        return 0
+
+    async def rpush(self, key: str, *values: str) -> int:
+        """Mock rpush method for list operations."""
+        return 1
+
+    async def lrange(self, key: str, start: int, stop: int) -> list[str]:
+        """Mock lrange method for list operations."""
+        return []
+
+    async def llen(self, key: str) -> int:
+        """Mock llen method for list operations."""
+        return 0
 
     def get_user_channel(self, user_id: str) -> str:
         """Track channel name generation."""

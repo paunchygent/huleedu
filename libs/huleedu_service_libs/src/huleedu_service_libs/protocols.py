@@ -195,11 +195,11 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
     async def sadd(self, key: str, *members: str) -> int:
         """
         Add one or more members to a Redis set.
-        
+
         Args:
             key: Redis key for the set
             members: One or more string values to add
-            
+
         Returns:
             Number of elements added to the set
         """
@@ -208,10 +208,10 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
     async def spop(self, key: str) -> str | None:
         """
         Remove and return a random member from a Redis set.
-        
+
         Args:
             key: Redis key for the set
-            
+
         Returns:
             Random member from the set, or None if set is empty
         """
@@ -220,10 +220,10 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
     async def scard(self, key: str) -> int:
         """
         Get the number of members in a Redis set.
-        
+
         Args:
             key: Redis key for the set
-            
+
         Returns:
             Number of members in the set
         """
@@ -232,10 +232,10 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
     async def smembers(self, key: str) -> set[str]:
         """
         Get all members of a Redis set.
-        
+
         Args:
             key: Redis key for the set
-            
+
         Returns:
             Set of all members
         """
@@ -245,12 +245,12 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
     async def hset(self, key: str, field: str, value: str) -> int:
         """
         Set field in a Redis hash.
-        
+
         Args:
             key: Redis key for the hash
             field: Field name
             value: Field value
-            
+
         Returns:
             1 if field is new, 0 if field was updated
         """
@@ -259,11 +259,11 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
     async def hget(self, key: str, field: str) -> str | None:
         """
         Get field value from a Redis hash.
-        
+
         Args:
             key: Redis key for the hash
             field: Field name
-            
+
         Returns:
             Field value or None if field doesn't exist
         """
@@ -272,10 +272,10 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
     async def hlen(self, key: str) -> int:
         """
         Get the number of fields in a Redis hash.
-        
+
         Args:
             key: Redis key for the hash
-            
+
         Returns:
             Number of fields in the hash
         """
@@ -284,10 +284,10 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
     async def hgetall(self, key: str) -> dict[str, str]:
         """
         Get all fields and values from a Redis hash.
-        
+
         Args:
             key: Redis key for the hash
-            
+
         Returns:
             Dictionary of all field-value pairs
         """
@@ -296,13 +296,78 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
     async def expire(self, key: str, ttl_seconds: int) -> bool:
         """
         Set TTL for a Redis key.
-        
+
         Args:
             key: Redis key
             ttl_seconds: TTL in seconds
-            
+
         Returns:
             True if TTL was set successfully
+        """
+        pass
+
+    # List operations for validation failure tracking
+    async def rpush(self, key: str, *values: str) -> int:
+        """
+        Append values to a Redis list.
+
+        Args:
+            key: Redis key for the list
+            values: One or more values to append
+
+        Returns:
+            Length of the list after operation
+        """
+        pass
+
+    async def lrange(self, key: str, start: int, stop: int) -> list[str]:
+        """
+        Get range of elements from a Redis list.
+
+        Args:
+            key: Redis key for the list
+            start: Start index (0-based)
+            stop: Stop index (inclusive, -1 for end)
+
+        Returns:
+            List of elements in the specified range
+        """
+        pass
+
+    async def llen(self, key: str) -> int:
+        """
+        Get the length of a Redis list.
+
+        Args:
+            key: Redis key for the list
+
+        Returns:
+            Length of the list
+        """
+        pass
+
+    # Key operations
+    async def ttl(self, key: str) -> int:
+        """
+        Get time to live for a key in seconds.
+
+        Args:
+            key: Redis key
+
+        Returns:
+            TTL in seconds, -2 if key doesn't exist, -1 if no TTL
+        """
+        pass
+
+    async def exists(self, key: str) -> int:
+        """
+        Check if a key exists.
+
+        Args:
+            key: Redis key to check
+
+        Returns:
+            1 if key exists, 0 otherwise
         """
         pass
 
