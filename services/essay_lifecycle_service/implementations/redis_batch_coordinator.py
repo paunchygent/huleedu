@@ -135,31 +135,39 @@ class RedisBatchCoordinator:
         try:
             # Use Redis transaction with optimistic locking
             await self._redis.watch(slots_key, assignments_key)
-            await self._redis.multi()
-
-            # Atomically pop a slot from available set
-            essay_id = await self._redis.spop(slots_key)
-
-            if essay_id is None:
-                # No slots available - abort transaction
+            
+            # Check availability BEFORE transaction (doesn't modify watched keys)
+            available_count = await self._redis.scard(slots_key)
+            if available_count == 0:
                 await self._redis.unwatch()
                 self._logger.warning(f"No available slots for batch {batch_id}")
                 return None
-
-            # Store assignment metadata
-            metadata_json = json.dumps(content_metadata)
-            await self._redis.hset(assignments_key, essay_id, metadata_json)
-
+            
+            await self._redis.multi()
+            
+            # Queue operations for atomic execution
+            await self._redis.spop(slots_key)  # Returns None during transaction, queued for execution
+            
             # Execute atomic transaction
             results = await self._redis.exec()
-
+            
             if results is None:
-                # Transaction was discarded due to key changes
+                # Transaction was discarded due to concurrent modification
                 self._logger.warning(
                     f"Slot assignment transaction discarded for batch {batch_id} "
                     "(concurrent modification detected)"
                 )
                 return None
+            
+            # Extract results from atomic execution
+            essay_id = results[0]  # Result of spop
+            if essay_id is None:
+                self._logger.warning(f"No available slots for batch {batch_id}")
+                return None
+            
+            # Store assignment metadata after successful slot assignment
+            metadata_json = json.dumps(content_metadata)
+            await self._redis.hset(assignments_key, essay_id, metadata_json)
 
             self._logger.info(
                 f"Assigned slot {essay_id} to content {content_metadata.get('text_storage_id')} "

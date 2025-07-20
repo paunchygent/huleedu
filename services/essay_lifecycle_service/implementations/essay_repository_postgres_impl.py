@@ -99,12 +99,6 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
             correlation_id = uuid4()
         try:
-            from alembic import command
-            from alembic.config import Config
-            from alembic.runtime.migration import MigrationContext
-            from alembic.operations import Operations
-            import os
-            
             # For tests, we'll manually apply the constraints instead of using Alembic
             # This avoids the async event loop conflict
             async with self.engine.begin() as conn:
@@ -122,15 +116,12 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                     ON essay_states(text_storage_id)
                 """))
                 
-                # Add unique constraint if it doesn't exist
+                # Create partial unique index (replacing the old constraint)
+                # This allows multiple NULL text_storage_id values in the same batch
                 await conn.execute(sa_text("""
-                    DO $$ BEGIN
-                        ALTER TABLE essay_states 
-                        ADD CONSTRAINT uq_essay_content_idempotency 
-                        UNIQUE (batch_id, text_storage_id);
-                    EXCEPTION
-                        WHEN duplicate_table THEN NULL;
-                    END $$
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_essay_content_idempotency_partial
+                    ON essay_states (batch_id, text_storage_id)
+                    WHERE text_storage_id IS NOT NULL
                 """))
                 
                 # Add foreign key constraint if it doesn't exist
@@ -682,32 +673,62 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                     )
                     return False, existing_essay.essay_id
 
-                # Create new essay state with atomic constraint checking
+                # Get internal essay ID
                 internal_essay_id = essay_data["internal_essay_id"]
                 initial_status = essay_data.get("initial_status", EssayStatus.READY_FOR_PROCESSING)
 
-                essay_state = ConcreteEssayState(
-                    essay_id=internal_essay_id,
-                    batch_id=batch_id,
-                    current_status=initial_status,
-                    processing_metadata={
+                # Check if essay already exists (created during batch registration)
+                existing_stmt = select(EssayStateDB).where(
+                    EssayStateDB.essay_id == internal_essay_id
+                )
+                existing_result = await session.execute(existing_stmt)
+                existing_essay_db = existing_result.scalars().first()
+
+                if existing_essay_db:
+                    # Update existing essay with content information
+                    existing_essay_db.text_storage_id = text_storage_id
+                    existing_essay_db.current_status = initial_status.value  # type: ignore[assignment]
+                    existing_essay_db.processing_metadata = {
+                        **existing_essay_db.processing_metadata,
                         "text_storage_id": text_storage_id,
                         "original_file_name": essay_data.get("original_file_name", ""),
                         "file_size": essay_data.get("file_size", 0),
                         "content_hash": essay_data.get("content_hash"),
                         "slot_assignment_timestamp": datetime.now(UTC).isoformat(),
-                    },
-                    storage_references={ContentType.ORIGINAL_ESSAY: text_storage_id},
-                    timeline={initial_status.value: datetime.now(UTC)},
-                )
+                    }
+                    existing_essay_db.storage_references = {
+                        **existing_essay_db.storage_references,
+                        ContentType.ORIGINAL_ESSAY.value: text_storage_id,
+                    }
+                    existing_essay_db.timeline = {
+                        **existing_essay_db.timeline,
+                        initial_status.value: datetime.now(UTC).isoformat(),
+                    }
+                    existing_essay_db.version += 1
+                else:
+                    # Create new essay state (shouldn't happen in normal flow)
+                    essay_state = ConcreteEssayState(
+                        essay_id=internal_essay_id,
+                        batch_id=batch_id,
+                        current_status=initial_status,
+                        processing_metadata={
+                            "text_storage_id": text_storage_id,
+                            "original_file_name": essay_data.get("original_file_name", ""),
+                            "file_size": essay_data.get("file_size", 0),
+                            "content_hash": essay_data.get("content_hash"),
+                            "slot_assignment_timestamp": datetime.now(UTC).isoformat(),
+                        },
+                        storage_references={ContentType.ORIGINAL_ESSAY: text_storage_id},
+                        timeline={initial_status.value: datetime.now(UTC)},
+                    )
 
-                # Convert to database format
-                db_data = self._essay_state_to_db_dict(essay_state)
-                # Explicitly set text_storage_id for the constraint
-                db_data["text_storage_id"] = text_storage_id
+                    # Convert to database format
+                    db_data = self._essay_state_to_db_dict(essay_state)
+                    # Explicitly set text_storage_id for the constraint
+                    db_data["text_storage_id"] = text_storage_id
 
-                db_essay = EssayStateDB(**db_data)
-                session.add(db_essay)
+                    db_essay = EssayStateDB(**db_data)
+                    session.add(db_essay)
 
                 # Commit will trigger the unique constraint check
                 await session.commit()
@@ -726,7 +747,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         except IntegrityError as e:
             # Handle unique constraint violation as idempotent success
             # Check for both our specific constraint name and general unique violation
-            if "uq_essay_content_idempotency" in str(e) or (
+            if "uq_essay_content_idempotency_partial" in str(e) or "uq_essay_content_idempotency" in str(e) or (
                 "duplicate key" in str(e) and "batch_id" in str(e) and "text_storage_id" in str(e)
             ):
                 # Another concurrent process assigned this content - find the existing assignment

@@ -495,10 +495,9 @@ class RedisClient(AtomicRedisClientProtocol):
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.spop(key)
-
             if self._transaction_pipeline is None:
+                # Outside transaction - execute immediately
+                result = await self.client.spop(key)
                 member = result.decode() if isinstance(result, bytes) else result
                 logger.debug(
                     f"Redis SPOP by '{self.client_id}': key='{key}' "
@@ -506,6 +505,8 @@ class RedisClient(AtomicRedisClientProtocol):
                 )
                 return member
             else:
+                # Inside transaction - queue command without await
+                self._transaction_pipeline.spop(key)
                 logger.debug(f"Redis SPOP queued by '{self.client_id}': key='{key}'")
                 return None  # Command queued, actual result determined by EXEC
         except Exception as e:
@@ -571,10 +572,9 @@ class RedisClient(AtomicRedisClientProtocol):
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.hset(key, field, value)
-
             if self._transaction_pipeline is None:
+                # Outside transaction - execute immediately
+                result = await self.client.hset(key, field, value)
                 is_new = int(result)
                 logger.debug(
                     f"Redis HSET by '{self.client_id}': key='{key}' field='{field}' "
@@ -582,6 +582,8 @@ class RedisClient(AtomicRedisClientProtocol):
                 )
                 return is_new
             else:
+                # Inside transaction - queue command without await
+                self._transaction_pipeline.hset(key, field, value)
                 logger.debug(
                     f"Redis HSET queued by '{self.client_id}': key='{key}' field='{field}'"
                 )

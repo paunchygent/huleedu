@@ -395,7 +395,7 @@ class TestDistributedPerformance:
             batch_event = BatchEssaysRegistered(
                 batch_id=batch_id,
                 expected_essay_count=essay_count,
-                essay_ids=[f"essay_{i:03d}" for i in range(essay_count)],
+                essay_ids=[f"essay_{batch_id}_{i:03d}" for i in range(essay_count)],
                 course_code=CourseCode.ENG5,
                 essay_instructions=f"Scaling test with {instance_count} instances",
                 user_id="scaling_test_user",
@@ -512,7 +512,7 @@ class TestDistributedPerformance:
             await asyncio.sleep(0.1)
 
             batch_id = f"memory_test_{batch_size}_{uuid4().hex[:8]}"
-            essay_ids = [f"essay_{i:03d}" for i in range(batch_size)]
+            essay_ids = [f"essay_{batch_id}_{i:03d}" for i in range(batch_size)]
 
             # Sample memory before batch creation
             await metrics.sample_memory_usage(f"before_batch_{batch_size}", 0, 0)
@@ -593,7 +593,7 @@ class TestDistributedPerformance:
         batch_creation_tasks = []
         for i in range(batch_count):
             batch_id = f"perf_target_{i}_{uuid4().hex[:8]}"
-            essay_ids = [f"essay_{j:03d}" for j in range(essays_per_batch)]
+            essay_ids = [f"essay_{batch_id}_{j:03d}" for j in range(essays_per_batch)]
 
             batch_event = BatchEssaysRegistered(
                 batch_id=batch_id,
@@ -719,7 +719,7 @@ class TestDistributedPerformance:
         batch_event = BatchEssaysRegistered(
             batch_id=batch_id,
             expected_essay_count=essay_count,
-            essay_ids=[f"essay_{i:03d}" for i in range(essay_count)],
+            essay_ids=[f"essay_{batch_id}_{i:03d}" for i in range(essay_count)],
             course_code=CourseCode.ENG5,
             essay_instructions="Endurance test",
             user_id="endurance_test_user",
