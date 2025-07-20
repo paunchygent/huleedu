@@ -16,7 +16,6 @@ The fix: Replace the unique constraint with a partial unique index that
 only applies when text_storage_id IS NOT NULL.
 """
 
-import sqlalchemy as sa
 
 from alembic import op
 

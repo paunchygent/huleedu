@@ -105,42 +105,16 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
     using RedisClientProtocol.
     """
 
-    async def watch(self, *keys: str) -> bool:
+    async def create_transaction_pipeline(self, *watch_keys: str):
         """
-        Watch one or more keys for changes during transaction.
+        Create a new pipeline for atomic transactions with optional key watching.
+        This is the modern Redis transaction pattern.
 
         Args:
-            keys: Redis keys to watch
+            watch_keys: Optional keys to watch for changes
 
         Returns:
-            True if WATCH command succeeded
-        """
-        pass
-
-    async def multi(self) -> bool:
-        """
-        Start a Redis transaction (MULTI).
-
-        Returns:
-            True if MULTI command succeeded
-        """
-        pass
-
-    async def exec(self) -> list[Any] | None:
-        """
-        Execute a Redis transaction (EXEC).
-
-        Returns:
-            List of results if transaction succeeded, None if transaction was discarded
-        """
-        pass
-
-    async def unwatch(self) -> bool:
-        """
-        Unwatch all keys (UNWATCH).
-
-        Returns:
-            True if UNWATCH command succeeded
+            A Redis pipeline configured for transactions
         """
         pass
 

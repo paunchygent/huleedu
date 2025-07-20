@@ -20,10 +20,10 @@ from uuid import UUID, uuid4
 import psutil
 import pytest
 from common_core.domain_enums import CourseCode
-from common_core.status_enums import EssayStatus
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.status_enums import EssayStatus
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 

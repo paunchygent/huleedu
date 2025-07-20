@@ -352,13 +352,13 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         try:
             # Use Redis coordinator to find the batch containing this essay
             result = await self._redis_coordinator.find_batch_for_essay(essay_id)
-            
+
             if result is not None:
                 _, user_id = result  # Only need user_id, ignore batch_id
                 return user_id
-            
+
             return None
-            
+
         except Exception as e:
             self._logger.error(f"Failed to get user_id for essay {essay_id}: {e}", exc_info=True)
             raise

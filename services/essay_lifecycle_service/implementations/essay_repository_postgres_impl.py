@@ -23,7 +23,8 @@ from huleedu_service_libs.error_handling import (
     raise_resource_not_found,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import select, update, text as sa_text
+from sqlalchemy import select, update
+from sqlalchemy import text as sa_text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -103,19 +104,19 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             # This avoids the async event loop conflict
             async with self.engine.begin() as conn:
                 # Execute each migration step separately (asyncpg requirement)
-                
+
                 # Add text_storage_id column if it doesn't exist
                 await conn.execute(sa_text("""
                     ALTER TABLE essay_states 
                     ADD COLUMN IF NOT EXISTS text_storage_id VARCHAR(255)
                 """))
-                
+
                 # Create index if it doesn't exist
                 await conn.execute(sa_text("""
                     CREATE INDEX IF NOT EXISTS ix_essay_states_text_storage_id 
                     ON essay_states(text_storage_id)
                 """))
-                
+
                 # Create partial unique index (replacing the old constraint)
                 # This allows multiple NULL text_storage_id values in the same batch
                 await conn.execute(sa_text("""
@@ -123,7 +124,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                     ON essay_states (batch_id, text_storage_id)
                     WHERE text_storage_id IS NOT NULL
                 """))
-                
+
                 # Add foreign key constraint if it doesn't exist
                 await conn.execute(sa_text("""
                     DO $$ BEGIN
@@ -135,7 +136,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                         WHEN duplicate_object THEN NULL;
                     END $$
                 """))
-            
+
             self.logger.info("Essay Lifecycle Service migrations applied successfully")
         except Exception as e:
             raise_connection_error(

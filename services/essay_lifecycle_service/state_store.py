@@ -115,7 +115,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         # Check if essay already exists for this batch and text_storage_id
         async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
             db.row_factory = aiosqlite.Row
-            
+
             # Check for existing essay with same batch_id and text_storage_id
             async with db.execute(
                 "SELECT essay_id FROM essay_states WHERE batch_id = ? AND storage_references LIKE ?",
@@ -124,11 +124,11 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
                 existing = await cursor.fetchone()
                 if existing:
                     return (False, existing["essay_id"])
-            
+
             # Create new essay
             essay_id = essay_data.get("internal_essay_id", str(uuid4()))
             storage_refs = json.dumps({"ORIGINAL_ESSAY": text_storage_id})
-            
+
             await db.execute(
                 """
                 INSERT INTO essay_states (
@@ -148,7 +148,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
                 ),
             )
             await db.commit()
-            
+
             return (True, essay_id)
 
     async def list_essays_by_batch(self, batch_id: str) -> list[ProtocolEssayState]:

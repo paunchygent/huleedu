@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import asyncio
 import random
-from collections.abc import AsyncGenerator, Generator
-from typing import Any, Coroutine, TypedDict
+from collections.abc import AsyncGenerator, Coroutine, Generator
+from typing import Any, TypedDict
 from uuid import uuid4
 
 import pytest

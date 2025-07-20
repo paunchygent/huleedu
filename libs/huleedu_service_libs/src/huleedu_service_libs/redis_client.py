@@ -8,7 +8,6 @@ Follows the same lifecycle management pattern as KafkaBus.
 from __future__ import annotations
 
 import os
-from contextlib import asynccontextmanager
 from typing import Any
 
 import redis.asyncio as aioredis
@@ -37,7 +36,6 @@ class RedisClient(AtomicRedisClientProtocol):
             socket_timeout=5,
         )
         self._started = False
-        self._transaction_pipeline = None  # Track transaction state
         self._pubsub: RedisPubSub | None = None
 
     async def start(self) -> None:
@@ -126,20 +124,11 @@ class RedisClient(AtomicRedisClientProtocol):
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            # Use pipeline if in transaction, otherwise use direct client
-            redis_client = self._transaction_pipeline or self.client
-            deleted_count = await redis_client.delete(key)
-
-            if self._transaction_pipeline is None:
-                # Only log and return for non-transaction operations
-                logger.debug(
-                    f"Redis DELETE by '{self.client_id}': key='{key}' deleted={deleted_count}",
-                )
-                return int(deleted_count)
-            else:
-                # In transaction - command is queued, success determined by EXEC
-                logger.debug(f"Redis DELETE queued by '{self.client_id}': key='{key}'")
-                return 1  # Assume success for transaction queuing
+            deleted_count = await self.client.delete(key)
+            logger.debug(
+                f"Redis DELETE by '{self.client_id}': key='{key}' deleted={deleted_count}",
+            )
+            return int(deleted_count)
         except Exception as e:
             logger.error(
                 f"Error deleting Redis key '{key}' by '{self.client_id}': {e}",
@@ -205,24 +194,13 @@ class RedisClient(AtomicRedisClientProtocol):
                 raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            # Use pipeline if in transaction, otherwise use direct client
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.setex(key, ttl_seconds, value)
-
-            if self._transaction_pipeline is None:
-                # Only log and return for non-transaction operations
-                success = bool(result)
-                logger.debug(
-                    f"Redis SETEX by '{self.client_id}': key='{key}' "
-                    f"ttl={ttl_seconds}s result={'SUCCESS' if success else 'FAILED'}",
-                )
-                return success
-            else:
-                # In transaction - command is queued, success determined by EXEC
-                logger.debug(
-                    f"Redis SETEX queued by '{self.client_id}': key='{key}' ttl={ttl_seconds}s",
-                )
-                return True
+            result = await self.client.setex(key, ttl_seconds, value)
+            success = bool(result)
+            logger.debug(
+                f"Redis SETEX by '{self.client_id}': key='{key}' "
+                f"ttl={ttl_seconds}s result={'SUCCESS' if success else 'FAILED'}",
+            )
+            return success
         except RedisTimeoutError:
             logger.error(f"Timeout on Redis SETEX operation by '{self.client_id}' for key '{key}'")
             raise
@@ -233,108 +211,46 @@ class RedisClient(AtomicRedisClientProtocol):
             )
             raise
 
-    async def watch(self, *keys: str) -> bool:
+    async def create_transaction_pipeline(self, *watch_keys: str):
         """
-        Watch one or more keys for changes during transaction.
+        Create a new pipeline for atomic transactions with optional key watching.
+        This is the modern Redis transaction pattern.
 
         Args:
-            keys: Redis keys to watch
+            watch_keys: Optional keys to watch for changes
 
         Returns:
-            True if WATCH command succeeded
+            A Redis pipeline configured for transactions
+
+        Example:
+            pipeline = await redis.create_transaction_pipeline('key1', 'key2')
+            pipeline.multi()
+            pipeline.spop('key1')  # No await - queued
+            pipeline.hset('key2', 'field', 'value')  # No await - queued
+            results = await pipeline.execute()
         """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            result = await self.client.watch(*keys)
-            success = bool(result)
-            logger.debug(
-                f"Redis WATCH by '{self.client_id}': keys={keys} "
-                f"result={'SUCCESS' if success else 'FAILED'}",
-            )
-            return success
+            # Create a new pipeline for this transaction
+            pipeline = self.client.pipeline(transaction=True)
+
+            # Watch keys if provided
+            if watch_keys:
+                await pipeline.watch(*watch_keys)
+                logger.debug(
+                    f"Redis transaction pipeline created by '{self.client_id}' watching keys: {watch_keys}"
+                )
+            else:
+                logger.debug(
+                    f"Redis transaction pipeline created by '{self.client_id}' without watching keys"
+                )
+
+            return pipeline
         except Exception as e:
             logger.error(
-                f"Error in Redis WATCH operation by '{self.client_id}' for keys {keys}: {e}",
-                exc_info=True,
-            )
-            raise
-
-    async def multi(self) -> bool:
-        """
-        Start a Redis transaction (MULTI) by creating a pipeline.
-
-        Returns:
-            True if MULTI command succeeded
-        """
-        if not self._started:
-            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-
-        try:
-            # Create a pipeline for the transaction
-            self._transaction_pipeline = self.client.pipeline()
-            # Multi is implicit when using pipeline
-            logger.debug(f"Redis pipeline created for transaction by '{self.client_id}'")
-            return True
-        except Exception as e:
-            self._transaction_pipeline = None
-            logger.error(
-                f"Error creating Redis pipeline by '{self.client_id}': {e}",
-                exc_info=True,
-            )
-            raise
-
-    async def exec(self) -> list[Any] | None:
-        """
-        Execute a Redis transaction (EXEC).
-
-        Returns:
-            List of command results if transaction succeeded,
-            None if transaction was discarded (watched key changed)
-        """
-        if not self._started:
-            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-
-        if self._transaction_pipeline is None:
-            raise RuntimeError("No active transaction to execute")
-
-        try:
-            result = await self._transaction_pipeline.execute()
-            self._transaction_pipeline = None  # Reset transaction state
-            logger.debug(
-                f"Redis EXEC by '{self.client_id}': "
-                f"result={'SUCCESS' if result is not None else 'DISCARDED'}",
-            )
-            return result
-        except Exception as e:
-            self._transaction_pipeline = None  # Reset on error
-            logger.error(
-                f"Error in Redis EXEC operation by '{self.client_id}': {e}",
-                exc_info=True,
-            )
-            raise
-
-    async def unwatch(self) -> bool:
-        """
-        Remove all watches from current connection.
-
-        Returns:
-            True if UNWATCH command succeeded
-        """
-        if not self._started:
-            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-
-        try:
-            result = await self.client.unwatch()
-            success = bool(result)
-            logger.debug(
-                f"Redis UNWATCH by '{self.client_id}': result={'SUCCESS' if success else 'FAILED'}",
-            )
-            return success
-        except Exception as e:
-            logger.error(
-                f"Error in Redis UNWATCH operation by '{self.client_id}': {e}",
+                f"Error creating transaction pipeline by '{self.client_id}': {e}",
                 exc_info=True,
             )
             raise
@@ -383,105 +299,28 @@ class RedisClient(AtomicRedisClientProtocol):
             )
             raise
 
-    async def publish(self, channel: str, message: str) -> int:
+    # Set operations for slot management
+    async def sadd(self, key: str, *members: str) -> int:
         """
-        Publish a message to a Redis channel.
-        Delegates to RedisPubSub for pub/sub functionality.
-        """
-        if not self._started or not self._pubsub:
-            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-        return await self._pubsub.publish(channel, message)
+        Add members to a Redis set.
 
-    @asynccontextmanager
-    async def subscribe(self, channel: str):
-        """
-        Subscribe to a Redis channel.
-        Delegates to RedisPubSub for pub/sub functionality.
-        """
-        if not self._started or not self._pubsub:
-            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-        async with self._pubsub.subscribe(channel) as pubsub:
-            yield pubsub
-
-    def get_user_channel(self, user_id: str) -> str:
-        """
-        Generate standardized user-specific channel name.
-        Delegates to RedisPubSub for consistency.
-        """
-        if not self._pubsub:
-            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-        return self._pubsub.get_user_channel(user_id)
-
-    async def publish_user_notification(
-        self, user_id: str, event_type: str, data: dict[str, Any]
-    ) -> int:
-        """
-        Convenience method to publish structured notifications to user-specific channels.
-        Delegates to RedisPubSub for pub/sub functionality.
-        """
-        if not self._started or not self._pubsub:
-            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-        return await self._pubsub.publish_user_notification(user_id, event_type, data)
-
-    async def ping(self) -> bool:
-        """
-        Health check method to verify Redis connectivity.
+        Args:
+            key: Redis key for the set
+            members: One or more string values to add
 
         Returns:
-            True if Redis connection is healthy
-
-        Raises:
-            RuntimeError: If client is not started
-            RedisConnectionError: If Redis is not reachable
+            Number of elements added to the set
         """
-        if not self._started:
-            logger.warning(f"Redis client '{self.client_id}' not started. Attempting to start.")
-            await self.start()
-            if not self._started:
-                logger.error(
-                    f"Cannot perform ping, Redis client '{self.client_id}' is not running.",
-                )
-                raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-
-        try:
-            result = await self.client.ping()
-            success = bool(result)
-            logger.debug(
-                f"Redis PING by '{self.client_id}': result={'SUCCESS' if success else 'FAILED'}"
-            )
-            return success
-        except RedisConnectionError:
-            logger.error(f"Redis ping failed - connection error for client '{self.client_id}'")
-            raise
-        except RedisTimeoutError:
-            logger.error(f"Redis ping failed - timeout for client '{self.client_id}'")
-            raise
-        except Exception as e:
-            logger.error(
-                f"Error in Redis ping operation by '{self.client_id}': {e}",
-                exc_info=True,
-            )
-            raise
-
-    # Set operations for atomic batch coordination
-    async def sadd(self, key: str, *members: str) -> int:
-        """Add one or more members to a Redis set."""
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.sadd(key, *members)
-
-            if self._transaction_pipeline is None:
-                added_count = int(result)
-                logger.debug(
-                    f"Redis SADD by '{self.client_id}': key='{key}' added={added_count} members"
-                )
-                return added_count
-            else:
-                logger.debug(f"Redis SADD queued by '{self.client_id}': key='{key}'")
-                return 0  # Command queued, actual count determined by EXEC
+            result = await self.client.sadd(key, *members)
+            added_count = int(result)
+            logger.debug(
+                f"Redis SADD by '{self.client_id}': key='{key}' added={added_count} members",
+            )
+            return added_count
         except Exception as e:
             logger.error(
                 f"Error in Redis SADD operation by '{self.client_id}' for key '{key}': {e}",
@@ -490,25 +329,25 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def spop(self, key: str) -> str | None:
-        """Remove and return a random member from a Redis set."""
+        """
+        Remove and return a random member from a Redis set.
+
+        Args:
+            key: Redis key for the set
+
+        Returns:
+            Random member from the set, or None if set is empty
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            if self._transaction_pipeline is None:
-                # Outside transaction - execute immediately
-                result = await self.client.spop(key)
-                member = result.decode() if isinstance(result, bytes) else result
-                logger.debug(
-                    f"Redis SPOP by '{self.client_id}': key='{key}' "
-                    f"result={'MEMBER' if member else 'EMPTY'}"
-                )
-                return member
-            else:
-                # Inside transaction - queue command without await
-                self._transaction_pipeline.spop(key)
-                logger.debug(f"Redis SPOP queued by '{self.client_id}': key='{key}'")
-                return None  # Command queued, actual result determined by EXEC
+            result = await self.client.spop(key)
+            logger.debug(
+                f"Redis SPOP by '{self.client_id}': key='{key}' "
+                f"result={'REMOVED' if result else 'EMPTY'}",
+            )
+            return str(result) if result is not None else None
         except Exception as e:
             logger.error(
                 f"Error in Redis SPOP operation by '{self.client_id}' for key '{key}': {e}",
@@ -517,21 +356,23 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def scard(self, key: str) -> int:
-        """Get the number of members in a Redis set."""
+        """
+        Get the number of members in a Redis set.
+
+        Args:
+            key: Redis key for the set
+
+        Returns:
+            Number of members in the set
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.scard(key)
-
-            if self._transaction_pipeline is None:
-                count = int(result)
-                logger.debug(f"Redis SCARD by '{self.client_id}': key='{key}' count={count}")
-                return count
-            else:
-                logger.debug(f"Redis SCARD queued by '{self.client_id}': key='{key}'")
-                return 0  # Command queued, actual count determined by EXEC
+            result = await self.client.scard(key)
+            count = int(result)
+            logger.debug(f"Redis SCARD by '{self.client_id}': key='{key}' count={count}")
+            return count
         except Exception as e:
             logger.error(
                 f"Error in Redis SCARD operation by '{self.client_id}' for key '{key}': {e}",
@@ -540,24 +381,25 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def smembers(self, key: str) -> set[str]:
-        """Get all members of a Redis set."""
+        """
+        Get all members of a Redis set.
+
+        Args:
+            key: Redis key for the set
+
+        Returns:
+            Set of all members
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.smembers(key)
-
-            if self._transaction_pipeline is None:
-                members = set(result) if result else set()
-                logger.debug(
-                    f"Redis SMEMBERS by '{self.client_id}': key='{key}' "
-                    f"returned {len(members)} members"
-                )
-                return members
-            else:
-                logger.debug(f"Redis SMEMBERS queued by '{self.client_id}': key='{key}'")
-                return set()  # Command queued, actual result determined by EXEC
+            result = await self.client.smembers(key)
+            members = set(result) if result else set()
+            logger.debug(
+                f"Redis SMEMBERS by '{self.client_id}': key='{key}' count={len(members)}",
+            )
+            return members
         except Exception as e:
             logger.error(
                 f"Error in Redis SMEMBERS operation by '{self.client_id}' for key '{key}': {e}",
@@ -567,27 +409,28 @@ class RedisClient(AtomicRedisClientProtocol):
 
     # Hash operations for metadata storage
     async def hset(self, key: str, field: str, value: str) -> int:
-        """Set field in a Redis hash."""
+        """
+        Set field in a Redis hash.
+
+        Args:
+            key: Redis key for the hash
+            field: Field name
+            value: Field value
+
+        Returns:
+            1 if field is new, 0 if field was updated
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            if self._transaction_pipeline is None:
-                # Outside transaction - execute immediately
-                result = await self.client.hset(key, field, value)
-                is_new = int(result)
-                logger.debug(
-                    f"Redis HSET by '{self.client_id}': key='{key}' field='{field}' "
-                    f"result={'NEW' if is_new else 'UPDATED'}"
-                )
-                return is_new
-            else:
-                # Inside transaction - queue command without await
-                self._transaction_pipeline.hset(key, field, value)
-                logger.debug(
-                    f"Redis HSET queued by '{self.client_id}': key='{key}' field='{field}'"
-                )
-                return 0  # Command queued, actual result determined by EXEC
+            result = await self.client.hset(key, field, value)
+            is_new = int(result) == 1
+            logger.debug(
+                f"Redis HSET by '{self.client_id}': key='{key}' field='{field}' "
+                f"result={'NEW' if is_new else 'UPDATED'}",
+            )
+            return int(result)
         except Exception as e:
             logger.error(
                 f"Error in Redis HSET operation by '{self.client_id}' for key '{key}': {e}",
@@ -596,26 +439,27 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def hget(self, key: str, field: str) -> str | None:
-        """Get field value from a Redis hash."""
+        """
+        Get field value from a Redis hash.
+
+        Args:
+            key: Redis key for the hash
+            field: Field name
+
+        Returns:
+            Field value or None if field doesn't exist
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.hget(key, field)
-
-            if self._transaction_pipeline is None:
-                value = result.decode() if isinstance(result, bytes) else result
-                logger.debug(
-                    f"Redis HGET by '{self.client_id}': key='{key}' field='{field}' "
-                    f"result={'FOUND' if value else 'NOT_FOUND'}"
-                )
-                return value
-            else:
-                logger.debug(
-                    f"Redis HGET queued by '{self.client_id}': key='{key}' field='{field}'"
-                )
-                return None  # Command queued, actual result determined by EXEC
+            result = await self.client.hget(key, field)
+            value = result.decode() if isinstance(result, bytes) else result
+            logger.debug(
+                f"Redis HGET by '{self.client_id}': key='{key}' field='{field}' "
+                f"result={'HIT' if value is not None else 'MISS'}",
+            )
+            return str(value) if value is not None else None
         except Exception as e:
             logger.error(
                 f"Error in Redis HGET operation by '{self.client_id}' for key '{key}': {e}",
@@ -624,21 +468,23 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def hlen(self, key: str) -> int:
-        """Get the number of fields in a Redis hash."""
+        """
+        Get the number of fields in a Redis hash.
+
+        Args:
+            key: Redis key for the hash
+
+        Returns:
+            Number of fields in the hash
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.hlen(key)
-
-            if self._transaction_pipeline is None:
-                count = int(result)
-                logger.debug(f"Redis HLEN by '{self.client_id}': key='{key}' count={count}")
-                return count
-            else:
-                logger.debug(f"Redis HLEN queued by '{self.client_id}': key='{key}'")
-                return 0  # Command queued, actual count determined by EXEC
+            result = await self.client.hlen(key)
+            count = int(result)
+            logger.debug(f"Redis HLEN by '{self.client_id}': key='{key}' count={count}")
+            return count
         except Exception as e:
             logger.error(
                 f"Error in Redis HLEN operation by '{self.client_id}' for key '{key}': {e}",
@@ -647,23 +493,25 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def hgetall(self, key: str) -> dict[str, str]:
-        """Get all fields and values from a Redis hash."""
+        """
+        Get all fields and values from a Redis hash.
+
+        Args:
+            key: Redis key for the hash
+
+        Returns:
+            Dictionary of all field-value pairs
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.hgetall(key)
-
-            if self._transaction_pipeline is None:
-                data = dict(result) if result else {}
-                logger.debug(
-                    f"Redis HGETALL by '{self.client_id}': key='{key}' returned {len(data)} fields"
-                )
-                return data
-            else:
-                logger.debug(f"Redis HGETALL queued by '{self.client_id}': key='{key}'")
-                return {}  # Command queued, actual result determined by EXEC
+            result = await self.client.hgetall(key)
+            data = dict(result) if result else {}
+            logger.debug(
+                f"Redis HGETALL by '{self.client_id}': key='{key}' returned {len(data)} fields",
+            )
+            return data
         except Exception as e:
             logger.error(
                 f"Error in Redis HGETALL operation by '{self.client_id}' for key '{key}': {e}",
@@ -672,26 +520,27 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def hexists(self, key: str, field: str) -> bool:
-        """Check if field exists in a Redis hash."""
+        """
+        Check if field exists in a Redis hash.
+
+        Args:
+            key: Redis key for the hash
+            field: Field name to check
+
+        Returns:
+            True if field exists in the hash, False otherwise
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.hexists(key, field)
-
-            if self._transaction_pipeline is None:
-                exists = bool(result)
-                logger.debug(
-                    f"Redis HEXISTS by '{self.client_id}': key='{key}' field='{field}' "
-                    f"exists={'YES' if exists else 'NO'}"
-                )
-                return exists
-            else:
-                logger.debug(
-                    f"Redis HEXISTS queued by '{self.client_id}': key='{key}' field='{field}'"
-                )
-                return False  # Command queued, actual result determined by EXEC
+            result = await self.client.hexists(key, field)
+            exists = bool(result)
+            logger.debug(
+                f"Redis HEXISTS by '{self.client_id}': key='{key}' field='{field}' "
+                f"exists={exists}",
+            )
+            return exists
         except Exception as e:
             logger.error(
                 f"Error in Redis HEXISTS operation by '{self.client_id}' for key '{key}': {e}",
@@ -700,26 +549,27 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def expire(self, key: str, ttl_seconds: int) -> bool:
-        """Set TTL for a Redis key."""
+        """
+        Set TTL for a Redis key.
+
+        Args:
+            key: Redis key
+            ttl_seconds: TTL in seconds
+
+        Returns:
+            True if TTL was set successfully
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.expire(key, ttl_seconds)
-
-            if self._transaction_pipeline is None:
-                success = bool(result)
-                logger.debug(
-                    f"Redis EXPIRE by '{self.client_id}': key='{key}' ttl={ttl_seconds}s "
-                    f"result={'SUCCESS' if success else 'FAILED'}"
-                )
-                return success
-            else:
-                logger.debug(
-                    f"Redis EXPIRE queued by '{self.client_id}': key='{key}' ttl={ttl_seconds}s"
-                )
-                return True  # Command queued, actual result determined by EXEC
+            result = await self.client.expire(key, ttl_seconds)
+            success = bool(result)
+            logger.debug(
+                f"Redis EXPIRE by '{self.client_id}': key='{key}' ttl={ttl_seconds}s "
+                f"result={'SUCCESS' if success else 'KEY_NOT_FOUND'}",
+            )
+            return success
         except Exception as e:
             logger.error(
                 f"Error in Redis EXPIRE operation by '{self.client_id}' for key '{key}': {e}",
@@ -727,25 +577,29 @@ class RedisClient(AtomicRedisClientProtocol):
             )
             raise
 
+    # List operations for validation failure tracking
     async def rpush(self, key: str, *values: str) -> int:
-        """Append values to a Redis list."""
+        """
+        Append values to a Redis list.
+
+        Args:
+            key: Redis key for the list
+            values: One or more values to append
+
+        Returns:
+            Length of the list after operation
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.rpush(key, *values)
-
-            if self._transaction_pipeline is None:
-                length = int(result)
-                logger.debug(
-                    f"Redis RPUSH by '{self.client_id}': key='{key}' "
-                    f"values={len(values)} new_length={length}"
-                )
-                return length
-            else:
-                logger.debug(f"Redis RPUSH queued by '{self.client_id}': key='{key}'")
-                return 0  # Command queued, actual result determined by EXEC
+            result = await self.client.rpush(key, *values)
+            length = int(result)
+            logger.debug(
+                f"Redis RPUSH by '{self.client_id}': key='{key}' "
+                f"added={len(values)} values, new_length={length}",
+            )
+            return length
         except Exception as e:
             logger.error(
                 f"Error in Redis RPUSH operation by '{self.client_id}' for key '{key}': {e}",
@@ -754,24 +608,28 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def lrange(self, key: str, start: int, stop: int) -> list[str]:
-        """Get range of elements from a Redis list."""
+        """
+        Get range of elements from a Redis list.
+
+        Args:
+            key: Redis key for the list
+            start: Start index (0-based)
+            stop: Stop index (inclusive, -1 for end)
+
+        Returns:
+            List of elements in the specified range
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.lrange(key, start, stop)
-
-            if self._transaction_pipeline is None:
-                elements = result or []
-                logger.debug(
-                    f"Redis LRANGE by '{self.client_id}': key='{key}' "
-                    f"range=({start},{stop}) count={len(elements)}"
-                )
-                return elements
-            else:
-                logger.debug(f"Redis LRANGE queued by '{self.client_id}': key='{key}'")
-                return []  # Command queued, actual result determined by EXEC
+            result = await self.client.lrange(key, start, stop)
+            elements = result or []
+            logger.debug(
+                f"Redis LRANGE by '{self.client_id}': key='{key}' "
+                f"range=[{start}:{stop}] returned {len(elements)} elements",
+            )
+            return elements
         except Exception as e:
             logger.error(
                 f"Error in Redis LRANGE operation by '{self.client_id}' for key '{key}': {e}",
@@ -780,21 +638,23 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def llen(self, key: str) -> int:
-        """Get the length of a Redis list."""
+        """
+        Get the length of a Redis list.
+
+        Args:
+            key: Redis key for the list
+
+        Returns:
+            Length of the list
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.llen(key)
-
-            if self._transaction_pipeline is None:
-                length = int(result)
-                logger.debug(f"Redis LLEN by '{self.client_id}': key='{key}' length={length}")
-                return length
-            else:
-                logger.debug(f"Redis LLEN queued by '{self.client_id}': key='{key}'")
-                return 0  # Command queued, actual result determined by EXEC
+            result = await self.client.llen(key)
+            length = int(result)
+            logger.debug(f"Redis LLEN by '{self.client_id}': key='{key}' length={length}")
+            return length
         except Exception as e:
             logger.error(
                 f"Error in Redis LLEN operation by '{self.client_id}' for key '{key}': {e}",
@@ -803,21 +663,23 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def ttl(self, key: str) -> int:
-        """Get time to live for a key in seconds."""
+        """
+        Get TTL of a Redis key in seconds.
+
+        Args:
+            key: Redis key
+
+        Returns:
+            TTL in seconds, -2 if key doesn't exist, -1 if key has no TTL
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.ttl(key)
-
-            if self._transaction_pipeline is None:
-                ttl_seconds = int(result)
-                logger.debug(f"Redis TTL by '{self.client_id}': key='{key}' ttl={ttl_seconds}s")
-                return ttl_seconds
-            else:
-                logger.debug(f"Redis TTL queued by '{self.client_id}': key='{key}'")
-                return -1  # Command queued, actual result determined by EXEC
+            result = await self.client.ttl(key)
+            ttl_seconds = int(result)
+            logger.debug(f"Redis TTL by '{self.client_id}': key='{key}' ttl={ttl_seconds}s")
+            return ttl_seconds
         except Exception as e:
             logger.error(
                 f"Error in Redis TTL operation by '{self.client_id}' for key '{key}': {e}",
@@ -826,27 +688,34 @@ class RedisClient(AtomicRedisClientProtocol):
             raise
 
     async def exists(self, key: str) -> int:
-        """Check if a key exists."""
+        """
+        Check if key exists in Redis.
+
+        Args:
+            key: Redis key to check
+
+        Returns:
+            1 if key exists, 0 otherwise
+        """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
 
         try:
-            redis_client = self._transaction_pipeline or self.client
-            result = await redis_client.exists(key)
-
-            if self._transaction_pipeline is None:
-                exists_count = int(result)
-                logger.debug(
-                    f"Redis EXISTS by '{self.client_id}': key='{key}' "
-                    f"exists={'YES' if exists_count > 0 else 'NO'}"
-                )
-                return exists_count
-            else:
-                logger.debug(f"Redis EXISTS queued by '{self.client_id}': key='{key}'")
-                return 0  # Command queued, actual result determined by EXEC
+            result = await self.client.exists(key)
+            exists_count = int(result)
+            logger.debug(
+                f"Redis EXISTS by '{self.client_id}': key='{key}' exists={exists_count > 0}",
+            )
+            return exists_count
         except Exception as e:
             logger.error(
                 f"Error in Redis EXISTS operation by '{self.client_id}' for key '{key}': {e}",
                 exc_info=True,
             )
             raise
+
+    # PubSub management
+    @property
+    def pubsub(self) -> RedisPubSub | None:
+        """Get the PubSub instance for this client."""
+        return self._pubsub

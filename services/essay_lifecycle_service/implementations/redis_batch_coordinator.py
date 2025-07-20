@@ -7,7 +7,9 @@ to enable horizontal scaling and eliminate race conditions in slot assignment.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import random
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -76,12 +78,13 @@ class RedisBatchCoordinator:
         timeout = timeout_seconds or self._default_timeout
 
         try:
-            # Use Redis pipeline for atomic batch initialization
-            await self._redis.multi()
+            # Create transaction pipeline - no watch needed for batch registration
+            pipeline = await self._redis.create_transaction_pipeline()
+            pipeline.multi()
 
             # Initialize available slots as a Redis SET
             slots_key = self._get_available_slots_key(batch_id)
-            await self._redis.sadd(slots_key, *essay_ids)
+            pipeline.sadd(slots_key, *essay_ids)
 
             # Store batch metadata as a Redis HASH
             metadata_key = self._get_metadata_key(batch_id)
@@ -95,14 +98,14 @@ class RedisBatchCoordinator:
                     value_str = value.isoformat()
                 else:
                     value_str = str(value)
-                await self._redis.hset(metadata_key, field, value_str)
+                pipeline.hset(metadata_key, field, value_str)
 
             # Set TTL for automatic cleanup
             timeout_key = self._get_timeout_key(batch_id)
-            await self._redis.setex(timeout_key, timeout, "timeout_marker")
+            pipeline.setex(timeout_key, timeout, "timeout_marker")
 
             # Execute atomic transaction
-            results = await self._redis.exec()
+            results = await pipeline.execute()
 
             if results is None:
                 raise RuntimeError(f"Batch registration transaction failed for batch {batch_id}")
@@ -112,7 +115,6 @@ class RedisBatchCoordinator:
             )
 
         except Exception as e:
-            await self._redis.unwatch()  # Clean up on error
             self._logger.error(f"Failed to register batch {batch_id}: {e}", exc_info=True)
             raise
 
@@ -132,53 +134,86 @@ class RedisBatchCoordinator:
         slots_key = self._get_available_slots_key(batch_id)
         assignments_key = self._get_assignments_key(batch_id)
 
-        try:
-            # Use Redis transaction with optimistic locking
-            await self._redis.watch(slots_key, assignments_key)
-            
-            # Check availability BEFORE transaction (doesn't modify watched keys)
-            available_count = await self._redis.scard(slots_key)
-            if available_count == 0:
-                await self._redis.unwatch()
-                self._logger.warning(f"No available slots for batch {batch_id}")
-                return None
-            
-            await self._redis.multi()
-            
-            # Queue operations for atomic execution
-            await self._redis.spop(slots_key)  # Returns None during transaction, queued for execution
-            
-            # Execute atomic transaction
-            results = await self._redis.exec()
-            
-            if results is None:
-                # Transaction was discarded due to concurrent modification
-                self._logger.warning(
-                    f"Slot assignment transaction discarded for batch {batch_id} "
-                    "(concurrent modification detected)"
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                # Create transaction pipeline with watched keys
+                pipeline = await self._redis.create_transaction_pipeline(slots_key, assignments_key)
+
+                # Start transaction
+                pipeline.multi()
+
+                # Queue operations for atomic execution (no await)
+                pipeline.spop(slots_key)
+
+                # Execute atomic transaction
+                results = await pipeline.execute()
+
+                if results is None:
+                    # Transaction was discarded due to concurrent modification
+                    if attempt < max_retries - 1:
+                        self._logger.debug(
+                            f"Slot assignment transaction discarded for batch {batch_id} "
+                            f"(concurrent modification detected), retrying attempt {attempt + 2}/{max_retries}"
+                        )
+                        # Exponential backoff with jitter to prevent thundering herd
+                        backoff_time = (0.02 + random.uniform(0, 0.01)) * (attempt + 1)
+                        await asyncio.sleep(backoff_time)
+                        continue
+                    else:
+                        self._logger.warning(
+                            f"Slot assignment transaction failed after {max_retries} attempts for batch {batch_id}"
+                        )
+                        return None
+
+                # Extract results from atomic execution
+                essay_id = results[0]  # Result of spop
+                if essay_id is None:
+                    # No slots were available when transaction executed
+                    self._logger.debug(f"No available slots for batch {batch_id} (all slots assigned)")
+                    return None
+
+                # Store assignment metadata after successful slot assignment
+                # This is a separate operation but acceptable since:
+                # 1. The slot is already removed atomically
+                # 2. If metadata storage fails, we still have the essay_id assigned
+                # 3. The system can recover by re-reading assignments
+                try:
+                    metadata_json = json.dumps(content_metadata)
+                    await self._redis.hset(assignments_key, essay_id, metadata_json)
+                except Exception as e:
+                    # Log error but don't fail the assignment
+                    self._logger.error(
+                        f"Failed to store assignment metadata for essay {essay_id} in batch {batch_id}: {e}",
+                        exc_info=True,
+                    )
+
+                # Success - log and return
+                self._logger.info(
+                    f"Assigned slot {essay_id} to content {content_metadata.get('text_storage_id')} "
+                    f"in batch {batch_id}"
                 )
-                return None
-            
-            # Extract results from atomic execution
-            essay_id = results[0]  # Result of spop
-            if essay_id is None:
-                self._logger.warning(f"No available slots for batch {batch_id}")
-                return None
-            
-            # Store assignment metadata after successful slot assignment
-            metadata_json = json.dumps(content_metadata)
-            await self._redis.hset(assignments_key, essay_id, metadata_json)
+                return essay_id
 
-            self._logger.info(
-                f"Assigned slot {essay_id} to content {content_metadata.get('text_storage_id')} "
-                f"in batch {batch_id}"
-            )
-            return essay_id
+            except asyncio.CancelledError:
+                # Re-raise cancellation
+                raise
+            except Exception as e:
+                # Pipeline cleanup is automatic - no unwatch needed
+                if attempt < max_retries - 1:
+                    self._logger.warning(
+                        f"Error in slot assignment for batch {batch_id}, retrying: {e}"
+                    )
+                    # Exponential backoff with jitter to prevent thundering herd
+                    backoff_time = (0.02 + random.uniform(0, 0.01)) * (attempt + 1)
+                    await asyncio.sleep(backoff_time)
+                    continue
+                else:
+                    self._logger.error(f"Failed to assign slot for batch {batch_id}: {e}", exc_info=True)
+                    raise
 
-        except Exception as e:
-            await self._redis.unwatch()  # Clean up on error
-            self._logger.error(f"Failed to assign slot for batch {batch_id}: {e}", exc_info=True)
-            raise
+        # Should never reach here
+        return None
 
     async def check_batch_completion(self, batch_id: str) -> bool:
         """
@@ -208,6 +243,25 @@ class RedisBatchCoordinator:
         except Exception as e:
             self._logger.error(
                 f"Failed to check batch completion for {batch_id}: {e}", exc_info=True
+            )
+            raise
+
+    async def get_available_slot_count(self, batch_id: str) -> int:
+        """
+        Get the number of available slots remaining for a batch.
+
+        Args:
+            batch_id: The batch identifier
+
+        Returns:
+            Number of available slots
+        """
+        try:
+            slots_key = self._get_available_slots_key(batch_id)
+            return await self._redis.scard(slots_key)
+        except Exception as e:
+            self._logger.error(
+                f"Failed to get available slot count for {batch_id}: {e}", exc_info=True
             )
             raise
 
@@ -556,14 +610,14 @@ class RedisBatchCoordinator:
         try:
             metadata_keys = await self._redis.scan_pattern("batch:*:metadata")
             batch_ids = []
-            
+
             for key in metadata_keys:
                 # Extract batch_id from key pattern: batch:{batch_id}:metadata
                 key_parts = key.split(":")
                 if len(key_parts) >= 3 and key_parts[0] == "batch" and key_parts[-1] == "metadata":
                     batch_id = ":".join(key_parts[1:-1])  # Handle batch_ids that contain colons
                     batch_ids.append(batch_id)
-            
+
             self._logger.debug(f"Found {len(batch_ids)} active batches in Redis")
             return batch_ids
 
@@ -584,14 +638,14 @@ class RedisBatchCoordinator:
         try:
             # Get all active batch IDs
             batch_ids = await self.list_active_batch_ids()
-            
+
             # Search through each batch's assignments
             for batch_id in batch_ids:
                 assignments_key = self._get_assignments_key(batch_id)
-                
+
                 # Check if this essay_id exists in this batch's assignments
                 assignment_exists = await self._redis.hexists(assignments_key, essay_id)
-                
+
                 if assignment_exists:
                     # Get the batch metadata to extract user_id
                     metadata = await self.get_batch_metadata(batch_id)
@@ -605,7 +659,7 @@ class RedisBatchCoordinator:
                         self._logger.warning(
                             f"Found essay {essay_id} in batch {batch_id} but no user_id in metadata"
                         )
-            
+
             # Essay not found in any batch
             self._logger.debug(f"Essay {essay_id} not found in any active batch")
             return None

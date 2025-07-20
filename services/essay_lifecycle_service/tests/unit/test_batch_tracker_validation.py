@@ -54,20 +54,20 @@ class TestBatchEssayTracker:
 
         # Create stateful mock Redis coordinator for realistic testing
         redis_coordinator = AsyncMock(spec=RedisBatchCoordinator)
-        
+
         # State tracking for realistic behavior
         batch_state: dict[str, dict[str, Any]] = {}
         failure_counts: dict[str, int] = {}
         slot_assignments: dict[str, set[str]] = {}  # Track slot assignments per batch
         available_essays: dict[str, list[str]] = {}  # Track available essay IDs per batch
         validation_failures: dict[str, list[dict[str, Any]]] = {}  # Track validation failures per batch
-        
+
         async def mock_register_batch_slots(batch_id: str, essay_ids: list[str], metadata: dict[str, Any], timeout_seconds: int) -> None:
             # Convert correlation_id to string to match Redis storage format
             metadata_copy = metadata.copy()
             if "correlation_id" in metadata_copy and metadata_copy["correlation_id"] is not None:
                 metadata_copy["correlation_id"] = str(metadata_copy["correlation_id"])
-            
+
             batch_state[batch_id] = {
                 "total_slots": len(essay_ids),
                 "assigned_slots": 0,
@@ -79,7 +79,7 @@ class TestBatchEssayTracker:
             failure_counts[batch_id] = 0
             slot_assignments[batch_id] = set()  # Track assigned slots
             validation_failures[batch_id] = []  # Track validation failures
-        
+
         async def mock_get_batch_status(batch_id: str) -> dict[str, Any] | None:
             if batch_id in batch_state:
                 # Update ready_count in the returned status for compatibility
@@ -87,7 +87,7 @@ class TestBatchEssayTracker:
                 status["ready_count"] = status["assigned_slots"]
                 return status
             return None
-        
+
         async def mock_assign_slot_atomic(batch_id: str, content_metadata: dict[str, Any]) -> str | None:
             # Simulate slot assignment if batch exists and has available slots
             if batch_id in batch_state:
@@ -99,20 +99,20 @@ class TestBatchEssayTracker:
                     batch_state[batch_id]["assignments"][essay_id] = content_metadata
                     return essay_id
             return None
-        
+
         async def mock_track_validation_failure(batch_id: str, failure_data: dict[str, Any]) -> None:
             if batch_id in failure_counts:
                 failure_counts[batch_id] += 1
                 validation_failures[batch_id].append(failure_data)
-        
+
         async def mock_get_validation_failure_count(batch_id: str) -> int:
             return failure_counts.get(batch_id, 0)
-        
+
         async def mock_get_assigned_count(batch_id: str) -> int:
             if batch_id in batch_state:
                 return int(batch_state[batch_id]["assigned_slots"])
             return 0
-        
+
         async def mock_check_batch_completion(batch_id: str) -> bool:
             """Mock completion check based on actual assignment state."""
             if batch_id in batch_state:
@@ -123,11 +123,11 @@ class TestBatchEssayTracker:
                 expected_count = int(batch_state[batch_id]["total_slots"])
                 return total_processed >= expected_count
             return False
-        
+
         async def mock_get_validation_failures(batch_id: str) -> list[dict[str, Any]]:
             # Return the actual validation failures tracked for this batch
             return validation_failures.get(batch_id, [])
-        
+
         async def mock_cleanup_batch(batch_id: str) -> None:
             # Remove batch from tracking
             batch_state.pop(batch_id, None)
@@ -145,9 +145,9 @@ class TestBatchEssayTracker:
         redis_coordinator.get_assigned_count.side_effect = mock_get_assigned_count
         redis_coordinator.get_validation_failures.side_effect = mock_get_validation_failures
         redis_coordinator.cleanup_batch.side_effect = mock_cleanup_batch
-        
+
         redis_coordinator.check_batch_completion.side_effect = mock_check_batch_completion
-        
+
         # Static mocks for other methods
         redis_coordinator.list_active_batch_ids.return_value = []  # No active batches in tests
         redis_coordinator.find_batch_for_essay.return_value = None  # Essay not found in tests

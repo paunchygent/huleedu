@@ -83,20 +83,19 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
 
         for attempt in range(max_retries):
             try:
-                # WATCH the essay key for changes
-                await self.redis_client.watch(essay_key)
-
-                # Get current essay state
+                # Get current essay state first (before creating pipeline)
                 essay_state = await self._get_essay_state_from_redis(essay_key)
 
                 # Check if step already completed (idempotency)
                 if step_name in essay_state["completed_steps"]:
-                    await self.redis_client.unwatch()
                     logger.debug(
                         f"Step {step_name} already completed for essay {essay_id}, skipping",
                         extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name},
                     )
                     return True
+
+                # Create transaction pipeline with watched keys
+                pipeline = await self.redis_client.create_transaction_pipeline(essay_key)
 
                 # Prepare updated state
                 essay_state["completed_steps"].add(step_name)
@@ -104,20 +103,19 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                 essay_state["last_updated"] = self._get_current_timestamp()
 
                 # Start transaction
-                await self.redis_client.multi()
+                pipeline.multi()
 
-                # Queue commands in transaction - use pipeline methods directly
-                # Note: Commands are queued, not executed until EXEC
+                # Queue commands in transaction - no await on pipeline methods
                 serializable_data = self._make_json_serializable(essay_state)
                 json_str = json.dumps(serializable_data)
 
-                # Queue the setex operation
-                await self.redis_client.setex(essay_key, self.redis_ttl, json_str)
-                # Queue the delete operation
-                await self.redis_client.delete_key(batch_summary_key)
+                # Queue the setex operation (no await)
+                pipeline.setex(essay_key, self.redis_ttl, json_str)
+                # Queue the delete operation (no await)
+                pipeline.delete(batch_summary_key)
 
                 # Execute transaction
-                result = await self.redis_client.exec()
+                result = await pipeline.execute()
 
                 if result is not None:
                     # Transaction succeeded
@@ -159,7 +157,7 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                         continue
 
             except Exception as e:
-                await self.redis_client.unwatch()  # Clean up on error
+                # Pipeline cleanup is automatic - no unwatch needed
                 logger.error(
                     f"Error in atomic operation attempt {attempt + 1}/{max_retries}: {e}",
                     extra={"batch_id": batch_id, "essay_id": essay_id, "step_name": step_name},

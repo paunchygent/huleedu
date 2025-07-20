@@ -17,10 +17,9 @@ from contextlib import asynccontextmanager
 from typing import Any
 from uuid import UUID
 
+import pytest
 from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
-
-import pytest
 from testcontainers.compose import DockerCompose
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
@@ -346,7 +345,7 @@ class DistributedTestOrchestrator:
         # Type guard: ensure self.compose is not None before accessing methods
         if self.compose is None:
             raise RuntimeError("Docker Compose infrastructure not started. Call start_infrastructure() first.")
-        
+
         postgres_host = self.compose.get_service_host("postgres", 5432)
         postgres_port = self.compose.get_service_port("postgres", 5432)
         return f"postgresql+asyncpg://testuser:testpass@{postgres_host}:{postgres_port}/els_distributed_test"
@@ -356,7 +355,7 @@ class DistributedTestOrchestrator:
         # Type guard: ensure self.compose is not None before accessing methods
         if self.compose is None:
             raise RuntimeError("Docker Compose infrastructure not started. Call start_infrastructure() first.")
-        
+
         redis_host = self.compose.get_service_host("redis", 6379)
         redis_port = self.compose.get_service_port("redis", 6379)
         return f"redis://{redis_host}:{redis_port}"
@@ -366,7 +365,7 @@ class DistributedTestOrchestrator:
         # Type guard: ensure self.compose is not None before accessing methods
         if self.compose is None:
             raise RuntimeError("Docker Compose infrastructure not started. Call start_infrastructure() first.")
-        
+
         kafka_host = self.compose.get_service_host("kafka", 9092)
         kafka_port = self.compose.get_service_port("kafka", 9092)
         return f"{kafka_host}:{kafka_port}"
@@ -376,7 +375,7 @@ class DistributedTestOrchestrator:
         # Type guard: ensure self.compose is not None before accessing methods
         if self.compose is None:
             raise RuntimeError("Docker Compose infrastructure not started. Call start_infrastructure() first.")
-        
+
         workers = []
         for i in range(1, 4):  # 3 workers
             worker_host = self.compose.get_service_host(f"els_worker_{i}", 6000)
