@@ -9,7 +9,10 @@ Uses testcontainers to create isolated test environment.
 """
 
 import asyncio
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
+from typing import Any
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -49,7 +52,7 @@ class TestRedisTransactionAndDatabaseUpdate:
     """Test the exact failure points: Redis transaction + DB update."""
 
     @pytest.fixture
-    async def test_infrastructure(self):
+    async def test_infrastructure(self) -> AsyncGenerator[dict[str, Any], None]:
         """Set up Redis and PostgreSQL containers with initialized services."""
         # Start containers
         redis_container = RedisContainer("redis:7-alpine")
@@ -65,6 +68,7 @@ class TestRedisTransactionAndDatabaseUpdate:
 
             # Create settings with environment variable override for DATABASE_URL
             import os
+
             os.environ["ESSAY_LIFECYCLE_SERVICE_DATABASE_URL"] = db_url
             os.environ["ESSAY_LIFECYCLE_SERVICE_REDIS_URL"] = redis_url
 
@@ -85,8 +89,11 @@ class TestRedisTransactionAndDatabaseUpdate:
             batch_tracker = DefaultBatchEssayTracker(persistence, redis_coordinator)
             await batch_tracker.initialize_from_database()
 
+            # Create mock kafka bus for this test
+            mock_kafka_bus = AsyncMock()
+
             event_publisher = DefaultEventPublisher(
-                kafka_bus=None,  # Not needed for this test
+                kafka_bus=mock_kafka_bus,  # Mock for this test
                 settings=settings,
                 redis_client=redis_client,
                 batch_tracker=batch_tracker,
@@ -110,7 +117,9 @@ class TestRedisTransactionAndDatabaseUpdate:
             await redis_client.stop()
             await repository.engine.dispose()
 
-    async def test_slot_assignment_with_content_provisioning(self, test_infrastructure):
+    async def test_slot_assignment_with_content_provisioning(
+        self, test_infrastructure: dict[str, Any]
+    ) -> None:
         """Test the exact sequence that was failing: batch registration → slot assignment → content update."""
         handler = test_infrastructure["handler"]
         repository = test_infrastructure["repository"]
@@ -192,7 +201,10 @@ class TestRedisTransactionAndDatabaseUpdate:
         assert updated_essay.processing_metadata["text_storage_id"] == text_storage_id
 
         # Step 4: Test idempotency
-        was_created2, final_essay_id2 = await repository.create_essay_state_with_content_idempotency(
+        (
+            was_created2,
+            final_essay_id2,
+        ) = await repository.create_essay_state_with_content_idempotency(
             batch_id=batch_id,
             text_storage_id=text_storage_id,
             essay_data=essay_data,
@@ -202,7 +214,7 @@ class TestRedisTransactionAndDatabaseUpdate:
         assert was_created2 is False, "Second attempt should be idempotent"
         assert final_essay_id2 == assigned_essay_id, "Should return the same essay ID"
 
-    async def test_concurrent_slot_assignments(self, test_infrastructure):
+    async def test_concurrent_slot_assignments(self, test_infrastructure: dict[str, Any]) -> None:
         """Test multiple concurrent slot assignments to verify atomicity."""
         handler = test_infrastructure["handler"]
         redis_coordinator = test_infrastructure["redis_coordinator"]
@@ -233,7 +245,7 @@ class TestRedisTransactionAndDatabaseUpdate:
         await handler.handle_batch_essays_registered(batch_event, correlation_id)
 
         # Perform 5 concurrent slot assignments with retry logic
-        async def assign_slot_with_retry(index: int, max_retries: int = 10):
+        async def assign_slot_with_retry(index: int, max_retries: int = 10) -> str | None:
             """Assign a slot with retry logic for handling transaction conflicts."""
             content_metadata = {
                 "text_storage_id": f"storage_{index}",
@@ -244,7 +256,7 @@ class TestRedisTransactionAndDatabaseUpdate:
                 result = await redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
                 if result is not None:
                     logger.info(f"Worker {index} assigned slot {result} on attempt {attempt + 1}")
-                    return result
+                    return str(result)  # Cast Any to str for type safety
 
                 # Transaction failed due to concurrent modification, retry with backoff
                 if attempt < max_retries - 1:
@@ -258,7 +270,9 @@ class TestRedisTransactionAndDatabaseUpdate:
 
         # Verify results
         successful_assignments = [r for r in results if r is not None]
-        assert len(successful_assignments) == 5, f"Expected 5 successful assignments, got {len(successful_assignments)}: {results}"
+        assert len(successful_assignments) == 5, (
+            f"Expected 5 successful assignments, got {len(successful_assignments)}: {results}"
+        )
 
         # Verify all assigned essay IDs are unique
         assert len(set(successful_assignments)) == 5, "All assigned essay IDs should be unique"
@@ -270,17 +284,16 @@ class TestRedisTransactionAndDatabaseUpdate:
         # Verify all content metadata was stored correctly
         for i in range(5):
             storage_id = f"storage_{i}"
-            found = any(
-                meta.get("text_storage_id") == storage_id
-                for meta in assignments.values()
-            )
+            found = any(meta.get("text_storage_id") == storage_id for meta in assignments.values())
             assert found, f"Content metadata for {storage_id} not found in assignments"
 
         # Verify no slots remaining
         remaining_count = await redis_coordinator.get_available_slot_count(batch_id)
         assert remaining_count == 0, "All slots should be assigned"
 
-    async def test_transaction_rollback_on_watch_failure(self, test_infrastructure):
+    async def test_transaction_rollback_on_watch_failure(
+        self, test_infrastructure: dict[str, Any]
+    ) -> None:
         """Test that Redis transaction properly handles WATCH failures."""
         redis_coordinator = test_infrastructure["redis_coordinator"]
         redis_client = test_infrastructure["redis_client"]
@@ -292,7 +305,7 @@ class TestRedisTransactionAndDatabaseUpdate:
         await redis_client.sadd(slots_key, "essay_1", "essay_2")
 
         # Simulate concurrent modification during transaction
-        async def interfere():
+        async def interfere() -> None:
             await asyncio.sleep(0.05)  # Let transaction start
             await redis_client.sadd(slots_key, "essay_3")  # Modify watched key
 

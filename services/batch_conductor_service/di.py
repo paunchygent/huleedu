@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from aiohttp import ClientSession, ClientTimeout
 from dishka import Provider, Scope, provide
@@ -52,8 +52,7 @@ class CoreInfrastructureProvider(Provider):
             redis_url=settings.REDIS_URL,
         )
         await redis_client.start()
-        # RedisClient implements all AtomicRedisClientProtocol methods
-        return cast(AtomicRedisClientProtocol, redis_client)
+        return redis_client
 
 
 class EventDrivenServicesProvider(Provider):

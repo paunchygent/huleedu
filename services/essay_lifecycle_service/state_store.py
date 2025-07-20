@@ -119,7 +119,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
             # Check for existing essay with same batch_id and text_storage_id
             async with db.execute(
                 "SELECT essay_id FROM essay_states WHERE batch_id = ? AND storage_references LIKE ?",
-                (batch_id, f'%"{text_storage_id}"%')
+                (batch_id, f'%"{text_storage_id}"%'),
             ) as cursor:
                 existing = await cursor.fetchone()
                 if existing:

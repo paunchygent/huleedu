@@ -106,36 +106,44 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 # Execute each migration step separately (asyncpg requirement)
 
                 # Add text_storage_id column if it doesn't exist
-                await conn.execute(sa_text("""
-                    ALTER TABLE essay_states 
+                await conn.execute(
+                    sa_text("""
+                    ALTER TABLE essay_states
                     ADD COLUMN IF NOT EXISTS text_storage_id VARCHAR(255)
-                """))
+                """)
+                )
 
                 # Create index if it doesn't exist
-                await conn.execute(sa_text("""
-                    CREATE INDEX IF NOT EXISTS ix_essay_states_text_storage_id 
+                await conn.execute(
+                    sa_text("""
+                    CREATE INDEX IF NOT EXISTS ix_essay_states_text_storage_id
                     ON essay_states(text_storage_id)
-                """))
+                """)
+                )
 
                 # Create partial unique index (replacing the old constraint)
                 # This allows multiple NULL text_storage_id values in the same batch
-                await conn.execute(sa_text("""
+                await conn.execute(
+                    sa_text("""
                     CREATE UNIQUE INDEX IF NOT EXISTS uq_essay_content_idempotency_partial
                     ON essay_states (batch_id, text_storage_id)
                     WHERE text_storage_id IS NOT NULL
-                """))
+                """)
+                )
 
                 # Add foreign key constraint if it doesn't exist
-                await conn.execute(sa_text("""
+                await conn.execute(
+                    sa_text("""
                     DO $$ BEGIN
-                        ALTER TABLE essay_states 
-                        ADD CONSTRAINT fk_essay_states_batch_id 
-                        FOREIGN KEY (batch_id) REFERENCES batch_essay_trackers(batch_id) 
+                        ALTER TABLE essay_states
+                        ADD CONSTRAINT fk_essay_states_batch_id
+                        FOREIGN KEY (batch_id) REFERENCES batch_essay_trackers(batch_id)
                         ON DELETE SET NULL;
                     EXCEPTION
                         WHEN duplicate_object THEN NULL;
                     END $$
-                """))
+                """)
+                )
 
             self.logger.info("Essay Lifecycle Service migrations applied successfully")
         except Exception as e:
@@ -267,6 +275,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                         processing_metadata=current_state.processing_metadata,
                         storage_references=storage_references_for_db,
                         timeline=timeline_for_db,
+                        batch_id=current_state.batch_id,
                         updated_at=datetime.now(UTC).replace(tzinfo=None),
                     )
                 )
@@ -748,8 +757,14 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         except IntegrityError as e:
             # Handle unique constraint violation as idempotent success
             # Check for both our specific constraint name and general unique violation
-            if "uq_essay_content_idempotency_partial" in str(e) or "uq_essay_content_idempotency" in str(e) or (
-                "duplicate key" in str(e) and "batch_id" in str(e) and "text_storage_id" in str(e)
+            if (
+                "uq_essay_content_idempotency_partial" in str(e)
+                or "uq_essay_content_idempotency" in str(e)
+                or (
+                    "duplicate key" in str(e)
+                    and "batch_id" in str(e)
+                    and "text_storage_id" in str(e)
+                )
             ):
                 # Another concurrent process assigned this content - find the existing assignment
                 async with self.session() as session:

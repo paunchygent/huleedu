@@ -7,6 +7,7 @@ This provides clean separation between individual essay processing and batch-lev
 
 from __future__ import annotations
 
+import asyncio
 from uuid import UUID
 
 from common_core.domain_enums import ContentType
@@ -17,6 +18,7 @@ from common_core.status_enums import BatchStatus, EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.protocols import (
+    BatchEssayTracker,
     BatchPhaseCoordinator,
     EssayRepositoryProtocol,
     EssayState,
@@ -30,10 +32,14 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
     """Default implementation of BatchPhaseCoordinator protocol."""
 
     def __init__(
-        self, repository: EssayRepositoryProtocol, event_publisher: EventPublisher
+        self,
+        repository: EssayRepositoryProtocol,
+        event_publisher: EventPublisher,
+        batch_tracker: BatchEssayTracker,
     ) -> None:
         self.repository = repository
         self.event_publisher = event_publisher
+        self.batch_tracker = batch_tracker
 
     async def check_batch_completion(
         self,
@@ -298,6 +304,17 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
             correlation_id=correlation_id,
         )
 
+        # If this is the final phase (CJ Assessment), schedule delayed cleanup
+        if phase_name == PhaseName.CJ_ASSESSMENT:
+            logger.info(
+                f"Final phase completed for batch {batch_id}, scheduling cleanup in 5 minutes",
+                extra={"batch_id": batch_id, "correlation_id": str(correlation_id)},
+            )
+            # Schedule delayed cleanup to ensure all downstream processing completes
+            asyncio.create_task(
+                self._delayed_batch_cleanup(batch_id, correlation_id, delay_minutes=5)
+            )
+
     def _get_text_storage_id_for_phase(
         self, essay_state: EssayState, phase_name: PhaseName | str
     ) -> str | None:
@@ -351,7 +368,47 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
 
         # Final fallback for missing storage references
         if hasattr(essay_state, "essay_id") and hasattr(essay_state, "storage_references"):
-            if not essay_state.storage_references:
-                return f"original-{essay_state.essay_id}"
+            logger.warning(
+                f"No text storage ID found for essay {essay_state.essay_id} phase {phase_name}",
+                extra={"essay_id": essay_state.essay_id, "phase_name": phase_name},
+            )
 
         return None
+
+    async def _delayed_batch_cleanup(
+        self, batch_id: str, correlation_id: UUID, delay_minutes: int = 5
+    ) -> None:
+        """Perform delayed cleanup of batch tracker records after final phase completion.
+
+        Args:
+            batch_id: ID of the batch to clean up
+            correlation_id: Correlation ID for tracing
+            delay_minutes: Minutes to wait before cleanup (default: 5)
+        """
+        try:
+            # Wait for the specified delay to ensure all downstream processing completes
+            await asyncio.sleep(delay_minutes * 60)
+
+            logger.info(
+                f"Starting delayed cleanup for batch {batch_id}",
+                extra={"batch_id": batch_id, "correlation_id": str(correlation_id)},
+            )
+
+            # Remove the batch tracker record from the database
+            await self.batch_tracker.remove_batch_from_database(batch_id)
+
+            logger.info(
+                f"Successfully cleaned up batch tracker for batch {batch_id}",
+                extra={"batch_id": batch_id, "correlation_id": str(correlation_id)},
+            )
+
+        except Exception as e:
+            # Log the error but don't raise - cleanup failures shouldn't break the pipeline
+            logger.error(
+                f"Failed to cleanup batch tracker for batch {batch_id}: {e}",
+                extra={
+                    "batch_id": batch_id,
+                    "correlation_id": str(correlation_id),
+                    "error": str(e),
+                },
+            )

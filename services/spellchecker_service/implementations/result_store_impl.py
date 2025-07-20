@@ -19,7 +19,7 @@ logger = create_service_logger("spellchecker_service.result_store_impl")
 class DefaultResultStore(ResultStoreProtocol):
     """Default implementation of ResultStoreProtocol with structured error handling."""
 
-    def __init__(self, content_service_url: str):
+    def __init__(self, content_service_url: str) -> None:
         self.content_service_url = content_service_url
 
     async def store_content(

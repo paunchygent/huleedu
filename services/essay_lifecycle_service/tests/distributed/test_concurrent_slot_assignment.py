@@ -753,5 +753,7 @@ class TestConcurrentSlotAssignment:
         assert len(essays_with_content) == essay_count
 
         # Assert - All content IDs are unique
-        content_ids = {essay.storage_references[ContentType.ORIGINAL_ESSAY] for essay in essays_with_content}
+        content_ids = {
+            essay.storage_references[ContentType.ORIGINAL_ESSAY] for essay in essays_with_content
+        }
         assert len(content_ids) == essay_count, "Duplicate content assignments found"

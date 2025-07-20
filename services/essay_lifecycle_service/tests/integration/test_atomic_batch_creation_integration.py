@@ -207,7 +207,9 @@ class TestAtomicBatchCreationIntegration:
 
     @pytest.fixture
     async def batch_tracker(
-        self, batch_tracker_persistence: BatchTrackerPersistence, redis_client: AtomicRedisClientProtocol
+        self,
+        batch_tracker_persistence: BatchTrackerPersistence,
+        redis_client: AtomicRedisClientProtocol,
     ) -> DefaultBatchEssayTracker:
         """Create real batch tracker with PostgreSQL persistence and Redis coordinator."""
         from services.essay_lifecycle_service.config import Settings

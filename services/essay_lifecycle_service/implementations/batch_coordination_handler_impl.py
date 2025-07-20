@@ -252,8 +252,9 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     correlation_id=publish_correlation_id,
                 )
 
-                # Clean up completed batch from database
-                await self.batch_tracker.remove_batch_from_database(batch_ready_event.batch_id)
+                # NOTE: Batch tracker record must persist for pipeline duration
+                # Essays need batch_id for phase outcome coordination throughout spellcheck/CJ phases
+                # Cleanup will happen at pipeline completion, not after content provisioning
 
             return True
 

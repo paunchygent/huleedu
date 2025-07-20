@@ -14,6 +14,7 @@ After resolving the Redis transaction bug, the comprehensive end-to-end test `te
 ## Problem Statement
 
 ### Symptoms
+
 - End-to-end test progresses past Redis slot assignment (✅ FIXED)
 - Spellchecker processing completes successfully for all 25 essays
 - ELS receives and processes `SpellcheckCompletedV1` events
@@ -22,12 +23,15 @@ After resolving the Redis transaction bug, the comprehensive end-to-end test `te
 - Pipeline stalls between spellcheck completion and next orchestration phase
 
 ### Expected vs. Actual Flow
+
 **Expected Flow:**
+
 ```
 Spellcheck Complete → ELS State Update → Batch Completion Check → ELSBatchPhaseOutcome Event → BOS Orchestration
 ```
 
 **Actual Flow:**
+
 ```
 Spellcheck Complete → ELS State Update → Batch Completion Check SKIPPED → No Event → Pipeline Hangs
 ```
@@ -37,6 +41,7 @@ Spellcheck Complete → ELS State Update → Batch Completion Check SKIPPED → 
 ### Pipeline Trace (Correlation ID: 11183ed5-09ad-4c95-b9a8-c8617a56832d)
 
 **Phase 1: Successful Setup** ✅
+
 ```
 14:47:20.418 - Batch registration: 53b7e581-104f-4584-8b29-f637d8dbdcdf
 14:47:20.418 - File upload: 25 essays uploaded successfully
@@ -45,6 +50,7 @@ Spellcheck Complete → ELS State Update → Batch Completion Check SKIPPED → 
 ```
 
 **Phase 2: Spellchecker Processing** ✅
+
 ```
 14:47:21.xxx - Spellchecker receives batch
 14:47:22.xxx - Spellchecker processes all 25 essays
@@ -52,6 +58,7 @@ Spellcheck Complete → ELS State Update → Batch Completion Check SKIPPED → 
 ```
 
 **Phase 3: ELS Processing** ❌ **FAILURE POINT**
+
 ```
 17:09:36 [info] Processing spellcheck result [service_result_handler]
 17:09:36 [info] Successfully updated essay status via state machine
@@ -60,6 +67,7 @@ Spellcheck Complete → ELS State Update → Batch Completion Check SKIPPED → 
 ```
 
 **Phase 4: Expected Orchestration** ❌ **NEVER REACHED**
+
 ```
 EXPECTED: ELSBatchPhaseOutcome event → BOS receives → Next phase orchestration
 ACTUAL: No event published → BOS waits indefinitely → Test timeout
@@ -70,6 +78,7 @@ ACTUAL: No event published → BOS waits indefinitely → Test timeout
 ### Critical Discovery: Missing batch_id After State Updates
 
 **Investigation Path:**
+
 1. ✅ ELS receives `SpellcheckCompletedV1` events correctly
 2. ✅ ELS fetches essay state with valid `batch_id`
 3. ✅ State machine transitions essay to `spellchecked_success`
@@ -84,6 +93,7 @@ ACTUAL: No event published → BOS waits indefinitely → Test timeout
 **Specific Issue**: Lines 55-65 in the UPDATE statement
 
 **Broken Code:**
+
 ```python
 # Line 55-65: SQL UPDATE statement missing batch_id preservation
 update_stmt = (
@@ -103,6 +113,7 @@ update_stmt = (
 ### Technical Root Cause
 
 **Database State Corruption Sequence:**
+
 1. **Initial State**: Essay exists with `batch_id = "53b7e581-104f-4584-8b29-f637d8dbdcdf"`
 2. **State Fetch**: `get_essay_state()` retrieves essay with correct batch_id
 3. **In-Memory Update**: State machine updates status/metadata in memory (batch_id preserved)
@@ -116,6 +127,7 @@ update_stmt = (
 **Method**: `DefaultServiceResultHandler.handle_spellcheck_result` (lines 65-236)
 
 **Critical Code Path:**
+
 ```python
 # Line 65: Get current essay state (WITH batch_id)
 essay_state = await self.repository.get_essay_state(result_data.entity_ref.entity_id)
@@ -146,6 +158,7 @@ if updated_essay_state:
 **Method**: `DefaultBatchPhaseCoordinator.check_batch_completion`
 
 **Critical Check:**
+
 ```python
 if not essay_state.batch_id:
     logger.debug(
@@ -164,6 +177,7 @@ if not essay_state.batch_id:
 **Lines**: 55-65
 
 **Required Change:**
+
 ```python
 # FIXED: Add batch_id to UPDATE statement
 update_stmt = (
@@ -183,6 +197,7 @@ update_stmt = (
 ### Validation Strategy
 
 **Database State Verification:**
+
 ```sql
 -- Before fix: batch_id becomes NULL after state updates
 SELECT essay_id, batch_id, current_status FROM essay_states 
@@ -194,6 +209,7 @@ WHERE batch_id = '53b7e581-104f-4584-8b29-f637d8dbdcdf';
 ```
 
 **Log Verification:**
+
 ```
 BEFORE: "Essay not part of a batch, skipping batch outcome check"
 AFTER: "Checking batch completion for batch 53b7e581-104f-4584-8b29-f637d8dbdcdf"
@@ -228,6 +244,7 @@ AFTER: "Checking batch completion for batch 53b7e581-104f-4584-8b29-f637d8dbdcdf
 ## Risk Assessment
 
 ### Low Risk Implementation
+
 - **Scope**: Single line addition to existing UPDATE statement
 - **Backward Compatibility**: ✅ No API changes required
 - **Data Safety**: ✅ Preserves existing data integrity
@@ -235,6 +252,7 @@ AFTER: "Checking batch completion for batch 53b7e581-104f-4584-8b29-f637d8dbdcdf
 - **Rollback**: ✅ Simple code revert if issues arise
 
 ### Monitoring Points
+
 - Essay state update success rates
 - Batch phase outcome event publication rates
 - End-to-end test completion rates
@@ -243,21 +261,26 @@ AFTER: "Checking batch completion for batch 53b7e581-104f-4584-8b29-f637d8dbdcdf
 ## System Architecture Impact
 
 ### Distributed State Management
+
 **Current Issue**: Essay state transitions break batch associations  
 **Fixed State**: Batch associations preserved throughout entire pipeline  
 
 ### Event-Driven Orchestration
+
 **Current Issue**: Missing phase outcome events stall pipeline  
 **Fixed Flow**: Proper event publishing enables continuous orchestration  
 
 ### Observability Enhancement
+
 **Current Gap**: Silent batch association failures  
 **Enhanced Logging**: Clear batch coordination success/failure visibility  
 
 ## Technical Underpinnings
 
 ### PostgreSQL State Management
+
 **EssayStateDB Schema:**
+
 ```sql
 CREATE TABLE essay_states (
     essay_id VARCHAR PRIMARY KEY,
@@ -271,14 +294,19 @@ CREATE TABLE essay_states (
 ```
 
 ### State Machine Integration
+
 **Essay State Transitions:**
+
 ```
 CONTENT_PROVISIONED → SPELLCHECK_PENDING → SPELLCHECKED_SUCCESS
 ```
+
 **Requirement**: `batch_id` must persist through all transitions
 
 ### Batch Phase Coordination
+
 **Phase Completion Logic:**
+
 ```python
 # Requires valid batch_id to function
 if essay_state.batch_id:
@@ -301,16 +329,19 @@ The fix is straightforward and low-risk, requiring only the addition of `batch_i
 ## Implementation Plan
 
 ### Phase 1: Code Fix (Immediate)
+
 1. Add `batch_id` field to UPDATE statement in `update_essay_state`
 2. Verify all essay state update paths preserve batch association
 3. Run unit tests to validate essay repository functionality
 
 ### Phase 2: Integration Validation (Same Day)
+
 1. Run integration tests for batch phase coordination
 2. Verify `ELSBatchPhaseOutcome` events published correctly
 3. Test complete spellcheck → phase outcome flow
 
 ### Phase 3: End-to-End Validation (Same Day)
+
 1. Execute `test_comprehensive_real_batch_pipeline`
 2. Confirm pipeline progression past spellcheck phase
 3. Validate complete pipeline flow to final orchestration

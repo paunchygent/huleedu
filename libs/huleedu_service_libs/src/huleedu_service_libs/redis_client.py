@@ -8,9 +8,11 @@ Follows the same lifecycle management pattern as KafkaBus.
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import redis.asyncio as aioredis
+import redis.client
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
@@ -240,11 +242,13 @@ class RedisClient(AtomicRedisClientProtocol):
             if watch_keys:
                 await pipeline.watch(*watch_keys)
                 logger.debug(
-                    f"Redis transaction pipeline created by '{self.client_id}' watching keys: {watch_keys}"
+                    f"Redis transaction pipeline created by '{self.client_id}' "
+                    f"watching keys: {watch_keys}"
                 )
             else:
                 logger.debug(
-                    f"Redis transaction pipeline created by '{self.client_id}' without watching keys"
+                    f"Redis transaction pipeline created by '{self.client_id}' "
+                    f"without watching keys"
                 )
 
             return pipeline
@@ -537,8 +541,7 @@ class RedisClient(AtomicRedisClientProtocol):
             result = await self.client.hexists(key, field)
             exists = bool(result)
             logger.debug(
-                f"Redis HEXISTS by '{self.client_id}': key='{key}' field='{field}' "
-                f"exists={exists}",
+                f"Redis HEXISTS by '{self.client_id}': key='{key}' field='{field}' exists={exists}",
             )
             return exists
         except Exception as e:
@@ -713,6 +716,108 @@ class RedisClient(AtomicRedisClientProtocol):
                 exc_info=True,
             )
             raise
+
+    # Missing AtomicRedisClientProtocol methods implementation
+    async def ping(self) -> bool:
+        """
+        Health check method to verify Redis connectivity.
+
+        Returns:
+            True if Redis connection is healthy
+        """
+        if not self._started:
+            logger.warning(f"Redis client '{self.client_id}' not started. Attempting to start.")
+            await self.start()
+            if not self._started:
+                logger.error(
+                    f"Cannot perform operation, Redis client '{self.client_id}' is not running.",
+                )
+                return False
+
+        try:
+            result = await self.client.ping()
+            is_healthy = bool(result)
+            logger.debug(f"Redis PING by '{self.client_id}': result={is_healthy}")
+            return is_healthy
+        except Exception as e:
+            logger.error(
+                f"Error in Redis PING operation by '{self.client_id}': {e}",
+                exc_info=True,
+            )
+            return False
+
+    async def publish(self, channel: str, message: str) -> int:
+        """
+        Publish a message to a Redis channel.
+
+        Args:
+            channel: The channel to publish to
+            message: The message to publish
+
+        Returns:
+            Number of subscribers that received the message
+        """
+        if not self._pubsub:
+            raise RuntimeError(
+                f"Redis client '{self.client_id}' PubSub not initialized. "
+                f"Ensure start() was called."
+            )
+        return await self._pubsub.publish(channel, message)
+
+    def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
+        """
+        Subscribe to a Redis channel within an async context manager.
+
+        Args:
+            channel: The channel to subscribe to
+
+        Returns:
+            Async context manager that yields a PubSub object
+        """
+        if not self._pubsub:
+            raise RuntimeError(
+                f"Redis client '{self.client_id}' PubSub not initialized. "
+                f"Ensure start() was called."
+            )
+        return self._pubsub.subscribe(channel)
+
+    def get_user_channel(self, user_id: str) -> str:
+        """
+        Generate standardized user-specific channel name.
+
+        Args:
+            user_id: The user's ID
+
+        Returns:
+            Standardized channel name for the user
+        """
+        if not self._pubsub:
+            raise RuntimeError(
+                f"Redis client '{self.client_id}' PubSub not initialized. "
+                f"Ensure start() was called."
+            )
+        return self._pubsub.get_user_channel(user_id)
+
+    async def publish_user_notification(
+        self, user_id: str, event_type: str, data: dict[str, Any]
+    ) -> int:
+        """
+        Convenience method to publish structured notifications to user-specific channels.
+
+        Args:
+            user_id: The target user's ID
+            event_type: The type of event
+            data: The event data payload
+
+        Returns:
+            Number of subscribers that received the notification
+        """
+        if not self._pubsub:
+            raise RuntimeError(
+                f"Redis client '{self.client_id}' PubSub not initialized. "
+                f"Ensure start() was called."
+            )
+        return await self._pubsub.publish_user_notification(user_id, event_type, data)
 
     # PubSub management
     @property

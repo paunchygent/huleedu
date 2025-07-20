@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import cast
 
 import httpx
 from dishka import Provider, Scope, provide
@@ -36,7 +35,7 @@ class ApiGatewayProvider(Provider):
     async def get_redis_client(self, config: Settings) -> AsyncIterator[AtomicRedisClientProtocol]:
         client = RedisClient(client_id=config.SERVICE_NAME, redis_url=config.REDIS_URL)
         await client.start()
-        yield cast(AtomicRedisClientProtocol, client)
+        yield client
         await client.stop()
 
     @provide

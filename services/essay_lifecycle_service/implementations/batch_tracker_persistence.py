@@ -51,7 +51,9 @@ class BatchTrackerPersistence:
                 tracker_db = BatchEssayTrackerDB(
                     batch_id=expectation.batch_id,
                     expected_essay_ids=list(expectation.expected_essay_ids),
-                    available_slots=list(expectation.expected_essay_ids),  # Initialize with all slots available
+                    available_slots=list(
+                        expectation.expected_essay_ids
+                    ),  # Initialize with all slots available
                     expected_count=expectation.expected_count,
                     course_code=expectation.course_code.value,
                     essay_instructions=expectation.essay_instructions,

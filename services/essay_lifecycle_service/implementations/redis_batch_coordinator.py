@@ -167,10 +167,12 @@ class RedisBatchCoordinator:
                         return None
 
                 # Extract results from atomic execution
-                essay_id = results[0]  # Result of spop
+                essay_id: str | None = results[0]  # Result of spop
                 if essay_id is None:
                     # No slots were available when transaction executed
-                    self._logger.debug(f"No available slots for batch {batch_id} (all slots assigned)")
+                    self._logger.debug(
+                        f"No available slots for batch {batch_id} (all slots assigned)"
+                    )
                     return None
 
                 # Store assignment metadata after successful slot assignment
@@ -209,7 +211,9 @@ class RedisBatchCoordinator:
                     await asyncio.sleep(backoff_time)
                     continue
                 else:
-                    self._logger.error(f"Failed to assign slot for batch {batch_id}: {e}", exc_info=True)
+                    self._logger.error(
+                        f"Failed to assign slot for batch {batch_id}: {e}", exc_info=True
+                    )
                     raise
 
         # Should never reach here

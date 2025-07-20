@@ -19,6 +19,7 @@ from services.essay_lifecycle_service.implementations.batch_phase_coordinator_im
     DefaultBatchPhaseCoordinator,
 )
 from services.essay_lifecycle_service.protocols import (
+    BatchEssayTracker,
     EssayRepositoryProtocol,
     EventPublisher,
 )
@@ -38,12 +39,22 @@ class TestDefaultBatchPhaseCoordinator:
         return AsyncMock(spec=EventPublisher)
 
     @pytest.fixture
+    def mock_batch_tracker(self) -> AsyncMock:
+        """Mock BatchEssayTracker for testing using protocol-based mocking."""
+        return AsyncMock(spec=BatchEssayTracker)
+
+    @pytest.fixture
     def coordinator(
-        self, mock_essay_repository: AsyncMock, mock_event_publisher: AsyncMock
+        self,
+        mock_essay_repository: AsyncMock,
+        mock_event_publisher: AsyncMock,
+        mock_batch_tracker: AsyncMock,
     ) -> DefaultBatchPhaseCoordinator:
         """Create DefaultBatchPhaseCoordinator instance for testing."""
         return DefaultBatchPhaseCoordinator(
-            repository=mock_essay_repository, event_publisher=mock_event_publisher
+            repository=mock_essay_repository,
+            event_publisher=mock_event_publisher,
+            batch_tracker=mock_batch_tracker,
         )
 
     def create_mock_essay_state(

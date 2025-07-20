@@ -19,7 +19,9 @@ logger = create_service_logger("spellchecker_service.event_publisher_impl")
 class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
     """Default implementation of SpellcheckEventPublisherProtocol with structured error handling."""
 
-    def __init__(self, kafka_event_type: str, source_service_name: str, kafka_output_topic: str):
+    def __init__(
+        self, kafka_event_type: str, source_service_name: str, kafka_output_topic: str
+    ) -> None:
         self.kafka_event_type = kafka_event_type
         self.source_service_name = source_service_name
         self.kafka_output_topic = kafka_output_topic

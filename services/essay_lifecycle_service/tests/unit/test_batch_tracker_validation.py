@@ -60,9 +60,13 @@ class TestBatchEssayTracker:
         failure_counts: dict[str, int] = {}
         slot_assignments: dict[str, set[str]] = {}  # Track slot assignments per batch
         available_essays: dict[str, list[str]] = {}  # Track available essay IDs per batch
-        validation_failures: dict[str, list[dict[str, Any]]] = {}  # Track validation failures per batch
+        validation_failures: dict[
+            str, list[dict[str, Any]]
+        ] = {}  # Track validation failures per batch
 
-        async def mock_register_batch_slots(batch_id: str, essay_ids: list[str], metadata: dict[str, Any], timeout_seconds: int) -> None:
+        async def mock_register_batch_slots(
+            batch_id: str, essay_ids: list[str], metadata: dict[str, Any], timeout_seconds: int
+        ) -> None:
             # Convert correlation_id to string to match Redis storage format
             metadata_copy = metadata.copy()
             if "correlation_id" in metadata_copy and metadata_copy["correlation_id"] is not None:
@@ -74,7 +78,7 @@ class TestBatchEssayTracker:
                 "is_complete": False,
                 "has_timeout": True,
                 "metadata": metadata_copy,
-                "assignments": {}
+                "assignments": {},
             }
             failure_counts[batch_id] = 0
             slot_assignments[batch_id] = set()  # Track assigned slots
@@ -88,7 +92,9 @@ class TestBatchEssayTracker:
                 return status
             return None
 
-        async def mock_assign_slot_atomic(batch_id: str, content_metadata: dict[str, Any]) -> str | None:
+        async def mock_assign_slot_atomic(
+            batch_id: str, content_metadata: dict[str, Any]
+        ) -> str | None:
             # Simulate slot assignment if batch exists and has available slots
             if batch_id in batch_state:
                 if batch_state[batch_id]["assigned_slots"] < batch_state[batch_id]["total_slots"]:
@@ -100,7 +106,9 @@ class TestBatchEssayTracker:
                     return essay_id
             return None
 
-        async def mock_track_validation_failure(batch_id: str, failure_data: dict[str, Any]) -> None:
+        async def mock_track_validation_failure(
+            batch_id: str, failure_data: dict[str, Any]
+        ) -> None:
             if batch_id in failure_counts:
                 failure_counts[batch_id] += 1
                 validation_failures[batch_id].append(failure_data)
@@ -141,7 +149,9 @@ class TestBatchEssayTracker:
         redis_coordinator.get_batch_status.side_effect = mock_get_batch_status
         redis_coordinator.assign_slot_atomic.side_effect = mock_assign_slot_atomic
         redis_coordinator.track_validation_failure.side_effect = mock_track_validation_failure
-        redis_coordinator.get_validation_failure_count.side_effect = mock_get_validation_failure_count
+        redis_coordinator.get_validation_failure_count.side_effect = (
+            mock_get_validation_failure_count
+        )
         redis_coordinator.get_assigned_count.side_effect = mock_get_assigned_count
         redis_coordinator.get_validation_failures.side_effect = mock_get_validation_failures
         redis_coordinator.cleanup_batch.side_effect = mock_cleanup_batch

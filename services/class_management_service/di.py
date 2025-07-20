@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import cast
 
 from aiokafka.errors import KafkaError
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
@@ -148,7 +147,7 @@ class ServiceProvider(Provider):
             self._redis_shutdown_handlers = []
         self._redis_shutdown_handlers.append(_shutdown_redis)
 
-        return cast(AtomicRedisClientProtocol, redis_client)
+        return redis_client
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(

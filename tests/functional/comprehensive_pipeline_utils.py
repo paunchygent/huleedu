@@ -41,7 +41,7 @@ def create_comprehensive_kafka_manager() -> KafkaTestManager:
     return KafkaTestManager()
 
 
-async def load_real_test_essays(max_essays: int = 25) -> list[Path]:
+async def load_real_test_essays(max_essays: int = 30) -> list[Path]:
     """
     Load real student essays from test directory.
 
@@ -93,20 +93,12 @@ async def register_comprehensive_batch(
     if correlation_id is None:
         correlation_id = str(uuid.uuid4())
 
-    # Randomly select from available course codes to prevent idempotency collisions
-    import random
-
+    # Use English course code for English essays
+    # Note: Language is inferred from course code (ENG* → 'en', SV* → 'sv')
     from common_core.domain_enums import CourseCode
 
-    available_courses = [
-        CourseCode.ENG5,
-        CourseCode.ENG6,
-        CourseCode.ENG7,
-        CourseCode.SV1,
-        CourseCode.SV2,
-        CourseCode.SV3,
-    ]
-    selected_course = random.choice(available_courses)
+    # Always use ENG5 for English essays in this test
+    selected_course = CourseCode.ENG5
 
     # Use ServiceTestManager's create_batch method for authentication
     batch_id, actual_correlation_id = await service_manager.create_batch(

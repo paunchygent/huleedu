@@ -17,7 +17,7 @@ logger = create_service_logger("spellchecker_service.content_client_impl")
 class DefaultContentClient(ContentClientProtocol):
     """Default implementation of ContentClientProtocol with structured error handling."""
 
-    def __init__(self, content_service_url: str):
+    def __init__(self, content_service_url: str) -> None:
         self.content_service_url = content_service_url
 
     async def fetch_content(

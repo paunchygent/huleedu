@@ -503,13 +503,17 @@ class TestRedisStateConsistency:
             batches_metadata.append((batch_id, complex_metadata))
 
         # Act - Concurrent metadata retrieval and slot operations
-        concurrent_tasks: list[tuple[str, str, Coroutine[Any, Any, dict[str, Any] | str | None]]] = []
+        concurrent_tasks: list[
+            tuple[str, str, Coroutine[Any, Any, dict[str, Any] | str | None]]
+        ] = []
 
         # Mix metadata retrievals with slot assignments
         for batch_id, _original_metadata in batches_metadata:
             # Metadata retrieval tasks
             for _ in range(3):
-                metadata_task: Coroutine[Any, Any, dict[str, Any] | None] = redis_coordinator.get_batch_metadata(batch_id)
+                metadata_task: Coroutine[Any, Any, dict[str, Any] | None] = (
+                    redis_coordinator.get_batch_metadata(batch_id)
+                )
                 concurrent_tasks.append(("metadata", batch_id, metadata_task))
 
             # Slot assignment tasks
@@ -520,7 +524,9 @@ class TestRedisStateConsistency:
                     "file_size_bytes": 1250 + i * 12,
                 }
 
-                assignment_task: Coroutine[Any, Any, str | None] = redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+                assignment_task: Coroutine[Any, Any, str | None] = (
+                    redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+                )
                 concurrent_tasks.append(("assignment", batch_id, assignment_task))
 
         # Execute all operations concurrently

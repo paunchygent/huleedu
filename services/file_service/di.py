@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any, cast
+from typing import Any
 
 from aiohttp import ClientSession
 from aiokafka.errors import KafkaError
@@ -122,7 +122,7 @@ class CoreInfrastructureProvider(Provider):
         # TODO Note: In production, this would be registered with the app lifecycle
         # For now, we rely on container cleanup
 
-        return cast(AtomicRedisClientProtocol, redis_client)
+        return redis_client
 
 
 class ServiceImplementationsProvider(Provider):

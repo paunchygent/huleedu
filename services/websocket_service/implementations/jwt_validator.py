@@ -16,7 +16,7 @@ class JWTValidator:
     Follows the same validation pattern as the API Gateway.
     """
 
-    def __init__(self, secret_key: str, algorithm: str = "HS256"):
+    def __init__(self, secret_key: str, algorithm: str = "HS256") -> None:
         self._secret_key = secret_key
         self._algorithm = algorithm
 

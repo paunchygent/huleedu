@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import cast
 
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
@@ -38,8 +37,7 @@ class WebSocketServiceProvider(Provider):
             redis_url=config.REDIS_URL,
         )
         await client.start()
-        # RedisClient implements AtomicRedisClientProtocol
-        yield cast(AtomicRedisClientProtocol, client)
+        yield client
         await client.stop()
 
     @provide(scope=Scope.APP)

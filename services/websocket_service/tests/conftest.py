@@ -44,18 +44,18 @@ class MockPubSubContextManager:
 class MockRedisClient(AtomicRedisClientProtocol):
     """Mock Redis client for testing WebSocket functionality."""
 
+    # Override ping attribute type for testing
+    ping: AsyncMock
+
     def __init__(self) -> None:
         self.client = AsyncMock()
-        self.client.ping = AsyncMock(return_value=True)
+        # Store ping as AsyncMock for test manipulation (side_effect, etc.)
+        self.ping = AsyncMock(return_value=True)
         self.get_user_channel_calls: list[str] = []
         self.subscribe_calls: list[str] = []
         self.publish_calls: list[tuple[str, str, dict[str, Any]]] = []
         self._mock_pubsub = AsyncMock()
         self._mock_pubsub.get_message = AsyncMock(return_value=None)
-
-    async def ping(self) -> bool:
-        """Mock ping method for health checks."""
-        return True
 
     async def set_if_not_exists(self, key: str, value: Any, ttl_seconds: int | None = None) -> bool:
         """Mock set_if_not_exists method."""
@@ -88,6 +88,12 @@ class MockRedisClient(AtomicRedisClientProtocol):
     async def unwatch(self) -> bool:
         """Mock unwatch method for transactions."""
         return True
+
+    async def create_transaction_pipeline(self, *watch_keys: str) -> Any:
+        """Mock create_transaction_pipeline method for atomic transactions."""
+        # Return a mock pipeline object
+        mock_pipeline = AsyncMock()
+        return mock_pipeline
 
     async def scan_pattern(self, pattern: str) -> list[str]:
         """Mock scan_pattern method."""

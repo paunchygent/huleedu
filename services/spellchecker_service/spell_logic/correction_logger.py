@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     pass  # No specific type imports needed here for now
 
 
-def log_essay_corrections(
+async def log_essay_corrections_async(
     essay_id: str,
     original_text: str,
     initial_l2_corrected_text: str,
@@ -187,12 +187,18 @@ def log_essay_corrections(
         + "\n",
     )
 
-    # --- Save the combined correction log to file ---
+    # --- Save the combined correction log to file (async) ---
     log_output_path = os.path.join(output_dir, f"{essay_id}_corrections_log.txt")
     try:
-        os.makedirs(output_dir, exist_ok=True)  # Ensure output directory exists
-        with open(log_output_path, "w", encoding="utf-8") as f:
-            f.write(log_buffer.getvalue())
+        import aiofiles
+        import aiofiles.os
+
+        # Ensure output directory exists (async)
+        await aiofiles.os.makedirs(output_dir, exist_ok=True)
+
+        # Write file asynchronously
+        async with aiofiles.open(log_output_path, "w", encoding="utf-8") as f:
+            await f.write(log_buffer.getvalue())
         logger.info(f"Saved detailed correction log to: {log_output_path}")
     except Exception as e:
         logger.error(f"Error saving correction log for essay {essay_id} to {log_output_path}: {e}")

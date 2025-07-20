@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
@@ -170,8 +170,7 @@ class CoreInfrastructureProvider(Provider):
         # TODO Note: In production, this would be registered with the app lifecycle
         # For now, we rely on container cleanup
 
-        # RedisClient implements all AtomicRedisClientProtocol methods
-        return cast(AtomicRedisClientProtocol, redis_client)
+        return redis_client
 
     @provide(scope=Scope.APP)
     def provide_database_engine(self, settings: Settings) -> AsyncEngine:
@@ -329,9 +328,10 @@ class BatchCoordinationProvider(Provider):
         self,
         repository: EssayRepositoryProtocol,
         event_publisher: EventPublisher,
+        batch_tracker: BatchEssayTracker,
     ) -> BatchPhaseCoordinator:
         """Provide batch phase coordinator implementation."""
-        return DefaultBatchPhaseCoordinator(repository, event_publisher)
+        return DefaultBatchPhaseCoordinator(repository, event_publisher, batch_tracker)
 
     @provide(scope=Scope.APP)
     def provide_service_result_handler(

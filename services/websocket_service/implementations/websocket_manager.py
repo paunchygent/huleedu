@@ -15,7 +15,7 @@ class WebSocketManager:
     Implements connection tracking and message broadcasting.
     """
 
-    def __init__(self, max_connections_per_user: int = 5):
+    def __init__(self, max_connections_per_user: int = 5) -> None:
         self._connections: dict[str, list[WebSocket]] = defaultdict(list)
         self._max_connections_per_user = max_connections_per_user
         self._lock = asyncio.Lock()

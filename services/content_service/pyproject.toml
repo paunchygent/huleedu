@@ -34,7 +34,7 @@ huleedu-common-core = "file:///app/libs/common_core"
 huleedu-service-libs = "file:///app/libs/huleedu_service_libs"
 
 [tool.pdm.scripts]
-start = "hypercorn app:app --bind 0.0.0.0:8000"
+start = "hypercorn app:app --bind 0.0.0.0:8000 --workers 4 --worker-class asyncio"
 dev = "quart --app app:app --debug run -p 8001" # Changed port for dev to match compose
 
 [tool.mypy]

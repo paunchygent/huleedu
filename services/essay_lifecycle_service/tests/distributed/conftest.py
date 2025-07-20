@@ -291,7 +291,9 @@ class DistributedTestEventPublisher(EventPublisher):
             "batch_essays_ready", self.instance_id, event_data.batch_id
         )
 
-    async def publish_excess_content_provisioned(self, event_data: Any, correlation_id: UUID) -> None:
+    async def publish_excess_content_provisioned(
+        self, event_data: Any, correlation_id: UUID
+    ) -> None:
         """Record excess content events."""
         async with self.lock:
             self.published_events.append(("excess_content_provisioned", event_data, correlation_id))
@@ -344,7 +346,9 @@ class DistributedTestOrchestrator:
         """Get PostgreSQL connection URL."""
         # Type guard: ensure self.compose is not None before accessing methods
         if self.compose is None:
-            raise RuntimeError("Docker Compose infrastructure not started. Call start_infrastructure() first.")
+            raise RuntimeError(
+                "Docker Compose infrastructure not started. Call start_infrastructure() first."
+            )
 
         postgres_host = self.compose.get_service_host("postgres", 5432)
         postgres_port = self.compose.get_service_port("postgres", 5432)
@@ -354,7 +358,9 @@ class DistributedTestOrchestrator:
         """Get Redis connection URL."""
         # Type guard: ensure self.compose is not None before accessing methods
         if self.compose is None:
-            raise RuntimeError("Docker Compose infrastructure not started. Call start_infrastructure() first.")
+            raise RuntimeError(
+                "Docker Compose infrastructure not started. Call start_infrastructure() first."
+            )
 
         redis_host = self.compose.get_service_host("redis", 6379)
         redis_port = self.compose.get_service_port("redis", 6379)
@@ -364,7 +370,9 @@ class DistributedTestOrchestrator:
         """Get Kafka connection URL."""
         # Type guard: ensure self.compose is not None before accessing methods
         if self.compose is None:
-            raise RuntimeError("Docker Compose infrastructure not started. Call start_infrastructure() first.")
+            raise RuntimeError(
+                "Docker Compose infrastructure not started. Call start_infrastructure() first."
+            )
 
         kafka_host = self.compose.get_service_host("kafka", 9092)
         kafka_port = self.compose.get_service_port("kafka", 9092)
@@ -374,7 +382,9 @@ class DistributedTestOrchestrator:
         """Get ELS worker URLs."""
         # Type guard: ensure self.compose is not None before accessing methods
         if self.compose is None:
-            raise RuntimeError("Docker Compose infrastructure not started. Call start_infrastructure() first.")
+            raise RuntimeError(
+                "Docker Compose infrastructure not started. Call start_infrastructure() first."
+            )
 
         workers = []
         for i in range(1, 4):  # 3 workers

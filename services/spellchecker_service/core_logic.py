@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Dict
 from uuid import UUID
 
 import aiohttp  # For ClientSession type hint
@@ -19,6 +20,10 @@ from huleedu_service_libs.logging_utils import create_service_logger
 # )
 
 logger = create_service_logger("spellchecker_service.core_logic")
+
+# Global cache for SpellChecker instances per language
+# This prevents recreating the dictionary for every essay
+_spellchecker_cache: Dict[str, any] = {}
 
 
 # --- Default Implementations / Helpers ---
@@ -259,6 +264,10 @@ async def default_perform_spell_check_algorithm(
     if correlation_id:
         log_extra["correlation_id"] = str(correlation_id)
 
+    import time
+
+    start_time = time.time()
+
     logger.info(
         f"{log_prefix}Performing L2 + pyspellchecker algorithm for text (length: {len(text)})",
         extra=log_extra,
@@ -285,14 +294,26 @@ async def default_perform_spell_check_algorithm(
             f"{settings.effective_filtered_dict_path}",
             extra=log_extra,
         )
+        l2_load_start = time.time()
         l2_errors = load_l2_errors(settings.effective_filtered_dict_path, filter_entries=False)
+        l2_load_time = time.time() - l2_load_start
+        logger.info(
+            f"{log_prefix}L2 dictionary load time: {l2_load_time:.3f}s",
+            extra={**log_extra, "l2_load_time_seconds": l2_load_time},
+        )
 
         if not l2_errors and settings.ENABLE_L2_CORRECTIONS:
             logger.warning(f"{log_prefix}L2 dictionary is empty but L2 corrections are enabled")
 
         # 2. Apply L2 corrections
+        l2_apply_start = time.time()
         l2_corrected_text, l2_corrections = apply_l2_corrections(text, l2_errors)
         l2_correction_count = len(l2_corrections)
+        l2_apply_time = time.time() - l2_apply_start
+        logger.info(
+            f"{log_prefix}L2 corrections apply time: {l2_apply_time:.3f}s",
+            extra={**log_extra, "l2_apply_time_seconds": l2_apply_time},
+        )
 
         if l2_correction_count > 0:
             logger.debug(
@@ -300,34 +321,50 @@ async def default_perform_spell_check_algorithm(
                 extra={**log_extra, "l2_corrections": l2_correction_count},
             )
 
-        # 3. Initialize pyspellchecker
-        logger.debug(
-            f"{log_prefix}Initializing SpellChecker for language: {language}", extra=log_extra
-        )
-        try:
-            spell_checker = SpellChecker(language=language)
-        except Exception as e:
-            logger.warning(
-                f"{log_prefix}Failed to initialize SpellChecker for language '{language}': {e}, "
-                f"falling back to L2 corrections only",
-                extra=log_extra,
+        # 3. Get or create cached pyspellchecker instance
+        global _spellchecker_cache
+        
+        if language not in _spellchecker_cache:
+            logger.debug(
+                f"{log_prefix}Creating new SpellChecker for language: {language} (first time)",
+                extra=log_extra
             )
-            # Fallback to L2 corrections only
-            return l2_corrected_text, l2_correction_count
+            spellchecker_init_start = time.time()
+            _spellchecker_cache[language] = SpellChecker(language=language)
+            spellchecker_init_time = time.time() - spellchecker_init_start
+            logger.info(
+                f"{log_prefix}SpellChecker created and cached: {spellchecker_init_time:.3f}s",
+                extra={**log_extra, "spellchecker_init_time_seconds": spellchecker_init_time, "cache_hit": False},
+            )
+        else:
+            logger.debug(
+                f"{log_prefix}Using cached SpellChecker for language: {language}",
+                extra={**log_extra, "cache_hit": True}
+            )
+        
+        spell_checker = _spellchecker_cache[language]
 
         # 4. Apply pyspellchecker corrections
         logger.debug(f"{log_prefix}Running pyspellchecker on L2-corrected text", extra=log_extra)
 
         # Tokenize using pattern from prototype
+        tokenize_start = time.time()
         token_pattern = re.compile(r"\w+(?:[-']\w+)*|[^\s\w]+|\s+")
         word_pattern = re.compile(r"^\w+(?:[-']\w+)*$")
 
         tokens = token_pattern.findall(l2_corrected_text)
+        tokenize_time = time.time() - tokenize_start
+        logger.debug(
+            f"{log_prefix}Tokenization time: {tokenize_time:.3f}s, found {len(tokens)} tokens",
+            extra={**log_extra, "tokenize_time_seconds": tokenize_time, "token_count": len(tokens)},
+        )
+
         pyspellchecker_corrections = []
         final_corrected_tokens = []
         current_pos = 0
 
         # Collect words for spell checking
+        word_collect_start = time.time()
         words_to_check = []
         word_indices_map = {}
         temp_word_idx = 0
@@ -343,9 +380,21 @@ async def default_perform_spell_check_algorithm(
                 temp_word_idx += 1
             current_pos += len(token_text)
 
+        word_collect_time = time.time() - word_collect_start
+        logger.debug(
+            f"{log_prefix}Word collection time: {word_collect_time:.3f}s, found {len(words_to_check)} words",
+            extra={**log_extra, "word_collect_time_seconds": word_collect_time, "word_count": len(words_to_check)},
+        )
+
         # Find misspelled words - check lowercase versions for consistency
+        unknown_check_start = time.time()
         lowercase_words = [word.lower() for word in words_to_check]
         misspelled_lowercase = spell_checker.unknown(lowercase_words)
+        unknown_check_time = time.time() - unknown_check_start
+        logger.info(
+            f"{log_prefix}SpellChecker.unknown() time: {unknown_check_time:.3f}s, found {len(misspelled_lowercase)} misspelled words",
+            extra={**log_extra, "unknown_check_time_seconds": unknown_check_time, "misspelled_count": len(misspelled_lowercase)},
+        )
 
         # Map back to original case words that need correction
         misspelled_words = set()
@@ -354,8 +403,10 @@ async def default_perform_spell_check_algorithm(
                 misspelled_words.add(words_to_check[i])  # Add original case word
 
         # Apply corrections
+        corrections_start = time.time()
         current_pos = 0
         word_idx_counter = 0
+        correction_times = []
 
         for token_text in tokens:
             token_len = len(token_text)
@@ -363,7 +414,16 @@ async def default_perform_spell_check_algorithm(
                 original_word = words_to_check[word_idx_counter]
 
                 if original_word in misspelled_words:
+                    correction_start = time.time()
                     corrected_word = spell_checker.correction(original_word.lower())
+                    correction_time = time.time() - correction_start
+                    correction_times.append(correction_time)
+                    
+                    if correction_time > 0.1:  # Log slow corrections
+                        logger.warning(
+                            f"{log_prefix}Slow correction: '{original_word}' -> '{corrected_word}' took {correction_time:.3f}s",
+                            extra={**log_extra, "slow_word": original_word, "correction_time_seconds": correction_time},
+                        )
 
                     if corrected_word and corrected_word.lower() != original_word.lower():
                         # Preserve case
@@ -396,50 +456,87 @@ async def default_perform_spell_check_algorithm(
                 final_corrected_tokens.append(token_text)
             current_pos += token_len
 
+        corrections_total_time = time.time() - corrections_start
+        if correction_times:
+            max_correction_time = max(correction_times)
+            avg_correction_time = sum(correction_times) / len(correction_times)
+            logger.info(
+                f"{log_prefix}Corrections loop time: {corrections_total_time:.3f}s, "
+                f"max single correction: {max_correction_time:.3f}s, "
+                f"avg correction: {avg_correction_time:.3f}s, "
+                f"total corrections attempted: {len(correction_times)}",
+                extra={
+                    **log_extra,
+                    "corrections_loop_time_seconds": corrections_total_time,
+                    "max_correction_time_seconds": max_correction_time,
+                    "avg_correction_time_seconds": avg_correction_time,
+                    "corrections_attempted": len(correction_times),
+                },
+            )
+
         final_corrected_text = "".join(final_corrected_tokens)
         pyspell_correction_count = len(pyspellchecker_corrections)
         total_corrections = l2_correction_count + pyspell_correction_count
 
         # 5. Log correction details if enabled
-        if settings.ENABLE_CORRECTION_LOGGING and essay_id:
-            try:
-                from .spell_logic.correction_logger import log_essay_corrections
+        # Log detailed corrections if essay_id is provided (asynchronous, non-blocking)
+        if essay_id:
+            import asyncio
 
-                # Convert L2 corrections to expected format
-                l2_corrections_formatted = []
-                for corr in l2_corrections:
-                    l2_corrections_formatted.append(
-                        {
-                            "original_word": corr.get("original_word", ""),
-                            "corrected_word": corr.get("corrected_word", ""),
-                            "start": corr.get("start", 0),
-                            "end": corr.get("end", 0),
-                            "rule": corr.get("rule", "L2"),
-                        },
+            async def log_corrections_async() -> None:
+                """Background task for correction logging to avoid blocking request processing."""
+                try:
+                    from .spell_logic.correction_logger import log_essay_corrections_async
+
+                    # Convert L2 corrections to expected format
+                    l2_corrections_formatted = []
+                    for corr in l2_corrections:
+                        l2_corrections_formatted.append(
+                            {
+                                "original_word": corr.get("original_word", ""),
+                                "corrected_word": corr.get("corrected_word", ""),
+                                "start": corr.get("start", 0),
+                                "end": corr.get("end", 0),
+                                "rule": corr.get("rule", "L2"),
+                            },
+                        )
+
+                    await log_essay_corrections_async(
+                        essay_id=essay_id,
+                        original_text=text,
+                        initial_l2_corrected_text=l2_corrected_text,
+                        final_corrected_text=final_corrected_text,
+                        applied_initial_l2_corrections=l2_corrections_formatted,
+                        main_checker_corrections=pyspellchecker_corrections,
+                        l2_context_reverted_count=0,  # Not implemented in simplified flow
+                        output_dir=settings.effective_correction_log_dir,
+                    )
+                    logger.debug(
+                        f"{log_prefix}Detailed correction logging completed", extra=log_extra
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"{log_prefix}Failed to log detailed corrections: {e}", extra=log_extra
                     )
 
-                log_essay_corrections(
-                    essay_id=essay_id,
-                    original_text=text,
-                    initial_l2_corrected_text=l2_corrected_text,
-                    final_corrected_text=final_corrected_text,
-                    applied_initial_l2_corrections=l2_corrections_formatted,
-                    main_checker_corrections=pyspellchecker_corrections,
-                    l2_context_reverted_count=0,  # Not implemented in simplified flow
-                    output_dir=settings.effective_correction_log_dir,
-                )
-                logger.debug(f"{log_prefix}Detailed correction logging completed", extra=log_extra)
-            except Exception as e:
-                logger.warning(
-                    f"{log_prefix}Failed to log detailed corrections: {e}", extra=log_extra
-                )
+            # Schedule logging as background task (fire-and-forget)
+            asyncio.create_task(log_corrections_async())
+            logger.debug(
+                f"{log_prefix}Scheduled correction logging as background task", extra=log_extra
+            )
 
+        total_time = time.time() - start_time
         logger.info(
             f"{log_prefix}L2 + pyspellchecker algorithm completed: "
             f"{l2_correction_count} L2 corrections, "
             f"{pyspell_correction_count} pyspellchecker corrections, "
-            f"{total_corrections} total corrections",
-            extra={**log_extra, "total_corrections": total_corrections},
+            f"{total_corrections} total corrections "
+            f"(total time: {total_time:.3f}s)",
+            extra={
+                **log_extra,
+                "total_corrections": total_corrections,
+                "total_processing_time_seconds": total_time,
+            },
         )
 
         return final_corrected_text, total_corrections

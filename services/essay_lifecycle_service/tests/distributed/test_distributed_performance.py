@@ -240,7 +240,9 @@ class MockEventPublisher(EventPublisher):
         async with self.lock:
             self.event_count += 1
 
-    async def publish_excess_content_provisioned(self, event_data: Any, correlation_id: UUID) -> None:
+    async def publish_excess_content_provisioned(
+        self, event_data: Any, correlation_id: UUID
+    ) -> None:
         async with self.lock:
             self.event_count += 1
 
@@ -431,7 +433,9 @@ class TestDistributedPerformance:
                     content_md5_hash=f"scaling_hash_{i}",
                 )
 
-                async def process_with_metrics(h: DefaultBatchCoordinationHandler, event: EssayContentProvisionedV1, iid: str) -> bool:
+                async def process_with_metrics(
+                    h: DefaultBatchCoordinationHandler, event: EssayContentProvisionedV1, iid: str
+                ) -> bool:
                     op_start = time.time()
                     try:
                         result = await h.handle_essay_content_provisioned(event, uuid4())
@@ -587,7 +591,7 @@ class TestDistributedPerformance:
         # Test comprehensive workload
         batch_count = 5
         essays_per_batch = 15
-        total_essays = batch_count * essays_per_batch
+        batch_count * essays_per_batch
 
         # Create multiple batches
         batch_creation_tasks = []
@@ -641,7 +645,9 @@ class TestDistributedPerformance:
                     content_md5_hash=f"target_hash_{batch_idx}_{essay_idx}",
                 )
 
-                async def timed_content_processing(h: DefaultBatchCoordinationHandler, event: EssayContentProvisionedV1) -> bool:
+                async def timed_content_processing(
+                    h: DefaultBatchCoordinationHandler, event: EssayContentProvisionedV1
+                ) -> bool:
                     start_time = time.time()
                     try:
                         result = await h.handle_essay_content_provisioned(event, uuid4())

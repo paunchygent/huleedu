@@ -98,7 +98,10 @@ class TestPostgreSQLEssayRepositoryIntegration:
         return repository
 
     async def create_batch_tracker(
-        self, repository: PostgreSQLEssayRepository, batch_id: str, essay_ids: list[str] | None = None
+        self,
+        repository: PostgreSQLEssayRepository,
+        batch_id: str,
+        essay_ids: list[str] | None = None,
     ) -> None:
         """Helper method to create batch tracker record for foreign key constraint compliance."""
         if essay_ids is None:
@@ -138,9 +141,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # Create batch tracker first to satisfy foreign key constraint
         await self.create_batch_tracker(postgres_repository, batch_id, [essay_id])
 
-        essay_ref = EntityReference(
-            entity_id=essay_id, entity_type="essay", parent_id=batch_id
-        )
+        essay_ref = EntityReference(entity_id=essay_id, entity_type="essay", parent_id=batch_id)
 
         created_essay = await postgres_repository.create_essay_record(essay_ref)
         assert created_essay.essay_id == essay_id
@@ -159,7 +160,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
         await self.create_batch_tracker(
             postgres_repository,
             sample_entity_reference.parent_id,
-            [sample_entity_reference.entity_id]
+            [sample_entity_reference.entity_id],
         )
 
         # Act - Create essay
@@ -194,7 +195,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
         await self.create_batch_tracker(
             postgres_repository,
             sample_entity_reference.parent_id,
-            [sample_entity_reference.entity_id]
+            [sample_entity_reference.entity_id],
         )
 
         # Arrange - Create essay
@@ -402,7 +403,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
         await self.create_batch_tracker(
             postgres_repository,
             sample_entity_reference.parent_id,
-            [sample_entity_reference.entity_id]
+            [sample_entity_reference.entity_id],
         )
 
         # Arrange - Create essay
@@ -523,12 +524,8 @@ class TestPostgreSQLEssayRepositoryIntegration:
                 entity_type="essay",
                 parent_id=batch_id,
             ),
-            EntityReference(
-                entity_id="new-essay-002", entity_type="essay", parent_id=batch_id
-            ),
-            EntityReference(
-                entity_id="new-essay-003", entity_type="essay", parent_id=batch_id
-            ),
+            EntityReference(entity_id="new-essay-002", entity_type="essay", parent_id=batch_id),
+            EntityReference(entity_id="new-essay-003", entity_type="essay", parent_id=batch_id),
         ]
 
         # Act & Assert - Batch creation should fail completely

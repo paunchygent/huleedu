@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     CONTENT_STORE_ROOT_PATH: Path = Path("./.local_content_store_mvp")
     HOST: str = "0.0.0.0"
     PORT: int = 8001  # Default port, matches docker-compose and pdm dev script for content_service
-    WEB_CONCURRENCY: int = 1
+    WEB_CONCURRENCY: int = 4  # Increased from 1 to handle concurrent batch requests
 
     # Quart app.run() parameters
     DEBUG: bool = False
