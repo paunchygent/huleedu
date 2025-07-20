@@ -129,6 +129,10 @@ class MockRedisClient(AtomicRedisClientProtocol):
         """Mock hgetall method for hash operations."""
         return {}
 
+    async def hexists(self, key: str, field: str) -> bool:
+        """Mock hexists method for hash operations."""
+        return False
+
     async def expire(self, key: str, ttl_seconds: int) -> bool:
         """Mock expire method for key operations."""
         return True

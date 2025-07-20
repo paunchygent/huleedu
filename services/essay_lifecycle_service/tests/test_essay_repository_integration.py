@@ -10,9 +10,10 @@ from __future__ import annotations
 from collections.abc import Generator
 from datetime import datetime
 from typing import Any
+from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import ContentType
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.error_enums import ErrorCode
 from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
@@ -68,9 +69,7 @@ class TestPostgreSQLEssayRepositoryIntegration:
     @pytest.fixture
     def sample_entity_reference(self) -> EntityReference:
         """Sample entity reference for testing."""
-        import uuid
-
-        unique_id = str(uuid.uuid4())[:8]  # Short unique suffix
+        unique_id = str(uuid4())[:8]  # Short unique suffix
         return EntityReference(
             entity_id=f"test-essay-{unique_id}",
             entity_type="essay",
@@ -83,17 +82,48 @@ class TestPostgreSQLEssayRepositoryIntegration:
         repository = PostgreSQLEssayRepository(test_settings)
         # Initialize the database schema
         await repository.initialize_db_schema()
+        # Run migrations to apply constraints
+        await repository.run_migrations()
 
         # Clean up any existing data to ensure test isolation
         async with repository.session() as session:
             from sqlalchemy import delete
 
-            from services.essay_lifecycle_service.models_db import EssayStateDB
+            from services.essay_lifecycle_service.models_db import EssayStateDB, BatchEssayTracker
 
             await session.execute(delete(EssayStateDB))
+            await session.execute(delete(BatchEssayTracker))
             await session.commit()
 
         return repository
+
+    async def create_batch_tracker(
+        self, repository: PostgreSQLEssayRepository, batch_id: str, essay_ids: list[str] | None = None
+    ) -> None:
+        """Helper method to create batch tracker record for foreign key constraint compliance."""
+        if essay_ids is None:
+            essay_ids = []
+        
+        async with repository.session() as session:
+            from services.essay_lifecycle_service.models_db import BatchEssayTracker
+            
+            batch_tracker = BatchEssayTracker(
+                batch_id=batch_id,
+                expected_essay_ids=essay_ids,
+                available_slots=essay_ids.copy(),
+                expected_count=len(essay_ids),
+                course_code=CourseCode.ENG5.value,
+                essay_instructions="Test essay instructions",
+                user_id="test-user",
+                correlation_id=str(uuid4()),
+                timeout_seconds=300,
+                total_slots=len(essay_ids),
+                assigned_slots=0,
+                is_ready=False,
+            )
+            
+            session.add(batch_tracker)
+            await session.commit()
 
     @pytest.mark.asyncio
     async def test_database_schema_initialization(
@@ -102,13 +132,19 @@ class TestPostgreSQLEssayRepositoryIntegration:
         """Test that database schema is created correctly."""
         # The schema should be initialized in the fixture
         # Let's verify we can perform basic operations
+        batch_id = "schema-test-batch"
+        essay_id = "schema-test-essay"
+        
+        # Create batch tracker first to satisfy foreign key constraint
+        await self.create_batch_tracker(postgres_repository, batch_id, [essay_id])
+        
         essay_ref = EntityReference(
-            entity_id="schema-test-essay", entity_type="essay", parent_id="schema-test-batch"
+            entity_id=essay_id, entity_type="essay", parent_id=batch_id
         )
 
         created_essay = await postgres_repository.create_essay_record(essay_ref)
-        assert created_essay.essay_id == "schema-test-essay"
-        assert created_essay.batch_id == "schema-test-batch"
+        assert created_essay.essay_id == essay_id
+        assert created_essay.batch_id == batch_id
         assert created_essay.current_status == EssayStatus.UPLOADED
 
     @pytest.mark.asyncio
@@ -118,6 +154,14 @@ class TestPostgreSQLEssayRepositoryIntegration:
         sample_entity_reference: EntityReference,
     ) -> None:
         """Test creating and retrieving an essay."""
+        # Create batch tracker first to satisfy foreign key constraint
+        assert sample_entity_reference.parent_id is not None
+        await self.create_batch_tracker(
+            postgres_repository, 
+            sample_entity_reference.parent_id, 
+            [sample_entity_reference.entity_id]
+        )
+        
         # Act - Create essay
         created_essay = await postgres_repository.create_essay_record(sample_entity_reference)
 
@@ -145,13 +189,23 @@ class TestPostgreSQLEssayRepositoryIntegration:
         sample_entity_reference: EntityReference,
     ) -> None:
         """Test updating essay state and metadata."""
+        # Create batch tracker first to satisfy foreign key constraint
+        assert sample_entity_reference.parent_id is not None
+        await self.create_batch_tracker(
+            postgres_repository, 
+            sample_entity_reference.parent_id, 
+            [sample_entity_reference.entity_id]
+        )
+        
         # Arrange - Create essay
         await postgres_repository.create_essay_record(sample_entity_reference)
 
         # Act - Update essay state
         new_metadata = {"updated_by": "test", "processing_step": "spellcheck"}
         await postgres_repository.update_essay_state(
-            sample_entity_reference.entity_id, EssayStatus.AWAITING_SPELLCHECK, new_metadata
+            essay_id=sample_entity_reference.entity_id,
+            new_status=EssayStatus.AWAITING_SPELLCHECK,
+            metadata=new_metadata,
         )
 
         # Act - Retrieve updated essay
@@ -173,6 +227,9 @@ class TestPostgreSQLEssayRepositoryIntegration:
         essay_id = "slot-test-essay"
         batch_id = "slot-test-batch"
         text_storage_id = "storage-123"
+
+        # Create batch tracker first to satisfy foreign key constraint
+        await self.create_batch_tracker(postgres_repository, batch_id, [essay_id])
 
         # Act - Create essay for slot assignment
         created_essay = await postgres_repository.create_or_update_essay_state_for_slot_assignment(
@@ -207,6 +264,10 @@ class TestPostgreSQLEssayRepositoryIntegration:
         """Test batch-level operations."""
         # Arrange - Create multiple essays in same batch
         batch_id = "batch-ops-test"
+        essay_ids = [f"essay-{i}" for i in range(3)]
+
+        # Create batch tracker first to satisfy foreign key constraint
+        await self.create_batch_tracker(postgres_repository, batch_id, essay_ids)
 
         for i in range(3):
             essay_ref = EntityReference(
@@ -217,11 +278,15 @@ class TestPostgreSQLEssayRepositoryIntegration:
             # Update some to different statuses
             if i == 0:
                 await postgres_repository.update_essay_state(
-                    f"essay-{i}", EssayStatus.AWAITING_SPELLCHECK, {}
+                    essay_id=f"essay-{i}",
+                    new_status=EssayStatus.AWAITING_SPELLCHECK,
+                    metadata={},
                 )
             elif i == 1:
                 await postgres_repository.update_essay_state(
-                    f"essay-{i}", EssayStatus.SPELLCHECKED_SUCCESS, {}
+                    essay_id=f"essay-{i}",
+                    new_status=EssayStatus.SPELLCHECKED_SUCCESS,
+                    metadata={},
                 )
 
         # Act - List essays by batch
@@ -255,12 +320,19 @@ class TestPostgreSQLEssayRepositoryIntegration:
             EssayStatus.UPLOADED,  # Not in any phase
         ]
 
+        essay_ids = [f"phase-essay-{i}" for i in range(len(essay_statuses))]
+        
+        # Create batch tracker first to satisfy foreign key constraint
+        await self.create_batch_tracker(postgres_repository, batch_id, essay_ids)
+
         for i, status in enumerate(essay_statuses):
             essay_ref = EntityReference(
                 entity_id=f"phase-essay-{i}", entity_type="essay", parent_id=batch_id
             )
             await postgres_repository.create_essay_record(essay_ref)
-            await postgres_repository.update_essay_state(f"phase-essay-{i}", status, {})
+            await postgres_repository.update_essay_state(
+                essay_id=f"phase-essay-{i}", new_status=status, metadata={}
+            )
 
         # Act - List essays by spellcheck phase
         spellcheck_essays = await postgres_repository.list_essays_by_batch_and_phase(
@@ -300,7 +372,9 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # Test update (should raise HuleEduError with RESOURCE_NOT_FOUND)
         with pytest.raises(HuleEduError) as exc_info:
             await postgres_repository.update_essay_state(
-                nonexistent_id, EssayStatus.AWAITING_SPELLCHECK, {}
+                essay_id=nonexistent_id,
+                new_status=EssayStatus.AWAITING_SPELLCHECK,
+                metadata={},
             )
 
         # Validate error structure
@@ -323,18 +397,30 @@ class TestPostgreSQLEssayRepositoryIntegration:
         sample_entity_reference: EntityReference,
     ) -> None:
         """Test that timeline and metadata are properly persisted and retrieved."""
+        # Create batch tracker first to satisfy foreign key constraint
+        assert sample_entity_reference.parent_id is not None
+        await self.create_batch_tracker(
+            postgres_repository, 
+            sample_entity_reference.parent_id, 
+            [sample_entity_reference.entity_id]
+        )
+        
         # Arrange - Create essay
         await postgres_repository.create_essay_record(sample_entity_reference)
 
         # Act - Update multiple times to build timeline
         metadata1 = {"step": "spellcheck", "data": {"corrections": 5}}
         await postgres_repository.update_essay_state(
-            sample_entity_reference.entity_id, EssayStatus.AWAITING_SPELLCHECK, metadata1
+            essay_id=sample_entity_reference.entity_id,
+            new_status=EssayStatus.AWAITING_SPELLCHECK,
+            metadata=metadata1,
         )
 
         metadata2 = {"step": "completed", "data": {"final_score": 85}}
         await postgres_repository.update_essay_state(
-            sample_entity_reference.entity_id, EssayStatus.SPELLCHECKED_SUCCESS, metadata2
+            essay_id=sample_entity_reference.entity_id,
+            new_status=EssayStatus.SPELLCHECKED_SUCCESS,
+            metadata=metadata2,
         )
 
         # Act - Retrieve final state
@@ -360,6 +446,11 @@ class TestPostgreSQLEssayRepositoryIntegration:
         """Test successful atomic batch creation of multiple essays."""
         # Arrange - Create batch of entity references
         batch_id = "atomic-test-batch"
+        essay_ids = [f"atomic-essay-{i:03d}" for i in range(1, 4)]
+        
+        # Create batch tracker first to satisfy foreign key constraint
+        await self.create_batch_tracker(postgres_repository, batch_id, essay_ids)
+        
         essay_refs = [
             EntityReference(
                 entity_id=f"atomic-essay-{i:03d}", entity_type="essay", parent_id=batch_id
@@ -413,9 +504,15 @@ class TestPostgreSQLEssayRepositoryIntegration:
         self, postgres_repository: PostgreSQLEssayRepository
     ) -> None:
         """Test that batch creation is truly atomic - all or nothing."""
-        # Arrange - Create one essay to test for duplicate key constraint
+        # Arrange - Create batch tracker and one essay to test for duplicate key constraint
+        batch_id = "atomicity-test-batch"
+        essay_ids = ["duplicate-essay-001", "new-essay-002", "new-essay-003"]
+        
+        # Create batch tracker first to satisfy foreign key constraint
+        await self.create_batch_tracker(postgres_repository, batch_id, essay_ids)
+        
         existing_ref = EntityReference(
-            entity_id="duplicate-essay-001", entity_type="essay", parent_id="atomicity-test-batch"
+            entity_id="duplicate-essay-001", entity_type="essay", parent_id=batch_id
         )
         await postgres_repository.create_essay_record(existing_ref)
 
@@ -424,13 +521,13 @@ class TestPostgreSQLEssayRepositoryIntegration:
             EntityReference(
                 entity_id="duplicate-essay-001",  # This will cause constraint violation
                 entity_type="essay",
-                parent_id="atomicity-test-batch",
+                parent_id=batch_id,
             ),
             EntityReference(
-                entity_id="new-essay-002", entity_type="essay", parent_id="atomicity-test-batch"
+                entity_id="new-essay-002", entity_type="essay", parent_id=batch_id
             ),
             EntityReference(
-                entity_id="new-essay-003", entity_type="essay", parent_id="atomicity-test-batch"
+                entity_id="new-essay-003", entity_type="essay", parent_id=batch_id
             ),
         ]
 
@@ -450,5 +547,5 @@ class TestPostgreSQLEssayRepositoryIntegration:
         assert new_essay_3 is None
 
         # Verify batch count is still 1 (only the original essay)
-        batch_essays = await postgres_repository.list_essays_by_batch("atomicity-test-batch")
+        batch_essays = await postgres_repository.list_essays_by_batch(batch_id)
         assert len(batch_essays) == 1

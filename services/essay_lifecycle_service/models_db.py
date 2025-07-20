@@ -81,8 +81,9 @@ class EssayStateDB(Base):
     )
 
     # Table-level constraints for data integrity (ELS-002 Phase 1)
+    # Note: Content idempotency is enforced by partial unique index in migration 20250720_0004
+    # This allows multiple essays with NULL text_storage_id while preventing duplicate assignments
     __table_args__ = (
-        UniqueConstraint("batch_id", "text_storage_id", name="uq_essay_content_idempotency"),
         ForeignKeyConstraint(
             ["batch_id"],
             ["batch_essay_trackers.batch_id"],

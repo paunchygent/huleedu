@@ -184,7 +184,7 @@ class TestRedisNotifications:
         mock_batch_tracker.get_user_id_for_essay.return_value = expected_user_id
 
         # Act
-        result = mock_batch_tracker.get_user_id_for_essay(essay_id)
+        result = await mock_batch_tracker.get_user_id_for_essay(essay_id)
 
         # Assert
         assert result == expected_user_id

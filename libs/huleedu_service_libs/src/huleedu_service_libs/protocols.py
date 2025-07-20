@@ -293,6 +293,19 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         """
         pass
 
+    async def hexists(self, key: str, field: str) -> bool:
+        """
+        Check if field exists in a Redis hash.
+
+        Args:
+            key: Redis key for the hash
+            field: Field name to check
+
+        Returns:
+            True if field exists in the hash, False otherwise
+        """
+        pass
+
     async def expire(self, key: str, ttl_seconds: int) -> bool:
         """
         Set TTL for a Redis key.

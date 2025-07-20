@@ -318,7 +318,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                     f"Batch {batch_id} completing early: "
                     f"{assigned_count} assigned + {failure_count} failed = {total_processed}"
                 )
-                return self._create_batch_ready_event_from_redis(batch_id, batch_status)
+                return await self._create_batch_ready_event_from_redis(batch_id, batch_status)
 
         return None
 

@@ -669,6 +669,34 @@ class RedisClient(AtomicRedisClientProtocol):
             )
             raise
 
+    async def hexists(self, key: str, field: str) -> bool:
+        """Check if field exists in a Redis hash."""
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            redis_client = self._transaction_pipeline or self.client
+            result = await redis_client.hexists(key, field)
+
+            if self._transaction_pipeline is None:
+                exists = bool(result)
+                logger.debug(
+                    f"Redis HEXISTS by '{self.client_id}': key='{key}' field='{field}' "
+                    f"exists={'YES' if exists else 'NO'}"
+                )
+                return exists
+            else:
+                logger.debug(
+                    f"Redis HEXISTS queued by '{self.client_id}': key='{key}' field='{field}'"
+                )
+                return False  # Command queued, actual result determined by EXEC
+        except Exception as e:
+            logger.error(
+                f"Error in Redis HEXISTS operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
     async def expire(self, key: str, ttl_seconds: int) -> bool:
         """Set TTL for a Redis key."""
         if not self._started:
