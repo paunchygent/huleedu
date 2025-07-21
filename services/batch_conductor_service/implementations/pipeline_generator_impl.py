@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 if TYPE_CHECKING:
     from prometheus_client import CollectorRegistry
@@ -12,6 +13,13 @@ from collections import defaultdict, deque
 from typing import Any
 
 import yaml
+
+from huleedu_service_libs.error_handling.batch_conductor_factories import (
+    raise_pipeline_dependency_cycle_detected,
+)
+from huleedu_service_libs.error_handling.factories import (
+    raise_configuration_error,
+)
 
 from services.batch_conductor_service.config import Settings
 from services.batch_conductor_service.pipeline_definitions import (
@@ -135,17 +143,52 @@ class DefaultPipelineGenerator:
             return []
         return list(self._pipelines.keys())
 
-    def validate_configuration(self) -> tuple[bool, str]:
-        """Validate pipeline configuration for cycles and dependencies (synchronous version)."""
+    def validate_configuration(self, correlation_id: UUID) -> None:
+        """Validate pipeline configuration for cycles and dependencies (synchronous version).
+        
+        Args:
+            correlation_id: Correlation ID for request tracing
+            
+        Raises:
+            HuleEduError: If configuration validation fails (cycles, missing dependencies, etc.)
+        """
         try:
             if not self._loaded:
-                return False, "Configuration not loaded"
+                raise_configuration_error(
+                    service="batch_conductor_service",
+                    operation="validate_configuration",
+                    config_key="pipeline_configuration",
+                    message="Configuration not loaded",
+                    correlation_id=correlation_id,
+                )
 
             # Re-run validation on current config
             self._validate_cycles()
-            return True, "Configuration is valid"
+            # Success case: method returns without raising
+
         except Exception as e:
-            return False, str(e)
+            # If it's already a HuleEduError, let it propagate
+            if hasattr(e, 'error_detail'):
+                raise
+            
+            # Check if it's a cycle detection error
+            if "cycle detected" in str(e).lower():
+                raise_pipeline_dependency_cycle_detected(
+                    service="batch_conductor_service",
+                    operation="validate_configuration",
+                    message=str(e),
+                    correlation_id=correlation_id,
+                    detection_stage="configuration_validation",
+                )
+            else:
+                # General configuration error
+                raise_configuration_error(
+                    service="batch_conductor_service",
+                    operation="validate_configuration", 
+                    config_key="pipeline_configuration",
+                    message=str(e),
+                    correlation_id=correlation_id,
+                )
 
     # ------------------------------------------------------------------
     # Internal helpers

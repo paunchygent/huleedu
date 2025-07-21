@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 if TYPE_CHECKING:
     from prometheus_client import CollectorRegistry
 
 from collections import defaultdict, deque
 
+from huleedu_service_libs.error_handling.batch_conductor_factories import (
+    raise_pipeline_compatibility_failed,
+    raise_pipeline_dependency_cycle_detected,
+)
+from huleedu_service_libs.error_handling.factories import (
+    raise_resource_not_found,
+)
 from services.batch_conductor_service.pipeline_definitions import PipelineDefinition, PipelineStep
 from services.batch_conductor_service.protocols import (
     BatchStateRepositoryProtocol,
@@ -113,21 +121,49 @@ class DefaultPipelineRules(PipelineRulesProtocol):
         return remaining_steps
 
     async def validate_pipeline_compatibility(
-        self, pipeline_name: str, batch_metadata: dict | None = None
-    ) -> tuple[bool, str | None]:
-        """Validate if pipeline can be executed with given batch metadata."""
+        self, pipeline_name: str, correlation_id: UUID, batch_metadata: dict | None = None
+    ) -> None:
+        """Validate if pipeline can be executed with given batch metadata.
+        
+        Args:
+            pipeline_name: Name of the pipeline to validate
+            correlation_id: Correlation ID for request tracing
+            batch_metadata: Optional batch metadata for compatibility checks
+            
+        Raises:
+            HuleEduError: If pipeline compatibility validation fails
+        """
         try:
             # Check if pipeline definition exists
             definition = await self._find_pipeline_containing_step(pipeline_name)
             if definition is None:
-                return False, f"Pipeline '{pipeline_name}' not found in configuration"
+                raise_resource_not_found(
+                    service="batch_conductor_service",
+                    operation="validate_pipeline_compatibility",
+                    resource_type="pipeline",
+                    resource_id=pipeline_name,
+                    correlation_id=correlation_id,
+                )
 
             # Basic validation - pipeline exists and is well-formed
             # Additional metadata-based validation can be added here as needed
-            return True, None
+            # Success case: method returns without raising
 
         except Exception as e:
-            return False, f"Pipeline validation error: {str(e)}"
+            # If it's already a HuleEduError, let it propagate
+            if hasattr(e, 'error_detail'):
+                raise
+            
+            # Otherwise, wrap in compatibility failure error
+            raise_pipeline_compatibility_failed(
+                service="batch_conductor_service",
+                operation="validate_pipeline_compatibility",
+                message=f"Pipeline validation error: {str(e)}",
+                correlation_id=correlation_id,
+                pipeline_name=pipeline_name,
+                batch_metadata=batch_metadata,
+                compatibility_issue=str(e),
+            )
 
     # ------------------------------------------------------------------
     # Internal helpers

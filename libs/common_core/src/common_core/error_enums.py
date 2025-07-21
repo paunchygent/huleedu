@@ -110,3 +110,17 @@ class LLMErrorCode(str, Enum):
 
     # System errors
     CONFIGURATION_ERROR = "LLM_CONFIGURATION_ERROR"
+
+
+class BatchConductorErrorCode(str, Enum):
+    """
+    Specific error codes for Batch Conductor Service pipeline operations.
+    
+    These codes provide domain-specific error classification for pipeline
+    dependency resolution, cycle detection, and compatibility validation.
+    Follows service-specific enum pattern for architectural consistency.
+    """
+    
+    PIPELINE_DEPENDENCY_RESOLUTION_FAILED = "BCS_PIPELINE_DEPENDENCY_RESOLUTION_FAILED"
+    PIPELINE_DEPENDENCY_CYCLE_DETECTED = "BCS_PIPELINE_DEPENDENCY_CYCLE_DETECTED"
+    PIPELINE_COMPATIBILITY_FAILED = "BCS_PIPELINE_COMPATIBILITY_FAILED"

@@ -3,12 +3,29 @@ Standardized, PURE data models for all services.
 """
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from common_core.error_enums import ErrorCode
+from common_core.error_enums import (
+    BatchConductorErrorCode,
+    ClassManagementErrorCode,
+    ErrorCode,
+    FileValidationErrorCode,
+    LLMErrorCode,
+    SpellcheckerErrorCode,
+)
+
+# Union type for all service-specific error codes
+ErrorCodeType = Union[
+    ErrorCode,
+    BatchConductorErrorCode,
+    ClassManagementErrorCode,
+    FileValidationErrorCode,
+    LLMErrorCode,
+    SpellcheckerErrorCode,
+]
 
 
 class ErrorDetail(BaseModel):
@@ -17,7 +34,7 @@ class ErrorDetail(BaseModel):
     This model contains only data fields and no behavior.
     """
 
-    error_code: ErrorCode
+    error_code: ErrorCodeType
     message: str
     correlation_id: UUID
     timestamp: datetime

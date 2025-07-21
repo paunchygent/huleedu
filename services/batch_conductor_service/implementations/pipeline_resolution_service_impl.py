@@ -5,10 +5,18 @@ from __future__ import annotations
 import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from common_core.events.envelope import EventEnvelope
 from common_core.status_enums import OperationStatus
+from huleedu_service_libs.error_handling.batch_conductor_factories import (
+    raise_pipeline_dependency_resolution_failed,
+)
+from huleedu_service_libs.error_handling.factories import (
+    raise_processing_error,
+    raise_resource_not_found,
+)
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 from services.batch_conductor_service.api_models import (
     BCSPipelineDefinitionRequestV1,
@@ -46,30 +54,45 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
         self._metrics = metrics
 
     async def resolve_pipeline(
-        self, batch_id: str, requested_pipeline: str
-    ) -> tuple[bool, list[str], str]:
+        self, batch_id: str, requested_pipeline: str, correlation_id: UUID
+    ) -> list[str]:
         """
         Resolve pipeline for batch processing with error handling and metrics.
 
+        Args:
+            batch_id: Batch identifier for pipeline resolution
+            requested_pipeline: Name of the requested pipeline
+            correlation_id: Correlation ID for request tracing
+
         Returns:
-            (success: bool, resolved_pipeline: list[str], error_message: str)
+            List of resolved pipeline steps in execution order
+            
+        Raises:
+            HuleEduError: If pipeline resolution fails (unknown pipeline, dependency issues, etc.)
         """
         try:
             # Validate that the requested pipeline exists
             pipeline_steps = self.pipeline_generator.get_pipeline_steps(requested_pipeline)
             if not pipeline_steps:
-                error_msg = f"Unknown pipeline: '{requested_pipeline}'"
                 logger.warning(
-                    f"Pipeline resolution failed: {error_msg}",
+                    f"Pipeline resolution failed: Unknown pipeline '{requested_pipeline}'",
                     extra={
                         "batch_id": batch_id,
                         "requested_pipeline": requested_pipeline,
                         "error": "unknown_pipeline",
+                        "correlation_id": str(correlation_id),
                     },
                 )
 
                 await self._track_failure_metrics(requested_pipeline, "unknown_pipeline")
-                return False, [], error_msg
+                raise_resource_not_found(
+                    service="batch_conductor_service",
+                    operation="resolve_pipeline",
+                    resource_type="pipeline",
+                    resource_id=requested_pipeline,
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
+                )
 
             # Resolve pipeline dependencies using event-driven state
             try:
@@ -84,20 +107,21 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
                         "requested_pipeline": requested_pipeline,
                         "resolved_steps": len(resolved_pipeline),
                         "final_pipeline": resolved_pipeline,
+                        "correlation_id": str(correlation_id),
                     },
                 )
 
                 await self._track_success_metrics(requested_pipeline)
-                return True, resolved_pipeline, ""
+                return resolved_pipeline
 
             except Exception as resolution_error:
-                error_msg = f"Pipeline dependency resolution failed: {resolution_error}"
                 logger.error(
-                    f"Pipeline resolution error: {error_msg}",
+                    f"Pipeline dependency resolution failed: {resolution_error}",
                     extra={
                         "batch_id": batch_id,
                         "requested_pipeline": requested_pipeline,
                         "error": str(resolution_error),
+                        "correlation_id": str(correlation_id),
                     },
                     exc_info=True,
                 )
@@ -113,16 +137,25 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
                 await self._track_failure_metrics(
                     requested_pipeline, "dependency_resolution_failed"
                 )
-                return False, [], error_msg
+                raise_pipeline_dependency_resolution_failed(
+                    service="batch_conductor_service",
+                    operation="resolve_pipeline_dependencies",
+                    message=f"Pipeline dependency resolution failed: {resolution_error}",
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
+                    requested_pipeline=requested_pipeline,
+                    resolution_stage="dependency_analysis",
+                    dependency_error=str(resolution_error),
+                )
 
         except Exception as e:
-            error_msg = f"Unexpected pipeline resolution error: {e}"
             logger.error(
-                f"Critical pipeline resolution failure: {error_msg}",
+                f"Critical pipeline resolution failure: Unexpected error: {e}",
                 extra={
                     "batch_id": batch_id,
                     "requested_pipeline": requested_pipeline,
                     "error": str(e),
+                    "correlation_id": str(correlation_id),
                 },
                 exc_info=True,
             )
@@ -133,30 +166,30 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
             )
 
             await self._track_failure_metrics(requested_pipeline, "critical_failure")
-            return False, [], error_msg
+            raise_processing_error(
+                service="batch_conductor_service",
+                operation="resolve_pipeline",
+                message=f"Unexpected pipeline resolution error: {e}",
+                correlation_id=correlation_id,
+                batch_id=batch_id,
+                requested_pipeline=requested_pipeline,
+            )
 
     async def resolve_pipeline_request(
         self, request: BCSPipelineDefinitionRequestV1
     ) -> BCSPipelineDefinitionResponseV1:
         """Resolve a complete pipeline request from BOS with duration tracking."""
         start_time = time.time()
+        correlation_id = uuid4()
 
         try:
-            success, resolved_pipeline, error_message = await self.resolve_pipeline(
-                request.batch_id, request.requested_pipeline
+            resolved_pipeline = await self.resolve_pipeline(
+                request.batch_id, request.requested_pipeline, correlation_id
             )
 
-            # Track duration regardless of success/failure
+            # Track duration for successful resolution
             duration = time.time() - start_time
             await self._track_duration_metrics(request.requested_pipeline, duration)
-
-            if not success:
-                # Return error response for API consumers
-                return BCSPipelineDefinitionResponseV1(
-                    batch_id=request.batch_id,
-                    final_pipeline=[],
-                    analysis_summary=f"Pipeline resolution failed: {error_message}",
-                )
 
             # Create successful response
             return BCSPipelineDefinitionResponseV1(
@@ -166,6 +199,17 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
                     f"Resolved '{request.requested_pipeline}' pipeline to "
                     f"{len(resolved_pipeline)} steps"
                 ),
+            )
+        except HuleEduError as e:
+            # Track duration for failed resolution
+            duration = time.time() - start_time
+            await self._track_duration_metrics(request.requested_pipeline, duration)
+
+            # Return error response for API consumers with structured error information
+            return BCSPipelineDefinitionResponseV1(
+                batch_id=request.batch_id,
+                final_pipeline=[],
+                analysis_summary=f"Pipeline resolution failed: {e.error_detail.message}",
             )
         except Exception:
             # Track duration even for unexpected errors
@@ -257,22 +301,38 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
         self,
         batch_id: str,
         requested_pipeline: str,
+        correlation_id: UUID,
         additional_metadata: dict | None = None,
     ) -> dict[str, Any]:
         """Resolve optimal pipeline configuration for a batch."""
-        success, resolved_pipeline, error_message = await self.resolve_pipeline(
-            batch_id, requested_pipeline
-        )
+        try:
+            resolved_pipeline = await self.resolve_pipeline(
+                batch_id, requested_pipeline, correlation_id
+            )
 
-        result = {
-            "success": success,
-            "batch_id": batch_id,
-            "requested_pipeline": requested_pipeline,
-            "resolved_pipeline": resolved_pipeline,
-            "error_message": error_message,
-        }
+            result = {
+                "success": True,
+                "batch_id": batch_id,
+                "requested_pipeline": requested_pipeline,
+                "resolved_pipeline": resolved_pipeline,
+                "error_message": "",
+            }
 
-        if additional_metadata:
-            result["additional_metadata"] = additional_metadata
+            if additional_metadata:
+                result["additional_metadata"] = additional_metadata
 
-        return result
+            return result
+
+        except HuleEduError as e:
+            result = {
+                "success": False,
+                "batch_id": batch_id,
+                "requested_pipeline": requested_pipeline,
+                "resolved_pipeline": [],
+                "error_message": e.error_detail.message,
+            }
+
+            if additional_metadata:
+                result["additional_metadata"] = additional_metadata
+
+            return result
