@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from uuid import UUID
 
 import aiohttp
@@ -51,6 +52,10 @@ class DefaultContentClient(ContentClientProtocol):
 
         try:
             timeout = aiohttp.ClientTimeout(total=10)
+            logger.debug(
+                f"{log_prefix}Making HTTP GET request to: {url}",
+                extra={"correlation_id": str(correlation_id)},
+            )
             async with http_session.get(url, timeout=timeout) as response:
                 # Use response.raise_for_status() to handle all 2xx codes correctly
                 response.raise_for_status()
@@ -88,7 +93,25 @@ class DefaultContentClient(ContentClientProtocol):
                     response_text=e.message[:200] if e.message else "No error message",
                 )
 
+        except asyncio.TimeoutError:
+            logger.error(
+                f"{log_prefix}HTTP request timed out after 10 seconds",
+                extra={"correlation_id": str(correlation_id)},
+            )
+            raise_content_service_error(
+                service="spellchecker_service",
+                operation="fetch_content",
+                message=f"HTTP request timeout fetching content from {storage_id}",
+                correlation_id=correlation_id,
+                content_service_url=self.content_service_url,
+                storage_id=storage_id,
+                timeout_seconds=10,
+            )
         except aiohttp.ServerTimeoutError:
+            logger.error(
+                f"{log_prefix}aiohttp ServerTimeoutError",
+                extra={"correlation_id": str(correlation_id)},
+            )
             raise_content_service_error(
                 service="spellchecker_service",
                 operation="fetch_content",

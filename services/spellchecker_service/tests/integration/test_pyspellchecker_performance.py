@@ -6,12 +6,15 @@ with specific words that take 0.3-1.0 seconds to process.
 """
 
 import time
-from typing import List, Tuple
+from typing import Any, Dict, Tuple
+
 import pytest
 from spellchecker import SpellChecker
 
+from services.spellchecker_service.core_logic import get_adaptive_edit_distance
 
-def time_correction(spell_checker: SpellChecker, word: str) -> Tuple[str, float]:
+
+def time_correction(spell_checker: SpellChecker, word: str) -> Tuple[str | None, float]:
     """Time a single word correction."""
     start = time.time()
     corrected = spell_checker.correction(word)
@@ -19,21 +22,21 @@ def time_correction(spell_checker: SpellChecker, word: str) -> Tuple[str, float]
     return corrected, duration
 
 
-def analyze_candidates(spell_checker: SpellChecker, word: str) -> dict:
+def analyze_candidates(spell_checker: SpellChecker, word: str) -> Dict[str, Any]:
     """Analyze the candidate generation for a word."""
     start = time.time()
     candidates = spell_checker.candidates(word)
     candidates_time = time.time() - start
-    
+
     # Count edit distance 1 and 2 candidates
     start_ed1 = time.time()
     ed1_candidates = spell_checker.edit_distance_1(word)
     ed1_time = time.time() - start_ed1
-    
+
     start_ed2 = time.time()
     ed2_candidates = spell_checker.edit_distance_2(word)
     ed2_time = time.time() - start_ed2
-    
+
     return {
         "word": word,
         "word_length": len(word),
@@ -48,97 +51,124 @@ def analyze_candidates(spell_checker: SpellChecker, word: str) -> dict:
 
 class TestPySpellCheckerPerformance:
     """Test PySpellChecker performance with problematic words from real essays."""
-    
+
     # Actual problematic words from the logs
     SLOW_WORDS = [
         "overconsumption",  # 15 chars, takes ~0.8-1.0s
-        "overconsuming",    # 13 chars, takes ~0.7s
-        "children's",       # 10 chars with apostrophe, takes ~0.35s
-        "short-term",       # 10 chars with hyphen, takes ~0.34s
-        "career-suicide",   # 14 chars with hyphen, takes ~0.77s
-    ]
-    
-    FAST_WORDS = [
-        "dangures",         # 8 chars, simple misspelling
-        "recieve",          # 7 chars, common misspelling
-        "teh",              # 3 chars, common typo
+        "overconsuming",  # 13 chars, takes ~0.7s
+        "children's",  # 10 chars with apostrophe, takes ~0.35s
+        "short-term",  # 10 chars with hyphen, takes ~0.34s
+        "career-suicide",  # 14 chars with hyphen, takes ~0.77s
     ]
 
-    def test_default_distance_performance(self):
+    FAST_WORDS = [
+        "dangures",  # 8 chars, simple misspelling
+        "recieve",  # 7 chars, common misspelling
+        "teh",  # 3 chars, common typo
+    ]
+
+    def test_default_distance_performance(self) -> None:
         """Test performance with default distance=2."""
-        spell_checker = SpellChecker(language='en')  # Default distance=2
-        
+        spell_checker = SpellChecker(language="en")  # Default distance=2
+
         print("\n\n=== Performance with distance=2 (default) ===")
         print(f"{'Word':<20} {'Length':<8} {'Corrected':<20} {'Time (s)':<10}")
         print("-" * 60)
-        
+
         for word in self.SLOW_WORDS + self.FAST_WORDS:
             corrected, duration = time_correction(spell_checker, word)
             print(f"{word:<20} {len(word):<8} {corrected or 'None':<20} {duration:<10.3f}")
-            
+
             # Assert slow words are actually slow with distance=2
             if word in self.SLOW_WORDS:
                 assert duration > 0.1, f"{word} should be slow but took only {duration:.3f}s"
 
-    def test_distance_1_performance(self):
+    def test_distance_1_performance(self) -> None:
         """Test performance with distance=1 as recommended by docs."""
-        spell_checker = SpellChecker(language='en', distance=1)
-        
+        spell_checker = SpellChecker(language="en", distance=1)
+
         print("\n\n=== Performance with distance=1 (optimized) ===")
         print(f"{'Word':<20} {'Length':<8} {'Corrected':<20} {'Time (s)':<10}")
         print("-" * 60)
-        
+
         for word in self.SLOW_WORDS + self.FAST_WORDS:
             corrected, duration = time_correction(spell_checker, word)
             print(f"{word:<20} {len(word):<8} {corrected or 'None':<20} {duration:<10.3f}")
-            
+
             # All words should be fast with distance=1
             assert duration < 0.1, f"{word} took {duration:.3f}s, expected < 0.1s"
 
-    def test_candidate_generation_analysis(self):
+    def test_candidate_generation_analysis(self) -> None:
         """Analyze why certain words are slow."""
-        spell_checker = SpellChecker(language='en')  # Default distance=2
-        
+        spell_checker = SpellChecker(language="en")  # Default distance=2
+
         print("\n\n=== Candidate Generation Analysis ===")
         print(f"{'Word':<20} {'Len':<5} {'ED1':<8} {'ED1 Time':<10} {'ED2':<10} {'ED2 Time':<10}")
         print("-" * 75)
-        
+
         for word in self.SLOW_WORDS[:3]:  # Just analyze a few slow words
             analysis = analyze_candidates(spell_checker, word)
-            print(f"{analysis['word']:<20} {analysis['word_length']:<5} "
-                  f"{analysis['ed1_count']:<8} {analysis['ed1_time']:<10.3f} "
-                  f"{analysis['ed2_count']:<10} {analysis['ed2_time']:<10.3f}")
+            print(
+                f"{analysis['word']:<20} {analysis['word_length']:<5} "
+                f"{analysis['ed1_count']:<8} {analysis['ed1_time']:<10.3f} "
+                f"{analysis['ed2_count']:<10} {analysis['ed2_time']:<10.3f}"
+            )
 
-    def test_unknown_words_performance(self):
+    def test_unknown_words_performance(self) -> None:
         """Test the unknown() method performance which is always fast."""
-        spell_checker = SpellChecker(language='en')
-        
+        spell_checker = SpellChecker(language="en")
+
         print("\n\n=== Unknown Words Check Performance ===")
         all_words = self.SLOW_WORDS + self.FAST_WORDS
-        
+
         start = time.time()
         unknown_words = spell_checker.unknown(all_words)
         duration = time.time() - start
-        
+
         print(f"Checking {len(all_words)} words took {duration:.3f}s")
         print(f"Unknown words: {unknown_words}")
-        
+
         # This should always be fast
         assert duration < 0.01, f"unknown() took {duration:.3f}s, expected < 0.01s"
 
-    @pytest.mark.parametrize("distance,word,expected_max_time", [
-        (2, "overconsumption", 2.0),  # Allow up to 2s for distance=2
-        (1, "overconsumption", 0.1),  # Should be fast with distance=1
-        (2, "teh", 0.01),             # Short words are always fast
-        (1, "teh", 0.01),
-    ])
-    def test_specific_word_performance(self, distance, word, expected_max_time):
+    @pytest.mark.parametrize(
+        "distance,word,expected_max_time",
+        [
+            (2, "overconsumption", 2.0),  # Allow up to 2s for distance=2
+            (1, "overconsumption", 0.1),  # Should be fast with distance=1
+            (2, "teh", 0.01),  # Short words are always fast
+            (1, "teh", 0.01),
+        ],
+    )
+    def test_specific_word_performance(
+        self, distance: int, word: str, expected_max_time: float
+    ) -> None:
         """Parameterized test for specific word/distance combinations."""
-        spell_checker = SpellChecker(language='en', distance=distance)
+        spell_checker = SpellChecker(language="en", distance=distance)
         corrected, duration = time_correction(spell_checker, word)
-        
-        assert duration < expected_max_time, \
+
+        assert duration < expected_max_time, (
             f"{word} with distance={distance} took {duration:.3f}s, expected < {expected_max_time}s"
+        )
+
+    def test_adaptive_distance_selection(self) -> None:
+        """Test that our adaptive distance function selects optimal distances."""
+        print("\n\n=== Adaptive Distance Selection ===")
+        print(f"{'Word':<20} {'Length':<8} {'Has -/apostrophe':<20} {'Selected Distance':<20}")
+        print("-" * 60)
+
+        test_words = self.SLOW_WORDS + self.FAST_WORDS
+
+        for word in test_words:
+            selected_distance = get_adaptive_edit_distance(word)
+            has_special = "Yes" if ("-" in word or "'" in word) else "No"
+            print(f"{word:<20} {len(word):<8} {has_special:<10} {selected_distance:<20}")
+
+            # Verify adaptive logic
+            if len(word) > 9 or "-" in word or "'" in word:
+                assert selected_distance == 1, f"{word} should get distance=1"
+            else:
+                assert selected_distance == 2, f"{word} should get distance=2"
 
 
 if __name__ == "__main__":

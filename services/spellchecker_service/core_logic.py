@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Any, Dict
 from uuid import UUID
 
 import aiohttp  # For ClientSession type hint
@@ -21,9 +21,16 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 logger = create_service_logger("spellchecker_service.core_logic")
 
-# Global cache for SpellChecker instances per language
+# Global cache for SpellChecker instances per language and distance
+# Key format: "{language}_d{distance}" (e.g., "en_d1", "en_d2")
 # This prevents recreating the dictionary for every essay
-_spellchecker_cache: Dict[str, any] = {}
+#
+# Design rationale for dual caching:
+# - PySpellChecker sets edit distance at initialization (cannot change per-word)
+# - Creating new instances per word would reload dictionary (very slow)
+# - Two cached instances trade ~10MB memory for 1000x performance gain
+# - Instances are read-only after creation, safe for concurrent async use
+_spellchecker_cache: Dict[str, Any] = {}
 
 
 # --- Default Implementations / Helpers ---
@@ -243,6 +250,26 @@ async def default_store_content_impl(
         )
 
 
+def get_adaptive_edit_distance(word: str) -> int:
+    """
+    Determine optimal edit distance based on word characteristics.
+
+    Returns:
+        1 for long words (>9 chars) or compound words (containing '-' or "'")
+        2 for short, simple words (better accuracy)
+    """
+    # Long words create exponential candidate generation with distance=2
+    if len(word) > 9:
+        return 1
+
+    # Compound words and contractions are problematic with distance=2
+    if "-" in word or "'" in word:
+        return 1
+
+    # Short, simple words benefit from distance=2 for better accuracy
+    return 2
+
+
 async def default_perform_spell_check_algorithm(
     text: str,
     essay_id: str | None = None,
@@ -321,28 +348,51 @@ async def default_perform_spell_check_algorithm(
                 extra={**log_extra, "l2_corrections": l2_correction_count},
             )
 
-        # 3. Get or create cached pyspellchecker instance
+        # 3. Get or create cached pyspellchecker instances
+        # We maintain two instances per language: distance=1 and distance=2
         global _spellchecker_cache
-        
-        if language not in _spellchecker_cache:
+
+        # Create cache keys for both distances
+        cache_key_d1 = f"{language}_d1"
+        cache_key_d2 = f"{language}_d2"
+
+        # Initialize SpellChecker with distance=1 if not cached
+        if cache_key_d1 not in _spellchecker_cache:
             logger.debug(
-                f"{log_prefix}Creating new SpellChecker for language: {language} (first time)",
-                extra=log_extra
+                f"{log_prefix}Creating new SpellChecker for language: {language}, distance=1 (first time)",
+                extra=log_extra,
             )
             spellchecker_init_start = time.time()
-            _spellchecker_cache[language] = SpellChecker(language=language)
+            _spellchecker_cache[cache_key_d1] = SpellChecker(language=language, distance=1)
             spellchecker_init_time = time.time() - spellchecker_init_start
             logger.info(
-                f"{log_prefix}SpellChecker created and cached: {spellchecker_init_time:.3f}s",
-                extra={**log_extra, "spellchecker_init_time_seconds": spellchecker_init_time, "cache_hit": False},
+                f"{log_prefix}SpellChecker (distance=1) created and cached: {spellchecker_init_time:.3f}s",
+                extra={
+                    **log_extra,
+                    "spellchecker_init_time_seconds": spellchecker_init_time,
+                    "distance": 1,
+                    "cache_hit": False,
+                },
             )
-        else:
+
+        # Initialize SpellChecker with distance=2 if not cached
+        if cache_key_d2 not in _spellchecker_cache:
             logger.debug(
-                f"{log_prefix}Using cached SpellChecker for language: {language}",
-                extra={**log_extra, "cache_hit": True}
+                f"{log_prefix}Creating new SpellChecker for language: {language}, distance=2 (first time)",
+                extra=log_extra,
             )
-        
-        spell_checker = _spellchecker_cache[language]
+            spellchecker_init_start = time.time()
+            _spellchecker_cache[cache_key_d2] = SpellChecker(language=language, distance=2)
+            spellchecker_init_time = time.time() - spellchecker_init_start
+            logger.info(
+                f"{log_prefix}SpellChecker (distance=2) created and cached: {spellchecker_init_time:.3f}s",
+                extra={
+                    **log_extra,
+                    "spellchecker_init_time_seconds": spellchecker_init_time,
+                    "distance": 2,
+                    "cache_hit": False,
+                },
+            )
 
         # 4. Apply pyspellchecker corrections
         logger.debug(f"{log_prefix}Running pyspellchecker on L2-corrected text", extra=log_extra)
@@ -383,17 +433,26 @@ async def default_perform_spell_check_algorithm(
         word_collect_time = time.time() - word_collect_start
         logger.debug(
             f"{log_prefix}Word collection time: {word_collect_time:.3f}s, found {len(words_to_check)} words",
-            extra={**log_extra, "word_collect_time_seconds": word_collect_time, "word_count": len(words_to_check)},
+            extra={
+                **log_extra,
+                "word_collect_time_seconds": word_collect_time,
+                "word_count": len(words_to_check),
+            },
         )
 
-        # Find misspelled words - check lowercase versions for consistency
+        # Find misspelled words - use distance=2 checker for unknown() as it has the full dictionary
         unknown_check_start = time.time()
         lowercase_words = [word.lower() for word in words_to_check]
-        misspelled_lowercase = spell_checker.unknown(lowercase_words)
+        spell_checker_d2 = _spellchecker_cache[cache_key_d2]
+        misspelled_lowercase = spell_checker_d2.unknown(lowercase_words)
         unknown_check_time = time.time() - unknown_check_start
         logger.info(
             f"{log_prefix}SpellChecker.unknown() time: {unknown_check_time:.3f}s, found {len(misspelled_lowercase)} misspelled words",
-            extra={**log_extra, "unknown_check_time_seconds": unknown_check_time, "misspelled_count": len(misspelled_lowercase)},
+            extra={
+                **log_extra,
+                "unknown_check_time_seconds": unknown_check_time,
+                "misspelled_count": len(misspelled_lowercase),
+            },
         )
 
         # Map back to original case words that need correction
@@ -414,15 +473,38 @@ async def default_perform_spell_check_algorithm(
                 original_word = words_to_check[word_idx_counter]
 
                 if original_word in misspelled_words:
+                    # Select appropriate SpellChecker based on word characteristics
+                    optimal_distance = get_adaptive_edit_distance(original_word)
+                    if optimal_distance == 1:
+                        spell_checker = _spellchecker_cache[cache_key_d1]
+                    else:
+                        spell_checker = _spellchecker_cache[cache_key_d2]
+
                     correction_start = time.time()
                     corrected_word = spell_checker.correction(original_word.lower())
                     correction_time = time.time() - correction_start
                     correction_times.append(correction_time)
-                    
+
                     if correction_time > 0.1:  # Log slow corrections
                         logger.warning(
-                            f"{log_prefix}Slow correction: '{original_word}' -> '{corrected_word}' took {correction_time:.3f}s",
-                            extra={**log_extra, "slow_word": original_word, "correction_time_seconds": correction_time},
+                            f"{log_prefix}Slow correction: '{original_word}' -> '{corrected_word}' took {correction_time:.3f}s (distance={optimal_distance})",
+                            extra={
+                                **log_extra,
+                                "slow_word": original_word,
+                                "correction_time_seconds": correction_time,
+                                "edit_distance": optimal_distance,
+                            },
+                        )
+                    else:
+                        # Log adaptive distance usage for monitoring
+                        logger.debug(
+                            f"{log_prefix}Corrected '{original_word}' using distance={optimal_distance} in {correction_time:.3f}s",
+                            extra={
+                                **log_extra,
+                                "word": original_word,
+                                "edit_distance": optimal_distance,
+                                "correction_time_seconds": correction_time,
+                            },
                         )
 
                     if corrected_word and corrected_word.lower() != original_word.lower():

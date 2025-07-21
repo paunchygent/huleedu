@@ -18,7 +18,7 @@ from opentelemetry.trace import Tracer
 from prometheus_client import CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from services.spellchecker_service.config import Settings, settings
+from services.spellchecker_service.config import Settings
 from services.spellchecker_service.implementations.content_client_impl import (
     DefaultContentClient,
 )
@@ -54,8 +54,8 @@ class SpellCheckerServiceProvider(Provider):
         self._engine = engine
 
     @provide(scope=Scope.APP)
-    def provide_settings(self) -> Settings:
-        """Provide service settings."""
+    def provide_settings(self, settings: Settings) -> Settings:
+        """Provide service settings from DI context."""
         return settings
 
     @provide(scope=Scope.APP)
