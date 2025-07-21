@@ -215,7 +215,7 @@ class TestBatchOrchestratorClientImpl:
         response = AsyncMock()
         response.status = 200
         response.json.side_effect = ValueError("Invalid JSON")
-        response.raise_for_status = AsyncMock()
+        response.raise_for_status = Mock()
 
         mock_context = AsyncMock()
         mock_context.__aenter__.return_value = response
