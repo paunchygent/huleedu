@@ -359,14 +359,16 @@ async def default_perform_spell_check_algorithm(
         # Initialize SpellChecker with distance=1 if not cached
         if cache_key_d1 not in _spellchecker_cache:
             logger.debug(
-                f"{log_prefix}Creating new SpellChecker for language: {language}, distance=1 (first time)",
+                f"{log_prefix}Creating new SpellChecker for language: "
+                f"{language}, distance=1 (first time)",
                 extra=log_extra,
             )
             spellchecker_init_start = time.time()
             _spellchecker_cache[cache_key_d1] = SpellChecker(language=language, distance=1)
             spellchecker_init_time = time.time() - spellchecker_init_start
             logger.info(
-                f"{log_prefix}SpellChecker (distance=1) created and cached: {spellchecker_init_time:.3f}s",
+                f"{log_prefix}SpellChecker (distance=1) created and cached: "
+                f"{spellchecker_init_time:.3f}s",
                 extra={
                     **log_extra,
                     "spellchecker_init_time_seconds": spellchecker_init_time,
@@ -378,14 +380,16 @@ async def default_perform_spell_check_algorithm(
         # Initialize SpellChecker with distance=2 if not cached
         if cache_key_d2 not in _spellchecker_cache:
             logger.debug(
-                f"{log_prefix}Creating new SpellChecker for language: {language}, distance=2 (first time)",
+                f"{log_prefix}Creating new SpellChecker for language: "
+                f"{language}, distance=2 (first time)",
                 extra=log_extra,
             )
             spellchecker_init_start = time.time()
             _spellchecker_cache[cache_key_d2] = SpellChecker(language=language, distance=2)
             spellchecker_init_time = time.time() - spellchecker_init_start
             logger.info(
-                f"{log_prefix}SpellChecker (distance=2) created and cached: {spellchecker_init_time:.3f}s",
+                f"{log_prefix}SpellChecker (distance=2) created and cached: "
+                f"{spellchecker_init_time:.3f}s",
                 extra={
                     **log_extra,
                     "spellchecker_init_time_seconds": spellchecker_init_time,
@@ -432,7 +436,8 @@ async def default_perform_spell_check_algorithm(
 
         word_collect_time = time.time() - word_collect_start
         logger.debug(
-            f"{log_prefix}Word collection time: {word_collect_time:.3f}s, found {len(words_to_check)} words",
+            f"{log_prefix}Word collection time: {word_collect_time:.3f}s, "
+            f"found {len(words_to_check)} words",
             extra={
                 **log_extra,
                 "word_collect_time_seconds": word_collect_time,
@@ -447,7 +452,8 @@ async def default_perform_spell_check_algorithm(
         misspelled_lowercase = spell_checker_d2.unknown(lowercase_words)
         unknown_check_time = time.time() - unknown_check_start
         logger.info(
-            f"{log_prefix}SpellChecker.unknown() time: {unknown_check_time:.3f}s, found {len(misspelled_lowercase)} misspelled words",
+            f"{log_prefix}SpellChecker.unknown() time: {unknown_check_time:.3f}s, "
+            f"found {len(misspelled_lowercase)} misspelled words",
             extra={
                 **log_extra,
                 "unknown_check_time_seconds": unknown_check_time,
@@ -487,7 +493,9 @@ async def default_perform_spell_check_algorithm(
 
                     if correction_time > 0.1:  # Log slow corrections
                         logger.warning(
-                            f"{log_prefix}Slow correction: '{original_word}' -> '{corrected_word}' took {correction_time:.3f}s (distance={optimal_distance})",
+                            f"{log_prefix}Slow correction: '{original_word}' -> "
+                            f"'{corrected_word}' took {correction_time:.3f}s "
+                            f"(distance={optimal_distance})",
                             extra={
                                 **log_extra,
                                 "slow_word": original_word,
@@ -498,7 +506,8 @@ async def default_perform_spell_check_algorithm(
                     else:
                         # Log adaptive distance usage for monitoring
                         logger.debug(
-                            f"{log_prefix}Corrected '{original_word}' using distance={optimal_distance} in {correction_time:.3f}s",
+                            f"{log_prefix}Corrected '{original_word}' using "
+                            f"distance={optimal_distance} in {correction_time:.3f}s",
                             extra={
                                 **log_extra,
                                 "word": original_word,

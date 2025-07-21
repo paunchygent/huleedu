@@ -79,7 +79,10 @@ class TestSpellcheckerServiceTestcontainers:
     def mock_content_service(
         self, real_test_essays: List[Tuple[str, str]]
     ) -> Generator[str, None, None]:
-        """Start a local mock content service that serves test essay content in a separate thread."""
+        """Start a local mock content service that serves test essay content.
+
+        Runs in a separate thread to avoid event loop conflicts.
+        """
         import asyncio
         import socket
         import threading
@@ -97,7 +100,7 @@ class TestSpellcheckerServiceTestcontainers:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.bind(("", 0))
                 s.listen(1)
-                port = s.getsockname()[1]
+                port: int = s.getsockname()[1]
             return port
 
         port = find_free_port()
@@ -133,8 +136,8 @@ class TestSpellcheckerServiceTestcontainers:
                 return web.json_response({"error": str(e)}, status=400)
 
         # Create and start the web application in a separate thread
-        def run_mock_server():
-            async def start_server():
+        def run_mock_server() -> None:
+            async def start_server() -> None:
                 app = web.Application()
                 app.router.add_get("/v1/content/{storage_id}", get_content)
                 app.router.add_post("/v1/content", store_content)
@@ -245,7 +248,7 @@ class TestSpellcheckerServiceTestcontainers:
 
         # Create test settings that override database URL
         class TestSettings(Settings):
-            def __init__(self, **kwargs):
+            def __init__(self, **kwargs: Any) -> None:
                 super().__init__(**kwargs)
                 # Store the postgres URL for the property to use
                 self._test_postgres_url = str(postgres_url)
