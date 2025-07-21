@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Response
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from prometheus_client import CollectorRegistry, generate_latest
 
-from services.websocket_service.config import settings
+from services.websocket_service.config import Settings
 from services.websocket_service.protocols import WebSocketManagerProtocol
 
 router = APIRouter()
@@ -19,7 +19,10 @@ SERVICE_START_TIME = time.time()
 
 
 @router.get("/healthz")
-async def health_check() -> dict[str, Any]:
+@inject
+async def health_check(
+    settings: FromDishka[Settings],
+) -> dict[str, Any]:
     """Basic health check endpoint."""
     return {
         "service": settings.SERVICE_NAME,
@@ -34,6 +37,7 @@ async def health_check() -> dict[str, Any]:
 @inject
 async def redis_health(
     redis_client: FromDishka[AtomicRedisClientProtocol],
+    settings: FromDishka[Settings],
 ) -> dict[str, Any]:
     """Check Redis connectivity health."""
     try:
@@ -62,6 +66,7 @@ async def redis_health(
 @inject
 async def websocket_health(
     websocket_manager: FromDishka[WebSocketManagerProtocol],
+    settings: FromDishka[Settings],
 ) -> dict[str, Any]:
     """Check WebSocket manager health."""
     total_connections = websocket_manager.get_total_connections()
