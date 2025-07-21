@@ -97,7 +97,7 @@ class TestFailedComparisonPoolAdd:
         mock_database.session.return_value.__aenter__.return_value = mock_session
 
         # Act & Assert
-        from services.cj_assessment_service.exceptions import DatabaseOperationError
+        from huleedu_service_libs.error_handling import HuleEduError
 
         with patch(
             "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
@@ -105,7 +105,7 @@ class TestFailedComparisonPoolAdd:
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = None
 
-            with pytest.raises(DatabaseOperationError, match="Batch state not found"):
+            with pytest.raises(HuleEduError, match="Batch state not found"):
                 await batch_pool_manager.add_to_failed_pool(
                     cj_batch_id=cj_batch_id,
                     comparison_task=sample_comparison_task,

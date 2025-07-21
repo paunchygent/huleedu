@@ -12,7 +12,7 @@ from services.cj_assessment_service.cj_core_logic.batch_completion_checker impor
     BatchCompletionChecker,
 )
 from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfigOverrides
-from services.cj_assessment_service.exceptions import DatabaseOperationError
+from huleedu_service_libs.error_handling import HuleEduError
 from services.cj_assessment_service.models_db import CJBatchState
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
@@ -304,16 +304,16 @@ class TestBatchCompletionChecker:
         ) as mock_get_batch_state:
             mock_get_batch_state.return_value = None
 
-            with pytest.raises(DatabaseOperationError) as exc_info:
+            with pytest.raises(HuleEduError) as exc_info:
                 await completion_checker.check_batch_completion(
                     cj_batch_id=cj_batch_id,
                     correlation_id=correlation_id,
                 )
 
             assert "Batch state not found" in str(exc_info.value)
-            assert exc_info.value.correlation_id == correlation_id
-            assert exc_info.value.details["operation"] == "check_batch_completion"
-            assert exc_info.value.details["entity_id"] == str(cj_batch_id)
+            assert exc_info.value.correlation_id == str(correlation_id)
+            assert exc_info.value.operation == "check_batch_completion"
+            assert exc_info.value.error_detail.details["entity_id"] == str(cj_batch_id)
 
     async def test_check_batch_completion_database_error(
         self,
@@ -335,23 +335,23 @@ class TestBatchCompletionChecker:
         ) as mock_get_batch_state:
             mock_get_batch_state.side_effect = Exception("Database connection failed")
 
-            with pytest.raises(DatabaseOperationError) as exc_info:
+            with pytest.raises(HuleEduError) as exc_info:
                 await completion_checker.check_batch_completion(
                     cj_batch_id=cj_batch_id,
                     correlation_id=correlation_id,
                 )
 
             assert "Failed to check batch completion" in str(exc_info.value)
-            assert exc_info.value.correlation_id == correlation_id
-            assert exc_info.value.details["operation"] == "check_batch_completion"
-            assert exc_info.value.details["entity_id"] == str(cj_batch_id)
+            assert exc_info.value.correlation_id == str(correlation_id)
+            assert exc_info.value.operation == "check_batch_completion"
+            assert exc_info.value.error_detail.details["entity_id"] == str(cj_batch_id)
 
     async def test_check_batch_completion_existing_database_operation_error(
         self,
         completion_checker: BatchCompletionChecker,
         mock_database: AsyncMock,
     ) -> None:
-        """Test completion check when DatabaseOperationError is raised."""
+        """Test completion check when HuleEduError is raised."""
         # Arrange
         cj_batch_id = 1
         correlation_id = uuid4()
@@ -359,11 +359,16 @@ class TestBatchCompletionChecker:
         mock_session = AsyncMock()
         mock_database.session.return_value.__aenter__.return_value = mock_session
 
-        original_error = DatabaseOperationError(
+        from huleedu_service_libs.error_handling import create_error_detail_with_context
+        from common_core.error_enums import ErrorCode
+        error_detail = create_error_detail_with_context(
+            error_code=ErrorCode.PROCESSING_ERROR,
             message="Original database error",
-            correlation_id=correlation_id,
+            service="cj_assessment_service",
             operation="original_operation",
+            correlation_id=correlation_id,
         )
+        original_error = HuleEduError(error_detail)
 
         # Act & Assert
         with patch(
@@ -372,13 +377,13 @@ class TestBatchCompletionChecker:
         ) as mock_get_batch_state:
             mock_get_batch_state.side_effect = original_error
 
-            with pytest.raises(DatabaseOperationError) as exc_info:
+            with pytest.raises(HuleEduError) as exc_info:
                 await completion_checker.check_batch_completion(
                     cj_batch_id=cj_batch_id,
                     correlation_id=correlation_id,
                 )
 
-            # Should re-raise the original DatabaseOperationError
+            # Should re-raise the original HuleEduError
             assert exc_info.value is original_error
             assert "Original database error" in str(exc_info.value)
 

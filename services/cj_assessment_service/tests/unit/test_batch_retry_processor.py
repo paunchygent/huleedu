@@ -15,7 +15,7 @@ from services.cj_assessment_service.cj_core_logic.batch_submission import (
     BatchSubmissionResult,
 )
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.exceptions import AssessmentProcessingError
+from huleedu_service_libs.error_handling import HuleEduError
 from services.cj_assessment_service.models_api import (
     ComparisonTask,
     EssayForComparison,
@@ -315,16 +315,16 @@ class TestBatchRetryProcessor:
         mock_pool_manager.form_retry_batch.side_effect = Exception("Pool formation failed")
 
         # Act & Assert
-        with pytest.raises(AssessmentProcessingError) as exc_info:
+        with pytest.raises(HuleEduError) as exc_info:
             await retry_processor.submit_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
 
         assert "Failed to submit retry batch" in str(exc_info.value)
-        assert exc_info.value.correlation_id == correlation_id
-        assert exc_info.value.details["batch_id"] == str(cj_batch_id)
-        assert exc_info.value.details["processing_stage"] == "retry_batch_submission"
+        assert exc_info.value.correlation_id == str(correlation_id)
+        assert exc_info.value.error_detail.details["batch_id"] == str(cj_batch_id)
+        assert exc_info.value.error_detail.details["processing_stage"] == "retry_batch_submission"
 
     async def test_submit_retry_batch_submission_failure(
         self,
@@ -343,15 +343,15 @@ class TestBatchRetryProcessor:
         mock_batch_submitter.submit_comparison_batch.side_effect = Exception("Submission failed")
 
         # Act & Assert
-        with pytest.raises(AssessmentProcessingError) as exc_info:
+        with pytest.raises(HuleEduError) as exc_info:
             await retry_processor.submit_retry_batch(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
 
         assert "Failed to submit retry batch" in str(exc_info.value)
-        assert exc_info.value.correlation_id == correlation_id
-        assert exc_info.value.details["batch_id"] == str(cj_batch_id)
+        assert exc_info.value.correlation_id == str(correlation_id)
+        assert exc_info.value.error_detail.details["batch_id"] == str(cj_batch_id)
 
     async def test_process_remaining_failed_comparisons_success(
         self,
@@ -489,16 +489,16 @@ class TestBatchRetryProcessor:
         )
 
         # Act & Assert
-        with pytest.raises(AssessmentProcessingError) as exc_info:
+        with pytest.raises(HuleEduError) as exc_info:
             await retry_processor.process_remaining_failed_comparisons(
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
 
         assert "Failed to process remaining failed comparisons" in str(exc_info.value)
-        assert exc_info.value.correlation_id == correlation_id
-        assert exc_info.value.details["batch_id"] == str(cj_batch_id)
-        assert exc_info.value.details["processing_stage"] == "end_of_batch_retry_processing"
+        assert exc_info.value.correlation_id == str(correlation_id)
+        assert exc_info.value.error_detail.details["batch_id"] == str(cj_batch_id)
+        assert exc_info.value.error_detail.details["processing_stage"] == "end_of_batch_retry_processing"
 
     async def test_end_of_batch_fairness_scenario(
         self,

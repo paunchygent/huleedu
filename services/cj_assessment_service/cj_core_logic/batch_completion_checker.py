@@ -11,7 +11,7 @@ from uuid import UUID
 from common_core.status_enums import CJBatchStateEnum
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from services.cj_assessment_service.exceptions import DatabaseOperationError
+from huleedu_service_libs.error_handling import HuleEduError, raise_processing_error
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
 from .batch_config import BatchConfigOverrides, get_effective_threshold
@@ -48,7 +48,7 @@ class BatchCompletionChecker:
             True if batch is complete or threshold reached, False otherwise
 
         Raises:
-            DatabaseOperationError: On database operation failure
+            HuleEduError: On database operation failure
         """
         try:
             async with self.database.session() as session:
@@ -58,10 +58,12 @@ class BatchCompletionChecker:
                 )
 
                 if not batch_state:
-                    raise DatabaseOperationError(
+                    raise_processing_error(
+                        service="cj_assessment_service",
+                        operation="check_batch_completion",
                         message="Batch state not found",
                         correlation_id=correlation_id,
-                        operation="check_batch_completion",
+                        database_operation="get_batch_state",
                         entity_id=str(cj_batch_id),
                     )
 
@@ -109,12 +111,14 @@ class BatchCompletionChecker:
                 exc_info=True,
             )
 
-            if isinstance(e, DatabaseOperationError):
+            if isinstance(e, HuleEduError):
                 raise
             else:
-                raise DatabaseOperationError(
+                raise_processing_error(
+                    service="cj_assessment_service",
+                    operation="check_batch_completion",
                     message=f"Failed to check batch completion: {str(e)}",
                     correlation_id=correlation_id,
-                    operation="check_batch_completion",
+                    database_operation="check_batch_completion",
                     entity_id=str(cj_batch_id),
                 )

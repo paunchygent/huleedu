@@ -12,7 +12,7 @@ from uuid import UUID
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.exceptions import AssessmentProcessingError
+from huleedu_service_libs.error_handling import raise_cj_assessment_processing_error
 from services.cj_assessment_service.protocols import (
     BatchProcessorProtocol,
     CJRepositoryProtocol,
@@ -74,7 +74,7 @@ class BatchRetryProcessor:
             BatchSubmissionResult if retry batch submitted, None if not needed
 
         Raises:
-            AssessmentProcessingError: On retry batch submission failure
+            HuleEduError: On retry batch submission failure
         """
         if not self.settings.ENABLE_FAILED_COMPARISON_RETRY:
             logger.info(
@@ -161,7 +161,9 @@ class BatchRetryProcessor:
                 exc_info=True,
             )
 
-            raise AssessmentProcessingError(
+            raise_cj_assessment_processing_error(
+                service="cj_assessment_service",
+                operation="submit_retry_batch",
                 message=f"Failed to submit retry batch: {str(e)}",
                 correlation_id=correlation_id,
                 batch_id=str(cj_batch_id),
@@ -189,7 +191,7 @@ class BatchRetryProcessor:
             BatchSubmissionResult if failures processed, None if nothing to process
 
         Raises:
-            AssessmentProcessingError: On end-of-batch processing failure
+            HuleEduError: On end-of-batch processing failure
         """
         logger.info(
             f"Processing remaining failed comparisons for batch {cj_batch_id} to ensure fairness",
@@ -221,7 +223,9 @@ class BatchRetryProcessor:
                 exc_info=True,
             )
 
-            raise AssessmentProcessingError(
+            raise_cj_assessment_processing_error(
+                service="cj_assessment_service",
+                operation="process_remaining_failed_comparisons",
                 message=f"Failed to process remaining failed comparisons: {str(e)}",
                 correlation_id=correlation_id,
                 batch_id=str(cj_batch_id),

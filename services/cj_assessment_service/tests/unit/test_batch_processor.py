@@ -16,9 +16,7 @@ from services.cj_assessment_service.cj_core_logic.batch_processor import (
     BatchSubmissionResult,
 )
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.exceptions import (
-    AssessmentProcessingError,
-)
+from huleedu_service_libs.error_handling import HuleEduError
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
     ComparisonTask,
@@ -209,7 +207,7 @@ class TestBatchProcessor:
         empty_tasks: list[ComparisonTask] = []
 
         # Act & Assert
-        with pytest.raises(AssessmentProcessingError) as exc_info:
+        with pytest.raises(HuleEduError) as exc_info:
             await batch_processor.submit_comparison_batch(
                 cj_batch_id=cj_batch_id,
                 comparison_tasks=empty_tasks,
@@ -217,7 +215,7 @@ class TestBatchProcessor:
             )
 
         assert "No comparison tasks provided" in str(exc_info.value)
-        assert exc_info.value.correlation_id == correlation_id
+        assert exc_info.value.correlation_id == str(correlation_id)
 
     async def test_submit_comparison_batch_llm_failure(
         self,
@@ -232,7 +230,7 @@ class TestBatchProcessor:
         mock_llm_interaction.perform_comparisons.side_effect = Exception("LLM failure")
 
         # Act & Assert
-        with pytest.raises(AssessmentProcessingError) as exc_info:
+        with pytest.raises(HuleEduError) as exc_info:
             await batch_processor.submit_comparison_batch(
                 cj_batch_id=cj_batch_id,
                 comparison_tasks=sample_comparison_tasks,
@@ -240,7 +238,7 @@ class TestBatchProcessor:
             )
 
         assert "Batch submission failed" in str(exc_info.value)
-        assert exc_info.value.correlation_id == correlation_id
+        assert exc_info.value.correlation_id == str(correlation_id)
 
     async def test_handle_batch_submission_with_request_data(
         self,

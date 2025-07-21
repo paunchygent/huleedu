@@ -34,9 +34,7 @@ from huleedu_service_libs.observability import (
 
 from services.cj_assessment_service.cj_core_logic import run_cj_assessment_workflow
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.exceptions import (
-    CJAssessmentError,
-)
+from huleedu_service_libs.error_handling import HuleEduError
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
@@ -425,17 +423,9 @@ def _categorize_processing_error(
     exception: Exception, correlation_id: UUID | None = None
 ) -> ErrorDetail:
     """Categorize processing exceptions into appropriate ErrorCode types."""
-    if isinstance(exception, CJAssessmentError):
-        # Already a structured CJ Assessment error - recreate with canonical model
-        return create_error_detail_with_context(
-            error_code=exception.error_code,
-            message=exception.message,
-            service="cj_assessment_service",
-            operation="process_cj_assessment",
-            correlation_id=exception.correlation_id or correlation_id or uuid4(),
-            capture_stack=False,  # Don't capture stack since it's already a structured error
-            details=exception.details,
-        )
+    if isinstance(exception, HuleEduError):
+        # Already a structured HuleEdu error - return the error detail directly
+        return exception.error_detail
 
     # Categorize based on exception type
     if "timeout" in str(exception).lower() or "TimeoutError" in type(exception).__name__:

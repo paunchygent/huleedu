@@ -15,9 +15,9 @@ from common_core.status_enums import CJBatchStateEnum
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.exceptions import (
-    AssessmentProcessingError,
-    DatabaseOperationError,
+from huleedu_service_libs.error_handling import (
+    raise_cj_assessment_processing_error,
+    raise_processing_error,
 )
 from services.cj_assessment_service.models_api import ComparisonTask
 from services.cj_assessment_service.protocols import (
@@ -84,12 +84,13 @@ class BatchProcessor:
             BatchSubmissionResult with submission details
 
         Raises:
-            AssessmentProcessingError: On batch submission failure
-            DatabaseOperationError: On database operation failure
-            LLMProviderError: On LLM provider communication failure
+            HuleEduError: On batch submission failure, database operation failure,
+                         or LLM provider communication failure
         """
         if not comparison_tasks:
-            raise AssessmentProcessingError(
+            raise_cj_assessment_processing_error(
+                service="cj_assessment_service",
+                operation="submit_comparison_tasks",
                 message="No comparison tasks provided for batch submission",
                 correlation_id=correlation_id,
                 batch_id=str(cj_batch_id),
@@ -202,8 +203,10 @@ class BatchProcessor:
                     extra={"correlation_id": str(correlation_id), "cj_batch_id": cj_batch_id},
                 )
 
-            # Re-raise all exceptions as AssessmentProcessingError for consistency
-            raise AssessmentProcessingError(
+            # Re-raise all exceptions using factory for consistency
+            raise_cj_assessment_processing_error(
+                service="cj_assessment_service",
+                operation="submit_comparison_tasks",
                 message=f"Batch submission failed: {str(e)}",
                 correlation_id=correlation_id,
                 batch_id=str(cj_batch_id),
@@ -229,7 +232,7 @@ class BatchProcessor:
             BatchSubmissionResult with submission details
 
         Raises:
-            AssessmentProcessingError: On batch submission failure
+            HuleEduError: On batch submission failure
         """
         # Extract configuration overrides from request data
         config_overrides = None
@@ -286,10 +289,12 @@ class BatchProcessor:
                 exc_info=True,
             )
 
-            raise DatabaseOperationError(
+            raise_processing_error(
+                service="cj_assessment_service",
+                operation="update_batch_state",
                 message=f"Failed to update batch state to {state.value}: {str(e)}",
                 correlation_id=correlation_id,
-                operation="update_batch_state",
+                database_operation="update_batch_state",
                 entity_id=str(cj_batch_id),
             )
 
@@ -321,9 +326,11 @@ class BatchProcessor:
                 exc_info=True,
             )
 
-            raise DatabaseOperationError(
+            raise_processing_error(
+                service="cj_assessment_service",
+                operation="update_submitted_count",
                 message=f"Failed to update submitted count: {str(e)}",
                 correlation_id=correlation_id,
-                operation="update_submitted_count",
+                database_operation="update_submitted_count",
                 entity_id=str(cj_batch_id),
             )

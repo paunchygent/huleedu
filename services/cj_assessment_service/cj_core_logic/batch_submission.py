@@ -14,7 +14,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.cj_assessment_service.exceptions import LLMProviderError
+from huleedu_service_libs.error_handling import raise_cj_llm_provider_error
 from services.cj_assessment_service.models_api import ComparisonTask
 from services.cj_assessment_service.protocols import LLMInteractionProtocol
 
@@ -52,7 +52,7 @@ async def submit_batch_chunk(
         max_tokens_override: Optional max tokens override
 
     Raises:
-        LLMProviderError: On LLM provider communication failure
+        HuleEduError: On LLM provider communication failure
     """
     try:
         # Use existing LLM interaction protocol for batch submission
@@ -89,7 +89,9 @@ async def submit_batch_chunk(
             exc_info=True,
         )
 
-        raise LLMProviderError(
+        raise_cj_llm_provider_error(
+            service="cj_assessment_service",
+            operation="submit_batch_chunk",
             message=f"Failed to submit batch chunk: {str(e)}",
             correlation_id=correlation_id,
             is_retryable=True,

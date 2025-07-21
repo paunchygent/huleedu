@@ -28,7 +28,6 @@ from huleedu_service_libs.error_handling import (
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.exceptions import map_status_to_error_code
 from services.cj_assessment_service.protocols import LLMProviderProtocol, RetryManagerProtocol
 
 logger = create_service_logger("cj_assessment_service.llm_provider_service_client")
@@ -378,10 +377,8 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 "response_preview": response_text[:200],
             }
 
-        error_code = map_status_to_error_code(status_code)
-
-        # Map error codes to appropriate factory functions
-        if error_code == ErrorCode.INVALID_REQUEST:
+        # Map status codes directly to appropriate factory functions
+        if status_code == 400:
             raise_invalid_request(
                 service="cj_assessment_service",
                 operation="_handle_error_response",
@@ -389,7 +386,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 correlation_id=correlation_id,
                 **details,
             )
-        elif error_code == ErrorCode.AUTHENTICATION_ERROR:
+        elif status_code in [401, 403]:
             raise_authentication_error(
                 service="cj_assessment_service",
                 operation="_handle_error_response",
@@ -397,7 +394,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 correlation_id=correlation_id,
                 **details,
             )
-        elif error_code == ErrorCode.RESOURCE_NOT_FOUND:
+        elif status_code == 404:
             raise_resource_not_found(
                 service="cj_assessment_service",
                 operation="_handle_error_response",
@@ -407,7 +404,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 correlation_id=correlation_id,
                 **details,
             )
-        elif error_code == ErrorCode.TIMEOUT:
+        elif status_code in [408, 504]:
             raise_timeout_error(
                 service="cj_assessment_service",
                 operation="_handle_error_response",
@@ -416,7 +413,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 correlation_id=correlation_id,
                 **details,
             )
-        elif error_code == ErrorCode.RATE_LIMIT:
+        elif status_code == 429:
             raise_rate_limit_error(
                 service="cj_assessment_service",
                 operation="_handle_error_response",
@@ -424,7 +421,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 correlation_id=correlation_id,
                 **details,
             )
-        elif error_code == ErrorCode.SERVICE_UNAVAILABLE:
+        elif status_code in [502, 503]:
             raise_service_unavailable(
                 service="cj_assessment_service",
                 operation="_handle_error_response",

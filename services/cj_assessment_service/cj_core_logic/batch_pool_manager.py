@@ -11,7 +11,7 @@ from uuid import UUID
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.exceptions import DatabaseOperationError
+from huleedu_service_libs.error_handling import HuleEduError, raise_processing_error
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import (
     ComparisonTask,
@@ -61,7 +61,7 @@ class BatchPoolManager:
             correlation_id: Request correlation ID for tracing
 
         Raises:
-            DatabaseOperationError: On database operation failure
+            HuleEduError: On database operation failure
         """
         logger.info(
             f"Adding failed comparison to pool for batch {cj_batch_id}",
@@ -82,10 +82,12 @@ class BatchPoolManager:
                 )
 
                 if not batch_state:
-                    raise DatabaseOperationError(
+                    raise_processing_error(
+                        service="cj_assessment_service",
+                        operation="add_to_failed_pool",
                         message="Batch state not found for failed pool addition",
                         correlation_id=correlation_id,
-                        operation="add_to_failed_pool",
+                        database_operation="get_batch_state",
                         entity_id=str(cj_batch_id),
                     )
 
@@ -151,10 +153,12 @@ class BatchPoolManager:
                 exc_info=True,
             )
 
-            raise DatabaseOperationError(
+            raise_processing_error(
+                service="cj_assessment_service",
+                operation="add_to_failed_pool",
                 message=f"Failed to add comparison to failed pool: {str(e)}",
                 correlation_id=correlation_id,
-                operation="add_to_failed_pool",
+                database_operation="add_to_failed_pool",
                 entity_id=str(cj_batch_id),
             )
 
@@ -175,7 +179,7 @@ class BatchPoolManager:
             True if retry batch should be created, False otherwise
 
         Raises:
-            DatabaseOperationError: On database operation failure
+            HuleEduError: On database operation failure
         """
         if not self.settings.ENABLE_FAILED_COMPARISON_RETRY:
             return False
@@ -246,10 +250,12 @@ class BatchPoolManager:
                 exc_info=True,
             )
 
-            raise DatabaseOperationError(
+            raise_processing_error(
+                service="cj_assessment_service",
+                operation="check_retry_batch_needed",
                 message=f"Failed to check retry batch need: {str(e)}",
                 correlation_id=correlation_id,
-                operation="check_retry_batch_needed",
+                database_operation="check_retry_batch_needed",
                 entity_id=str(cj_batch_id),
             )
 
@@ -270,7 +276,7 @@ class BatchPoolManager:
             List of comparison tasks for retry, or None if not enough failures
 
         Raises:
-            DatabaseOperationError: On database operation failure
+            HuleEduError: On database operation failure
         """
         try:
             async with self.database.session() as session:
@@ -395,9 +401,11 @@ class BatchPoolManager:
                 exc_info=True,
             )
 
-            raise DatabaseOperationError(
+            raise_processing_error(
+                service="cj_assessment_service",
+                operation="form_retry_batch",
                 message=f"Failed to form retry batch: {str(e)}",
                 correlation_id=correlation_id,
-                operation="form_retry_batch",
+                database_operation="form_retry_batch",
                 entity_id=str(cj_batch_id),
             )
