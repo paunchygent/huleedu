@@ -21,6 +21,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry
 from quart import Blueprint, Response, current_app, jsonify
 from quart_dishka import inject
 
+from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import ErrorResponse
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
@@ -48,7 +49,8 @@ def create_error_response(
 
 
 @health_bp.route("/healthz")
-async def health_check() -> tuple[Response, int]:
+@inject
+async def health_check(settings: FromDishka[Settings]) -> tuple[Response, int]:
     """Standardized health check endpoint for CJ Assessment Service."""
     try:
         # Check database connectivity
@@ -61,7 +63,7 @@ async def health_check() -> tuple[Response, int]:
 
         engine = current_app.database_engine  # Guaranteed to exist
         try:
-            health_checker = DatabaseHealthChecker(engine, "cj_assessment_service")
+            health_checker = DatabaseHealthChecker(engine, settings.SERVICE_NAME)
             summary = await health_checker.get_health_summary()
             dependencies["database"] = {"status": summary.get("status", "unknown")}
             if summary.get("status") not in ["healthy", "warning"]:
@@ -74,13 +76,13 @@ async def health_check() -> tuple[Response, int]:
         overall_status = "healthy" if checks["dependencies_available"] else "unhealthy"
 
         health_response = {
-            "service": "cj_assessment_service",
+            "service": settings.SERVICE_NAME,
             "status": overall_status,
             "message": f"CJ Assessment Service is {overall_status}",
-            "version": "1.0.0",
+            "version": settings.VERSION,
             "checks": checks,
             "dependencies": dependencies,
-            "environment": "development",
+            "environment": settings.ENVIRONMENT.value,
         }
 
         status_code = 200 if overall_status == "healthy" else 503
@@ -96,7 +98,8 @@ async def health_check() -> tuple[Response, int]:
 
 
 @health_bp.route("/healthz/database")
-async def database_health_check() -> Response | tuple[Response, int]:
+@inject
+async def database_health_check(settings: FromDishka[Settings]) -> Response | tuple[Response, int]:
     """Database-specific health check endpoint with detailed metrics."""
     try:
         # Type-safe access to guaranteed infrastructure
@@ -106,7 +109,7 @@ async def database_health_check() -> Response | tuple[Response, int]:
         engine = current_app.database_engine  # Guaranteed to exist
 
         # Create health checker and perform comprehensive check
-        health_checker = DatabaseHealthChecker(engine, "cj_assessment_service")
+        health_checker = DatabaseHealthChecker(engine, settings.SERVICE_NAME)
         health_result = await health_checker.comprehensive_health_check()
 
         # Determine HTTP status code based on health status
@@ -128,7 +131,10 @@ async def database_health_check() -> Response | tuple[Response, int]:
 
 
 @health_bp.route("/healthz/database/summary")
-async def database_health_summary() -> Response | tuple[Response, int]:
+@inject
+async def database_health_summary(
+    settings: FromDishka[Settings],
+) -> Response | tuple[Response, int]:
     """Lightweight database health summary for frequent polling."""
     try:
         # Type-safe access to guaranteed infrastructure
@@ -138,7 +144,7 @@ async def database_health_summary() -> Response | tuple[Response, int]:
         engine = current_app.database_engine  # Guaranteed to exist
 
         # Create health checker and get summary
-        health_checker = DatabaseHealthChecker(engine, "cj_assessment_service")
+        health_checker = DatabaseHealthChecker(engine, settings.SERVICE_NAME)
         summary = await health_checker.get_health_summary()
 
         # Determine HTTP status code
@@ -181,7 +187,8 @@ async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
 
 
 @health_bp.route("/healthz/live")
-async def liveness_probe() -> tuple[Response, int]:
+@inject
+async def liveness_probe(settings: FromDishka[Settings]) -> tuple[Response, int]:
     """Kubernetes liveness probe endpoint.
 
     Simple check to verify the service is running.
@@ -194,7 +201,7 @@ async def liveness_probe() -> tuple[Response, int]:
         # Basic check - if we can handle requests, we're alive
         response = {
             "status": "alive",
-            "service": "cj_assessment_service",
+            "service": settings.SERVICE_NAME,
             "message": "Service is responding",
         }
         return jsonify(response), 200
@@ -207,6 +214,7 @@ async def liveness_probe() -> tuple[Response, int]:
 @inject
 async def readiness_probe(
     repository: FromDishka[CJRepositoryProtocol],
+    settings: FromDishka[Settings],
 ) -> tuple[Response, int]:
     """Kubernetes readiness probe endpoint.
 
@@ -280,7 +288,7 @@ async def readiness_probe(
 
         response = {
             "status": "ready" if is_ready else "not_ready",
-            "service": "cj_assessment_service",
+            "service": settings.SERVICE_NAME,
             "checks": checks,
             "message": "Service is ready to accept traffic" if is_ready else "Service is not ready",
         }

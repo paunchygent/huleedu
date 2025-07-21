@@ -8,14 +8,15 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_l
 from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
-from services.content_service.config import settings
+from services.content_service.config import Settings
 
 logger = create_service_logger("content.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
 
 @health_bp.route("/healthz")
-async def health_check() -> Response | tuple[Response, int]:
+@inject
+async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Response, int]:
     """Standardized health check endpoint with storage validation."""
     try:
         checks = {"service_responsive": True, "dependencies_available": True}

@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     ENVIRONMENT: Environment = Environment.DEVELOPMENT
     SERVICE_NAME: str = "spell-checker-service"
+    VERSION: str = "1.0.0"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
 

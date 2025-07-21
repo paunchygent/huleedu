@@ -9,7 +9,7 @@ from pathlib import Path
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry, Counter
 
-from services.content_service.config import settings
+from services.content_service.config import Settings, settings
 from services.content_service.implementations.filesystem_content_store import FileSystemContentStore
 from services.content_service.implementations.prometheus_content_metrics import (
     PrometheusContentMetrics,
@@ -19,6 +19,11 @@ from services.content_service.protocols import ContentMetricsProtocol, ContentSt
 
 class ContentServiceProvider(Provider):
     """DI provider for Content Service dependencies."""
+
+    @provide(scope=Scope.APP)
+    def provide_settings(self) -> Settings:
+        """Provide service settings."""
+        return settings
 
     @provide(scope=Scope.APP)
     def provide_collector_registry(self) -> CollectorRegistry:

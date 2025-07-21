@@ -71,7 +71,7 @@ class TestBatchStatusPerformanceIntegration:
 
         # First create the batch tracker record to satisfy foreign key constraint
         from services.essay_lifecycle_service.models_db import BatchEssayTracker
-        
+
         async with postgres_repository.session() as session:
             batch_tracker = BatchEssayTracker(
                 batch_id=batch_id,
@@ -155,7 +155,7 @@ class TestBatchStatusPerformanceIntegration:
 
         # First create the batch tracker record to satisfy foreign key constraint
         from services.essay_lifecycle_service.models_db import BatchEssayTracker
-        
+
         async with postgres_repository.session() as session:
             batch_tracker = BatchEssayTracker(
                 batch_id=batch_id,

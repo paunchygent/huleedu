@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     SERVICE_NAME: str = "cj_assessment_service"
     ENVIRONMENT: Environment = Environment.DEVELOPMENT
+    VERSION: str = "1.0.0"
 
     # Kafka configuration
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"

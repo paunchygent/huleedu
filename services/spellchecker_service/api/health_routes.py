@@ -15,6 +15,8 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_l
 from quart import Blueprint, Response, current_app, jsonify
 from quart_dishka import inject
 
+from services.spellchecker_service.config import Settings
+
 if TYPE_CHECKING:
     from huleedu_service_libs.quart_app import HuleEduApp
 
@@ -23,7 +25,8 @@ health_bp = Blueprint("health_routes", __name__)
 
 
 @health_bp.route("/healthz")
-async def health_check() -> tuple[Response, int]:
+@inject
+async def health_check(settings: FromDishka[Settings]) -> tuple[Response, int]:
     """Standardized health check endpoint for Spell Checker Service."""
     try:
         # Check database connectivity
@@ -36,7 +39,7 @@ async def health_check() -> tuple[Response, int]:
         engine = current_app.database_engine
 
         try:
-            health_checker = DatabaseHealthChecker(engine, "spellchecker_service")
+            health_checker = DatabaseHealthChecker(engine, settings.SERVICE_NAME)
             summary = await health_checker.get_health_summary()
             dependencies["database"] = {"status": summary.get("status", "unknown")}
             if summary.get("status") not in ["healthy", "warning"]:
@@ -54,13 +57,13 @@ async def health_check() -> tuple[Response, int]:
         overall_status = "healthy" if checks["dependencies_available"] else "unhealthy"
 
         health_response = {
-            "service": "spellchecker_service",
+            "service": settings.SERVICE_NAME,
             "status": overall_status,
             "message": f"Spell Checker Service is {overall_status}",
-            "version": "1.0.0",
+            "version": getattr(settings, "VERSION", "1.0.0"),
             "checks": checks,
             "dependencies": dependencies,
-            "environment": "development",
+            "environment": settings.ENVIRONMENT.value,
         }
 
         status_code = 200 if overall_status == "healthy" else 503
@@ -70,10 +73,10 @@ async def health_check() -> tuple[Response, int]:
         logger.error(f"Health check failed: {e}")
         return jsonify(
             {
-                "service": "spellchecker_service",
+                "service": settings.SERVICE_NAME,
                 "status": "unhealthy",
                 "message": "Health check failed",
-                "version": "1.0.0",
+                "version": getattr(settings, "VERSION", "1.0.0"),
                 "error": str(e),
             }
         ), 503

@@ -312,9 +312,9 @@ class TestAtomicBatchCreationIntegration:
         batch_tracker_persistence: BatchTrackerPersistence,
     ) -> None:
         """Test that database failure during batch creation rolls back all changes."""
-        # Arrange - First create the batch tracker record to satisfy foreign key constraint        
+        # Arrange - First create the batch tracker record to satisfy foreign key constraint
         from services.essay_lifecycle_service.models_db import BatchEssayTracker
-        
+
         async with postgres_repository.session() as session:
             batch_tracker_record = BatchEssayTracker(
                 batch_id=sample_batch_event.batch_id,
@@ -333,7 +333,7 @@ class TestAtomicBatchCreationIntegration:
             )
             session.add(batch_tracker_record)
             await session.commit()
-        
+
         # Now create one essay manually to cause constraint violation
         from common_core.metadata_models import EntityReference
 
@@ -402,15 +402,16 @@ class TestAtomicBatchCreationIntegration:
 
         # Act & Assert - Empty batches are rejected by RedisBatchCoordinator
         with pytest.raises(HuleEduError) as exc_info:
-            await coordination_handler.handle_batch_essays_registered(
-                empty_event, correlation_id
-            )
-        
+            await coordination_handler.handle_batch_essays_registered(empty_event, correlation_id)
+
         # Validate error
         error = exc_info.value
         assert error.error_detail.error_code == ErrorCode.PROCESSING_ERROR
         # The specific error message is in the details field
-        assert error.error_detail.details.get("error_details") == "Cannot register batch with empty essay_ids"
+        assert (
+            error.error_detail.details.get("error_details")
+            == "Cannot register batch with empty essay_ids"
+        )
 
         # Assert - No essays created
         batch_essays = await postgres_repository.list_essays_by_batch("empty-batch")
