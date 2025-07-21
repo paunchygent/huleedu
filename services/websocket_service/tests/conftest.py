@@ -333,6 +333,7 @@ class MockWebSocketServiceProvider(Provider):
     def get_config(self) -> Settings:
         """Provide test settings."""
         return Settings(
+            SERVICE_NAME="websocket_service",
             JWT_SECRET_KEY="test-secret",
             REDIS_URL="redis://localhost:6379",
             WEBSOCKET_MAX_CONNECTIONS_PER_USER=5,

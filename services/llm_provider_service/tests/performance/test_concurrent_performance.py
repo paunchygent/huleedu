@@ -204,6 +204,8 @@ class TestConcurrentPerformance:
         assert p95_time < 5.0  # P95 should be under 5s
         assert statistics.mean(response_times) < 2.0  # Mean should be under 2s
 
+    @pytest.mark.slow
+    @pytest.mark.performance
     @pytest.mark.asyncio
     async def test_high_concurrency_stress(self, infrastructure_di_container: Any) -> None:
         """Test higher concurrency stress with real infrastructure."""
@@ -256,6 +258,8 @@ class TestConcurrentPerformance:
         assert p95_time < 8.0  # P95 under 8 seconds under stress
         assert statistics.mean(response_times) < 3.0  # Mean under 3s
 
+    @pytest.mark.slow
+    @pytest.mark.performance
     @pytest.mark.asyncio
     async def test_concurrent_burst_pattern(self, infrastructure_di_container: Any) -> None:
         """Test burst pattern with real infrastructure."""
@@ -334,6 +338,8 @@ class TestConcurrentPerformance:
         assert p95_time < 6.0  # P95 should remain reasonable during bursts
         assert statistics.mean(all_response_times) < 3.0  # Mean should stay reasonable
 
+    @pytest.mark.slow
+    @pytest.mark.performance
     @pytest.mark.asyncio
     async def test_concurrent_mixed_providers(self, infrastructure_di_container: Any) -> None:
         """Test concurrent requests using different mock providers with real infrastructure."""

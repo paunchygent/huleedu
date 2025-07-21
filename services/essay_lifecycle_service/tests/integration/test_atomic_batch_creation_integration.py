@@ -170,6 +170,7 @@ class TestAtomicBatchCreationIntegration:
         """Create PostgreSQL repository with test database."""
         repository = PostgreSQLEssayRepository(test_settings)
         await repository.initialize_db_schema()
+        await repository.run_migrations()  # Add foreign key constraints
 
         # Clean up any existing data to ensure test isolation
         async with repository.session() as session:
@@ -177,6 +178,7 @@ class TestAtomicBatchCreationIntegration:
 
             from services.essay_lifecycle_service.models_db import BatchEssayTracker, EssayStateDB
 
+            # Delete from child table first to respect foreign key constraint
             await session.execute(delete(EssayStateDB))
             await session.execute(delete(BatchEssayTracker))
             await session.commit()
@@ -307,9 +309,32 @@ class TestAtomicBatchCreationIntegration:
         coordination_handler: DefaultBatchCoordinationHandler,
         sample_batch_event: BatchEssaysRegistered,
         postgres_repository: PostgreSQLEssayRepository,
+        batch_tracker_persistence: BatchTrackerPersistence,
     ) -> None:
         """Test that database failure during batch creation rolls back all changes."""
-        # Arrange - Create one essay manually to cause constraint violation
+        # Arrange - First create the batch tracker record to satisfy foreign key constraint        
+        from services.essay_lifecycle_service.models_db import BatchEssayTracker
+        
+        async with postgres_repository.session() as session:
+            batch_tracker_record = BatchEssayTracker(
+                batch_id=sample_batch_event.batch_id,
+                expected_essay_ids=sample_batch_event.essay_ids,
+                available_slots=sample_batch_event.essay_ids,
+                expected_count=len(sample_batch_event.essay_ids),
+                course_code=sample_batch_event.course_code.value,
+                essay_instructions=sample_batch_event.essay_instructions,
+                user_id=sample_batch_event.user_id,
+                correlation_id=str(uuid4()),
+                timeout_seconds=300,
+                total_slots=len(sample_batch_event.essay_ids),
+                assigned_slots=0,
+                is_ready=False,
+                # Don't set created_at/updated_at - they have server_default
+            )
+            session.add(batch_tracker_record)
+            await session.commit()
+        
+        # Now create one essay manually to cause constraint violation
         from common_core.metadata_models import EntityReference
 
         existing_ref = EntityReference(
@@ -375,22 +400,25 @@ class TestAtomicBatchCreationIntegration:
 
         correlation_id = uuid4()
 
-        # Act - Process empty batch event
-        result = await coordination_handler.handle_batch_essays_registered(
-            empty_event, correlation_id
-        )
-
-        # Assert - Handler succeeded
-        assert result is True
+        # Act & Assert - Empty batches are rejected by RedisBatchCoordinator
+        with pytest.raises(HuleEduError) as exc_info:
+            await coordination_handler.handle_batch_essays_registered(
+                empty_event, correlation_id
+            )
+        
+        # Validate error
+        error = exc_info.value
+        assert error.error_detail.error_code == ErrorCode.PROCESSING_ERROR
+        # The specific error message is in the details field
+        assert error.error_detail.details.get("error_details") == "Cannot register batch with empty essay_ids"
 
         # Assert - No essays created
         batch_essays = await postgres_repository.list_essays_by_batch("empty-batch")
         assert len(batch_essays) == 0
 
-        # Assert - Batch expectation was registered in tracker
+        # Assert - Batch expectation was NOT registered in tracker (rejected before registration)
         batch_status = await batch_tracker.get_batch_status("empty-batch")
-        assert batch_status is not None
-        assert batch_status["expected_count"] == 0
+        assert batch_status is None  # Empty batches are rejected before tracker registration
 
     @pytest.mark.asyncio
     async def test_atomic_batch_creation_preserves_existing_functionality(

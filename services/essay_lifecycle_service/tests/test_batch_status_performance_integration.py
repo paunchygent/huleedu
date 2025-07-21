@@ -10,6 +10,7 @@ from __future__ import annotations
 import time
 from collections.abc import Generator
 from typing import Any
+from uuid import uuid4
 
 import pytest
 from common_core.metadata_models import EntityReference
@@ -67,6 +68,28 @@ class TestBatchStatusPerformanceIntegration:
         """Test performance with realistic batch size (100 essays) using real database."""
         batch_id = "performance-test-batch-100"
         essay_count = 100
+
+        # First create the batch tracker record to satisfy foreign key constraint
+        from services.essay_lifecycle_service.models_db import BatchEssayTracker
+        
+        async with postgres_repository.session() as session:
+            batch_tracker = BatchEssayTracker(
+                batch_id=batch_id,
+                expected_essay_ids=[f"essay-{i:03d}" for i in range(essay_count)],
+                available_slots=[f"essay-{i:03d}" for i in range(essay_count)],
+                expected_count=essay_count,
+                course_code="ENG5",
+                essay_instructions="Performance test batch",
+                user_id="perf_test_user",
+                correlation_id=str(uuid4()),
+                timeout_seconds=300,
+                total_slots=essay_count,
+                assigned_slots=0,
+                is_ready=False,
+                # Don't set created_at/updated_at - they have server_default
+            )
+            session.add(batch_tracker)
+            await session.commit()
 
         # Create realistic batch of essays
         essay_refs = [
@@ -129,6 +152,28 @@ class TestBatchStatusPerformanceIntegration:
         """Test performance with large batch size (200 essays) using real database."""
         batch_id = "performance-test-batch-200"
         essay_count = 200
+
+        # First create the batch tracker record to satisfy foreign key constraint
+        from services.essay_lifecycle_service.models_db import BatchEssayTracker
+        
+        async with postgres_repository.session() as session:
+            batch_tracker = BatchEssayTracker(
+                batch_id=batch_id,
+                expected_essay_ids=[f"large-essay-{i:03d}" for i in range(essay_count)],
+                available_slots=[f"large-essay-{i:03d}" for i in range(essay_count)],
+                expected_count=essay_count,
+                course_code="ENG5",
+                essay_instructions="Large performance test batch",
+                user_id="perf_test_user",
+                correlation_id=str(uuid4()),
+                timeout_seconds=300,
+                total_slots=essay_count,
+                assigned_slots=0,
+                is_ready=False,
+                # Don't set created_at/updated_at - they have server_default
+            )
+            session.add(batch_tracker)
+            await session.commit()
 
         # Create large batch of essays
         essay_refs = [

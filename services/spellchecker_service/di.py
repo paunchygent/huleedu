@@ -18,7 +18,7 @@ from opentelemetry.trace import Tracer
 from prometheus_client import CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from services.spellchecker_service.config import Settings
+from services.spellchecker_service.config import Settings, settings
 from services.spellchecker_service.implementations.content_client_impl import (
     DefaultContentClient,
 )
@@ -54,8 +54,8 @@ class SpellCheckerServiceProvider(Provider):
         self._engine = engine
 
     @provide(scope=Scope.APP)
-    def provide_settings(self, settings: Settings) -> Settings:
-        """Provide service settings from DI context."""
+    def provide_settings(self) -> Settings:
+        """Provide service settings."""
         return settings
 
     @provide(scope=Scope.APP)
@@ -138,14 +138,14 @@ class SpellCheckerServiceProvider(Provider):
         return ClientSession()
 
     @provide(scope=Scope.APP)
-    def provide_content_client(self, app_settings: Settings) -> ContentClientProtocol:
+    def provide_content_client(self, settings: Settings) -> ContentClientProtocol:
         """Provide content client implementation."""
-        return DefaultContentClient(content_service_url=app_settings.CONTENT_SERVICE_URL)
+        return DefaultContentClient(content_service_url=settings.CONTENT_SERVICE_URL)
 
     @provide(scope=Scope.APP)
-    def provide_result_store(self, app_settings: Settings) -> ResultStoreProtocol:
+    def provide_result_store(self, settings: Settings) -> ResultStoreProtocol:
         """Provide result store implementation."""
-        return DefaultResultStore(content_service_url=app_settings.CONTENT_SERVICE_URL)
+        return DefaultResultStore(content_service_url=settings.CONTENT_SERVICE_URL)
 
     @provide(scope=Scope.APP)
     def provide_database_engine(self) -> AsyncEngine:
@@ -181,7 +181,7 @@ class SpellCheckerServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_spellcheck_event_publisher(
         self,
-        app_settings: Settings,
+        settings: Settings,
     ) -> SpellcheckEventPublisherProtocol:
         """Provide spellcheck event publisher implementation."""
         return DefaultSpellcheckEventPublisher(
@@ -193,7 +193,7 @@ class SpellCheckerServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_spell_checker_kafka_consumer(
         self,
-        app_settings: Settings,
+        settings: Settings,
         content_client: ContentClientProtocol,
         result_store: ResultStoreProtocol,
         spell_logic: SpellLogicProtocol,
@@ -205,9 +205,9 @@ class SpellCheckerServiceProvider(Provider):
     ) -> SpellCheckerKafkaConsumer:
         """Provide Kafka consumer with injected dependencies."""
         return SpellCheckerKafkaConsumer(
-            kafka_bootstrap_servers=app_settings.KAFKA_BOOTSTRAP_SERVERS,
-            consumer_group=app_settings.CONSUMER_GROUP,
-            consumer_client_id=app_settings.CONSUMER_CLIENT_ID,
+            kafka_bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            consumer_group=settings.CONSUMER_GROUP,
+            consumer_client_id=settings.CONSUMER_CLIENT_ID,
             content_client=content_client,
             result_store=result_store,
             spell_logic=spell_logic,
