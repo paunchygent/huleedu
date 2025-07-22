@@ -301,15 +301,25 @@ dc-restart = "docker compose restart"  # Restart service: pdm run dc-restart api
 dc-rebuild = "docker compose up -d --build"  # Rebuild specific service: pdm run dc-rebuild batch_orchestrator_service
 dc-logs-service = "docker compose logs -f --tail=50"  # Logs for specific service: pdm run dc-logs-service content_service
 
-# Development workflow commands
+# Development workflow commands with BuildKit optimization
 dev-up = "docker compose up -d"  # Start with volume mounts (uses override file)
-dev-build = "DOCKER_BUILDKIT=1 docker compose build --parallel"  # Fast parallel build
-dev-rebuild = {composite = ["docker compose down --remove-orphans", "DOCKER_BUILDKIT=1 docker compose build --parallel", "docker compose up -d"]}
-dev-fresh = "docker compose build --no-cache"  # Force fresh build (when caching issues occur)
+dev-build = {cmd = "docker compose build --parallel", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Fast parallel build with BuildKit
+dev-rebuild = {composite = ["docker compose down --remove-orphans", "pdm run dev-build", "docker compose up -d"]}
+
+# Optimized no-cache builds (2025 best practices)
+dev-fresh = {cmd = "docker compose build --no-cache --parallel", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Force fresh parallel build
+dev-fresh-single = {cmd = "docker compose build --no-cache", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Fresh build single service (add service name)
+dev-fresh-verbose = {cmd = "docker compose build --no-cache --parallel --progress=plain", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Fresh build with detailed output
+
+# Performance-optimized builds
+build-parallel = {cmd = "docker compose build --parallel", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Maximum parallel build
+build-parallel-pull = {cmd = "docker compose build --parallel --pull", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Update base images + parallel
+build-service = {cmd = "docker compose build", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Optimized single service build (add service name)
 
 # System management
-docker-reset = {composite = ["docker compose down --remove-orphans --volumes", "docker compose build", "docker compose up -d"]}  # Full reset including volumes
+docker-reset = {composite = ["docker compose down --remove-orphans --volumes", "pdm run build-parallel", "docker compose up -d"]}  # Full reset with optimized build
 docker-clean = "docker system prune -af --volumes"  # Clean all unused Docker resources (use with caution!)
+docker-builder-prune = "docker builder prune -af"  # Clean BuildKit cache (frees disk space)
 
 # Individual service development
 dev-content = "pdm run -p services/content_service dev"

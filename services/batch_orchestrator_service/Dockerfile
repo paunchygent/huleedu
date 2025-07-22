@@ -31,7 +31,8 @@ COPY services/batch_orchestrator_service/ /app/services/batch_orchestrator_servi
 WORKDIR /app/services/batch_orchestrator_service
 
 # Install dependencies for the batch_orchestrator_service using its own pyproject.toml
-RUN pdm install --prod
+# Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
+RUN pdm install --prod --frozen-lockfile
 
 RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
 USER appuser

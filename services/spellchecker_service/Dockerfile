@@ -30,7 +30,8 @@ WORKDIR /app/services/spellchecker_service
 
 # Install dependencies for the spellchecker_service using its own pyproject.toml
 # PDM will use the overrides to find local dependencies at the correct paths
-RUN pdm install --prod
+# Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
+RUN pdm install --prod --frozen-lockfile
 
 # Ensure runtime user can write logs/corrections
 RUN mkdir -p /app/services/spellchecker_service/data/corrected_essays \

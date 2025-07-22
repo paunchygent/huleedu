@@ -26,7 +26,8 @@ COPY services/api_gateway_service/ /app/services/api_gateway_service/
 WORKDIR /app/services/api_gateway_service
 
 # Install dependencies for the api_gateway_service using its own pyproject.toml
-RUN pdm install --prod
+# Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
+RUN pdm install --prod --frozen-lockfile
 
 # Setup user and permissions. Note: chown needs to be run as root.
 USER root

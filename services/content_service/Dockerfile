@@ -31,7 +31,8 @@ WORKDIR /app/services/content_service
 
 # Install dependencies for the content_service using its own pyproject.toml
 # PDM will use the overrides to find local dependencies at the correct paths
-RUN pdm install --prod
+# Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
+RUN pdm install --prod --frozen-lockfile
 
 RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser && \
     mkdir -p ${CONTENT_STORE_ROOT_PATH} && \

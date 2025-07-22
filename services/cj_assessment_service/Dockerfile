@@ -34,7 +34,8 @@ WORKDIR /app/services/cj_assessment_service
 
 # Install dependencies for the cj_assessment_service using its own pyproject.toml
 # PDM will use the overrides to find local dependencies at the correct paths
-RUN pdm install --prod
+# Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
+RUN pdm install --prod --frozen-lockfile
 
 RUN groupadd -r cjassessment && useradd --no-log-init -r -g cjassessment cjassessment \
     && chown -R cjassessment:cjassessment /app

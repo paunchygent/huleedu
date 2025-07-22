@@ -28,7 +28,8 @@ COPY services/class_management_service/ /app/services/class_management_service/
 WORKDIR /app/services/class_management_service
 
 # Install dependencies for the class_management_service using its own pyproject.toml
-RUN pdm install --prod
+# Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
+RUN pdm install --prod --frozen-lockfile
 
 # Setup user and permissions. Note: chown needs to be run as root.
 USER root

@@ -33,7 +33,8 @@ WORKDIR /app/services/essay_lifecycle_service
 
 # Install dependencies for the essay_lifecycle_service using its own pyproject.toml
 # PDM will use the overrides to find local dependencies at the correct paths
-RUN pdm install --prod
+# Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
+RUN pdm install --prod --frozen-lockfile
 
 # Create data directory for essay lifecycle state storage
 RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser && \
