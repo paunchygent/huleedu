@@ -15,6 +15,9 @@ from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
+from services.batch_orchestrator_service.implementations.batch_pipeline_state_manager import (
+    BatchPipelineStateManager,
+)
 from services.batch_orchestrator_service.implementations.batch_repository_impl import (
     MockBatchRepositoryImpl,
 )
@@ -23,9 +26,6 @@ from services.batch_orchestrator_service.implementations.notification_service im
 )
 from services.batch_orchestrator_service.implementations.pipeline_phase_coordinator_impl import (
     DefaultPipelinePhaseCoordinator,
-)
-from services.batch_orchestrator_service.implementations.pipeline_state_manager import (
-    PipelineStateManager,
 )
 
 
@@ -56,13 +56,20 @@ class TestPipelineProgressionScenarios:
             # Add other phases as needed for testing
         }
         notification_service = NotificationService(mock_redis_client, batch_repository)
-        state_manager = PipelineStateManager(batch_repository)
+        # Create a mock state manager that delegates to batch repository
+        mock_state_manager = AsyncMock(spec=BatchPipelineStateManager)
+        mock_state_manager.save_processing_pipeline_state = batch_repository.save_processing_pipeline_state
+        mock_state_manager.get_processing_pipeline_state = batch_repository.get_processing_pipeline_state
+        # Mock the update_phase_status_atomically method to always succeed
+        mock_state_manager.update_phase_status_atomically.return_value = True
+        # Mock the record_phase_failure method to always succeed
+        mock_state_manager.record_phase_failure.return_value = True
         return DefaultPipelinePhaseCoordinator(
             batch_repo=batch_repository,
             phase_initiators_map=phase_initiators_map,
             redis_client=mock_redis_client,
             notification_service=notification_service,
-            state_manager=state_manager,
+            state_manager=mock_state_manager,
         )
 
     async def test_spellcheck_to_cj_assessment_pipeline_progression(

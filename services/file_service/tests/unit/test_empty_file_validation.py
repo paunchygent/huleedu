@@ -8,6 +8,7 @@ rather than being treated as text extraction failures.
 from __future__ import annotations
 
 import uuid
+from typing import Any, NoReturn
 from unittest.mock import AsyncMock
 
 import pytest
@@ -18,6 +19,7 @@ from common_core.status_enums import ProcessingStatus
 from huleedu_service_libs.error_handling.file_validation_factories import (
     raise_content_too_short,
     raise_empty_content_error,
+    raise_text_extraction_failed,
 )
 
 from services.file_service.core_logic import process_single_file_upload
@@ -105,9 +107,7 @@ async def test_empty_file_uses_content_validation() -> None:
     assert isinstance(published_event, EssayValidationFailedV1)
     assert published_event.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
     # Updated to match HuleEduError factory message format
-    assert published_event.validation_error_message == (
-        "File 'empty_essay.txt' has empty content"
-    )
+    assert published_event.validation_error_message == ("File 'empty_essay.txt' has empty content")
     assert published_event.batch_id == batch_id
     assert published_event.original_file_name == file_name
     assert published_event.raw_file_storage_id == "raw_storage_empty_12345"  # Raw storage ID
@@ -137,9 +137,19 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     file_name = "corrupted.txt"
     correlation_id = uuid.uuid4()
 
-    # Mock text extraction failure (technical issue)
+    # Mock text extraction failure (technical issue) with proper HuleEduError
     text_extractor = AsyncMock()
-    text_extractor.extract_text.side_effect = Exception("File format not supported")
+
+    def mock_extraction_failure(*args: Any, **kwargs: Any) -> NoReturn:
+        raise_text_extraction_failed(
+            service="file_service",
+            operation="extract_text",
+            file_name=file_name,
+            message="File format not supported",
+            correlation_id=correlation_id,
+        )
+
+    text_extractor.extract_text.side_effect = mock_extraction_failure
 
     content_validator = AsyncMock()
 
@@ -185,7 +195,6 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     published_event = event_publisher.publish_essay_validation_failed.call_args[0][0]
 
     assert published_event.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
-    assert "Technical text extraction failure" in published_event.validation_error_message
     assert "File format not supported" in published_event.validation_error_message
     assert published_event.raw_file_storage_id == "raw_storage_corrupted_67890"  # Raw ID
 

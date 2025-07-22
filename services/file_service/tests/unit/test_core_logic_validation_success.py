@@ -8,7 +8,7 @@ integration, event publishing, and proper correlation ID handling.
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, call
+from unittest.mock import AsyncMock
 
 import pytest
 from common_core.domain_enums import ContentType
@@ -89,13 +89,13 @@ class TestCoreLogicValidationSuccess:
 
         # Verify content storage was called TWICE (NEW BEHAVIOR)
         assert mock_content_client.store_content.call_count == 2
-        
+
         # Verify first call (raw blob storage) arguments
         first_call_args = mock_content_client.store_content.call_args_list[0][0]
         assert first_call_args[0] == file_content  # content_bytes
         assert first_call_args[1] == ContentType.RAW_UPLOAD_BLOB  # content_type
         assert len(first_call_args) == 3  # content_bytes + content_type + correlation_id
-        
+
         # Verify second call (extracted text storage) arguments
         second_call_args = mock_content_client.store_content.call_args_list[1][0]
         assert second_call_args[0] == extracted_text.encode("utf-8")  # content_bytes
@@ -153,13 +153,13 @@ class TestCoreLogicValidationSuccess:
 
         # Verify content storage was called TWICE (NEW BEHAVIOR)
         assert mock_content_client.store_content.call_count == 2
-        
+
         # Verify first call (raw blob storage) arguments
         first_call_args = mock_content_client.store_content.call_args_list[0][0]
         assert first_call_args[0] == file_content  # content_bytes
         assert first_call_args[1] == ContentType.RAW_UPLOAD_BLOB  # content_type
         assert len(first_call_args) == 3  # content_bytes + content_type + correlation_id
-        
+
         # Verify second call (extracted text storage) arguments
         second_call_args = mock_content_client.store_content.call_args_list[1][0]
         assert second_call_args[0] == extracted_text.encode("utf-8")  # content_bytes

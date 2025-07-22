@@ -78,7 +78,8 @@ async def upload_batch_files(
             await batch_validator.can_modify_batch_files(batch_id, user_id, main_correlation_id)
         except HuleEduError as e:
             logger.info(
-                f"File upload blocked for batch {batch_id} by user {user_id}: {e.error_detail.message}"
+                f"File upload blocked for batch {batch_id} by user {user_id}: "
+                f"{e.error_detail.message}"
             )
             return jsonify({"error": e.error_detail.model_dump()}), 409
 
@@ -228,7 +229,8 @@ async def add_files_to_batch(
             await batch_validator.can_modify_batch_files(batch_id, user_id, main_correlation_id)
         except HuleEduError as e:
             logger.info(
-                f"File addition blocked for batch {batch_id} by user {user_id}: {e.error_detail.message}"
+                f"File addition blocked for batch {batch_id} by user {user_id}: "
+                f"{e.error_detail.message}"
             )
             return jsonify({"error": e.error_detail.model_dump()}), 409
 

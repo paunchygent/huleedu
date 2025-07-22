@@ -8,14 +8,18 @@ ensuring raw blob is stored first before any processing occurs.
 from __future__ import annotations
 
 import uuid
+from typing import Any, NoReturn
 from unittest.mock import AsyncMock
 
 import pytest
 from common_core.domain_enums import ContentType
 from common_core.error_enums import FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
-from common_core.status_enums import OperationStatus, ProcessingStatus
-from huleedu_service_libs.error_handling.file_validation_factories import raise_content_too_short
+from common_core.status_enums import ProcessingStatus
+from huleedu_service_libs.error_handling.file_validation_factories import (
+    raise_content_too_short,
+    raise_text_extraction_failed,
+)
 
 from services.file_service.core_logic import process_single_file_upload
 
@@ -75,7 +79,7 @@ async def test_process_single_file_stores_raw_blob_first() -> None:
     assert len(call_args) == 3  # file_content + file_name + correlation_id
 
     # Result should contain both storage IDs
-    assert result["status"] == OperationStatus.SUCCESS.value
+    assert result["status"] == ProcessingStatus.COMPLETED.value
     assert result["raw_file_storage_id"] == "raw_storage_id_123"
     assert result["text_storage_id"] == "text_storage_id_456"
 
@@ -97,7 +101,18 @@ async def test_extraction_failure_includes_raw_storage_id() -> None:
 
     # Configure mocks - extraction fails, but raw storage succeeds
     content_client.store_content.return_value = "raw_storage_id_123"
-    text_extractor.extract_text.side_effect = Exception("Extraction failed")
+
+    # Configure text extraction to raise proper HuleEduError
+    def mock_extraction_failure(*args: Any, **kwargs: Any) -> NoReturn:
+        raise_text_extraction_failed(
+            service="file_service",
+            operation="extract_text",
+            file_name=file_name,
+            message="Extraction failed",
+            correlation_id=correlation_id,
+        )
+
+    text_extractor.extract_text.side_effect = mock_extraction_failure
 
     # Act
     result = await process_single_file_upload(

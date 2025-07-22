@@ -15,11 +15,11 @@ from huleedu_service_libs.error_handling import (
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
+from services.batch_orchestrator_service.implementations.batch_pipeline_state_manager import (
+    BatchPipelineStateManager,
+)
 from services.batch_orchestrator_service.implementations.notification_service import (
     NotificationService,
-)
-from services.batch_orchestrator_service.implementations.pipeline_state_manager import (
-    PipelineStateManager,
 )
 from services.batch_orchestrator_service.protocols import (
     BatchRepositoryProtocol,
@@ -38,7 +38,7 @@ class DefaultPipelinePhaseCoordinator:
         phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol],
         redis_client: AtomicRedisClientProtocol,
         notification_service: NotificationService,
-        state_manager: PipelineStateManager,
+        state_manager: BatchPipelineStateManager,
     ) -> None:
         self.batch_repo = batch_repo
         self.phase_initiators_map = phase_initiators_map
@@ -85,11 +85,14 @@ class DefaultPipelinePhaseCoordinator:
         else:
             updated_status = PipelineExecutionStatus.FAILED
 
-        await self.state_manager.update_phase_status(
-            batch_id,
-            completed_phase,
-            updated_status,
-            datetime.now(UTC).isoformat(),
+        # Update status from IN_PROGRESS to completion status
+        await self.state_manager.update_phase_status_atomically(
+            batch_id=batch_id,
+            phase_name=completed_phase,
+            expected_status=PipelineExecutionStatus.IN_PROGRESS,
+            new_status=updated_status,
+            completion_timestamp=datetime.now(UTC).isoformat(),
+            correlation_id=str(correlation_id),
         )
 
         # Publish real-time update to Redis for UI notifications
@@ -287,7 +290,7 @@ class DefaultPipelinePhaseCoordinator:
                     batch_id=batch_id,
                     phase_name=next_phase_name,
                     error=e,
-                    correlation_id=correlation_id,
+                    correlation_id=str(correlation_id),
                 )
 
                 # Mark phase as FAILED in pipeline state
@@ -458,16 +461,18 @@ class DefaultPipelinePhaseCoordinator:
                 batch_id=batch_id,
                 phase_name=first_phase_name,
                 error=e,
-                correlation_id=correlation_id,
+                correlation_id=str(correlation_id),
             )
             raise
 
         # Update pipeline state - mark first phase as DISPATCH_INITIATED
-        await self.state_manager.update_phase_status(
+        await self.state_manager.update_phase_status_atomically(
             batch_id=batch_id,
-            phase=first_phase_name,
-            status=PipelineExecutionStatus.DISPATCH_INITIATED,
+            phase_name=first_phase_name,
+            expected_status=PipelineExecutionStatus.PENDING_DEPENDENCIES,
+            new_status=PipelineExecutionStatus.DISPATCH_INITIATED,
             completion_timestamp=datetime.now(UTC).isoformat(),
+            correlation_id=str(correlation_id),
         )
 
         logger.info(
@@ -491,12 +496,29 @@ class DefaultPipelinePhaseCoordinator:
             status: The new status for the phase
             completion_timestamp: Optional completion timestamp
         """
+        # Get current state to determine expected status
+        current_state = await self.batch_repo.get_processing_pipeline_state(batch_id)
+        if not current_state:
+            logger.error(f"No pipeline state found for batch {batch_id}")
+            return
+
+        # Determine current status
+        if hasattr(current_state, "get_pipeline"):
+            pipeline_detail = current_state.get_pipeline(phase.value)
+            current_status = pipeline_detail.status if pipeline_detail else PipelineExecutionStatus.PENDING_DEPENDENCIES
+        else:
+            phase_status_key = f"{phase.value}_status"
+            current_status_str = current_state.get(phase_status_key, PipelineExecutionStatus.PENDING_DEPENDENCIES.value)
+            current_status = PipelineExecutionStatus(current_status_str)
+
         # Update the phase status in the pipeline state
-        await self.state_manager.update_phase_status(
+        await self.state_manager.update_phase_status_atomically(
             batch_id=batch_id,
-            phase=phase,
-            status=status,
+            phase_name=phase,
+            expected_status=current_status,
+            new_status=status,
             completion_timestamp=completion_timestamp,
+            correlation_id=str(correlation_id),
         )
 
         logger.info(

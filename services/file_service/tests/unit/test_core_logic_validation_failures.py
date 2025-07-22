@@ -146,7 +146,9 @@ class TestCoreLogicValidationFailures:
         mock_content_client.store_content.return_value = "raw_storage_empty_123"
         mock_text_extractor.extract_text.return_value = ""
 
-        def mock_empty_content_failure(text: str, file_name: str, correlation_id: uuid.UUID) -> None:
+        def mock_empty_content_failure(
+            text: str, file_name: str, correlation_id: uuid.UUID
+        ) -> None:
             raise_empty_content_error(
                 service="file_service",
                 operation="validate_content",
@@ -172,7 +174,7 @@ class TestCoreLogicValidationFailures:
         assert result["status"] == ProcessingStatus.FAILED.value
         assert result["error_code"] == FileValidationErrorCode.EMPTY_CONTENT
         # Updated to match HuleEduError factory message format
-        assert "contains no readable text content" in result["error_message"]
+        assert "has empty content" in result["error_message"]
         assert result["raw_file_storage_id"] == "raw_storage_empty_123"
 
         # Verify raw storage was called (NEW BEHAVIOR)
@@ -211,7 +213,9 @@ class TestCoreLogicValidationFailures:
         mock_content_client.store_content.return_value = "raw_storage_long_456"
         mock_text_extractor.extract_text.return_value = "A" * 10000
 
-        def mock_content_too_long_failure(text: str, file_name: str, correlation_id: uuid.UUID) -> None:
+        def mock_content_too_long_failure(
+            text: str, file_name: str, correlation_id: uuid.UUID
+        ) -> None:
             raise_content_too_long(
                 service="file_service",
                 operation="validate_content",
@@ -279,7 +283,9 @@ class TestCoreLogicValidationFailures:
         mock_content_client.store_content.return_value = "raw_storage_corr_789"
         mock_text_extractor.extract_text.return_value = "Short"
 
-        def mock_short_content_failure(text: str, file_name: str, correlation_id: uuid.UUID) -> None:
+        def mock_short_content_failure(
+            text: str, file_name: str, correlation_id: uuid.UUID
+        ) -> None:
             raise_content_too_short(
                 service="file_service",
                 operation="validate_content",
@@ -349,7 +355,9 @@ class TestCoreLogicValidationFailures:
         mock_text_extractor.extract_text.return_value = ""
 
         # Configure validation to properly handle empty content
-        def mock_empty_validation_failure(text: str, file_name: str, correlation_id: uuid.UUID) -> None:
+        def mock_empty_validation_failure(
+            text: str, file_name: str, correlation_id: uuid.UUID
+        ) -> None:
             raise_empty_content_error(
                 service="file_service",
                 operation="validate_content",
@@ -408,7 +416,7 @@ class TestCoreLogicValidationFailures:
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
         assert event_data.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
-        assert "contains no readable text content" in event_data.validation_error_message
+        assert "has empty content" in event_data.validation_error_message
         assert event_data.raw_file_storage_id == "raw_storage_empty_extract_999"
 
         # Verify success event was NOT published

@@ -8,11 +8,15 @@ and proper error event publishing.
 from __future__ import annotations
 
 import uuid
+from typing import Any, NoReturn
 from unittest.mock import AsyncMock
 
 import pytest
 from common_core.error_enums import FileValidationErrorCode
 from common_core.status_enums import ProcessingStatus
+from huleedu_service_libs.error_handling.file_validation_factories import (
+    raise_text_extraction_failed,
+)
 
 from services.file_service.core_logic import process_single_file_upload
 from services.file_service.tests.unit.core_logic_validation_utils import (
@@ -39,10 +43,17 @@ class TestCoreLogicValidationErrors:
         file_name = TEST_FILE_NAMES["extraction_fail"]
         correlation_id = uuid.uuid4()
 
-        # Configure text extractor to fail
-        mock_text_extractor.extract_text.side_effect = RuntimeError(
-            "Unable to extract text from PDF",
-        )
+        # Configure text extractor to fail with proper HuleEduError
+        def mock_extraction_failure(*args: Any, **kwargs: Any) -> NoReturn:
+            raise_text_extraction_failed(
+                service="file_service",
+                operation="extract_text",
+                file_name=file_name,
+                message="Unable to extract text from PDF",
+                correlation_id=correlation_id,
+            )
+
+        mock_text_extractor.extract_text.side_effect = mock_extraction_failure
 
         # Act
         result = await process_single_file_upload(
@@ -61,7 +72,12 @@ class TestCoreLogicValidationErrors:
         assert result["raw_file_storage_id"] == "storage_id_12345"
 
         # Verify text extraction was attempted
-        mock_text_extractor.extract_text.assert_called_once_with(file_content, file_name)
+        mock_text_extractor.extract_text.assert_called_once()
+        # Verify the call arguments (file_content, file_name, correlation_id)
+        call_args = mock_text_extractor.extract_text.call_args[0]
+        assert call_args[0] == file_content
+        assert call_args[1] == file_name
+        assert len(call_args) == 3  # file_content + file_name + correlation_id
 
         # Verify validation was NOT called (extraction failed)
         mock_content_validator.validate_content.assert_not_called()
@@ -71,7 +87,7 @@ class TestCoreLogicValidationErrors:
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
         assert event_data.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
-        assert "Technical text extraction failure" in event_data.validation_error_message
+        assert "Unable to extract text from PDF" in event_data.validation_error_message
 
         # Verify success event was NOT published
         mock_event_publisher.publish_essay_content_provisioned.assert_not_called()

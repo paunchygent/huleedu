@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from io import BytesIO
-from typing import Any
+from typing import Any, NoReturn
 from unittest.mock import AsyncMock
 
 import pytest
@@ -111,7 +111,8 @@ class TestFileRoutesValidation:
         """Test file upload blocked when batch is locked for processing."""
         # Configure validator to raise HuleEduError for batch lock scenario
         from huleedu_service_libs.error_handling import raise_processing_error
-        def mock_locked_batch(*args):
+
+        def mock_locked_batch(*args: Any) -> NoReturn:
             raise_processing_error(
                 service="file_service",
                 operation="can_modify_batch_files",
@@ -119,6 +120,7 @@ class TestFileRoutesValidation:
                 correlation_id=args[2],  # correlation_id is third argument
                 batch_id=args[0],
             )
+
         mock_batch_validator.can_modify_batch_files.side_effect = mock_locked_batch
 
         # Create test file data
@@ -136,8 +138,11 @@ class TestFileRoutesValidation:
         assert response.status_code == 409
 
         data = await response.get_json()
-        assert "error" in data
-        assert "Cannot add files to batch" in data["error"]
+        # Updated to match HuleEduError structured format (nested under "error" key)
+        error_detail = data["error"]
+        assert "Batch is locked" in error_detail["message"]
+        assert error_detail["error_code"] == "PROCESSING_ERROR"
+        assert error_detail["details"]["batch_id"] == "test-batch-123"
 
         # Assert - correlation_id is auto-generated, so we just check it was called once
         mock_batch_validator.can_modify_batch_files.assert_called_once()

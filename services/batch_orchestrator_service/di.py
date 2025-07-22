@@ -25,8 +25,14 @@ from services.batch_orchestrator_service.implementations.ai_feedback_initiator_i
 from services.batch_orchestrator_service.implementations.batch_conductor_client_impl import (
     BatchConductorClientImpl,
 )
+from services.batch_orchestrator_service.implementations.batch_database_infrastructure import (
+    BatchDatabaseInfrastructure,
+)
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
+)
+from services.batch_orchestrator_service.implementations.batch_pipeline_state_manager import (
+    BatchPipelineStateManager,
 )
 from services.batch_orchestrator_service.implementations.batch_processing_service_impl import (
     BatchProcessingServiceImpl,
@@ -58,9 +64,6 @@ from services.batch_orchestrator_service.implementations.notification_service im
 )
 from services.batch_orchestrator_service.implementations.pipeline_phase_coordinator_impl import (
     DefaultPipelinePhaseCoordinator,
-)
-from services.batch_orchestrator_service.implementations.pipeline_state_manager import (
-    PipelineStateManager,
 )
 from services.batch_orchestrator_service.implementations.spellcheck_initiator_impl import (
     SpellcheckInitiatorImpl,
@@ -324,12 +327,21 @@ class StateManagementProvider(Provider):
     """Provider for pipeline state management dependencies."""
 
     @provide(scope=Scope.APP)
+    def provide_database_infrastructure(
+        self,
+        settings: Settings,
+        database_metrics: DatabaseMetrics,
+    ) -> BatchDatabaseInfrastructure:
+        """Provide database infrastructure for batch operations."""
+        return BatchDatabaseInfrastructure(settings, database_metrics)
+
+    @provide(scope=Scope.APP)
     def provide_pipeline_state_manager(
         self,
-        batch_repo: BatchRepositoryProtocol,
-    ) -> PipelineStateManager:
+        db_infrastructure: BatchDatabaseInfrastructure,
+    ) -> BatchPipelineStateManager:
         """Provide pipeline state manager for state persistence."""
-        return PipelineStateManager(batch_repo)
+        return BatchPipelineStateManager(db_infrastructure)
 
 
 class PipelineCoordinationProvider(Provider):
@@ -342,7 +354,7 @@ class PipelineCoordinationProvider(Provider):
         phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol],
         redis_client: AtomicRedisClientProtocol,
         notification_service: NotificationService,
-        state_manager: PipelineStateManager,
+        state_manager: BatchPipelineStateManager,
     ) -> PipelinePhaseCoordinatorProtocol:
         """Provide pipeline phase coordinator implementation with extracted services."""
         return DefaultPipelinePhaseCoordinator(

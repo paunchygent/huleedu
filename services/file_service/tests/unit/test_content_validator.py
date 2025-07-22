@@ -22,7 +22,7 @@ class TestFileContentValidator:
     @pytest.fixture
     def validator(self) -> FileContentValidator:
         """Create a standard validator instance for testing."""
-        return FileContentValidator(min_length=50, max_length=1000)
+        return FileContentValidator(min_length=50, max_length=50000)
 
     @pytest.fixture
     def custom_validator(self) -> FileContentValidator:
@@ -117,8 +117,8 @@ class TestFileContentValidator:
         error_detail = exc_info.value.error_detail
         assert error_detail.error_code == FileValidationErrorCode.CONTENT_TOO_LONG
         assert "long.txt" in error_detail.message
-        assert "50001 characters" in error_detail.message
-        assert "not exceed 50000 characters" in error_detail.message
+        assert "maximum: 50000" in error_detail.message
+        assert "actual: 50001" in error_detail.message
         assert error_detail.correlation_id == correlation_id
 
     async def test_validate_exact_minimum_length(self, validator: FileContentValidator) -> None:
@@ -204,7 +204,8 @@ class TestFileContentValidator:
         # Verify error details
         error_detail = exc_info.value.error_detail
         assert error_detail.error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
-        assert "at least 10 characters" in error_detail.message
+        assert "minimum: 10" in error_detail.message
+        assert "actual: 9" in error_detail.message
         assert error_detail.correlation_id == correlation_id
 
     async def test_custom_limits_too_long(self, custom_validator: FileContentValidator) -> None:
@@ -220,7 +221,8 @@ class TestFileContentValidator:
         # Verify error details
         error_detail = exc_info.value.error_detail
         assert error_detail.error_code == FileValidationErrorCode.CONTENT_TOO_LONG
-        assert "not exceed 100 characters" in error_detail.message
+        assert "maximum: 100" in error_detail.message
+        assert "actual: 101" in error_detail.message
         assert error_detail.correlation_id == correlation_id
 
     async def test_real_world_essay_content(self, validator: FileContentValidator) -> None:

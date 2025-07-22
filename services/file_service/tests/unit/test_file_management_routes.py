@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from io import BytesIO
-from typing import Any
+from typing import Any, NoReturn
 from unittest.mock import AsyncMock
 
 import pytest
@@ -255,7 +255,8 @@ class TestFileManagementRoutes:
         user_id = "user-456"
         # Mock HuleEduError for batch lock scenario
         from huleedu_service_libs.error_handling import raise_processing_error
-        def mock_locked_batch(*args):
+
+        def mock_locked_batch(*args: Any) -> NoReturn:
             raise_processing_error(
                 service="file_service",
                 operation="can_modify_batch_files",
@@ -263,6 +264,7 @@ class TestFileManagementRoutes:
                 correlation_id=args[2],  # correlation_id is third argument
                 batch_id=args[0],
             )
+
         mock_batch_validator.can_modify_batch_files.side_effect = mock_locked_batch
 
         # Act
@@ -273,9 +275,11 @@ class TestFileManagementRoutes:
         # Assert
         assert response.status_code == 409
         data = await response.get_json()
-        assert data["error"] == "Cannot add files to batch"
-        assert "Batch is currently being processed" in data["reason"]
-        assert data["batch_id"] == batch_id
+        # Updated to match HuleEduError structured format (nested under "error" key)
+        error_detail = data["error"]
+        assert "Batch is currently being processed" in error_detail["message"]
+        assert error_detail["error_code"] == "PROCESSING_ERROR"
+        assert error_detail["details"]["batch_id"] == batch_id
 
     async def test_add_files_to_batch_no_files(
         self,
@@ -429,7 +433,8 @@ class TestFileManagementRoutes:
         user_id = "user-789"
         # Mock HuleEduError for batch lock scenario
         from huleedu_service_libs.error_handling import raise_processing_error
-        def mock_locked_batch(*args):
+
+        def mock_locked_batch(*args: Any) -> NoReturn:
             raise_processing_error(
                 service="file_service",
                 operation="can_modify_batch_files",
@@ -437,6 +442,7 @@ class TestFileManagementRoutes:
                 correlation_id=args[2],  # correlation_id is third argument
                 batch_id=args[0],
             )
+
         mock_batch_validator.can_modify_batch_files.side_effect = mock_locked_batch
 
         # Act
@@ -447,10 +453,11 @@ class TestFileManagementRoutes:
         # Assert
         assert response.status_code == 409
         data = await response.get_json()
-        assert data["error"] == "Cannot remove file from batch"
-        assert "Batch is currently being processed" in data["reason"]
-        assert data["batch_id"] == batch_id
-        assert data["essay_id"] == essay_id
+        # Updated to match HuleEduError structured format (nested under "error" key)
+        error_detail = data["error"]
+        assert "Batch is currently being processed" in error_detail["message"]
+        assert error_detail["error_code"] == "PROCESSING_ERROR"
+        assert error_detail["details"]["batch_id"] == batch_id
 
     async def test_correlation_id_handling(
         self,
