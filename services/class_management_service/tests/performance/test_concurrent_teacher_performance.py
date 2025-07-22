@@ -80,7 +80,10 @@ class TestConcurrentTeacherPerformance:
 
                     for student_request in student_requests:
                         duration, student_result, student_success = await measure_async_operation(
-                            performance_repository.create_student, teacher_id, student_request, uuid.uuid4()
+                            performance_repository.create_student,
+                            teacher_id,
+                            student_request,
+                            uuid.uuid4(),
                         )
 
                         performance_metrics.record_operation(
@@ -217,7 +220,10 @@ class TestConcurrentTeacherPerformance:
 
                     for student_request in student_requests:
                         duration, student_result, student_success = await measure_async_operation(
-                            performance_repository.create_student, teacher_id, student_request, uuid.uuid4()
+                            performance_repository.create_student,
+                            teacher_id,
+                            student_request,
+                            uuid.uuid4(),
                         )
 
                         performance_metrics.record_operation(
@@ -258,7 +264,10 @@ class TestConcurrentTeacherPerformance:
                                 student_result,
                                 student_success,
                             ) = await measure_async_operation(
-                                performance_repository.create_student, teacher_id, student_request, uuid.uuid4()
+                                performance_repository.create_student,
+                                teacher_id,
+                                student_request,
+                                uuid.uuid4(),
                             )
 
                             performance_metrics.record_operation(
@@ -523,7 +532,10 @@ class TestConcurrentTeacherPerformance:
                         )
 
                         duration, student_result, student_success = await measure_async_operation(
-                            performance_repository.create_student, teacher_id, student_request, uuid.uuid4()
+                            performance_repository.create_student,
+                            teacher_id,
+                            student_request,
+                            uuid.uuid4(),
                         )
 
                         results["operations"].append(

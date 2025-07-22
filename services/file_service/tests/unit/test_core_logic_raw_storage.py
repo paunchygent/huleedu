@@ -14,9 +14,10 @@ import pytest
 from common_core.domain_enums import ContentType
 from common_core.error_enums import FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
+from common_core.status_enums import OperationStatus, ProcessingStatus
+from huleedu_service_libs.error_handling.file_validation_factories import raise_content_too_short
 
 from services.file_service.core_logic import process_single_file_upload
-from services.file_service.validation_models import FileProcessingStatus, ValidationResult
 
 
 @pytest.mark.asyncio
@@ -36,7 +37,7 @@ async def test_process_single_file_stores_raw_blob_first() -> None:
 
     # Configure mocks
     text_extractor.extract_text.return_value = "Test essay content"
-    content_validator.validate_content.return_value = ValidationResult(is_valid=True)
+    content_validator.validate_content.return_value = None  # No exception means success
     content_client.store_content.side_effect = ["raw_storage_id_123", "text_storage_id_456"]
 
     # Act
@@ -65,10 +66,16 @@ async def test_process_single_file_stores_raw_blob_first() -> None:
     assert second_call[0][1] == ContentType.EXTRACTED_PLAINTEXT
 
     # Text extraction should happen AFTER raw storage
-    text_extractor.extract_text.assert_called_once_with(file_content, file_name)
+    # Note: correlation_id is auto-generated, so we verify the call was made
+    text_extractor.extract_text.assert_called_once()
+    # Verify the first two arguments are file_content and file_name
+    call_args = text_extractor.extract_text.call_args[0]
+    assert call_args[0] == file_content
+    assert call_args[1] == file_name
+    assert len(call_args) == 3  # file_content + file_name + correlation_id
 
     # Result should contain both storage IDs
-    assert result["status"] == FileProcessingStatus.PROCESSING_SUCCESS.value
+    assert result["status"] == OperationStatus.SUCCESS.value
     assert result["raw_file_storage_id"] == "raw_storage_id_123"
     assert result["text_storage_id"] == "text_storage_id_456"
 
@@ -105,7 +112,13 @@ async def test_extraction_failure_includes_raw_storage_id() -> None:
     )
 
     # Assert - Raw storage happened first
-    content_client.store_content.assert_called_once_with(file_content, ContentType.RAW_UPLOAD_BLOB)
+    # Note: store_content now includes correlation_id as third parameter
+    content_client.store_content.assert_called_once()
+    # Verify the call arguments
+    call_args = content_client.store_content.call_args[0]
+    assert call_args[0] == file_content  # content_bytes
+    assert call_args[1] == ContentType.RAW_UPLOAD_BLOB  # content_type
+    assert len(call_args) == 3  # content_bytes + content_type + correlation_id
 
     # Validation failure event published with raw_file_storage_id
     event_publisher.publish_essay_validation_failed.assert_called_once()
@@ -116,7 +129,7 @@ async def test_extraction_failure_includes_raw_storage_id() -> None:
     assert published_event.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
 
     # Result includes raw storage ID even on failure
-    assert result["status"] == FileProcessingStatus.EXTRACTION_FAILED.value
+    assert result["status"] == ProcessingStatus.FAILED.value
     assert result["raw_file_storage_id"] == "raw_storage_id_123"
 
 
@@ -138,11 +151,18 @@ async def test_validation_failure_includes_raw_storage_id() -> None:
     # Configure mocks - validation fails
     content_client.store_content.return_value = "raw_storage_id_123"
     text_extractor.extract_text.return_value = ""  # Empty content
-    content_validator.validate_content.return_value = ValidationResult(
-        is_valid=False,
-        error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
-        error_message="Content is too short",
-    )
+
+    def mock_validation_failure(text: str, file_name: str, correlation_id: uuid.UUID) -> None:
+        raise_content_too_short(
+            service="file_service",
+            operation="validate_content",
+            file_name=file_name,
+            min_length=50,
+            actual_length=len(text),
+            correlation_id=correlation_id,
+        )
+
+    content_validator.validate_content.side_effect = mock_validation_failure
 
     # Act
     result = await process_single_file_upload(
@@ -157,7 +177,13 @@ async def test_validation_failure_includes_raw_storage_id() -> None:
     )
 
     # Assert - Raw storage happened first
-    content_client.store_content.assert_called_once_with(file_content, ContentType.RAW_UPLOAD_BLOB)
+    # Note: store_content now includes correlation_id as third parameter
+    content_client.store_content.assert_called_once()
+    # Verify the call arguments
+    call_args = content_client.store_content.call_args[0]
+    assert call_args[0] == file_content  # content_bytes
+    assert call_args[1] == ContentType.RAW_UPLOAD_BLOB  # content_type
+    assert len(call_args) == 3  # content_bytes + content_type + correlation_id
 
     # Validation failure event published with raw_file_storage_id
     event_publisher.publish_essay_validation_failed.assert_called_once()
@@ -168,7 +194,7 @@ async def test_validation_failure_includes_raw_storage_id() -> None:
     assert published_event.validation_error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
 
     # Result includes raw storage ID
-    assert result["status"] == FileProcessingStatus.CONTENT_VALIDATION_FAILED.value
+    assert result["status"] == ProcessingStatus.FAILED.value
     assert result["raw_file_storage_id"] == "raw_storage_id_123"
 
 
@@ -189,7 +215,7 @@ async def test_success_event_includes_both_storage_ids() -> None:
 
     # Configure mocks for success path
     text_extractor.extract_text.return_value = "Valid essay content"
-    content_validator.validate_content.return_value = ValidationResult(is_valid=True)
+    content_validator.validate_content.return_value = None  # No exception means success
     content_client.store_content.side_effect = ["raw_storage_id_123", "text_storage_id_456"]
 
     # Act

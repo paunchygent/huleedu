@@ -12,13 +12,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 from common_core.error_enums import FileValidationErrorCode
+from common_core.status_enums import ProcessingStatus
 
 from services.file_service.core_logic import process_single_file_upload
 from services.file_service.tests.unit.core_logic_validation_utils import (
     TEST_BATCH_IDS,
     TEST_FILE_NAMES,
 )
-from services.file_service.validation_models import FileProcessingStatus
 
 
 class TestCoreLogicValidationErrors:
@@ -57,7 +57,7 @@ class TestCoreLogicValidationErrors:
         )
 
         # Assert
-        assert result["status"] == FileProcessingStatus.EXTRACTION_FAILED.value
+        assert result["status"] == ProcessingStatus.FAILED.value
         assert result["raw_file_storage_id"] == "storage_id_12345"
 
         # Verify text extraction was attempted
@@ -107,7 +107,7 @@ class TestCoreLogicValidationErrors:
         )
 
         # Assert
-        assert result["status"] == FileProcessingStatus.RAW_STORAGE_FAILED.value
+        assert result["status"] == ProcessingStatus.FAILED.value
         assert "error_detail" in result
 
         # Verify text extraction was NOT called (raw storage failed first)

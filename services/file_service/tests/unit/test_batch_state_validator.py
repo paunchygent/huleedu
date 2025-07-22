@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import uuid
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from common_core.pipeline_models import PipelineExecutionStatus
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
 from services.file_service.implementations.batch_state_validator import BOSBatchStateValidator
 
@@ -110,10 +112,9 @@ class TestBOSBatchStateValidator:
         }
         self._setup_mock_response(mock_session, 200, json_data)
 
-        can_modify, reason = await validator.can_modify_batch_files("batch-123", "test-user")
-
-        assert can_modify is True
-        assert reason == "Batch can be modified"
+        correlation_id = uuid.uuid4()
+        # Should not raise exception - None means success
+        await validator.can_modify_batch_files("batch-123", "test-user", correlation_id)
 
     async def test_cannot_modify_batch_in_progress(
         self, validator: BOSBatchStateValidator, mock_session: AsyncMock
@@ -181,10 +182,12 @@ class TestBOSBatchStateValidator:
         }
         self._setup_mock_response(mock_session, 200, json_data)
 
-        can_modify, reason = await validator.can_modify_batch_files("batch-123", "test-user")
+        correlation_id = uuid.uuid4()
+        # Should raise HuleEduError for batch in progress
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.can_modify_batch_files("batch-123", "test-user", correlation_id)
 
-        assert can_modify is False
-        assert "spellcheck processing has started" in reason
+        assert "spellcheck processing has started" in exc_info.value.error_detail.message
 
     async def test_cannot_modify_batch_dispatch_initiated(
         self, validator: BOSBatchStateValidator, mock_session: AsyncMock
@@ -252,10 +255,12 @@ class TestBOSBatchStateValidator:
         }
         self._setup_mock_response(mock_session, 200, json_data)
 
-        can_modify, reason = await validator.can_modify_batch_files("batch-123", "test-user")
+        correlation_id = uuid.uuid4()
+        # Should raise HuleEduError for batch with dispatch initiated
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.can_modify_batch_files("batch-123", "test-user", correlation_id)
 
-        assert can_modify is False
-        assert "spellcheck processing has started" in reason
+        assert "spellcheck processing has started" in exc_info.value.error_detail.message
 
     async def test_cannot_modify_completed_batch(
         self, validator: BOSBatchStateValidator, mock_session: AsyncMock
@@ -323,10 +328,12 @@ class TestBOSBatchStateValidator:
         }
         self._setup_mock_response(mock_session, 200, json_data)
 
-        can_modify, reason = await validator.can_modify_batch_files("batch-123", "test-user")
+        correlation_id = uuid.uuid4()
+        # Should raise HuleEduError for completed batch
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.can_modify_batch_files("batch-123", "test-user", correlation_id)
 
-        assert can_modify is False
-        assert "spellcheck processing has started" in reason
+        assert "spellcheck processing has started" in exc_info.value.error_detail.message
 
     async def test_cannot_modify_batch_partial_success(
         self, validator: BOSBatchStateValidator, mock_session: AsyncMock
@@ -394,10 +401,12 @@ class TestBOSBatchStateValidator:
         }
         self._setup_mock_response(mock_session, 200, json_data)
 
-        can_modify, reason = await validator.can_modify_batch_files("batch-123", "test-user")
+        correlation_id = uuid.uuid4()
+        # Should raise HuleEduError for batch with partial success
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.can_modify_batch_files("batch-123", "test-user", correlation_id)
 
-        assert can_modify is False
-        assert "ai_feedback processing has started" in reason
+        assert "ai_feedback processing has started" in exc_info.value.error_detail.message
 
     async def test_cannot_modify_wrong_user(
         self, validator: BOSBatchStateValidator, mock_session: AsyncMock
@@ -465,10 +474,12 @@ class TestBOSBatchStateValidator:
         }
         self._setup_mock_response(mock_session, 200, json_data)
 
-        can_modify, reason = await validator.can_modify_batch_files("batch-123", "test-user")
+        correlation_id = uuid.uuid4()
+        # Should raise HuleEduError for wrong user
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.can_modify_batch_files("batch-123", "test-user", correlation_id)
 
-        assert can_modify is False
-        assert "You don't own this batch" in reason
+        assert "You don't own this batch" in exc_info.value.error_detail.message
 
     async def test_batch_not_found(
         self, validator: BOSBatchStateValidator, mock_session: AsyncMock
@@ -476,10 +487,12 @@ class TestBOSBatchStateValidator:
         """Test handling of non-existent batch."""
         self._setup_mock_response(mock_session, 404, {})
 
-        can_modify, reason = await validator.can_modify_batch_files("nonexistent", "test-user")
+        correlation_id = uuid.uuid4()
+        # Should raise HuleEduError for non-existent batch
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.can_modify_batch_files("nonexistent", "test-user", correlation_id)
 
-        assert can_modify is False
-        assert reason == "Batch not found"
+        assert "not found" in exc_info.value.error_detail.message.lower()
 
     async def test_bos_server_error(
         self, validator: BOSBatchStateValidator, mock_session: AsyncMock
@@ -487,10 +500,12 @@ class TestBOSBatchStateValidator:
         """Test handling of BOS server errors."""
         self._setup_mock_response(mock_session, 500, {})
 
-        can_modify, reason = await validator.can_modify_batch_files("batch-123", "test-user")
+        correlation_id = uuid.uuid4()
+        # Should raise HuleEduError for server error
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.can_modify_batch_files("batch-123", "test-user", correlation_id)
 
-        assert can_modify is False
-        assert reason == "Unable to verify batch state"
+        assert "external service" in exc_info.value.error_detail.message.lower()
 
     async def test_network_error_handling(
         self, validator: BOSBatchStateValidator, mock_session: AsyncMock
@@ -498,10 +513,12 @@ class TestBOSBatchStateValidator:
         """Test handling of network errors."""
         mock_session.get.side_effect = Exception("Network error")
 
-        can_modify, reason = await validator.can_modify_batch_files("batch-123", "test-user")
+        correlation_id = uuid.uuid4()
+        # Should raise HuleEduError for network error
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.can_modify_batch_files("batch-123", "test-user", correlation_id)
 
-        assert can_modify is False
-        assert reason == "Unable to verify batch state"
+        assert "external service" in exc_info.value.error_detail.message.lower()
 
     async def test_invalid_pipeline_state_format(
         self, validator: BOSBatchStateValidator, mock_session: AsyncMock
@@ -516,10 +533,12 @@ class TestBOSBatchStateValidator:
         }
         self._setup_mock_response(mock_session, 200, json_data)
 
-        can_modify, reason = await validator.can_modify_batch_files("batch-123", "test-user")
+        correlation_id = uuid.uuid4()
+        # Should raise HuleEduError for invalid format
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.can_modify_batch_files("batch-123", "test-user", correlation_id)
 
-        assert can_modify is False
-        assert reason == "Invalid pipeline state format"
+        assert "invalid" in exc_info.value.error_detail.message.lower()
 
     async def test_get_batch_lock_status_unlocked(
         self, validator: BOSBatchStateValidator, mock_session: AsyncMock
@@ -587,7 +606,7 @@ class TestBOSBatchStateValidator:
         }
         self._setup_mock_response(mock_session, 200, json_data)
 
-        lock_status = await validator.get_batch_lock_status("batch-123")
+        lock_status = await validator.get_batch_lock_status("batch-123", uuid.uuid4())
 
         assert lock_status["locked"] is False
         assert lock_status["reason"] == "Batch is open for modifications"
@@ -659,7 +678,7 @@ class TestBOSBatchStateValidator:
         }
         self._setup_mock_response(mock_session, 200, json_data)
 
-        lock_status = await validator.get_batch_lock_status("batch-123")
+        lock_status = await validator.get_batch_lock_status("batch-123", uuid.uuid4())
 
         assert lock_status["locked"] is True
         assert lock_status["reason"] == "spellcheck processing has started"

@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import uuid
+from pathlib import Path
+
 import pytest
 from common_core.observability_enums import OperationType
 from common_core.status_enums import OperationStatus
+from huleedu_service_libs.error_handling import (
+    raise_content_service_error,
+    raise_resource_not_found,
+)
 from quart import Quart
 
 
@@ -28,22 +35,33 @@ class MockContentStore:
         self.stored_content: dict[str, bytes] = {}
         self.next_id = "test-content-id-123"
 
-    async def save_content(self, content_data: bytes) -> str:
+    async def save_content(self, content_data: bytes, correlation_id: uuid.UUID) -> str:
         """Mock content save operation."""
         if not content_data:
-            raise ValueError("No content data provided")
+            raise_content_service_error(
+                service="content_service",
+                operation="save_content",
+                message="No content data provided",
+                correlation_id=correlation_id,
+            )
 
         content_id = self.next_id
         self.stored_content[content_id] = content_data
         return content_id
 
-    async def get_content_path(self, content_id: str) -> str:
+    async def get_content_path(self, content_id: str, correlation_id: uuid.UUID) -> Path:
         """Mock get content path operation."""
         if content_id not in self.stored_content:
-            raise FileNotFoundError(f"Content {content_id} not found")
-        return f"/mock/path/{content_id}"
+            raise_resource_not_found(
+                service="content_service",
+                operation="get_content_path",
+                resource_type="content",
+                resource_id=content_id,
+                correlation_id=correlation_id,
+            )
+        return Path(f"/mock/path/{content_id}")
 
-    async def content_exists(self, content_id: str) -> bool:
+    async def content_exists(self, content_id: str, correlation_id: uuid.UUID) -> bool:
         """Mock content existence check."""
         return content_id in self.stored_content
 
@@ -90,9 +108,10 @@ class TestContentRoutesMetricsIntegration:
 
         # Verify intended behavior: successful upload should record success metric
         content_data = b"test content data"
+        correlation_id = uuid.uuid4()
 
         # Simulate successful upload
-        await mock_store.save_content(content_data)
+        await mock_store.save_content(content_data, correlation_id)
         mock_metrics.record_operation(OperationType.UPLOAD, OperationStatus.SUCCESS)
 
         # Verify metrics were recorded
@@ -106,10 +125,14 @@ class TestContentRoutesMetricsIntegration:
         mock_store: MockContentStore,
     ) -> None:
         """Test that failed upload records error metric."""
+        from huleedu_service_libs.error_handling import HuleEduError
+
+        correlation_id = uuid.uuid4()
+
         # Simulate upload failure
         try:
-            await mock_store.save_content(b"")  # Empty content should fail
-        except ValueError:
+            await mock_store.save_content(b"", correlation_id)  # Empty content should fail
+        except HuleEduError:
             mock_metrics.record_operation(OperationType.UPLOAD, OperationStatus.FAILED)
 
         # Verify error metrics were recorded
@@ -122,12 +145,14 @@ class TestContentRoutesMetricsIntegration:
         mock_store: MockContentStore,
     ) -> None:
         """Test that successful download records success metric."""
+        correlation_id = uuid.uuid4()
+
         # Setup: store some content first
-        content_id = await mock_store.save_content(b"test content")
+        content_id = await mock_store.save_content(b"test content", correlation_id)
 
         # Simulate successful download
-        assert await mock_store.content_exists(content_id)
-        await mock_store.get_content_path(content_id)
+        assert await mock_store.content_exists(content_id, correlation_id)
+        await mock_store.get_content_path(content_id, correlation_id)
         mock_metrics.record_operation(OperationType.DOWNLOAD, OperationStatus.SUCCESS)
 
         # Verify metrics were recorded
@@ -140,10 +165,12 @@ class TestContentRoutesMetricsIntegration:
         mock_store: MockContentStore,
     ) -> None:
         """Test that download not found records not_found metric."""
+        correlation_id = uuid.uuid4()
+
         # Simulate download of non-existent content
         content_id = "non-existent-id"
 
-        if not await mock_store.content_exists(content_id):
+        if not await mock_store.content_exists(content_id, correlation_id):
             mock_metrics.record_operation(OperationType.DOWNLOAD, OperationStatus.NOT_FOUND)
 
         # Verify metrics were recorded

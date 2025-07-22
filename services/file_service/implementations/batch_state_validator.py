@@ -3,9 +3,18 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 import aiohttp
 from common_core.pipeline_models import PipelineExecutionStatus, ProcessingPipelineState
+from huleedu_service_libs.error_handling import (
+    raise_authorization_error,
+    raise_external_service_error,
+    raise_invalid_response,
+    raise_processing_error,
+    raise_resource_not_found,
+)
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.file_service.config import Settings
@@ -39,7 +48,9 @@ class BOSBatchStateValidator:
             finally:
                 resp.release()
 
-    async def can_modify_batch_files(self, batch_id: str, user_id: str) -> tuple[bool, str]:
+    async def can_modify_batch_files(
+        self, batch_id: str, user_id: str, correlation_id: UUID
+    ) -> None:
         """
         Check if batch files can be modified by querying BOS pipeline state.
 
@@ -47,21 +58,53 @@ class BOSBatchStateValidator:
         - Any processing phase has active status (DISPATCH_INITIATED, IN_PROGRESS, or completed)
         - User doesn't own the batch
         - Batch doesn't exist
+
+        Args:
+            batch_id: The batch identifier
+            user_id: The authenticated user identifier
+            correlation_id: Request correlation ID for tracing
+
+        Returns:
+            None if modification is allowed
+
+        Raises:
+            HuleEduError: If batch cannot be modified with specific reason
         """
         try:
             bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
 
             status, pipeline_data = await self._fetch_json(bos_url)
             if status == 404:
-                return False, "Batch not found"
+                raise_resource_not_found(
+                    service="file_service",
+                    operation="can_modify_batch_files",
+                    resource_type="batch",
+                    resource_id=batch_id,
+                    correlation_id=correlation_id,
+                )
             elif status != 200:
                 logger.error(f"BOS query failed for batch {batch_id}: status {status}")
-                return False, "Unable to verify batch state"
+                raise_external_service_error(
+                    service="file_service",
+                    operation="can_modify_batch_files",
+                    external_service="batch_orchestrator_service",
+                    message=f"External service error: Failed to verify batch state (HTTP {status})",
+                    correlation_id=correlation_id,
+                    status_code=status,
+                )
 
             # Verify user ownership
             batch_user_id = pipeline_data.get("user_id")
             if batch_user_id != user_id:
-                return False, "You don't own this batch"
+                raise_authorization_error(
+                    service="file_service",
+                    operation="can_modify_batch_files",
+                    message="You don't own this batch",
+                    correlation_id=correlation_id,
+                    batch_owner=batch_user_id,
+                    requested_user=user_id,
+                    batch_id=batch_id,
+                )
 
             # Parse pipeline state using Pydantic model for type safety
             pipeline_state_data = pipeline_data.get("pipeline_state", {})
@@ -73,17 +116,49 @@ class BOSBatchStateValidator:
                     f"Failed to parse pipeline state for batch {batch_id}: {e}",
                     exc_info=True,
                 )
-                return False, "Invalid pipeline state format"
+                raise_invalid_response(
+                    service="file_service",
+                    operation="can_modify_batch_files",
+                    message="Invalid pipeline state format from BOS",
+                    correlation_id=correlation_id,
+                    parse_error=str(e),
+                )
 
             # Check each phase for locking status using proper enum values
-            return self._check_pipeline_state(pipeline_state)
+            self._check_pipeline_state(pipeline_state, batch_id, correlation_id)
 
-        except Exception as e:
+        except HuleEduError:
+            # Re-raise HuleEduError as-is without wrapping
+            raise
+        except (aiohttp.ClientError, Exception) as e:
+            # Network and HTTP errors should be treated as external service errors
             logger.error(f"Error validating batch state for {batch_id}: {e}", exc_info=True)
-            return False, "Unable to verify batch state"
+            raise_external_service_error(
+                service="file_service",
+                operation="can_modify_batch_files",
+                external_service="batch_orchestrator_service",
+                message="Failed to communicate with external service",
+                correlation_id=correlation_id,
+                error=str(e),
+            )
 
-    def _check_pipeline_state(self, pipeline_state: ProcessingPipelineState) -> tuple[bool, str]:
-        """Check pipeline state using Pydantic model with proper enum values."""
+    def _check_pipeline_state(
+        self, pipeline_state: ProcessingPipelineState, batch_id: str, correlation_id: UUID
+    ) -> None:
+        """
+        Check pipeline state using Pydantic model with proper enum values.
+
+        Args:
+            pipeline_state: The pipeline state to check
+            batch_id: The batch identifier for error context
+            correlation_id: Request correlation ID for tracing
+
+        Returns:
+            None if batch can be modified
+
+        Raises:
+            HuleEduError: If batch is locked due to active processing
+        """
         # Define statuses that indicate active processing (batch is locked)
         locking_statuses = {
             PipelineExecutionStatus.DISPATCH_INITIATED,
@@ -102,12 +177,32 @@ class BOSBatchStateValidator:
 
         for phase_name, phase_detail in phases_to_check:
             if phase_detail and phase_detail.status in locking_statuses:
-                return False, f"{phase_name} processing has started"
+                raise_processing_error(
+                    service="file_service",
+                    operation="can_modify_batch_files",
+                    message=f"Batch {batch_id} is locked: {phase_name} processing has started",
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
+                    locked_by_phase=phase_name,
+                    phase_status=phase_detail.status.value,
+                )
 
-        return True, "Batch can be modified"
+        # No exception raised means batch can be modified
 
-    async def get_batch_lock_status(self, batch_id: str) -> dict[str, Any]:
-        """Get detailed batch lock status for client information."""
+    async def get_batch_lock_status(self, batch_id: str, correlation_id: UUID) -> dict[str, Any]:
+        """
+        Get detailed batch lock status for client information.
+
+        Args:
+            batch_id: The batch identifier
+            correlation_id: Request correlation ID for tracing
+
+        Returns:
+            dict: Lock status with reason and metadata
+
+        Raises:
+            HuleEduError: If batch status cannot be retrieved
+        """
         try:
             bos_url = f"{self.settings.BOS_URL}/internal/v1/batches/{batch_id}/pipeline-state"
 

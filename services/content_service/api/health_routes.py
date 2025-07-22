@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
@@ -18,6 +20,8 @@ health_bp = Blueprint("health_routes", __name__)
 @inject
 async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Response, int]:
     """Standardized health check endpoint with storage validation."""
+    correlation_id = uuid.uuid4()
+
     try:
         checks = {"service_responsive": True, "dependencies_available": True}
         dependencies = {}
@@ -30,7 +34,8 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
 
             if not path_exists or not path_is_dir:
                 logger.error(
-                    f"Health check failed: Store root {store_path.resolve()} not accessible."
+                    f"Health check failed: Store root {store_path.resolve()} not accessible.",
+                    extra={"correlation_id": str(correlation_id)},
                 )
                 dependencies["storage"] = {
                     "status": "unhealthy",
@@ -46,7 +51,11 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
                     "writable": True,  # Could add actual write test
                 }
         except Exception as e:
-            logger.error(f"Storage health check failed: {e}")
+            logger.error(
+                f"Storage health check failed: {e}",
+                extra={"correlation_id": str(correlation_id)},
+                exc_info=True,
+            )
             dependencies["storage"] = {"status": "unhealthy", "error": str(e)}
             checks["dependencies_available"] = False
 
@@ -60,13 +69,18 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
             "checks": checks,
             "dependencies": dependencies,
             "environment": "development",
+            "correlation_id": str(correlation_id),
         }
 
         status_code = 200 if overall_status == "healthy" else 503
         return jsonify(health_response), status_code
 
     except Exception as e:
-        logger.error(f"Health check unexpected error: {e}", exc_info=True)
+        logger.error(
+            f"Health check unexpected error: {e}",
+            extra={"correlation_id": str(correlation_id)},
+            exc_info=True,
+        )
         return jsonify(
             {
                 "service": "content_service",
@@ -74,6 +88,7 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
                 "message": "Health check failed",
                 "version": "1.0.0",
                 "error": str(e),
+                "correlation_id": str(correlation_id),
             }
         ), 503
 
@@ -82,10 +97,17 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
 @inject
 async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
     """Prometheus metrics endpoint."""
+    correlation_id = uuid.uuid4()
+
     try:
         metrics_data = generate_latest(registry)
         response = Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
+        response.headers["X-Correlation-ID"] = str(correlation_id)
         return response
     except Exception as e:
-        logger.error(f"Error generating metrics: {e}", exc_info=True)
+        logger.error(
+            f"Error generating metrics: {e}",
+            extra={"correlation_id": str(correlation_id)},
+            exc_info=True,
+        )
         return Response("Error generating metrics", status=500)

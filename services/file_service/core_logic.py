@@ -15,6 +15,8 @@ from typing import Any
 from common_core.domain_enums import ContentType
 from common_core.error_enums import FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
+from common_core.status_enums import OperationStatus, ProcessingStatus
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.file_service.protocols import (
@@ -23,7 +25,6 @@ from services.file_service.protocols import (
     EventPublisherProtocol,
     TextExtractorProtocol,
 )
-from services.file_service.validation_models import FileProcessingStatus, FileValidationStatus
 
 logger = create_service_logger("file_service.core_logic")
 
@@ -84,6 +85,7 @@ async def process_single_file_upload(
         raw_file_storage_id = await content_client.store_content(
             file_content,
             ContentType.RAW_UPLOAD_BLOB,
+            main_correlation_id,
         )
         logger.info(
             f"Stored raw file blob for {file_name}, raw_file_storage_id: {raw_file_storage_id}",
@@ -125,13 +127,13 @@ async def process_single_file_upload(
         if files_uploaded_counter:
             files_uploaded_counter.labels(
                 file_type=file_ext,
-                validation_status=FileValidationStatus.RAW_STORAGE_FAILED.value,
+                validation_status=OperationStatus.FAILED.value,
                 batch_id=str(batch_id),
             ).inc()
 
         return {
             "file_name": file_name,
-            "status": FileProcessingStatus.RAW_STORAGE_FAILED.value,
+            "status": ProcessingStatus.FAILED.value,
             "error_detail": str(storage_error),
         }
 
@@ -139,12 +141,12 @@ async def process_single_file_upload(
     # Note: This should only fail for technical issues (unsupported format, corruption, etc.)
     # Empty files should successfully extract to empty string and be handled by validation
     try:
-        text = await text_extractor.extract_text(file_content, file_name)
+        text = await text_extractor.extract_text(file_content, file_name, main_correlation_id)
         logger.debug(
             f"Text extraction completed for {file_name}: {len(text) if text else 0} characters",
             extra={"correlation_id": str(main_correlation_id)},
         )
-    except Exception as extraction_error:
+    except HuleEduError as extraction_error:
         logger.error(
             f"Text extraction failed for {file_name}: {extraction_error}",
             extra={"correlation_id": str(main_correlation_id)},
@@ -157,7 +159,7 @@ async def process_single_file_upload(
             original_file_name=file_name,
             raw_file_storage_id=raw_file_storage_id,
             validation_error_code=FileValidationErrorCode.TEXT_EXTRACTION_FAILED,
-            validation_error_message=f"Technical text extraction failure: {extraction_error}",
+            validation_error_message=extraction_error.error_detail.message,
             file_size_bytes=len(file_content),
             correlation_id=main_correlation_id,
             timestamp=datetime.now(UTC),
@@ -180,26 +182,27 @@ async def process_single_file_upload(
         if files_uploaded_counter:
             files_uploaded_counter.labels(
                 file_type=file_ext,
-                validation_status=FileValidationStatus.EXTRACTION_FAILED.value,
+                validation_status=OperationStatus.FAILED.value,
                 batch_id=str(batch_id),
             ).inc()
 
         return {
             "file_name": file_name,
             "raw_file_storage_id": raw_file_storage_id,
-            "status": FileProcessingStatus.EXTRACTION_FAILED.value,
+            "status": ProcessingStatus.FAILED.value,
         }
 
     # Step 3: Validate extracted content against business rules
     # This handles all content-related issues including empty content, length limits, etc.
-    validation_result = await content_validator.validate_content(text, file_name)
-    if not validation_result.is_valid:
+    try:
+        await content_validator.validate_content(text, file_name, main_correlation_id)
+    except HuleEduError as validation_error:
         logger.warning(
-            f"Content validation failed for {file_name}: {validation_result.error_message}",
+            f"Content validation failed for {file_name}: {validation_error.error_detail.message}",
             extra={
                 "correlation_id": str(main_correlation_id),
-                "error_code": validation_result.error_code,
-                "error_message": validation_result.error_message,
+                "error_code": validation_error.error_detail.error_code,
+                "error_message": validation_error.error_detail.message,
                 "content_length": len(text) if text else 0,
             },
         )
@@ -209,12 +212,8 @@ async def process_single_file_upload(
             batch_id=batch_id,
             original_file_name=file_name,
             raw_file_storage_id=raw_file_storage_id,
-            validation_error_code=FileValidationErrorCode(validation_result.error_code)
-            if validation_result.error_code
-            else FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
-            validation_error_message=(
-                validation_result.error_message or "Content validation failed"
-            ),
+            validation_error_code=FileValidationErrorCode(validation_error.error_detail.error_code),
+            validation_error_message=validation_error.error_detail.message,
             file_size_bytes=len(file_content),
             correlation_id=main_correlation_id,
             timestamp=datetime.now(UTC),
@@ -237,22 +236,23 @@ async def process_single_file_upload(
         if files_uploaded_counter:
             files_uploaded_counter.labels(
                 file_type=file_ext,
-                validation_status=FileValidationStatus.CONTENT_VALIDATION_FAILED.value,
+                validation_status=OperationStatus.FAILED.value,
                 batch_id=str(batch_id),
             ).inc()
 
         return {
             "file_name": file_name,
             "raw_file_storage_id": raw_file_storage_id,
-            "status": FileProcessingStatus.CONTENT_VALIDATION_FAILED.value,
-            "error_code": validation_result.error_code,
-            "error_message": validation_result.error_message,
+            "status": ProcessingStatus.FAILED.value,
+            "error_code": validation_error.error_detail.error_code,
+            "error_message": validation_error.error_detail.message,
         }
 
     # Step 4: Store validated extracted plaintext and publish success event
     text_storage_id = await content_client.store_content(
         text.encode("utf-8"),
         ContentType.EXTRACTED_PLAINTEXT,
+        main_correlation_id,
     )
     logger.info(
         f"Stored extracted plaintext for file {file_name}, text_storage_id: {text_storage_id}",
@@ -292,7 +292,7 @@ async def process_single_file_upload(
     if files_uploaded_counter:
         files_uploaded_counter.labels(
             file_type=file_ext,
-            validation_status=FileValidationStatus.SUCCESS.value,
+            validation_status=OperationStatus.SUCCESS.value,
             batch_id=str(batch_id),
         ).inc()
 
@@ -300,5 +300,5 @@ async def process_single_file_upload(
         "file_name": file_name,
         "raw_file_storage_id": raw_file_storage_id,
         "text_storage_id": text_storage_id,
-        "status": FileProcessingStatus.PROCESSING_SUCCESS.value,
+        "status": ProcessingStatus.COMPLETED.value,
     }

@@ -14,9 +14,13 @@ import pytest
 from common_core.domain_enums import ContentType
 from common_core.error_enums import FileValidationErrorCode
 from common_core.events.file_events import EssayValidationFailedV1
+from common_core.status_enums import ProcessingStatus
+from huleedu_service_libs.error_handling.file_validation_factories import (
+    raise_content_too_short,
+    raise_empty_content_error,
+)
 
 from services.file_service.core_logic import process_single_file_upload
-from services.file_service.validation_models import FileProcessingStatus, ValidationResult
 
 
 @pytest.mark.asyncio
@@ -40,11 +44,16 @@ async def test_empty_file_uses_content_validation() -> None:
     text_extractor.extract_text.return_value = ""  # Empty string (successful extraction)
 
     content_validator = AsyncMock()
-    content_validator.validate_content.return_value = ValidationResult(
-        is_valid=False,
-        error_code=FileValidationErrorCode.EMPTY_CONTENT,
-        error_message="File 'empty_essay.txt' contains no readable text content.",
-    )
+
+    def mock_empty_validation(text: str, file_name: str, correlation_id: uuid.UUID) -> None:
+        raise_empty_content_error(
+            service="file_service",
+            operation="validate_content",
+            file_name=file_name,
+            correlation_id=correlation_id,
+        )
+
+    content_validator.validate_content.side_effect = mock_empty_validation
 
     content_client = AsyncMock()
     content_client.store_content.return_value = "raw_storage_empty_12345"  # Proper string return
@@ -64,16 +73,30 @@ async def test_empty_file_uses_content_validation() -> None:
     )
 
     # Assert - Text extraction was called and succeeded
-    text_extractor.extract_text.assert_called_once_with(empty_file_content, file_name)
+    # Note: correlation_id is auto-generated, so we verify the call was made
+    text_extractor.extract_text.assert_called_once()
+    # Verify the first two arguments are file_content and file_name
+    call_args = text_extractor.extract_text.call_args[0]
+    assert call_args[0] == empty_file_content
+    assert call_args[1] == file_name
+    assert len(call_args) == 3  # file_content + file_name + correlation_id
 
     # Assert - Content validation was called with empty string
-    content_validator.validate_content.assert_called_once_with("", file_name)
+    # Note: correlation_id is auto-generated, so we verify the call was made
+    content_validator.validate_content.assert_called_once()
+    # Verify the first two arguments are text and file_name
+    call_args = content_validator.validate_content.call_args[0]
+    assert call_args[0] == ""
+    assert call_args[1] == file_name
+    assert len(call_args) == 3  # text + file_name + correlation_id
 
     # Assert - Raw storage was called (NEW BEHAVIOR)
-    content_client.store_content.assert_called_once_with(
-        empty_file_content,
-        ContentType.RAW_UPLOAD_BLOB,
-    )
+    # Note: store_content now includes correlation_id as third parameter
+    assert content_client.store_content.call_count == 1
+    call_args = content_client.store_content.call_args[0]
+    assert call_args[0] == empty_file_content  # content_bytes
+    assert call_args[1] == ContentType.RAW_UPLOAD_BLOB  # content_type
+    assert len(call_args) == 3  # content_bytes + content_type + correlation_id
 
     # Assert - Validation failure event was published with correct error code
     event_publisher.publish_essay_validation_failed.assert_called_once()
@@ -81,8 +104,9 @@ async def test_empty_file_uses_content_validation() -> None:
 
     assert isinstance(published_event, EssayValidationFailedV1)
     assert published_event.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
+    # Updated to match HuleEduError factory message format
     assert published_event.validation_error_message == (
-        "File 'empty_essay.txt' contains no readable text content."
+        "File 'empty_essay.txt' has empty content"
     )
     assert published_event.batch_id == batch_id
     assert published_event.original_file_name == file_name
@@ -92,7 +116,7 @@ async def test_empty_file_uses_content_validation() -> None:
     event_publisher.publish_essay_content_provisioned.assert_not_called()
 
     # Assert - Correct return status
-    assert result["status"] == FileProcessingStatus.CONTENT_VALIDATION_FAILED.value
+    assert result["status"] == ProcessingStatus.FAILED.value
     assert result["error_code"] == FileValidationErrorCode.EMPTY_CONTENT
     assert result["file_name"] == file_name
     assert result["raw_file_storage_id"] == "raw_storage_empty_12345"
@@ -137,10 +161,21 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     )
 
     # Assert - Text extraction was attempted
-    text_extractor.extract_text.assert_called_once_with(file_content, file_name)
+    # Note: correlation_id is auto-generated, so we verify the call was made
+    text_extractor.extract_text.assert_called_once()
+    # Verify the first two arguments are file_content and file_name
+    call_args = text_extractor.extract_text.call_args[0]
+    assert call_args[0] == file_content
+    assert call_args[1] == file_name
+    assert len(call_args) == 3  # file_content + file_name + correlation_id
 
     # Assert - Raw storage was called (NEW BEHAVIOR - happens before extraction)
-    content_client.store_content.assert_called_once_with(file_content, ContentType.RAW_UPLOAD_BLOB)
+    # Note: store_content now includes correlation_id as third parameter
+    assert content_client.store_content.call_count == 1
+    call_args = content_client.store_content.call_args[0]
+    assert call_args[0] == file_content  # content_bytes
+    assert call_args[1] == ContentType.RAW_UPLOAD_BLOB  # content_type
+    assert len(call_args) == 3  # content_bytes + content_type + correlation_id
 
     # Assert - Content validation was NOT called (extraction failed)
     content_validator.validate_content.assert_not_called()
@@ -155,7 +190,7 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     assert published_event.raw_file_storage_id == "raw_storage_corrupted_67890"  # Raw ID
 
     # Assert - Correct return status
-    assert result["status"] == FileProcessingStatus.EXTRACTION_FAILED.value
+    assert result["status"] == ProcessingStatus.FAILED.value
     assert result["file_name"] == file_name
     assert result["raw_file_storage_id"] == "raw_storage_corrupted_67890"
 
@@ -178,14 +213,18 @@ async def test_content_too_short_validation() -> None:
     text_extractor.extract_text.return_value = "Hi"  # Short but not empty
 
     content_validator = AsyncMock()
-    content_validator.validate_content.return_value = ValidationResult(
-        is_valid=False,
-        error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
-        error_message=(
-            "File 'too_short.txt' contains only 2 characters. "
-            "Essays must contain at least 50 characters."
-        ),
-    )
+
+    def mock_short_validation(text: str, file_name: str, correlation_id: uuid.UUID) -> None:
+        raise_content_too_short(
+            service="file_service",
+            operation="validate_content",
+            file_name=file_name,
+            min_length=50,
+            actual_length=len(text),
+            correlation_id=correlation_id,
+        )
+
+    content_validator.validate_content.side_effect = mock_short_validation
 
     content_client = AsyncMock()
     content_client.store_content.return_value = "raw_storage_short_11111"
@@ -206,13 +245,21 @@ async def test_content_too_short_validation() -> None:
 
     # Assert - Both extraction and validation were called
     text_extractor.extract_text.assert_called_once()
-    content_validator.validate_content.assert_called_once_with("Hi", file_name)
+    # Note: correlation_id is auto-generated, so we verify the call was made
+    content_validator.validate_content.assert_called_once()
+    # Verify the first two arguments are text and file_name
+    call_args = content_validator.validate_content.call_args[0]
+    assert call_args[0] == "Hi"
+    assert call_args[1] == file_name
+    assert len(call_args) == 3  # text + file_name + correlation_id
 
     # Assert - Raw storage was called (NEW BEHAVIOR)
-    content_client.store_content.assert_called_once_with(
-        short_file_content,
-        ContentType.RAW_UPLOAD_BLOB,
-    )
+    # Note: store_content now includes correlation_id as third parameter
+    assert content_client.store_content.call_count == 1
+    call_args = content_client.store_content.call_args[0]
+    assert call_args[0] == short_file_content  # content_bytes
+    assert call_args[1] == ContentType.RAW_UPLOAD_BLOB  # content_type
+    assert len(call_args) == 3  # content_bytes + content_type + correlation_id
 
     # Assert - Correct validation failure event
     event_publisher.publish_essay_validation_failed.assert_called_once()
@@ -221,6 +268,6 @@ async def test_content_too_short_validation() -> None:
     assert published_event.raw_file_storage_id == "raw_storage_short_11111"
 
     # Assert - Correct return status
-    assert result["status"] == FileProcessingStatus.CONTENT_VALIDATION_FAILED.value
+    assert result["status"] == ProcessingStatus.FAILED.value
     assert result["error_code"] == FileValidationErrorCode.CONTENT_TOO_SHORT
     assert result["raw_file_storage_id"] == "raw_storage_short_11111"

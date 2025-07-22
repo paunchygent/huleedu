@@ -109,11 +109,17 @@ class TestFileRoutesValidation:
         self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
     ) -> None:
         """Test file upload blocked when batch is locked for processing."""
-        # Configure validator to return locked status
-        mock_batch_validator.can_modify_batch_files.return_value = (
-            False,
-            "Batch is locked: Spellcheck has started",
-        )
+        # Configure validator to raise HuleEduError for batch lock scenario
+        from huleedu_service_libs.error_handling import raise_processing_error
+        def mock_locked_batch(*args):
+            raise_processing_error(
+                service="file_service",
+                operation="can_modify_batch_files",
+                message="Batch is locked: Spellcheck has started",
+                correlation_id=args[2],  # correlation_id is third argument
+                batch_id=args[0],
+            )
+        mock_batch_validator.can_modify_batch_files.side_effect = mock_locked_batch
 
         # Create test file data
         file_data = BytesIO(b"Test essay content")
@@ -133,10 +139,13 @@ class TestFileRoutesValidation:
         assert "error" in data
         assert "Cannot add files to batch" in data["error"]
 
-        # Verify validator was called
-        mock_batch_validator.can_modify_batch_files.assert_called_once_with(
-            "test-batch-123", "test-user-456"
-        )
+        # Assert - correlation_id is auto-generated, so we just check it was called once
+        mock_batch_validator.can_modify_batch_files.assert_called_once()
+        # Verify the arguments are batch_id, user_id, and correlation_id UUID
+        call_args = mock_batch_validator.can_modify_batch_files.call_args[0]
+        assert call_args[0] == "test-batch-123"
+        assert call_args[1] == "test-user-456"
+        assert len(call_args) == 3  # batch_id + user_id + correlation_id
 
     async def test_upload_batch_files_missing_user_id(self, app_client: QuartTestClient) -> None:
         """Test file upload fails without user authentication."""
@@ -179,8 +188,8 @@ class TestFileRoutesValidation:
         self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
     ) -> None:
         """Test file upload fails when no files are provided."""
-        # Configure validator to allow modifications
-        mock_batch_validator.can_modify_batch_files.return_value = (True, "Batch can be modified")
+        # Configure validator to allow modifications (no exception)
+        mock_batch_validator.can_modify_batch_files.return_value = None
 
         # Make request with batch_id but no files in 'files' field
         response = await app_client.post(
@@ -203,8 +212,8 @@ class TestFileRoutesValidation:
         self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
     ) -> None:
         """Test successful file upload returns 202 Accepted with proper JSON structure."""
-        # Configure validator to allow modifications
-        mock_batch_validator.can_modify_batch_files.return_value = (True, "Batch can be modified")
+        # Configure validator to allow modifications (no exception)
+        mock_batch_validator.can_modify_batch_files.return_value = None
 
         # Create proper FileStorage object for Quart test client
         file_data = BytesIO(b"Test essay content")
@@ -230,9 +239,12 @@ class TestFileRoutesValidation:
             print(f"Response data: {error_data}")
 
             # Also check if the request was processed at all
-            mock_batch_validator.can_modify_batch_files.assert_called_once_with(
-                "test-batch-123", "test-user-456"
-            )
+            mock_batch_validator.can_modify_batch_files.assert_called_once()
+            # Verify the arguments are batch_id, user_id, and correlation_id UUID
+            call_args = mock_batch_validator.can_modify_batch_files.call_args[0]
+            assert call_args[0] == "test-batch-123"
+            assert call_args[1] == "test-user-456"
+            assert len(call_args) == 3  # batch_id + user_id + correlation_id
 
         # Should return 202 Accepted (fire-and-forget async pattern)
         assert response.status_code == 202
@@ -257,8 +269,8 @@ class TestFileRoutesValidation:
         self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
     ) -> None:
         """Test multiple files upload in single request returns 202 with correct file count."""
-        # Configure validator to allow modifications
-        mock_batch_validator.can_modify_batch_files.return_value = (True, "Batch can be modified")
+        # Configure validator to allow modifications (no exception)
+        mock_batch_validator.can_modify_batch_files.return_value = None
 
         # For testing YOUR architecture (multiple files with same field name),
         # we need to manually construct multipart form data since Quart's test client
@@ -313,17 +325,20 @@ class TestFileRoutesValidation:
 
         uuid.UUID(data["correlation_id"])  # Should not raise exception
 
-        # Verify batch validator was called once before processing any files
-        mock_batch_validator.can_modify_batch_files.assert_called_once_with(
-            "test-batch-456", "test-user-789"
-        )
+        # Assert - correlation_id is auto-generated, so we just check it was called once
+        mock_batch_validator.can_modify_batch_files.assert_called_once()
+        # Verify the arguments are batch_id, user_id, and correlation_id UUID
+        call_args = mock_batch_validator.can_modify_batch_files.call_args[0]
+        assert call_args[0] == "test-batch-456"
+        assert call_args[1] == "test-user-789"
+        assert len(call_args) == 3  # batch_id + user_id + correlation_id
 
     async def test_correlation_id_header_handling(
         self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
     ) -> None:
         """Test that provided correlation ID is used in response."""
-        # Configure validator to allow modifications
-        mock_batch_validator.can_modify_batch_files.return_value = (True, "Batch can be modified")
+        # Configure validator to allow modifications (no exception)
+        mock_batch_validator.can_modify_batch_files.return_value = None
 
         # Create FileStorage object
         file_data = BytesIO(b"Test essay content")
@@ -354,8 +369,8 @@ class TestFileRoutesValidation:
         self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
     ) -> None:
         """Test that invalid correlation ID generates a new one."""
-        # Configure validator to allow modifications
-        mock_batch_validator.can_modify_batch_files.return_value = (True, "Batch can be modified")
+        # Configure validator to allow modifications (no exception)
+        mock_batch_validator.can_modify_batch_files.return_value = None
 
         # Create FileStorage object
         file_data = BytesIO(b"Test essay content")

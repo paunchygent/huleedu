@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, call
 import pytest
 from common_core.domain_enums import ContentType
 from common_core.events.file_events import EssayContentProvisionedV1
+from common_core.status_enums import ProcessingStatus
 
 from services.file_service.core_logic import process_single_file_upload
 from services.file_service.tests.unit.core_logic_validation_utils import (
@@ -20,7 +21,6 @@ from services.file_service.tests.unit.core_logic_validation_utils import (
     TEST_FILE_NAMES,
     VALID_FILE_CONTENT,
 )
-from services.file_service.validation_models import FileProcessingStatus
 
 
 class TestCoreLogicValidationSuccess:
@@ -66,31 +66,41 @@ class TestCoreLogicValidationSuccess:
 
         # Assert workflow completion
         assert result["file_name"] == file_name
-        assert result["status"] == FileProcessingStatus.PROCESSING_SUCCESS.value
+        assert result["status"] == ProcessingStatus.COMPLETED.value
         assert result["raw_file_storage_id"] == "raw_storage_id_12345"
         assert result["text_storage_id"] == "text_storage_id_67890"
 
         # Verify text extraction was called
-        mock_text_extractor.extract_text.assert_called_once_with(file_content, file_name)
+        # Note: correlation_id is auto-generated, so we verify the call was made
+        mock_text_extractor.extract_text.assert_called_once()
+        # Verify the first two arguments are file_content and file_name
+        call_args = mock_text_extractor.extract_text.call_args[0]
+        assert call_args[0] == file_content
+        assert call_args[1] == file_name
+        assert len(call_args) == 3  # file_content + file_name + correlation_id
 
         # Verify validation was called
         mock_content_validator.validate_content.assert_called_once()
         validation_call_args = mock_content_validator.validate_content.call_args
-        assert len(validation_call_args[0]) == 2  # text and file_name
+        assert len(validation_call_args[0]) == 3  # text, file_name, and correlation_id
         assert validation_call_args[0][0] == extracted_text  # extracted text
         assert validation_call_args[0][1] == file_name
+        assert validation_call_args[0][2] == correlation_id
 
         # Verify content storage was called TWICE (NEW BEHAVIOR)
         assert mock_content_client.store_content.call_count == 2
-        mock_content_client.store_content.assert_has_calls(
-            [
-                call(file_content, ContentType.RAW_UPLOAD_BLOB),  # First: raw blob
-                call(
-                    extracted_text.encode("utf-8"),
-                    ContentType.EXTRACTED_PLAINTEXT,
-                ),  # Second: extracted text
-            ],
-        )
+        
+        # Verify first call (raw blob storage) arguments
+        first_call_args = mock_content_client.store_content.call_args_list[0][0]
+        assert first_call_args[0] == file_content  # content_bytes
+        assert first_call_args[1] == ContentType.RAW_UPLOAD_BLOB  # content_type
+        assert len(first_call_args) == 3  # content_bytes + content_type + correlation_id
+        
+        # Verify second call (extracted text storage) arguments
+        second_call_args = mock_content_client.store_content.call_args_list[1][0]
+        assert second_call_args[0] == extracted_text.encode("utf-8")  # content_bytes
+        assert second_call_args[1] == ContentType.EXTRACTED_PLAINTEXT  # content_type
+        assert len(second_call_args) == 3  # content_bytes + content_type + correlation_id
 
         # Verify success event was published
         mock_event_publisher.publish_essay_content_provisioned.assert_called_once()
@@ -143,12 +153,18 @@ class TestCoreLogicValidationSuccess:
 
         # Verify content storage was called TWICE (NEW BEHAVIOR)
         assert mock_content_client.store_content.call_count == 2
-        mock_content_client.store_content.assert_has_calls(
-            [
-                call(file_content, ContentType.RAW_UPLOAD_BLOB),
-                call(extracted_text.encode("utf-8"), ContentType.EXTRACTED_PLAINTEXT),
-            ],
-        )
+        
+        # Verify first call (raw blob storage) arguments
+        first_call_args = mock_content_client.store_content.call_args_list[0][0]
+        assert first_call_args[0] == file_content  # content_bytes
+        assert first_call_args[1] == ContentType.RAW_UPLOAD_BLOB  # content_type
+        assert len(first_call_args) == 3  # content_bytes + content_type + correlation_id
+        
+        # Verify second call (extracted text storage) arguments
+        second_call_args = mock_content_client.store_content.call_args_list[1][0]
+        assert second_call_args[0] == extracted_text.encode("utf-8")  # content_bytes
+        assert second_call_args[1] == ContentType.EXTRACTED_PLAINTEXT  # content_type
+        assert len(second_call_args) == 3  # content_bytes + content_type + correlation_id
 
         # Assert correlation ID propagation for success event
         success_call = mock_event_publisher.publish_essay_content_provisioned.call_args

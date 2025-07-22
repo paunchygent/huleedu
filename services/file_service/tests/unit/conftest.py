@@ -16,8 +16,6 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from services.file_service.validation_models import ValidationResult
-
 
 @pytest.fixture
 def mock_text_extractor() -> AsyncMock:
@@ -33,12 +31,8 @@ def mock_text_extractor() -> AsyncMock:
 def mock_content_validator() -> AsyncMock:
     """Create mock content validator."""
     validator = AsyncMock()
-    # Default to valid content
-    validator.validate_content.return_value = ValidationResult(
-        is_valid=True,
-        error_code=None,
-        error_message=None,
-    )
+    # Default to valid content - returns None (no exception)
+    validator.validate_content.return_value = None
     return validator
 
 

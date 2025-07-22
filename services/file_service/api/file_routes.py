@@ -8,6 +8,7 @@ from typing import Any
 
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 from dishka import FromDishka
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
@@ -57,20 +58,7 @@ async def upload_batch_files(
             logger.warning(f"Batch upload attempt for {batch_id} without user authentication.")
             return jsonify({"error": "User authentication required"}), 401
 
-        # Validate batch can be modified before processing any files
-        can_modify, reason = await batch_validator.can_modify_batch_files(batch_id, user_id)
-        if not can_modify:
-            logger.info(f"File upload blocked for batch {batch_id} by user {user_id}: {reason}")
-            return jsonify(
-                {"error": "Cannot add files to batch", "reason": reason, "batch_id": batch_id}
-            ), 409
-
-        uploaded_files = files.getlist("files")  # Assuming form field name is 'files'
-        if not uploaded_files:
-            logger.warning(f"No files provided for batch {batch_id}.")
-            return jsonify({"error": "No files provided in 'files' field."}), 400
-
-        # Check for X-Correlation-ID header for distributed tracing
+        # Generate correlation ID first for all operations
         correlation_id_header = request.headers.get("X-Correlation-ID")
         if correlation_id_header:
             try:
@@ -84,6 +72,20 @@ async def upload_batch_files(
                 main_correlation_id = uuid.uuid4()
         else:
             main_correlation_id = uuid.uuid4()
+
+        # Validate batch can be modified before processing any files
+        try:
+            await batch_validator.can_modify_batch_files(batch_id, user_id, main_correlation_id)
+        except HuleEduError as e:
+            logger.info(
+                f"File upload blocked for batch {batch_id} by user {user_id}: {e.error_detail.message}"
+            )
+            return jsonify({"error": e.error_detail.model_dump()}), 409
+
+        uploaded_files = files.getlist("files")  # Assuming form field name is 'files'
+        if not uploaded_files:
+            logger.warning(f"No files provided for batch {batch_id}.")
+            return jsonify({"error": "No files provided in 'files' field."}), 400
 
         logger.info(
             f"Received {len(uploaded_files)} files for batch {batch_id} from user {user_id}. "
@@ -156,8 +158,18 @@ async def get_batch_state(
             logger.warning(f"Batch state query for {batch_id} without user authentication.")
             return jsonify({"error": "User authentication required"}), 401
 
+        # Generate correlation ID for this operation
+        correlation_id_header = request.headers.get("X-Correlation-ID")
+        if correlation_id_header:
+            try:
+                correlation_id = uuid.UUID(correlation_id_header)
+            except ValueError:
+                correlation_id = uuid.uuid4()
+        else:
+            correlation_id = uuid.uuid4()
+
         # Get detailed batch lock status
-        lock_status = await batch_validator.get_batch_lock_status(batch_id)
+        lock_status = await batch_validator.get_batch_lock_status(batch_id, correlation_id)
 
         logger.info(f"Batch state query for {batch_id} by user {user_id}")
 
@@ -196,20 +208,7 @@ async def add_files_to_batch(
             )
             return jsonify({"error": "User authentication required"}), 401
 
-        # Validate batch can be modified before processing any files
-        can_modify, reason = await batch_validator.can_modify_batch_files(batch_id, user_id)
-        if not can_modify:
-            logger.info(f"File addition blocked for batch {batch_id} by user {user_id}: {reason}")
-            return jsonify(
-                {"error": "Cannot add files to batch", "reason": reason, "batch_id": batch_id}
-            ), 409
-
-        uploaded_files = files.getlist("files")  # Assuming form field name is 'files'
-        if not uploaded_files:
-            logger.warning(f"No files provided for batch {batch_id}.")
-            return jsonify({"error": "No files provided in 'files' field."}), 400
-
-        # Check for X-Correlation-ID header for distributed tracing
+        # Generate correlation ID first for all operations
         correlation_id_header = request.headers.get("X-Correlation-ID")
         if correlation_id_header:
             try:
@@ -223,6 +222,20 @@ async def add_files_to_batch(
                 main_correlation_id = uuid.uuid4()
         else:
             main_correlation_id = uuid.uuid4()
+
+        # Validate batch can be modified before processing any files
+        try:
+            await batch_validator.can_modify_batch_files(batch_id, user_id, main_correlation_id)
+        except HuleEduError as e:
+            logger.info(
+                f"File addition blocked for batch {batch_id} by user {user_id}: {e.error_detail.message}"
+            )
+            return jsonify({"error": e.error_detail.model_dump()}), 409
+
+        uploaded_files = files.getlist("files")  # Assuming form field name is 'files'
+        if not uploaded_files:
+            logger.warning(f"No files provided for batch {batch_id}.")
+            return jsonify({"error": "No files provided in 'files' field."}), 400
 
         logger.info(
             f"Adding {len(uploaded_files)} files to existing batch {batch_id} by user {user_id}. "
@@ -322,25 +335,6 @@ async def remove_file_from_batch(
             logger.warning(warning_msg)
             return jsonify({"error": "User authentication required"}), 401
 
-        # Validate batch can be modified before removing files
-        can_modify, reason = await batch_validator.can_modify_batch_files(batch_id, user_id)
-        if not can_modify:
-            info_msg = "File removal blocked for batch %s, essay %s by user %s: %s" % (
-                batch_id,
-                essay_id,
-                user_id,
-                reason,
-            )
-            logger.info(info_msg)
-            return jsonify(
-                {
-                    "error": "Cannot remove file from batch",
-                    "reason": reason,
-                    "batch_id": batch_id,
-                    "essay_id": essay_id,
-                }
-            ), 409
-
         # Check for X-Correlation-ID header for distributed tracing
         correlation_id_header = request.headers.get("X-Correlation-ID")
         if correlation_id_header:
@@ -355,6 +349,19 @@ async def remove_file_from_batch(
                 correlation_id = uuid.uuid4()
         else:
             correlation_id = uuid.uuid4()
+
+        # Validate batch can be modified before removing files
+        try:
+            await batch_validator.can_modify_batch_files(batch_id, user_id, correlation_id)
+        except HuleEduError as e:
+            info_msg = "File removal blocked for batch %s, essay %s by user %s: %s" % (
+                batch_id,
+                essay_id,
+                user_id,
+                e.error_detail.message,
+            )
+            logger.info(info_msg)
+            return jsonify({"error": e.error_detail.model_dump()}), 409
 
         logger.info(
             f"Removing file essay {essay_id} from batch {batch_id} by user {user_id}. "

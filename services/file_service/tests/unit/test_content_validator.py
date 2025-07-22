@@ -7,8 +7,11 @@ of file content according to business rules and requirements.
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from common_core.error_enums import FileValidationErrorCode
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
 from services.file_service.content_validator import FileContentValidator
 
@@ -28,154 +31,201 @@ class TestFileContentValidator:
 
     async def test_validate_valid_content(self, validator: FileContentValidator) -> None:
         """Test validation of content that meets all requirements."""
+        # Arrange
+        correlation_id = uuid.uuid4()
         valid_text = (
             "This is a well-structured essay with "
             "sufficient content and meaningful structure for processing "
             "that meets all validation requirements."
         )
 
-        result = await validator.validate_content(valid_text, "valid_essay.txt")
-
-        assert result.is_valid is True
-        assert result.error_code is None
-        assert result.error_message is None
+        # Act & Assert - Should not raise any exception for valid content
+        await validator.validate_content(valid_text, "valid_essay.txt", correlation_id)
 
     async def test_validate_empty_string(self, validator: FileContentValidator) -> None:
         """Test rejection of completely empty content."""
-        result = await validator.validate_content("", "empty.txt")
+        # Arrange
+        correlation_id = uuid.uuid4()
 
-        assert result.is_valid is False
-        assert result.error_code == FileValidationErrorCode.EMPTY_CONTENT
-        assert result.error_message is not None
-        assert "empty.txt" in result.error_message
-        assert "no readable text content" in result.error_message
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_content("", "empty.txt", correlation_id)
+
+        # Verify error details
+        error_detail = exc_info.value.error_detail
+        assert error_detail.error_code == FileValidationErrorCode.EMPTY_CONTENT
+        assert "empty.txt" in error_detail.message
+        assert error_detail.correlation_id == correlation_id
 
     async def test_validate_none_content(self, validator: FileContentValidator) -> None:
         """Test handling of None content (defensive programming)."""
-        result = await validator.validate_content(None, "none.txt")  # type: ignore[arg-type]
+        # Arrange
+        correlation_id = uuid.uuid4()
 
-        assert result.is_valid is False
-        assert result.error_code == FileValidationErrorCode.EMPTY_CONTENT
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_content(None, "none.txt", correlation_id)  # type: ignore[arg-type]
+
+        # Verify error details
+        assert exc_info.value.error_detail.error_code == FileValidationErrorCode.EMPTY_CONTENT
 
     async def test_validate_whitespace_only(self, validator: FileContentValidator) -> None:
         """Test rejection of content containing only whitespace."""
+        # Arrange
         whitespace_content = "   \n\t   \r\n   "
+        correlation_id = uuid.uuid4()
 
-        result = await validator.validate_content(whitespace_content, "whitespace.txt")
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_content(whitespace_content, "whitespace.txt", correlation_id)
 
-        assert result.is_valid is False
-        assert result.error_code == FileValidationErrorCode.EMPTY_CONTENT
-        assert result.error_message is not None
-        assert "whitespace.txt" in result.error_message
+        # Verify error details
+        error_detail = exc_info.value.error_detail
+        assert error_detail.error_code == FileValidationErrorCode.EMPTY_CONTENT
+        assert "whitespace.txt" in error_detail.message
+        assert error_detail.correlation_id == correlation_id
 
     async def test_validate_content_too_short(self, validator: FileContentValidator) -> None:
         """Test rejection of content below minimum length."""
+        # Arrange
         short_content = "Too short"  # Less than 50 characters
+        correlation_id = uuid.uuid4()
 
-        result = await validator.validate_content(short_content, "short.txt")
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_content(short_content, "short.txt", correlation_id)
 
-        assert result.is_valid is False
-        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
-        assert result.error_message is not None
-        assert "short.txt" in result.error_message
-        assert "9 characters" in result.error_message
-        assert "at least 50 characters" in result.error_message
+        # Verify error details
+        error_detail = exc_info.value.error_detail
+        assert error_detail.error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
+        assert "short.txt" in error_detail.message
+        assert "actual: 9" in error_detail.message
+        assert "minimum: 50" in error_detail.message
+        assert error_detail.correlation_id == correlation_id
 
     async def test_validate_content_too_long(self, validator: FileContentValidator) -> None:
         """Test rejection of content exceeding maximum length."""
-        long_content = "A" * 1001  # Exceeds 1000 character limit
+        # Arrange
+        long_content = "A" * 50001  # Exceeds 50000 character limit (default max_length)
+        correlation_id = uuid.uuid4()
 
-        result = await validator.validate_content(long_content, "long.txt")
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_content(long_content, "long.txt", correlation_id)
 
-        assert result.is_valid is False
-        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_LONG
-        assert result.error_message is not None
-        assert "long.txt" in result.error_message
-        assert "1001 characters" in result.error_message
-        assert "not exceed 1000 characters" in result.error_message
+        # Verify error details
+        error_detail = exc_info.value.error_detail
+        assert error_detail.error_code == FileValidationErrorCode.CONTENT_TOO_LONG
+        assert "long.txt" in error_detail.message
+        assert "50001 characters" in error_detail.message
+        assert "not exceed 50000 characters" in error_detail.message
+        assert error_detail.correlation_id == correlation_id
 
     async def test_validate_exact_minimum_length(self, validator: FileContentValidator) -> None:
         """Test validation of content at exact minimum length boundary."""
+        # Arrange
         exact_min_content = "A" * 50  # Exactly 50 characters
+        correlation_id = uuid.uuid4()
 
-        result = await validator.validate_content(exact_min_content, "exact_min.txt")
-
-        assert result.is_valid is True
+        # Act - should not raise exception
+        await validator.validate_content(exact_min_content, "exact_min.txt", correlation_id)
 
     async def test_validate_exact_maximum_length(self, validator: FileContentValidator) -> None:
         """Test validation of content at exact maximum length boundary."""
-        exact_max_content = "A" * 1000  # Exactly 1000 characters
+        # Arrange
+        exact_max_content = "A" * 50000  # Exactly 50000 characters (default max_length)
+        correlation_id = uuid.uuid4()
 
-        result = await validator.validate_content(exact_max_content, "exact_max.txt")
-
-        assert result.is_valid is True
+        # Act - should not raise exception
+        await validator.validate_content(exact_max_content, "exact_max.txt", correlation_id)
 
     async def test_validate_one_below_minimum(self, validator: FileContentValidator) -> None:
         """Test rejection of content one character below minimum."""
+        # Arrange
         below_min_content = "A" * 49  # One less than 50
+        correlation_id = uuid.uuid4()
 
-        result = await validator.validate_content(below_min_content, "below_min.txt")
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_content(below_min_content, "below_min.txt", correlation_id)
 
-        assert result.is_valid is False
-        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
+        # Verify error details
+        assert exc_info.value.error_detail.error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
+        assert exc_info.value.error_detail.correlation_id == correlation_id
 
     async def test_validate_one_above_maximum(self, validator: FileContentValidator) -> None:
         """Test rejection of content one character above maximum."""
-        above_max_content = "A" * 1001  # One more than 1000
+        # Arrange
+        above_max_content = "A" * 50001  # One more than 50000 (default max_length)
+        correlation_id = uuid.uuid4()
 
-        result = await validator.validate_content(above_max_content, "above_max.txt")
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_content(above_max_content, "above_max.txt", correlation_id)
 
-        assert result.is_valid is False
-        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_LONG
+        # Verify error details
+        assert exc_info.value.error_detail.error_code == FileValidationErrorCode.CONTENT_TOO_LONG
+        assert exc_info.value.error_detail.correlation_id == correlation_id
 
     async def test_validate_content_with_whitespace_trimming(
         self,
         validator: FileContentValidator,
     ) -> None:
         """Test that content length is calculated after trimming whitespace."""
-        # 50 characters plus surrounding whitespace
+        # Arrange - 50 characters plus surrounding whitespace
         content_with_whitespace = "   " + "A" * 50 + "   \n\t"
+        correlation_id = uuid.uuid4()
 
-        result = await validator.validate_content(content_with_whitespace, "trimmed.txt")
-
-        assert result.is_valid is True  # Should pass because trimmed length is exactly 50
+        # Act - should not raise exception (trimmed length is exactly 50)
+        await validator.validate_content(content_with_whitespace, "trimmed.txt", correlation_id)
 
     async def test_custom_length_limits(self, custom_validator: FileContentValidator) -> None:
         """Test validator with custom minimum and maximum length limits."""
-        # Test content that passes custom limits but would fail standard limits
+        # Arrange - Test content that passes custom limits but would fail standard limits
         content = (
             "Short valid"  # 11 characters - valid for custom (10-100)
-            # but invalid for standard (50-1000)
+            # but invalid for standard (50-50000)
         )
+        correlation_id = uuid.uuid4()
 
-        result = await custom_validator.validate_content(content, "custom.txt")
-
-        assert result.is_valid is True
+        # Act - should not raise exception for custom validator
+        await custom_validator.validate_content(content, "custom.txt", correlation_id)
 
     async def test_custom_limits_too_short(self, custom_validator: FileContentValidator) -> None:
         """Test custom validator rejects content below its minimum."""
+        # Arrange
         content = "Too short"  # 9 characters - below custom minimum of 10
+        correlation_id = uuid.uuid4()
 
-        result = await custom_validator.validate_content(content, "custom_short.txt")
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await custom_validator.validate_content(content, "custom_short.txt", correlation_id)
 
-        assert result.is_valid is False
-        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
-        assert result.error_message is not None
-        assert "at least 10 characters" in result.error_message
+        # Verify error details
+        error_detail = exc_info.value.error_detail
+        assert error_detail.error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
+        assert "at least 10 characters" in error_detail.message
+        assert error_detail.correlation_id == correlation_id
 
     async def test_custom_limits_too_long(self, custom_validator: FileContentValidator) -> None:
         """Test custom validator rejects content above its maximum."""
+        # Arrange
         content = "A" * 101  # 101 characters - above custom maximum of 100
+        correlation_id = uuid.uuid4()
 
-        result = await custom_validator.validate_content(content, "custom_long.txt")
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await custom_validator.validate_content(content, "custom_long.txt", correlation_id)
 
-        assert result.is_valid is False
-        assert result.error_code == FileValidationErrorCode.CONTENT_TOO_LONG
-        assert result.error_message is not None
-        assert "not exceed 100 characters" in result.error_message
+        # Verify error details
+        error_detail = exc_info.value.error_detail
+        assert error_detail.error_code == FileValidationErrorCode.CONTENT_TOO_LONG
+        assert "not exceed 100 characters" in error_detail.message
+        assert error_detail.correlation_id == correlation_id
 
     async def test_real_world_essay_content(self, validator: FileContentValidator) -> None:
         """Test validation with realistic essay content."""
+        # Arrange
         essay_content = """
         The Impact of Technology on Modern Education
 
@@ -186,10 +236,10 @@ class TestFileContentValidator:
 
         The advantages of educational technology are numerous and significant...
         """
+        correlation_id = uuid.uuid4()
 
-        result = await validator.validate_content(essay_content, "essay.txt")
-
-        assert result.is_valid is True
+        # Act - should not raise exception
+        await validator.validate_content(essay_content, "essay.txt", correlation_id)
 
     async def test_filename_inclusion_in_error_messages(
         self,
@@ -199,16 +249,22 @@ class TestFileContentValidator:
         test_cases = [
             ("", "empty_file.docx", FileValidationErrorCode.EMPTY_CONTENT),
             ("Short", "brief_essay.pdf", FileValidationErrorCode.CONTENT_TOO_SHORT),
-            ("A" * 1001, "massive_essay.txt", FileValidationErrorCode.CONTENT_TOO_LONG),
+            ("A" * 50001, "massive_essay.txt", FileValidationErrorCode.CONTENT_TOO_LONG),
         ]
 
         for content, filename, expected_error in test_cases:
-            result = await validator.validate_content(content, filename)
+            # Arrange
+            correlation_id = uuid.uuid4()
 
-            assert result.is_valid is False
-            assert result.error_code == expected_error
-            assert result.error_message is not None
-            assert filename in result.error_message
+            # Act & Assert
+            with pytest.raises(HuleEduError) as exc_info:
+                await validator.validate_content(content, filename, correlation_id)
+
+            # Verify error details
+            error_detail = exc_info.value.error_detail
+            assert error_detail.error_code == expected_error
+            assert filename in error_detail.message
+            assert error_detail.correlation_id == correlation_id
 
     async def test_validator_initialization_defaults(self) -> None:
         """Test that validator initializes with correct default values."""

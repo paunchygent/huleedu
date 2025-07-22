@@ -137,7 +137,12 @@ class TestFileManagementRoutes:
         data = await response.get_json()
         assert data["batch_id"] == batch_id
         assert data["lock_status"] == lock_status
-        mock_batch_validator.get_batch_lock_status.assert_called_once_with(batch_id)
+        # Assert - correlation_id is auto-generated, so we just check it was called once
+        mock_batch_validator.get_batch_lock_status.assert_called_once()
+        # Verify the first argument is batch_id and second is UUID
+        call_args = mock_batch_validator.get_batch_lock_status.call_args[0]
+        assert call_args[0] == batch_id
+        assert len(call_args) == 2  # batch_id + correlation_id
 
     async def test_get_batch_state_no_auth(
         self,
@@ -186,7 +191,8 @@ class TestFileManagementRoutes:
         # Arrange
         batch_id = "test-batch-123"
         user_id = "user-456"
-        mock_batch_validator.can_modify_batch_files.return_value = (True, "")
+        # Mock no exception (successful validation)
+        mock_batch_validator.can_modify_batch_files.return_value = None
 
         # Create proper FileStorage object for Quart test client
         file_data = BytesIO(b"Test essay content")
@@ -211,8 +217,13 @@ class TestFileManagementRoutes:
         assert "correlation_id" in data
         assert data["added_files"] == 1
 
-        # Verify validation was called
-        mock_batch_validator.can_modify_batch_files.assert_called_once_with(batch_id, user_id)
+        # Assert - correlation_id is auto-generated, so we just check it was called once
+        mock_batch_validator.can_modify_batch_files.assert_called_once()
+        # Verify the arguments are batch_id, user_id, and correlation_id UUID
+        call_args = mock_batch_validator.can_modify_batch_files.call_args[0]
+        assert call_args[0] == batch_id
+        assert call_args[1] == user_id
+        assert len(call_args) == 3  # batch_id + user_id + correlation_id
 
         # Verify event publishing was called
         mock_event_publisher.publish_batch_file_added_v1.assert_called_once()
@@ -242,8 +253,17 @@ class TestFileManagementRoutes:
         # Arrange
         batch_id = "test-batch-123"
         user_id = "user-456"
-        lock_reason = "Batch is currently being processed"
-        mock_batch_validator.can_modify_batch_files.return_value = (False, lock_reason)
+        # Mock HuleEduError for batch lock scenario
+        from huleedu_service_libs.error_handling import raise_processing_error
+        def mock_locked_batch(*args):
+            raise_processing_error(
+                service="file_service",
+                operation="can_modify_batch_files",
+                message="Batch is currently being processed",
+                correlation_id=args[2],  # correlation_id is third argument
+                batch_id=args[0],
+            )
+        mock_batch_validator.can_modify_batch_files.side_effect = mock_locked_batch
 
         # Act
         response = await app_client.post(
@@ -254,7 +274,7 @@ class TestFileManagementRoutes:
         assert response.status_code == 409
         data = await response.get_json()
         assert data["error"] == "Cannot add files to batch"
-        assert data["reason"] == lock_reason
+        assert "Batch is currently being processed" in data["reason"]
         assert data["batch_id"] == batch_id
 
     async def test_add_files_to_batch_no_files(
@@ -266,7 +286,8 @@ class TestFileManagementRoutes:
         # Arrange
         batch_id = "test-batch-123"
         user_id = "user-456"
-        mock_batch_validator.can_modify_batch_files.return_value = (True, "")
+        # Mock no exception (successful validation)
+        mock_batch_validator.can_modify_batch_files.return_value = None
 
         # Act
         response = await app_client.post(
@@ -288,7 +309,8 @@ class TestFileManagementRoutes:
         # Arrange
         batch_id = "test-batch-456"
         user_id = "user-789"
-        mock_batch_validator.can_modify_batch_files.return_value = (True, "")
+        # Mock no exception (successful validation)
+        mock_batch_validator.can_modify_batch_files.return_value = None
 
         # Manual multipart form construction for multiple files with same field name
         # boundary = "----QuartTestBoundary" # Removed as unused
@@ -329,8 +351,13 @@ class TestFileManagementRoutes:
         assert "2 files added" in data["message"]
         assert data["added_files"] == 2
 
-        # Verify validation was called
-        mock_batch_validator.can_modify_batch_files.assert_called_once_with(batch_id, user_id)
+        # Assert - correlation_id is auto-generated, so we just check it was called once
+        mock_batch_validator.can_modify_batch_files.assert_called_once()
+        # Verify the arguments are batch_id, user_id, and correlation_id UUID
+        call_args = mock_batch_validator.can_modify_batch_files.call_args[0]
+        assert call_args[0] == batch_id
+        assert call_args[1] == user_id
+        assert len(call_args) == 3  # batch_id + user_id + correlation_id
 
         # Verify event publishing was called twice (once per file)
         assert mock_event_publisher.publish_batch_file_added_v1.call_count == 2
@@ -346,7 +373,8 @@ class TestFileManagementRoutes:
         batch_id = "test-batch-123"
         essay_id = "essay-456"
         user_id = "user-789"
-        mock_batch_validator.can_modify_batch_files.return_value = (True, "")
+        # Mock no exception (successful validation)
+        mock_batch_validator.can_modify_batch_files.return_value = None
 
         # Act
         response = await app_client.delete(
@@ -361,8 +389,13 @@ class TestFileManagementRoutes:
         assert data["essay_id"] == essay_id
         assert "correlation_id" in data
 
-        # Verify validation was called
-        mock_batch_validator.can_modify_batch_files.assert_called_once_with(batch_id, user_id)
+        # Assert - correlation_id is auto-generated, so we just check it was called once
+        mock_batch_validator.can_modify_batch_files.assert_called_once()
+        # Verify the arguments are batch_id, user_id, and correlation_id UUID
+        call_args = mock_batch_validator.can_modify_batch_files.call_args[0]
+        assert call_args[0] == batch_id
+        assert call_args[1] == user_id
+        assert len(call_args) == 3  # batch_id + user_id + correlation_id
 
         # Verify event publishing was called
         mock_event_publisher.publish_batch_file_removed_v1.assert_called_once()
@@ -394,8 +427,17 @@ class TestFileManagementRoutes:
         batch_id = "test-batch-123"
         essay_id = "essay-456"
         user_id = "user-789"
-        lock_reason = "Batch is currently being processed"
-        mock_batch_validator.can_modify_batch_files.return_value = (False, lock_reason)
+        # Mock HuleEduError for batch lock scenario
+        from huleedu_service_libs.error_handling import raise_processing_error
+        def mock_locked_batch(*args):
+            raise_processing_error(
+                service="file_service",
+                operation="can_modify_batch_files",
+                message="Batch is currently being processed",
+                correlation_id=args[2],  # correlation_id is third argument
+                batch_id=args[0],
+            )
+        mock_batch_validator.can_modify_batch_files.side_effect = mock_locked_batch
 
         # Act
         response = await app_client.delete(
@@ -406,7 +448,7 @@ class TestFileManagementRoutes:
         assert response.status_code == 409
         data = await response.get_json()
         assert data["error"] == "Cannot remove file from batch"
-        assert data["reason"] == lock_reason
+        assert "Batch is currently being processed" in data["reason"]
         assert data["batch_id"] == batch_id
         assert data["essay_id"] == essay_id
 
@@ -422,7 +464,8 @@ class TestFileManagementRoutes:
         essay_id = "essay-456"
         user_id = "user-789"
         correlation_id = "12345678-1234-5678-9abc-123456789abc"
-        mock_batch_validator.can_modify_batch_files.return_value = (True, "")
+        # Mock no exception (successful validation)
+        mock_batch_validator.can_modify_batch_files.return_value = None
 
         # Act
         response = await app_client.delete(

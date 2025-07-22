@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 

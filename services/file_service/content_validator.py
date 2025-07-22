@@ -7,9 +7,13 @@ meet quality standards before processing by downstream services.
 
 from __future__ import annotations
 
-from common_core.error_enums import FileValidationErrorCode
+from uuid import UUID
 
-from services.file_service.validation_models import ValidationResult
+from huleedu_service_libs.error_handling.file_validation_factories import (
+    raise_content_too_long,
+    raise_content_too_short,
+    raise_empty_content_error,
+)
 
 
 class FileContentValidator:
@@ -32,48 +36,50 @@ class FileContentValidator:
         self.min_length = min_length
         self.max_length = max_length
 
-    async def validate_content(self, text: str, file_name: str) -> ValidationResult:
+    async def validate_content(self, text: str, file_name: str, correlation_id: UUID) -> None:
         """
         Validate extracted text content against business rules.
 
         Args:
             text: Extracted text content to validate
             file_name: Original filename for context in error messages
+            correlation_id: Request correlation ID for tracing
 
         Returns:
-            ValidationResult indicating success/failure with details
+            None if validation passes
+
+        Raises:
+            HuleEduError: If validation fails with specific error code
         """
         # Empty content check
         if not text or not text.strip():
-            return ValidationResult(
-                is_valid=False,
-                error_code=FileValidationErrorCode.EMPTY_CONTENT,
-                error_message=f"File '{file_name}' contains no readable text content.",
+            raise_empty_content_error(
+                service="file_service",
+                operation="validate_content",
+                file_name=file_name,
+                correlation_id=correlation_id,
             )
 
         # Length validation
         content_length = len(text.strip())
         if content_length < self.min_length:
-            return ValidationResult(
-                is_valid=False,
-                error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
-                error_message=(
-                    f"File '{file_name}' contains only "
-                    f"{content_length} characters. Essays must contain at least "
-                    f"{self.min_length} characters."
-                ),
+            raise_content_too_short(
+                service="file_service",
+                operation="validate_content",
+                file_name=file_name,
+                min_length=self.min_length,
+                actual_length=content_length,
+                correlation_id=correlation_id,
             )
 
         if content_length > self.max_length:
-            return ValidationResult(
-                is_valid=False,
-                error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
-                error_message=(
-                    f"File '{file_name}' contains "
-                    f"{content_length} characters. Essays must not exceed "
-                    f"{self.max_length} characters."
-                ),
+            raise_content_too_long(
+                service="file_service",
+                operation="validate_content",
+                file_name=file_name,
+                max_length=self.max_length,
+                actual_length=content_length,
+                correlation_id=correlation_id,
             )
 
-        # Valid content
-        return ValidationResult(is_valid=True)
+        # Valid content - no exception raised
