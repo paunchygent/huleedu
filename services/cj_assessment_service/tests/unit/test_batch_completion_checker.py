@@ -7,12 +7,12 @@ from uuid import uuid4
 
 import pytest
 from common_core.status_enums import CJBatchStateEnum
+from huleedu_service_libs.error_handling import HuleEduError
 
 from services.cj_assessment_service.cj_core_logic.batch_completion_checker import (
     BatchCompletionChecker,
 )
 from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfigOverrides
-from huleedu_service_libs.error_handling import HuleEduError
 from services.cj_assessment_service.models_db import CJBatchState
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
@@ -359,8 +359,9 @@ class TestBatchCompletionChecker:
         mock_session = AsyncMock()
         mock_database.session.return_value.__aenter__.return_value = mock_session
 
-        from huleedu_service_libs.error_handling import create_error_detail_with_context
         from common_core.error_enums import ErrorCode
+        from huleedu_service_libs.error_handling import create_error_detail_with_context
+
         error_detail = create_error_detail_with_context(
             error_code=ErrorCode.PROCESSING_ERROR,
             message="Original database error",

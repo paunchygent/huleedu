@@ -9,10 +9,10 @@ from __future__ import annotations
 from typing import cast
 from uuid import UUID
 
+from huleedu_service_libs.error_handling import raise_processing_error
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
-from huleedu_service_libs.error_handling import raise_processing_error
 from services.cj_assessment_service.protocols import (
     BatchProcessorProtocol,
     CJRepositoryProtocol,

@@ -12,7 +12,6 @@ from collections import defaultdict, deque
 
 from huleedu_service_libs.error_handling.batch_conductor_factories import (
     raise_pipeline_compatibility_failed,
-    raise_pipeline_dependency_cycle_detected,
 )
 from huleedu_service_libs.error_handling.factories import (
     raise_resource_not_found,
@@ -124,12 +123,12 @@ class DefaultPipelineRules(PipelineRulesProtocol):
         self, pipeline_name: str, correlation_id: UUID, batch_metadata: dict | None = None
     ) -> None:
         """Validate if pipeline can be executed with given batch metadata.
-        
+
         Args:
             pipeline_name: Name of the pipeline to validate
             correlation_id: Correlation ID for request tracing
             batch_metadata: Optional batch metadata for compatibility checks
-            
+
         Raises:
             HuleEduError: If pipeline compatibility validation fails
         """
@@ -151,9 +150,9 @@ class DefaultPipelineRules(PipelineRulesProtocol):
 
         except Exception as e:
             # If it's already a HuleEduError, let it propagate
-            if hasattr(e, 'error_detail'):
+            if hasattr(e, "error_detail"):
                 raise
-            
+
             # Otherwise, wrap in compatibility failure error
             raise_pipeline_compatibility_failed(
                 service="batch_conductor_service",

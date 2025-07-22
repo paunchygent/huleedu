@@ -9,9 +9,9 @@ from __future__ import annotations
 from uuid import UUID
 
 from common_core.status_enums import CJBatchStateEnum
+from huleedu_service_libs.error_handling import HuleEduError, raise_processing_error
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from huleedu_service_libs.error_handling import HuleEduError, raise_processing_error
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
 from .batch_config import BatchConfigOverrides, get_effective_threshold

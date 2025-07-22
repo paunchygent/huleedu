@@ -93,30 +93,49 @@ CREATE TABLE shared_class_templates (
 **Complexity**: Medium  
 **Dependencies**: Additional language processing services
 
+**Architecture Decision**: See [ADR-001](../../../docs/adr/001-class-management-course-skill-level.md) for course skill level architecture
+
 **Features**:
-- Support for German, French, Spanish courses
-- Multi-language essay processing pipelines
-- Language-specific spell checking and analysis
-- Cross-language comparative analytics
+- Support for multiple education levels (grundskola, gymnasium)
+- Support for additional languages (German, French, Spanish)
+- Education-level aware course management
+- Prerequisite tracking for course progression
 
 **Course Extensions**:
 ```python
 class CourseCode(str, Enum):
-    # Existing courses
-    ENG5 = "ENG5"
-    ENG6 = "ENG6" 
-    ENG7 = "ENG7"
-    SV1 = "SV1"
-    SV2 = "SV2"
-    SV3 = "SV3"
+    # Gymnasium courses (existing)
+    ENG5 = "ENG5"  # English 5 (gymnasium)
+    ENG6 = "ENG6"  # English 6 (gymnasium)
+    ENG7 = "ENG7"  # English 7 (gymnasium)
+    SV1 = "SV1"    # Svenska 1 (gymnasium)
+    SV2 = "SV2"    # Svenska 2 (gymnasium)
+    SV3 = "SV3"    # Svenska 3 (gymnasium)
     
-    # Future extensions
-    GER1 = "GER1"  # German 1
-    GER2 = "GER2"  # German 2
-    FR1 = "FR1"    # French 1
-    FR2 = "FR2"    # French 2
-    ESP1 = "ESP1"  # Spanish 1
-    ESP2 = "ESP2"  # Spanish 2
+    # Grundskola upper (högstadiet) - Phase 4.1
+    SV7 = "SV7"    # Svenska årskurs 7
+    SV8 = "SV8"    # Svenska årskurs 8
+    SV9 = "SV9"    # Svenska årskurs 9
+    EN7 = "EN7"    # Engelska årskurs 7
+    EN8 = "EN8"    # Engelska årskurs 8
+    EN9 = "EN9"    # Engelska årskurs 9
+    
+    # Additional languages - Phase 4.2
+    GER1 = "GER1"  # Tyska 1 (gymnasium)
+    GER2 = "GER2"  # Tyska 2 (gymnasium)
+    FR1 = "FR1"    # Franska 1 (gymnasium)
+    FR2 = "FR2"    # Franska 2 (gymnasium)
+    ESP1 = "ESP1"  # Spanska 1 (gymnasium)
+    ESP2 = "ESP2"  # Spanska 2 (gymnasium)
+```
+
+**Database Schema Updates**:
+```sql
+-- Per ADR-001: Add education context
+ALTER TABLE courses 
+ADD COLUMN education_level VARCHAR(50),
+ADD COLUMN sequence_number INTEGER,
+ADD COLUMN prerequisite_course_code VARCHAR(20);
 ```
 
 ## Phase 5: Analytics & Reporting
@@ -184,6 +203,12 @@ class CourseCode(str, Enum):
 - Horizontal scaling considerations for multi-tenant architecture
 - Database sharding strategies for large organizations
 - Event-driven architecture for real-time updates
+
+## Architecture Decisions
+
+### Documented ADRs
+- [ADR-001](../../../docs/adr/001-class-management-course-skill-level.md): Course Skill Level Architecture
+- [ADR-002](../../../docs/adr/002-student-record-to-user-account-linking.md): Student to User Account Linking
 
 ## Decision Points
 

@@ -4,9 +4,15 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional, Type, TypeVar, cast
+from uuid import UUID
 
 from common_core.domain_enums import CourseCode
 from huleedu_service_libs.database import DatabaseMetricsProtocol
+from huleedu_service_libs.error_handling import (
+    raise_course_not_found,
+    raise_multiple_course_error,
+    raise_validation_error,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -17,10 +23,6 @@ from services.class_management_service.api_models import (
     CreateStudentRequest,
     UpdateClassRequest,
     UpdateStudentRequest,
-)
-from services.class_management_service.exceptions import (
-    CourseNotFoundError,
-    MultipleCourseError,
 )
 from services.class_management_service.models_db import (
     Course,
@@ -88,7 +90,7 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             await session.close()
 
     async def create_class(
-        self, user_id: str, class_data: CreateClassRequest
+        self, user_id: str, class_data: CreateClassRequest, correlation_id: UUID
     ) -> T:  # Returns type T (UserClass or subclass)
         start_time = time.time()
         operation = "create_class"
@@ -98,7 +100,9 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
         try:
             async with self.session() as session:
                 # Validate course codes
-                course = await self._validate_and_get_course(session, class_data.course_codes)
+                course = await self._validate_and_get_course(
+                    session, class_data.course_codes, correlation_id
+                )
 
                 new_class = UserClass(
                     name=class_data.name,
@@ -131,7 +135,7 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             return cast(T | None, result.scalars().first())
 
     async def update_class(
-        self, class_id: uuid.UUID, class_data: UpdateClassRequest
+        self, class_id: uuid.UUID, class_data: UpdateClassRequest, correlation_id: UUID
     ) -> T | None:  # Returns type T or None
         async with self.session() as session:
             stmt = select(UserClass).where(UserClass.id == class_id)
@@ -146,7 +150,9 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
 
             if class_data.course_codes is not None:
                 # Validate course codes and get the single course
-                course = await self._validate_and_get_course(session, class_data.course_codes)
+                course = await self._validate_and_get_course(
+                    session, class_data.course_codes, correlation_id
+                )
                 db_class.course = course
 
             await session.flush()
@@ -159,7 +165,7 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             return result.rowcount > 0
 
     async def create_student(
-        self, user_id: str, student_data: CreateStudentRequest
+        self, user_id: str, student_data: CreateStudentRequest, correlation_id: UUID
     ) -> U:  # Returns type U (Student or subclass)
         start_time = time.time()
         operation = "create_student"
@@ -230,7 +236,7 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             self._record_operation_metrics(operation, table, duration, success)
 
     async def update_student(
-        self, student_id: uuid.UUID, student_data: UpdateStudentRequest
+        self, student_id: uuid.UUID, student_data: UpdateStudentRequest, correlation_id: UUID
     ) -> U | None:  # Returns type U or None
         start_time = time.time()
         operation = "update_student"
@@ -313,7 +319,7 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             self._record_operation_metrics(operation, table, duration, success)
 
     async def associate_essay_to_student(
-        self, user_id: str, essay_id: uuid.UUID, student_id: uuid.UUID
+        self, user_id: str, essay_id: uuid.UUID, student_id: uuid.UUID, correlation_id: UUID
     ) -> None:
         start_time = time.time()
         operation = "associate_essay_to_student"
@@ -340,27 +346,43 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             self._record_operation_metrics(operation, table, duration, success)
 
     async def _validate_and_get_course(
-        self, session: AsyncSession, course_codes: list[CourseCode]
+        self, session: AsyncSession, course_codes: list[CourseCode], correlation_id: UUID
     ) -> Course:
         """Validate course codes and return the single course.
 
         Args:
             session: Database session
             course_codes: List of course codes to validate
+            correlation_id: Request correlation ID for tracking
 
         Returns:
             The validated Course entity
 
         Raises:
-            MultipleCourseError: If multiple course codes are provided
-            CourseNotFoundError: If the course code is not found in the database
+            HuleEduError: If validation fails or course not found
         """
         if len(course_codes) > 1:
-            raise MultipleCourseError(course_codes)
+            course_codes_str = ", ".join(code.value for code in course_codes)
+            raise_multiple_course_error(
+                service="class_management_service",
+                operation="_validate_and_get_course",
+                message=(
+                    f"Multiple courses provided ({course_codes_str}), "
+                    f"but only one course per class is supported"
+                ),
+                correlation_id=correlation_id,
+                provided_course_codes=[code.value for code in course_codes],
+            )
 
         if not course_codes:
             # This should be caught by Pydantic validation, but defensive programming
-            raise CourseNotFoundError([])
+            raise_validation_error(
+                service="class_management_service",
+                operation="_validate_and_get_course",
+                field="course_codes",
+                message="Course codes list cannot be empty",
+                correlation_id=correlation_id,
+            )
 
         course_code = course_codes[0]
 
@@ -369,6 +391,12 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
         course = result.scalars().first()
 
         if course is None:
-            raise CourseNotFoundError([course_code])
+            raise_course_not_found(
+                service="class_management_service",
+                operation="_validate_and_get_course",
+                course_id=str(course_code.value),
+                correlation_id=correlation_id,
+                missing_course_codes=[course_code.value],
+            )
 
         return course

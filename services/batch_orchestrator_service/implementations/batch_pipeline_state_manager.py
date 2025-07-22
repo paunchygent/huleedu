@@ -193,12 +193,12 @@ class BatchPipelineStateManager:
     ) -> bool:
         """
         Record a phase failure with structured error details.
-        
+
         This method creates a PhaseStatusLog entry with proper error_details
         populated from the HuleEduError instance.
         """
         from huleedu_service_libs.error_handling import HuleEduError
-        
+
         async with self.db.session() as session:
             try:
                 # Create phase status log with error details
@@ -208,7 +208,9 @@ class BatchPipelineStateManager:
                     status=PhaseStatusEnum.FAILED,
                     correlation_id=correlation_id,
                     phase_started_at=datetime.now(UTC).replace(tzinfo=None),
-                    error_details=error.error_detail.model_dump() if isinstance(error, HuleEduError) else {
+                    error_details=error.error_detail.model_dump()
+                    if isinstance(error, HuleEduError)
+                    else {
                         "error_code": "PROCESSING_ERROR",
                         "message": str(error),
                         "service": "batch_orchestrator_service",
@@ -221,7 +223,7 @@ class BatchPipelineStateManager:
                     },
                 )
                 session.add(phase_log)
-                
+
                 # Also update the batch's error_details
                 stmt = (
                     update(Batch)
@@ -232,15 +234,15 @@ class BatchPipelineStateManager:
                     )
                 )
                 await session.execute(stmt)
-                
+
                 await session.commit()
-                
+
                 self.logger.info(
                     f"Recorded phase failure for batch {batch_id} phase {phase_name}",
                     extra={"correlation_id": correlation_id},
                 )
                 return True
-                
+
             except Exception as e:
                 self.logger.error(
                     f"Failed to record phase failure for batch {batch_id}: {e}",

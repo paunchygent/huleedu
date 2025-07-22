@@ -19,12 +19,12 @@ from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
+from huleedu_service_libs.error_handling import HuleEduError
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import (
     AIFeedbackInitiatorImpl,
 )
-from huleedu_service_libs.error_handling import HuleEduError
 from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
 )

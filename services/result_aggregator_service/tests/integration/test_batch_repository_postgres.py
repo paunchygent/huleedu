@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import AsyncGenerator, Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from common_core.error_enums import ErrorCode
@@ -220,6 +220,7 @@ class TestBatchRepositoryIntegration:
         )
 
         from datetime import datetime, timezone
+
         error_detail = ErrorDetail(
             error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
             message="Spellcheck service timeout",
@@ -255,7 +256,10 @@ class TestBatchRepositoryIntegration:
         assert essays_by_id["essay-success"].spellcheck_status == ProcessingStage.COMPLETED
         assert essays_by_id["essay-failed"].spellcheck_status == ProcessingStage.FAILED
         assert essays_by_id["essay-failed"].spellcheck_error_detail is not None
-        assert essays_by_id["essay-failed"].spellcheck_error_detail["message"] == "Spellcheck service timeout"
+        assert (
+            essays_by_id["essay-failed"].spellcheck_error_detail["message"]
+            == "Spellcheck service timeout"
+        )
 
     async def test_batch_critical_failure(
         self, batch_repository: BatchRepositoryPostgresImpl
@@ -269,6 +273,7 @@ class TestBatchRepositoryIntegration:
 
         # Mark batch as critically failed
         from datetime import datetime, timezone
+
         error_detail = ErrorDetail(
             error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
             message="Kafka consumer disconnected during processing",
@@ -277,7 +282,9 @@ class TestBatchRepositoryIntegration:
             service="result_aggregator_service",
             operation="update_batch_failed",
         )
-        await batch_repository.update_batch_failed(batch_id, error_detail, error_detail.correlation_id)
+        await batch_repository.update_batch_failed(
+            batch_id, error_detail, error_detail.correlation_id
+        )
 
         # Verify failure state
         batch = await batch_repository.get_batch(batch_id)
@@ -285,7 +292,9 @@ class TestBatchRepositoryIntegration:
         assert batch.overall_status == BatchStatus.FAILED_CRITICALLY
         assert batch.batch_error_detail is not None
         assert batch.batch_error_detail["error_code"] == ErrorCode.EXTERNAL_SERVICE_ERROR.value
-        assert batch.batch_error_detail["message"] == "Kafka consumer disconnected during processing"
+        assert (
+            batch.batch_error_detail["message"] == "Kafka consumer disconnected during processing"
+        )
         # Note: error_count is not tracked in the current implementation
         # assert batch.error_count == 1
         # Note: processing_completed_at is not set by the current implementation

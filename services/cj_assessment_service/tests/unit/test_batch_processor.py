@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 from common_core import EssayComparisonWinner
 from common_core.status_enums import CJBatchStateEnum
+from huleedu_service_libs.error_handling import HuleEduError
 
 from services.cj_assessment_service.cj_core_logic.batch_processor import (
     BatchConfigOverrides,
@@ -16,7 +17,6 @@ from services.cj_assessment_service.cj_core_logic.batch_processor import (
     BatchSubmissionResult,
 )
 from services.cj_assessment_service.config import Settings
-from huleedu_service_libs.error_handling import HuleEduError
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
     ComparisonTask,

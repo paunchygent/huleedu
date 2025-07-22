@@ -12,10 +12,10 @@ from typing import Any
 from uuid import UUID
 
 from common_core.status_enums import CJBatchStateEnum
+from huleedu_service_libs.error_handling import raise_processing_error
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
-from huleedu_service_libs.error_handling import raise_processing_error
 from services.cj_assessment_service.models_api import ComparisonTask
 from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,

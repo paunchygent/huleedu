@@ -36,7 +36,7 @@ def raise_cj_insufficient_comparisons(
     **additional_context: Any,
 ) -> NoReturn:
     """Create and raise a CJ insufficient comparisons error.
-    
+
     Use this when there aren't enough valid comparisons to compute reliable
     Bradley-Terry scores. This is a domain-specific error unique to the
     Comparative Judgement algorithm.
@@ -57,7 +57,7 @@ def raise_cj_insufficient_comparisons(
         "required_count": required_count,
         **additional_context,
     }
-    
+
     error_detail = create_error_detail_with_context(
         error_code=CJAssessmentErrorCode.CJ_INSUFFICIENT_COMPARISONS,
         message=message,
@@ -80,7 +80,7 @@ def raise_cj_score_convergence_failed(
     **additional_context: Any,
 ) -> NoReturn:
     """Create and raise a CJ score convergence failure error.
-    
+
     Use this when the Bradley-Terry iterative algorithm fails to converge
     within the maximum number of iterations or encounters mathematical errors.
     This is specific to the Comparative Judgement scoring algorithm.
@@ -101,7 +101,7 @@ def raise_cj_score_convergence_failed(
         "convergence_error": convergence_error,
         **additional_context,
     }
-    
+
     error_detail = create_error_detail_with_context(
         error_code=CJAssessmentErrorCode.CJ_SCORE_CONVERGENCE_FAILED,
         message=message,
@@ -125,7 +125,7 @@ def raise_cj_comparison_imbalance(
     **additional_context: Any,
 ) -> NoReturn:
     """Create and raise a CJ comparison imbalance error.
-    
+
     Use this when the distribution of comparisons across essays is severely
     imbalanced, which could lead to unreliable rankings. This is specific
     to the Comparative Judgement pair generation algorithm.
@@ -148,7 +148,7 @@ def raise_cj_comparison_imbalance(
         "max_comparisons": max_comparisons,
         **additional_context,
     }
-    
+
     error_detail = create_error_detail_with_context(
         error_code=CJAssessmentErrorCode.CJ_COMPARISON_IMBALANCE,
         message=message,
@@ -170,7 +170,7 @@ def raise_cj_callback_correlation_failed(
     **additional_context: Any,
 ) -> NoReturn:
     """Create and raise a CJ callback correlation failure error.
-    
+
     Use this when an LLM callback cannot be correlated to its original
     comparison pair. This is specific to the CJ Assessment Service's
     callback processing system.
@@ -189,7 +189,7 @@ def raise_cj_callback_correlation_failed(
         "batch_id": batch_id,
         **additional_context,
     }
-    
+
     error_detail = create_error_detail_with_context(
         error_code=CJAssessmentErrorCode.CJ_CALLBACK_CORRELATION_FAILED,
         message=message,

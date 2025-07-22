@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from dishka import FromDishka
+from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
@@ -12,11 +13,6 @@ from quart_dishka import inject
 from services.class_management_service.api_models import (
     CreateClassRequest,
     UpdateClassRequest,
-)
-from services.class_management_service.exceptions import (
-    ClassManagementServiceError,
-    CourseNotFoundError,
-    MultipleCourseError,
 )
 from services.class_management_service.metrics import CmsMetrics
 from services.class_management_service.models_db import Student, UserClass
@@ -51,33 +47,22 @@ async def create_class(
             ).inc()
             metrics.class_creations_total.inc()
             return jsonify({"id": str(new_class.id), "name": new_class.name}), 201
-        except CourseNotFoundError as e:
-            logger.warning(f"Course not found during class creation: {e.message}")
+        except HuleEduError as e:
+            logger.warning(
+                f"Class management error: {e.error_detail.message}",
+                extra={
+                    "correlation_id": str(e.error_detail.correlation_id),
+                    "error_code": e.error_detail.error_code,
+                    "operation": e.error_detail.operation,
+                },
+            )
             metrics.http_requests_total.labels(
                 method="POST", endpoint="/v1/classes/", http_status=400
             ).inc()
             metrics.api_errors_total.labels(
-                endpoint="/v1/classes/", error_type="course_not_found"
+                endpoint="/v1/classes/", error_type=str(e.error_detail.error_code).lower()
             ).inc()
-            return jsonify({"error": e.message, "error_code": e.error_code}), 400
-        except MultipleCourseError as e:
-            logger.warning(f"Multiple courses provided during class creation: {e.message}")
-            metrics.http_requests_total.labels(
-                method="POST", endpoint="/v1/classes/", http_status=400
-            ).inc()
-            metrics.api_errors_total.labels(
-                endpoint="/v1/classes/", error_type="multiple_course_error"
-            ).inc()
-            return jsonify({"error": e.message, "error_code": e.error_code}), 400
-        except ClassManagementServiceError as e:
-            logger.warning(f"Class management service error during creation: {e.message}")
-            metrics.http_requests_total.labels(
-                method="POST", endpoint="/v1/classes/", http_status=400
-            ).inc()
-            metrics.api_errors_total.labels(
-                endpoint="/v1/classes/", error_type="service_error"
-            ).inc()
-            return jsonify({"error": e.message, "error_code": e.error_code}), 400
+            return jsonify({"error": e.error_detail.model_dump()}), 400
         except Exception as e:
             logger.error(f"Error creating class: {e}", exc_info=True)
             metrics.http_requests_total.labels(
@@ -200,33 +185,23 @@ async def update_class(
                 endpoint=f"/v1/classes/{class_id}", error_type="bad_request"
             ).inc()
             return jsonify({"error": "Invalid class ID format"}), 400
-        except CourseNotFoundError as e:
-            logger.warning(f"Course not found during class update: {e.message}")
+        except HuleEduError as e:
+            logger.warning(
+                f"Class management error during update: {e.error_detail.message}",
+                extra={
+                    "correlation_id": str(e.error_detail.correlation_id),
+                    "error_code": e.error_detail.error_code,
+                    "operation": e.error_detail.operation,
+                },
+            )
             metrics.http_requests_total.labels(
                 method="PUT", endpoint=f"/v1/classes/{class_id}", http_status=400
             ).inc()
             metrics.api_errors_total.labels(
-                endpoint=f"/v1/classes/{class_id}", error_type="course_not_found"
+                endpoint=f"/v1/classes/{class_id}",
+                error_type=str(e.error_detail.error_code).lower(),
             ).inc()
-            return jsonify({"error": e.message, "error_code": e.error_code}), 400
-        except MultipleCourseError as e:
-            logger.warning(f"Multiple courses provided during class update: {e.message}")
-            metrics.http_requests_total.labels(
-                method="PUT", endpoint=f"/v1/classes/{class_id}", http_status=400
-            ).inc()
-            metrics.api_errors_total.labels(
-                endpoint=f"/v1/classes/{class_id}", error_type="multiple_course_error"
-            ).inc()
-            return jsonify({"error": e.message, "error_code": e.error_code}), 400
-        except ClassManagementServiceError as e:
-            logger.warning(f"Class management service error during update: {e.message}")
-            metrics.http_requests_total.labels(
-                method="PUT", endpoint=f"/v1/classes/{class_id}", http_status=400
-            ).inc()
-            metrics.api_errors_total.labels(
-                endpoint=f"/v1/classes/{class_id}", error_type="service_error"
-            ).inc()
-            return jsonify({"error": e.message, "error_code": e.error_code}), 400
+            return jsonify({"error": e.error_detail.model_dump()}), 400
         except Exception as e:
             logger.error(f"Error updating class: {e}", exc_info=True)
             metrics.http_requests_total.labels(

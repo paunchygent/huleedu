@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from common_core.error_enums import ErrorCode
 from common_core.status_enums import CJBatchStateEnum
 from sqlalchemy import (
     JSON,

@@ -9,8 +9,6 @@ from uuid import UUID, uuid4
 
 import pytest
 from common_core.domain_enums import ContentType, CourseCode
-from common_core.error_enums import ErrorCode
-from common_core.models.error_models import ErrorDetail
 from common_core.event_enums import ProcessingEvent
 from common_core.events import (
     BatchEssaysRegistered,
@@ -25,6 +23,7 @@ from common_core.metadata_models import (
     StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
+from common_core.models.error_models import ErrorDetail
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus, EssayStatus, ProcessingStage
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
@@ -626,7 +625,7 @@ class TestProcessSpellcheckCompleted:
         assert call_args.kwargs["corrected_text_storage_id"] is None
         assert call_args.kwargs["error_detail"] is not None
         assert call_args.kwargs["correlation_id"] == test_correlation_id
-        
+
         # Verify error_detail structure
         error_detail = call_args.kwargs["error_detail"]
         assert "Spellcheck service error" in error_detail.message

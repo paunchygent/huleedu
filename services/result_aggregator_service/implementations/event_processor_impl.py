@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from common_core.error_enums import ErrorCode
 from common_core.status_enums import BatchStatus, ProcessingStage
 from huleedu_service_libs.error_handling import (
     create_error_detail_with_context,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
-from common_core.error_enums import ErrorCode
 
 from services.result_aggregator_service.protocols import (
     BatchRepositoryProtocol,
@@ -196,7 +196,11 @@ class EventProcessorImpl(EventProcessorProtocol):
 
             # Create error detail if spellcheck failed
             error_detail = None
-            if status == ProcessingStage.FAILED and data.system_metadata and data.system_metadata.error_info:
+            if (
+                status == ProcessingStage.FAILED
+                and data.system_metadata
+                and data.system_metadata.error_info
+            ):
                 error_detail = create_error_detail_with_context(
                     error_code=ErrorCode.SPELLCHECK_SERVICE_ERROR,
                     message=str(data.system_metadata.error_info),

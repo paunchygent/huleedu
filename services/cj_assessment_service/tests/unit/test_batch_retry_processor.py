@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 import pytest
+from huleedu_service_libs.error_handling import HuleEduError
 
 from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
     BatchRetryProcessor,
@@ -15,7 +16,6 @@ from services.cj_assessment_service.cj_core_logic.batch_submission import (
     BatchSubmissionResult,
 )
 from services.cj_assessment_service.config import Settings
-from huleedu_service_libs.error_handling import HuleEduError
 from services.cj_assessment_service.models_api import (
     ComparisonTask,
     EssayForComparison,
@@ -498,7 +498,10 @@ class TestBatchRetryProcessor:
         assert "Failed to process remaining failed comparisons" in str(exc_info.value)
         assert exc_info.value.correlation_id == str(correlation_id)
         assert exc_info.value.error_detail.details["batch_id"] == str(cj_batch_id)
-        assert exc_info.value.error_detail.details["processing_stage"] == "end_of_batch_retry_processing"
+        assert (
+            exc_info.value.error_detail.details["processing_stage"]
+            == "end_of_batch_retry_processing"
+        )
 
     async def test_end_of_batch_fairness_scenario(
         self,

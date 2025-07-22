@@ -16,6 +16,7 @@ import pytest
 
 # Test all critical imports from analysis
 from common_core.domain_enums import CourseCode
+from common_core.error_enums import ClassManagementErrorCode
 from common_core.events.class_events import (
     ClassCreatedV1,
     ClassUpdatedV1,
@@ -23,14 +24,14 @@ from common_core.events.class_events import (
     StudentUpdatedV1,
 )
 from common_core.events.envelope import EventEnvelope
+from huleedu_service_libs.error_handling import (
+    HuleEduError,
+    raise_course_not_found,
+)
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from services.class_management_service.api_models import CreateClassRequest, CreateStudentRequest
 from services.class_management_service.config import Settings
-from services.class_management_service.exceptions import (
-    ClassManagementServiceError,
-    CourseNotFoundError,
-)
 from services.class_management_service.implementations.class_repository_postgres_impl import (
     PostgreSQLClassRepositoryImpl,
 )
@@ -188,30 +189,31 @@ class TestAnalysisValidation:
 
         print("✓ Protocol method signatures validated")
 
-    def test_custom_exceptions_have_expected_structure(self) -> None:
-        """Validate custom exceptions have structure referenced in analysis."""
-        # Test exception can be instantiated and has expected instance attributes
-        test_base_error = ClassManagementServiceError("Test message", "TEST_CODE")
-        assert hasattr(test_base_error, "error_code"), (
-            "ClassManagementServiceError instance should have error_code attribute"
-        )
-        assert hasattr(test_base_error, "message"), (
-            "ClassManagementServiceError instance should have message attribute"
-        )
-        assert test_base_error.error_code == "TEST_CODE"
-        assert test_base_error.message == "Test message"
+    def test_error_handling_with_factories(self) -> None:
+        """Validate error handling using HuleEduError factories."""
+        import uuid
 
-        # Test CourseNotFoundError
-        test_error = CourseNotFoundError([CourseCode.ENG5])
-        assert hasattr(test_error, "missing_course_codes"), (
-            "CourseNotFoundError should have missing_course_codes attribute"
-        )
-        assert test_error.error_code == "COURSE_NOT_FOUND", (
-            f"Expected COURSE_NOT_FOUND, got {test_error.error_code}"
-        )
-        assert CourseCode.ENG5 in test_error.missing_course_codes
+        correlation_id = uuid.uuid4()
 
-        print("✓ Custom exception structure validated")
+        # Test course not found factory
+        with pytest.raises(HuleEduError) as exc_info:
+            raise_course_not_found(
+                service="class_management_service",
+                operation="test_operation",
+                course_id="ENG5",
+                correlation_id=correlation_id,
+                missing_course_codes=["ENG5"],
+            )
+
+        error_detail = exc_info.value.error_detail
+        assert error_detail.error_code == ClassManagementErrorCode.COURSE_NOT_FOUND
+        assert error_detail.details["course_id"] == "ENG5"
+        assert error_detail.details["missing_course_codes"] == ["ENG5"]
+        assert error_detail.correlation_id == correlation_id
+        assert error_detail.service == "class_management_service"
+        assert error_detail.operation == "test_operation"
+
+        print("✓ Error factory functions validated")
 
     def test_repository_implementation_has_async_session_pattern(self) -> None:
         """Validate repository implementation has async session management pattern from analysis."""

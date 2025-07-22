@@ -27,6 +27,7 @@ import gc
 import os
 import statistics
 import time
+import uuid
 from typing import Any, Dict, List
 
 import psutil
@@ -165,7 +166,7 @@ class TestDatabaseBulkPerformance:
 
         # Create a realistic class first
         class_request = test_data_generator.generate_class_requests(1)[0]
-        await performance_repository.create_class(teacher_id, class_request)
+        await performance_repository.create_class(teacher_id, class_request, uuid.uuid4())
 
         # Generate realistic class roster (25-30 students)
         roster_sizes = [25, 28, 30]  # Typical class sizes
@@ -182,7 +183,9 @@ class TestDatabaseBulkPerformance:
 
             for student_request in student_requests:
                 try:
-                    await performance_repository.create_student(teacher_id, student_request)
+                    await performance_repository.create_student(
+                        teacher_id, student_request, uuid.uuid4()
+                    )
                     successful_enrollments += 1
                 except Exception as e:
                     print(f"  ⚠ Student enrollment failed: {e}")
@@ -245,7 +248,7 @@ class TestDatabaseBulkPerformance:
             try:
                 # Create class
                 class_request = CreateClassRequest(name=class_name, course_codes=[CourseCode.ENG6])
-                await performance_repository.create_class(teacher_id, class_request)
+                await performance_repository.create_class(teacher_id, class_request, uuid.uuid4())
                 successful_classes += 1
 
                 # Add students to class
@@ -253,7 +256,9 @@ class TestDatabaseBulkPerformance:
 
                 for student_request in student_requests:
                     try:
-                        await performance_repository.create_student(teacher_id, student_request)
+                        await performance_repository.create_student(
+                            teacher_id, student_request, uuid.uuid4()
+                        )
                         successful_students += 1
                     except Exception as e:
                         print(f"    ⚠ Student enrollment failed in {class_name}: {e}")
@@ -306,12 +311,16 @@ class TestDatabaseBulkPerformance:
                 class_request = CreateClassRequest(
                     name=f"Complex Query Test Class {i + 1}-{j + 1}", course_codes=[CourseCode.ENG6]
                 )
-                created_class = await performance_repository.create_class(teacher_id, class_request)
+                created_class = await performance_repository.create_class(
+                    teacher_id, class_request, uuid.uuid4()
+                )
 
                 # Add students to each class
                 student_requests = EducationalTestDataGenerator.generate_student_requests(20)
                 for student_request in student_requests:
-                    await performance_repository.create_student(teacher_id, student_request)
+                    await performance_repository.create_student(
+                        teacher_id, student_request, uuid.uuid4()
+                    )
 
                 class_data.append((teacher_id, created_class.id))
 
@@ -451,7 +460,9 @@ class TestDatabaseBulkPerformance:
 
             for student_request in student_requests:
                 try:
-                    await performance_repository.create_student(teacher_id, student_request)
+                    await performance_repository.create_student(
+                        teacher_id, student_request, uuid.uuid4()
+                    )
                     successful_operations += 1
                 except Exception:
                     pass  # Count failures without logging for memory test
@@ -535,7 +546,9 @@ class TestDatabaseBulkPerformance:
 
         for student_request in mixed_batch:
             try:
-                await performance_repository.create_student(teacher_id, student_request)
+                await performance_repository.create_student(
+                    teacher_id, student_request, uuid.uuid4()
+                )
                 successful_enrollments += 1
             except Exception as e:
                 if "unique constraint" in str(e).lower() or "duplicate" in str(e).lower():
@@ -568,7 +581,9 @@ class TestDatabaseBulkPerformance:
 
         for student_request in large_batch:
             try:
-                await performance_repository.create_student(teacher_id, student_request)
+                await performance_repository.create_student(
+                    teacher_id, student_request, uuid.uuid4()
+                )
                 large_batch_successes += 1
             except Exception:
                 pass  # Expected for constraint violations

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import uuid
 from typing import Any, Dict, List
 
 import pytest
@@ -61,7 +62,7 @@ class TestConcurrentTeacherPerformance:
 
             for i, class_request in enumerate(class_requests):
                 duration, result, success = await measure_async_operation(
-                    performance_repository.create_class, teacher_id, class_request
+                    performance_repository.create_class, teacher_id, class_request, uuid.uuid4()
                 )
 
                 performance_metrics.record_operation("concurrent_class_creation", duration, success)
@@ -79,7 +80,7 @@ class TestConcurrentTeacherPerformance:
 
                     for student_request in student_requests:
                         duration, student_result, student_success = await measure_async_operation(
-                            performance_repository.create_student, teacher_id, student_request
+                            performance_repository.create_student, teacher_id, student_request, uuid.uuid4()
                         )
 
                         performance_metrics.record_operation(
@@ -182,7 +183,7 @@ class TestConcurrentTeacherPerformance:
 
                 for class_request in class_requests:
                     duration, result, success = await measure_async_operation(
-                        performance_repository.create_class, teacher_id, class_request
+                        performance_repository.create_class, teacher_id, class_request, uuid.uuid4()
                     )
 
                     performance_metrics.record_operation(
@@ -200,7 +201,7 @@ class TestConcurrentTeacherPerformance:
                 class_request = test_data_generator.generate_class_requests(1)[0]
 
                 duration, class_result, class_success = await measure_async_operation(
-                    performance_repository.create_class, teacher_id, class_request
+                    performance_repository.create_class, teacher_id, class_request, uuid.uuid4()
                 )
 
                 performance_metrics.record_operation(
@@ -216,7 +217,7 @@ class TestConcurrentTeacherPerformance:
 
                     for student_request in student_requests:
                         duration, student_result, student_success = await measure_async_operation(
-                            performance_repository.create_student, teacher_id, student_request
+                            performance_repository.create_student, teacher_id, student_request, uuid.uuid4()
                         )
 
                         performance_metrics.record_operation(
@@ -237,7 +238,7 @@ class TestConcurrentTeacherPerformance:
 
                 for class_request in class_requests:
                     duration, result, success = await measure_async_operation(
-                        performance_repository.create_class, teacher_id, class_request
+                        performance_repository.create_class, teacher_id, class_request, uuid.uuid4()
                     )
 
                     performance_metrics.record_operation(
@@ -257,7 +258,7 @@ class TestConcurrentTeacherPerformance:
                                 student_result,
                                 student_success,
                             ) = await measure_async_operation(
-                                performance_repository.create_student, teacher_id, student_request
+                                performance_repository.create_student, teacher_id, student_request, uuid.uuid4()
                             )
 
                             performance_metrics.record_operation(
@@ -386,7 +387,7 @@ class TestConcurrentTeacherPerformance:
 
             for class_request in class_requests:
                 duration, result, success = await measure_async_operation(
-                    performance_repository.create_class, teacher_id, class_request
+                    performance_repository.create_class, teacher_id, class_request, uuid.uuid4()
                 )
 
                 performance_metrics.record_operation("peak_class_creation", duration, success)
@@ -502,7 +503,7 @@ class TestConcurrentTeacherPerformance:
                 )
 
                 duration, result, success = await measure_async_operation(
-                    performance_repository.create_class, teacher_id, class_request
+                    performance_repository.create_class, teacher_id, class_request, uuid.uuid4()
                 )
 
                 results["operations"].append(("class_creation", duration, success))
@@ -522,7 +523,7 @@ class TestConcurrentTeacherPerformance:
                         )
 
                         duration, student_result, student_success = await measure_async_operation(
-                            performance_repository.create_student, teacher_id, student_request
+                            performance_repository.create_student, teacher_id, student_request, uuid.uuid4()
                         )
 
                         results["operations"].append(

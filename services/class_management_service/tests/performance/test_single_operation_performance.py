@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import uuid
 
 import pytest
 from common_core.domain_enums import CourseCode
@@ -42,7 +43,7 @@ class TestSingleOperationPerformance:
 
         # Act - measure single operation
         duration, result, success = await measure_async_operation(
-            performance_repository.create_class, teacher_id, class_request
+            performance_repository.create_class, teacher_id, class_request, uuid.uuid4()
         )
 
         # Assert - baseline performance thresholds
@@ -72,7 +73,7 @@ class TestSingleOperationPerformance:
 
         # Act - measure single operation
         duration, result, success = await measure_async_operation(
-            performance_repository.create_student, teacher_id, student_request
+            performance_repository.create_student, teacher_id, student_request, uuid.uuid4()
         )
 
         # Assert - baseline performance thresholds
@@ -103,7 +104,7 @@ class TestSingleOperationPerformance:
         )
 
         class_duration, class_result, class_success = await measure_async_operation(
-            performance_repository.create_class, teacher_id, class_request
+            performance_repository.create_class, teacher_id, class_request, uuid.uuid4()
         )
 
         assert class_success, "Class creation failed in sequential test"
@@ -121,7 +122,7 @@ class TestSingleOperationPerformance:
         total_enrollment_time = 0.0
         for student_request in student_requests:
             duration, result, success = await measure_async_operation(
-                performance_repository.create_student, teacher_id, student_request
+                performance_repository.create_student, teacher_id, student_request, uuid.uuid4()
             )
 
             assert success, f"Student enrollment failed: {result}"
@@ -160,7 +161,7 @@ class TestSingleOperationPerformance:
 
         for class_request in class_requests:
             duration, result, success = await measure_async_operation(
-                performance_repository.create_class, teacher_id, class_request
+                performance_repository.create_class, teacher_id, class_request, uuid.uuid4()
             )
 
             results.append((duration, success))
@@ -202,7 +203,7 @@ class TestSingleOperationPerformance:
         first_request = CreateClassRequest(name="Connection Test 1", course_codes=[CourseCode.SV2])
 
         first_duration, first_result, first_success = await measure_async_operation(
-            performance_repository.create_class, teacher_id, first_request
+            performance_repository.create_class, teacher_id, first_request, uuid.uuid4()
         )
 
         assert first_success, "First operation failed"
@@ -214,7 +215,7 @@ class TestSingleOperationPerformance:
             request = CreateClassRequest(name=f"Connection Test {i}", course_codes=[CourseCode.SV2])
 
             duration, result, success = await measure_async_operation(
-                performance_repository.create_class, teacher_id, request
+                performance_repository.create_class, teacher_id, request, uuid.uuid4()
             )
 
             assert success, f"Operation {i} failed"

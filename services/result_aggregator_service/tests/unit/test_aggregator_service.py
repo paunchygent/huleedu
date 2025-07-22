@@ -413,7 +413,7 @@ class TestAggregatorServiceImpl:
                 essays=[],
                 batch_error_detail={
                     "error_code": "PROCESSING_ERROR",
-                    "message": "Critical processing error"
+                    "message": "Critical processing error",
                 },
             ),
         ]
@@ -433,7 +433,7 @@ class TestAggregatorServiceImpl:
         assert result[0].overall_status == BatchStatus.FAILED_CRITICALLY
         assert result[0].batch_error_detail == {
             "error_code": "PROCESSING_ERROR",
-            "message": "Critical processing error"
+            "message": "Critical processing error",
         }
 
         mock_batch_repository.get_user_batches.assert_called_once_with(

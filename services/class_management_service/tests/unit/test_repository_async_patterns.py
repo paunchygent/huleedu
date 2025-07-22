@@ -114,19 +114,34 @@ class TestRepositoryAsyncSessionPatterns:
 
     def test_course_validation_logic_unit(self) -> None:
         """Test course validation business logic in isolation."""
-        # Test multiple course error
-        from services.class_management_service.exceptions import MultipleCourseError
+        # Test multiple course error using factory
+        import uuid
+
+        from common_core.error_enums import ClassManagementErrorCode
+        from huleedu_service_libs.error_handling import HuleEduError, raise_multiple_course_error
 
         multiple_courses = [CourseCode.ENG5, CourseCode.SV1]
+        correlation_id = uuid.uuid4()
 
         # This tests the validation logic without database calls
-        with pytest.raises(MultipleCourseError) as exc_info:
-            # We need to trigger this validation - let's check the exception type
-            error = MultipleCourseError(multiple_courses)
-            raise error
+        with pytest.raises(HuleEduError) as exc_info:
+            # We trigger the error using the factory function
+            course_codes_str = ", ".join(code.value for code in multiple_courses)
+            raise_multiple_course_error(
+                service="class_management_service",
+                operation="test_validation",
+                message=(
+                    f"Multiple courses provided ({course_codes_str}), "
+                    f"but only one course per class is supported"
+                ),
+                correlation_id=correlation_id,
+                provided_course_codes=[code.value for code in multiple_courses],
+            )
 
-        assert exc_info.value.provided_course_codes == multiple_courses
-        assert "Multiple courses provided" in str(exc_info.value)
+        error_detail = exc_info.value.error_detail
+        assert error_detail.error_code == ClassManagementErrorCode.MULTIPLE_COURSE_ERROR
+        assert error_detail.details["provided_course_codes"] == ["ENG5", "SV1"]
+        assert "Multiple courses provided" in error_detail.message
 
     def test_repository_type_safety_patterns(self) -> None:
         """Test repository maintains type safety with generics."""

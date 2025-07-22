@@ -20,7 +20,6 @@ from huleedu_service_libs.error_handling.batch_conductor_factories import (
 from huleedu_service_libs.error_handling.factories import (
     raise_configuration_error,
 )
-
 from services.batch_conductor_service.config import Settings
 from services.batch_conductor_service.pipeline_definitions import (
     PipelineConfig,
@@ -145,10 +144,10 @@ class DefaultPipelineGenerator:
 
     def validate_configuration(self, correlation_id: UUID) -> None:
         """Validate pipeline configuration for cycles and dependencies (synchronous version).
-        
+
         Args:
             correlation_id: Correlation ID for request tracing
-            
+
         Raises:
             HuleEduError: If configuration validation fails (cycles, missing dependencies, etc.)
         """
@@ -168,9 +167,9 @@ class DefaultPipelineGenerator:
 
         except Exception as e:
             # If it's already a HuleEduError, let it propagate
-            if hasattr(e, 'error_detail'):
+            if hasattr(e, "error_detail"):
                 raise
-            
+
             # Check if it's a cycle detection error
             if "cycle detected" in str(e).lower():
                 raise_pipeline_dependency_cycle_detected(
@@ -184,7 +183,7 @@ class DefaultPipelineGenerator:
                 # General configuration error
                 raise_configuration_error(
                     service="batch_conductor_service",
-                    operation="validate_configuration", 
+                    operation="validate_configuration",
                     config_key="pipeline_configuration",
                     message=str(e),
                     correlation_id=correlation_id,

@@ -115,12 +115,12 @@ class LLMErrorCode(str, Enum):
 class BatchConductorErrorCode(str, Enum):
     """
     Specific error codes for Batch Conductor Service pipeline operations.
-    
+
     These codes provide domain-specific error classification for pipeline
     dependency resolution, cycle detection, and compatibility validation.
     Follows service-specific enum pattern for architectural consistency.
     """
-    
+
     PIPELINE_DEPENDENCY_RESOLUTION_FAILED = "BCS_PIPELINE_DEPENDENCY_RESOLUTION_FAILED"
     PIPELINE_DEPENDENCY_CYCLE_DETECTED = "BCS_PIPELINE_DEPENDENCY_CYCLE_DETECTED"
     PIPELINE_COMPATIBILITY_FAILED = "BCS_PIPELINE_COMPATIBILITY_FAILED"
@@ -129,16 +129,20 @@ class BatchConductorErrorCode(str, Enum):
 class CJAssessmentErrorCode(str, Enum):
     """
     CJ Assessment Service domain-specific error codes.
-    
+
     These codes represent errors unique to the Comparative Judgement algorithm
     and callback correlation system. Generic errors like timeouts or external
     service failures should use the base ErrorCode enum.
     """
-    
+
     # Comparative Judgement Algorithm Specifics
-    CJ_INSUFFICIENT_COMPARISONS = "CJ_INSUFFICIENT_COMPARISONS"  # Not enough comparisons for reliable scoring
+    CJ_INSUFFICIENT_COMPARISONS = (
+        "CJ_INSUFFICIENT_COMPARISONS"  # Not enough comparisons for reliable scoring
+    )
     CJ_SCORE_CONVERGENCE_FAILED = "CJ_SCORE_CONVERGENCE_FAILED"  # Bradley-Terry didn't converge
     CJ_COMPARISON_IMBALANCE = "CJ_COMPARISON_IMBALANCE"  # Some essays over/under compared
-    
+
     # CJ Callback Correlation
-    CJ_CALLBACK_CORRELATION_FAILED = "CJ_CALLBACK_CORRELATION_FAILED"  # Can't match callback to comparison pair
+    CJ_CALLBACK_CORRELATION_FAILED = (
+        "CJ_CALLBACK_CORRELATION_FAILED"  # Can't match callback to comparison pair
+    )

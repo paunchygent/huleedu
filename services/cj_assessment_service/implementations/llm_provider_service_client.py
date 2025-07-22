@@ -11,7 +11,6 @@ from typing import Any
 from uuid import UUID
 
 import aiohttp
-from common_core.error_enums import ErrorCode
 from huleedu_service_libs.error_handling import (
     HuleEduError,
     raise_authentication_error,

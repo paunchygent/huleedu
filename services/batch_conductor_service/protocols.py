@@ -96,12 +96,12 @@ class PipelineRulesProtocol(Protocol):
         self, pipeline_name: str, correlation_id: UUID, batch_metadata: dict | None = None
     ) -> None:
         """Validate if pipeline can be executed with given batch metadata.
-        
+
         Args:
             pipeline_name: Name of the pipeline to validate
             correlation_id: Correlation ID for request tracing
             batch_metadata: Optional batch metadata for compatibility checks
-            
+
         Raises:
             HuleEduError: If pipeline compatibility validation fails
         """
@@ -175,10 +175,10 @@ class PipelineGeneratorProtocol(Protocol):
 
     def validate_configuration(self, correlation_id: UUID) -> None:
         """Validate pipeline configuration for cycles and dependencies.
-        
+
         Args:
             correlation_id: Correlation ID for request tracing
-            
+
         Raises:
             HuleEduError: If configuration validation fails (cycles, missing dependencies, etc.)
         """
@@ -222,15 +222,15 @@ class PipelineResolutionServiceProtocol(Protocol):
         self, batch_id: str, requested_pipeline: str, correlation_id: UUID
     ) -> list[str]:
         """Resolve pipeline for batch processing with error handling and metrics.
-        
+
         Args:
             batch_id: Batch identifier for pipeline resolution
             requested_pipeline: Name of the requested pipeline
             correlation_id: Correlation ID for request tracing
-            
+
         Returns:
             List of resolved pipeline steps in execution order
-            
+
         Raises:
             HuleEduError: If pipeline resolution fails (unknown pipeline, dependency issues, etc.)
         """
@@ -244,13 +244,13 @@ class PipelineResolutionServiceProtocol(Protocol):
         additional_metadata: dict | None = None,
     ) -> dict[str, Any]:
         """Resolve optimal pipeline configuration for a batch.
-        
+
         Args:
             batch_id: Batch identifier for pipeline resolution
             requested_pipeline: Name of the requested pipeline
             correlation_id: Correlation ID for request tracing
             additional_metadata: Optional additional metadata for pipeline resolution
-            
+
         Returns:
             Dictionary containing pipeline resolution results and metadata
         """

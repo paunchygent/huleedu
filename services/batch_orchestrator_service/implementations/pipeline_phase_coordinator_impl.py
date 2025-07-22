@@ -8,6 +8,10 @@ from uuid import UUID
 
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 from common_core.status_enums import BatchStatus
+from huleedu_service_libs.error_handling import (
+    HuleEduError,
+    raise_validation_error,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
@@ -16,11 +20,6 @@ from services.batch_orchestrator_service.implementations.notification_service im
 )
 from services.batch_orchestrator_service.implementations.pipeline_state_manager import (
     PipelineStateManager,
-)
-from huleedu_service_libs.error_handling import (
-    HuleEduError,
-    raise_validation_error,
-    raise_processing_error,
 )
 from services.batch_orchestrator_service.protocols import (
     BatchRepositoryProtocol,

@@ -57,7 +57,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         self, user_id: str, request: CreateClassRequest, correlation_id: uuid.UUID
     ) -> T:  # Returns type T (UserClass or subclass)
         # The type checker knows that create_class returns T
-        new_class: T = await self.repo.create_class(user_id, request)
+        new_class: T = await self.repo.create_class(user_id, request, correlation_id)
 
         # Access attributes that are guaranteed by the UserClass base class
         event_data = ClassCreatedV1(
@@ -87,7 +87,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         request: UpdateClassRequest,
         correlation_id: uuid.UUID,
     ) -> T | None:
-        updated_class = await self.repo.update_class(class_id, request)
+        updated_class = await self.repo.update_class(class_id, request, correlation_id)
         if updated_class:
             event_data = ClassUpdatedV1(
                 class_id=str(updated_class.id),
@@ -113,7 +113,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         self, user_id: str, request: CreateStudentRequest, correlation_id: uuid.UUID
     ) -> U:  # Returns type U (Student or subclass)
         # The type checker knows that create_student returns U
-        new_student: U = await self.repo.create_student(user_id, request)
+        new_student: U = await self.repo.create_student(user_id, request, correlation_id)
 
         # Access attributes that are guaranteed by the Student base class
         event_data = StudentCreatedV1(
@@ -145,7 +145,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         request: UpdateStudentRequest,
         correlation_id: uuid.UUID,
     ) -> U | None:
-        updated_student = await self.repo.update_student(student_id, request)
+        updated_student = await self.repo.update_student(student_id, request, correlation_id)
         if updated_student:
             add_class_ids = None
             if request.add_class_ids:

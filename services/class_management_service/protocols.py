@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from typing import Generic, Protocol, TypeVar
+from uuid import UUID
 
 from common_core.events.envelope import EventEnvelope
 
@@ -21,7 +22,7 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
     """Protocol for class and student data persistence operations."""
 
     async def create_class(
-        self, user_id: str, class_data: CreateClassRequest
+        self, user_id: str, class_data: CreateClassRequest, correlation_id: UUID
     ) -> T:  # Returns type T (UserClass or subclass)
         ...
 
@@ -29,14 +30,14 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
         ...
 
     async def update_class(
-        self, class_id: uuid.UUID, class_data: UpdateClassRequest
+        self, class_id: uuid.UUID, class_data: UpdateClassRequest, correlation_id: UUID
     ) -> T | None:  # Returns type T or None
         ...
 
     async def delete_class(self, class_id: uuid.UUID) -> bool: ...
 
     async def create_student(
-        self, user_id: str, student_data: CreateStudentRequest
+        self, user_id: str, student_data: CreateStudentRequest, correlation_id: UUID
     ) -> U:  # Returns type U (Student or subclass)
         ...
 
@@ -44,14 +45,14 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
         ...
 
     async def update_student(
-        self, student_id: uuid.UUID, student_data: UpdateStudentRequest
+        self, student_id: uuid.UUID, student_data: UpdateStudentRequest, correlation_id: UUID
     ) -> U | None:  # Returns type U or None
         ...
 
     async def delete_student(self, student_id: uuid.UUID) -> bool: ...
 
     async def associate_essay_to_student(
-        self, user_id: str, essay_id: uuid.UUID, student_id: uuid.UUID
+        self, user_id: str, essay_id: uuid.UUID, student_id: uuid.UUID, correlation_id: UUID
     ) -> None: ...
 
 

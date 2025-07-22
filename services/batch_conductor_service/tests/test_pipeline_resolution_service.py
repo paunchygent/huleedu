@@ -194,7 +194,10 @@ class TestPipelineResolutionServiceBehavior:
         assert response.final_pipeline == []
         assert response.analysis_summary is not None
         assert "Pipeline resolution failed" in response.analysis_summary
-        assert "pipeline with ID" in response.analysis_summary and "not found" in response.analysis_summary
+        assert (
+            "pipeline with ID" in response.analysis_summary
+            and "not found" in response.analysis_summary
+        )
         assert "nonexistent_pipeline" in response.analysis_summary
 
     async def test_multiple_unknown_pipeline_requests(
@@ -391,11 +394,11 @@ class TestPipelineResolutionServiceBehavior:
 
         # Assert - DLQ publication should occur for unknown pipeline errors
         mock_dlq_producer.publish_to_dlq.assert_called_once()
-        
+
         # Verify DLQ call includes proper error tracking
         call_args = mock_dlq_producer.publish_to_dlq.call_args
-        assert call_args[1]['base_topic'] == 'huleedu.pipelines.resolution'
-        assert call_args[1]['dlq_reason'] == 'critical_resolution_failure'
+        assert call_args[1]["base_topic"] == "huleedu.pipelines.resolution"
+        assert call_args[1]["dlq_reason"] == "critical_resolution_failure"
 
     # Test Category 6: Business Logic Integration
 
@@ -405,6 +408,7 @@ class TestPipelineResolutionServiceBehavior:
         """Test the resolve_optimal_pipeline interface for BOS integration."""
         # Arrange
         from uuid import uuid4
+
         batch_id = "batch_optimal_001"
         requested_pipeline = "ai_feedback"
         correlation_id = uuid4()
@@ -429,19 +433,24 @@ class TestPipelineResolutionServiceBehavior:
         """Test resolve_optimal_pipeline failure handling."""
         # Arrange
         from uuid import uuid4
+
         batch_id = "batch_optimal_fail_001"
         requested_pipeline = "invalid_pipeline_name"
         correlation_id = uuid4()
 
         # Act
-        result = await service.resolve_optimal_pipeline(batch_id, requested_pipeline, correlation_id)
+        result = await service.resolve_optimal_pipeline(
+            batch_id, requested_pipeline, correlation_id
+        )
 
         # Assert
         assert result["success"] is False
         assert result["batch_id"] == batch_id
         assert result["requested_pipeline"] == requested_pipeline
         assert result["resolved_pipeline"] == []
-        assert "pipeline with ID" in result["error_message"] and "not found" in result["error_message"]
+        assert (
+            "pipeline with ID" in result["error_message"] and "not found" in result["error_message"]
+        )
         assert "additional_metadata" not in result
 
     # Test Category 7: Edge Cases and Robustness

@@ -35,7 +35,7 @@ def raise_pipeline_dependency_resolution_failed(
     **additional_context: Any,
 ) -> NoReturn:
     """Create and raise a pipeline dependency resolution failure error.
-    
+
     Use this for complex pipeline dependency resolution failures that require
     batch context, pipeline information, and resolution stage details.
 
@@ -57,7 +57,7 @@ def raise_pipeline_dependency_resolution_failed(
         "dependency_error": dependency_error,
         **additional_context,
     }
-    
+
     error_detail = create_error_detail_with_context(
         error_code=BatchConductorErrorCode.PIPELINE_DEPENDENCY_RESOLUTION_FAILED,
         message=message,
@@ -80,7 +80,7 @@ def raise_pipeline_dependency_cycle_detected(
     **additional_context: Any,
 ) -> NoReturn:
     """Create and raise a pipeline dependency cycle detection error.
-    
+
     Use this for circular dependency detection in pipeline configurations
     that require cycle information and detection context.
 
@@ -100,7 +100,7 @@ def raise_pipeline_dependency_cycle_detected(
         "detection_stage": detection_stage,
         **additional_context,
     }
-    
+
     error_detail = create_error_detail_with_context(
         error_code=BatchConductorErrorCode.PIPELINE_DEPENDENCY_CYCLE_DETECTED,
         message=message,
@@ -123,7 +123,7 @@ def raise_pipeline_compatibility_failed(
     **additional_context: Any,
 ) -> NoReturn:
     """Create and raise a pipeline compatibility validation error.
-    
+
     Use this for pipeline compatibility validation failures that require
     pipeline information and batch metadata context.
 
@@ -143,7 +143,7 @@ def raise_pipeline_compatibility_failed(
         "compatibility_issue": compatibility_issue,
         **additional_context,
     }
-    
+
     error_detail = create_error_detail_with_context(
         error_code=BatchConductorErrorCode.PIPELINE_COMPATIBILITY_FAILED,
         message=message,

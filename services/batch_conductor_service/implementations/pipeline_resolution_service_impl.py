@@ -66,7 +66,7 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
 
         Returns:
             List of resolved pipeline steps in execution order
-            
+
         Raises:
             HuleEduError: If pipeline resolution fails (unknown pipeline, dependency issues, etc.)
         """

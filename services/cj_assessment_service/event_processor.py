@@ -22,6 +22,7 @@ from common_core.events.llm_provider_events import LLMComparisonResultV1
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import BatchStatus, ProcessingStage
+from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.error_handling.error_detail_factory import (
     create_error_detail_with_context,
 )
@@ -34,7 +35,6 @@ from huleedu_service_libs.observability import (
 
 from services.cj_assessment_service.cj_core_logic import run_cj_assessment_workflow
 from services.cj_assessment_service.config import Settings
-from huleedu_service_libs.error_handling import HuleEduError
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,

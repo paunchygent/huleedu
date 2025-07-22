@@ -91,7 +91,9 @@ async def update_comparison_result(
         if comparison_result.is_error and comparison_result.error_detail:
             # Update error fields
             comparison_pair.winner = "error"
-            comparison_pair.error_code = comparison_result.error_detail.error_code.value  # Convert enum to string
+            comparison_pair.error_code = (
+                comparison_result.error_detail.error_code.value
+            )  # Convert enum to string
             comparison_pair.error_correlation_id = comparison_result.error_detail.correlation_id
             comparison_pair.error_timestamp = comparison_result.error_detail.timestamp
             comparison_pair.error_service = comparison_result.error_detail.service

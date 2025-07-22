@@ -92,7 +92,8 @@ class TestRepositoryIntegration:
         user_id = "integration-test-user"
 
         # Act
-        created_class = await repository.create_class(user_id, class_data)
+        correlation_id = uuid.uuid4()
+        created_class = await repository.create_class(user_id, class_data, correlation_id)
 
         # Assert
         assert created_class.id is not None
@@ -121,7 +122,8 @@ class TestRepositoryIntegration:
         user_id = "integration-test-user"
 
         # Act
-        created_student = await repository.create_student(user_id, student_data)
+        correlation_id = uuid.uuid4()
+        created_student = await repository.create_student(user_id, student_data, correlation_id)
 
         # Assert - test the critical DetachedInstanceError prevention
         assert created_student.id is not None
@@ -150,9 +152,11 @@ class TestRepositoryIntegration:
         class_data2 = CreateClassRequest(name="Concurrent Class 2", course_codes=[CourseCode.SV1])
 
         # Act - run concurrent operations
+        correlation_id1 = uuid.uuid4()
+        correlation_id2 = uuid.uuid4()
         results = await asyncio.gather(
-            repo1.create_class("user1", class_data1),
-            repo2.create_class("user2", class_data2),
+            repo1.create_class("user1", class_data1, correlation_id1),
+            repo2.create_class("user2", class_data2, correlation_id2),
             return_exceptions=True,
         )
 
@@ -183,18 +187,27 @@ class TestRepositoryIntegration:
         )
         user_id = "error-test-user"
 
-        # Act & Assert - should raise MultipleCourseError
-        from services.class_management_service.exceptions import MultipleCourseError
+        # Act & Assert - should raise HuleEduError
+        from common_core.error_enums import ClassManagementErrorCode
+        from huleedu_service_libs.error_handling import HuleEduError
 
-        with pytest.raises(MultipleCourseError):
-            await repository.create_class(user_id, invalid_class_data)
+        correlation_id = uuid.uuid4()
+        with pytest.raises(HuleEduError) as exc_info:
+            await repository.create_class(user_id, invalid_class_data, correlation_id)
+
+        # Verify error details
+        error_detail = exc_info.value.error_detail
+        assert error_detail.error_code == ClassManagementErrorCode.MULTIPLE_COURSE_ERROR
 
         # Verify database is in clean state (transaction was rolled back)
         # Create a valid class to ensure database is still functional
         valid_class_data = CreateClassRequest(
             name="Recovery Test Class", course_codes=[CourseCode.ENG5]
         )
-        recovered_class = await repository.create_class(user_id, valid_class_data)
+        new_correlation_id = uuid.uuid4()
+        recovered_class = await repository.create_class(
+            user_id, valid_class_data, new_correlation_id
+        )
         assert recovered_class.name == "Recovery Test Class"
 
     @pytest.mark.asyncio
@@ -207,14 +220,17 @@ class TestRepositoryIntegration:
             person_name=PersonNameV1(first_name="Original", last_name="Name"),
             email="original@example.com",
         )
-        created_student = await repository.create_student("test-user", student_data)
+        correlation_id = uuid.uuid4()
+        created_student = await repository.create_student("test-user", student_data, correlation_id)
 
         # Act - update the student
         update_data = UpdateStudentRequest(
             person_name=PersonNameV1(first_name="Updated", last_name="Name"),
             email="updated@example.com",
         )
-        updated_student = await repository.update_student(created_student.id, update_data)
+        updated_student = await repository.update_student(
+            created_student.id, update_data, correlation_id
+        )
 
         # Assert
         assert updated_student is not None
@@ -232,7 +248,8 @@ class TestRepositoryIntegration:
         """Test delete operations follow proper async session patterns."""
         # Arrange - create a class to delete
         class_data = CreateClassRequest(name="Delete Test Class", course_codes=[CourseCode.ENG5])
-        created_class = await repository.create_class("test-user", class_data)
+        correlation_id = uuid.uuid4()
+        created_class = await repository.create_class("test-user", class_data, correlation_id)
 
         # Act - delete the class
         delete_result = await repository.delete_class(created_class.id)
@@ -254,11 +271,14 @@ class TestRepositoryIntegration:
             person_name=PersonNameV1(first_name="Essay", last_name="Student"),
             email="essay.student@example.com",
         )
-        created_student = await repository.create_student("test-user", student_data)
+        correlation_id = uuid.uuid4()
+        created_student = await repository.create_student("test-user", student_data, correlation_id)
         essay_id = uuid.uuid4()
 
         # Act - associate essay to student
-        await repository.associate_essay_to_student("test-user", essay_id, created_student.id)
+        await repository.associate_essay_to_student(
+            "test-user", essay_id, created_student.id, correlation_id
+        )
 
         # Assert - verify association was created (would need to check association table)
         # For now, just verify the operation completed without error
@@ -270,20 +290,24 @@ class TestRepositoryIntegration:
     ) -> None:
         """Test course validation logic with real database."""
         # Test that multiple courses raise appropriate error
-        from services.class_management_service.exceptions import MultipleCourseError
+        from common_core.error_enums import ClassManagementErrorCode
+        from huleedu_service_libs.error_handling import HuleEduError
 
         multiple_course_data = CreateClassRequest(
             name="Multiple Course Class",
             course_codes=[CourseCode.ENG5, CourseCode.SV1, CourseCode.ENG6],
         )
 
-        with pytest.raises(MultipleCourseError) as exc_info:
-            await repository.create_class("test-user", multiple_course_data)
+        correlation_id = uuid.uuid4()
+        with pytest.raises(HuleEduError) as exc_info:
+            await repository.create_class("test-user", multiple_course_data, correlation_id)
 
-        assert len(exc_info.value.provided_course_codes) == 3
-        assert CourseCode.ENG5 in exc_info.value.provided_course_codes
-        assert CourseCode.SV1 in exc_info.value.provided_course_codes
-        assert CourseCode.ENG6 in exc_info.value.provided_course_codes
+        error_detail = exc_info.value.error_detail
+        assert error_detail.error_code == ClassManagementErrorCode.MULTIPLE_COURSE_ERROR
+        assert len(error_detail.details["provided_course_codes"]) == 3
+        assert "ENG5" in error_detail.details["provided_course_codes"]
+        assert "SV1" in error_detail.details["provided_course_codes"]
+        assert "ENG6" in error_detail.details["provided_course_codes"]
 
     @pytest.mark.asyncio
     async def test_database_schema_initialization(self, async_engine: AsyncEngine) -> None:

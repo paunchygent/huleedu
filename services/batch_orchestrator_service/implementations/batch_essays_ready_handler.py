@@ -11,11 +11,11 @@ from typing import Any
 
 from common_core.events.batch_coordination_events import BatchEssaysReady
 from common_core.events.envelope import EventEnvelope
-from huleedu_service_libs.logging_utils import create_service_logger
-
 from huleedu_service_libs.error_handling import (
     raise_validation_error,
 )
+from huleedu_service_libs.logging_utils import create_service_logger
+
 from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
     BatchRepositoryProtocol,
