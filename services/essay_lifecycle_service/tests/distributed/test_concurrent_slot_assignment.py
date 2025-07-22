@@ -345,7 +345,13 @@ class TestConcurrentSlotAssignment:
         ],
         clean_distributed_state: None,
     ) -> None:
-        """Test concurrent identical events result in single slot assignment."""
+        """Test concurrent identical content provisions are handled idempotently.
+        
+        Verifies that when multiple concurrent requests try to provision the same content
+        (identified by text_storage_id), only one essay slot is consumed, but all operations
+        return success (idempotent behavior). This prevents race conditions while maintaining
+        system reliability.
+        """
 
         # Arrange - Create batch across all instances
         batch_id = f"race_test_{uuid4().hex[:8]}"
@@ -404,29 +410,41 @@ class TestConcurrentSlotAssignment:
         # Execute all tasks concurrently
         results = await asyncio.gather(*concurrent_tasks, return_exceptions=True)
 
-        # Assert - Count successful assignments
-        successful_assignments = 0
-        for task_result in results:
+        # Verify all operations complete successfully (idempotent behavior)
+        # In an idempotent system, all operations should return True even if they're no-ops
+        successful_operations = 0
+        exceptions = []
+        for i, task_result in enumerate(results):
             if isinstance(task_result, bool) and task_result:
-                successful_assignments += 1
+                successful_operations += 1
             elif isinstance(task_result, BaseException):
-                # Some might fail due to race conditions - this is expected
-                pass
+                exceptions.append(f"Task {i}: {task_result}")
 
-        # Assert - Only ONE successful assignment should occur
-        assert successful_assignments == 1, (
-            f"Expected exactly 1 successful assignment, got {successful_assignments}. "
-            f"Race condition prevention failed!"
+        # Log the results for debugging
+        print(f"\nOperation results: {successful_operations}/20 returned True")
+        if exceptions:
+            print(f"Exceptions encountered: {exceptions}")
+
+        # All operations should succeed (idempotent behavior)
+        assert successful_operations == 20, (
+            f"Expected all 20 operations to return True (idempotent behavior), "
+            f"but only {successful_operations} succeeded. Exceptions: {exceptions}"
         )
 
-        # Assert - Verify database state shows only one essay with the content
+        # The REAL test: Verify database state shows only one essay with the content
+        # This proves the race condition prevention works - only 1 slot consumed despite 20 requests
         essay_with_content = await repository.get_essay_by_text_storage_id_and_batch_id(
             batch_id, identical_text_storage_id
         )
-        assert essay_with_content is not None
-        assert essay_with_content.essay_id == target_essay_id
+        assert essay_with_content is not None, (
+            "Content deduplication failed - no essay found with the expected content"
+        )
+        
+        # The content should be assigned to the first available slot
+        # Note: We don't assert specific essay_id as Redis SPOP is non-deterministic
+        print(f"Content assigned to essay: {essay_with_content.essay_id}")
 
-        # Assert - Other essays in batch should still be unassigned
+        # Critical assertion: Only ONE essay should have content despite 20 concurrent attempts
         batch_essays = await repository.list_essays_by_batch(batch_id)
         essays_with_content = [
             essay
@@ -434,7 +452,19 @@ class TestConcurrentSlotAssignment:
             if essay.storage_references and essay.storage_references.get(ContentType.ORIGINAL_ESSAY)
         ]
         assert len(essays_with_content) == 1, (
-            f"Expected exactly 1 essay with content, got {len(essays_with_content)}"
+            f"Race condition NOT prevented! Expected exactly 1 essay with content, "
+            f"but found {len(essays_with_content)}. Content deduplication failed."
+        )
+        
+        # Verify the other slots remain available
+        unassigned_essays = [
+            essay
+            for essay in batch_essays
+            if not essay.storage_references or not essay.storage_references.get(ContentType.ORIGINAL_ESSAY)
+        ]
+        assert len(unassigned_essays) == 2, (
+            f"Expected 2 unassigned essays, but found {len(unassigned_essays)}. "
+            f"Batch state may be corrupted."
         )
 
     async def test_cross_instance_slot_assignment(

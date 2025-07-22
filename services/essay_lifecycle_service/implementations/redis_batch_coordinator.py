@@ -56,6 +56,10 @@ class RedisBatchCoordinator:
         """Get Redis key for batch timeout tracking."""
         return f"batch:{batch_id}:timeout"
 
+    def _get_content_assignments_key(self, batch_id: str) -> str:
+        """Get Redis key for content assignments hash (text_storage_id -> essay_id mapping)."""
+        return f"batch:{batch_id}:content_assignments"
+
     async def register_batch_slots(
         self,
         batch_id: str,
@@ -123,6 +127,9 @@ class RedisBatchCoordinator:
     ) -> str | None:
         """
         Atomically assign an available slot to content using Redis SPOP.
+        
+        Implements content deduplication to prevent identical content from being
+        assigned to multiple slots, solving the race condition issue.
 
         Args:
             batch_id: The batch identifier
@@ -133,17 +140,41 @@ class RedisBatchCoordinator:
         """
         slots_key = self._get_available_slots_key(batch_id)
         assignments_key = self._get_assignments_key(batch_id)
+        content_assignments_key = self._get_content_assignments_key(batch_id)
+        
+        # Extract text_storage_id for deduplication
+        text_storage_id = content_metadata.get("text_storage_id")
+        if not text_storage_id:
+            raise ValueError("content_metadata must include text_storage_id for deduplication")
 
         max_retries = 5
         for attempt in range(max_retries):
             try:
-                # Create transaction pipeline with watched keys
-                pipeline = await self._redis.create_transaction_pipeline(slots_key, assignments_key)
+                # First, check if content already assigned (non-transactional for efficiency)
+                existing_essay_id = await self._redis.hget(content_assignments_key, text_storage_id)
+                if existing_essay_id is not None:
+                    # Content already assigned - return existing assignment (idempotent)
+                    self._logger.info(
+                        f"Content {text_storage_id} already assigned to essay {existing_essay_id} "
+                        f"in batch {batch_id} (idempotent operation)"
+                    )
+                    return existing_essay_id
+                
+                # Create transaction pipeline with watched keys (including content assignments)
+                pipeline = await self._redis.create_transaction_pipeline(
+                    slots_key, assignments_key, content_assignments_key
+                )
 
-                # Start transaction
+                # Start transaction for atomic operations
                 pipeline.multi()
 
-                # Queue operations for atomic execution (no await)
+                # Queue all operations for atomic execution
+                # We need to make this truly atomic by using HSETNX
+                # HSETNX only sets if the key doesn't exist, returning 1 if set, 0 if already exists
+                
+                # First try to claim this content atomically with a placeholder
+                pipeline.hsetnx(content_assignments_key, text_storage_id, "PENDING")
+                # Then try to get a slot
                 pipeline.spop(slots_key)
 
                 # Execute atomic transaction
@@ -167,26 +198,50 @@ class RedisBatchCoordinator:
                         return None
 
                 # Extract results from atomic execution
-                essay_id: str | None = results[0]  # Result of spop
+                # results[0] is from hsetnx (1 if we claimed it, 0 if already exists)
+                # results[1] is from spop (slot assignment)
+                content_claimed = results[0]
+                essay_id = results[1]
+                
+                # Check if we successfully claimed the content
+                if content_claimed == 0:
+                    # Content was already claimed by another process
+                    # We need to get the actual essay_id (not "PENDING")
+                    actual_essay_id = await self._redis.hget(content_assignments_key, text_storage_id)
+                    
+                    # Wait a bit for the other process to update from PENDING to actual ID
+                    if actual_essay_id == "PENDING":
+                        await asyncio.sleep(0.01)  # Brief wait
+                        actual_essay_id = await self._redis.hget(content_assignments_key, text_storage_id)
+                    
+                    self._logger.info(
+                        f"Content {text_storage_id} already claimed by another process, "
+                        f"assigned to essay {actual_essay_id} in batch {batch_id}"
+                    )
+                    return actual_essay_id if actual_essay_id != "PENDING" else None
+                
+                # We claimed the content, check if we got a slot
                 if essay_id is None:
-                    # No slots were available when transaction executed
+                    # No slots available - remove our PENDING claim
+                    await self._redis.hdel(content_assignments_key, text_storage_id)
                     self._logger.debug(
-                        f"No available slots for batch {batch_id} (all slots assigned)"
+                        f"No available slots for batch {batch_id} (all slots assigned), "
+                        f"removed pending claim for content {text_storage_id}"
                     )
                     return None
+                
+                # Success - update PENDING to actual essay_id
+                await self._redis.hset(content_assignments_key, text_storage_id, essay_id)
 
-                # Store assignment metadata after successful slot assignment
-                # This is a separate operation but acceptable since:
-                # 1. The slot is already removed atomically
-                # 2. If metadata storage fails, we still have the essay_id assigned
-                # 3. The system can recover by re-reading assignments
+                # Store full assignment metadata
                 try:
                     metadata_json = json.dumps(content_metadata)
                     await self._redis.hset(assignments_key, essay_id, metadata_json)
                 except Exception as e:
-                    # Log error but don't fail the assignment
+                    # Log error but don't fail the assignment since content mapping is already done
                     self._logger.error(
-                        f"Failed to store assignment metadata for essay {essay_id} in batch {batch_id}: {e}",
+                        f"Failed to store assignment metadata for essay {essay_id} "
+                        f"in batch {batch_id}: {e}",
                         exc_info=True,
                     )
 
@@ -394,6 +449,7 @@ class RedisBatchCoordinator:
                 self._get_metadata_key(batch_id),
                 self._get_timeout_key(batch_id),
                 self._get_validation_failures_key(batch_id),
+                self._get_content_assignments_key(batch_id),  # Clean up content deduplication data
             ]
 
             for key in keys_to_delete:
@@ -627,6 +683,28 @@ class RedisBatchCoordinator:
 
         except Exception as e:
             self._logger.error(f"Failed to list active batch IDs: {e}", exc_info=True)
+            raise
+
+    async def get_essay_id_for_content(self, batch_id: str, text_storage_id: str) -> str | None:
+        """
+        Get the essay ID assigned to a specific text_storage_id.
+        
+        Args:
+            batch_id: The batch identifier
+            text_storage_id: The text storage ID to look up
+            
+        Returns:
+            The essay ID if content is assigned, None otherwise
+        """
+        try:
+            content_assignments_key = self._get_content_assignments_key(batch_id)
+            essay_id = await self._redis.hget(content_assignments_key, text_storage_id)
+            return essay_id
+        except Exception as e:
+            self._logger.error(
+                f"Failed to get essay ID for content {text_storage_id} in batch {batch_id}: {e}",
+                exc_info=True
+            )
             raise
 
     async def find_batch_for_essay(self, essay_id: str) -> tuple[str, str] | None:
