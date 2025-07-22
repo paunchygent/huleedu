@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Protocol
+from uuid import UUID
 
+from common_core.models.error_models import ErrorDetail
 from common_core.events import (
     BatchEssaysRegistered,
     CJAssessmentCompletedV1,
@@ -34,7 +36,7 @@ class BatchRepositoryProtocol(Protocol):
         ...
 
     async def update_batch_status(
-        self, batch_id: str, status: str, error: Optional[str] = None
+        self, batch_id: str, status: str, error_detail: Optional[ErrorDetail] = None, correlation_id: Optional[UUID] = None
     ) -> bool:
         """Update batch status."""
         ...
@@ -50,9 +52,10 @@ class BatchRepositoryProtocol(Protocol):
         essay_id: str,
         batch_id: str,
         status: ProcessingStage,
+        correlation_id: UUID,
         correction_count: Optional[int] = None,
         corrected_text_storage_id: Optional[str] = None,
-        error: Optional[str] = None,
+        error_detail: Optional[ErrorDetail] = None,
     ) -> None:
         """Update essay spellcheck results."""
         ...
@@ -62,10 +65,11 @@ class BatchRepositoryProtocol(Protocol):
         essay_id: str,
         batch_id: str,
         status: ProcessingStage,
+        correlation_id: UUID,
         rank: Optional[int] = None,
         score: Optional[float] = None,
         comparison_count: Optional[int] = None,
-        error: Optional[str] = None,
+        error_detail: Optional[ErrorDetail] = None,
     ) -> None:
         """Update essay CJ assessment results."""
         ...
@@ -80,7 +84,7 @@ class BatchRepositoryProtocol(Protocol):
         """Update batch after phase completion."""
         ...
 
-    async def update_batch_failed(self, batch_id: str, error_message: str) -> None:
+    async def update_batch_failed(self, batch_id: str, error_detail: ErrorDetail, correlation_id: UUID) -> None:
         """Mark batch as failed."""
         ...
 

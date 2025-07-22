@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -85,7 +85,7 @@ def create_mock_batch_result(
     overall_status: BatchStatus,
     essay_count: int,
     essays: List[AsyncMock],
-    error_message: Optional[str] = None,
+    batch_error_detail: Optional[Dict[str, Any]] = None,
 ) -> AsyncMock:
     """Create a mock BatchResult object."""
     mock_batch: AsyncMock = AsyncMock(spec=BatchResult)
@@ -94,7 +94,7 @@ def create_mock_batch_result(
     mock_batch.overall_status = overall_status
     mock_batch.essay_count = essay_count
     mock_batch.essays = essays
-    mock_batch.last_error = error_message
+    mock_batch.batch_error_detail = batch_error_detail
     mock_batch.completed_essay_count = len(
         [e for e in essays if e.spellcheck_status == ProcessingStage.COMPLETED.value]
     )
@@ -109,7 +109,7 @@ def create_mock_essay_result(
     batch_id: str,
     spellcheck_status: Optional[ProcessingStage] = None,
     spellcheck_correction_count: Optional[int] = None,
-    spellcheck_error: Optional[str] = None,
+    spellcheck_error_detail: Optional[Dict[str, Any]] = None,
     cj_assessment_status: Optional[ProcessingStage] = None,
     cj_rank: Optional[int] = None,
     cj_score: Optional[float] = None,
@@ -120,7 +120,7 @@ def create_mock_essay_result(
     mock_essay.batch_id = batch_id
     mock_essay.spellcheck_status = spellcheck_status.value if spellcheck_status else None
     mock_essay.spellcheck_correction_count = spellcheck_correction_count
-    mock_essay.spellcheck_error = spellcheck_error
+    mock_essay.spellcheck_error_detail = spellcheck_error_detail
     mock_essay.cj_assessment_status = cj_assessment_status.value if cj_assessment_status else None
     mock_essay.cj_rank = cj_rank
     mock_essay.cj_score = cj_score
@@ -163,7 +163,7 @@ class TestAggregatorServiceImpl:
                 essay_id="essay-3",
                 batch_id=batch_id,
                 spellcheck_status=ProcessingStage.FAILED,
-                spellcheck_error="Timeout error",
+                spellcheck_error_detail={"error_code": "TIMEOUT_ERROR", "message": "Timeout error"},
                 cj_assessment_status=ProcessingStage.PENDING,
             ),
         ]
@@ -411,7 +411,10 @@ class TestAggregatorServiceImpl:
                 overall_status=BatchStatus.FAILED_CRITICALLY,
                 essay_count=2,
                 essays=[],
-                error_message="Critical processing error",
+                batch_error_detail={
+                    "error_code": "PROCESSING_ERROR",
+                    "message": "Critical processing error"
+                },
             ),
         ]
 
@@ -428,7 +431,10 @@ class TestAggregatorServiceImpl:
         # Assert
         assert len(result) == 1
         assert result[0].overall_status == BatchStatus.FAILED_CRITICALLY
-        assert result[0].last_error == "Critical processing error"
+        assert result[0].batch_error_detail == {
+            "error_code": "PROCESSING_ERROR",
+            "message": "Critical processing error"
+        }
 
         mock_batch_repository.get_user_batches.assert_called_once_with(
             user_id=user_id,

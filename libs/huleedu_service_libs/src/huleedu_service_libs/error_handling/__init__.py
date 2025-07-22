@@ -1,10 +1,11 @@
 """Error handling utilities for HuleEdu services."""
 
-# Legacy imports - will be removed after migration
+# CJ Assessment domain-specific error factories
 from huleedu_service_libs.error_handling.cj_assessment_factories import (
-    raise_cj_assessment_processing_error,
-    raise_cj_llm_provider_error,
-    raise_cj_queue_operation_error,
+    raise_cj_callback_correlation_failed,
+    raise_cj_comparison_imbalance,
+    raise_cj_insufficient_comparisons,
+    raise_cj_score_convergence_failed,
 )
 from huleedu_service_libs.error_handling.class_management_factories import (
     raise_class_not_found,
@@ -123,10 +124,11 @@ __all__ = [
     "raise_unknown_validation_error",
     # Spellchecker error factories
     "raise_spell_event_correlation_error",
-    # CJ Assessment error factories
-    "raise_cj_llm_provider_error",
-    "raise_cj_assessment_processing_error",
-    "raise_cj_queue_operation_error",
+    # CJ Assessment domain-specific error factories
+    "raise_cj_insufficient_comparisons",
+    "raise_cj_score_convergence_failed",
+    "raise_cj_comparison_imbalance",
+    "raise_cj_callback_correlation_failed",
     # Framework-specific handlers moved to submodules (see imports above)
     # Testing utilities
     "assert_raises_huleedu_error",

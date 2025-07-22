@@ -174,7 +174,7 @@ def create_mock_batch_result(
     )
     mock_batch.created_at = MagicMock()
     mock_batch.updated_at = MagicMock()
-    mock_batch.last_error = None
+    mock_batch.batch_error_detail = None
     mock_batch.requested_pipeline = None  # Set to None or a string value
     mock_batch.processing_started_at = None
     mock_batch.processing_completed_at = None
@@ -201,8 +201,8 @@ def create_mock_essay_result(
     mock_essay.cj_score = cj_score
     mock_essay.filename = None
     mock_essay.spellcheck_corrected_text_storage_id = None
-    mock_essay.spellcheck_error = None
-    mock_essay.cj_assessment_error = None
+    mock_essay.spellcheck_error_detail = None
+    mock_essay.cj_assessment_error_detail = None
     mock_essay.updated_at = MagicMock()
     return mock_essay
 

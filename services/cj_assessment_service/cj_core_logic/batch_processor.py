@@ -15,10 +15,7 @@ from common_core.status_enums import CJBatchStateEnum
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
-from huleedu_service_libs.error_handling import (
-    raise_cj_assessment_processing_error,
-    raise_processing_error,
-)
+from huleedu_service_libs.error_handling import raise_processing_error
 from services.cj_assessment_service.models_api import ComparisonTask
 from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
@@ -88,7 +85,7 @@ class BatchProcessor:
                          or LLM provider communication failure
         """
         if not comparison_tasks:
-            raise_cj_assessment_processing_error(
+            raise_processing_error(
                 service="cj_assessment_service",
                 operation="submit_comparison_tasks",
                 message="No comparison tasks provided for batch submission",
@@ -204,7 +201,7 @@ class BatchProcessor:
                 )
 
             # Re-raise all exceptions using factory for consistency
-            raise_cj_assessment_processing_error(
+            raise_processing_error(
                 service="cj_assessment_service",
                 operation="submit_comparison_tasks",
                 message=f"Batch submission failed: {str(e)}",

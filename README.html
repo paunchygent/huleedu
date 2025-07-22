@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>README</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">README</h1>
+</header>
+<h1 id="huleedu-microservice-platform">HuleEdu Microservice
+Platform</h1>
+<p>HuleEdu is an educational technology platform for automated essay
+processing and assessment. It is built as a collection of specialized
+microservices orchestrated into a unified workflow for tasks such as
+file ingestion, text content storage, spell checking, and AI-based
+comparative judgment of student essays.</p>
+<p>The system has been rebuilt from a legacy monolithic application into
+a modern event-driven microservice architecture to improve scalability,
+maintainability, and clear separation of concerns. All services and
+shared components reside in a single monorepo for synchronized
+development.</p>
+<p>This document provides a technical overview of the system
+architecture, usage guidelines for developers, development standards,
+current implementation status, and planned future enhancements.</p>
+<h2 id="architecture-and-design">Architecture and Design</h2>
+<h3 id="core-architectural-principles">Core Architectural
+Principles</h3>
+<h4 id="domain-driven-design-ddd">Domain-Driven Design (DDD)</h4>
+<p>The platform is divided into services by bounded context. Each
+microservice owns its domain logic and data store. Service boundaries
+are strictly enforced (no direct database access across services, no
+tightly coupled logic).</p>
+<h4 id="event-driven-architecture-eda">Event-Driven Architecture
+(EDA)</h4>
+<p>Microservices communicate primarily through asynchronous events via a
+Kafka message bus. Cross-service interactions are decoupled using Kafka
+topics (with a standardized event schema), minimizing the need for
+direct synchronous calls between services.</p>
+<h4 id="explicit-data-contracts">Explicit Data Contracts</h4>
+<p>All inter-service communication models (event payloads, API
+request/response schemas) are defined as versioned Pydantic models in a
+shared <code>common_core</code> library. A standardized
+<code>EventEnvelope</code> wrapper is used for all Kafka events to
+provide metadata (timestamps, origin, schema version, correlation IDs,
+etc.) and ensure compatibility across services.</p>
+<h4 id="service-autonomy">Service Autonomy</h4>
+<p>Each service is independently deployable and has its own data
+persistence. One service will never directly query or write to another
+service’s database; any data sharing occurs via published events or
+well-defined internal APIs. This autonomy allows services to scale and
+evolve in isolation.</p>
+<h4 id="asynchronous-io">Asynchronous I/O</h4>
+<p>All services are written using Python’s
+<code>async</code>/<code>await</code> and asynchronous frameworks:</p>
+<ul>
+<li><strong>Web Services</strong>: Quart or FastAPI</li>
+<li><strong>Kafka Clients</strong>: aiokafka</li>
+<li><strong>Database Access</strong>: async SQLAlchemy</li>
+</ul>
+<p>Non-blocking I/O ensures that each service can handle high
+concurrency efficiently.</p>
+<h4 id="dependency-injection-di">Dependency Injection (DI)</h4>
+<p>The codebase employs a custom DI framework (Dishka) to invert
+dependencies and facilitate testing. Each service defines abstract
+interfaces (<code>typing.Protocol</code> classes in a
+<code>protocols.py</code>) for its key operations or external
+interactions. Concrete implementations are provided and wired at runtime
+via a DI container (see each service’s <code>di.py</code>). This ensures
+business logic depends on interfaces, making components swappable and
+modular.</p>
+<h4 id="configurable-via-environment">Configurable via Environment</h4>
+<p>Services use Pydantic <code>BaseSettings</code> classes (in each
+service’s <code>config.py</code>) to load configuration from environment
+variables (with support for <code>.env</code> files in development).
+This centralizes configuration (e.g. database URLs, API keys, service
+ports) and makes services twelve-factor compliant. No configuration
+values are hard-coded; all are injected via environment or configuration
+files.</p>
+<h4 id="centralized-logging-observability">Centralized Logging &amp;
+Observability</h4>
+<p>A shared logging utility
+(<code>huleedu_service_libs.logging_utils</code>) provides structured
+logging for all services. Logs include correlation IDs flowing through
+event metadata and request headers, enabling traceability across service
+boundaries.</p>
+<p>Each service avoids using the standard logging module directly and
+instead uses the centralized logger to ensure a uniform format. In
+addition, every service exposes:</p>
+<ul>
+<li><code>/healthz</code> endpoint for health checks</li>
+<li><code>/metrics</code> endpoint for Prometheus scraping</li>
+</ul>
+<p>This contributes to a consistent observability stack.</p>
+<h2 id="monorepo-structure">Monorepo Structure</h2>
+<p>The repository is organized as a monorepo managed by PDM (Python
+Dependency Manager), containing all services and shared code in one
+place for easy coordination:</p>
+<ul>
+<li><p><strong><code>common_core/</code></strong> – Shared Python
+package defining common data models and enums used across services. This
+includes Pydantic models for events and API DTOs (Data Transfer
+Objects), standardized enumerations (e.g., for statuses, error codes),
+and the base event envelope format. This library is the source of truth
+for inter-service data contracts.</p></li>
+<li><p><strong><code>services/</code></strong> – Directory holding all
+microservices, each in its own sub-folder. For example:</p>
+<ul>
+<li><code>services/content_service/</code></li>
+<li><code>services/spellchecker_service/</code></li>
+<li><code>services/batch_orchestrator_service/</code></li>
+</ul>
+<p>(See Microservices Overview below for details on each
+service)</p></li>
+<li><p><strong><code>services/libs/</code></strong> – Shared service
+libraries (internal utility packages). These include common
+infrastructure code such as Kafka client wrappers, Redis clients, and
+logging/monitoring helpers that are used by multiple services.</p></li>
+<li><p><strong><code>scripts/</code></strong> – Utility and setup
+scripts for development and operations. Notable scripts include:</p>
+<ul>
+<li><code>setup_huledu_environment.sh</code> – Bootstraps the
+development environment (installs PDM if missing, then installs all
+packages in the monorepo).</li>
+<li><code>kafka_topic_bootstrap.py</code> – Script to create all
+required Kafka topics (run automatically on startup in Docker
+Compose).</li>
+<li>Other convenience scripts for Docker orchestration and testing
+(e.g., <code>docker-rebuild.sh</code>,
+<code>validate_batch_coordination.sh</code>).</li>
+</ul></li>
+<li><p><strong><code>documentation/</code></strong> – Design and
+planning documents. This includes product requirement docs (PRDs),
+architecture decision records, and task breakdowns for major development
+phases. For example, the <code>SERVICE_FUTURE_ENHANCEMENTS/</code> and
+<code>TASKS/</code> subfolders contain specs and implementation notes
+for new features and phases of the project.</p></li>
+<li><p><strong><code>.windsurf/rules/</code></strong> – The repository’s
+development standards and rules in machine-readable Markdown format.
+Each rule file (e.g., coding standards, service architecture
+requirements, testing practices) is kept here. The master index
+<code>000-rule-index.mdc</code> lists all rules. These rules are used to
+ensure consistency and quality across the codebase (often enforced via
+review or tooling).</p></li>
+</ul>
+<h2 id="microservices-overview">Microservices Overview</h2>
+<p>The HuleEdu platform is composed of multiple microservices, each
+responsible for a specific aspect of the overall system. All services
+are implemented in Python (&gt;=3.11) and use asynchronous
+frameworks.</p>
+<p>They communicate via Kafka events and occasional internal HTTP calls.
+Below is a brief overview of each service and its role:</p>
+<h3 id="content-service">Content Service</h3>
+<p>A Quart-based HTTP service for binary content storage and retrieval.
+It handles storing essay files or text in a filesystem-based repository
+(local disk for development; could be S3 or similar in production). It
+exposes a simple REST API on port 8001 (e.g.,
+<code>POST/GET /v1/content</code> for uploading or fetching content by
+ID). Other services (like File Service and Essay Lifecycle) use this
+service to persist and retrieve raw text or file contents.</p>
+<h3 id="file-service">File Service</h3>
+<p>A Quart-based HTTP service (port 7001) that handles file uploads and
+content ingestion workflow. This service accepts multipart file uploads
+(for example, a batch of student essay files) via an endpoint such as
+<code>POST /v1/files/batch</code>. For each uploaded file, it extracts
+text content (performing PDF/DOCX text extraction if necessary), stores
+the content via the Content Service, and emits an
+<code>EssayContentProvisioned</code> event to signal that an essay’s
+text is ready. It acts as the entry point for new essay data entering
+the system, orchestrating with Essay Lifecycle Service to initialize
+essay records. The File Service also publishes events to Kafka to
+trigger downstream processing (for example, notifying that a new batch
+of essays is ready for spell checking).</p>
+<h3 id="essay-lifecycle-service-els">Essay Lifecycle Service (ELS)</h3>
+<p>A hybrid service with both an HTTP API (port 6001) and a Kafka event
+consumer component. ELS maintains the state of each essay through the
+processing pipeline using a formal state machine. It defines an
+<code>EssayStateMachine</code> (via the <code>transitions</code>
+library) that governs allowed state transitions (e.g., from
+<code>content_provisioned</code> to <code>spellcheck_completed</code> to
+<code>cj_completed</code>, etc.).</p>
+<p>The service receives commands and events to advance essay state: for
+example, it consumes a <code>BatchSpellcheckInitiateCommand</code> event
+to start spell checking all essays in a batch, and later emits an
+<code>EssaySpellcheckCompleted</code> event when an essay’s spellcheck
+phase is done. ELS also exposes HTTP endpoints for querying or updating
+essay state if needed (and for internal coordination with Batch
+Orchestrator).</p>
+<p>For persistence, it uses a relational database to store essay
+metadata and state (SQLite in development, PostgreSQL in production),
+accessed via SQLAlchemy. ELS ensures exactly-once state transitions and
+acts as the source of truth for an essay’s progress through the
+pipeline.</p>
+<h3 id="batch-orchestrator-service-bos">Batch Orchestrator Service
+(BOS)</h3>
+<p>A Quart-based HTTP service (port 5001) that coordinates processing at
+the batch level. A “batch” represents a collection of essays (e.g., a
+class assignment submission batch) to be processed together. BOS
+provides APIs to register a new batch and to initiate processing on a
+batch (triggering the pipeline of analysis phases for all essays in that
+batch).</p>
+<p>When a client (or the API Gateway) requests a batch pipeline
+execution via BOS, the BOS will consult the Batch Conductor Service to
+determine the correct sequence of phases based on the current state of
+the batch and system configuration. BOS then issues commands to the
+Essay Lifecycle Service (e.g., instruct ELS to start spellchecking all
+essays in the batch) and listens for phase completion events on Kafka.
+In essence, BOS is the central orchestrator that drives the multi-phase
+essay analysis workflow, orchestrating between ELS and various
+processing services.</p>
+<p>BOS does not perform heavy processing itself; it issues commands and
+reacts to events, maintaining batch-level context and progress.</p>
+<h3 id="batch-conductor-service-bcs">Batch Conductor Service (BCS)</h3>
+<p>An internal orchestration logic service (Quart-based, port 4002 for
+its API). BCS’s responsibility is dynamic pipeline dependency
+resolution. BOS delegates to BCS when it needs to determine which phase
+of processing should happen next for a given batch.</p>
+<p>BCS keeps track of what processing has been completed for each batch
+by consuming all relevant events (e.g., it listens to essay-level
+completion events from ELS and results from analysis services). Using
+this information, BCS computes whether the prerequisites for the next
+phase are satisfied. For example, if the pipeline is
+<code>Spell Checking -&gt; Comparative Judgment</code>, BCS will ensure
+all essays in the batch have spellcheck results before allowing the BOS
+to trigger the Comparative Judgment phase.</p>
+<p>BCS uses Redis as an in-memory store to manage batch state and
+coordinate complex transitions (employing atomic operations and
+optimistic locking via Redis transactions to avoid race conditions in
+concurrent event processing). It also provides an API (POST
+/internal/v1/pipelines/define) for BOS to request a pipeline resolution
+(this API returns the next phase or indicates completion). BCS
+implements robust error handling: if it detects an inconsistency or
+failure in phase progression, it can push a message to a Dead Letter
+Queue (DLQ) topic for later analysis. In summary, BCS adds intelligence
+to the orchestration process, enabling dynamic pipelines that adapt to
+real-time results and conditions.</p>
+<h3 id="spellchecker-service">Spellchecker Service</h3>
+<p>A Kafka consumer microservice (no public HTTP API) dedicated to
+spelling and grammar analysis of essay text. This service listens on a
+Kafka topic (e.g. <code>huleedu.commands.spellcheck.v1</code>) for
+commands to spell-check a particular essay. Upon receiving a command, it
+retrieves the essay text (from Content Service or included in the event
+payload), then performs spell checking and linguistic error analysis. It
+incorporates both standard spell-checking (via libraries like
+<code>pyspellchecker</code>) and second-language (L2) error correction
+logic for non-native writing issues. After processing, it emits an
+<code>EssaySpellcheckCompleted</code> event containing the results
+(e.g. lists of errors found and corrections). The Spellchecker Service
+runs as an asynchronous worker and typically handles many essays in
+parallel from the event queue. It also exposes a Prometheus metrics
+endpoint (on a small HTTP server at port 8002) to report its operation
+status (e.g. number of essays processed, processing duration, etc.).
+This service is a key part of the first phase in the essay processing
+pipeline.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li><strong>Event-Driven</strong>: Listens on Kafka topic
+<code>huleedu.commands.spellcheck.v1</code></li>
+<li><strong>Language Support</strong>:
+<ul>
+<li>Standard spell-checking (using libraries like
+<code>pyspellchecker</code>)</li>
+<li>Second-language (L2) error correction for non-native writing</li>
+</ul></li>
+<li><strong>Asynchronous Processing</strong>: Handles multiple essays in
+parallel</li>
+<li><strong>Monitoring</strong>: Exposes Prometheus metrics endpoint on
+port 8002</li>
+</ul>
+<p><strong>Workflow:</strong></p>
+<ul>
+<li>Receives spell-check command via Kafka</li>
+<li>Retrieves essay text from Content Service or event payload</li>
+<li>Performs linguistic analysis</li>
+<li>Emits <code>EssaySpellcheckCompleted</code> event with results</li>
+</ul>
+<h3 id="comparative-judgment-cj-assessment-service">Comparative Judgment
+(CJ) Assessment Service</h3>
+<p>A Kafka-driven service (with optional HTTP endpoints for health
+checks on port 9095) that performs AI-assisted comparative judgment of
+essays. In comparative judgment, essays are evaluated by comparing them
+in pairs. This service uses Large Language Model (LLM) APIs to generate
+pairwise comparisons or scores between essays in a batch. It listens on
+a Kafka topic (e.g. <code>huleedu.commands.cj_assess.v1</code>) for
+commands to assess a batch or a pair of essays. Internally, the CJ
+service interacts with the LLM Provider Service (described below) to
+obtain AI-generated judgments in a resilient way. It may break a large
+task (ranking a whole batch of essays) into many pairwise comparison
+queries to the LLM provider. The service collates the results
+(e.g. which essays won comparisons) and from these produces a ranked
+list or scores for all essays in the batch. Once comparative assessment
+for the batch is complete, it emits a
+<code>BatchComparativeJudgmentCompleted</code> event with the outcome
+(e.g. relative rankings or scores for each essay). This event can then
+be used by other components (Result Aggregator or BOS) to finalize the
+batch results. The CJ Assessment Service uses a PostgreSQL database to
+store intermediate results and ensure consistency (especially since LLM
+calls may be slow or need retries). Metrics and health endpoints are
+available (on <code>/metrics</code> and <code>/healthz</code>) for
+monitoring. This service enables automated scoring or ranking of essays
+using AI, providing the core of the grading or feedback mechanism.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li><strong>Port</strong>: 9095 (HTTP endpoints for health checks)</li>
+<li><strong>Event-Driven</strong>: Listens on Kafka topic
+<code>huleedu.commands.cj_assess.v1</code></li>
+<li><strong>AI Integration</strong>: Uses LLM Provider Service for
+pairwise comparisons</li>
+<li><strong>Data Persistence</strong>: PostgreSQL database for storing
+intermediate results</li>
+<li><strong>Monitoring</strong>:
+<ul>
+<li><code>/metrics</code> endpoint for Prometheus</li>
+<li><code>/healthz</code> endpoint for health checks</li>
+</ul></li>
+</ul>
+<p><strong>Workflow:</strong></p>
+<ul>
+<li>Receives assessment command via Kafka</li>
+<li>Breaks down batch assessment into pairwise comparisons</li>
+<li>Uses LLM Provider Service for AI judgments</li>
+<li>Collates results into ranked list or scores</li>
+<li>Emits <code>BatchComparativeJudgmentCompleted</code> event with
+outcomes</li>
+</ul>
+<h3 id="llm-provider-service">LLM Provider Service</h3>
+<p>A specialized Quart-based HTTP service (port 8090) that acts as a
+gateway and queue for calls to external Large Language Model providers.
+Multiple services in the platform (especially the CJ Assessment and
+future AI-driven services) need to call external AI APIs (like OpenAI,
+Anthropic, etc.). Instead of each service handling these calls (which
+can be slow or have rate limits), the LLM Provider Service centralizes
+this function. It exposes endpoints such as
+<code>POST /api/v1/comparison</code> to submit a comparison or other AI
+request. Requests are queued (in Redis) and processed asynchronously to
+handle high load and avoid hitting external API limits. The service
+implements circuit breakers and fallback strategies: if one AI provider
+is down or returns errors, it can switch to an alternative provider or
+degrade gracefully. Clients (like the CJ service) receive an immediate
+acknowledgment (HTTP 202 Accepted with a queue ID) and can poll
+<code>/api/v1/status/{queue_id}</code> or
+<code>/api/v1/results/{queue_id}</code> to get the result once ready.
+This design gives resilience to the AI calls and decouples the rest of
+the system from external API latency or failures.</p>
+<p>The LLM Provider Service supports multiple AI providers (OpenAI,
+Anthropic, Google PaLM, OpenRouter, etc.) through a unified interface,
+and does no caching of responses (each request passes through to
+preserve the psychometric validity of CJ assessments). It uses Redis
+both for queuing requests and as a short-term results store. This
+service is critical for any AI-driven feature in HuleEdu, ensuring those
+features are robust and scalable.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li><strong>Centralized AI API Management</strong>:
+<ul>
+<li>Handles rate limiting</li>
+<li>Implements circuit breakers</li>
+<li>Provides fallback strategies</li>
+</ul></li>
+<li><strong>Asynchronous Processing</strong>: Uses Redis for request
+queuing</li>
+<li><strong>Multi-Provider Support</strong>: Works with OpenAI,
+Anthropic, and other LLM providers</li>
+</ul>
+<p><strong>API Endpoints:</strong></p>
+<ul>
+<li><code>POST /api/v1/comparison</code> - Submit AI comparison
+request</li>
+<li><code>GET /api/v1/status/{queue_id}</code> - Check request
+status</li>
+<li><code>GET /api/v1/results/{queue_id}</code> - Retrieve results</li>
+</ul>
+<p><strong>Resilience Features:</strong></p>
+<ul>
+<li>Automatic retries for failed requests</li>
+<li>Load balancing across multiple AI providers</li>
+<li>Graceful degradation when providers are unavailable</li>
+</ul>
+<h3 id="class-management-service-cms">Class Management Service
+(CMS)</h3>
+<p>A Quart-based HTTP CRUD service (port 5002) that manages metadata
+about classes, students, and their enrollment relationships. It serves
+as the authoritative source for user domain data: which classes exist,
+which students belong to which class, etc. Other services (like the API
+Gateway or any feature that needs student info) rely on CMS for querying
+class/student info. It provides REST endpoints under
+<code>/v1/classes</code> and <code>/v1/students</code> for creating,
+reading, updating, and deleting these records. For instance, an admin
+could create a new class and assign students to it via this service’s
+API. The service uses a PostgreSQL database to persist class and student
+information. All access to class/student data from other parts of the
+system goes through this service (directly or via the API Gateway),
+ensuring a single source of truth. This microservice illustrates the
+platform’s domain separation: educational administrative data is handled
+separately from essay processing data.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li><strong>Authoritative Source</strong>: Serves as the single source
+of truth for user domain data</li>
+<li><strong>Data Management</strong>:
+<ul>
+<li>Tracks which classes exist</li>
+<li>Manages student enrollments</li>
+</ul></li>
+<li><strong>REST API</strong>:
+<ul>
+<li><code>/v1/classes</code> - Manage class records</li>
+<li><code>/v1/students</code> - Manage student records</li>
+</ul></li>
+<li><strong>Database</strong>: PostgreSQL for persistent storage</li>
+</ul>
+<h3 id="result-aggregator-service-ras">Result Aggregator Service
+(RAS)</h3>
+<p>A hybrid service (Kafka consumer with an internal HTTP interface on
+port 4003) responsible for aggregating and materializing the results of
+essay processing for fast retrieval.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li><strong>Event Processing</strong>: Listens to all completion events
+on Kafka</li>
+<li><strong>Data Storage</strong>: Maintains materialized views in
+PostgreSQL</li>
+<li><strong>API Endpoint</strong>:
+<code>GET /internal/v1/batches/{batch_id}/status</code> - Returns
+comprehensive status and results</li>
+<li><strong>CQRS Pattern</strong>: Separates command (write) and query
+(read) operations</li>
+<li><strong>Performance</strong>: Uses Redis caching for frequent
+queries</li>
+<li><strong>Security</strong>: Implements service-to-service
+authentication</li>
+</ul>
+<h3 id="api-gateway-service">API Gateway Service</h3>
+<p>A FastAPI-based gateway service (port 4001) that serves as the
+unified entry point for external clients (e.g., a Svelte frontend or
+third-party applications).</p>
+<p><strong>Core Responsibilities:</strong></p>
+<ul>
+<li><strong>Authentication</strong>: Validates JWT tokens for incoming
+requests</li>
+<li><strong>Request Validation</strong>: Uses Pydantic models from
+<code>common_core</code></li>
+<li><strong>Rate Limiting</strong>: Protects backend services from
+excessive traffic</li>
+<li><strong>Request Routing</strong>: Proxies requests to appropriate
+internal services</li>
+<li><strong>Event Publishing</strong>: Publishes client requests as
+Kafka events</li>
+<li><strong>WebSocket Support</strong>: Enables real-time updates for
+clients</li>
+<li><strong>Anti-Corruption Layer</strong>: Translates between internal
+and client-facing data models</li>
+</ul>
+<h3 id="websocket-service">WebSocket Service</h3>
+<p>A dedicated service for managing persistent WebSocket connections
+with clients. It works in conjunction with the API Gateway to provide
+real-time updates on essay processing status.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li><strong>Real-Time Updates</strong>: Pushes status changes to clients
+as they happen.</li>
+<li><strong>Scalability</strong>: Designed to handle a large number of
+concurrent connections.</li>
+<li><strong>Integration</strong>: Listens to internal Kafka events to
+know when to notify clients.</li>
+</ul>
+<h2 id="technology-stack">Technology Stack</h2>
+<p>HuleEdu leverages a modern Python-based tech stack and tooling:</p>
+<h3 id="core-technologies">Core Technologies</h3>
+<h4 id="python-3.11">Python 3.11+</h4>
+<ul>
+<li>Primary programming language for all services</li>
+<li>Chosen for its rich ecosystem and async support</li>
+</ul>
+<h4 id="web-frameworks">Web Frameworks</h4>
+<ul>
+<li><strong>Quart</strong>: ASGI-compatible Flask variant used for most
+HTTP services</li>
+<li><strong>FastAPI</strong>: Used for API Gateway and lightweight APIs
+<ul>
+<li>High performance</li>
+<li>Built-in data validation</li>
+<li>Async route handlers</li>
+<li>Automatic OpenAPI documentation</li>
+</ul></li>
+</ul>
+<h4 id="data-validation-serialization">Data Validation &amp;
+Serialization</h4>
+<ul>
+<li><strong>Pydantic</strong>:
+<ul>
+<li>Defines schemas for configuration and data models</li>
+<li>Validates all request/response bodies</li>
+<li>Ensures data consistency across services</li>
+<li>Used for Kafka event payloads</li>
+</ul></li>
+</ul>
+<h4 id="event-streaming">Event Streaming</h4>
+<ul>
+<li><strong>Apache Kafka</strong>:
+<ul>
+<li>Backbone of event-driven architecture</li>
+<li>Uses <code>aiokafka</code> for Python clients</li>
+<li>Provides scalable, durable message queuing</li>
+<li>Enables asynchronous workflows</li>
+<li>Supports event replay and ordering</li>
+</ul></li>
+</ul>
+<h3 id="database-solutions">Database Solutions</h3>
+<h4 id="postgresql">PostgreSQL</h4>
+<ul>
+<li>Primary production database</li>
+<li>Used for services requiring robust data storage</li>
+<li>Handles Class Management, Result Aggregator, and CJ service
+data</li>
+</ul>
+<h4 id="sqlite">SQLite</h4>
+<ul>
+<li>Default for development environments</li>
+<li>Simplifies local development setup</li>
+</ul>
+<h3 id="orm-database-access">ORM &amp; Database Access</h3>
+<h4 id="sqlalchemy">SQLAlchemy</h4>
+<ul>
+<li>Async ORM for database operations</li>
+<li>Provides abstraction layer over SQL</li>
+<li>Enables database-agnostic code</li>
+<li>Supports migrations and schema management</li>
+</ul>
+<h3 id="redis">Redis</h3>
+<p>In-memory data store used for caching and transient data
+coordination.</p>
+<p><strong>Key Use Cases:</strong></p>
+<ul>
+<li><p><strong>Batch Coordination</strong>: Maintains batch state and
+critical section locks (using WATCH/MULTI transactions)</p></li>
+<li><p><strong>Request Queuing</strong>: Used by LLM Provider and API
+Gateway</p></li>
+<li><p><strong>Rate Limiting</strong>: Enforces request rate
+limits</p></li>
+<li><p><strong>Caching</strong>: Speeds up frequent queries (e.g., in
+RAS)</p></li>
+<li><p>Atomic operations for data consistency</p></li>
+<li><p>Pub/sub capabilities for event-driven patterns</p></li>
+<li><p>Low-latency performance</p></li>
+<li><p>Built-in concurrency control</p></li>
+</ul>
+<h3 id="dishka-dependency-injection">Dishka (Dependency Injection)</h3>
+<p>Custom DI framework integrated with Quart (<code>quart_dishka</code>)
+for managing service components.</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li><strong>Loose Coupling</strong>: Binds implementations to interfaces
+at runtime.</li>
+<li><strong>Test-Friendly</strong>: Simplifies testing by allowing easy
+swapping of implementations.</li>
+<li><strong>Clean Architecture</strong>: Supports clean architecture
+patterns through dependency inversion.</li>
+</ul>
+<p><strong>Usage Example:</strong></p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Service definition</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> DatabaseService(Protocol):</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> get_data(<span class="va">self</span>) <span class="op">-&gt;</span> Data: ...</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Production implementation</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> PostgresDatabaseService(DatabaseService):</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> get_data(<span class="va">self</span>) <span class="op">-&gt;</span> Data:</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Implementation using PostgreSQL</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">pass</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Test implementation</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MockDatabaseService(DatabaseService):</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> get_data(<span class="va">self</span>) <span class="op">-&gt;</span> Data:</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Mock implementation for testing</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> TestData()</span></code></pre></div>
+<h2 id="containerization-orchestration">Containerization &amp;
+Orchestration</h2>
+<h3 id="docker-docker-compose">Docker &amp; Docker Compose</h3>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li>Containerization of all services and dependencies</li>
+<li>Consistent runtime environments</li>
+<li>Simplified local development and testing</li>
+<li>Production-parity in development</li>
+</ul>
+<p><strong>Components:</strong></p>
+<ul>
+<li><strong>Dockerfiles</strong>: One per microservice</li>
+<li><strong>docker-compose.yml</strong>: Central configuration for all
+services</li>
+<li><strong>Dependencies</strong>:
+<ul>
+<li>Kafka</li>
+<li>Zookeeper</li>
+<li>Redis</li>
+<li>PostgreSQL</li>
+</ul></li>
+</ul>
+<h2 id="development-tools">Development Tools</h2>
+<h3 id="pdm-python-dependency-manager">PDM (Python Dependency
+Manager)</h3>
+<p>PDM is used to manage Python packages in our monorepo. It provides
+several key benefits:</p>
+<ul>
+<li><strong>Editable Packages</strong>: Each service can be installed as
+an editable package</li>
+<li><strong>Unified Lockfile</strong>: Single source of truth for all
+dependencies</li>
+<li><strong>Task Runner</strong>: Built-in support for common
+development tasks</li>
+<li><strong>Modern Workflow</strong>: Replaces traditional tools like
+pip/venv and Makefiles</li>
+</ul>
+<p><strong>Common Commands:</strong></p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Install dependencies</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">pdm</span> install</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Run tests</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">pdm</span> run test</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Run linter</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ex">pdm</span> run lint</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Run formatter</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="ex">pdm</span> run format</span></code></pre></div>
+<h3 id="ruff-linter-formatter">Ruff (Linter &amp; Formatter)</h3>
+<p>Ruff is a fast Python linter and code formatter configured for the
+project. It enforces coding style (PEP8 compliance, import sorting,
+etc.) and can automatically apply simple formatting fixes.</p>
+<p>The project uses Ruff to:</p>
+<ul>
+<li>Flag style and syntax issues</li>
+<li>Automatically format code (via <code>pdm run format-all</code>)</li>
+<li>Enforce consistent code style across the codebase</li>
+<li>Speed up code reviews by catching issues early</li>
+</ul>
+<h3 id="mypy-static-type-checker">MyPy (Static Type Checker)</h3>
+<p>MyPy is used throughout the codebase to ensure type safety and catch
+potential issues at development time.</p>
+<p><strong>Key Benefits:</strong></p>
+<ul>
+<li>Full type hinting support</li>
+<li>Catches type errors before runtime</li>
+<li>Ensures interface contracts are maintained</li>
+<li>Improves code quality in a large codebase</li>
+<li>Works well with protocols and dependency injection</li>
+</ul>
+<h3 id="pytest-testing-framework">PyTest (Testing Framework)</h3>
+<p>PyTest is the testing framework used for all automated tests in the
+project.</p>
+<p><strong>Testing Strategy:</strong></p>
+<ul>
+<li><strong>Unit Tests</strong>: Test individual components in
+isolation</li>
+<li><strong>Integration Tests</strong>: Verify interactions between
+components</li>
+<li><strong>Contract Tests</strong>: Ensure events and APIs conform to
+expected schemas</li>
+<li><strong>End-to-End Tests</strong>: Test complete workflows</li>
+</ul>
+<p><strong>Features:</strong></p>
+<ul>
+<li>Run tests via <code>pdm run test-all</code></li>
+<li>Support for testing with real dependencies</li>
+<li>Temporary database and Kafka instances for testing</li>
+<li>Extensive use of fixtures for test setup</li>
+<li>Plugins for async testing and code coverage</li>
+</ul>
+<h2 id="development-setup-and-usage">Development Setup and Usage</h2>
+<p>This section provides instructions for developers who want to set up,
+run, or extend the system locally.</p>
+<h3 id="prerequisites">Prerequisites</h3>
+<ul>
+<li><strong>Python 3.11 or above</strong> - Required for running the
+services and tools</li>
+<li><strong>Docker with Docker Compose</strong> - Required for running
+dependencies in containers</li>
+<li><strong>PDM</strong> - Python Dependency Manager (will be installed
+automatically if missing)</li>
+</ul>
+<h3 id="initial-environment-setup">Initial Environment Setup</h3>
+<ol type="1">
+<li><p>Clone the repository to your local machine:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone <span class="op">&lt;</span>repository-url<span class="op">&gt;</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> huledu-reboot</span></code></pre></div></li>
+<li><p>Run the setup script to install dependencies:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./scripts/setup_huledu_environment.sh</span></span></code></pre></div>
+<p>This script will:</p>
+<ul>
+<li>Install PDM if not already present</li>
+<li>Set up a virtual environment (<code>.venv</code>)</li>
+<li>Install all Python dependencies</li>
+<li>Register each service package in development mode</li>
+<li>Configure pre-commit hooks</li>
+</ul>
+<blockquote>
+<p><strong>Note:</strong> The project uses PDM instead of pip or Poetry.
+Do not use <code>pip install .</code> directly. The setup script and
+<code>pdm install</code> ensure the correct environment. All commands
+below assume the PDM-managed virtual environment is active (the setup
+script activates it automatically, or you can run <code>pdm shell</code>
+manually).</p>
+</blockquote></li>
+</ol>
+<h2 id="running-the-full-system-with-docker-compose">Running the Full
+System with Docker Compose</h2>
+<p>The recommended way to run all microservices together (along with
+required infrastructure like Kafka) is using Docker Compose. PDM
+provides helper scripts to simplify this process.</p>
+<h3 id="building-service-images">Building Service Images</h3>
+<p>From the project root, build the Docker images for all
+microservices:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pdm</span> run docker-build</span></code></pre></div>
+<p>This command will:</p>
+<ol type="1">
+<li>Build all service images in parallel</li>
+<li>Tag them with the current branch name and <code>latest</code></li>
+<li>Cache intermediate layers for faster subsequent builds</li>
+</ol>
+<p>This will use the Dockerfiles in each service directory to create
+images tagged for this project. It may take some time on first build as
+it installs OS packages and Python dependencies inside the images.</p>
+<h3 id="launching-services-with-docker-compose">Launching Services with
+Docker Compose</h3>
+<p>To start all services, run:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pdm</span> run docker-up</span></code></pre></div>
+<p>This command starts the Docker Compose stack defined in
+<code>docker-compose.yml</code>. It will spin up:</p>
+<p><strong>Core Services:</strong></p>
+<ul>
+<li>Zookeeper and Kafka brokers (for the event bus)</li>
+<li>Redis (for BCS state and LLM queue)</li>
+<li>PostgreSQL (with separate databases for services)</li>
+<li>Kafka topic initializer container (runs once at startup)</li>
+</ul>
+<p><strong>HuleEdu Microservices:</strong></p>
+<ul>
+<li>Content Service</li>
+<li>File Service</li>
+<li>ELS (Event Logging Service)</li>
+<li>BOS (Batch Orchestration Service)</li>
+<li>BCS (Batch Coordination Service)</li>
+<li>Spellchecker Service</li>
+<li>CJ (Comparative Judgment) Service</li>
+<li>LLM Provider Service</li>
+<li>CMS (Class Management Service)</li>
+<li>RAS (Result Aggregator Service)</li>
+<li>API Gateway</li>
+<li>And other supporting services</li>
+</ul>
+<h3 id="verifying-the-deployment">Verifying the Deployment</h3>
+<p>Once started, services run in the background (detached mode). You can
+verify they’re running by:</p>
+<ol type="1">
+<li><p>Checking container status:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker-compose</span> ps</span></code></pre></div></li>
+<li><p>Accessing health endpoints:</p>
+<ul>
+<li>BOS: <code>http://localhost:5001/healthz</code></li>
+<li>API Gateway: <code>http://localhost:8000/health</code></li>
+<li>(Ports may vary based on configuration)</li>
+</ul></li>
+</ol>
+<h3 id="interacting-with-the-system">Interacting with the System</h3>
+<p>Once all containers are up, you can:</p>
+<ol type="1">
+<li><strong>Upload Files</strong>:
+<ul>
+<li>Use the File Service API</li>
+<li>Or go through the API Gateway</li>
+</ul></li>
+<li><strong>Process Batches</strong>:
+<ul>
+<li>Trigger batch processing via the BOS API</li>
+</ul></li>
+<li><strong>Monitor Activity</strong>:
+<ul>
+<li>Observe logs and events</li>
+<li>Check service metrics and health</li>
+</ul></li>
+</ol>
+<p>For development and testing, you can use the provided scripts or
+write unit/integration tests. See individual service README files for
+specific API documentation and examples.</p>
+<h3 id="shutting-down">Shutting Down</h3>
+<p>To stop all services:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pdm</span> run docker-down</span></code></pre></div>
+<p>This will:</p>
+<ul>
+<li>Stop and remove all containers</li>
+<li>Preserve data in volumes (PostgreSQL, file storage, etc.)</li>
+<li>Maintain configuration between restarts</li>
+</ul>
+<h3 id="additional-commands">Additional Commands</h3>
+<ul>
+<li><p><strong>View Logs</strong>:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pdm</span> run docker-logs</span></code></pre></div></li>
+<li><p><strong>Restart Services</strong>:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pdm</span> run docker-restart</span></code></pre></div></li>
+<li><p><strong>Remove Volumes</strong> (use with caution):</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker-compose</span> down <span class="at">-v</span></span></code></pre></div></li>
+</ul>
+<p><strong>Note</strong>: The <code>docker-restart</code> command
+combines <code>docker-down</code> and <code>docker-up</code>, which is
+useful when you’ve changed code and rebuilt images.</p>
+<h2 id="common-development-tasks">Common Development Tasks</h2>
+<p>All routine development tasks are encapsulated in PDM scripts (see
+the <code>[tool.pdm.scripts]</code> section of
+<code>pyproject.toml</code>). Here are key commands to be run from the
+project root:</p>
+<h3 id="code-quality">Code Quality</h3>
+<ul>
+<li><strong>Format Code</strong>: <code>pdm run format-all</code> -
+Auto-format the codebase using Ruff’s formatting rules</li>
+<li><strong>Lint Code</strong>: <code>pdm run lint-all</code> - Run the
+linter (Ruff) on all files</li>
+<li><strong>Fix Lint Issues</strong>: <code>pdm run lint-fix</code> -
+Automatically fix lint issues where possible</li>
+<li><strong>Type Checking</strong>: <code>pdm run typecheck-all</code> -
+Execute MyPy across the monorepo</li>
+</ul>
+<h3 id="testing">Testing</h3>
+<ul>
+<li><strong>Run All Tests</strong>: <code>pdm run test-all</code> -
+Execute all tests for all services</li>
+<li><strong>Parallel Testing</strong>:
+<code>pdm run test-parallel</code> - Force parallel execution
+(default)</li>
+<li><strong>Sequential Testing</strong>:
+<code>pdm run test-sequential</code> - Run tests serially when
+needed</li>
+</ul>
+<p>The test suite includes:</p>
+<ul>
+<li>Unit tests for each service</li>
+<li>Integration tests involving multiple services</li>
+<li>Contract tests for shared models</li>
+</ul>
+<h3 id="docker-workflow">Docker Workflow</h3>
+<p>In addition to <code>docker-up</code>/<code>docker-down</code>
+mentioned above:</p>
+<ul>
+<li><strong>Build Images</strong>: <code>pdm run docker-build</code> -
+Build images after making changes</li>
+<li><strong>View Logs</strong>: <code>pdm run docker-logs</code> -
+Stream logs from all containers</li>
+<li><strong>Restart All</strong>: <code>pdm run docker-restart</code> -
+Quickly rebuild and relaunch all containers</li>
+</ul>
+<h3 id="kafka-topic-management">Kafka Topic Management</h3>
+<ul>
+<li><strong>Setup Topics</strong>:
+<code>pdm run kafka-setup-topics</code> - Create/reset Kafka topics
+manually</li>
+</ul>
+<p>This runs the <code>scripts/kafka_topic_bootstrap.py</code> script to
+idempotently create all expected topics. Note that this is automatically
+done on <code>docker-up</code> via the compose file, so manual use is
+only needed in special cases (e.g., running Kafka outside Docker).</p>
+<p><strong>Important</strong>: Developers are expected to use these
+standardized commands to ensure consistency. Using the formatter and
+linter ensures code meets the project’s style requirements before
+committing.</p>
+<h2 id="development-standards-and-practices">Development Standards and
+Practices</h2>
+<p>Development of HuleEdu adheres to strict standards to maintain code
+quality, readability, and architectural consistency. These standards are
+documented in the internal rules (see the <code>.windsurf/rules/</code>
+directory) and enforced via tooling and code review:</p>
+<h3 id="coding-style-and-format">Coding Style and Format</h3>
+<ul>
+<li><strong>Style Guidelines</strong>: The codebase follows PEP 8 style
+guidelines, automatically enforced by Ruff</li>
+<li><strong>Lint Requirements</strong>: All code must pass lint checks
+(no unused imports, consistent naming, etc.)</li>
+<li><strong>Auto-formatting</strong>: Formatting issues should be fixed
+by the <code>format-all</code> command</li>
+<li><strong>File Size Limits</strong>: Maximum of 400 lines of code per
+file is recommended to keep modules focused (checked by the linter)</li>
+<li><strong>Organization</strong>: Descriptive naming and clear module
+organization are expected</li>
+</ul>
+<h3 id="static-typing">Static Typing</h3>
+<ul>
+<li><strong>Full Annotation</strong>: All functions, methods, and
+modules are fully type-annotated</li>
+<li><strong>Type Checking</strong>: MyPy is used to ensure type
+correctness across the entire project</li>
+<li><strong>Maintenance</strong>: Developers must update type hints as
+code evolves and resolve any MyPy warnings</li>
+<li><strong>Benefits</strong>: Static typing catches many errors at
+build time and serves as up-to-date documentation for function
+interfaces</li>
+</ul>
+<h3 id="testing-and-ci">Testing and CI</h3>
+<ul>
+<li><strong>Test Requirements</strong>: Every new feature or bug fix
+must include appropriate tests</li>
+<li><strong>Coverage Goals</strong>: The project maintains high test
+coverage including:
+<ul>
+<li>Unit tests for logic</li>
+<li>Integration tests for service interactions</li>
+<li>Contract tests for checking that producers and consumers of events
+agree on schemas</li>
+</ul></li>
+</ul>
+<p>Tests are run in continuous integration, and builds will fail if
+tests do not pass or if coverage regresses significantly. Developers are
+expected to run <code>pdm run test-all</code> locally before pushing
+changes. Additionally, integration tests spin up dependent services
+(often using Docker or in-memory fakes) to verify end-to-end behavior of
+critical flows.</p>
+<h3 id="documentation-updates">Documentation Updates</h3>
+<p>Keeping documentation in sync with the code is treated as part of the
+development process. When a change is made to a service or a core
+library, any relevant README, architectural document, or rule file must
+be updated in the same commit.</p>
+<p><strong>Example</strong>: If a new event type is introduced, its
+definition in <code>common_core</code> should be documented and any
+relevant service README should mention how the service uses that
+event.</p>
+<p>The project’s <strong>Rule 090: Documentation Standards</strong>
+requires that documentation be maintained as an integral part of
+development, and even minor changes should be reflected in docstrings or
+markdown docs as appropriate.</p>
+<h3 id="architectural-consistency">Architectural Consistency</h3>
+<p>The project has defined patterns that each service must follow,
+detailed in the rules under <code>.windsurf/rules/</code>. Key
+requirements include:</p>
+<ul>
+<li><strong>HTTP Services</strong>: Must use a blueprint structure (no
+route definitions directly in <code>app.py</code>)</li>
+<li><strong>Background Tasks</strong>: All long-running tasks must be
+idempotent to support retries</li>
+<li><strong>Cross-Service Communication</strong>: Must go through
+designated integration points (Kafka or internal APIs)</li>
+</ul>
+<p>During code reviews, maintainers check for compliance with these
+patterns. Significant deviations are not allowed unless a new pattern is
+being proposed and documented. This ensures that the system remains
+homogeneous in its architecture and that developers can navigate code
+across services easily.</p>
+<h3 id="git-workflow">Git Workflow</h3>
+<p>While no formal contribution guide is included here, the following
+practices are expected:</p>
+<ul>
+<li><strong>Pull Requests</strong>: All contributions should go through
+pull requests with reviews</li>
+<li><strong>Commit Quality</strong>: Commits should be granular and
+messages descriptive</li>
+<li><strong>Pre-commit Hooks</strong>: The repository includes
+formatting/linting as a pre-commit hook (installed via
+<code>setup_huledu_environment.sh</code>) to catch issues early</li>
+<li><strong>Merge Requirements</strong>: Merge decisions factor in
+passing CI checks (tests, lint, type check) and adherence to the above
+standards</li>
+</ul>
+<h2 id="current-status-of-implementation">Current Status of
+Implementation</h2>
+<p>As of now, all core microservices of the HuleEdu platform have been
+implemented and integrated into a functioning whole. The system is
+capable of ingesting a batch of essays and executing a full analysis
+pipeline on them.</p>
+<h3 id="major-achievements">Major Achievements</h3>
+<h4 id="dynamic-pipeline-orchestration">Dynamic Pipeline
+Orchestration</h4>
+<p>The multi-phase processing pipeline (file upload → content storage →
+spell check → comparative judgment → aggregation) is fully operational.
+The Batch Orchestrator and Batch Conductor services work in tandem to
+support dynamic sequencing of phases.</p>
+<h4 id="observability">Observability</h4>
+<p>The observability stack is implemented uniformly across services:</p>
+<ul>
+<li><strong>Metrics</strong>: Endpoints (at <code>/metrics</code>)
+export service-specific metrics such as request rates, event processing
+times, and queue lengths, which can be collected by Prometheus.</li>
+<li><strong>Health Checks</strong>: Endpoints (<code>/healthz</code>)
+are in place for orchestration tools or load balancers to detect
+unhealthy instances.</li>
+<li><strong>Structured Logging</strong>: Logging is structured (JSON
+logs or key-value pairs) and includes important identifiers (e.g.,
+<code>batch_id</code>, <code>essay_id</code>,
+<code>correlation_id</code>) to make it possible to trace a single
+essay’s journey through the microservices by searching aggregated
+logs.</li>
+</ul>
+<p>This readiness in observability is important for both debugging
+during development and for future production monitoring.</p>
+<h4 id="deployment-and-containerization">Deployment and
+Containerization</h4>
+<p>All services run correctly in Docker containers, and the Docker
+Compose setup has been tested to ensure that a new developer or tester
+can bring up the entire system with minimal effort. The compose file
+handles:</p>
+<ul>
+<li>Inter-service networking</li>
+<li>Environment variable wiring</li>
+<li>Initialization tasks like topic creation</li>
+</ul>
+<p>This means the system is effectively deployable on any
+Docker-compatible infrastructure. While not yet deployed to a cloud
+environment, the necessary pieces (Docker images, network
+configurations, volume declarations for data) are in place, reducing the
+effort to move to staging or production servers. In summary, the HuleEdu
+platform’s current implementation represents a working “walking
+skeleton” of the intended final system: all primary services are
+functional and integrated in the core workflow of processing essays. The
+focus so far has been on back-end architecture correctness and
+robustness. The system can handle the end-to-end scenario of a teacher
+uploading a batch of essays and receiving</p>
+<p>analytical results. The foundation is laid for scaling up (both in
+terms of load and in terms of adding features).</p>
+<h2 id="future-development-roadmap">Future Development Roadmap</h2>
+<p>While the core backend is in place, several additional services and
+features are planned to complete the platform’s capabilities and improve
+the user experience. These future developments include:</p>
+<h3 id="ai-feedback-service-planned">AI Feedback Service (Planned)</h3>
+<p>A microservice that will generate individualized feedback for student
+essays using AI (LLM-based). This service would take an essay (after
+spellchecking, perhaps) and produce formative feedback (comments on
+grammar, structure, content relevance, etc.). It will likely use the LLM
+Provider Service to call an AI model with a prompt to generate feedback,
+and then emit an event with the feedback results. This service will add
+an “AI feedback” phase to the processing pipeline, complementing the
+comparative judgment score with qualitative feedback for the
+student.</p>
+<h3 id="nlp-metrics-service-planned">NLP Metrics Service (Planned)</h3>
+<p>A microservice focused on computing various Natural Language
+Processing metrics on each essay. This could include readability scores,
+vocabulary complexity, sentence length variance, plagiarism detection,
+and other analytics. By having a dedicated service, these
+computationally intensive analyses can be done in parallel with other
+phases if appropriate. The output (various metrics and flags per essay)
+would be consumed by the Result Aggregator and made available in the
+final report.</p>
+<h3 id="user-management-service-planned">User Management Service
+(Planned)</h3>
+<p>Currently, user and authentication concerns (beyond class/student
+relationships) are not central. A future User Service will handle
+platform users (teachers, students, admins), authentication credentials,
+and roles/permissions. This service would integrate with the API Gateway
+to provide JWT authentication and would manage login sessions, password
+resets, etc. This is crucial for a production deployment where multiple
+schools or institutions might use the platform with separate accounts
+and data isolation.</p>
+<h3 id="svelte-frontend-application-in-development">Svelte Frontend
+Application (In Development)</h3>
+<p>A modern web frontend (likely built with Svelte) is planned to allow
+educators and students to interact with HuleEdu. Through the frontend,
+teachers could upload batches of essays, track processing progress in
+real time, and review results (scores, feedback) once ready. Students
+might use it to submit assignments and view feedback. The frontend will
+communicate exclusively with the API Gateway service. Development of the
+UI will focus on providing a clean user experience and real-time updates
+via WebSockets (for example, to show a teacher a live status of their
+batch processing: “spellchecking 10/30 essays completed…”).</p>
+<h3 id="websocket-live-updates-planned">WebSocket Live Updates
+(Planned)</h3>
+<p>Alongside the Svelte app, the full utilization of WebSockets through
+the API Gateway is a near-term goal. This involves finalizing a
+publish/subscribe mechanism (likely using Redis or Kafka streams) so
+that when internal events occur (e.g. an essay’s analysis completes or a
+batch finishes a phase), a message is pushed to any connected frontends.
+This real-time capability will set HuleEdu apart from batch systems that
+only offer polling, making the experience more interactive.</p>
+<h3 id="online-cj-assessment-calibration-system-planned">Online CJ
+Assessment Calibration System (Planned)</h3>
+<p>As the platform relies on AI for scoring (CJ Assessment Service), we
+are implementing an integrated online check-and-balance system that
+operates within the CJ Assessment Pipeline itself. This system employs
+machine learning algorithms similar to traditional Automated Essay
+Scoring (AES) random forest models to continuously validate and
+calibrate AI-generated judgments in real-time. The calibration system is
+directly linked to the NLP Service, which continuously analyzes essays
+and is intermittently retrained on the growing corpus of submitted
+student essays using established AES text metrics and essay quality
+markers.</p>
+<p>Unlike traditional offline analytics approaches, this online system
+provides immediate feedback during the assessment process, flagging
+potential anomalies (such as essays that appear inconsistent with their
+assigned rankings) and generating adjustment factors that can be applied
+in real-time. The system produces calibration reports and reliability
+metrics that can be fed back into the scoring algorithm or presented to
+instructors for review, ensuring continuous improvement of assessment
+accuracy and maintaining trust in the AI-generated results.</p>
+<p>Additional Pipeline Phases – Beyond Spellcheck, CJ, and AI feedback,
+other analysis phases can be incorporated into the pipeline. For
+example, an “NLP Enrichment” phase might annotate</p>
+<p>essays with part-of-speech tags or entity recognition (if needed for
+educational feedback), or a “Peer Comparison” phase might compare a
+student’s essay to a repository of past essays to give relative
+feedback. The architecture is built to accommodate new phases relatively
+easily by adding new services and defining their events/contracts, so
+the roadmap is open-ended about integrating more AI/NLP capabilities as
+the product evolves. Scaling and Performance – As usage grows, certain
+components may need to be scaled out or refactored. Future work will
+include performance optimizations such as: using Kafka consumer groups
+to allow multiple instances of worker services (Spellchecker, CJ, etc.)
+to share load; scaling the API Gateway and other HTTP services
+horizontally behind a load balancer; optimizing database interactions
+(adding indexes, caching frequently accessed data in RAS or CMS); and
+possibly partitioning Kafka topics by class or school if needed to
+handle very large volumes. While this is not a single feature, it is a
+continuous effort that will accompany the addition of users to the
+platform. Cloud Deployment and CI/CD – To prepare for real-world use,
+the project plans to containerize and deploy on cloud infrastructure
+(e.g. Kubernetes or a container orchestration service). CI/CD pipelines
+will be set up to run tests, build images, and deploy to
+staging/production automatically upon merges. Infrastructure-as-code
+(Terraform or similar) might be introduced to manage cloud resources
+(databases, message broker, etc.). Though largely an operations task,
+this is on the roadmap to transition the project from a purely local-dev
+setup to a live service. This roadmap is subject to refinement as the
+project progresses and user feedback is gathered. However, it gives a
+clear direction: the immediate next steps focus on front-end integration
+(API Gateway and Svelte UI), richer analysis features (AI feedback, NLP
+metrics), and robust user management. These additions, combined with the
+strong backend foundation already in place, will move HuleEdu toward a
+production-ready state suitable for pilot programs and eventually larger
+deployments.</p>
+<h2 id="documentation-and-further-information">Documentation and Further
+Information</h2>
+<p>This README provides a high-level overview of the HuleEdu platform.
+For more detailed information, consult the following resources:</p>
+<h3 id="service-specific-documentation">Service-Specific
+Documentation</h3>
+<ul>
+<li>Each microservice has its own README file in its root directory
+(e.g., <code>/services/content_service/README.md</code>).</li>
+<li>These files contain detailed information about the service’s
+responsibilities, API endpoints (if applicable), configuration options,
+and specific deployment notes.</li>
+<li>If you are working on or using a particular service, refer to its
+README for in-depth information.</li>
+</ul>
+<h3 id="architecture-design-documents">Architecture &amp; Design
+Documents</h3>
+<ul>
+<li>The <code>documentation/</code> directory contains high-level design
+documents, product requirement documents (PRDs), and technical plans for
+various features.</li>
+<li>Notable files include detailed discussions of the state machine
+design, the reasoning behind certain architectural choices, and plans
+for future phases.</li>
+<li>These documents are useful for understanding the rationale behind
+the implementation and for onboarding new contributors to the system’s
+design philosophy.</li>
+</ul>
+<h3 id="architectural-decision-records-adrs">Architectural Decision
+Records (ADRs)</h3>
+<ul>
+<li>Key architectural decisions are documented in ADRs, located in the
+<code>/docs/adr/</code> directory.</li>
+<li>These records explain the context, decision, and consequences for
+significant choices, such as the adoption of event-driven architecture,
+the selection of RabbitMQ, or the design of the processing
+pipelines.</li>
+</ul>
+<h3 id="development-rules">Development Rules</h3>
+<ul>
+<li>The <code>.windsurf/rules/</code> directory defines the project’s
+development rules and standards in a structured format.</li>
+<li>This covers everything from project structure conventions to coding
+style, error handling patterns, and documentation requirements.</li>
+<li>The <code>000-rule-index.mdc</code> file provides an index of all
+available rule files.</li>
+<li>Developers should familiarize themselves with these rules, as they
+codify best practices and are treated as part of the code review
+criteria.</li>
+<li>They also ensure that as the team grows, the codebase remains
+uniform and maintainable.</li>
+</ul>
+<h3 id="changelog">Changelog</h3>
+<ul>
+<li>The <code>CHANGELOG.md</code> or commit history can be consulted for
+a chronological record of major changes and feature additions.</li>
+<li>This can help in understanding how the system evolved to its current
+state.</li>
+</ul>
+</body>
+</html>

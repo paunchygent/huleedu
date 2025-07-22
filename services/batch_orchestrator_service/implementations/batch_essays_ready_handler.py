@@ -13,10 +13,12 @@ from common_core.events.batch_coordination_events import BatchEssaysReady
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from huleedu_service_libs.error_handling import (
+    raise_validation_error,
+)
 from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
     BatchRepositoryProtocol,
-    DataValidationError,
 )
 
 logger = create_service_logger("bos.handlers.batch_essays_ready")
@@ -83,8 +85,13 @@ class BatchEssaysReadyHandler:
                     # Store essays from BatchEssaysReady for later client-triggered processing
                     ready_essays = batch_essays_ready_data.ready_essays
                     if not ready_essays:
-                        raise DataValidationError(
-                            f"BatchEssaysReady for batch {batch_id} contains no ready_essays",
+                        raise_validation_error(
+                            service="batch_orchestrator_service",
+                            operation="handle_batch_essays_ready",
+                            field="ready_essays",
+                            message=f"BatchEssaysReady for batch {batch_id} contains no ready_essays",
+                            correlation_id=envelope.correlation_id,
+                            batch_id=batch_id,
                         )
 
                     # Store essays for later pipeline processing

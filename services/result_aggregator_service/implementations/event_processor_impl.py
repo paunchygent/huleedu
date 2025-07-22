@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from common_core.status_enums import BatchStatus, ProcessingStage
+from huleedu_service_libs.error_handling import (
+    create_error_detail_with_context,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
+from common_core.error_enums import ErrorCode
 
 from services.result_aggregator_service.protocols import (
     BatchRepositoryProtocol,
@@ -106,9 +110,23 @@ class EventProcessorImpl(EventProcessorProtocol):
                     failed_count=failed_count,
                 )
             elif data.phase_status == BatchStatus.FAILED_CRITICALLY:
+                # Create structured error detail for phase failure
+                error_detail = create_error_detail_with_context(
+                    error_code=ErrorCode.PROCESSING_ERROR,
+                    message=f"Phase {data.phase_name.value} failed critically",
+                    service="result_aggregator_service",
+                    operation="process_batch_phase_outcome",
+                    correlation_id=envelope.correlation_id,
+                    details={
+                        "batch_id": data.batch_id,
+                        "phase": data.phase_name.value,
+                        "status": data.phase_status.value,
+                    },
+                )
                 await self.batch_repository.update_batch_failed(
                     batch_id=data.batch_id,
-                    error_message=f"Phase {data.phase_name.value} failed critically",
+                    error_detail=error_detail,
+                    correlation_id=envelope.correlation_id,
                 )
 
             # Invalidate cache
@@ -176,20 +194,31 @@ class EventProcessorImpl(EventProcessorProtocol):
                     # Get the first storage ID from the references
                     corrected_text_storage_id = next(iter(corrected_refs.values()), None)
 
+            # Create error detail if spellcheck failed
+            error_detail = None
+            if status == ProcessingStage.FAILED and data.system_metadata and data.system_metadata.error_info:
+                error_detail = create_error_detail_with_context(
+                    error_code=ErrorCode.SPELLCHECK_SERVICE_ERROR,
+                    message=str(data.system_metadata.error_info),
+                    service="result_aggregator_service",
+                    operation="process_spellcheck_completed",
+                    correlation_id=envelope.correlation_id,
+                    details={
+                        "essay_id": essay_id,
+                        "batch_id": batch_id,
+                        "status": data.status,
+                    },
+                )
+
             # Update essay result
             await self.batch_repository.update_essay_spellcheck_result(
                 essay_id=essay_id,
                 batch_id=batch_id,
                 status=status,
+                correlation_id=envelope.correlation_id,
                 correction_count=data.corrections_made,
                 corrected_text_storage_id=corrected_text_storage_id,
-                error=str(data.system_metadata.error_info)
-                if (
-                    status == ProcessingStage.FAILED
-                    and data.system_metadata
-                    and data.system_metadata.error_info
-                )
-                else None,
+                error_detail=error_detail,
             )
 
             # Invalidate cache
@@ -238,10 +267,11 @@ class EventProcessorImpl(EventProcessorProtocol):
                     essay_id=essay_id,
                     batch_id=batch_id,
                     status=ProcessingStage.COMPLETED,
+                    correlation_id=envelope.correlation_id,
                     rank=rank,
                     score=score,
                     comparison_count=None,  # Not provided in current event
-                    error=None,
+                    error_detail=None,
                 )
 
             # Invalidate cache

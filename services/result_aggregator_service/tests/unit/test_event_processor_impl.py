@@ -5,10 +5,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from common_core.domain_enums import ContentType, CourseCode
+from common_core.error_enums import ErrorCode
+from common_core.models.error_models import ErrorDetail
 from common_core.event_enums import ProcessingEvent
 from common_core.events import (
     BatchEssaysRegistered,
@@ -395,10 +397,13 @@ class TestProcessBatchPhaseOutcome:
         await event_processor.process_batch_phase_outcome(envelope, data)
 
         # Assert
-        mock_batch_repository.update_batch_failed.assert_called_once_with(
-            batch_id=batch_id,
-            error_message="Phase spellcheck failed critically",
-        )
+        # Check that update_batch_failed was called with ErrorDetail and correlation_id
+        assert mock_batch_repository.update_batch_failed.call_count == 1
+        call_args = mock_batch_repository.update_batch_failed.call_args[1]
+        assert call_args["batch_id"] == batch_id
+        assert isinstance(call_args["error_detail"], ErrorDetail)
+        assert call_args["error_detail"].message == "Phase spellcheck failed critically"
+        assert isinstance(call_args["correlation_id"], UUID)
         mock_state_store.invalidate_batch.assert_called_once_with(batch_id)
 
     @pytest.mark.asyncio
@@ -495,14 +500,16 @@ class TestProcessSpellcheckCompleted:
         await event_processor.process_spellcheck_completed(envelope, data)
 
         # Assert
-        mock_batch_repository.update_essay_spellcheck_result.assert_called_once_with(
-            essay_id=essay_id,
-            batch_id=batch_id,
-            status=ProcessingStage.COMPLETED,
-            correction_count=5,
-            corrected_text_storage_id=storage_id,
-            error=None,
-        )
+        # Check the call was made with correct parameters
+        assert mock_batch_repository.update_essay_spellcheck_result.call_count == 1
+        call_args = mock_batch_repository.update_essay_spellcheck_result.call_args[1]
+        assert call_args["essay_id"] == essay_id
+        assert call_args["batch_id"] == batch_id
+        assert call_args["status"] == ProcessingStage.COMPLETED
+        assert call_args["correction_count"] == 5
+        assert call_args["corrected_text_storage_id"] == storage_id
+        assert call_args["error_detail"] is None
+        assert "correlation_id" in call_args
         mock_state_store.invalidate_batch.assert_called_once_with(batch_id)
 
     @pytest.mark.asyncio
@@ -538,11 +545,13 @@ class TestProcessSpellcheckCompleted:
             storage_metadata=None,
         )
 
+        test_correlation_id = uuid4()
         envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="SpellcheckResultDataV1",
             event_timestamp=datetime.now(timezone.utc),
             source_service="spellchecker",
+            correlation_id=test_correlation_id,
             data=data,
         )
 
@@ -554,9 +563,10 @@ class TestProcessSpellcheckCompleted:
             essay_id=essay_id,
             batch_id=batch_id,
             status=ProcessingStage.COMPLETED,
+            correlation_id=test_correlation_id,
             correction_count=0,
             corrected_text_storage_id=None,
-            error=None,
+            error_detail=None,
         )
 
     @pytest.mark.asyncio
@@ -593,11 +603,13 @@ class TestProcessSpellcheckCompleted:
             storage_metadata=None,
         )
 
+        test_correlation_id = uuid4()
         envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
             event_id=uuid4(),
             event_type="SpellcheckResultDataV1",
             event_timestamp=datetime.now(timezone.utc),
             source_service="spellchecker",
+            correlation_id=test_correlation_id,
             data=data,
         )
 
@@ -605,14 +617,20 @@ class TestProcessSpellcheckCompleted:
         await event_processor.process_spellcheck_completed(envelope, data)
 
         # Assert
-        mock_batch_repository.update_essay_spellcheck_result.assert_called_once_with(
-            essay_id=essay_id,
-            batch_id=batch_id,
-            status=ProcessingStage.FAILED,
-            correction_count=0,
-            corrected_text_storage_id=None,
-            error="{'message': 'Spellcheck service error', 'code': 'SC_001'}",
-        )
+        # Check that error_detail was created correctly
+        call_args = mock_batch_repository.update_essay_spellcheck_result.call_args
+        assert call_args.kwargs["essay_id"] == essay_id
+        assert call_args.kwargs["batch_id"] == batch_id
+        assert call_args.kwargs["status"] == ProcessingStage.FAILED
+        assert call_args.kwargs["correction_count"] == 0
+        assert call_args.kwargs["corrected_text_storage_id"] is None
+        assert call_args.kwargs["error_detail"] is not None
+        assert call_args.kwargs["correlation_id"] == test_correlation_id
+        
+        # Verify error_detail structure
+        error_detail = call_args.kwargs["error_detail"]
+        assert "Spellcheck service error" in error_detail.message
+        assert error_detail.error_code.value == "SPELLCHECK_SERVICE_ERROR"
 
     @pytest.mark.asyncio
     async def test_spellcheck_missing_entity_reference(
@@ -749,27 +767,25 @@ class TestProcessCJAssessmentCompleted:
 
         # Check first essay
         call_args_1 = mock_batch_repository.update_essay_cj_assessment_result.call_args_list[0]
-        assert call_args_1.kwargs == {
-            "essay_id": essay1_id,
-            "batch_id": batch_id,
-            "status": ProcessingStage.COMPLETED,
-            "rank": 1,
-            "score": 0.85,
-            "comparison_count": None,
-            "error": None,
-        }
+        assert call_args_1.kwargs["essay_id"] == essay1_id
+        assert call_args_1.kwargs["batch_id"] == batch_id
+        assert call_args_1.kwargs["status"] == ProcessingStage.COMPLETED
+        assert call_args_1.kwargs["rank"] == 1
+        assert call_args_1.kwargs["score"] == 0.85
+        assert call_args_1.kwargs["comparison_count"] is None
+        assert call_args_1.kwargs["error_detail"] is None
+        assert "correlation_id" in call_args_1.kwargs
 
         # Check second essay
         call_args_2 = mock_batch_repository.update_essay_cj_assessment_result.call_args_list[1]
-        assert call_args_2.kwargs == {
-            "essay_id": essay2_id,
-            "batch_id": batch_id,
-            "status": ProcessingStage.COMPLETED,
-            "rank": 2,
-            "score": 0.65,
-            "comparison_count": None,
-            "error": None,
-        }
+        assert call_args_2.kwargs["essay_id"] == essay2_id
+        assert call_args_2.kwargs["batch_id"] == batch_id
+        assert call_args_2.kwargs["status"] == ProcessingStage.COMPLETED
+        assert call_args_2.kwargs["rank"] == 2
+        assert call_args_2.kwargs["score"] == 0.65
+        assert call_args_2.kwargs["comparison_count"] is None
+        assert call_args_2.kwargs["error_detail"] is None
+        assert "correlation_id" in call_args_2.kwargs
 
         mock_state_store.invalidate_batch.assert_called_once_with(batch_id)
 
@@ -827,15 +843,15 @@ class TestProcessCJAssessmentCompleted:
         await event_processor.process_cj_assessment_completed(envelope, data)
 
         # Assert - should only process the first essay
-        mock_batch_repository.update_essay_cj_assessment_result.assert_called_once_with(
-            essay_id=essay1_id,
-            batch_id=batch_id,
-            status=ProcessingStage.COMPLETED,
-            rank=1,
-            score=0.85,
-            comparison_count=None,
-            error=None,
-        )
+        call_args = mock_batch_repository.update_essay_cj_assessment_result.call_args
+        assert call_args.kwargs["essay_id"] == essay1_id
+        assert call_args.kwargs["batch_id"] == batch_id
+        assert call_args.kwargs["status"] == ProcessingStage.COMPLETED
+        assert call_args.kwargs["rank"] == 1
+        assert call_args.kwargs["score"] == 0.85
+        assert call_args.kwargs["comparison_count"] is None
+        assert call_args.kwargs["error_detail"] is None
+        assert "correlation_id" in call_args.kwargs
 
     @pytest.mark.asyncio
     async def test_cj_assessment_empty_rankings(

@@ -12,6 +12,10 @@ from uuid import UUID
 import choix
 import numpy as np
 from common_core import EssayComparisonWinner
+from huleedu_service_libs.error_handling import (
+    raise_cj_insufficient_comparisons,
+    raise_cj_score_convergence_failed,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,7 +74,7 @@ async def record_comparisons_and_update_scores(
             error_service = None
             error_details = None
             if result.error_detail:
-                error_code = result.error_detail.error_code
+                error_code = result.error_detail.error_code.value  # Convert enum to string
                 error_correlation_id = result.error_detail.correlation_id
                 error_timestamp = result.error_detail.timestamp
                 error_service = result.error_detail.service
@@ -119,14 +123,18 @@ async def record_comparisons_and_update_scores(
     all_valid_db_comparisons = all_db_comparisons_result.scalars().all()
 
     if len(all_valid_db_comparisons) < 1:  # Or a higher threshold like 3
-        logger.warning(
-            f"Not enough valid comparisons ({len(all_valid_db_comparisons)}) in DB for "
-            f"CJ Batch {cj_batch_id} to compute scores.",
-            extra={"cj_batch_id": str(cj_batch_id)},
+        raise_cj_insufficient_comparisons(
+            service="cj_assessment_service",
+            operation="record_comparisons_and_update_scores",
+            message=(
+                f"Not enough valid comparisons ({len(all_valid_db_comparisons)}) in DB for "
+                f"CJ Batch {cj_batch_id} to compute scores. At least 1 comparison is required."
+            ),
+            correlation_id=correlation_id,
+            batch_id=str(cj_batch_id),
+            comparison_count=len(all_valid_db_comparisons),
+            required_count=1,
         )
-        return {
-            essay.id: essay.current_bt_score or 0.0 for essay in all_essays
-        }  # Return current/default scores
 
     # 3. Prepare data for choix
     # Create a mapping from ELS Essay ID (string) to an integer index (0 to n-1)
@@ -151,11 +159,15 @@ async def record_comparisons_and_update_scores(
             )
 
     if not choix_comparison_data:
-        logger.warning(
-            f"No valid comparison data mapped for `choix` for CJ Batch {cj_batch_id}.",
-            extra={"cj_batch_id": str(cj_batch_id)},
+        raise_cj_insufficient_comparisons(
+            service="cj_assessment_service",
+            operation="record_comparisons_and_update_scores",
+            message=f"No valid comparison data mapped for `choix` for CJ Batch {cj_batch_id}.",
+            correlation_id=correlation_id,
+            batch_id=str(cj_batch_id),
+            comparison_count=0,
+            required_count=1,
         )
-        return {essay.id: essay.current_bt_score or 0.0 for essay in all_essays}
 
     # 4. Compute Bradley-Terry scores using `choix`
     try:
@@ -181,13 +193,15 @@ async def record_comparisons_and_update_scores(
         return updated_bt_scores
 
     except Exception as e:
-        logger.error(
-            f"Error computing/updating Bradley-Terry scores for CJ Batch {cj_batch_id}: {e}",
-            exc_info=True,
-            extra={"cj_batch_id": str(cj_batch_id)},
+        raise_cj_score_convergence_failed(
+            service="cj_assessment_service",
+            operation="record_comparisons_and_update_scores",
+            message=f"Error computing/updating Bradley-Terry scores for CJ Batch {cj_batch_id}: {str(e)}",
+            correlation_id=correlation_id,
+            batch_id=str(cj_batch_id),
+            convergence_error=str(e),
+            comparison_count=len(choix_comparison_data),
         )
-        # Return current scores if calculation fails
-        return {essay.id: essay.current_bt_score or 0.0 for essay in all_essays}
 
 
 def check_score_stability(

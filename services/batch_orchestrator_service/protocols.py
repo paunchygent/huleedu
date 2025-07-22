@@ -20,17 +20,10 @@ from services.batch_orchestrator_service.api_models import BatchRegistrationRequ
 # Assuming common_core models might be used in signatures
 
 
-# Exception hierarchy for phase initiation errors
-class InitiationError(Exception):
-    """Base exception for errors occurring during phase initiation."""
-
-
-class DataValidationError(InitiationError):
-    """Raised when critical data is missing or invalid for phase initiation."""
-
-
-class CommandPublishError(InitiationError):
-    """Raised when command publishing to event system fails."""
+# Note: Custom exceptions removed in favor of HuleEduError pattern
+# Use raise_validation_error for data validation issues
+# Use raise_processing_error for phase initiation failures
+# Use raise_kafka_publish_error for command publishing failures
 
 
 # Placeholder for a Pydantic model representing a BatchUpload entity
@@ -69,7 +62,7 @@ class PipelinePhaseInitiatorProtocol(Protocol):
             batch_context: Full batch context from registration
 
         Raises:
-            InitiationError: If phase initiation cannot proceed
+            HuleEduError: If phase initiation cannot proceed
         """
         pass
 
@@ -228,8 +221,7 @@ class PipelinePhaseCoordinatorProtocol(Protocol):
             batch_context: Full batch context for essay retrieval
 
         Raises:
-            InitiationError: If pipeline initiation fails
-            DataValidationError: If resolved pipeline is invalid
+            HuleEduError: If pipeline initiation fails or resolved pipeline is invalid
         """
         pass
 

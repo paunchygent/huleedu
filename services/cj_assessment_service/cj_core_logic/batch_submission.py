@@ -14,7 +14,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from huleedu_service_libs.error_handling import raise_cj_llm_provider_error
+from huleedu_service_libs.error_handling import raise_external_service_error
 from services.cj_assessment_service.models_api import ComparisonTask
 from services.cj_assessment_service.protocols import LLMInteractionProtocol
 
@@ -89,11 +89,12 @@ async def submit_batch_chunk(
             exc_info=True,
         )
 
-        raise_cj_llm_provider_error(
+        raise_external_service_error(
             service="cj_assessment_service",
             operation="submit_batch_chunk",
             message=f"Failed to submit batch chunk: {str(e)}",
             correlation_id=correlation_id,
+            external_service="LLM Provider Service",
             is_retryable=True,
         )
 

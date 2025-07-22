@@ -24,12 +24,12 @@ class EssayResultResponse(BaseModel):
     spellcheck_status: Optional[str] = None
     spellcheck_correction_count: Optional[int] = None
     spellcheck_corrected_text_storage_id: Optional[str] = None
-    spellcheck_error: Optional[str] = None
+    spellcheck_error_detail: Optional[Dict[str, Any]] = None
 
     cj_assessment_status: Optional[str] = None
     cj_rank: Optional[int] = None
     cj_score: Optional[float] = None
-    cj_assessment_error: Optional[str] = None
+    cj_assessment_error_detail: Optional[Dict[str, Any]] = None
 
     # Timestamps
     last_updated: datetime
@@ -102,13 +102,13 @@ class BatchStatusResponse(BaseModel):
                     else None,
                     spellcheck_correction_count=essay.spellcheck_correction_count,
                     spellcheck_corrected_text_storage_id=essay.spellcheck_corrected_text_storage_id,
-                    spellcheck_error=essay.spellcheck_error,
+                    spellcheck_error_detail=essay.spellcheck_error_detail,
                     cj_assessment_status=essay.cj_assessment_status.value
                     if essay.cj_assessment_status
                     else None,
                     cj_rank=essay.cj_rank,
                     cj_score=essay.cj_score,
-                    cj_assessment_error=essay.cj_assessment_error,
+                    cj_assessment_error_detail=essay.cj_assessment_error_detail,
                     last_updated=essay.updated_at,
                 )
                 for essay in batch_result.essays
@@ -121,8 +121,12 @@ class BatchStatusResponse(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """Standard error response."""
+    """Standard error response with structured error details."""
 
-    error: str
-    details: Optional[Dict[str, Any]] = None
+    error_code: str
+    message: str
     correlation_id: str = Field(default_factory=lambda: str(uuid4()))
+    service: str
+    operation: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    details: Dict[str, Any] = Field(default_factory=dict)

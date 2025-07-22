@@ -16,10 +16,12 @@ from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
+from huleedu_service_libs.error_handling import (
+    raise_validation_error,
+)
 from services.batch_orchestrator_service.protocols import (
     AIFeedbackInitiatorProtocol,
     BatchEventPublisherProtocol,
-    DataValidationError,
 )
 
 from .utils import _infer_language_from_course_code
@@ -65,14 +67,25 @@ class AIFeedbackInitiatorImpl(AIFeedbackInitiatorProtocol):
 
             # Validate that this is the correct phase
             if phase_to_initiate != PhaseName.AI_FEEDBACK:
-                raise DataValidationError(
-                    f"AIFeedbackInitiatorImpl received incorrect phase: {phase_to_initiate}",
+                raise_validation_error(
+                    service="batch_orchestrator_service",
+                    operation="ai_feedback_initiation",
+                    field="phase_to_initiate",
+                    message=f"AIFeedbackInitiatorImpl received incorrect phase: {phase_to_initiate}",
+                    correlation_id=correlation_id,
+                    expected_phase="AI_FEEDBACK",
+                    received_phase=phase_to_initiate.value,
                 )
 
             # Validate required data
             if not essays_for_processing:
-                raise DataValidationError(
-                    f"No essays provided for AI feedback initiation in batch {batch_id}",
+                raise_validation_error(
+                    service="batch_orchestrator_service",
+                    operation="ai_feedback_initiation",
+                    field="essays_for_processing",
+                    message=f"No essays provided for AI feedback initiation in batch {batch_id}",
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
                 )
 
             # Get language from course code

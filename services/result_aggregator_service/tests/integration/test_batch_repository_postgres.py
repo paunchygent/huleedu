@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from typing import AsyncGenerator, Optional
+from uuid import UUID, uuid4
 
 import pytest
+from common_core.error_enums import ErrorCode
+from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import BatchStatus, ProcessingStage
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from testcontainers.postgres import PostgresContainer
@@ -131,7 +134,8 @@ class TestBatchRepositoryIntegration:
                 status=ProcessingStage.COMPLETED,
                 correction_count=i * 2,  # Varying correction counts
                 corrected_text_storage_id=f"storage-{essay_id}",
-                error=None,
+                error_detail=None,
+                correlation_id=uuid4(),
             )
 
         # Verify essay spellcheck updates
@@ -154,7 +158,8 @@ class TestBatchRepositoryIntegration:
                 rank=i + 1,
                 score=0.9 - (i * 0.1),  # Decreasing scores
                 comparison_count=10,
-                error=None,
+                error_detail=None,
+                correlation_id=uuid4(),
             )
 
         # Verify CJ assessment updates
@@ -210,16 +215,27 @@ class TestBatchRepositoryIntegration:
             status=ProcessingStage.COMPLETED,
             correction_count=5,
             corrected_text_storage_id="storage-001",
-            error=None,
+            error_detail=None,
+            correlation_id=uuid4(),
         )
 
+        from datetime import datetime, timezone
+        error_detail = ErrorDetail(
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+            message="Spellcheck service timeout",
+            correlation_id=uuid4(),
+            timestamp=datetime.now(timezone.utc),
+            service="spellchecker_service",
+            operation="spellcheck_processing",
+        )
         await batch_repository.update_essay_spellcheck_result(
             essay_id="essay-failed",
             batch_id=batch_id,
             status=ProcessingStage.FAILED,
             correction_count=None,
             corrected_text_storage_id=None,
-            error="Spellcheck service timeout",
+            error_detail=error_detail,
+            correlation_id=error_detail.correlation_id,
         )
 
         # Update batch phase with failures
@@ -238,7 +254,8 @@ class TestBatchRepositoryIntegration:
         essays_by_id = {e.essay_id: e for e in batch.essays}
         assert essays_by_id["essay-success"].spellcheck_status == ProcessingStage.COMPLETED
         assert essays_by_id["essay-failed"].spellcheck_status == ProcessingStage.FAILED
-        assert essays_by_id["essay-failed"].spellcheck_error == "Spellcheck service timeout"
+        assert essays_by_id["essay-failed"].spellcheck_error_detail is not None
+        assert essays_by_id["essay-failed"].spellcheck_error_detail["message"] == "Spellcheck service timeout"
 
     async def test_batch_critical_failure(
         self, batch_repository: BatchRepositoryPostgresImpl
@@ -251,14 +268,24 @@ class TestBatchRepositoryIntegration:
         await batch_repository.create_batch(batch_id=batch_id, user_id=user_id, essay_count=5)
 
         # Mark batch as critically failed
-        error_message = "Kafka consumer disconnected during processing"
-        await batch_repository.update_batch_failed(batch_id, error_message)
+        from datetime import datetime, timezone
+        error_detail = ErrorDetail(
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+            message="Kafka consumer disconnected during processing",
+            correlation_id=uuid4(),
+            timestamp=datetime.now(timezone.utc),
+            service="result_aggregator_service",
+            operation="update_batch_failed",
+        )
+        await batch_repository.update_batch_failed(batch_id, error_detail, error_detail.correlation_id)
 
         # Verify failure state
         batch = await batch_repository.get_batch(batch_id)
         assert batch is not None
         assert batch.overall_status == BatchStatus.FAILED_CRITICALLY
-        assert batch.last_error == error_message
+        assert batch.batch_error_detail is not None
+        assert batch.batch_error_detail["error_code"] == ErrorCode.EXTERNAL_SERVICE_ERROR.value
+        assert batch.batch_error_detail["message"] == "Kafka consumer disconnected during processing"
         # Note: error_count is not tracked in the current implementation
         # assert batch.error_count == 1
         # Note: processing_completed_at is not set by the current implementation
@@ -285,6 +312,8 @@ class TestBatchRepositoryIntegration:
                 status=ProcessingStage.COMPLETED,
                 correction_count=i,
                 corrected_text_storage_id=f"storage-{essay_id}",
+                error_detail=None,
+                correlation_id=uuid4(),
             )
 
         # Verify all updates were applied

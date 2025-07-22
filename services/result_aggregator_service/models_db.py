@@ -67,8 +67,8 @@ class BatchResult(Base):
     )
 
     # Error tracking
-    last_error: Mapped[Optional[str]] = mapped_column(String(500))
     error_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    batch_error_detail: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     # Additional metadata as JSON for flexibility
     batch_metadata: Mapped[Optional[dict[str, Any]]] = mapped_column(
@@ -114,7 +114,7 @@ class EssayResult(Base):
     spellcheck_correction_count: Mapped[Optional[int]] = mapped_column(Integer)
     spellcheck_corrected_text_storage_id: Mapped[Optional[str]] = mapped_column(String(255))
     spellcheck_completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    spellcheck_error: Mapped[Optional[str]] = mapped_column(String(500))
+    spellcheck_error_detail: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     # CJ Assessment Phase Results
     cj_assessment_status: Mapped[Optional[ProcessingStage]] = mapped_column(
@@ -124,7 +124,7 @@ class EssayResult(Base):
     cj_score: Mapped[Optional[float]] = mapped_column(Float)
     cj_comparison_count: Mapped[Optional[int]] = mapped_column(Integer)
     cj_assessment_completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    cj_assessment_error: Mapped[Optional[str]] = mapped_column(String(500))
+    cj_assessment_error_detail: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     # === Future Service Placeholders (Commented for Phase 1) ===
 

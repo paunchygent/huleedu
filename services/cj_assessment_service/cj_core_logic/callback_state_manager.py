@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     )
 
 from common_core.events.llm_provider_events import LLMComparisonResultV1
+from huleedu_service_libs.error_handling import raise_cj_callback_correlation_failed
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,7 +63,15 @@ async def update_comparison_result(
         # DEBUG: Temporarily removed debug output
 
         if comparison_pair is None:
-            return None
+            raise_cj_callback_correlation_failed(
+                service="cj_assessment_service",
+                operation="update_comparison_result",
+                message=(
+                    f"Cannot find comparison pair for callback with correlation ID: {correlation_id}"
+                ),
+                correlation_id=correlation_id,
+                callback_correlation_id=correlation_id,
+            )
 
         # Check idempotency - skip if already has result
         if comparison_pair.winner is not None:
@@ -82,7 +91,7 @@ async def update_comparison_result(
         if comparison_result.is_error and comparison_result.error_detail:
             # Update error fields
             comparison_pair.winner = "error"
-            comparison_pair.error_code = comparison_result.error_detail.error_code
+            comparison_pair.error_code = comparison_result.error_detail.error_code.value  # Convert enum to string
             comparison_pair.error_correlation_id = comparison_result.error_detail.correlation_id
             comparison_pair.error_timestamp = comparison_result.error_detail.timestamp
             comparison_pair.error_service = comparison_result.error_detail.service

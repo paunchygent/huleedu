@@ -17,10 +17,13 @@ from services.batch_orchestrator_service.implementations.notification_service im
 from services.batch_orchestrator_service.implementations.pipeline_state_manager import (
     PipelineStateManager,
 )
+from huleedu_service_libs.error_handling import (
+    HuleEduError,
+    raise_validation_error,
+    raise_processing_error,
+)
 from services.batch_orchestrator_service.protocols import (
     BatchRepositoryProtocol,
-    DataValidationError,
-    InitiationError,
     PipelinePhaseInitiatorProtocol,
 )
 
@@ -168,7 +171,14 @@ class DefaultPipelinePhaseCoordinator:
                 requested_pipelines = current_pipeline_state.get("requested_pipelines")
 
             if not requested_pipelines:
-                raise DataValidationError(f"No requested pipelines found for batch {batch_id}")
+                raise_validation_error(
+                    service="batch_orchestrator_service",
+                    operation="handle_phase_concluded",
+                    field="requested_pipelines",
+                    message=f"No requested pipelines found for batch {batch_id}",
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
+                )
 
             # Dynamic next phase determination
             try:
@@ -239,7 +249,15 @@ class DefaultPipelinePhaseCoordinator:
             # Retrieve and use generic initiator
             initiator = self.phase_initiators_map.get(next_phase_name)
             if not initiator:
-                raise DataValidationError(f"No initiator found for phase {next_phase_name}")
+                raise_validation_error(
+                    service="batch_orchestrator_service",
+                    operation="handle_phase_concluded",
+                    field="phase_initiator",
+                    message=f"No initiator found for phase {next_phase_name}",
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
+                    phase=next_phase_name.value,
+                )
 
             # Prepare essays for processing (use provided or fall back to batch context)
             essays_to_process = processed_essays_from_previous_phase
@@ -260,20 +278,25 @@ class DefaultPipelinePhaseCoordinator:
                     essays_for_processing=essays_to_process,
                     batch_context=batch_context,
                 )
-            except InitiationError as e:
+            except HuleEduError as e:
                 logger.error(
                     f"Failed to initiate phase {next_phase_name} for batch {batch_id}: {e}",
                 )
 
-                # Mark phase as FAILED and save state
+                # Record phase failure with structured error details
+                await self.state_manager.record_phase_failure(
+                    batch_id=batch_id,
+                    phase_name=next_phase_name,
+                    error=e,
+                    correlation_id=correlation_id,
+                )
+
+                # Mark phase as FAILED in pipeline state
                 if hasattr(current_pipeline_state, "get_pipeline"):  # Pydantic object
                     pipeline_detail = current_pipeline_state.get_pipeline(next_phase_name.value)
                     if pipeline_detail:
                         pipeline_detail.status = PipelineExecutionStatus.FAILED
-                        pipeline_detail.error_info = {
-                            "error": str(e),
-                            "timestamp": datetime.now(UTC).isoformat(),
-                        }
+                        pipeline_detail.error_info = e.error_detail.model_dump()
                         await self.batch_repo.save_processing_pipeline_state(
                             batch_id,
                             current_pipeline_state,
@@ -283,8 +306,8 @@ class DefaultPipelinePhaseCoordinator:
                     updated_pipeline_state.update(
                         {
                             f"{next_phase_name.value}_status": PipelineExecutionStatus.FAILED.value,
-                            f"{next_phase_name.value}_error": str(e),
-                            f"{next_phase_name.value}_failed_at": (datetime.now(UTC).isoformat()),
+                            f"{next_phase_name.value}_error_detail": e.error_detail.model_dump(),
+                            f"{next_phase_name.value}_failed_at": datetime.now(UTC).isoformat(),
                         },
                     )
                     await self.batch_repo.save_processing_pipeline_state(
@@ -292,7 +315,6 @@ class DefaultPipelinePhaseCoordinator:
                         updated_pipeline_state,
                     )
 
-                # TODO: Publish diagnostic event when error event models are available
                 raise
 
             # Generic state update - mark phase as DISPATCH_INITIATED
@@ -349,7 +371,14 @@ class DefaultPipelinePhaseCoordinator:
 
         # Validate resolved pipeline
         if not resolved_pipeline:
-            raise DataValidationError(f"Empty resolved pipeline for batch {batch_id}")
+            raise_validation_error(
+                service="batch_orchestrator_service",
+                operation="initiate_resolved_pipeline",
+                field="resolved_pipeline",
+                message=f"Empty resolved pipeline for batch {batch_id}",
+                correlation_id=correlation_id,
+                batch_id=batch_id,
+            )
 
         # Get first phase from resolved pipeline
         first_phase_name = resolved_pipeline[0]
@@ -387,14 +416,27 @@ class DefaultPipelinePhaseCoordinator:
         # Get phase initiator
         initiator = self.phase_initiators_map.get(first_phase_name)
         if not initiator:
-            raise DataValidationError(f"No initiator found for first phase {first_phase_name}")
+            raise_validation_error(
+                service="batch_orchestrator_service",
+                operation="initiate_resolved_pipeline",
+                field="phase_initiator",
+                message=f"No initiator found for first phase {first_phase_name}",
+                correlation_id=correlation_id,
+                batch_id=batch_id,
+                phase=first_phase_name.value,
+            )
 
         # Get essays that were stored from the original BatchEssaysReady event
         essays_for_processing = await self.batch_repo.get_batch_essays(batch_id)
 
         if not essays_for_processing:
-            raise DataValidationError(
-                f"No essays found for batch {batch_id}. Batch may not be ready for processing.",
+            raise_validation_error(
+                service="batch_orchestrator_service",
+                operation="initiate_resolved_pipeline",
+                field="essays_for_processing",
+                message=f"No essays found for batch {batch_id}. Batch may not be ready for processing.",
+                correlation_id=correlation_id,
+                batch_id=batch_id,
             )
 
         logger.info(f"Retrieved {len(essays_for_processing)} essays for pipeline initiation")
@@ -408,9 +450,16 @@ class DefaultPipelinePhaseCoordinator:
                 essays_for_processing=essays_for_processing,
                 batch_context=batch_context,
             )
-        except InitiationError as e:
+        except HuleEduError as e:
             logger.error(
                 f"Failed to initiate first phase {first_phase_name} for batch {batch_id}: {e}",
+            )
+            # Record phase failure with structured error details
+            await self.state_manager.record_phase_failure(
+                batch_id=batch_id,
+                phase_name=first_phase_name,
+                error=e,
+                correlation_id=correlation_id,
             )
             raise
 

@@ -180,7 +180,7 @@ class ComparisonPair(Base):
     raw_llm_response: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Structured error fields
-    error_code: Mapped[ErrorCode | None] = mapped_column(SQLAlchemyEnum(ErrorCode), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     error_correlation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
     error_timestamp: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, doc="When error occurred"

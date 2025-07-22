@@ -6,7 +6,9 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncIterator, Dict, List, Optional
+from uuid import UUID
 
+from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import BatchStatus, ProcessingStage
 from huleedu_service_libs.database import DatabaseMetricsProtocol
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -175,7 +177,7 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             return batch
 
     async def update_batch_status(
-        self, batch_id: str, status: str, error: Optional[str] = None
+        self, batch_id: str, status: str, error_detail: Optional[ErrorDetail] = None, correlation_id: Optional[UUID] = None
     ) -> bool:
         """Update batch status.
 
@@ -201,8 +203,8 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
                     return False
 
                 batch.overall_status = batch_status
-                if error:
-                    batch.last_error = error
+                if error_detail:
+                    batch.batch_error_detail = error_detail.model_dump(mode='json')
                 batch.updated_at = datetime.utcnow()
 
                 await session.commit()
@@ -217,9 +219,10 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         essay_id: str,
         batch_id: str,
         status: ProcessingStage,
+        correlation_id: UUID,
         correction_count: Optional[int] = None,
         corrected_text_storage_id: Optional[str] = None,
-        error: Optional[str] = None,
+        error_detail: Optional[ErrorDetail] = None,
     ) -> None:
         """Update essay spellcheck results.
 
@@ -255,8 +258,8 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
                 essay.spellcheck_correction_count = correction_count
             if corrected_text_storage_id:
                 essay.spellcheck_corrected_text_storage_id = corrected_text_storage_id
-            if error:
-                essay.spellcheck_error = error
+            if error_detail:
+                essay.spellcheck_error_detail = error_detail.model_dump(mode='json')
 
             essay.updated_at = datetime.utcnow()
             await session.commit()
@@ -266,10 +269,11 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         essay_id: str,
         batch_id: str,
         status: ProcessingStage,
+        correlation_id: UUID,
         rank: Optional[int] = None,
         score: Optional[float] = None,
         comparison_count: Optional[int] = None,
-        error: Optional[str] = None,
+        error_detail: Optional[ErrorDetail] = None,
     ) -> None:
         """Update essay CJ assessment results.
 
@@ -308,8 +312,8 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
                 essay.cj_score = score
             if comparison_count is not None:
                 essay.cj_comparison_count = comparison_count
-            if error:
-                essay.cj_assessment_error = error
+            if error_detail:
+                essay.cj_assessment_error_detail = error_detail.model_dump(mode='json')
 
             essay.updated_at = datetime.utcnow()
             await session.commit()
@@ -361,7 +365,7 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
                 batch.updated_at = datetime.utcnow()
                 await session.commit()
 
-    async def update_batch_failed(self, batch_id: str, error_message: str) -> None:
+    async def update_batch_failed(self, batch_id: str, error_detail: ErrorDetail, correlation_id: UUID) -> None:
         """Mark batch as failed."""
         async with self._get_session() as session:
             result = await session.execute(
@@ -371,6 +375,6 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
 
             if batch:
                 batch.overall_status = BatchStatus.FAILED_CRITICALLY
-                batch.last_error = error_message
+                batch.batch_error_detail = error_detail.model_dump(mode='json')
                 batch.updated_at = datetime.utcnow()
                 await session.commit()

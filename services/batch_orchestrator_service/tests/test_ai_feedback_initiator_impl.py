@@ -24,9 +24,9 @@ from services.batch_orchestrator_service.api_models import BatchRegistrationRequ
 from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import (
     AIFeedbackInitiatorImpl,
 )
+from huleedu_service_libs.error_handling import HuleEduError
 from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
-    DataValidationError,
 )
 
 
@@ -137,10 +137,7 @@ class TestAIFeedbackInitiatorImpl:
         sample_correlation_id: UUID,
     ) -> None:
         """Test that initiator rejects incorrect phase."""
-        with pytest.raises(
-            DataValidationError,
-            match="AIFeedbackInitiatorImpl received incorrect phase",
-        ):
+        with pytest.raises(HuleEduError) as exc_info:
             await ai_feedback_initiator.initiate_phase(
                 batch_id="test-batch-456",
                 phase_to_initiate=PhaseName.CJ_ASSESSMENT,  # Wrong phase!
@@ -148,6 +145,7 @@ class TestAIFeedbackInitiatorImpl:
                 essays_for_processing=sample_essay_refs,
                 batch_context=sample_batch_context,
             )
+        assert "AIFeedbackInitiatorImpl received incorrect phase" in str(exc_info.value)
 
     async def test_initiate_phase_empty_essays_validation(
         self,
@@ -156,10 +154,7 @@ class TestAIFeedbackInitiatorImpl:
         sample_correlation_id: UUID,
     ) -> None:
         """Test that initiator rejects empty essay list."""
-        with pytest.raises(
-            DataValidationError,
-            match="No essays provided for AI feedback initiation",
-        ):
+        with pytest.raises(HuleEduError) as exc_info:
             await ai_feedback_initiator.initiate_phase(
                 batch_id="test-batch-456",
                 phase_to_initiate=PhaseName.AI_FEEDBACK,
@@ -167,6 +162,7 @@ class TestAIFeedbackInitiatorImpl:
                 essays_for_processing=[],  # Empty list!
                 batch_context=sample_batch_context,
             )
+        assert "No essays provided for AI feedback initiation" in str(exc_info.value)
 
     async def test_educational_context_placeholder_values(
         self,

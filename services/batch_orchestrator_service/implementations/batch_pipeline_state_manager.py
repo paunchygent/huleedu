@@ -183,3 +183,67 @@ class BatchPipelineStateManager:
                     f"Failed atomic phase update for batch {batch_id} phase {phase_name}: {e}",
                 )
                 return False
+
+    async def record_phase_failure(
+        self,
+        batch_id: str,
+        phase_name: PhaseName,
+        error: HuleEduError,
+        correlation_id: str,
+    ) -> bool:
+        """
+        Record a phase failure with structured error details.
+        
+        This method creates a PhaseStatusLog entry with proper error_details
+        populated from the HuleEduError instance.
+        """
+        from huleedu_service_libs.error_handling import HuleEduError
+        
+        async with self.db.session() as session:
+            try:
+                # Create phase status log with error details
+                phase_log = PhaseStatusLog(
+                    batch_id=batch_id,
+                    phase=phase_name,
+                    status=PhaseStatusEnum.FAILED,
+                    correlation_id=correlation_id,
+                    phase_started_at=datetime.now(UTC).replace(tzinfo=None),
+                    error_details=error.error_detail.model_dump() if isinstance(error, HuleEduError) else {
+                        "error_code": "PROCESSING_ERROR",
+                        "message": str(error),
+                        "service": "batch_orchestrator_service",
+                        "operation": f"phase_{phase_name.value}_execution",
+                        "correlation_id": correlation_id,
+                        "timestamp": datetime.now(UTC).isoformat(),
+                    },
+                    processing_metadata={
+                        "failure_recorded_at": datetime.now(UTC).isoformat(),
+                    },
+                )
+                session.add(phase_log)
+                
+                # Also update the batch's error_details
+                stmt = (
+                    update(Batch)
+                    .where(Batch.id == batch_id)
+                    .values(
+                        error_details=phase_log.error_details,
+                        updated_at=datetime.now(UTC).replace(tzinfo=None),
+                    )
+                )
+                await session.execute(stmt)
+                
+                await session.commit()
+                
+                self.logger.info(
+                    f"Recorded phase failure for batch {batch_id} phase {phase_name}",
+                    extra={"correlation_id": correlation_id},
+                )
+                return True
+                
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to record phase failure for batch {batch_id}: {e}",
+                    exc_info=True,
+                )
+                return False

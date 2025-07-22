@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from common_core.error_enums import (
     BatchConductorErrorCode,
+    CJAssessmentErrorCode,
     ClassManagementErrorCode,
     ErrorCode,
     FileValidationErrorCode,
@@ -21,6 +22,7 @@ from common_core.error_enums import (
 ErrorCodeType = Union[
     ErrorCode,
     BatchConductorErrorCode,
+    CJAssessmentErrorCode,
     ClassManagementErrorCode,
     FileValidationErrorCode,
     LLMErrorCode,

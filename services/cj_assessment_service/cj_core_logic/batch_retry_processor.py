@@ -12,7 +12,7 @@ from uuid import UUID
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
-from huleedu_service_libs.error_handling import raise_cj_assessment_processing_error
+from huleedu_service_libs.error_handling import raise_processing_error
 from services.cj_assessment_service.protocols import (
     BatchProcessorProtocol,
     CJRepositoryProtocol,
@@ -161,7 +161,7 @@ class BatchRetryProcessor:
                 exc_info=True,
             )
 
-            raise_cj_assessment_processing_error(
+            raise_processing_error(
                 service="cj_assessment_service",
                 operation="submit_retry_batch",
                 message=f"Failed to submit retry batch: {str(e)}",
@@ -223,7 +223,7 @@ class BatchRetryProcessor:
                 exc_info=True,
             )
 
-            raise_cj_assessment_processing_error(
+            raise_processing_error(
                 service="cj_assessment_service",
                 operation="process_remaining_failed_comparisons",
                 message=f"Failed to process remaining failed comparisons: {str(e)}",

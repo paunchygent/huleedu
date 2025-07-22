@@ -12,11 +12,13 @@ from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
+from huleedu_service_libs.error_handling import (
+    raise_validation_error,
+)
 from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
     BatchRepositoryProtocol,
     CJAssessmentInitiatorProtocol,
-    DataValidationError,
 )
 
 from .utils import _infer_language_from_course_code
@@ -57,14 +59,25 @@ class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):
 
             # Validate that this is the correct phase
             if phase_to_initiate != PhaseName.CJ_ASSESSMENT:
-                raise DataValidationError(
-                    f"DefaultCJAssessmentInitiator received incorrect phase: {phase_to_initiate}",
+                raise_validation_error(
+                    service="batch_orchestrator_service",
+                    operation="cj_assessment_initiation",
+                    field="phase_to_initiate",
+                    message=f"DefaultCJAssessmentInitiator received incorrect phase: {phase_to_initiate}",
+                    correlation_id=correlation_id,
+                    expected_phase="CJ_ASSESSMENT",
+                    received_phase=phase_to_initiate.value,
                 )
 
             # Validate required data
             if not essays_for_processing:
-                raise DataValidationError(
-                    f"No essays provided for CJ assessment initiation in batch {batch_id}",
+                raise_validation_error(
+                    service="batch_orchestrator_service",
+                    operation="cj_assessment_initiation",
+                    field="essays_for_processing",
+                    message=f"No essays provided for CJ assessment initiation in batch {batch_id}",
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
                 )
 
             # Get language from course code
