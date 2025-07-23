@@ -71,13 +71,9 @@ async def test_atomic_redis_protocol_compliance(di_container: Any) -> None:
     assert callable(redis_client.delete_key)
 
     # Verify atomic protocol methods exist
-    assert hasattr(redis_client, "watch")
-    assert hasattr(redis_client, "multi")
-    assert hasattr(redis_client, "exec")
+    assert hasattr(redis_client, "create_transaction_pipeline")
     assert hasattr(redis_client, "scan_pattern")
-    assert callable(redis_client.watch)
-    assert callable(redis_client.multi)
-    assert callable(redis_client.exec)
+    assert callable(redis_client.create_transaction_pipeline)
     assert callable(redis_client.scan_pattern)
 
     # Verify pub/sub protocol methods exist
