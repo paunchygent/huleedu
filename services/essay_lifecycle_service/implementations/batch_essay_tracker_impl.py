@@ -13,6 +13,7 @@ from typing import Any
 from uuid import UUID
 
 from common_core.domain_enums import get_course_language
+from common_core.error_enums import ErrorCode, FileValidationErrorCode
 from common_core.events.batch_coordination_events import (
     BatchEssaysReady,
     BatchEssaysRegistered,
@@ -23,6 +24,7 @@ from common_core.metadata_models import (
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
+from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.implementations.batch_expectation import BatchExpectation
@@ -300,7 +302,8 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             f"Total failures: {failure_count}"
         )
 
-        return None
+        # Check if batch is now complete after this failure
+        return await self.check_batch_completion(batch_id)
 
     async def check_batch_completion(self, batch_id: str) -> Any | None:  # BatchEssaysReady | None
         """
@@ -434,19 +437,53 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         failure_dicts = await self._redis_coordinator.get_validation_failures(batch_id)
         failures: list[EssayValidationFailedV1] = []
         for failure_dict in failure_dicts:
-            failures.append(
-                EssayValidationFailedV1(
-                    batch_id=failure_dict["batch_id"],
-                    original_file_name=failure_dict["original_file_name"],
-                    validation_error_code=failure_dict["validation_error_code"],
-                    validation_error_message=failure_dict["validation_error_message"],
-                    file_size_bytes=failure_dict["file_size_bytes"],
-                    raw_file_storage_id=failure_dict["raw_file_storage_id"],
-                    correlation_id=UUID(failure_dict["correlation_id"])
-                    if failure_dict.get("correlation_id")
-                    else None,
+            try:
+                # Convert string error code back to enum
+                error_code_str = failure_dict["validation_error_code"]
+                try:
+                    error_code = FileValidationErrorCode(error_code_str)
+                except ValueError:
+                    # If the error code is not recognized, use a default
+                    self._logger.warning(
+                        f"Unknown validation error code '{error_code_str}' for batch {batch_id}, "
+                        f"using UNKNOWN_VALIDATION_ERROR"
+                    )
+                    error_code = FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR
+
+                failures.append(
+                    EssayValidationFailedV1(
+                        batch_id=failure_dict["batch_id"],
+                        original_file_name=failure_dict["original_file_name"],
+                        validation_error_code=error_code,
+                        validation_error_message=failure_dict["validation_error_message"],
+                        file_size_bytes=failure_dict["file_size_bytes"],
+                        raw_file_storage_id=failure_dict["raw_file_storage_id"],
+                        correlation_id=UUID(failure_dict["correlation_id"])
+                        if failure_dict.get("correlation_id")
+                        else None,
+                    )
                 )
-            )
+            except KeyError as e:
+                raise HuleEduError(
+                    error_code=ErrorCode.PROCESSING_ERROR,
+                    message=f"Invalid validation failure data in Redis for batch {batch_id}",
+                    extra={
+                        "batch_id": batch_id,
+                        "missing_field": str(e),
+                        "failure_dict": failure_dict
+                    }
+                )
+            except Exception as e:
+                raise HuleEduError(
+                    error_code=ErrorCode.PROCESSING_ERROR,
+                    message=f"Failed to reconstruct validation failure event for batch {batch_id}",
+                    extra={
+                        "batch_id": batch_id,
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                        "failure_dict": failure_dict
+                    }
+                )
 
         # Create BatchEssaysReady event
         ready_event = BatchEssaysReady(

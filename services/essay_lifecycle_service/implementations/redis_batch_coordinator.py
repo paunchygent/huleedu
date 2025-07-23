@@ -253,7 +253,7 @@ class RedisBatchCoordinator:
 
     async def _get_completion_state_atomically(self, batch_id: str) -> dict[str, int]:
         """Get all completion state in single atomic Redis transaction."""
-        pipe = self._redis.pipeline()
+        pipe = await self._redis.create_transaction_pipeline()
         pipe.multi()
         
         # Get all state atomically
@@ -300,13 +300,12 @@ class RedisBatchCoordinator:
         Returns True if this call marked it completed, False if already completed.
         """
         # Use SET NX (set if not exists) for atomic completion flag
-        result = await self._redis.set(
+        result = await self._redis.set_if_not_exists(
             f"batch:{batch_id}:completed", 
             "true", 
-            nx=True,  # Only set if doesn't exist
-            ex=86400  # 24 hour expiry
+            ttl_seconds=86400  # 24 hour expiry
         )
-        return result is True  # True if we set it, False if already existed
+        return result  # True if we set it, False if already existed
 
     async def get_available_slot_count(self, batch_id: str) -> int:
         """
