@@ -505,10 +505,16 @@ class DefaultPipelinePhaseCoordinator:
         # Determine current status
         if hasattr(current_state, "get_pipeline"):
             pipeline_detail = current_state.get_pipeline(phase.value)
-            current_status = pipeline_detail.status if pipeline_detail else PipelineExecutionStatus.PENDING_DEPENDENCIES
+            current_status = (
+                pipeline_detail.status
+                if pipeline_detail
+                else PipelineExecutionStatus.PENDING_DEPENDENCIES
+            )
         else:
             phase_status_key = f"{phase.value}_status"
-            current_status_str = current_state.get(phase_status_key, PipelineExecutionStatus.PENDING_DEPENDENCIES.value)
+            current_status_str = current_state.get(
+                phase_status_key, PipelineExecutionStatus.PENDING_DEPENDENCIES.value
+            )
             current_status = PipelineExecutionStatus(current_status_str)
 
         # Update the phase status in the pipeline state

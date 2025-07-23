@@ -92,6 +92,11 @@ class Settings(BaseSettings):
         default=1000, description="Maximum size of fallback queue for failed Kafka messages"
     )
 
+    # Redis Configuration for Distributed Coordination
+    redis_transaction_retries: int = Field(
+        default=5, description="Maximum retries for Redis transaction operations"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

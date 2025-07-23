@@ -104,7 +104,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             "course_code": batch_essays_registered.course_code.value,
             "essay_instructions": batch_essays_registered.essay_instructions,
             "user_id": batch_essays_registered.user_id,
-            "correlation_id": correlation_id,
+            "correlation_id": str(correlation_id),  # Convert UUID to string for Redis storage
             "expected_count": len(batch_essays_registered.essay_ids),
             "created_at": datetime.now().isoformat(),
         }
@@ -114,7 +114,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             batch_id=batch_id,
             essay_ids=batch_essays_registered.essay_ids,
             metadata=batch_metadata,
-            timeout_seconds=300,  # 5 minutes default timeout
+            timeout_seconds=86400,  # 24 hours for complex processing including overnight LLM batches
         )
 
         # **Create BatchExpectation for database persistence**
@@ -127,7 +127,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             user_id=batch_essays_registered.user_id,
             correlation_id=correlation_id,
             created_at=datetime.now(UTC),
-            timeout_seconds=300,
+            timeout_seconds=86400,  # 24 hours for complex processing
         )
 
         # Persist to database
@@ -481,6 +481,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             class_type="GUEST",  # Placeholder
             teacher_first_name=None,
             teacher_last_name=None,
+            user_id=metadata.get("user_id", ""),  # Get user_id from metadata
             validation_failures=failures if failures else None,
             total_files_processed=len(ready_essays) + len(failures),
         )

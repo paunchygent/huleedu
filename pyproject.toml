@@ -21,6 +21,7 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "PyJWT",  # For test authentication
+    "psutil>=7.0.0",
 ]
 
 [dependency-groups]
@@ -44,6 +45,7 @@ monorepo-tools = [
 # Install all services and common_core for unified development
 dev = [
     "coverage>=7.9.2",
+    "redis>=6.2.0",
 ]
 
 [tool.ruff]

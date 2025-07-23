@@ -269,6 +269,7 @@ async def setup_test_data(test_app: FunctionalTestResultAggregatorApp) -> BatchR
             essay_id="essay-001",
             batch_id="test-batch-001",
             status=ProcessingStage.COMPLETED,
+            correlation_id=uuid4(),
             correction_count=5,
             corrected_text_storage_id="storage-001",
         )
@@ -277,6 +278,7 @@ async def setup_test_data(test_app: FunctionalTestResultAggregatorApp) -> BatchR
             essay_id="essay-001",
             batch_id="test-batch-001",
             status=ProcessingStage.COMPLETED,
+            correlation_id=uuid4(),
             rank=1,
             score=0.95,
             comparison_count=10,
@@ -286,6 +288,7 @@ async def setup_test_data(test_app: FunctionalTestResultAggregatorApp) -> BatchR
             essay_id="essay-002",
             batch_id="test-batch-001",
             status=ProcessingStage.COMPLETED,
+            correlation_id=uuid4(),
             correction_count=3,
             corrected_text_storage_id="storage-002",
         )
@@ -294,6 +297,7 @@ async def setup_test_data(test_app: FunctionalTestResultAggregatorApp) -> BatchR
             essay_id="essay-002",
             batch_id="test-batch-001",
             status=ProcessingStage.COMPLETED,
+            correlation_id=uuid4(),
             rank=2,
             score=0.85,
             comparison_count=10,

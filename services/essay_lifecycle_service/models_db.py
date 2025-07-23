@@ -122,7 +122,9 @@ class BatchEssayTracker(Base):
     correlation_id: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # Timeout configuration
-    timeout_seconds: Mapped[int] = mapped_column(Integer, default=300, nullable=False)
+    timeout_seconds: Mapped[int] = mapped_column(
+        Integer, default=86400, nullable=False
+    )  # 24 hours for complex processing
 
     # Legacy fields (maintained for compatibility)
     total_slots: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -33,4 +33,4 @@ class BatchExpectation:
     user_id: str
     correlation_id: UUID  # Original correlation ID from registration
     created_at: datetime
-    timeout_seconds: int = 300  # 5 minutes default
+    timeout_seconds: int = 86400  # 24 hours for complex processing including overnight LLM batches

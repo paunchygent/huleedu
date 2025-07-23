@@ -167,7 +167,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     correlation_id=correlation_id,
                 )
 
-                return True
+                return False
 
             # Step 2: Atomic content provisioning with database-level idempotency
             from common_core.status_enums import EssayStatus

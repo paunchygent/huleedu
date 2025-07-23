@@ -9,15 +9,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import random
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from redis.exceptions import WatchError
 
-from services.essay_lifecycle_service.config import Settings
+if TYPE_CHECKING:
+    from services.essay_lifecycle_service.config import Settings
+
+
+logger = create_service_logger(__name__)
 
 
 class RedisBatchCoordinator:
@@ -37,8 +43,10 @@ class RedisBatchCoordinator:
     def __init__(self, redis_client: AtomicRedisClientProtocol, settings: Settings) -> None:
         self._redis = redis_client
         self._settings = settings
-        self._logger = create_service_logger("redis_batch_coordinator")
-        self._default_timeout = 300  # 5 minutes default
+        self._logger = logger
+        self._default_timeout = (
+            86400  # 24 hours for complex processing including overnight LLM batches
+        )
 
     def _get_available_slots_key(self, batch_id: str) -> str:
         """Get Redis key for available slots set."""
@@ -126,153 +134,82 @@ class RedisBatchCoordinator:
         self, batch_id: str, content_metadata: dict[str, Any]
     ) -> str | None:
         """
-        Atomically assign an available slot to content using Redis SPOP.
-        
-        Implements content deduplication to prevent identical content from being
-        assigned to multiple slots, solving the race condition issue.
+        Atomically assign an available slot to content using a full Redis transaction
+        with retries on WatchError.
 
         Args:
             batch_id: The batch identifier
-            content_metadata: Content metadata including text_storage_id, original_file_name
+            content_metadata: Content metadata including text_storage_id
 
         Returns:
-            The assigned internal essay ID if successful, None if no slots available
+            The assigned internal essay ID if successful, None if no slots are available
+            or if a race condition caused the transaction to fail after retries.
         """
-        slots_key = self._get_available_slots_key(batch_id)
-        assignments_key = self._get_assignments_key(batch_id)
-        content_assignments_key = self._get_content_assignments_key(batch_id)
-        
-        # Extract text_storage_id for deduplication
         text_storage_id = content_metadata.get("text_storage_id")
         if not text_storage_id:
-            raise ValueError("content_metadata must include text_storage_id for deduplication")
+            raise ValueError("content_metadata must include text_storage_id")
 
-        max_retries = 5
-        for attempt in range(max_retries):
+        for attempt in range(self._settings.redis_transaction_retries):
             try:
-                # First, check if content already assigned (non-transactional for efficiency)
-                existing_essay_id = await self._redis.hget(content_assignments_key, text_storage_id)
-                if existing_essay_id is not None:
-                    # Content already assigned - return existing assignment (idempotent)
-                    self._logger.info(
-                        f"Content {text_storage_id} already assigned to essay {existing_essay_id} "
-                        f"in batch {batch_id} (idempotent operation)"
-                    )
-                    return existing_essay_id
-                
-                # Create transaction pipeline with watched keys (including content assignments)
-                pipeline = await self._redis.create_transaction_pipeline(
-                    slots_key, assignments_key, content_assignments_key
+                return await self._attempt_slot_assignment(
+                    batch_id, text_storage_id, content_metadata
                 )
-
-                # Start transaction for atomic operations
-                pipeline.multi()
-
-                # Queue all operations for atomic execution
-                # We need to make this truly atomic by using HSETNX
-                # HSETNX only sets if the key doesn't exist, returning 1 if set, 0 if already exists
-                
-                # First try to claim this content atomically with a placeholder
-                pipeline.hsetnx(content_assignments_key, text_storage_id, "PENDING")
-                # Then try to get a slot
-                pipeline.spop(slots_key)
-
-                # Execute atomic transaction
-                results = await pipeline.execute()
-
-                if results is None:
-                    # Transaction was discarded due to concurrent modification
-                    if attempt < max_retries - 1:
-                        self._logger.debug(
-                            f"Slot assignment transaction discarded for batch {batch_id} "
-                            f"(concurrent modification detected), retrying attempt {attempt + 2}/{max_retries}"
-                        )
-                        # Exponential backoff with jitter to prevent thundering herd
-                        backoff_time = (0.02 + random.uniform(0, 0.01)) * (attempt + 1)
-                        await asyncio.sleep(backoff_time)
-                        continue
-                    else:
-                        self._logger.warning(
-                            f"Slot assignment transaction failed after {max_retries} attempts for batch {batch_id}"
-                        )
-                        return None
-
-                # Extract results from atomic execution
-                # results[0] is from hsetnx (1 if we claimed it, 0 if already exists)
-                # results[1] is from spop (slot assignment)
-                content_claimed = results[0]
-                essay_id = results[1]
-                
-                # Check if we successfully claimed the content
-                if content_claimed == 0:
-                    # Content was already claimed by another process
-                    # We need to get the actual essay_id (not "PENDING")
-                    actual_essay_id = await self._redis.hget(content_assignments_key, text_storage_id)
-                    
-                    # Wait a bit for the other process to update from PENDING to actual ID
-                    if actual_essay_id == "PENDING":
-                        await asyncio.sleep(0.01)  # Brief wait
-                        actual_essay_id = await self._redis.hget(content_assignments_key, text_storage_id)
-                    
-                    self._logger.info(
-                        f"Content {text_storage_id} already claimed by another process, "
-                        f"assigned to essay {actual_essay_id} in batch {batch_id}"
-                    )
-                    return actual_essay_id if actual_essay_id != "PENDING" else None
-                
-                # We claimed the content, check if we got a slot
-                if essay_id is None:
-                    # No slots available - remove our PENDING claim
-                    await self._redis.hdel(content_assignments_key, text_storage_id)
-                    self._logger.debug(
-                        f"No available slots for batch {batch_id} (all slots assigned), "
-                        f"removed pending claim for content {text_storage_id}"
-                    )
-                    return None
-                
-                # Success - update PENDING to actual essay_id
-                await self._redis.hset(content_assignments_key, text_storage_id, essay_id)
-
-                # Store full assignment metadata
-                try:
-                    metadata_json = json.dumps(content_metadata)
-                    await self._redis.hset(assignments_key, essay_id, metadata_json)
-                except Exception as e:
-                    # Log error but don't fail the assignment since content mapping is already done
-                    self._logger.error(
-                        f"Failed to store assignment metadata for essay {essay_id} "
-                        f"in batch {batch_id}: {e}",
-                        exc_info=True,
-                    )
-
-                # Success - log and return
-                self._logger.info(
-                    f"Assigned slot {essay_id} to content {content_metadata.get('text_storage_id')} "
-                    f"in batch {batch_id}"
-                )
-                return essay_id
-
-            except asyncio.CancelledError:
-                # Re-raise cancellation
-                raise
-            except Exception as e:
-                # Pipeline cleanup is automatic - no unwatch needed
-                if attempt < max_retries - 1:
+            except WatchError:
+                if attempt < self._settings.redis_transaction_retries - 1:
+                    delay = (2**attempt) * 0.01 + random.uniform(0, 0.01)
                     self._logger.warning(
-                        f"Error in slot assignment for batch {batch_id}, retrying: {e}"
+                        f"WatchError on attempt {attempt + 1} for {text_storage_id}, retrying in {delay:.3f}s..."
                     )
-                    # Exponential backoff with jitter to prevent thundering herd
-                    backoff_time = (0.02 + random.uniform(0, 0.01)) * (attempt + 1)
-                    await asyncio.sleep(backoff_time)
-                    continue
+                    await asyncio.sleep(delay)
                 else:
                     self._logger.error(
-                        f"Failed to assign slot for batch {batch_id}: {e}", exc_info=True
+                        f"Final attempt failed for {text_storage_id} due to WatchError."
                     )
-                    raise
+                    return None
 
-        # Should never reach here
-        return None
+        return None  # Should not be reached, but for safety
+
+    async def _attempt_slot_assignment(
+        self, batch_id: str, text_storage_id: str, content_metadata: dict[str, Any]
+    ) -> str | None:
+        slots_key = self._get_available_slots_key(batch_id)
+        content_assignments_key = self._get_content_assignments_key(batch_id)
+        assignments_key = self._get_assignments_key(batch_id)
+
+        async with await self._redis.create_transaction_pipeline(
+            slots_key, content_assignments_key
+        ) as pipe:
+            # Check for duplicate content first
+            existing_assignment = await pipe.hget(content_assignments_key, text_storage_id)
+            if existing_assignment:
+                self._logger.info(
+                    f"Content {text_storage_id} already assigned to essay {existing_assignment} "
+                    f"in batch {batch_id} (idempotent operation)"
+                )
+                return str(existing_assignment)
+
+            # Check for available slots
+            available_slots = await pipe.smembers(slots_key)
+            if not available_slots:
+                self._logger.warning(f"No available slots in batch {batch_id}.")
+                return None
+
+            # Start the transaction
+            pipe.multi()
+
+            # Pop a slot and perform assignments
+            assigned_essay_id = available_slots.pop()
+            pipe.srem(slots_key, assigned_essay_id)
+            pipe.hset(content_assignments_key, text_storage_id, assigned_essay_id)
+            pipe.hset(assignments_key, assigned_essay_id, json.dumps(content_metadata))
+
+            # Execute the transaction. Throws WatchError if optimistic lock fails.
+            await pipe.execute()
+
+            self._logger.info(
+                f"Successfully assigned content {text_storage_id} to slot {assigned_essay_id}"
+            )
+            return str(assigned_essay_id)
 
     async def check_batch_completion(self, batch_id: str) -> bool:
         """
@@ -448,7 +385,6 @@ class RedisBatchCoordinator:
                 self._get_assignments_key(batch_id),
                 self._get_metadata_key(batch_id),
                 self._get_timeout_key(batch_id),
-                self._get_validation_failures_key(batch_id),
                 self._get_content_assignments_key(batch_id),  # Clean up content deduplication data
             ]
 
@@ -582,6 +518,21 @@ class RedisBatchCoordinator:
             # Add to list of failures
             await self._redis.rpush(failures_key, failure_json)
 
+            # Remove a slot from available slots to account for the validation failure
+            # This ensures batch completion tracking works correctly
+            # Note: We use SPOP (not SREM) because validation failures occur BEFORE
+            # slot assignment, so there's no specific essay_id to remove. We just need
+            # to reduce the available slot count by one.
+            slots_key = self._get_available_slots_key(batch_id)
+            
+            # Use spop to remove a random slot from the available set
+            removed_slot = await self._redis.spop(slots_key)
+            if removed_slot:
+                self._logger.debug(
+                    f"Removed slot {removed_slot} from available slots for batch {batch_id} "
+                    f"due to validation failure"
+                )
+
             # Set TTL to match batch timeout
             timeout_key = self._get_timeout_key(batch_id)
             timeout_exists = await self._redis.get(timeout_key) is not None
@@ -688,11 +639,11 @@ class RedisBatchCoordinator:
     async def get_essay_id_for_content(self, batch_id: str, text_storage_id: str) -> str | None:
         """
         Get the essay ID assigned to a specific text_storage_id.
-        
+
         Args:
             batch_id: The batch identifier
             text_storage_id: The text storage ID to look up
-            
+
         Returns:
             The essay ID if content is assigned, None otherwise
         """
@@ -703,7 +654,7 @@ class RedisBatchCoordinator:
         except Exception as e:
             self._logger.error(
                 f"Failed to get essay ID for content {text_storage_id} in batch {batch_id}: {e}",
-                exc_info=True
+                exc_info=True,
             )
             raise
 

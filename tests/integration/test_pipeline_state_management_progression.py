@@ -58,10 +58,28 @@ class TestPipelineProgressionScenarios:
         notification_service = NotificationService(mock_redis_client, batch_repository)
         # Create a mock state manager that delegates to batch repository
         mock_state_manager = AsyncMock(spec=BatchPipelineStateManager)
-        mock_state_manager.save_processing_pipeline_state = batch_repository.save_processing_pipeline_state
-        mock_state_manager.get_processing_pipeline_state = batch_repository.get_processing_pipeline_state
-        # Mock the update_phase_status_atomically method to always succeed
-        mock_state_manager.update_phase_status_atomically.return_value = True
+        mock_state_manager.save_processing_pipeline_state = (
+            batch_repository.save_processing_pipeline_state
+        )
+        mock_state_manager.get_processing_pipeline_state = (
+            batch_repository.get_processing_pipeline_state
+        )
+
+        # Mock the update_phase_status_atomically method to perform actual updates
+        async def mock_update_phase_status(
+            batch_id, phase_name, expected_status, new_status, **kwargs
+        ):
+            # Get current state
+            state = await batch_repository.get_processing_pipeline_state(batch_id)
+            if state:
+                phase_key = f"{phase_name.value}_status"
+                if state.get(phase_key) == expected_status.value:
+                    state[phase_key] = new_status.value
+                    await batch_repository.save_processing_pipeline_state(batch_id, state)
+                    return True
+            return False
+
+        mock_state_manager.update_phase_status_atomically.side_effect = mock_update_phase_status
         # Mock the record_phase_failure method to always succeed
         mock_state_manager.record_phase_failure.return_value = True
         return DefaultPipelinePhaseCoordinator(

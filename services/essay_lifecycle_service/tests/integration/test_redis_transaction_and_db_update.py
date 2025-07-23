@@ -78,7 +78,7 @@ class TestRedisTransactionAndDatabaseUpdate:
             redis_client = RedisClient(client_id="test-redis", redis_url=redis_url)
             await redis_client.start()
 
-            redis_coordinator = RedisBatchCoordinator(redis_client, logger)
+            redis_coordinator = RedisBatchCoordinator(redis_client, settings)
 
             repository = PostgreSQLEssayRepository(settings)
             await repository.initialize_db_schema()
