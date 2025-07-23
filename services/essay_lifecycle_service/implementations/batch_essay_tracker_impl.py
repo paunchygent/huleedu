@@ -14,6 +14,7 @@ from uuid import UUID
 
 from common_core.domain_enums import get_course_language
 from common_core.error_enums import ErrorCode, FileValidationErrorCode
+from common_core.models.error_models import ErrorDetail
 from common_core.events.batch_coordination_events import (
     BatchEssaysReady,
     BatchEssaysRegistered,
@@ -287,9 +288,10 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         # Track validation failure in Redis
         failure_data = {
             "batch_id": batch_id,
+            "file_upload_id": validation_failed.file_upload_id,
             "original_file_name": validation_failed.original_file_name,
             "validation_error_code": validation_failed.validation_error_code.value,
-            "validation_error_message": validation_failed.validation_error_message,
+            "validation_error_detail": validation_failed.validation_error_detail.model_dump(mode="json"),
             "file_size_bytes": validation_failed.file_size_bytes,
             "raw_file_storage_id": validation_failed.raw_file_storage_id,
             "correlation_id": str(validation_failed.correlation_id)
@@ -456,9 +458,10 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 failures.append(
                     EssayValidationFailedV1(
                         batch_id=failure_dict["batch_id"],
+                        file_upload_id=failure_dict["file_upload_id"],
                         original_file_name=failure_dict["original_file_name"],
                         validation_error_code=error_code,
-                        validation_error_message=failure_dict["validation_error_message"],
+                        validation_error_detail=ErrorDetail.model_validate(failure_dict["validation_error_detail"]),
                         file_size_bytes=failure_dict["file_size_bytes"],
                         raw_file_storage_id=failure_dict["raw_file_storage_id"],
                         correlation_id=UUID(failure_dict["correlation_id"])

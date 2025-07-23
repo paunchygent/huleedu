@@ -16,6 +16,9 @@ from common_core.domain_enums import ContentType
 from common_core.error_enums import FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from common_core.status_enums import OperationStatus, ProcessingStatus
+from huleedu_service_libs.error_handling.error_detail_factory import (
+    create_error_detail_with_context,
+)
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -31,6 +34,7 @@ logger = create_service_logger("file_service.core_logic")
 
 async def process_single_file_upload(
     batch_id: str,
+    file_upload_id: str,
     file_content: bytes,
     file_name: str,
     main_correlation_id: uuid.UUID,
@@ -59,6 +63,7 @@ async def process_single_file_upload(
 
     Args:
         batch_id: Batch identifier this file belongs to
+        file_upload_id: Unique identifier for this file upload
         file_content: Raw file bytes
         file_name: Original filename
         main_correlation_id: Correlation ID for batch upload operation
@@ -99,12 +104,26 @@ async def process_single_file_upload(
         )
 
         # Publish storage failure event WITHOUT raw_file_storage_id (since storage failed)
+        error_detail = create_error_detail_with_context(
+            error_code=FileValidationErrorCode.RAW_STORAGE_FAILED,
+            message=f"Failed to store raw file: {storage_error}",
+            service="file_service",
+            operation="process_single_file_upload",
+            correlation_id=main_correlation_id,
+            details={
+                "batch_id": batch_id,
+                "file_name": file_name,
+                "file_size_bytes": len(file_content),
+            },
+        )
+
         validation_failure_event = EssayValidationFailedV1(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             original_file_name=file_name,
             raw_file_storage_id="STORAGE_FAILED",  # Indicate storage failure
             validation_error_code=FileValidationErrorCode.RAW_STORAGE_FAILED,
-            validation_error_message=f"Failed to store raw file: {storage_error}",
+            validation_error_detail=error_detail,
             file_size_bytes=len(file_content),
             correlation_id=main_correlation_id,
             timestamp=datetime.now(UTC),
@@ -156,10 +175,11 @@ async def process_single_file_upload(
         # Publish technical extraction failure event WITH raw_file_storage_id
         validation_failure_event = EssayValidationFailedV1(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             original_file_name=file_name,
             raw_file_storage_id=raw_file_storage_id,
             validation_error_code=FileValidationErrorCode.TEXT_EXTRACTION_FAILED,
-            validation_error_message=extraction_error.error_detail.message,
+            validation_error_detail=extraction_error.error_detail,
             file_size_bytes=len(file_content),
             correlation_id=main_correlation_id,
             timestamp=datetime.now(UTC),
@@ -210,10 +230,11 @@ async def process_single_file_upload(
         # Publish business rule validation failure event WITH raw_file_storage_id
         validation_failure_event = EssayValidationFailedV1(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             original_file_name=file_name,
             raw_file_storage_id=raw_file_storage_id,
             validation_error_code=FileValidationErrorCode(validation_error.error_detail.error_code),
-            validation_error_message=validation_error.error_detail.message,
+            validation_error_detail=validation_error.error_detail,
             file_size_bytes=len(file_content),
             correlation_id=main_correlation_id,
             timestamp=datetime.now(UTC),
@@ -266,6 +287,7 @@ async def process_single_file_upload(
     # Construct success event WITH both storage IDs
     content_provisioned_event_data = EssayContentProvisionedV1(
         batch_id=batch_id,
+        file_upload_id=file_upload_id,
         original_file_name=file_name,
         raw_file_storage_id=raw_file_storage_id,
         text_storage_id=text_storage_id,

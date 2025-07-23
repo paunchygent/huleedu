@@ -14,6 +14,7 @@ class ProcessingEvent(str, Enum):
     # -------------  Essay lifecycle  -------------#
     ESSAY_PHASE_INITIATION_REQUESTED = "essay.phase.initiation.requested"
     ESSAY_LIFECYCLE_STATE_UPDATED = "essay.lifecycle.state.updated"
+    ESSAY_SLOT_ASSIGNED = "essay.slot.assigned"
     # -------------  Essay content readiness  -------------#
     ESSAY_CONTENT_PROVISIONED = "essay.content.provisioned"
     EXCESS_CONTENT_PROVISIONED = "excess.content.provisioned"
@@ -90,6 +91,7 @@ _TOPIC_MAPPING = {
         "huleedu.class.student.associations.confirmed.v1"
     ),
     ProcessingEvent.VALIDATION_TIMEOUT_PROCESSED: "huleedu.class.validation.timeout.processed.v1",
+    ProcessingEvent.ESSAY_SLOT_ASSIGNED: "huleedu.els.essay.slot.assigned.v1",
     # LLM Provider events
     ProcessingEvent.LLM_REQUEST_STARTED: "huleedu.llm_provider.request_started.v1",
     ProcessingEvent.LLM_REQUEST_COMPLETED: "huleedu.llm_provider.request_completed.v1",

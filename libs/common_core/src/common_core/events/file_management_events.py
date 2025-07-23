@@ -36,7 +36,7 @@ class BatchFileAddedV1(BaseModel):
 
     event: str = Field(default="batch.file.added")
     batch_id: str = Field(description="Batch identifier")
-    essay_id: str = Field(description="New essay identifier")
+    file_upload_id: str = Field(description="Unique identifier for this file upload")
     filename: str = Field(description="Original filename")
     user_id: str = Field(description="User who added the file")
     correlation_id: UUID = Field(default_factory=uuid4)
@@ -48,7 +48,7 @@ class BatchFileRemovedV1(BaseModel):
 
     event: str = Field(default="batch.file.removed")
     batch_id: str = Field(description="Batch identifier")
-    essay_id: str = Field(description="Removed essay identifier")
+    file_upload_id: str = Field(description="File upload identifier to remove")
     filename: str = Field(description="Original filename")
     user_id: str = Field(description="User who removed the file")
     correlation_id: UUID = Field(default_factory=uuid4)

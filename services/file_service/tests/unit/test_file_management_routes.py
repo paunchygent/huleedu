@@ -390,7 +390,7 @@ class TestFileManagementRoutes:
         data = await response.get_json()
         assert essay_id in data["message"]
         assert data["batch_id"] == batch_id
-        assert data["essay_id"] == essay_id
+        assert data["file_upload_id"] == essay_id
         assert "correlation_id" in data
 
         # Assert - correlation_id is auto-generated, so we just check it was called once

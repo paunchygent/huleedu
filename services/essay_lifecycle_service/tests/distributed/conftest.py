@@ -311,6 +311,15 @@ class DistributedTestEventPublisher(EventPublisher):
             "els_batch_phase_outcome", self.instance_id, event_data.batch_id
         )
 
+    async def publish_essay_slot_assigned(self, event_data: Any, correlation_id: UUID) -> None:
+        """Record essay slot assigned events."""
+        async with self.lock:
+            self.published_events.append(("essay_slot_assigned", event_data, correlation_id))
+
+        await self.metrics.record_coordination_event(
+            "essay_slot_assigned", self.instance_id, event_data.batch_id
+        )
+
 
 class DistributedTestOrchestrator:
     """Orchestrates Docker Compose-based distributed testing infrastructure."""

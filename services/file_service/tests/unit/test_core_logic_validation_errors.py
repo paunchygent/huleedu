@@ -56,8 +56,10 @@ class TestCoreLogicValidationErrors:
         mock_text_extractor.extract_text.side_effect = mock_extraction_failure
 
         # Act
+        file_upload_id = str(uuid.uuid4())
         result = await process_single_file_upload(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             file_content=file_content,
             file_name=file_name,
             main_correlation_id=correlation_id,
@@ -87,7 +89,7 @@ class TestCoreLogicValidationErrors:
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
         assert event_data.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
-        assert "Unable to extract text from PDF" in event_data.validation_error_message
+        assert "Unable to extract text from PDF" in event_data.validation_error_detail.message
 
         # Verify success event was NOT published
         mock_event_publisher.publish_essay_content_provisioned.assert_not_called()
@@ -111,8 +113,10 @@ class TestCoreLogicValidationErrors:
         mock_content_client.store_content.side_effect = RuntimeError("Content Service unavailable")
 
         # Act
+        file_upload_id = str(uuid.uuid4())
         result = await process_single_file_upload(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             file_content=file_content,
             file_name=file_name,
             main_correlation_id=correlation_id,
@@ -137,7 +141,7 @@ class TestCoreLogicValidationErrors:
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
         assert event_data.validation_error_code == FileValidationErrorCode.RAW_STORAGE_FAILED
-        assert "Failed to store raw file" in event_data.validation_error_message
+        assert "Failed to store raw file" in event_data.validation_error_detail.message
         assert event_data.raw_file_storage_id == "STORAGE_FAILED"
 
         # Verify success event was NOT published

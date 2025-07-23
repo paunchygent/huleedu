@@ -133,7 +133,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
 
             logger.info(
                 f"Published BatchFileAddedV1 event for batch {event_data.batch_id}, "
-                f"essay {event_data.essay_id}, file: {event_data.filename}",
+                f"file {event_data.file_upload_id}, filename: {event_data.filename}",
             )
 
             # Publish to Redis for real-time updates
@@ -142,7 +142,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 "batch_file_added",
                 {
                     "batch_id": event_data.batch_id,
-                    "essay_id": event_data.essay_id,
+                    "file_upload_id": event_data.file_upload_id,
                     "filename": event_data.filename,
                     "timestamp": event_data.timestamp.isoformat(),
                 },
@@ -175,7 +175,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
 
             logger.info(
                 f"Published BatchFileRemovedV1 event for batch {event_data.batch_id}, "
-                f"essay {event_data.essay_id}, file: {event_data.filename}",
+                f"file {event_data.file_upload_id}, filename: {event_data.filename}",
             )
 
             # Publish to Redis for real-time updates
@@ -184,7 +184,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 "batch_file_removed",
                 {
                     "batch_id": event_data.batch_id,
-                    "essay_id": event_data.essay_id,
+                    "file_upload_id": event_data.file_upload_id,
                     "filename": event_data.filename,
                     "timestamp": event_data.timestamp.isoformat(),
                 },

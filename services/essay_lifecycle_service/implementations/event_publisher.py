@@ -408,6 +408,66 @@ class DefaultEventPublisher(EventPublisher):
                     error_details=str(e),
                 )
 
+    async def publish_essay_slot_assigned(
+        self,
+        event_data: Any,  # EssaySlotAssignedV1
+        correlation_id: UUID,
+    ) -> None:
+        """Publish EssaySlotAssignedV1 event when content is assigned to a slot."""
+        from uuid import uuid4
+
+        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.events.envelope import EventEnvelope
+
+        # Create event envelope
+        envelope = EventEnvelope[Any](
+            event_type="huleedu.els.essay.slot.assigned.v1",
+            source_service=self.settings.SERVICE_NAME,
+            correlation_id=correlation_id or uuid4(),
+            data=event_data,
+            metadata={},
+        )
+
+        # Inject current trace context
+        if envelope.metadata is not None:
+            inject_trace_context(envelope.metadata)
+
+        # Publish to Kafka using the essay slot assigned topic
+        topic = topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED)
+        try:
+            await self.kafka_bus.publish(topic=topic, envelope=envelope)
+            logger.info(
+                "Published EssaySlotAssignedV1 event to Kafka",
+                extra={
+                    "batch_id": getattr(event_data, "batch_id", "unknown"),
+                    "essay_id": getattr(event_data, "essay_id", "unknown"),
+                    "file_upload_id": getattr(event_data, "file_upload_id", "unknown"),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to publish EssaySlotAssignedV1 event: {e}",
+                extra={"correlation_id": str(correlation_id)},
+                exc_info=True,
+            )
+            # Use structured error handling if available
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_kafka_publish_error(
+                    service="essay_lifecycle_service",
+                    operation="publish_essay_slot_assigned",
+                    message=f"Failed to publish essay slot assigned event to Kafka: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    topic=topic,
+                    batch_id=getattr(event_data, "batch_id", "unknown"),
+                    essay_id=getattr(event_data, "essay_id", "unknown"),
+                    file_upload_id=getattr(event_data, "file_upload_id", "unknown"),
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
+
     async def publish_els_batch_phase_outcome(
         self,
         event_data: Any,  # ELSBatchPhaseOutcomeV1

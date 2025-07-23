@@ -66,8 +66,10 @@ class TestCoreLogicValidationFailures:
         mock_content_validator.validate_content.side_effect = mock_validation_failure
 
         # Act
+        file_upload_id = str(uuid.uuid4())
         result = await process_single_file_upload(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             file_content=file_content,
             file_name=file_name,
             main_correlation_id=correlation_id,
@@ -159,8 +161,10 @@ class TestCoreLogicValidationFailures:
         mock_content_validator.validate_content.side_effect = mock_empty_content_failure
 
         # Act
+        file_upload_id = str(uuid.uuid4())
         result = await process_single_file_upload(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             file_content=file_content,
             file_name=file_name,
             main_correlation_id=correlation_id,
@@ -228,8 +232,10 @@ class TestCoreLogicValidationFailures:
         mock_content_validator.validate_content.side_effect = mock_content_too_long_failure
 
         # Act
+        file_upload_id = str(uuid.uuid4())
         result = await process_single_file_upload(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             file_content=file_content,
             file_name=file_name,
             main_correlation_id=correlation_id,
@@ -298,8 +304,10 @@ class TestCoreLogicValidationFailures:
         mock_content_validator.validate_content.side_effect = mock_short_content_failure
 
         # Act
+        file_upload_id = str(uuid.uuid4())
         await process_single_file_upload(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             file_content=file_content,
             file_name=file_name,
             main_correlation_id=correlation_id,
@@ -368,8 +376,10 @@ class TestCoreLogicValidationFailures:
         mock_content_validator.validate_content.side_effect = mock_empty_validation_failure
 
         # Act
+        file_upload_id = str(uuid.uuid4())
         result = await process_single_file_upload(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             file_content=file_content,
             file_name=file_name,
             main_correlation_id=correlation_id,
@@ -416,7 +426,7 @@ class TestCoreLogicValidationFailures:
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
         assert event_data.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
-        assert "has empty content" in event_data.validation_error_message
+        assert "has empty content" in event_data.validation_error_detail.message
         assert event_data.raw_file_storage_id == "raw_storage_empty_extract_999"
 
         # Verify success event was NOT published

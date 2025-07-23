@@ -263,6 +263,10 @@ class MockEventPublisher(EventPublisher):
         async with self.lock:
             self.event_count += 1
 
+    async def publish_essay_slot_assigned(self, event_data: Any, correlation_id: UUID) -> None:
+        async with self.lock:
+            self.event_count += 1
+
 
 @pytest.mark.performance
 @pytest.mark.docker
@@ -537,6 +541,7 @@ class TestDistributedPerformance:
 
                 content_event = EssayContentProvisionedV1(
                     batch_id=batch_id,
+                    file_upload_id=f"test-file-upload-scaling-{i}",
                     text_storage_id=f"scaling_content_{i}_{uuid4().hex[:8]}",
                     raw_file_storage_id=f"raw_essay_{i:03d}_{uuid4().hex[:8]}",
                     original_file_name=f"scaling_test_{i}.txt",
@@ -725,6 +730,7 @@ class TestDistributedPerformance:
             for i in range(batch_size):
                 content_event = EssayContentProvisionedV1(
                     batch_id=batch_id,
+                    file_upload_id=f"test-file-upload-memory-{i}",
                     text_storage_id=f"memory_content_{i}_{uuid4().hex[:8]}",
                     raw_file_storage_id=f"raw_essay_{i:03d}_{uuid4().hex[:8]}",
                     original_file_name=f"memory_test_{i}.txt",
@@ -811,6 +817,7 @@ class TestDistributedPerformance:
 
             content_event = EssayContentProvisionedV1(
                 batch_id=batch_id,
+                file_upload_id=f"test-file-upload-endurance-{operation_count}",
                 text_storage_id=f"endurance_content_{operation_count}_{uuid4().hex[:8]}",
                 raw_file_storage_id=f"raw_essay_{operation_count:03d}_{uuid4().hex[:8]}",
                 original_file_name=f"endurance_test_{operation_count}.txt",

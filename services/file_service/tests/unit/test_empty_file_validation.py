@@ -63,8 +63,10 @@ async def test_empty_file_uses_content_validation() -> None:
     event_publisher = AsyncMock()
 
     # Act
+    file_upload_id = str(uuid.uuid4())
     result = await process_single_file_upload(
         batch_id=batch_id,
+        file_upload_id=file_upload_id,
         file_content=empty_file_content,
         file_name=file_name,
         main_correlation_id=correlation_id,
@@ -106,8 +108,11 @@ async def test_empty_file_uses_content_validation() -> None:
 
     assert isinstance(published_event, EssayValidationFailedV1)
     assert published_event.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
-    # Updated to match HuleEduError factory message format
-    assert published_event.validation_error_message == ("File 'empty_essay.txt' has empty content")
+    # Check that error_detail is present instead of error_message
+    assert hasattr(published_event, "validation_error_detail")
+    assert (
+        published_event.validation_error_detail.error_code == FileValidationErrorCode.EMPTY_CONTENT
+    )
     assert published_event.batch_id == batch_id
     assert published_event.original_file_name == file_name
     assert published_event.raw_file_storage_id == "raw_storage_empty_12345"  # Raw storage ID
@@ -159,8 +164,10 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     event_publisher = AsyncMock()
 
     # Act
+    file_upload_id = str(uuid.uuid4())
     result = await process_single_file_upload(
         batch_id=batch_id,
+        file_upload_id=file_upload_id,
         file_content=file_content,
         file_name=file_name,
         main_correlation_id=correlation_id,
@@ -195,7 +202,7 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
     published_event = event_publisher.publish_essay_validation_failed.call_args[0][0]
 
     assert published_event.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
-    assert "File format not supported" in published_event.validation_error_message
+    assert "File format not supported" in published_event.validation_error_detail.message
     assert published_event.raw_file_storage_id == "raw_storage_corrupted_67890"  # Raw ID
 
     # Assert - Correct return status
@@ -241,8 +248,10 @@ async def test_content_too_short_validation() -> None:
     event_publisher = AsyncMock()
 
     # Act
+    file_upload_id = str(uuid.uuid4())
     result = await process_single_file_upload(
         batch_id=batch_id,
+        file_upload_id=file_upload_id,
         file_content=short_file_content,
         file_name=file_name,
         main_correlation_id=correlation_id,

@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
 from ..error_enums import FileValidationErrorCode
+from ..models.error_models import ErrorDetail
 
 
 class EssayContentProvisionedV1(BaseModel):
@@ -27,6 +28,7 @@ class EssayContentProvisionedV1(BaseModel):
 
     event: str = Field(default="essay.content.provisioned", description="Event type identifier")
     batch_id: str = Field(description="Batch identifier this content belongs to")
+    file_upload_id: str = Field(description="Unique identifier for this file upload")
     original_file_name: str = Field(description="Original uploaded file name")
     raw_file_storage_id: str = Field(
         description="Storage ID of the original, unmodified raw file blob.",
@@ -50,6 +52,7 @@ class EssayValidationFailedV1(BaseModel):
 
     event: str = Field(default="essay.validation.failed", description="Event type identifier")
     batch_id: str = Field(description="Batch identifier this failed validation belongs to")
+    file_upload_id: str = Field(description="Unique identifier for this file upload")
     original_file_name: str = Field(description="Name of the file that failed validation")
     raw_file_storage_id: str = Field(
         description="Storage ID of the raw file blob that failed validation.",
@@ -57,7 +60,7 @@ class EssayValidationFailedV1(BaseModel):
     validation_error_code: FileValidationErrorCode = Field(
         description="Specific validation error code from FileValidationErrorCode enum"
     )
-    validation_error_message: str = Field(description="Human-readable error message with context")
+    validation_error_detail: ErrorDetail = Field(description="Structured error detail with context")
     file_size_bytes: int = Field(description="Size of the failed file for metrics and analysis")
     correlation_id: UUID = Field(default_factory=uuid4, description="Request correlation ID")
     timestamp: datetime = Field(

@@ -16,6 +16,7 @@ import pytest
 from common_core.error_enums import FileValidationErrorCode
 from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayValidationFailedV1
+from common_core.models.error_models import ErrorDetail
 
 from services.essay_lifecycle_service.protocols import BatchEssayTracker
 
@@ -33,9 +34,17 @@ class TestValidationEventConsumerIntegration:
         """Fixture providing a sample validation failure event."""
         return EssayValidationFailedV1(
             batch_id="batch_consumer_test",
+            file_upload_id="test-file-upload-consumer",
             original_file_name="failed_essay.txt",
             validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
-            validation_error_message="File content is empty or contains only whitespace",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.EMPTY_CONTENT,
+                message="File content is empty or contains only whitespace",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=0,
             raw_file_storage_id="test_storage_id_consumer",
             correlation_id=uuid4(),
@@ -127,9 +136,17 @@ class TestValidationEventConsumerIntegration:
         validation_failures = [
             EssayValidationFailedV1(
                 batch_id="batch_multiple",
+                file_upload_id=f"test-file-upload-multiple-{i}",
                 original_file_name=f"failed_{i}.txt",
                 validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
-                validation_error_message=f"Content is too short: file {i}",
+                validation_error_detail=ErrorDetail(
+                    error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+                    message=f"Content is too short: file {i}",
+                    correlation_id=uuid4(),
+                    timestamp=datetime.now(UTC),
+                    service="file_service",
+                    operation="validate_content"
+                ),
                 file_size_bytes=10,
                 raw_file_storage_id=f"test_storage_id_multiple_{i:03d}",
             )
@@ -151,9 +168,17 @@ class TestValidationEventConsumerIntegration:
 
         validation_failure = EssayValidationFailedV1(
             batch_id="batch_correlation",
+            file_upload_id="test-file-upload-correlation",
             original_file_name="tracked_file.txt",
             validation_error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
-            validation_error_message="Content is too long, exceeds maximum length",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
+                message="Content is too long, exceeds maximum length",
+                correlation_id=correlation_id,
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=100000,
             raw_file_storage_id="test_storage_id_correlation",
             correlation_id=correlation_id,
@@ -176,9 +201,17 @@ class TestValidationEventConsumerIntegration:
             source_service="file_service",
             data=EssayValidationFailedV1(
                 batch_id="batch_invalid",
+                file_upload_id="test-file-upload-invalid",
                 original_file_name="test.txt",
                 validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
-                validation_error_message="Test error",
+                validation_error_detail=ErrorDetail(
+                    error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
+                    message="Test error",
+                    correlation_id=uuid4(),
+                    timestamp=datetime.now(UTC),
+                    service="file_service",
+                    operation="validate_content"
+                ),
                 file_size_bytes=100,
                 raw_file_storage_id="test_storage_id_invalid",
             ),
@@ -199,9 +232,17 @@ class TestValidationEventConsumerIntegration:
 
         validation_failure = EssayValidationFailedV1(
             batch_id="batch_error",
+            file_upload_id="test-file-upload-error",
             original_file_name="error_test.txt",
             validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
-            validation_error_message="Test error message",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
+                message="Test error message",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=50,
             raw_file_storage_id="test_storage_id_error",
         )
@@ -238,9 +279,17 @@ class TestValidationEventConsumerIntegration:
 
         validation_failure = EssayValidationFailedV1(
             batch_id=batch_id,
+            file_upload_id="test-file-upload-consistency",
             original_file_name="consistency_test.txt",
             validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
-            validation_error_message="Invalid file format",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
+                message="Invalid file format",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=0,
             raw_file_storage_id="test_storage_id_consistency",
         )
@@ -269,9 +318,17 @@ class TestValidationEventConsumerIntegration:
         validation_failures = [
             EssayValidationFailedV1(
                 batch_id=f"batch_concurrent_{i}",
+                file_upload_id=f"test-file-upload-concurrent-{i}",
                 original_file_name=f"concurrent_{i}.txt",
                 validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
-                validation_error_message=f"Content too short for concurrent test {i}",
+                validation_error_detail=ErrorDetail(
+                    error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+                    message=f"Content too short for concurrent test {i}",
+                    correlation_id=uuid4(),
+                    timestamp=datetime.now(UTC),
+                    service="file_service",
+                    operation="validate_content"
+                ),
                 file_size_bytes=15,
                 raw_file_storage_id=f"test_storage_id_concurrent_{i:03d}",
             )
@@ -337,9 +394,17 @@ class TestValidationEventConsumerIntegration:
         for error_code in error_codes:
             validation_failure = EssayValidationFailedV1(
                 batch_id="batch_error_codes",
+                file_upload_id=f"test-file-upload-{error_code.value.lower()}",
                 original_file_name=f"test_{error_code.value.lower()}.txt",
                 validation_error_code=error_code,
-                validation_error_message=f"Test message for {error_code.value}",
+                validation_error_detail=ErrorDetail(
+                    error_code=error_code,
+                    message=f"Test message for {error_code.value}",
+                    correlation_id=uuid4(),
+                    timestamp=datetime.now(UTC),
+                    service="file_service",
+                    operation="validate_content"
+                ),
                 file_size_bytes=100,
                 raw_file_storage_id=f"test_storage_id_{error_code.value.lower()}",
             )

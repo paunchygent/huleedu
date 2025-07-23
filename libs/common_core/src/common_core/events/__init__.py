@@ -22,6 +22,8 @@ from .class_events import (
 from .client_commands import ClientBatchPipelineRequestV1
 from .els_bos_events import ELSBatchPhaseOutcomeV1
 from .envelope import EventEnvelope
+from .essay_lifecycle_events import EssaySlotAssignedV1
+from .file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from .file_management_events import (
     BatchFileAddedV1,
     BatchFileRemovedV1,
@@ -48,7 +50,10 @@ __all__ = [
     "ClientBatchPipelineRequestV1",
     "ELS_CJAssessmentRequestV1",
     "ELSBatchPhaseOutcomeV1",
+    "EssayContentProvisionedV1",
+    "EssaySlotAssignedV1",
     "EssayStudentAssociationUpdatedV1",
+    "EssayValidationFailedV1",
     "EventEnvelope",
     "EventTracker",
     "ExcessContentProvisionedV1",

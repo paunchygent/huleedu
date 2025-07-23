@@ -183,6 +183,14 @@ class EventPublisher(Protocol):
         """Publish BatchEssaysReady event when batch is complete."""
         ...
 
+    async def publish_essay_slot_assigned(
+        self,
+        event_data: Any,  # EssaySlotAssignedV1
+        correlation_id: UUID,
+    ) -> None:
+        """Publish EssaySlotAssignedV1 event when content is assigned to a slot."""
+        ...
+
     async def publish_els_batch_phase_outcome(
         self,
         event_data: Any,  # ELSBatchPhaseOutcomeV1

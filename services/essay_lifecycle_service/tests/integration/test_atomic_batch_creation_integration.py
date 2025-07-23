@@ -107,6 +107,10 @@ class MockEventPublisher(EventPublisher):
         """Record published events for verification."""
         self.published_events.append(("els_batch_phase_outcome", event_data, correlation_id))
 
+    async def publish_essay_slot_assigned(self, event_data: Any, correlation_id: UUID) -> None:
+        """Record published events for verification."""
+        self.published_events.append(("essay_slot_assigned", event_data, correlation_id))
+
 
 class TestAtomicBatchCreationIntegration:
     """Integration tests for atomic batch creation behavior with real infrastructure."""

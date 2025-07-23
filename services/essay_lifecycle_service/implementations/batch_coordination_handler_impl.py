@@ -177,6 +177,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 "initial_status": EssayStatus.READY_FOR_PROCESSING,
                 "original_file_name": event_data.original_file_name,
                 "file_size": event_data.file_size_bytes,
+                "file_upload_id": event_data.file_upload_id,
                 "content_hash": event_data.content_md5_hash,
             }
 
@@ -208,6 +209,22 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         "correlation_id": str(correlation_id),
                     },
                 )
+
+                # Publish EssaySlotAssignedV1 event for client traceability
+                from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
+
+                slot_assigned_event = EssaySlotAssignedV1(
+                    batch_id=event_data.batch_id,
+                    essay_id=final_essay_id,
+                    file_upload_id=event_data.file_upload_id,
+                    text_storage_id=event_data.text_storage_id,
+                    correlation_id=correlation_id,
+                )
+
+                await self.event_publisher.publish_essay_slot_assigned(
+                    event_data=slot_assigned_event,
+                    correlation_id=correlation_id,
+                )
             else:
                 # Idempotent case - content already assigned
                 logger.info(
@@ -218,6 +235,22 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         "assigned_essay_id": final_essay_id,
                         "correlation_id": str(correlation_id),
                     },
+                )
+
+                # Still publish EssaySlotAssignedV1 for idempotent cases to ensure client receives mapping
+                from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
+
+                slot_assigned_event = EssaySlotAssignedV1(
+                    batch_id=event_data.batch_id,
+                    essay_id=final_essay_id,
+                    file_upload_id=event_data.file_upload_id,
+                    text_storage_id=event_data.text_storage_id,
+                    correlation_id=correlation_id,
+                )
+
+                await self.event_publisher.publish_essay_slot_assigned(
+                    event_data=slot_assigned_event,
+                    correlation_id=correlation_id,
                 )
 
             # **Step 3: Check Batch Completion**

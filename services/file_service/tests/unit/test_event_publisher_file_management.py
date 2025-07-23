@@ -59,7 +59,7 @@ class TestDefaultEventPublisherFileManagement:
         correlation_id = uuid.uuid4()
         event_data = BatchFileAddedV1(
             batch_id="test-batch-123",
-            essay_id="essay-456",
+            file_upload_id="file-upload-456",
             filename="test_essay.txt",
             user_id="user-789",
         )
@@ -87,7 +87,7 @@ class TestDefaultEventPublisherFileManagement:
             event_type="batch_file_added",
             data={
                 "batch_id": "test-batch-123",
-                "essay_id": "essay-456",
+                "file_upload_id": "file-upload-456",
                 "filename": "test_essay.txt",
                 "timestamp": event_data.timestamp.isoformat(),
             },
@@ -104,7 +104,7 @@ class TestDefaultEventPublisherFileManagement:
         test_correlation_id = uuid4()
         event_data = BatchFileAddedV1(
             batch_id="test-batch-123",
-            essay_id="essay-456",
+            file_upload_id="file-upload-456",
             filename="test_essay.txt",
             user_id="user-789",
         )
@@ -130,7 +130,7 @@ class TestDefaultEventPublisherFileManagement:
         # Arrange
         event_data = BatchFileAddedV1(
             batch_id="test-batch-123",
-            essay_id="essay-456",
+            file_upload_id="file-upload-456",
             filename="test_essay.txt",
             user_id="user-789",
         )
@@ -152,7 +152,7 @@ class TestDefaultEventPublisherFileManagement:
         correlation_id = uuid.uuid4()
         event_data = BatchFileRemovedV1(
             batch_id="test-batch-123",
-            essay_id="essay-456",
+            file_upload_id="file-upload-456",
             filename="test_essay.txt",
             user_id="user-789",
         )
@@ -180,7 +180,7 @@ class TestDefaultEventPublisherFileManagement:
             event_type="batch_file_removed",
             data={
                 "batch_id": "test-batch-123",
-                "essay_id": "essay-456",
+                "file_upload_id": "file-upload-456",
                 "filename": "test_essay.txt",
                 "timestamp": event_data.timestamp.isoformat(),
             },
@@ -197,7 +197,7 @@ class TestDefaultEventPublisherFileManagement:
         test_correlation_id = uuid4()
         event_data = BatchFileRemovedV1(
             batch_id="test-batch-123",
-            essay_id="essay-456",
+            file_upload_id="file-upload-456",
             filename="test_essay.txt",
             user_id="user-789",
         )
@@ -223,7 +223,7 @@ class TestDefaultEventPublisherFileManagement:
         # Arrange
         event_data = BatchFileRemovedV1(
             batch_id="test-batch-123",
-            essay_id="essay-456",
+            file_upload_id="file-upload-456",
             filename="test_essay.txt",
             user_id="user-789",
         )
@@ -238,13 +238,13 @@ class TestDefaultEventPublisherFileManagement:
         # Test BatchFileAddedV1
         added_event = BatchFileAddedV1(
             batch_id="batch-123",
-            essay_id="essay-456",
+            file_upload_id="file-upload-456",
             filename="test.txt",
             user_id="user-789",
         )
         assert added_event.event == "batch.file.added"
         assert added_event.batch_id == "batch-123"
-        assert added_event.essay_id == "essay-456"
+        assert added_event.file_upload_id == "file-upload-456"
         assert added_event.filename == "test.txt"
         assert added_event.user_id == "user-789"
         assert added_event.timestamp is not None
@@ -253,13 +253,13 @@ class TestDefaultEventPublisherFileManagement:
         # Test BatchFileRemovedV1
         removed_event = BatchFileRemovedV1(
             batch_id="batch-123",
-            essay_id="essay-456",
+            file_upload_id="file-upload-456",
             filename="test.txt",
             user_id="user-789",
         )
         assert removed_event.event == "batch.file.removed"
         assert removed_event.batch_id == "batch-123"
-        assert removed_event.essay_id == "essay-456"
+        assert removed_event.file_upload_id == "file-upload-456"
         assert removed_event.filename == "test.txt"
         assert removed_event.user_id == "user-789"
         assert removed_event.timestamp is not None

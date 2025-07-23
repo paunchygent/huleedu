@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 import pytest
 from common_core.error_enums import FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
+from common_core.models.error_models import ErrorDetail
 
 
 class TestEssayContentProvisionedV1:
@@ -23,6 +24,7 @@ class TestEssayContentProvisionedV1:
         """Test creating EssayContentProvisionedV1 with only required fields."""
         model = EssayContentProvisionedV1(
             batch_id="batch_123",
+            file_upload_id="test-file-upload-id",
             original_file_name="essay.txt",
             raw_file_storage_id="raw_abc123",
             text_storage_id="text_def456",
@@ -43,6 +45,7 @@ class TestEssayContentProvisionedV1:
         correlation_id = uuid4()
         model = EssayContentProvisionedV1(
             batch_id="batch_123",
+            file_upload_id="test-file-upload-id",
             original_file_name="essay.txt",
             raw_file_storage_id="raw_abc123",
             text_storage_id="text_def456",
@@ -62,17 +65,25 @@ class TestEssayValidationFailedV1:
         """Test that validation failure event can be created with required fields."""
         event = EssayValidationFailedV1(
             batch_id="batch_456",
+            file_upload_id="test-file-upload-id",
             original_file_name="empty_essay.txt",
             raw_file_storage_id="raw_xyz789",
             validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
-            validation_error_message="File content is empty or contains only whitespace",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.EMPTY_CONTENT,
+                message="File content is empty or contains only whitespace",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=0,
         )
 
         assert event.batch_id == "batch_456"
         assert event.original_file_name == "empty_essay.txt"
         assert event.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
-        assert event.validation_error_message == "File content is empty or contains only whitespace"
+        assert event.validation_error_detail.message == "File content is empty or contains only whitespace"
         assert event.file_size_bytes == 0
         assert event.event == "essay.validation.failed"
         assert isinstance(event.correlation_id, UUID)
@@ -85,10 +96,18 @@ class TestEssayValidationFailedV1:
 
         event = EssayValidationFailedV1(
             batch_id="batch_789",
+            file_upload_id="test-file-upload-id",
             original_file_name="too_short_essay.docx",
             raw_file_storage_id="raw_abc456",
             validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
-            validation_error_message="Content length (25 characters) below minimum threshold (50)",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+                message="Content length (25 characters) below minimum threshold (50)",
+                correlation_id=correlation_id,
+                timestamp=timestamp,
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=512,
             correlation_id=correlation_id,
             timestamp=timestamp,
@@ -105,10 +124,18 @@ class TestEssayValidationFailedV1:
         correlation_id = uuid4()
         original_event = EssayValidationFailedV1(
             batch_id="batch_serialize",
+            file_upload_id="test-file-upload-id",
             original_file_name="test_file.pdf",
             raw_file_storage_id="raw_serialize123",
             validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
-            validation_error_message="Content is too short",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+                message="Content is too short",
+                correlation_id=correlation_id,
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=150,
             correlation_id=correlation_id,
         )
@@ -126,7 +153,7 @@ class TestEssayValidationFailedV1:
         assert reconstructed_event.original_file_name == original_event.original_file_name
         assert reconstructed_event.validation_error_code == original_event.validation_error_code
         assert (
-            reconstructed_event.validation_error_message == original_event.validation_error_message
+            reconstructed_event.validation_error_detail.message == original_event.validation_error_detail.message
         )
         assert reconstructed_event.file_size_bytes == original_event.file_size_bytes
         assert reconstructed_event.correlation_id == original_event.correlation_id
@@ -135,10 +162,18 @@ class TestEssayValidationFailedV1:
         """Test that default values are properly set."""
         event = EssayValidationFailedV1(
             batch_id="test_batch",
+            file_upload_id="test-file-upload-id",
             original_file_name="test.txt",
             raw_file_storage_id="raw_default123",
             validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
-            validation_error_message="Test error message",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
+                message="Test error message",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=100,
         )
 
@@ -164,10 +199,18 @@ class TestEssayValidationFailedV1:
         for code in error_codes:
             event = EssayValidationFailedV1(
                 batch_id=f"batch_{code.value.lower()}",
+                file_upload_id="test-file-upload-id",
                 original_file_name=f"test_{code.value.lower()}.txt",
                 raw_file_storage_id="raw_test123",
                 validation_error_code=code,
-                validation_error_message=f"Test {code.value}",
+                validation_error_detail=ErrorDetail(
+                    error_code=code,
+                    message=f"Test {code.value}",
+                    correlation_id=uuid4(),
+                    timestamp=datetime.now(UTC),
+                    service="file_service",
+                    operation="validate_content"
+                ),
                 file_size_bytes=100,
             )
             assert event.validation_error_code == code
@@ -177,10 +220,18 @@ class TestEssayValidationFailedV1:
         # Zero byte file
         event_zero = EssayValidationFailedV1(
             batch_id="batch_zero",
+            file_upload_id="test-file-upload-id",
             original_file_name="empty.txt",
             raw_file_storage_id="raw_zero123",
             validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
-            validation_error_message="Empty file",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.EMPTY_CONTENT,
+                message="Empty file",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=0,
         )
         assert event_zero.file_size_bytes == 0
@@ -188,10 +239,18 @@ class TestEssayValidationFailedV1:
         # Large file
         event_large = EssayValidationFailedV1(
             batch_id="batch_large",
+            file_upload_id="test-file-upload-id",
             original_file_name="huge.txt",
             raw_file_storage_id="raw_large123",
             validation_error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
-            validation_error_message="File too large",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
+                message="File too large",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=10_000_000,
         )
         assert event_large.file_size_bytes == 10_000_000
@@ -201,10 +260,18 @@ class TestEssayValidationFailedV1:
         # Event with default timestamp
         event_default = EssayValidationFailedV1(
             batch_id="batch_tz",
+            file_upload_id="test-file-upload-id",
             original_file_name="test.txt",
             raw_file_storage_id="raw_tz123",
             validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
-            validation_error_message="Test message",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
+                message="Test message",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=100,
         )
 
@@ -216,10 +283,18 @@ class TestEssayValidationFailedV1:
         explicit_time = datetime(2025, 1, 16, 12, 0, 0, tzinfo=UTC)
         event_explicit = EssayValidationFailedV1(
             batch_id="batch_explicit",
+            file_upload_id="test-file-upload-id",
             original_file_name="test2.txt",
             raw_file_storage_id="raw_explicit123",
             validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
-            validation_error_message="Test message",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
+                message="Test message",
+                correlation_id=uuid4(),
+                timestamp=explicit_time,
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=200,
             timestamp=explicit_time,
         )
@@ -233,7 +308,14 @@ class TestEssayValidationFailedV1:
             EssayValidationFailedV1(  # type: ignore[call-arg]
                 original_file_name="test.txt",
                 validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
-                validation_error_message="Test message",
+                validation_error_detail=ErrorDetail(
+                    error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
+                    message="Test message",
+                    correlation_id=uuid4(),
+                    timestamp=datetime.now(UTC),
+                    service="file_service",
+                    operation="validate_content"
+                ),
                 file_size_bytes=100,
             )
 
@@ -245,11 +327,17 @@ class TestEssayValidationFailedV1:
 
         event = EssayValidationFailedV1(
             batch_id=batch_id,
+            file_upload_id="test-file-upload-id",
             original_file_name="student_essay_3.docx",
             raw_file_storage_id="raw_coordination123",
             validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
-            validation_error_message=(
-                "Essay content (15 words) below minimum requirement (50 words)"
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+                message="Essay content (15 words) below minimum requirement (50 words)",
+                correlation_id=correlation_id,
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
             ),
             file_size_bytes=256,
             correlation_id=correlation_id,
@@ -258,8 +346,8 @@ class TestEssayValidationFailedV1:
         # Verify event contains all information needed for coordination
         assert event.batch_id == batch_id
         assert "student_essay_3.docx" in event.original_file_name
-        assert "15 words" in event.validation_error_message
-        assert "50 words" in event.validation_error_message
+        assert "15 words" in event.validation_error_detail.message
+        assert "50 words" in event.validation_error_detail.message
         assert event.validation_error_code == "CONTENT_TOO_SHORT"
         assert event.correlation_id == correlation_id
 

@@ -116,6 +116,11 @@ class MockEventPublisher(EventPublisher):
         async with self.lock:
             self.published_events.append(("els_batch_phase_outcome", event_data, correlation_id))
 
+    async def publish_essay_slot_assigned(self, event_data: Any, correlation_id: UUID) -> None:
+        """Record essay slot assigned events."""
+        async with self.lock:
+            self.published_events.append(("essay_slot_assigned", event_data, correlation_id))
+
 
 class PerformanceMetrics:
     """Collects and analyzes distributed performance metrics."""
@@ -391,6 +396,7 @@ class TestConcurrentSlotAssignment:
 
         identical_content_event = EssayContentProvisionedV1(
             batch_id=batch_id,
+            file_upload_id="test-file-upload-identical",
             text_storage_id=identical_text_storage_id,
             raw_file_storage_id=f"raw_{target_essay_id}_{uuid4().hex[:8]}",
             original_file_name="test_essay.txt",
@@ -515,6 +521,7 @@ class TestConcurrentSlotAssignment:
 
             content_event = EssayContentProvisionedV1(
                 batch_id=batch_id,
+                file_upload_id=f"test-file-upload-bulk-{i}",
                 text_storage_id=f"content_{i}_{uuid4().hex[:8]}",
                 raw_file_storage_id=f"raw_{essay_id}_{uuid4().hex[:8]}",
                 original_file_name=f"essay_{i}.txt",
@@ -623,6 +630,7 @@ class TestConcurrentSlotAssignment:
 
             content_event = EssayContentProvisionedV1(
                 batch_id=batch_id,
+                file_upload_id=f"test-file-upload-completion-{i}",
                 text_storage_id=f"completion_content_{i}_{uuid4().hex[:8]}",
                 raw_file_storage_id=f"raw_{essay_id}_{uuid4().hex[:8]}",
                 original_file_name=f"completion_essay_{i}.txt",
@@ -714,6 +722,7 @@ class TestConcurrentSlotAssignment:
 
             content_event = EssayContentProvisionedV1(
                 batch_id=batch_id,
+                file_upload_id=f"test-file-upload-perf-{i}",
                 text_storage_id=f"perf_content_{i}_{uuid4().hex[:8]}",
                 raw_file_storage_id=f"raw_{essay_id}_{uuid4().hex[:8]}",
                 original_file_name=f"perf_essay_{i}.txt",

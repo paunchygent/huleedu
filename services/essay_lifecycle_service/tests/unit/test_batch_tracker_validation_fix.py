@@ -18,6 +18,7 @@ from common_core.error_enums import FileValidationErrorCode
 from common_core.events.batch_coordination_events import BatchEssaysReady, BatchEssaysRegistered
 from common_core.events.file_events import EssayValidationFailedV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.models.error_models import ErrorDetail
 
 from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
     DefaultBatchEssayTracker,
@@ -154,9 +155,17 @@ class TestValidationFailureCompletionFix:
         for i in range(1, 3):
             failure = EssayValidationFailedV1(
                 batch_id="batch_complete_on_failure",
+                file_upload_id=f"test-file-upload-{i}",
                 original_file_name=f"failed_{i}.txt",
                 validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
-                validation_error_message="Empty content",
+                validation_error_detail=ErrorDetail(
+                    error_code=FileValidationErrorCode.EMPTY_CONTENT,
+                    message="Empty content",
+                    correlation_id=uuid4(),
+                    timestamp=datetime.now(UTC),
+                    service="file_service",
+                    operation="validate_content"
+                ),
                 file_size_bytes=0,
                 raw_file_storage_id=f"storage_{i}",
                 correlation_id=uuid4(),
@@ -167,9 +176,17 @@ class TestValidationFailureCompletionFix:
         # Third failure SHOULD trigger completion
         failure3 = EssayValidationFailedV1(
             batch_id="batch_complete_on_failure",
+            file_upload_id="test-file-upload-3",
             original_file_name="failed_3.txt",
             validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
-            validation_error_message="Empty content",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.EMPTY_CONTENT,
+                message="Empty content",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=0,
             raw_file_storage_id="storage_3",
             correlation_id=uuid4(),
@@ -236,9 +253,17 @@ class TestValidationFailureCompletionFix:
         # Now add 2 validation failures
         failure1 = EssayValidationFailedV1(
             batch_id="batch_mixed",
+            file_upload_id="test-file-upload-failure-1",
             original_file_name="failed_3.txt",
             validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
-            validation_error_message="Too short",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+                message="Too short",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=10,
             raw_file_storage_id="storage_3",
         )
@@ -248,9 +273,17 @@ class TestValidationFailureCompletionFix:
 
         failure2 = EssayValidationFailedV1(
             batch_id="batch_mixed",
+            file_upload_id="test-file-upload-failure-2",
             original_file_name="failed_4.txt",
             validation_error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
-            validation_error_message="Too long",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
+                message="Too long",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=1000000,
             raw_file_storage_id="storage_4",
         )
@@ -292,9 +325,17 @@ class TestValidationFailureCompletionFix:
         for i in range(1, 3):
             failure = EssayValidationFailedV1(
                 batch_id="batch_once",
+                file_upload_id=f"test-file-upload-once-{i}",
                 original_file_name=f"failed_{i}.txt",
                 validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
-                validation_error_message="Empty",
+                validation_error_detail=ErrorDetail(
+                    error_code=FileValidationErrorCode.EMPTY_CONTENT,
+                    message="Empty",
+                    correlation_id=uuid4(),
+                    timestamp=datetime.now(UTC),
+                    service="file_service",
+                    operation="validate_content"
+                ),
                 file_size_bytes=0,
                 raw_file_storage_id=f"storage_{i}",
             )
@@ -307,9 +348,17 @@ class TestValidationFailureCompletionFix:
         # Try to add another failure - should not trigger completion again
         extra_failure = EssayValidationFailedV1(
             batch_id="batch_once",
+            file_upload_id="test-file-upload-extra",
             original_file_name="extra_fail.txt",
             validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
-            validation_error_message="Extra",
+            validation_error_detail=ErrorDetail(
+                error_code=FileValidationErrorCode.EMPTY_CONTENT,
+                message="Extra",
+                correlation_id=uuid4(),
+                timestamp=datetime.now(UTC),
+                service="file_service",
+                operation="validate_content"
+            ),
             file_size_bytes=0,
             raw_file_storage_id="storage_extra",
         )

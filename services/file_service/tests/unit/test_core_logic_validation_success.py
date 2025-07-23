@@ -53,8 +53,10 @@ class TestCoreLogicValidationSuccess:
         mock_text_extractor.extract_text.return_value = extracted_text
 
         # Act
+        file_upload_id = str(uuid.uuid4())
         result = await process_single_file_upload(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             file_content=file_content,
             file_name=file_name,
             main_correlation_id=correlation_id,
@@ -140,8 +142,10 @@ class TestCoreLogicValidationSuccess:
         mock_text_extractor.extract_text.return_value = extracted_text
 
         # Act - successful validation
+        file_upload_id = str(uuid.uuid4())
         await process_single_file_upload(
             batch_id=batch_id,
+            file_upload_id=file_upload_id,
             file_content=file_content,
             file_name=file_name,
             main_correlation_id=correlation_id,

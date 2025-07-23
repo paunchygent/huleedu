@@ -45,8 +45,10 @@ async def test_process_single_file_stores_raw_blob_first() -> None:
     content_client.store_content.side_effect = ["raw_storage_id_123", "text_storage_id_456"]
 
     # Act
+    file_upload_id = str(uuid.uuid4())
     result = await process_single_file_upload(
         batch_id=batch_id,
+        file_upload_id=file_upload_id,
         file_content=file_content,
         file_name=file_name,
         main_correlation_id=correlation_id,
@@ -115,8 +117,10 @@ async def test_extraction_failure_includes_raw_storage_id() -> None:
     text_extractor.extract_text.side_effect = mock_extraction_failure
 
     # Act
+    file_upload_id = str(uuid.uuid4())
     result = await process_single_file_upload(
         batch_id=batch_id,
+        file_upload_id=file_upload_id,
         file_content=file_content,
         file_name=file_name,
         main_correlation_id=correlation_id,
@@ -180,8 +184,10 @@ async def test_validation_failure_includes_raw_storage_id() -> None:
     content_validator.validate_content.side_effect = mock_validation_failure
 
     # Act
+    file_upload_id = str(uuid.uuid4())
     result = await process_single_file_upload(
         batch_id=batch_id,
+        file_upload_id=file_upload_id,
         file_content=file_content,
         file_name=file_name,
         main_correlation_id=correlation_id,
@@ -234,8 +240,10 @@ async def test_success_event_includes_both_storage_ids() -> None:
     content_client.store_content.side_effect = ["raw_storage_id_123", "text_storage_id_456"]
 
     # Act
+    file_upload_id = str(uuid.uuid4())
     await process_single_file_upload(
         batch_id=batch_id,
+        file_upload_id=file_upload_id,
         file_content=file_content,
         file_name=file_name,
         main_correlation_id=correlation_id,

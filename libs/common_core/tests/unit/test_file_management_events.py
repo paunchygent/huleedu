@@ -180,13 +180,13 @@ class TestBatchFileAddedV1:
         """Test creating BatchFileAddedV1 with only required fields."""
         model = BatchFileAddedV1(
             batch_id="batch_123",
-            essay_id="essay_456",
+            file_upload_id="essay_456",
             filename="new_essay.txt",
             user_id="user_789",
         )
 
         assert model.batch_id == "batch_123"
-        assert model.essay_id == "essay_456"
+        assert model.file_upload_id == "essay_456"
         assert model.filename == "new_essay.txt"
         assert model.user_id == "user_789"
         assert model.event == "batch.file.added"
@@ -200,7 +200,7 @@ class TestBatchFileAddedV1:
 
         model = BatchFileAddedV1(
             batch_id="batch_456",
-            essay_id="essay_789",
+            file_upload_id="essay_789",
             filename="additional_essay.pdf",
             user_id="teacher_123",
             correlation_id=correlation_id,
@@ -208,7 +208,7 @@ class TestBatchFileAddedV1:
         )
 
         assert model.batch_id == "batch_456"
-        assert model.essay_id == "essay_789"
+        assert model.file_upload_id == "essay_789"
         assert model.filename == "additional_essay.pdf"
         assert model.user_id == "teacher_123"
         assert model.correlation_id == correlation_id
@@ -219,7 +219,7 @@ class TestBatchFileAddedV1:
         correlation_id = uuid4()
         original_event = BatchFileAddedV1(
             batch_id="batch_serialize",
-            essay_id="essay_serialize",
+            file_upload_id="essay_serialize",
             filename="serialize_test.docx",
             user_id="user_serialize",
             correlation_id=correlation_id,
@@ -235,7 +235,7 @@ class TestBatchFileAddedV1:
 
         # Verify all fields match
         assert reconstructed_event.batch_id == original_event.batch_id
-        assert reconstructed_event.essay_id == original_event.essay_id
+        assert reconstructed_event.file_upload_id == original_event.file_upload_id
         assert reconstructed_event.filename == original_event.filename
         assert reconstructed_event.user_id == original_event.user_id
         assert reconstructed_event.correlation_id == original_event.correlation_id
@@ -247,7 +247,7 @@ class TestBatchFileAddedV1:
 
         event = BatchFileAddedV1(
             batch_id=batch_id,
-            essay_id="essay_new_addition",
+            file_upload_id="essay_new_addition",
             filename="late_submission.txt",
             user_id="teacher_456",
             correlation_id=correlation_id,
@@ -273,13 +273,13 @@ class TestBatchFileRemovedV1:
         """Test creating BatchFileRemovedV1 with only required fields."""
         model = BatchFileRemovedV1(
             batch_id="batch_123",
-            essay_id="essay_456",
+            file_upload_id="essay_456",
             filename="removed_essay.txt",
             user_id="user_789",
         )
 
         assert model.batch_id == "batch_123"
-        assert model.essay_id == "essay_456"
+        assert model.file_upload_id == "essay_456"
         assert model.filename == "removed_essay.txt"
         assert model.user_id == "user_789"
         assert model.event == "batch.file.removed"
@@ -293,7 +293,7 @@ class TestBatchFileRemovedV1:
 
         model = BatchFileRemovedV1(
             batch_id="batch_456",
-            essay_id="essay_789",
+            file_upload_id="essay_789",
             filename="unwanted_essay.pdf",
             user_id="teacher_123",
             correlation_id=correlation_id,
@@ -301,7 +301,7 @@ class TestBatchFileRemovedV1:
         )
 
         assert model.batch_id == "batch_456"
-        assert model.essay_id == "essay_789"
+        assert model.file_upload_id == "essay_789"
         assert model.filename == "unwanted_essay.pdf"
         assert model.user_id == "teacher_123"
         assert model.correlation_id == correlation_id
@@ -312,7 +312,7 @@ class TestBatchFileRemovedV1:
         correlation_id = uuid4()
         original_event = BatchFileRemovedV1(
             batch_id="batch_remove_serialize",
-            essay_id="essay_remove_serialize",
+            file_upload_id="essay_remove_serialize",
             filename="remove_test.docx",
             user_id="user_remove_serialize",
             correlation_id=correlation_id,
@@ -328,7 +328,7 @@ class TestBatchFileRemovedV1:
 
         # Verify all fields match
         assert reconstructed_event.batch_id == original_event.batch_id
-        assert reconstructed_event.essay_id == original_event.essay_id
+        assert reconstructed_event.file_upload_id == original_event.file_upload_id
         assert reconstructed_event.filename == original_event.filename
         assert reconstructed_event.user_id == original_event.user_id
         assert reconstructed_event.correlation_id == original_event.correlation_id
@@ -340,7 +340,7 @@ class TestBatchFileRemovedV1:
 
         event = BatchFileRemovedV1(
             batch_id=batch_id,
-            essay_id="essay_incorrect_upload",
+            file_upload_id="essay_incorrect_upload",
             filename="wrong_assignment.pdf",
             user_id="teacher_correcting",
             correlation_id=correlation_id,
@@ -363,7 +363,7 @@ class TestBatchFileRemovedV1:
         with pytest.raises(ValueError):
             # Missing required batch_id for file added
             BatchFileAddedV1(  # type: ignore[call-arg]
-                essay_id="essay_test",
+                file_upload_id="essay_test",
                 filename="test.txt",
                 user_id="user_test",
             )
@@ -372,7 +372,7 @@ class TestBatchFileRemovedV1:
             # Missing required user_id for file removed
             BatchFileRemovedV1(  # type: ignore[call-arg]
                 batch_id="batch_test",
-                essay_id="essay_test",
+                file_upload_id="essay_test",
                 filename="test.txt",
             )
 
@@ -380,13 +380,13 @@ class TestBatchFileRemovedV1:
         """Test timestamp handling across file management events."""
         file_added_event = BatchFileAddedV1(
             batch_id="batch_time",
-            essay_id="essay_time_1",
+            file_upload_id="essay_time_1",
             filename="time_test_1.txt",
             user_id="user_time",
         )
         file_removed_event = BatchFileRemovedV1(
             batch_id="batch_time",
-            essay_id="essay_time_2",
+            file_upload_id="essay_time_2",
             filename="time_test_2.txt",
             user_id="user_time",
         )

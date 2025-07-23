@@ -97,10 +97,12 @@ async def upload_batch_files(
         for file_storage in uploaded_files:
             if file_storage and file_storage.filename:
                 file_content = file_storage.read()
+                file_upload_id = str(uuid.uuid4())  # Generate unique tracking ID
                 # Pass all required injected dependencies to process_single_file_upload
                 task = asyncio.create_task(
                     process_single_file_upload(
                         batch_id=batch_id,
+                        file_upload_id=file_upload_id,
                         file_content=file_content,
                         file_name=file_storage.filename,
                         main_correlation_id=main_correlation_id,
@@ -250,15 +252,18 @@ async def add_files_to_batch(
         for file_storage in uploaded_files:
             if file_storage and file_storage.filename:
                 file_content = file_storage.read()
-                essay_id = str(uuid.uuid4())  # Generate essay_id for each file
+                file_upload_id = str(uuid.uuid4())  # Generate tracking ID for each file
 
                 # Track file for event publishing
-                added_files.append({"essay_id": essay_id, "filename": file_storage.filename})
+                added_files.append(
+                    {"file_upload_id": file_upload_id, "filename": file_storage.filename}
+                )
 
                 # Pass all required injected dependencies to process_single_file_upload
                 task = asyncio.create_task(
                     process_single_file_upload(
                         batch_id=batch_id,
+                        file_upload_id=file_upload_id,
                         file_content=file_content,
                         file_name=file_storage.filename,
                         main_correlation_id=main_correlation_id,
@@ -287,7 +292,7 @@ async def add_files_to_batch(
             try:
                 event_data = BatchFileAddedV1(
                     batch_id=batch_id,
-                    essay_id=file_info["essay_id"],
+                    file_upload_id=file_info["file_upload_id"],
                     filename=file_info["filename"],
                     user_id=user_id,
                 )
@@ -312,11 +317,11 @@ async def add_files_to_batch(
         return jsonify({"error": "Internal server error"}), 500
 
 
-@file_bp.route("/batch/<batch_id>/files/<essay_id>", methods=["DELETE"])
+@file_bp.route("/batch/<batch_id>/files/<file_upload_id>", methods=["DELETE"])
 @inject
 async def remove_file_from_batch(
     batch_id: str,
-    essay_id: str,
+    file_upload_id: str,
     batch_validator: FromDishka[BatchStateValidatorProtocol],
     event_publisher: FromDishka[EventPublisherProtocol],
 ) -> Response | tuple[Response, int]:
@@ -331,8 +336,8 @@ async def remove_file_from_batch(
         user_id = request.headers.get("X-User-ID")
         if not user_id:
             warning_msg = (
-                "File removal attempt for batch %s, essay %s without user authentication."
-                % (batch_id, essay_id)
+                "File removal attempt for batch %s, file %s without user authentication."
+                % (batch_id, file_upload_id)
             )
             logger.warning(warning_msg)
             return jsonify({"error": "User authentication required"}), 401
@@ -356,9 +361,9 @@ async def remove_file_from_batch(
         try:
             await batch_validator.can_modify_batch_files(batch_id, user_id, correlation_id)
         except HuleEduError as e:
-            info_msg = "File removal blocked for batch %s, essay %s by user %s: %s" % (
+            info_msg = "File removal blocked for batch %s, file %s by user %s: %s" % (
                 batch_id,
-                essay_id,
+                file_upload_id,
                 user_id,
                 e.error_detail.message,
             )
@@ -366,17 +371,18 @@ async def remove_file_from_batch(
             return jsonify({"error": e.error_detail.model_dump()}), 409
 
         logger.info(
-            f"Removing file essay {essay_id} from batch {batch_id} by user {user_id}. "
+            f"Removing file {file_upload_id} from batch {batch_id} by user {user_id}. "
             f"Correlation ID: {correlation_id}",
         )
 
         # Publish BatchFileRemovedV1 event
-        # Note: We don't have the original filename, so we'll use essay_id as placeholder
+        # Note: We don't have the original filename, so we'll use file_upload_id as placeholder
         # In a real implementation, this would require querying the file metadata
         event_data = BatchFileRemovedV1(
             batch_id=batch_id,
-            essay_id=essay_id,
-            filename=f"essay_{essay_id}",  # Placeholder - would be actual filename in production
+            file_upload_id=file_upload_id,
+            # Placeholder - would be actual filename in production
+            filename=f"file_{file_upload_id}",
             user_id=user_id,
         )
 
@@ -385,14 +391,16 @@ async def remove_file_from_batch(
         return jsonify(
             {
                 "message": (
-                    f"File removal request processed for essay {essay_id} in batch {batch_id}"
+                    f"File removal request processed for file {file_upload_id} in batch {batch_id}"
                 ),
                 "batch_id": batch_id,
-                "essay_id": essay_id,
+                "file_upload_id": file_upload_id,
                 "correlation_id": str(correlation_id),
             }
         ), 200
 
     except Exception as e:
-        logger.error(f"Error removing file {essay_id} from batch {batch_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error removing file {file_upload_id} from batch {batch_id}: {e}", exc_info=True
+        )
         return jsonify({"error": "Internal server error"}), 500
