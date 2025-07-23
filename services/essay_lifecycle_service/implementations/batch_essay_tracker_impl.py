@@ -193,15 +193,17 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             BatchEssaysReady event if batch is complete, None otherwise
         """
         try:
-            # Check completion state in Redis
+            # Check completion state in Redis using atomic coordinator
             is_complete = await self._redis_coordinator.check_batch_completion(batch_id)
 
             if is_complete:
-                # Get batch metadata from Redis for event creation
-                redis_status = await self._redis_coordinator.get_batch_status(batch_id)
-
-                if redis_status:
-                    return await self._create_batch_ready_event_from_redis(batch_id, redis_status)
+                # Atomically mark as completed to prevent double-completion
+                marked_complete = await self._redis_coordinator.mark_batch_completed_atomically(batch_id)
+                if marked_complete:
+                    # Get batch metadata from Redis for event creation
+                    redis_status = await self._redis_coordinator.get_batch_status(batch_id)
+                    if redis_status:
+                        return await self._create_batch_ready_event_from_redis(batch_id, redis_status)
 
             return None
 
@@ -298,28 +300,6 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             f"Total failures: {failure_count}"
         )
 
-        # Check if we should trigger early batch completion
-        # Get batch status from Redis
-        batch_status = await self._redis_coordinator.get_batch_status(batch_id)
-
-        if batch_status:
-            assigned_count = await self._redis_coordinator.get_assigned_count(batch_id)
-            total_processed = assigned_count + failure_count
-            expected_count = batch_status["total_slots"]
-
-            self._logger.info(
-                f"Batch {batch_id} processing status: {assigned_count} assigned + "
-                f"{failure_count} failed = {total_processed}/{expected_count}"
-            )
-
-            # If processed count meets expectation, complete batch early
-            if total_processed >= expected_count:
-                self._logger.info(
-                    f"Batch {batch_id} completing early: "
-                    f"{assigned_count} assigned + {failure_count} failed = {total_processed}"
-                )
-                return await self._create_batch_ready_event_from_redis(batch_id, batch_status)
-
         return None
 
     async def check_batch_completion(self, batch_id: str) -> Any | None:  # BatchEssaysReady | None
@@ -340,10 +320,13 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         total_processed = assigned_count + failure_count
         expected_count = batch_status["total_slots"]
 
-        # Check if batch is complete (either all slots filled OR processed count meets expectation)
+        # Use atomic completion check that considers all scenarios
         is_complete = await self._redis_coordinator.check_batch_completion(batch_id)
-        if is_complete or total_processed >= expected_count:
-            return await self._create_batch_ready_event_from_redis(batch_id, batch_status)
+        if is_complete:
+            # Atomically mark as completed to prevent double-completion
+            marked_complete = await self._redis_coordinator.mark_batch_completed_atomically(batch_id)
+            if marked_complete:
+                return await self._create_batch_ready_event_from_redis(batch_id, batch_status)
 
         return None
 

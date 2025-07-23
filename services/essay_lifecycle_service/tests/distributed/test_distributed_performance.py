@@ -493,7 +493,7 @@ class TestDistributedPerformance:
         handlers, metrics = performance_infrastructure
 
         # Test with different instance counts: 1, 3, 5
-        scaling_results: dict[int, dict[str, float]] = {}
+        scaling_results: dict[int, dict[str, Any]] = {}
         instance_work_distribution: dict[int, dict[int, list[str]]] = {}  # Track which instance processed what
 
         for instance_count in [1, 3, 5]:
