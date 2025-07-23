@@ -30,7 +30,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 class QueueRedisPipeline:
     """Pipeline implementation for queue Redis operations."""
 
-    def __init__(self, pipeline: aioredis.Pipeline, client_id: str):
+    def __init__(self, pipeline: aioredis.client.Pipeline, client_id: str):
         self._pipeline = pipeline
         self._client_id = client_id
 

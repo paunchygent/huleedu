@@ -306,7 +306,7 @@ class DatabaseHealthChecker:
                     AND query != '<IDLE>'
                 """)
                 )
-                long_running_queries = result.scalar()
+                long_running_queries = result.scalar() or 0
 
                 # Determine status
                 status = "healthy"

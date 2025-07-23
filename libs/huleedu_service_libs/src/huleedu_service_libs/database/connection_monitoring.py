@@ -130,11 +130,20 @@ class ConnectionPoolMonitor:
         """Get current pool status information."""
         try:
             pool = self.engine.pool
+            # Use getattr with defaults for compatibility with different pool types
             return {
-                "size": pool.size(),
-                "checked_in": pool.checkedin(),
-                "checked_out": pool.checkedout(),
-                "overflow": pool.overflow(),
+                "size": getattr(pool, "size", lambda: 0)()
+                if callable(getattr(pool, "size", None))
+                else 0,
+                "checked_in": getattr(pool, "checkedin", lambda: 0)()
+                if callable(getattr(pool, "checkedin", None))
+                else 0,
+                "checked_out": getattr(pool, "checkedout", lambda: 0)()
+                if callable(getattr(pool, "checkedout", None))
+                else 0,
+                "overflow": getattr(pool, "overflow", lambda: 0)()
+                if callable(getattr(pool, "overflow", None))
+                else 0,
             }
         except Exception as e:
             self.service_logger.error(f"Error getting pool status: {e}")

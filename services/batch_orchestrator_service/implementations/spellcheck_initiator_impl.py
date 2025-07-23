@@ -60,7 +60,9 @@ class SpellcheckInitiatorImpl(SpellcheckInitiatorProtocol):
                     service="batch_orchestrator_service",
                     operation="spellcheck_initiation",
                     field="phase_to_initiate",
-                    message=f"SpellcheckInitiatorImpl received incorrect phase: {phase_to_initiate}",
+                    message=(
+                        f"SpellcheckInitiatorImpl received incorrect phase: {phase_to_initiate}"
+                    ),
                     correlation_id=correlation_id,
                     expected_phase="SPELLCHECK",
                     received_phase=phase_to_initiate.value,

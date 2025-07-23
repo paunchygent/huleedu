@@ -67,7 +67,8 @@ async def update_comparison_result(
                 service="cj_assessment_service",
                 operation="update_comparison_result",
                 message=(
-                    f"Cannot find comparison pair for callback with correlation ID: {correlation_id}"
+                    f"Cannot find comparison pair for callback with correlation ID: "
+                    f"{correlation_id}"
                 ),
                 correlation_id=correlation_id,
                 callback_correlation_id=correlation_id,

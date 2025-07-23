@@ -8,7 +8,7 @@ to Kafka due to circuit breaker trips or connection issues.
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Optional, TypeVar
+from typing import Generic, Optional, TypeVar
 
 from common_core.events.envelope import EventEnvelope
 from pydantic import BaseModel
@@ -21,7 +21,7 @@ T_EventPayload = TypeVar("T_EventPayload", bound=BaseModel)
 
 
 @dataclass
-class QueuedMessage:
+class QueuedMessage(Generic[T_EventPayload]):
     """Represents a message queued for retry."""
 
     topic: str

@@ -71,7 +71,9 @@ class AIFeedbackInitiatorImpl(AIFeedbackInitiatorProtocol):
                     service="batch_orchestrator_service",
                     operation="ai_feedback_initiation",
                     field="phase_to_initiate",
-                    message=f"AIFeedbackInitiatorImpl received incorrect phase: {phase_to_initiate}",
+                    message=(
+                        f"AIFeedbackInitiatorImpl received incorrect phase: {phase_to_initiate}"
+                    ),
                     correlation_id=correlation_id,
                     expected_phase="AI_FEEDBACK",
                     received_phase=phase_to_initiate.value,

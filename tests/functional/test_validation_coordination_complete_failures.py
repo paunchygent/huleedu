@@ -42,7 +42,9 @@ async def test_complete_validation_failures_0_of_25():
     # Set up Kafka consumer using modern utility pattern
     kafka_manager = create_validation_kafka_manager()
 
-    async with kafka_manager.consumer("complete_failures", auto_offset_reset="earliest") as consumer:
+    async with kafka_manager.consumer(
+        "complete_failures", auto_offset_reset="earliest"
+    ) as consumer:
         # NOW trigger operations - consumer is guaranteed ready
         batch_id, correlation_id = await create_validation_batch(
             course_code,

@@ -25,6 +25,7 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 from common_core.status_enums import EssayStatus
+from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 from pydantic import BaseModel
@@ -183,7 +184,7 @@ class TestBatchCoordinationBusinessImpact:
         # Now simulate content provisioning that triggers batch readiness
         # Mock batch tracker to assign a slot
         mock_batch_tracker.assign_slot_to_content.return_value = "essay_0"
-        
+
         # Mock repository to succeed in creating essay state
         mock_repository.create_essay_state_with_content_idempotency.return_value = (
             True,  # was_created
@@ -248,7 +249,7 @@ class TestBatchCoordinationBusinessImpact:
                 event_data=content_event,
                 correlation_id=correlation_id,
             )
-        
+
         # Verify it's a Kafka error
         assert "KAFKA_PUBLISH_ERROR" in str(exc_info.value) or "KafkaError" in str(exc_info.value)
 
@@ -302,7 +303,7 @@ class TestBatchCoordinationBusinessImpact:
 
         # Mock batch tracker to assign a slot
         mock_batch_tracker.assign_slot_to_content.return_value = "essay_0"
-        
+
         # Mock repository to succeed in creating essay state
         mock_repository.create_essay_state_with_content_idempotency.return_value = (
             True,  # was_created
@@ -359,10 +360,10 @@ class TestBatchCoordinationBusinessImpact:
                 event_data=content_provisioned_event,
                 correlation_id=correlation_id,
             )
-        
+
         # Verify it's a Kafka publish error
         assert "KAFKA_PUBLISH_ERROR" in str(exc_info.value) or "KafkaError" in str(exc_info.value)
-        
+
         # Assert: Business impact verification
         # Even though the handler raised an exception, we can verify partial progress
 
@@ -421,7 +422,7 @@ class TestServiceRequestDispatchBusinessImpact:
         correlation_id = uuid4()
 
         # The dispatch method will raise an exception when Kafka publishing fails
-        with pytest.raises(Exception):
+        with pytest.raises(HuleEduError):
             await dispatcher.dispatch_spellcheck_requests(
                 essays_to_process=essays_to_process,
                 language=Language.ENGLISH,
@@ -560,7 +561,7 @@ class TestDualChannelPublishingBusinessImpact:
                 status=EssayStatus.SPELLCHECKED_SUCCESS,
                 correlation_id=correlation_id,
             )
-        
+
         # Verify it's a Redis error
         assert "EXTERNAL_SERVICE_ERROR" in str(exc_info.value) or "Redis" in str(exc_info.value)
 
@@ -571,7 +572,7 @@ class TestDualChannelPublishingBusinessImpact:
 
         # Verify Redis publishing was attempted and failed
         failing_redis_client.publish_user_notification.assert_called_once()
-        
+
         # Verify that user_id lookup was attempted
         mock_batch_tracker.get_user_id_for_essay.assert_called_once_with("essay_123")
 
@@ -624,7 +625,7 @@ class TestDualChannelPublishingBusinessImpact:
         # Act: Attempt status update
         correlation_id = uuid4()
 
-        with pytest.raises(Exception):  # Should raise due to Kafka failure
+        with pytest.raises(HuleEduError):  # Should raise due to Kafka failure
             await event_publisher.publish_status_update(
                 essay_ref=essay_ref,
                 status=EssayStatus.CJ_ASSESSMENT_SUCCESS,
@@ -703,7 +704,7 @@ class TestBusinessWorkflowRecoveryScenarios:
         correlation_id = uuid4()
 
         # First update should fail
-        with pytest.raises(Exception):
+        with pytest.raises(HuleEduError):
             await event_publisher.publish_status_update(
                 essay_ref=essay_ref,
                 status=EssayStatus.AWAITING_SPELLCHECK,
@@ -711,7 +712,7 @@ class TestBusinessWorkflowRecoveryScenarios:
             )
 
         # Second update should also fail
-        with pytest.raises(Exception):
+        with pytest.raises(HuleEduError):
             await event_publisher.publish_status_update(
                 essay_ref=essay_ref,
                 status=EssayStatus.SPELLCHECKING_IN_PROGRESS,
@@ -789,7 +790,8 @@ class TestBusinessImpactIntegrationScenarios:
             event_publisher=event_publisher,
         )
 
-        dispatcher = DefaultSpecializedServiceRequestDispatcher(
+        # Create dispatcher for potential use in extended test scenarios
+        _dispatcher = DefaultSpecializedServiceRequestDispatcher(
             kafka_bus=intermittent_kafka_bus,
             settings=mock_settings,
         )
@@ -818,7 +820,7 @@ class TestBusinessImpactIntegrationScenarios:
             correlation_id=correlation_id,
         )
         assert result1 is True
-        
+
         # Note: Batch registration doesn't publish to Kafka, only registers with tracker and creates DB records
         assert intermittent_kafka_bus.publish.call_count == 0
 
@@ -831,7 +833,7 @@ class TestBusinessImpactIntegrationScenarios:
 
         # Ensure the batch tracker returns a user_id for the essay
         mock_batch_tracker.get_user_id_for_essay.return_value = "integration_user"
-        
+
         # This call should fail (first actual Kafka call in our side_effect list)
         with pytest.raises(Exception) as exc_info:
             await event_publisher.publish_status_update(
@@ -839,9 +841,11 @@ class TestBusinessImpactIntegrationScenarios:
                 status=EssayStatus.READY_FOR_PROCESSING,
                 correlation_id=correlation_id,
             )
-        
+
         # Verify it's a Kafka error (first call fails)
-        assert "Intermittent failure #2" in str(exc_info.value) or "KAFKA_PUBLISH_ERROR" in str(exc_info.value)
+        assert "Intermittent failure #2" in str(exc_info.value) or "KAFKA_PUBLISH_ERROR" in str(
+            exc_info.value
+        )
         assert intermittent_kafka_bus.publish.call_count == 1
 
         # Step 3: Another status update (should succeed - second actual call)
@@ -871,7 +875,7 @@ class TestBusinessImpactIntegrationScenarios:
 
         # Verify graceful degradation for non-critical operations
         assert not business_context.status_updates_completed
-        
+
         # Verify the exact pattern of calls
         assert intermittent_kafka_bus.publish.call_count == 2
         # No Kafka calls during batch registration

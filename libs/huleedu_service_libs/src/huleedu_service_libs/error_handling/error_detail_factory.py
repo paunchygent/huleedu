@@ -7,13 +7,12 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
-from common_core.error_enums import ErrorCode
-from common_core.models.error_models import ErrorDetail
+from common_core.models.error_models import ErrorCodeType, ErrorDetail
 from opentelemetry import trace
 
 
 def create_error_detail_with_context(
-    error_code: ErrorCode,
+    error_code: ErrorCodeType,
     message: str,
     service: str,
     operation: str,
@@ -31,7 +30,7 @@ def create_error_detail_with_context(
     - Generates correlation_id if not provided
 
     Args:
-        error_code: The error code from the ErrorCode enum
+        error_code: The error code from any of the error code enums
         message: Human-readable error message
         service: The service where the error occurred
         operation: The operation being performed when the error occurred

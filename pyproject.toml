@@ -283,6 +283,9 @@ check-imports = "python scripts/check_import_patterns.py"
 lint-all = {composite = ["ruff check --force-exclude .", "python scripts/check_import_patterns.py"]}
 lint-fix = "ruff check --fix --force-exclude ."
 typecheck-all = "mypy --config-file pyproject.toml ."
+typecheck-libs = {composite = ["cd libs && mypy -p common_core --show-error-codes", "cd libs && mypy -p huleedu_service_libs --show-error-codes"]}
+typecheck-common-core = {shell = "cd libs && mypy -p common_core --show-error-codes"}
+typecheck-service-libs = {shell = "cd libs && mypy -p huleedu_service_libs --show-error-codes"}
 test-all = "pytest"
 test-parallel = "pytest -n auto"
 test-sequential = "pytest -n 0"

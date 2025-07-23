@@ -224,17 +224,17 @@ class RedisBatchCoordinator:
     async def check_batch_completion(self, batch_id: str) -> bool:
         """
         Atomically check if batch is complete using comprehensive Redis state.
-        
+
         A batch is complete when EITHER:
-        1. No available slots remaining (all assigned or failed), OR  
+        1. No available slots remaining (all assigned or failed), OR
         2. Total processed (assigned + failed) >= expected count
-        
+
         AND batch hasn't already been marked completed.
         """
         try:
             completion_state = await self._get_completion_state_atomically(batch_id)
             is_complete = self._is_batch_complete(completion_state)
-            
+
             self._logger.debug(
                 f"Batch {batch_id} completion check: "
                 f"available={completion_state['available_slots']}, "
@@ -255,28 +255,28 @@ class RedisBatchCoordinator:
         """Get all completion state in single atomic Redis transaction."""
         pipe = await self._redis.create_transaction_pipeline()
         pipe.multi()
-        
+
         # Get all state atomically
-        pipe.scard(self._get_available_slots_key(batch_id))              # remaining slots
-        pipe.llen(self._get_validation_failures_key(batch_id))           # failure count  
-        pipe.hlen(self._get_assignments_key(batch_id))                   # assignment count
-        pipe.hget(self._get_metadata_key(batch_id), "expected_count")    # expected count
-        pipe.exists(f"batch:{batch_id}:completed")                       # completion flag
-        
+        pipe.scard(self._get_available_slots_key(batch_id))  # remaining slots
+        pipe.llen(self._get_validation_failures_key(batch_id))  # failure count
+        pipe.hlen(self._get_assignments_key(batch_id))  # assignment count
+        pipe.hget(self._get_metadata_key(batch_id), "expected_count")  # expected count
+        pipe.exists(f"batch:{batch_id}:completed")  # completion flag
+
         results = await pipe.execute()
-        
+
         return {
             "available_slots": results[0] or 0,
-            "failure_count": results[1] or 0, 
+            "failure_count": results[1] or 0,
             "assigned_count": results[2] or 0,
             "expected_count": int(results[3] or 0),
-            "already_completed": bool(results[4])
+            "already_completed": bool(results[4]),
         }
 
     def _is_batch_complete(self, state: dict[str, int]) -> bool:
         """
         Single function that determines completion across ALL scenarios.
-        
+
         Completion criteria (ALL must be satisfied):
         1. Not already completed (prevents double-completion)
         2. Either:
@@ -285,25 +285,25 @@ class RedisBatchCoordinator:
         """
         if state["already_completed"]:
             return False
-            
+
         total_processed = state["assigned_count"] + state["failure_count"]
         expected = state["expected_count"]
         no_slots_remaining = state["available_slots"] == 0
-        
+
         # Batch complete if either all slots consumed OR all files processed
         return no_slots_remaining or (total_processed >= expected)
 
     async def mark_batch_completed_atomically(self, batch_id: str) -> bool:
         """
         Atomically mark batch as completed to prevent double-completion.
-        
+
         Returns True if this call marked it completed, False if already completed.
         """
         # Use SET NX (set if not exists) for atomic completion flag
         result = await self._redis.set_if_not_exists(
-            f"batch:{batch_id}:completed", 
-            "true", 
-            ttl_seconds=86400  # 24 hour expiry
+            f"batch:{batch_id}:completed",
+            "true",
+            ttl_seconds=86400,  # 24 hour expiry
         )
         return result  # True if we set it, False if already existed
 
@@ -584,23 +584,27 @@ class RedisBatchCoordinator:
             # Use atomic transaction to ensure both operations succeed or fail together
             pipeline = await self._redis.create_transaction_pipeline()
             pipeline.multi()
-            
+
             # Add to list of failures
             pipeline.rpush(failures_key, failure_json)
-            
+
             # Remove a slot from available slots to account for the validation failure
             # Note: We use SPOP (not SREM) because validation failures occur BEFORE
             # slot assignment, so there's no specific essay_id to remove. We just need
             # to reduce the available slot count by one.
             pipeline.spop(slots_key)
-            
+
             # Execute atomically
             results = await pipeline.execute()
             removed_slot = results[1] if len(results) > 1 else None
-            
+
             if removed_slot:
                 # Decode bytes to string for logging
-                slot_str = removed_slot.decode('utf-8') if isinstance(removed_slot, bytes) else removed_slot
+                slot_str = (
+                    removed_slot.decode("utf-8")
+                    if isinstance(removed_slot, bytes)
+                    else removed_slot
+                )
                 self._logger.debug(
                     f"Removed slot {slot_str} from available slots for batch {batch_id} "
                     f"due to validation failure"

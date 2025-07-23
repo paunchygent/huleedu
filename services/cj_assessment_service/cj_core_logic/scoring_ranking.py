@@ -196,7 +196,10 @@ async def record_comparisons_and_update_scores(
         raise_cj_score_convergence_failed(
             service="cj_assessment_service",
             operation="record_comparisons_and_update_scores",
-            message=f"Error computing/updating Bradley-Terry scores for CJ Batch {cj_batch_id}: {str(e)}",
+            message=(
+                f"Error computing/updating Bradley-Terry scores for CJ Batch {cj_batch_id}: "
+                f"{str(e)}"
+            ),
             correlation_id=correlation_id,
             batch_id=str(cj_batch_id),
             convergence_error=str(e),

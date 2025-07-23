@@ -358,13 +358,15 @@ class TestPipelineResolutionServiceBehavior:
         # Act
         await service.resolve_pipeline_request(request)
 
-        # Assert - Verify DLQ publication occurred (may be called multiple times due to comprehensive error handling)
+        # Assert - Verify DLQ publication occurred
+        # (may be called multiple times due to comprehensive error handling)
         assert mock_dlq_producer.publish_to_dlq.call_count >= 1
         call_kwargs = mock_dlq_producer.publish_to_dlq.call_args.kwargs
 
         # Check DLQ call structure
         assert call_kwargs["base_topic"] == "huleedu.pipelines.resolution"
-        # With comprehensive error handling, the final DLQ call will be for critical_resolution_failure
+        # With comprehensive error handling, the final DLQ call will be for
+        # critical_resolution_failure
         assert call_kwargs["dlq_reason"] == "critical_resolution_failure"
 
         # Check event envelope

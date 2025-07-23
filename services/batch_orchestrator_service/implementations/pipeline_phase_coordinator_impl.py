@@ -436,7 +436,9 @@ class DefaultPipelinePhaseCoordinator:
                 service="batch_orchestrator_service",
                 operation="initiate_resolved_pipeline",
                 field="essays_for_processing",
-                message=f"No essays found for batch {batch_id}. Batch may not be ready for processing.",
+                message=(
+                    f"No essays found for batch {batch_id}. Batch may not be ready for processing."
+                ),
                 correlation_id=correlation_id,
                 batch_id=batch_id,
             )

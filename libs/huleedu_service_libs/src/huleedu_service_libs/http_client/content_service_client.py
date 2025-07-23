@@ -118,7 +118,7 @@ class ContentServiceClient(ContentServiceClientProtocol):
         # Build context for error reporting and logging
         context = {
             "content_type": content_type.value,
-            "content_length": len(content),
+            "content_length": str(len(content)),
             "external_service": "content_service",
         }
         if essay_id:
@@ -142,6 +142,7 @@ class ContentServiceClient(ContentServiceClientProtocol):
             data=content.encode("utf-8"),
             correlation_id=correlation_id,
             timeout_seconds=self.config.http_config.default_timeout_seconds,
+            headers=None,
             **context,
         )
 

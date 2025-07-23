@@ -25,6 +25,9 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 from huleedu_service_libs.error_handling import HuleEduError
+from huleedu_service_libs.error_handling.error_detail_factory import (
+    create_error_detail_with_context,
+)
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.implementations.batch_expectation import BatchExpectation
@@ -200,12 +203,16 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
             if is_complete:
                 # Atomically mark as completed to prevent double-completion
-                marked_complete = await self._redis_coordinator.mark_batch_completed_atomically(batch_id)
+                marked_complete = await self._redis_coordinator.mark_batch_completed_atomically(
+                    batch_id
+                )
                 if marked_complete:
                     # Get batch metadata from Redis for event creation
                     redis_status = await self._redis_coordinator.get_batch_status(batch_id)
                     if redis_status:
-                        return await self._create_batch_ready_event_from_redis(batch_id, redis_status)
+                        return await self._create_batch_ready_event_from_redis(
+                            batch_id, redis_status
+                        )
 
             return None
 
@@ -317,17 +324,13 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         if not batch_status:
             return None
 
-        # Get failure count from Redis
-        failure_count = await self._redis_coordinator.get_validation_failure_count(batch_id)
-        assigned_count = await self._redis_coordinator.get_assigned_count(batch_id)
-        total_processed = assigned_count + failure_count
-        expected_count = batch_status["total_slots"]
-
         # Use atomic completion check that considers all scenarios
         is_complete = await self._redis_coordinator.check_batch_completion(batch_id)
         if is_complete:
             # Atomically mark as completed to prevent double-completion
-            marked_complete = await self._redis_coordinator.mark_batch_completed_atomically(batch_id)
+            marked_complete = await self._redis_coordinator.mark_batch_completed_atomically(
+                batch_id
+            )
             if marked_complete:
                 return await self._create_batch_ready_event_from_redis(batch_id, batch_status)
 
@@ -464,26 +467,32 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                     )
                 )
             except KeyError as e:
-                raise HuleEduError(
+                error_detail = create_error_detail_with_context(
                     error_code=ErrorCode.PROCESSING_ERROR,
                     message=f"Invalid validation failure data in Redis for batch {batch_id}",
-                    extra={
+                    service="essay_lifecycle_service",
+                    operation="_create_batch_ready_event_from_redis",
+                    details={
                         "batch_id": batch_id,
                         "missing_field": str(e),
-                        "failure_dict": failure_dict
-                    }
+                        "failure_dict": failure_dict,
+                    },
                 )
+                raise HuleEduError(error_detail) from e
             except Exception as e:
-                raise HuleEduError(
+                error_detail = create_error_detail_with_context(
                     error_code=ErrorCode.PROCESSING_ERROR,
                     message=f"Failed to reconstruct validation failure event for batch {batch_id}",
-                    extra={
+                    service="essay_lifecycle_service",
+                    operation="_create_batch_ready_event_from_redis",
+                    details={
                         "batch_id": batch_id,
                         "error_type": type(e).__name__,
                         "error_message": str(e),
-                        "failure_dict": failure_dict
-                    }
+                        "failure_dict": failure_dict,
+                    },
                 )
+                raise HuleEduError(error_detail) from e
 
         # Create BatchEssaysReady event
         ready_event = BatchEssaysReady(

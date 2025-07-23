@@ -89,7 +89,9 @@ class BatchEssaysReadyHandler:
                             service="batch_orchestrator_service",
                             operation="handle_batch_essays_ready",
                             field="ready_essays",
-                            message=f"BatchEssaysReady for batch {batch_id} contains no ready_essays",
+                            message=(
+                                f"BatchEssaysReady for batch {batch_id} contains no ready_essays"
+                            ),
                             correlation_id=envelope.correlation_id,
                             batch_id=batch_id,
                         )

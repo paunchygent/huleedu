@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .domain_enums import ContentType
 from .status_enums import ProcessingStage
@@ -79,9 +79,15 @@ class PersonNameV1(BaseModel):
     last_name: str
     legal_full_name: str | None = None
 
-    def __pydantic_post_init__(self, **kwargs: Any) -> None:
-        if self.legal_full_name is None:
-            self.legal_full_name = f"{self.first_name} {self.last_name}".strip()
+    @model_validator(mode="before")
+    @classmethod
+    def set_legal_full_name(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if isinstance(values, dict):
+            if values.get("legal_full_name") is None:
+                first_name = values.get("first_name", "")
+                last_name = values.get("last_name", "")
+                values["legal_full_name"] = f"{first_name} {last_name}".strip()
+        return values
 
     model_config = {
         "frozen": True,

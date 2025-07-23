@@ -764,7 +764,7 @@ class RedisClient(AtomicRedisClientProtocol):
             )
         return await self._pubsub.publish(channel, message)
 
-    def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
+    async def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
         """
         Subscribe to a Redis channel within an async context manager.
 
@@ -772,14 +772,15 @@ class RedisClient(AtomicRedisClientProtocol):
             channel: The channel to subscribe to
 
         Returns:
-            Async context manager that yields a PubSub object
+            Async generator that yields a PubSub object
         """
         if not self._pubsub:
             raise RuntimeError(
                 f"Redis client '{self.client_id}' PubSub not initialized. "
                 f"Ensure start() was called."
             )
-        return self._pubsub.subscribe(channel)
+        async with self._pubsub.subscribe(channel) as pubsub:
+            yield pubsub
 
     def get_user_channel(self, user_id: str) -> str:
         """

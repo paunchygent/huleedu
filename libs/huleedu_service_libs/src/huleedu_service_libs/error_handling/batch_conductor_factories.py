@@ -46,7 +46,8 @@ def raise_pipeline_dependency_resolution_failed(
         correlation_id: Correlation ID for request tracing
         batch_id: Optional batch ID being processed
         requested_pipeline: Optional pipeline name that failed resolution
-        resolution_stage: Optional stage where resolution failed (e.g., "dependency_analysis", "topological_sort")
+        resolution_stage: Optional stage where resolution failed
+            (e.g., "dependency_analysis", "topological_sort")
         dependency_error: Optional underlying dependency error details
         **additional_context: Additional error context details
     """
@@ -91,7 +92,8 @@ def raise_pipeline_dependency_cycle_detected(
         correlation_id: Correlation ID for request tracing
         pipeline_name: Optional pipeline name where cycle was detected
         cycle_steps: Optional list of steps involved in the cycle
-        detection_stage: Optional stage where cycle was detected (e.g., "configuration_validation", "topological_sort")
+        detection_stage: Optional stage where cycle was detected
+            (e.g., "configuration_validation", "topological_sort")
         **additional_context: Additional error context details
     """
     details = {

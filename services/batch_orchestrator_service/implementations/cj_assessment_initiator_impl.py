@@ -63,7 +63,10 @@ class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):
                     service="batch_orchestrator_service",
                     operation="cj_assessment_initiation",
                     field="phase_to_initiate",
-                    message=f"DefaultCJAssessmentInitiator received incorrect phase: {phase_to_initiate}",
+                    message=(
+                        f"DefaultCJAssessmentInitiator received incorrect phase: "
+                        f"{phase_to_initiate}"
+                    ),
                     correlation_id=correlation_id,
                     expected_phase="CJ_ASSESSMENT",
                     received_phase=phase_to_initiate.value,

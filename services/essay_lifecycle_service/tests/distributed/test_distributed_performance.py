@@ -494,7 +494,9 @@ class TestDistributedPerformance:
 
         # Test with different instance counts: 1, 3, 5
         scaling_results: dict[int, dict[str, Any]] = {}
-        instance_work_distribution: dict[int, dict[int, list[str]]] = {}  # Track which instance processed what
+        instance_work_distribution: dict[
+            int, dict[int, list[int]]
+        ] = {}  # Track which instance processed what
 
         for instance_count in [1, 3, 5]:
             test_handlers = handlers[:instance_count]
@@ -547,6 +549,7 @@ class TestDistributedPerformance:
                     event: EssayContentProvisionedV1,
                     iid: str,
                     essay_idx: int,
+                    current_instance_count: int,
                 ) -> tuple[bool, int, int]:
                     op_start = time.time()
                     try:
@@ -556,7 +559,7 @@ class TestDistributedPerformance:
                             "scaling_content_provision", duration, result, f"instance_{iid}"
                         )
                         if result:
-                            instance_work_distribution[instance_count][int(iid)].append(essay_idx)
+                            instance_work_distribution[current_instance_count][int(iid)].append(essay_idx)
                         return (result, int(iid), essay_idx)
                     except Exception as e:
                         duration = time.time() - op_start
@@ -569,7 +572,7 @@ class TestDistributedPerformance:
                         )
                         raise
 
-                task = process_with_metrics(handler, content_event, str(handler_idx), i)
+                task = process_with_metrics(handler, content_event, str(handler_idx), i, instance_count)
                 content_tasks.append(task)
 
             # Execute all operations
@@ -593,12 +596,12 @@ class TestDistributedPerformance:
 
             # Check for duplicate processing
             processed_essays = set()
-            for success, instance_id, essay_idx in successful_results:
+            for _success, _instance_id, essay_idx in successful_results:
                 if essay_idx in processed_essays:
                     raise AssertionError(f"Essay {essay_idx} was processed multiple times!")
                 processed_essays.add(essay_idx)
 
-            scaling_results[instance_count] = {
+            results_dict: dict[str, Any] = {
                 "total_duration": total_duration,
                 "throughput": successful_ops / total_duration,
                 "successful_operations": successful_ops,
@@ -606,6 +609,7 @@ class TestDistributedPerformance:
                 "instance_count": instance_count,
                 "all_essays_processed": len(processed_essays) == essay_count,
             }
+            scaling_results[instance_count] = results_dict
 
             await metrics.sample_memory_usage(f"scaling_{instance_count}_instances", 1, essay_count)
 
@@ -613,7 +617,7 @@ class TestDistributedPerformance:
 
         # 1. UPDATED: Allow coordination failures for containerized testing (ULTRATHINK fix)
         # Analysis shows testcontainer environment adds inherent latency and timing issues
-        for instance_count, results in scaling_results.items():
+        for instance_count, scaling_result in scaling_results.items():
             # Realistic expectations for containerized testing environment
             if instance_count == 1:
                 # Single instance: up to 15% failures due to function-scoped container overhead
@@ -622,14 +626,14 @@ class TestDistributedPerformance:
                 # Multiple instances: up to 30% failures due to container + coordination overhead
                 max_acceptable_failures = min(essay_count * 0.30, 20)
 
-            assert results["failed_operations"] <= max_acceptable_failures, (
+            assert scaling_result["failed_operations"] <= max_acceptable_failures, (
                 f"Excessive coordination failures with {instance_count} instances: "
-                f"{results['failed_operations']} > {max_acceptable_failures} "
+                f"{scaling_result['failed_operations']} > {max_acceptable_failures} "
                 f"(Testcontainer environment adds latency - this validates correctness, not raw performance)"
             )
             # UPDATED: Focus on correctness rather than 100% processing success
             # If we allow coordination failures, we can't expect all essays to be processed
-            processed_count = results["successful_operations"]
+            processed_count = scaling_result["successful_operations"]
             expected_min_processed = essay_count - max_acceptable_failures
             assert processed_count >= expected_min_processed, (
                 f"Too few essays processed with {instance_count} instances: "

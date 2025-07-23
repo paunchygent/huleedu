@@ -98,7 +98,11 @@ def create_validation_test_files(success_count: int, failure_count: int) -> list
     # Create failure files (various validation failure types)
     # Note: Use minimal content that reaches validation but fails validation checks
     failure_types = [
-        {"suffix": "empty", "content": " ", "error_code": "EMPTY_CONTENT"},  # Single space - reaches validation but fails
+        {
+            "suffix": "empty",
+            "content": " ",
+            "error_code": "EMPTY_CONTENT",
+        },  # Single space - reaches validation but fails
         {"suffix": "too_short", "content": "Short", "error_code": "CONTENT_TOO_SHORT"},
         {"suffix": "whitespace", "content": "   \n\t  \n  ", "error_code": "EMPTY_CONTENT"},
     ]
