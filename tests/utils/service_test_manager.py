@@ -47,7 +47,7 @@ class ServiceTestManager:
         ServiceEndpoint("content_service", 8001, has_http_api=True, has_metrics=True),
         ServiceEndpoint("batch_orchestrator_service", 5001, has_http_api=True, has_metrics=True),
         ServiceEndpoint("batch_conductor_service", 4002, has_http_api=True, has_metrics=True),
-        ServiceEndpoint("essay_lifecycle_service", 6001, has_http_api=True, has_metrics=True),
+        ServiceEndpoint("essay_lifecycle_api", 6001, has_http_api=True, has_metrics=True),
         ServiceEndpoint("file_service", 7001, has_http_api=True, has_metrics=True),
         ServiceEndpoint("spellchecker_service", 8002, has_http_api=True, has_metrics=True),
         ServiceEndpoint("cj_assessment_service", 9095, has_http_api=True, has_metrics=True),

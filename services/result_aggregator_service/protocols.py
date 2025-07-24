@@ -94,6 +94,15 @@ class BatchRepositoryProtocol(Protocol):
         """Mark batch as failed."""
         ...
 
+    async def update_essay_file_mapping(
+        self,
+        essay_id: str,
+        file_upload_id: str,
+        text_storage_id: Optional[str] = None,
+    ) -> None:
+        """Update essay with file_upload_id for traceability."""
+        ...
+
 
 class StateStoreProtocol(Protocol):
     """Protocol for state store operations."""
@@ -118,6 +127,12 @@ class EventProcessorProtocol(Protocol):
         self, envelope: EventEnvelope[BatchEssaysRegistered], data: BatchEssaysRegistered
     ) -> None:
         """Process batch registration event."""
+        ...
+
+    async def process_essay_slot_assigned(
+        self, envelope: EventEnvelope[Any], data: Any  # EssaySlotAssignedV1
+    ) -> None:
+        """Process essay slot assignment event for file traceability."""
         ...
 
     async def process_batch_phase_outcome(

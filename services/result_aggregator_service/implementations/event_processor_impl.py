@@ -26,6 +26,7 @@ if TYPE_CHECKING:
         EventEnvelope,
         SpellcheckResultDataV1,
     )
+    from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
 
 logger = create_service_logger("result_aggregator.event_processor")
 
@@ -78,6 +79,49 @@ class EventProcessorImpl(EventProcessorProtocol):
             logger.error(
                 "Failed to process batch registration",
                 batch_id=data.batch_id,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
+
+    async def process_essay_slot_assigned(
+        self, envelope: "EventEnvelope[EssaySlotAssignedV1]", data: "EssaySlotAssignedV1"
+    ) -> None:
+        """Process essay slot assignment event for file traceability."""
+        try:
+            # Type checking - data is EssaySlotAssignedV1
+            logger.info(
+                "Processing essay slot assignment",
+                batch_id=data.batch_id,
+                essay_id=data.essay_id,
+                file_upload_id=data.file_upload_id,
+            )
+
+            # Update the essay record with file_upload_id mapping
+            await self.batch_repository.update_essay_file_mapping(
+                essay_id=data.essay_id,
+                file_upload_id=data.file_upload_id,
+                text_storage_id=data.text_storage_id,
+            )
+
+            # Invalidate cache to ensure fresh data includes file_upload_id
+            await self.state_store.invalidate_batch(data.batch_id)
+            
+            # Get batch to find user_id for cache invalidation
+            batch = await self.batch_repository.get_batch(data.batch_id)
+            if batch:
+                await self.cache_manager.invalidate_user_batches(batch.user_id)
+
+            logger.info(
+                "Essay slot assignment processed successfully",
+                essay_id=data.essay_id,
+                file_upload_id=data.file_upload_id,
+            )
+
+        except Exception as e:
+            logger.error(
+                "Failed to process essay slot assignment",
+                essay_id=getattr(data, "essay_id", "unknown"),
                 error=str(e),
                 exc_info=True,
             )

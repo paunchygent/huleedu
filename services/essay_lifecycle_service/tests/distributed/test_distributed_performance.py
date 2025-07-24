@@ -264,6 +264,12 @@ class MockEventPublisher(EventPublisher):
             self.event_count += 1
 
     async def publish_essay_slot_assigned(self, event_data: Any, correlation_id: UUID) -> None:
+        # Validate event data structure for performance tests
+        assert hasattr(event_data, "batch_id"), "EssaySlotAssignedV1 must have batch_id"
+        assert hasattr(event_data, "essay_id"), "EssaySlotAssignedV1 must have essay_id"
+        assert hasattr(event_data, "file_upload_id"), "EssaySlotAssignedV1 must have file_upload_id"
+        assert hasattr(event_data, "text_storage_id"), "EssaySlotAssignedV1 must have text_storage_id"
+        
         async with self.lock:
             self.event_count += 1
 

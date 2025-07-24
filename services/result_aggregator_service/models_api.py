@@ -19,6 +19,7 @@ class EssayResultResponse(BaseModel):
 
     essay_id: str
     filename: Optional[str] = None
+    file_upload_id: Optional[str] = None  # Added for complete traceability
 
     # Current service results
     spellcheck_status: Optional[str] = None
@@ -97,6 +98,7 @@ class BatchStatusResponse(BaseModel):
                 EssayResultResponse(
                     essay_id=essay.essay_id,
                     filename=essay.filename,
+                    file_upload_id=essay.file_upload_id,  # Include for traceability
                     spellcheck_status=essay.spellcheck_status.value
                     if essay.spellcheck_status
                     else None,

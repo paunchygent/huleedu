@@ -49,6 +49,7 @@ class ResultAggregatorKafkaConsumer:
         # Topic subscription list - current services only
         self.topics = [
             topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),  # Add batch registration
+            topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED),  # Add slot assignment for traceability
             "huleedu.els.batch.phase.outcome.v1",
             "huleedu.essay.spellcheck.completed.v1",
             "huleedu.cj_assessment.completed.v1",
@@ -65,6 +66,7 @@ class ResultAggregatorKafkaConsumer:
             event_type_ttls={
                 # Batch registration and coordination events (12 hours)
                 "BatchEssaysRegistered": 43200,
+                "EssaySlotAssignedV1": 43200,  # Slot assignment for traceability
                 "ELSBatchPhaseOutcomeV1": 43200,
                 # Processing completion events (24 hours)
                 "SpellcheckResultDataV1": 86400,
@@ -212,6 +214,17 @@ class ResultAggregatorKafkaConsumer:
                 )
                 await self.event_processor.process_cj_assessment_completed(
                     cj_envelope, cj_envelope.data
+                )
+
+            elif record.topic == topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED):
+                # Import here to avoid circular imports
+                from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
+                
+                slot_envelope = EventEnvelope[EssaySlotAssignedV1].model_validate_json(
+                    message_value_str
+                )
+                await self.event_processor.process_essay_slot_assigned(
+                    slot_envelope, slot_envelope.data
                 )
 
             else:

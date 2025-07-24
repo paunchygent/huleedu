@@ -384,3 +384,70 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
                 batch.batch_error_detail = error_detail.model_dump(mode="json")
                 batch.updated_at = datetime.utcnow()
                 await session.commit()
+
+    async def update_essay_file_mapping(
+        self,
+        essay_id: str,
+        file_upload_id: str,
+        text_storage_id: Optional[str] = None,
+    ) -> None:
+        """Update essay with file_upload_id for traceability."""
+        start_time = time.perf_counter()
+        try:
+            async with self._get_session() as session:
+                # Check if essay exists, if not create it
+                result = await session.execute(
+                    select(EssayResult).where(EssayResult.essay_id == essay_id)
+                )
+                essay = result.scalars().first()
+
+                if essay:
+                    # Update existing essay
+                    essay.file_upload_id = file_upload_id
+                    if text_storage_id:
+                        essay.original_text_storage_id = text_storage_id
+                    essay.updated_at = datetime.utcnow()
+                else:
+                    # Create new essay record with minimal info
+                    # This handles the case where slot assignment happens before batch registration
+                    essay = EssayResult(
+                        essay_id=essay_id,
+                        batch_id="pending",  # Will be updated when batch is registered
+                        file_upload_id=file_upload_id,
+                        original_text_storage_id=text_storage_id,
+                    )
+                    session.add(essay)
+
+                await session.commit()
+
+                duration = time.perf_counter() - start_time
+                self._record_operation_metrics(
+                    operation="update_essay_file_mapping",
+                    table="essay_results",
+                    duration=duration,
+                    success=True,
+                )
+
+                self.logger.info(
+                    "Updated essay file mapping",
+                    essay_id=essay_id,
+                    file_upload_id=file_upload_id,
+                    is_new=essay is None,
+                )
+
+        except Exception as e:
+            duration = time.perf_counter() - start_time
+            self._record_operation_metrics(
+                operation="update_essay_file_mapping",
+                table="essay_results",
+                duration=duration,
+                success=False,
+            )
+            self._record_error_metrics(type(e).__name__, "update_essay_file_mapping")
+            self.logger.error(
+                "Failed to update essay file mapping",
+                essay_id=essay_id,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
