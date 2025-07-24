@@ -44,7 +44,7 @@ Teachers need real-time notification when files are assigned to essay slots:
 
 ## Implementation Design
 
-### Phase 1: ELS Redis Publishing
+### ELS Redis Publishing Implementation
 
 Modify `DefaultEventPublisher` to dual-publish `EssaySlotAssignedV1`:
 
