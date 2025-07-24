@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncGenerator, Generator
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import ContentType, CourseCode
@@ -39,180 +39,8 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
 from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
     RedisBatchCoordinator,
 )
-from services.essay_lifecycle_service.protocols import EventPublisher
 
-
-class MockEventPublisher(EventPublisher):
-    """Mock event publisher that records published events for verification."""
-
-    def __init__(self) -> None:
-        self.published_events: list[tuple[str, Any, UUID]] = []
-        self.lock = asyncio.Lock()
-
-    async def publish_status_update(
-        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID
-    ) -> None:
-        """Record status update events."""
-        async with self.lock:
-            self.published_events.append(("status_update", (essay_ref, status), correlation_id))
-
-    async def publish_batch_phase_progress(
-        self,
-        batch_id: str,
-        phase: str,
-        completed_count: int,
-        failed_count: int,
-        total_essays_in_phase: int,
-        correlation_id: UUID,
-    ) -> None:
-        """Record batch phase progress events."""
-        async with self.lock:
-            self.published_events.append(
-                (
-                    "batch_phase_progress",
-                    {
-                        "batch_id": batch_id,
-                        "phase": phase,
-                        "completed_count": completed_count,
-                        "failed_count": failed_count,
-                        "total_essays_in_phase": total_essays_in_phase,
-                    },
-                    correlation_id,
-                )
-            )
-
-    async def publish_batch_phase_concluded(
-        self,
-        batch_id: str,
-        phase: str,
-        status: str,
-        details: dict[str, Any],
-        correlation_id: UUID,
-    ) -> None:
-        """Record batch phase concluded events."""
-        async with self.lock:
-            self.published_events.append(
-                (
-                    "batch_phase_concluded",
-                    {"batch_id": batch_id, "phase": phase, "status": status, "details": details},
-                    correlation_id,
-                )
-            )
-
-    async def publish_batch_essays_ready(self, event_data: Any, correlation_id: UUID) -> None:
-        """Record batch essays ready events."""
-        async with self.lock:
-            self.published_events.append(("batch_essays_ready", event_data, correlation_id))
-
-    async def publish_excess_content_provisioned(
-        self, event_data: Any, correlation_id: UUID
-    ) -> None:
-        """Record excess content events."""
-        async with self.lock:
-            self.published_events.append(("excess_content_provisioned", event_data, correlation_id))
-
-    async def publish_els_batch_phase_outcome(self, event_data: Any, correlation_id: UUID) -> None:
-        """Record ELS batch phase outcome events."""
-        async with self.lock:
-            self.published_events.append(("els_batch_phase_outcome", event_data, correlation_id))
-
-    async def publish_essay_slot_assigned(self, event_data: Any, correlation_id: UUID) -> None:
-        """Record essay slot assigned events."""
-        async with self.lock:
-            # Validate event data structure
-            assert hasattr(event_data, "batch_id"), "EssaySlotAssignedV1 must have batch_id"
-            assert hasattr(event_data, "essay_id"), "EssaySlotAssignedV1 must have essay_id"
-            assert hasattr(event_data, "file_upload_id"), "EssaySlotAssignedV1 must have file_upload_id"
-            assert hasattr(event_data, "text_storage_id"), "EssaySlotAssignedV1 must have text_storage_id"
-
-            # Validate field values
-            assert event_data.batch_id, "batch_id must not be empty"
-            assert event_data.essay_id, "essay_id must not be empty"
-            assert event_data.file_upload_id, "file_upload_id must not be empty"
-            assert event_data.text_storage_id, "text_storage_id must not be empty"
-
-            self.published_events.append(("essay_slot_assigned", event_data, correlation_id))
-
-
-class PerformanceMetrics:
-    """Collects and analyzes distributed performance metrics."""
-
-    def __init__(self) -> None:
-        self.operations: list[dict[str, Any]] = []
-        self.lock = asyncio.Lock()
-
-    async def record_operation(
-        self,
-        operation_type: str,
-        duration: float,
-        success: bool,
-        instance_id: str | None = None,
-        details: dict[str, Any] | None = None,
-    ) -> None:
-        """Record a timed operation."""
-        async with self.lock:
-            self.operations.append(
-                {
-                    "operation_type": operation_type,
-                    "duration": duration,
-                    "success": success,
-                    "instance_id": instance_id,
-                    "details": details or {},
-                    "timestamp": asyncio.get_event_loop().time(),
-                }
-            )
-
-    def get_statistics(self) -> dict[str, Any]:
-        """Get comprehensive performance statistics."""
-        if not self.operations:
-            return {"total_operations": 0}
-
-        successes = [op for op in self.operations if op["success"]]
-        failures = [op for op in self.operations if not op["success"]]
-        durations = [op["duration"] for op in successes]
-
-        if durations:
-            durations.sort()
-            p95_index = int(0.95 * len(durations))
-            p99_index = int(0.99 * len(durations))
-
-            stats = {
-                "total_operations": len(self.operations),
-                "success_count": len(successes),
-                "failure_count": len(failures),
-                "success_rate": len(successes) / len(self.operations),
-                "avg_duration": sum(durations) / len(durations),
-                "min_duration": min(durations),
-                "max_duration": max(durations),
-                "p95_duration": durations[p95_index]
-                if p95_index < len(durations)
-                else durations[-1],
-                "p99_duration": durations[p99_index]
-                if p99_index < len(durations)
-                else durations[-1],
-            }
-        else:
-            stats = {
-                "total_operations": len(self.operations),
-                "success_count": 0,
-                "failure_count": len(failures),
-                "success_rate": 0.0,
-            }
-
-        # Add operation type breakdown
-        by_type: dict[str, dict[str, Any]] = {}
-        for op in self.operations:
-            op_type = str(op["operation_type"])
-            if op_type not in by_type:
-                by_type[op_type] = {"count": 0, "durations": []}
-            by_type[op_type]["count"] = int(by_type[op_type]["count"]) + 1
-            if op["success"]:
-                durations_list = list(by_type[op_type]["durations"])
-                durations_list.append(float(op["duration"]))
-                by_type[op_type]["durations"] = durations_list
-
-        stats["by_operation_type"] = by_type
-        return stats
+from .test_utils import DistributedTestSettings, MockEventPublisher, PerformanceMetrics
 
 
 @pytest.mark.docker
@@ -236,20 +64,6 @@ class TestConcurrentSlotAssignment:
         yield container
         container.stop()
 
-    class DistributedTestSettings(Settings):
-        """Test settings for distributed infrastructure."""
-
-        def __init__(self, database_url: str, redis_url: str) -> None:
-            super().__init__()
-            object.__setattr__(self, "_database_url", database_url)
-            self.REDIS_URL = redis_url
-            self.DATABASE_POOL_SIZE = 5  # Higher pool for concurrent operations
-            self.DATABASE_MAX_OVERFLOW = 10
-
-        @property
-        def DATABASE_URL(self) -> str:
-            return str(object.__getattribute__(self, "_database_url"))
-
     @pytest.fixture
     def distributed_settings(
         self, postgres_container: PostgresContainer, redis_container: RedisContainer
@@ -261,7 +75,9 @@ class TestConcurrentSlotAssignment:
 
         redis_url = f"redis://{redis_container.get_container_host_ip()}:{redis_container.get_exposed_port(6379)}"
 
-        return self.DistributedTestSettings(database_url=pg_url, redis_url=redis_url)
+        return DistributedTestSettings.create_basic_settings(
+            database_url=pg_url, redis_url=redis_url
+        )
 
     @pytest.fixture
     async def clean_distributed_state(
@@ -555,7 +371,7 @@ class TestConcurrentSlotAssignment:
                 except Exception as e:
                     duration = asyncio.get_event_loop().time() - start_time
                     await metrics.record_operation(
-                        "content_provision", duration, False, instance_id, {"error": str(e)}
+                        "content_provision", duration, False, instance_id, None, {"error": str(e)}
                     )
                     raise
 
@@ -591,7 +407,7 @@ class TestConcurrentSlotAssignment:
         assert len(content_ids) == essay_count, "Duplicate content assignments detected"
 
         # Assert - Performance targets met
-        stats = metrics.get_statistics()
+        stats = metrics.get_operation_statistics()
         assert stats["success_rate"] >= 0.95, f"Success rate too low: {stats['success_rate']}"
         if "avg_duration" in stats:
             assert stats["avg_duration"] < 0.2, (
@@ -762,6 +578,7 @@ class TestConcurrentSlotAssignment:
                         duration,
                         False,
                         f"task_{task_id}",
+                        None,
                         {"error": str(e)},
                     )
                     return False, task_id
@@ -783,7 +600,7 @@ class TestConcurrentSlotAssignment:
         )
 
         # Assert - Performance statistics
-        stats = metrics.get_statistics()
+        stats = metrics.get_operation_statistics()
         print(f"Performance stats: {stats}")
 
         # Performance targets from the requirements

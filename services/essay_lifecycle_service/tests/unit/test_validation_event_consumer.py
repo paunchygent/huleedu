@@ -43,7 +43,7 @@ class TestValidationEventConsumerIntegration:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=0,
             raw_file_storage_id="test_storage_id_consumer",
@@ -145,7 +145,7 @@ class TestValidationEventConsumerIntegration:
                     correlation_id=uuid4(),
                     timestamp=datetime.now(UTC),
                     service="file_service",
-                    operation="validate_content"
+                    operation="validate_content",
                 ),
                 file_size_bytes=10,
                 raw_file_storage_id=f"test_storage_id_multiple_{i:03d}",
@@ -177,7 +177,7 @@ class TestValidationEventConsumerIntegration:
                 correlation_id=correlation_id,
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=100000,
             raw_file_storage_id="test_storage_id_correlation",
@@ -210,7 +210,7 @@ class TestValidationEventConsumerIntegration:
                     correlation_id=uuid4(),
                     timestamp=datetime.now(UTC),
                     service="file_service",
-                    operation="validate_content"
+                    operation="validate_content",
                 ),
                 file_size_bytes=100,
                 raw_file_storage_id="test_storage_id_invalid",
@@ -241,7 +241,7 @@ class TestValidationEventConsumerIntegration:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=50,
             raw_file_storage_id="test_storage_id_error",
@@ -288,7 +288,7 @@ class TestValidationEventConsumerIntegration:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=0,
             raw_file_storage_id="test_storage_id_consistency",
@@ -327,7 +327,7 @@ class TestValidationEventConsumerIntegration:
                     correlation_id=uuid4(),
                     timestamp=datetime.now(UTC),
                     service="file_service",
-                    operation="validate_content"
+                    operation="validate_content",
                 ),
                 file_size_bytes=15,
                 raw_file_storage_id=f"test_storage_id_concurrent_{i:03d}",
@@ -403,7 +403,7 @@ class TestValidationEventConsumerIntegration:
                     correlation_id=uuid4(),
                     timestamp=datetime.now(UTC),
                     service="file_service",
-                    operation="validate_content"
+                    operation="validate_content",
                 ),
                 file_size_bytes=100,
                 raw_file_storage_id=f"test_storage_id_{error_code.value.lower()}",

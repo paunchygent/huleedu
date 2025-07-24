@@ -291,7 +291,9 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             "file_upload_id": validation_failed.file_upload_id,
             "original_file_name": validation_failed.original_file_name,
             "validation_error_code": validation_failed.validation_error_code.value,
-            "validation_error_detail": validation_failed.validation_error_detail.model_dump(mode="json"),
+            "validation_error_detail": validation_failed.validation_error_detail.model_dump(
+                mode="json"
+            ),
             "file_size_bytes": validation_failed.file_size_bytes,
             "raw_file_storage_id": validation_failed.raw_file_storage_id,
             "correlation_id": str(validation_failed.correlation_id)
@@ -461,7 +463,9 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                         file_upload_id=failure_dict["file_upload_id"],
                         original_file_name=failure_dict["original_file_name"],
                         validation_error_code=error_code,
-                        validation_error_detail=ErrorDetail.model_validate(failure_dict["validation_error_detail"]),
+                        validation_error_detail=ErrorDetail.model_validate(
+                            failure_dict["validation_error_detail"]
+                        ),
                         file_size_bytes=failure_dict["file_size_bytes"],
                         raw_file_storage_id=failure_dict["raw_file_storage_id"],
                         correlation_id=UUID(failure_dict["correlation_id"])

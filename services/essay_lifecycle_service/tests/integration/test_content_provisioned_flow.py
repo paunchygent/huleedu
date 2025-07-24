@@ -73,6 +73,7 @@ class TestContentProvisionedFlow:
 
             # Configure environment
             import os
+
             os.environ["ESSAY_LIFECYCLE_SERVICE_DATABASE_URL"] = db_url
             os.environ["ESSAY_LIFECYCLE_SERVICE_REDIS_URL"] = redis_url
 
@@ -200,6 +201,7 @@ class TestContentProvisionedFlow:
         for event in published_events:
             if "essay.slot.assigned" in event["topic"]:
                 import json
+
                 event_data = json.loads(event["value"])
                 if event_data["event_type"] == "EssaySlotAssignedV1":
                     slot_assigned_event = event_data
@@ -270,7 +272,11 @@ class TestContentProvisionedFlow:
         # Verify results
         successful_provisions = []
         for result in results:
-            if not isinstance(result, BaseException) and isinstance(result, tuple) and len(result) == 2:
+            if (
+                not isinstance(result, BaseException)
+                and isinstance(result, tuple)
+                and len(result) == 2
+            ):
                 success, fid = result
                 if success:
                     successful_provisions.append((success, fid))
@@ -346,11 +352,15 @@ class TestContentProvisionedFlow:
         assert success2, "Second provision should succeed (idempotent)"
 
         # Should publish same number of events (idempotent)
-        assert len(published_events) == events_after_first * 2, "Should publish events for both calls"
+        assert len(published_events) == events_after_first * 2, (
+            "Should publish events for both calls"
+        )
 
         # Verify only one essay has content
         essays = await repository.list_essays_by_batch(batch_id)
-        assigned_count = sum(1 for e in essays if ContentType.ORIGINAL_ESSAY in e.storage_references)
+        assigned_count = sum(
+            1 for e in essays if ContentType.ORIGINAL_ESSAY in e.storage_references
+        )
         assert assigned_count == 1, "Only one essay should have content assigned"
 
     async def test_event_publishing_failure_handling(

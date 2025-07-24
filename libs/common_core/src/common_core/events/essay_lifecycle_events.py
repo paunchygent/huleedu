@@ -29,4 +29,3 @@ class EssaySlotAssignedV1(BaseModel):
     text_storage_id: str = Field(description="Storage ID of assigned content")
     correlation_id: UUID = Field(default_factory=uuid4, description="Request correlation ID")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
-

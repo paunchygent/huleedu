@@ -164,7 +164,7 @@ class TestValidationFailureCompletionFix:
                     correlation_id=uuid4(),
                     timestamp=datetime.now(UTC),
                     service="file_service",
-                    operation="validate_content"
+                    operation="validate_content",
                 ),
                 file_size_bytes=0,
                 raw_file_storage_id=f"storage_{i}",
@@ -185,7 +185,7 @@ class TestValidationFailureCompletionFix:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=0,
             raw_file_storage_id="storage_3",
@@ -229,9 +229,7 @@ class TestValidationFailureCompletionFix:
         await tracker.register_batch(batch_registration, uuid4())
 
         # Mock 2 successful slot assignments
-        async def mock_assign_slot(
-            batch_id: str, content_metadata: dict[str, Any]
-        ) -> str | None:
+        async def mock_assign_slot(batch_id: str, content_metadata: dict[str, Any]) -> str | None:
             if batch_id == "batch_mixed":
                 state = await mock_redis_coordinator.get_batch_status(batch_id)
                 if state["assigned_slots"] < 2:  # Allow 2 assignments
@@ -262,7 +260,7 @@ class TestValidationFailureCompletionFix:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=10,
             raw_file_storage_id="storage_3",
@@ -282,7 +280,7 @@ class TestValidationFailureCompletionFix:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=1000000,
             raw_file_storage_id="storage_4",
@@ -334,7 +332,7 @@ class TestValidationFailureCompletionFix:
                     correlation_id=uuid4(),
                     timestamp=datetime.now(UTC),
                     service="file_service",
-                    operation="validate_content"
+                    operation="validate_content",
                 ),
                 file_size_bytes=0,
                 raw_file_storage_id=f"storage_{i}",
@@ -357,7 +355,7 @@ class TestValidationFailureCompletionFix:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=0,
             raw_file_storage_id="storage_extra",

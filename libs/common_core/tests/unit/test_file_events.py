@@ -75,7 +75,7 @@ class TestEssayValidationFailedV1:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=0,
         )
@@ -83,7 +83,10 @@ class TestEssayValidationFailedV1:
         assert event.batch_id == "batch_456"
         assert event.original_file_name == "empty_essay.txt"
         assert event.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
-        assert event.validation_error_detail.message == "File content is empty or contains only whitespace"
+        assert (
+            event.validation_error_detail.message
+            == "File content is empty or contains only whitespace"
+        )
         assert event.file_size_bytes == 0
         assert event.event == "essay.validation.failed"
         assert isinstance(event.correlation_id, UUID)
@@ -106,7 +109,7 @@ class TestEssayValidationFailedV1:
                 correlation_id=correlation_id,
                 timestamp=timestamp,
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=512,
             correlation_id=correlation_id,
@@ -134,7 +137,7 @@ class TestEssayValidationFailedV1:
                 correlation_id=correlation_id,
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=150,
             correlation_id=correlation_id,
@@ -153,7 +156,8 @@ class TestEssayValidationFailedV1:
         assert reconstructed_event.original_file_name == original_event.original_file_name
         assert reconstructed_event.validation_error_code == original_event.validation_error_code
         assert (
-            reconstructed_event.validation_error_detail.message == original_event.validation_error_detail.message
+            reconstructed_event.validation_error_detail.message
+            == original_event.validation_error_detail.message
         )
         assert reconstructed_event.file_size_bytes == original_event.file_size_bytes
         assert reconstructed_event.correlation_id == original_event.correlation_id
@@ -172,7 +176,7 @@ class TestEssayValidationFailedV1:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=100,
         )
@@ -209,7 +213,7 @@ class TestEssayValidationFailedV1:
                     correlation_id=uuid4(),
                     timestamp=datetime.now(UTC),
                     service="file_service",
-                    operation="validate_content"
+                    operation="validate_content",
                 ),
                 file_size_bytes=100,
             )
@@ -230,7 +234,7 @@ class TestEssayValidationFailedV1:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=0,
         )
@@ -249,7 +253,7 @@ class TestEssayValidationFailedV1:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=10_000_000,
         )
@@ -270,7 +274,7 @@ class TestEssayValidationFailedV1:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=100,
         )
@@ -293,7 +297,7 @@ class TestEssayValidationFailedV1:
                 correlation_id=uuid4(),
                 timestamp=explicit_time,
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=200,
             timestamp=explicit_time,
@@ -314,7 +318,7 @@ class TestEssayValidationFailedV1:
                     correlation_id=uuid4(),
                     timestamp=datetime.now(UTC),
                     service="file_service",
-                    operation="validate_content"
+                    operation="validate_content",
                 ),
                 file_size_bytes=100,
             )
@@ -337,7 +341,7 @@ class TestEssayValidationFailedV1:
                 correlation_id=correlation_id,
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=256,
             correlation_id=correlation_id,

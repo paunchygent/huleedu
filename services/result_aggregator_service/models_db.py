@@ -104,7 +104,9 @@ class EssayResult(Base):
     # Core metadata
     filename: Mapped[Optional[str]] = mapped_column(String(255))
     original_text_storage_id: Mapped[Optional[str]] = mapped_column(String(255))
-    file_upload_id: Mapped[Optional[str]] = mapped_column(String(255), index=True)  # Added for traceability
+    file_upload_id: Mapped[Optional[str]] = mapped_column(
+        String(255), index=True
+    )  # Added for traceability
 
     # === Current Service Results ===
 

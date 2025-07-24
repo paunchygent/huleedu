@@ -11,19 +11,16 @@ from __future__ import annotations
 
 import asyncio
 import gc
-import statistics
 import time
 from collections.abc import AsyncGenerator, Generator
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
-import psutil
 import pytest
 from common_core.domain_enums import CourseCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
-from common_core.status_enums import EssayStatus
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -43,241 +40,8 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
 from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
     RedisBatchCoordinator,
 )
-from services.essay_lifecycle_service.protocols import EventPublisher
 
-
-class PerformanceMetrics:
-    """Comprehensive performance metrics collection and analysis."""
-
-    def __init__(self) -> None:
-        self.operation_timings: list[dict[str, Any]] = []
-        self.memory_samples: list[dict[str, Any]] = []
-        self.throughput_samples: list[dict[str, Any]] = []
-        self.lock = asyncio.Lock()
-        self.process = psutil.Process()
-
-    async def record_operation(
-        self,
-        operation_type: str,
-        duration: float,
-        success: bool,
-        instance_id: str | None = None,
-        batch_size: int | None = None,
-        details: dict[str, Any] | None = None,
-    ) -> None:
-        """Record individual operation timing."""
-        async with self.lock:
-            self.operation_timings.append(
-                {
-                    "operation_type": operation_type,
-                    "duration": duration,
-                    "success": success,
-                    "instance_id": instance_id,
-                    "batch_size": batch_size,
-                    "timestamp": time.time(),
-                    "details": details or {},
-                }
-            )
-
-    async def sample_memory_usage(
-        self, context: str, batch_count: int = 0, total_essays: int = 0
-    ) -> None:
-        """Sample current memory usage."""
-        memory_info = self.process.memory_info()
-        async with self.lock:
-            self.memory_samples.append(
-                {
-                    "context": context,
-                    "rss_mb": memory_info.rss / 1024 / 1024,
-                    "vms_mb": memory_info.vms / 1024 / 1024,
-                    "batch_count": batch_count,
-                    "total_essays": total_essays,
-                    "timestamp": time.time(),
-                }
-            )
-
-    async def record_throughput(
-        self,
-        operation_type: str,
-        operations_completed: int,
-        duration: float,
-        instance_count: int = 1,
-    ) -> None:
-        """Record throughput measurement."""
-        async with self.lock:
-            self.throughput_samples.append(
-                {
-                    "operation_type": operation_type,
-                    "operations_completed": operations_completed,
-                    "duration": duration,
-                    "ops_per_second": operations_completed / duration if duration > 0 else 0,
-                    "instance_count": instance_count,
-                    "timestamp": time.time(),
-                }
-            )
-
-    def get_operation_statistics(self, operation_type: str | None = None) -> dict[str, Any]:
-        """Get comprehensive operation statistics."""
-        operations = self.operation_timings
-        if operation_type:
-            operations = [op for op in operations if op["operation_type"] == operation_type]
-
-        if not operations:
-            return {"operation_count": 0}
-
-        successful_ops = [op for op in operations if op["success"]]
-        failed_ops = [op for op in operations if not op["success"]]
-
-        if successful_ops:
-            durations = [op["duration"] for op in successful_ops]
-            durations.sort()
-
-            return {
-                "operation_count": len(operations),
-                "success_count": len(successful_ops),
-                "failure_count": len(failed_ops),
-                "success_rate": len(successful_ops) / len(operations),
-                "avg_duration": statistics.mean(durations),
-                "median_duration": statistics.median(durations),
-                "min_duration": min(durations),
-                "max_duration": max(durations),
-                "p95_duration": durations[int(0.95 * len(durations))]
-                if len(durations) > 20
-                else max(durations),
-                "p99_duration": durations[int(0.99 * len(durations))]
-                if len(durations) > 100
-                else max(durations),
-                "std_dev": statistics.stdev(durations) if len(durations) > 1 else 0,
-            }
-        else:
-            return {
-                "operation_count": len(operations),
-                "success_count": 0,
-                "failure_count": len(failed_ops),
-                "success_rate": 0.0,
-            }
-
-    def get_memory_analysis(self) -> dict[str, Any]:
-        """Analyze memory usage patterns."""
-        if not self.memory_samples:
-            return {"sample_count": 0}
-
-        rss_values = [sample["rss_mb"] for sample in self.memory_samples]
-        essay_counts = [sample["total_essays"] for sample in self.memory_samples]
-
-        # Calculate memory efficiency
-        # Find baseline memory (when no essays are processed)
-        baseline_memory = min(rss_values)  # Minimum memory is closest to baseline
-
-        # For memory efficiency, only use "final" samples or samples after full processing
-        # This avoids intermediate samples that show partial memory allocation
-        relevant_samples = [
-            s
-            for s in self.memory_samples
-            if "final" in s["context"] or "after_full_processing" in s["context"]
-        ]
-
-        memory_per_essay = []
-        for sample in relevant_samples:
-            if sample["total_essays"] > 0:
-                # Calculate memory above baseline per essay
-                memory_above_baseline = sample["rss_mb"] - baseline_memory
-                memory_per_essay.append(memory_above_baseline / sample["total_essays"])
-
-        return {
-            "sample_count": len(self.memory_samples),
-            "min_memory_mb": min(rss_values),
-            "max_memory_mb": max(rss_values),
-            "avg_memory_mb": statistics.mean(rss_values),
-            "memory_growth": max(rss_values) - min(rss_values),
-            "max_essays_tracked": max(essay_counts) if essay_counts else 0,
-            "avg_memory_per_essay": statistics.mean(memory_per_essay) if memory_per_essay else 0,
-            "memory_efficiency_consistent": statistics.stdev(memory_per_essay) < 0.1
-            if len(memory_per_essay) > 1
-            else True,
-        }
-
-    def get_throughput_analysis(self) -> dict[str, Any]:
-        """Analyze throughput patterns."""
-        if not self.throughput_samples:
-            return {"sample_count": 0}
-
-        throughputs = [sample["ops_per_second"] for sample in self.throughput_samples]
-
-        return {
-            "sample_count": len(self.throughput_samples),
-            "min_throughput": min(throughputs),
-            "max_throughput": max(throughputs),
-            "avg_throughput": statistics.mean(throughputs),
-            "throughput_consistency": statistics.stdev(throughputs) if len(throughputs) > 1 else 0,
-        }
-
-
-class MockEventPublisher(EventPublisher):
-    """Performance-optimized mock event publisher."""
-
-    def __init__(self) -> None:
-        self.event_count = 0
-        self.lock = asyncio.Lock()
-
-    async def publish_status_update(
-        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID
-    ) -> None:
-        async with self.lock:
-            self.event_count += 1
-
-    async def publish_batch_phase_progress(
-        self,
-        batch_id: str,
-        phase: str,
-        completed_count: int,
-        failed_count: int,
-        total_essays_in_phase: int,
-        correlation_id: UUID,
-    ) -> None:
-        async with self.lock:
-            self.event_count += 1
-
-    async def publish_batch_phase_concluded(
-        self,
-        batch_id: str,
-        phase: str,
-        status: str,
-        details: dict[str, Any],
-        correlation_id: UUID,
-    ) -> None:
-        async with self.lock:
-            self.event_count += 1
-
-    async def publish_batch_essays_ready(self, event_data: Any, correlation_id: UUID) -> None:
-        async with self.lock:
-            self.event_count += 1
-
-    async def publish_excess_content_provisioned(
-        self, event_data: Any, correlation_id: UUID
-    ) -> None:
-        async with self.lock:
-            self.event_count += 1
-
-    async def publish_els_batch_phase_outcome(self, event_data: Any, correlation_id: UUID) -> None:
-        async with self.lock:
-            self.event_count += 1
-
-    async def publish_essay_slot_assigned(self, event_data: Any, correlation_id: UUID) -> None:
-        # Validate event data structure for performance tests
-        assert hasattr(event_data, "batch_id"), "EssaySlotAssignedV1 must have batch_id"
-        assert hasattr(event_data, "essay_id"), "EssaySlotAssignedV1 must have essay_id"
-        assert hasattr(event_data, "file_upload_id"), "EssaySlotAssignedV1 must have file_upload_id"
-        assert hasattr(event_data, "text_storage_id"), "EssaySlotAssignedV1 must have text_storage_id"
-
-        # Validate field values
-        assert event_data.batch_id, "batch_id must not be empty"
-        assert event_data.essay_id, "essay_id must not be empty"
-        assert event_data.file_upload_id, "file_upload_id must not be empty"
-        assert event_data.text_storage_id, "text_storage_id must not be empty"
-
-        async with self.lock:
-            self.event_count += 1
+from .test_utils import DistributedTestSettings, MockEventPublisher, PerformanceMetrics
 
 
 @pytest.mark.performance
@@ -302,24 +66,6 @@ class TestDistributedPerformance:
         yield container
         container.stop()
 
-    class PerformanceTestSettings(Settings):
-        """Optimized settings for performance testing."""
-
-        def __init__(self, database_url: str, redis_url: str) -> None:
-            super().__init__()
-            object.__setattr__(self, "_database_url", database_url)
-            self.REDIS_URL = redis_url
-            # Optimized for performance testing
-            # Increased pool size to handle concurrent load (75+ operations)
-            self.DATABASE_POOL_SIZE = 20
-            self.DATABASE_MAX_OVERFLOW = 60  # Total: 80 connections > 75 concurrent ops
-            self.DATABASE_POOL_PRE_PING = True
-            self.DATABASE_POOL_RECYCLE = 1800
-
-        @property
-        def DATABASE_URL(self) -> str:
-            return str(object.__getattribute__(self, "_database_url"))
-
     @pytest.fixture
     def performance_settings(
         self, postgres_container: PostgresContainer, redis_container: RedisContainer
@@ -331,7 +77,9 @@ class TestDistributedPerformance:
 
         redis_url = f"redis://{redis_container.get_container_host_ip()}:{redis_container.get_exposed_port(6379)}"
 
-        return self.PerformanceTestSettings(database_url=pg_url, redis_url=redis_url)
+        return DistributedTestSettings.create_performance_settings(
+            database_url=pg_url, redis_url=redis_url
+        )
 
     @pytest.fixture
     async def performance_infrastructure(
@@ -576,7 +324,9 @@ class TestDistributedPerformance:
                             "scaling_content_provision", duration, result, f"instance_{iid}"
                         )
                         if result:
-                            instance_work_distribution[current_instance_count][int(iid)].append(essay_idx)
+                            instance_work_distribution[current_instance_count][int(iid)].append(
+                                essay_idx
+                            )
                         return (result, int(iid), essay_idx)
                     except Exception as e:
                         duration = time.time() - op_start
@@ -589,7 +339,9 @@ class TestDistributedPerformance:
                         )
                         raise
 
-                task = process_with_metrics(handler, content_event, str(handler_idx), i, instance_count)
+                task = process_with_metrics(
+                    handler, content_event, str(handler_idx), i, instance_count
+                )
                 content_tasks.append(task)
 
             # Execute all operations

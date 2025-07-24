@@ -169,7 +169,9 @@ class TestFileTraceabilityE2E:
             assert len(batch_registered_event["data"]["essay_ids"]) == 3
 
             # Validate content provisioned
-            assert content_provisioned_event is not None, "EssayContentProvisionedV1 event not found"
+            assert content_provisioned_event is not None, (
+                "EssayContentProvisionedV1 event not found"
+            )
             content_data = content_provisioned_event["data"]
             assert content_data["batch_id"] == batch_id
             assert content_data["file_upload_id"] == file_upload_id
@@ -184,9 +186,9 @@ class TestFileTraceabilityE2E:
             assert slot_data["text_storage_id"] == content_event.text_storage_id
 
             # Validate correlation across events
-            assert (
-                slot_assigned_event["correlation_id"] == str(correlation_id)
-            ), "Correlation ID mismatch"
+            assert slot_assigned_event["correlation_id"] == str(correlation_id), (
+                "Correlation ID mismatch"
+            )
 
             logger.info(
                 "✅ File traceability validated",
@@ -281,7 +283,9 @@ class TestFileTraceabilityE2E:
                 if "essay.slot.assigned" in event["data"].get("event_type", "")
             ]
 
-            assert len(slot_assignments) == 5, f"Expected 5 slot assignments, got {len(slot_assignments)}"
+            assert len(slot_assignments) == 5, (
+                f"Expected 5 slot assignments, got {len(slot_assignments)}"
+            )
 
             # Verify each file has unique mapping
             file_to_essay_mapping = {}
@@ -290,11 +294,15 @@ class TestFileTraceabilityE2E:
                 file_upload_id = data["file_upload_id"]
                 essay_id = data["essay_id"]
 
-                assert file_upload_id in file_upload_ids, f"Unknown file_upload_id: {file_upload_id}"
+                assert file_upload_id in file_upload_ids, (
+                    f"Unknown file_upload_id: {file_upload_id}"
+                )
                 assert essay_id in essay_ids, f"Essay ID not from pre-generated set: {essay_id}"
 
                 # Ensure no duplicate mappings
-                assert file_upload_id not in file_to_essay_mapping, f"Duplicate mapping for {file_upload_id}"
+                assert file_upload_id not in file_to_essay_mapping, (
+                    f"Duplicate mapping for {file_upload_id}"
+                )
                 file_to_essay_mapping[file_upload_id] = essay_id
 
             # Verify all files were mapped

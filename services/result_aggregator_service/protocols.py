@@ -130,7 +130,9 @@ class EventProcessorProtocol(Protocol):
         ...
 
     async def process_essay_slot_assigned(
-        self, envelope: EventEnvelope[Any], data: Any  # EssaySlotAssignedV1
+        self,
+        envelope: EventEnvelope[Any],
+        data: Any,  # EssaySlotAssignedV1
     ) -> None:
         """Process essay slot assignment event for file traceability."""
         ...

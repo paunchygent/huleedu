@@ -197,7 +197,7 @@ class TestBatchEssayTracker:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=0,
             raw_file_storage_id="test_storage_id_001",
@@ -284,7 +284,7 @@ class TestBatchEssayTracker:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=10,
             raw_file_storage_id="test_storage_id_004",
@@ -304,7 +304,7 @@ class TestBatchEssayTracker:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=10,
             raw_file_storage_id="test_storage_id_005",
@@ -362,7 +362,7 @@ class TestBatchEssayTracker:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=15,
             raw_file_storage_id="test_storage_id_025",
@@ -402,7 +402,7 @@ class TestBatchEssayTracker:
                     correlation_id=uuid4(),
                     timestamp=datetime.now(UTC),
                     service="file_service",
-                    operation="validate_content"
+                    operation="validate_content",
                 ),
                 file_size_bytes=0,
                 raw_file_storage_id=f"test_storage_id_{i:03d}",
@@ -444,7 +444,7 @@ class TestBatchEssayTracker:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=10,
             raw_file_storage_id="test_storage_id_004",
@@ -463,7 +463,7 @@ class TestBatchEssayTracker:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=10,
             raw_file_storage_id="test_storage_id_005",
@@ -519,7 +519,7 @@ class TestBatchEssayTracker:
                     correlation_id=uuid4(),
                     timestamp=datetime.now(UTC),
                     service="file_service",
-                    operation="validate_content"
+                    operation="validate_content",
                 ),
                 file_size_bytes=0,
                 raw_file_storage_id=f"test_storage_id_failed_{i:03d}",
@@ -562,7 +562,7 @@ class TestBatchEssayTracker:
                 correlation_id=correlation_id,
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=100000,
             raw_file_storage_id="test_storage_id_tracked",
@@ -606,7 +606,7 @@ class TestBatchEssayTracker:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=50,
             raw_file_storage_id="test_storage_id_final",
@@ -643,7 +643,7 @@ class TestBatchEssayTracker:
                         correlation_id=uuid4(),
                         timestamp=datetime.now(UTC),
                         service="file_service",
-                        operation="validate_content"
+                        operation="validate_content",
                     ),
                     file_size_bytes=0,
                     raw_file_storage_id=f"test_storage_id_empty_{i:03d}",
@@ -677,7 +677,7 @@ class TestBatchEssayTracker:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=20,
             raw_file_storage_id="test_storage_id_short_4",
@@ -707,7 +707,7 @@ class TestBatchEssayTracker:
                 correlation_id=uuid4(),
                 timestamp=datetime.now(UTC),
                 service="file_service",
-                operation="validate_content"
+                operation="validate_content",
             ),
             file_size_bytes=20,
             raw_file_storage_id="test_storage_id_short_5",
@@ -742,7 +742,7 @@ class TestBatchEssayTracker:
                         correlation_id=uuid4(),
                         timestamp=datetime.now(UTC),
                         service="file_service",
-                        operation="validate_content"
+                        operation="validate_content",
                     ),
                     file_size_bytes=15,
                     raw_file_storage_id=f"test_storage_id_concurrent_{i:03d}",
