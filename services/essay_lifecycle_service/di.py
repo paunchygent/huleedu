@@ -46,11 +46,15 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
     PostgreSQLEssayRepository,
 )
 from services.essay_lifecycle_service.implementations.event_publisher import DefaultEventPublisher
+from services.essay_lifecycle_service.implementations.event_relay_worker import EventRelayWorker
 from services.essay_lifecycle_service.implementations.future_services_command_handlers import (
     FutureServicesCommandHandler,
 )
 from services.essay_lifecycle_service.implementations.metrics_collector import (
     DefaultMetricsCollector,
+)
+from services.essay_lifecycle_service.implementations.outbox_repository_impl import (
+    PostgreSQLOutboxRepository,
 )
 from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
     RedisBatchCoordinator,
@@ -73,6 +77,7 @@ from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
     EventPublisher,
     MetricsCollector,
+    OutboxRepositoryProtocol,
     ServiceResultHandler,
     SpecializedServiceRequestDispatcher,
 )
@@ -217,6 +222,11 @@ class CoreInfrastructureProvider(Provider):
             await postgres_repo.initialize_db_schema()
             return postgres_repo
 
+    @provide(scope=Scope.APP)
+    def provide_outbox_repository(self, engine: AsyncEngine) -> OutboxRepositoryProtocol:
+        """Provide outbox repository for transactional event publishing."""
+        return PostgreSQLOutboxRepository(engine)
+
 
 class ServiceClientsProvider(Provider):
     """Provider for external service client implementations."""
@@ -228,9 +238,12 @@ class ServiceClientsProvider(Provider):
         settings: Settings,
         redis_client: AtomicRedisClientProtocol,
         batch_tracker: BatchEssayTracker,
+        outbox_repository: OutboxRepositoryProtocol,
     ) -> EventPublisher:
-        """Provide event publisher implementation with Redis support and batch tracking."""
-        return DefaultEventPublisher(kafka_bus, settings, redis_client, batch_tracker)
+        """Provide event publisher implementation with Redis support, batch tracking, and outbox pattern."""
+        return DefaultEventPublisher(
+            kafka_bus, settings, redis_client, batch_tracker, outbox_repository
+        )
 
     @provide(scope=Scope.APP)
     def provide_metrics_collector(self, registry: CollectorRegistry) -> MetricsCollector:
@@ -239,10 +252,23 @@ class ServiceClientsProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_specialized_service_request_dispatcher(
-        self, kafka_bus: KafkaPublisherProtocol, settings: Settings
+        self,
+        kafka_bus: KafkaPublisherProtocol,
+        settings: Settings,
+        outbox_repository: OutboxRepositoryProtocol,
     ) -> SpecializedServiceRequestDispatcher:
-        """Provide specialized service request dispatcher implementation."""
-        return DefaultSpecializedServiceRequestDispatcher(kafka_bus, settings)
+        """Provide specialized service request dispatcher implementation with outbox support."""
+        return DefaultSpecializedServiceRequestDispatcher(kafka_bus, settings, outbox_repository)
+
+    @provide(scope=Scope.APP)
+    def provide_event_relay_worker(
+        self,
+        outbox_repository: OutboxRepositoryProtocol,
+        kafka_bus: KafkaPublisherProtocol,
+        settings: Settings,
+    ) -> EventRelayWorker:
+        """Provide event relay worker for processing outbox events."""
+        return EventRelayWorker(outbox_repository, kafka_bus, settings)
 
 
 class CommandHandlerProvider(Provider):

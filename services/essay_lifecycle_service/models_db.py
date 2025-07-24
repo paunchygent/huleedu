@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from uuid import UUID, uuid4
 
 from common_core.status_enums import EssayStatus
 from sqlalchemy import (
@@ -17,12 +18,15 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     String,
     Text,
     text,
 )
 from sqlalchemy.dialects.postgresql import ENUM as SQLAlchemyEnum
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -209,3 +213,49 @@ class EssayProcessingLog(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
+
+
+class EventOutbox(Base):
+    """
+    Database model for transactional outbox pattern.
+
+    Stores events to be published to Kafka, ensuring reliable delivery
+    even when Kafka is temporarily unavailable.
+    """
+
+    __tablename__ = "event_outbox"
+
+    # Primary key
+    id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+
+    # Aggregate information
+    aggregate_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    aggregate_type: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    # Event data
+    event_type: Mapped[str] = mapped_column(String(255), nullable=False)
+    event_data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    event_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Publishing metadata
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("NOW()")
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Indexes for efficient querying
+    __table_args__ = (
+        # Partial index for unpublished events
+        Index(
+            "idx_outbox_unpublished", "published_at", postgresql_where=text("published_at IS NULL")
+        ),
+        Index("idx_outbox_created", "created_at"),
+        Index("idx_outbox_aggregate", "aggregate_id", "aggregate_type"),
+    )

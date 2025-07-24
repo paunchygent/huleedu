@@ -199,6 +199,26 @@ class EventPublisher(Protocol):
         """Publish ELSBatchPhaseOutcomeV1 event when batch phase is complete."""
         ...
 
+    async def publish_to_outbox(
+        self,
+        aggregate_type: str,
+        aggregate_id: str,
+        event_type: str,
+        event_data: Any,  # EventEnvelope[Any]
+        topic: str,
+    ) -> None:
+        """
+        Store event in outbox for reliable delivery.
+
+        Args:
+            aggregate_type: Type of aggregate (e.g., "essay", "batch")
+            aggregate_id: ID of the aggregate that produced the event
+            event_type: Type of event being published
+            event_data: Complete event envelope to publish
+            topic: Kafka topic to publish to
+        """
+        ...
+
 
 class BatchCommandHandler(Protocol):
     """Protocol for handling batch processing commands from Batch Service."""
@@ -289,6 +309,125 @@ class ServiceResultHandler(Protocol):
         correlation_id: UUID,
     ) -> bool:
         """Handle CJ assessment failure from CJ Assessment Service."""
+        ...
+
+
+class OutboxEvent(Protocol):
+    """Protocol for outbox event data model."""
+
+    id: UUID
+    aggregate_id: str
+    aggregate_type: str
+    event_type: str
+    event_data: dict[str, Any]
+    event_key: str | None
+    created_at: Any  # datetime
+    published_at: Any | None  # datetime
+    retry_count: int
+    last_error: str | None
+
+
+class OutboxRepositoryProtocol(Protocol):
+    """
+    Protocol for event outbox persistence operations.
+
+    Implements the Transactional Outbox Pattern for reliable event publishing,
+    decoupling business operations from Kafka availability.
+    """
+
+    async def add_event(
+        self,
+        aggregate_id: str,
+        aggregate_type: str,
+        event_type: str,
+        event_data: dict[str, Any],
+        event_key: str | None = None,
+    ) -> UUID:
+        """
+        Add event to outbox within current transaction.
+
+        Args:
+            aggregate_id: ID of the aggregate that produced the event
+            aggregate_type: Type of aggregate (e.g., "essay", "batch")
+            event_type: Full event type name (e.g., "huleedu.els.essay.slot.assigned.v1")
+            event_data: Serialized event envelope data
+            event_key: Optional Kafka partition key
+
+        Returns:
+            UUID of the created outbox entry
+        """
+        ...
+
+    async def get_unpublished_events(self, limit: int = 100) -> list[OutboxEvent]:
+        """
+        Retrieve unpublished events for relay.
+
+        Args:
+            limit: Maximum number of events to retrieve
+
+        Returns:
+            List of unpublished events ordered by creation time
+        """
+        ...
+
+    async def mark_published(self, event_id: UUID) -> None:
+        """
+        Mark event as successfully published.
+
+        Args:
+            event_id: ID of the outbox event to mark as published
+        """
+        ...
+
+    async def record_error(self, event_id: UUID, error_message: str) -> None:
+        """
+        Record publishing error and increment retry count.
+
+        Args:
+            event_id: ID of the outbox event that failed
+            error_message: Error details for debugging
+        """
+        ...
+
+    async def get_event_by_id(self, event_id: UUID) -> OutboxEvent | None:
+        """
+        Retrieve specific outbox event by ID.
+
+        Args:
+            event_id: ID of the outbox event
+
+        Returns:
+            Outbox event or None if not found
+        """
+        ...
+
+    async def mark_event_failed(self, event_id: UUID, error: str) -> None:
+        """
+        Mark an event as permanently failed after exceeding max retries.
+
+        Args:
+            event_id: ID of the outbox event
+            error: Final error message
+        """
+        ...
+
+    async def mark_event_published(self, event_id: UUID) -> None:
+        """
+        Mark an event as successfully published.
+
+        Args:
+            event_id: ID of the outbox event
+        """
+        ...
+
+    async def increment_retry_count(self, event_id: UUID, error: str) -> None:
+        """
+        Increment retry count and record error for a failed event.
+
+        Args:
+            event_id: ID of the outbox event
+            error: Error message from the failed attempt
+        """
         ...
 
 

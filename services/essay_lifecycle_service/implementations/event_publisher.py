@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
     from services.essay_lifecycle_service.config import Settings
+    from services.essay_lifecycle_service.protocols import OutboxRepositoryProtocol
 
 from huleedu_service_libs.error_handling import (
     raise_external_service_error,
@@ -37,11 +38,13 @@ class DefaultEventPublisher(EventPublisher):
         settings: Settings,
         redis_client: AtomicRedisClientProtocol,
         batch_tracker: BatchEssayTracker,
+        outbox_repository: OutboxRepositoryProtocol,
     ) -> None:
         self.kafka_bus = kafka_bus
         self.settings = settings
         self.redis_client = redis_client
         self.batch_tracker = batch_tracker
+        self.outbox_repository = outbox_repository
 
     async def publish_status_update(
         self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID
@@ -80,10 +83,16 @@ class DefaultEventPublisher(EventPublisher):
                 envelope.metadata = {}
             inject_trace_context(envelope.metadata)
 
-        # Publish to Kafka using KafkaBus.publish()
+        # Publish to outbox for reliable delivery
         try:
             topic = "essay.status.events"
-            await self.kafka_bus.publish(topic, envelope)
+            await self.publish_to_outbox(
+                aggregate_type="essay",
+                aggregate_id=str(essay_ref.entity_id),
+                event_type="essay.status.updated.v1",
+                event_data=envelope,
+                topic=topic,
+            )
         except Exception as e:
             # Re-raise HuleEduError as-is, or wrap other exceptions
             if hasattr(e, "error_detail"):
@@ -92,7 +101,7 @@ class DefaultEventPublisher(EventPublisher):
                 raise_kafka_publish_error(
                     service="essay_lifecycle_service",
                     operation="publish_status_update",
-                    message=f"Failed to publish essay status update to Kafka: {e.__class__.__name__}",
+                    message=f"Failed to publish essay status update to outbox: {e.__class__.__name__}",
                     correlation_id=correlation_id,
                     topic=topic,
                     essay_id=essay_ref.entity_id,
@@ -212,10 +221,16 @@ class DefaultEventPublisher(EventPublisher):
                 envelope.metadata = {}
             inject_trace_context(envelope.metadata)
 
-        # Publish to Batch Service topic
+        # Publish to outbox for reliable delivery
         try:
             topic = "batch.phase.progress.events"
-            await self.kafka_bus.publish(topic, envelope)
+            await self.publish_to_outbox(
+                aggregate_type="batch",
+                aggregate_id=batch_id,
+                event_type="huleedu.els.batch_phase.progress.v1",
+                event_data=envelope,
+                topic=topic,
+            )
         except Exception as e:
             # Re-raise HuleEduError as-is, or wrap other exceptions
             if hasattr(e, "error_detail"):
@@ -224,7 +239,7 @@ class DefaultEventPublisher(EventPublisher):
                 raise_kafka_publish_error(
                     service="essay_lifecycle_service",
                     operation="publish_batch_phase_progress",
-                    message=f"Failed to publish batch phase progress to Kafka: {e.__class__.__name__}",
+                    message=f"Failed to publish batch phase progress to outbox: {e.__class__.__name__}",
                     correlation_id=correlation_id,
                     topic=topic,
                     batch_id=batch_id,
@@ -279,10 +294,16 @@ class DefaultEventPublisher(EventPublisher):
                 envelope.metadata = {}
             inject_trace_context(envelope.metadata)
 
-        # Publish to Batch Service topic
+        # Publish to outbox for reliable delivery
         try:
             topic = "batch.phase.concluded.events"
-            await self.kafka_bus.publish(topic, envelope)
+            await self.publish_to_outbox(
+                aggregate_type="batch",
+                aggregate_id=batch_id,
+                event_type="huleedu.els.batch_phase.concluded.v1",
+                event_data=envelope,
+                topic=topic,
+            )
         except Exception as e:
             # Re-raise HuleEduError as-is, or wrap other exceptions
             if hasattr(e, "error_detail"):
@@ -291,7 +312,7 @@ class DefaultEventPublisher(EventPublisher):
                 raise_kafka_publish_error(
                     service="essay_lifecycle_service",
                     operation="publish_batch_phase_concluded",
-                    message=f"Failed to publish batch phase conclusion to Kafka: {e.__class__.__name__}",
+                    message=f"Failed to publish batch phase conclusion to outbox: {e.__class__.__name__}",
                     correlation_id=correlation_id,
                     topic=topic,
                     batch_id=batch_id,
@@ -339,10 +360,16 @@ class DefaultEventPublisher(EventPublisher):
                 envelope.metadata = {}
             inject_trace_context(envelope.metadata)
 
-        # Publish to the correct topic
+        # Publish to outbox for reliable delivery
         try:
             topic = topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
-            await self.kafka_bus.publish(topic, envelope)
+            await self.publish_to_outbox(
+                aggregate_type="batch",
+                aggregate_id=getattr(event_data, "batch_id", "unknown"),
+                event_type="huleedu.els.excess.content.provisioned.v1",
+                event_data=envelope,
+                topic=topic,
+            )
         except Exception as e:
             # Re-raise HuleEduError as-is, or wrap other exceptions
             if hasattr(e, "error_detail"):
@@ -351,7 +378,7 @@ class DefaultEventPublisher(EventPublisher):
                 raise_kafka_publish_error(
                     service="essay_lifecycle_service",
                     operation="publish_excess_content_provisioned",
-                    message=f"Failed to publish excess content provisioned event to Kafka: {e.__class__.__name__}",
+                    message=f"Failed to publish excess content provisioned event to outbox: {e.__class__.__name__}",
                     correlation_id=correlation_id,
                     topic=topic,
                     batch_id=getattr(event_data, "batch_id", "unknown"),
@@ -387,10 +414,16 @@ class DefaultEventPublisher(EventPublisher):
                 envelope.metadata = {}
             inject_trace_context(envelope.metadata)
 
-        # Publish to the correct topic
+        # Publish to outbox for reliable delivery
         try:
             topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
-            await self.kafka_bus.publish(topic, envelope)
+            await self.publish_to_outbox(
+                aggregate_type="batch",
+                aggregate_id=getattr(event_data, "batch_id", "unknown"),
+                event_type="huleedu.els.batch.essays.ready.v1",
+                event_data=envelope,
+                topic=topic,
+            )
         except Exception as e:
             # Re-raise HuleEduError as-is, or wrap other exceptions
             if hasattr(e, "error_detail"):
@@ -399,7 +432,7 @@ class DefaultEventPublisher(EventPublisher):
                 raise_kafka_publish_error(
                     service="essay_lifecycle_service",
                     operation="publish_batch_essays_ready",
-                    message=f"Failed to publish batch essays ready event to Kafka: {e.__class__.__name__}",
+                    message=f"Failed to publish batch essays ready event to outbox: {e.__class__.__name__}",
                     correlation_id=correlation_id,
                     topic=topic,
                     batch_id=getattr(event_data, "batch_id", "unknown"),
@@ -432,12 +465,18 @@ class DefaultEventPublisher(EventPublisher):
         if envelope.metadata is not None:
             inject_trace_context(envelope.metadata)
 
-        # Publish to Kafka using the essay slot assigned topic
+        # Publish to outbox for reliable delivery
         topic = topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED)
         try:
-            await self.kafka_bus.publish(topic=topic, envelope=envelope)
+            await self.publish_to_outbox(
+                aggregate_type="essay",
+                aggregate_id=getattr(event_data, "essay_id", "unknown"),
+                event_type="huleedu.els.essay.slot.assigned.v1",
+                event_data=envelope,
+                topic=topic,
+            )
             logger.info(
-                "Published EssaySlotAssignedV1 event to Kafka",
+                "Published EssaySlotAssignedV1 event to outbox",
                 extra={
                     "batch_id": getattr(event_data, "batch_id", "unknown"),
                     "essay_id": getattr(event_data, "essay_id", "unknown"),
@@ -458,7 +497,7 @@ class DefaultEventPublisher(EventPublisher):
                 raise_kafka_publish_error(
                     service="essay_lifecycle_service",
                     operation="publish_essay_slot_assigned",
-                    message=f"Failed to publish essay slot assigned event to Kafka: {e.__class__.__name__}",
+                    message=f"Failed to publish essay slot assigned event to outbox: {e.__class__.__name__}",
                     correlation_id=correlation_id,
                     topic=topic,
                     batch_id=getattr(event_data, "batch_id", "unknown"),
@@ -495,10 +534,16 @@ class DefaultEventPublisher(EventPublisher):
                 envelope.metadata = {}
             inject_trace_context(envelope.metadata)
 
-        # Publish to the correct topic
+        # Publish to outbox for reliable delivery
         try:
             topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
-            await self.kafka_bus.publish(topic, envelope)
+            await self.publish_to_outbox(
+                aggregate_type="batch",
+                aggregate_id=getattr(event_data, "batch_id", "unknown"),
+                event_type="huleedu.els.batch.phase.outcome.v1",
+                event_data=envelope,
+                topic=topic,
+            )
         except Exception as e:
             # Re-raise HuleEduError as-is, or wrap other exceptions
             if hasattr(e, "error_detail"):
@@ -507,12 +552,108 @@ class DefaultEventPublisher(EventPublisher):
                 raise_kafka_publish_error(
                     service="essay_lifecycle_service",
                     operation="publish_els_batch_phase_outcome",
-                    message=f"Failed to publish ELS batch phase outcome event to Kafka: {e.__class__.__name__}",
+                    message=f"Failed to publish ELS batch phase outcome event to outbox: {e.__class__.__name__}",
                     correlation_id=correlation_id,
                     topic=topic,
                     batch_id=getattr(event_data, "batch_id", "unknown"),
                     phase=getattr(event_data, "phase", "unknown"),
                     outcome=getattr(event_data, "outcome", "unknown"),
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
+
+    async def publish_to_outbox(
+        self,
+        aggregate_type: str,
+        aggregate_id: str,
+        event_type: str,
+        event_data: Any,  # EventEnvelope[Any]
+        topic: str,
+    ) -> None:
+        """
+        Store event in outbox for reliable delivery.
+
+        This implements the Transactional Outbox Pattern, decoupling business
+        operations from Kafka availability. Events are stored in the database
+        and published asynchronously by the relay worker.
+
+        Args:
+            aggregate_type: Type of aggregate (e.g., "essay", "batch")
+            aggregate_id: ID of the aggregate that produced the event
+            event_type: Type of event being published
+            event_data: Complete event envelope to publish
+            topic: Kafka topic to publish to
+
+        Raises:
+            HuleEduError: If outbox repository is not configured
+            DatabaseError: If storing to outbox fails
+        """
+        if not self.outbox_repository:
+            raise_external_service_error(
+                service="essay_lifecycle_service",
+                operation="publish_to_outbox",
+                external_service="outbox_repository",
+                message="Outbox repository not configured for transactional publishing",
+                correlation_id=event_data.correlation_id
+                if hasattr(event_data, "correlation_id")
+                else UUID("00000000-0000-0000-0000-000000000000"),
+                aggregate_id=aggregate_id,
+                event_type=event_type,
+            )
+
+        try:
+            # Serialize the envelope to JSON for storage
+            # Using model_dump(mode="json") to handle UUID and datetime serialization
+            serialized_data = event_data.model_dump(mode="json")
+
+            # Add topic to the event data for relay worker
+            serialized_data["topic"] = topic
+
+            # Determine Kafka key from envelope metadata or aggregate ID
+            event_key = None
+            if hasattr(event_data, "metadata") and event_data.metadata:
+                event_key = event_data.metadata.get("partition_key", aggregate_id)
+            else:
+                event_key = aggregate_id
+
+            # Store in outbox
+            outbox_id = await self.outbox_repository.add_event(
+                aggregate_id=aggregate_id,
+                aggregate_type=aggregate_type,
+                event_type=event_type,
+                event_data=serialized_data,
+                event_key=event_key,
+            )
+
+            logger.info(
+                "Event stored in outbox for reliable delivery",
+                extra={
+                    "outbox_id": str(outbox_id),
+                    "event_type": event_type,
+                    "aggregate_id": aggregate_id,
+                    "aggregate_type": aggregate_type,
+                    "topic": topic,
+                    "correlation_id": str(event_data.correlation_id)
+                    if hasattr(event_data, "correlation_id")
+                    else None,
+                },
+            )
+
+        except Exception as e:
+            # Re-raise HuleEduError as-is, wrap others
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_external_service_error(
+                    service="essay_lifecycle_service",
+                    operation="publish_to_outbox",
+                    external_service="outbox_repository",
+                    message=f"Failed to store event in outbox: {e.__class__.__name__}",
+                    correlation_id=event_data.correlation_id
+                    if hasattr(event_data, "correlation_id")
+                    else UUID("00000000-0000-0000-0000-000000000000"),
+                    aggregate_id=aggregate_id,
+                    event_type=event_type,
                     error_type=e.__class__.__name__,
                     error_details=str(e),
                 )

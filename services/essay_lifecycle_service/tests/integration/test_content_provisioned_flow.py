@@ -97,10 +97,16 @@ class TestContentProvisionedFlow:
             mock_kafka_bus = AsyncMock()
             published_events = []
 
-            async def capture_event(topic: str, value: bytes, **kwargs: Any) -> None:
-                published_events.append({"topic": topic, "value": value})
+            async def capture_event(topic: str, envelope: Any, key: str | None = None) -> None:
+                # Serialize envelope to match actual Kafka publishing
+                import json
 
-            mock_kafka_bus.send_and_wait.side_effect = capture_event
+                serialized = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
+                published_events.append(
+                    {"topic": topic, "envelope": envelope, "serialized": serialized, "key": key}
+                )
+
+            mock_kafka_bus.publish.side_effect = capture_event
 
             event_publisher = DefaultEventPublisher(
                 kafka_bus=mock_kafka_bus,
@@ -200,17 +206,15 @@ class TestContentProvisionedFlow:
         slot_assigned_event = None
         for event in published_events:
             if "essay.slot.assigned" in event["topic"]:
-                import json
-
-                event_data = json.loads(event["value"])
-                if event_data["event_type"] == "EssaySlotAssignedV1":
-                    slot_assigned_event = event_data
+                envelope = event["envelope"]
+                if "essay.slot.assigned" in envelope.event_type:
+                    slot_assigned_event = envelope
                     break
 
         assert slot_assigned_event is not None, "EssaySlotAssignedV1 should be published"
-        assert slot_assigned_event["data"]["file_upload_id"] == file_upload_id
-        assert slot_assigned_event["data"]["essay_id"] == str(assigned_essay.internal_essay_id)
-        assert slot_assigned_event["data"]["text_storage_id"] == text_storage_id
+        assert slot_assigned_event.data.file_upload_id == file_upload_id
+        assert slot_assigned_event.data.essay_id == str(assigned_essay.essay_id)
+        assert slot_assigned_event.data.text_storage_id == text_storage_id
 
     async def test_concurrent_content_provisioning(
         self, test_infrastructure: dict[str, Any]
@@ -396,7 +400,7 @@ class TestContentProvisionedFlow:
         await handler.handle_batch_essays_registered(batch_event, correlation_id)
 
         # Configure Kafka to fail
-        mock_kafka_bus.send_and_wait.side_effect = Exception("Kafka unavailable")
+        mock_kafka_bus.publish.side_effect = Exception("Kafka unavailable")
 
         # Test: Try to provision content
         content_event = EssayContentProvisionedV1(
@@ -411,7 +415,10 @@ class TestContentProvisionedFlow:
         )
 
         # This reveals the architectural debt - if Kafka fails, the operation fails
-        with pytest.raises(Exception, match="Kafka unavailable"):
+        with pytest.raises(
+            Exception,
+            match=r"\[KAFKA_PUBLISH_ERROR\].*Failed to publish essay slot assigned event to Kafka",
+        ):
             await handler.handle_essay_content_provisioned(content_event, correlation_id)
 
         # This is the problem identified in the session context -

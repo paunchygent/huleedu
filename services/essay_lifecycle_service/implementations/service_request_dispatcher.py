@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
     from services.essay_lifecycle_service.config import Settings
+    from services.essay_lifecycle_service.protocols import OutboxRepositoryProtocol
 
 from common_core.domain_enums import CourseCode, Language
 from huleedu_service_libs.error_handling import (
@@ -31,9 +32,15 @@ from services.essay_lifecycle_service.protocols import SpecializedServiceRequest
 class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispatcher):
     """Default implementation of SpecializedServiceRequestDispatcher protocol."""
 
-    def __init__(self, kafka_bus: KafkaPublisherProtocol, settings: Settings) -> None:
+    def __init__(
+        self,
+        kafka_bus: KafkaPublisherProtocol,
+        settings: Settings,
+        outbox_repository: OutboxRepositoryProtocol,
+    ) -> None:
         self.kafka_bus = kafka_bus
         self.settings = settings
+        self.outbox_repository = outbox_repository
 
     async def dispatch_spellcheck_requests(
         self,
@@ -102,9 +109,18 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 if envelope.metadata is not None:
                     inject_trace_context(envelope.metadata)
 
-                # Publish to Spell Checker Service
+                # Publish to outbox for reliable delivery
                 topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
-                await self.kafka_bus.publish(topic, envelope)
+                # Serialize envelope for outbox storage
+                event_data = envelope.model_dump(mode="json")
+                event_data["topic"] = topic  # Add topic to event data for relay worker
+                await self.outbox_repository.add_event(
+                    aggregate_id=essay_ref.essay_id,
+                    aggregate_type="essay",
+                    event_type=envelope.event_type,
+                    event_data=event_data,
+                    event_key=essay_ref.essay_id,
+                )
 
                 logger.info(
                     f"Dispatched spellcheck request for essay {essay_ref.essay_id}",
@@ -125,7 +141,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                     raise_spellcheck_service_error(
                         service="essay_lifecycle_service",
                         operation="dispatch_spellcheck_requests",
-                        message=f"Failed to dispatch spellcheck request for essay {essay_ref.essay_id}: {e.__class__.__name__}",
+                        message=f"Failed to dispatch spellcheck request to outbox for essay {essay_ref.essay_id}: {e.__class__.__name__}",
                         correlation_id=correlation_id,
                         essay_id=essay_ref.essay_id,
                         text_storage_id=essay_ref.text_storage_id,
@@ -239,9 +255,18 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
             if envelope.metadata is not None:
                 inject_trace_context(envelope.metadata)
 
-            # Publish to CJ Assessment Service
+            # Publish to outbox for reliable delivery
             topic = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
-            await self.kafka_bus.publish(topic, envelope)
+            # For batch-level events, use batch_id as aggregate
+            event_data = envelope.model_dump(mode="json")
+            event_data["topic"] = topic  # Add topic to event data for relay worker
+            await self.outbox_repository.add_event(
+                aggregate_id=batch_id,
+                aggregate_type="batch",
+                event_type=envelope.event_type,
+                event_data=event_data,
+                event_key=batch_id,
+            )
 
             logger.info(
                 "Successfully dispatched CJ assessment request",
@@ -263,7 +288,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 raise_cj_assessment_service_error(
                     service="essay_lifecycle_service",
                     operation="dispatch_cj_assessment_requests",
-                    message=f"Failed to dispatch CJ assessment request: {e.__class__.__name__}",
+                    message=f"Failed to dispatch CJ assessment request to outbox: {e.__class__.__name__}",
                     correlation_id=correlation_id,
                     batch_id=batch_id,
                     essay_count=len(essays_to_process),

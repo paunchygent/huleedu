@@ -34,6 +34,7 @@ from services.essay_lifecycle_service.di import (
     CoreInfrastructureProvider,
     ServiceClientsProvider,
 )
+from services.essay_lifecycle_service.implementations.event_relay_worker import EventRelayWorker
 from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
     BatchCoordinationHandler,
@@ -229,6 +230,7 @@ async def main() -> None:
     )
 
     consumer = None
+    event_relay_worker = None
     try:
         async with container() as request_container:
             # Get dependencies from DI container
@@ -237,8 +239,13 @@ async def main() -> None:
             service_result_handler = await request_container.get(ServiceResultHandler)
             redis_client = await request_container.get(AtomicRedisClientProtocol)
             tracer = await request_container.get(Tracer)
+            event_relay_worker = await request_container.get(EventRelayWorker)
 
             logger.info("Dependencies injected successfully")
+
+            # Start event relay worker for outbox pattern
+            await event_relay_worker.start()
+            logger.info("Event relay worker started for outbox pattern")
 
             # Create and start Kafka consumer
             consumer = await create_kafka_consumer()
@@ -259,6 +266,14 @@ async def main() -> None:
         logger.error(f"Worker failed: {e}")
         sys.exit(1)
     finally:
+        # Stop event relay worker first
+        if event_relay_worker:
+            try:
+                await event_relay_worker.stop()
+                logger.info("Event relay worker stopped")
+            except Exception as e:
+                logger.error(f"Error stopping event relay worker: {e}")
+
         if consumer:
             try:
                 await consumer.stop()

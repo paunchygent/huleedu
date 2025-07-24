@@ -97,6 +97,20 @@ class Settings(BaseSettings):
         default=5, description="Maximum retries for Redis transaction operations"
     )
 
+    # Outbox Pattern Configuration
+    OUTBOX_POLL_INTERVAL_SECONDS: float = Field(
+        default=1.0, description="Interval in seconds between outbox polling cycles"
+    )
+    OUTBOX_BATCH_SIZE: int = Field(
+        default=100, description="Maximum number of events to process per polling cycle"
+    )
+    OUTBOX_MAX_RETRIES: int = Field(
+        default=5, description="Maximum retry attempts for failed event publishing"
+    )
+    OUTBOX_ERROR_RETRY_INTERVAL_SECONDS: float = Field(
+        default=5.0, description="Interval in seconds to wait after polling errors"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
