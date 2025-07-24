@@ -110,6 +110,7 @@ class TestCoreLogicValidationSuccess:
         event_data = success_event_call[0][0]
         assert isinstance(event_data, EssayContentProvisionedV1)
         assert event_data.batch_id == batch_id
+        assert event_data.file_upload_id == file_upload_id
         assert event_data.original_file_name == file_name
         assert event_data.raw_file_storage_id == "raw_storage_id_12345"  # Raw storage ID
         assert event_data.text_storage_id == "text_storage_id_67890"  # Text storage ID
@@ -176,5 +177,6 @@ class TestCoreLogicValidationSuccess:
         passed_correlation_id = success_call[0][1]
         assert event_data.correlation_id == correlation_id
         assert passed_correlation_id == correlation_id
+        assert event_data.file_upload_id == file_upload_id
         assert event_data.raw_file_storage_id == "raw_storage_correlation_111"
         assert event_data.text_storage_id == "text_storage_correlation_222"

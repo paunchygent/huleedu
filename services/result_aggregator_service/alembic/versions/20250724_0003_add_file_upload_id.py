@@ -26,7 +26,7 @@ def upgrade() -> None:
         "essay_results",
         sa.Column("file_upload_id", sa.String(255), nullable=True),
     )
-    
+
     # Create index for efficient lookups by file_upload_id
     op.create_index(
         "idx_essay_file_upload",
@@ -40,6 +40,6 @@ def downgrade() -> None:
     """Remove file_upload_id column and its index."""
     # Drop index first
     op.drop_index("idx_essay_file_upload", table_name="essay_results")
-    
+
     # Drop column
     op.drop_column("essay_results", "file_upload_id")

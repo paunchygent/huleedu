@@ -113,7 +113,7 @@ async def _publish_essay_slot_assigned_to_redis(
         )
 ```
 
-### Phase 2: Client Integration
+### Client Integration
 
 Frontend clients need to handle the new event type:
 
@@ -143,7 +143,7 @@ function handleSlotAssignment(data: SlotAssignmentData) {
 }
 ```
 
-### Phase 3: Enhanced RAS API Response
+### Enhanced RAS API Response
 
 With RAS now tracking `file_upload_id`, the complete flow is:
 
@@ -210,23 +210,6 @@ async def test_essay_slot_assigned_redis_publishing():
 - Test missing user_id handling
 - Validate notification payload structure
 
-## Rollout Plan
-
-### Stage 1: Dark Launch (Week 1)
-- Deploy Redis publishing code (disabled by feature flag)
-- Monitor Redis performance impact
-- No client changes
-
-### Stage 2: Internal Testing (Week 2)
-- Enable for internal test users
-- Validate notification delivery
-- Gather feedback on payload structure
-
-### Stage 3: Progressive Rollout (Week 3-4)
-- Enable for 10% → 50% → 100% of users
-- Monitor Redis pub/sub metrics
-- Address any issues
-
 ## Monitoring & Metrics
 
 ### Key Metrics
@@ -240,20 +223,6 @@ async def test_essay_slot_assigned_redis_publishing():
 - Redis pub/sub performance
 - Per-user notification volume
 - Error rates by event type
-
-## Future Enhancements
-
-1. **Batch Progress Notifications**
-   - Real-time updates as essays complete processing
-   - Progress bar updates in UI
-
-2. **Error Notifications**
-   - Immediate notification of validation failures
-   - Allow quick remediation
-
-3. **Completion Notifications**
-   - Notify when entire batch processing completes
-   - Include summary statistics
 
 ## Conclusion
 

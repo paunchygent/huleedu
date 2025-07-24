@@ -13,17 +13,15 @@ Uses testcontainers for isolated testing environment.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import Any, AsyncIterator
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from typing import Any
+from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import ContentType, CourseCode
-from common_core.event_enums import ProcessingEvent, topic_name
-from common_core.events import EventEnvelope
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
-from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
 from common_core.events.file_events import EssayContentProvisionedV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
@@ -196,7 +194,7 @@ class TestContentProvisionedFlow:
 
         # Verify event published
         assert len(published_events) > 0, "Should publish events"
-        
+
         # Find the EssaySlotAssignedV1 event
         slot_assigned_event = None
         for event in published_events:
@@ -346,7 +344,7 @@ class TestContentProvisionedFlow:
         # Second provision (idempotent)
         success2 = await handler.handle_essay_content_provisioned(content_event, correlation_id)
         assert success2, "Second provision should succeed (idempotent)"
-        
+
         # Should publish same number of events (idempotent)
         assert len(published_events) == events_after_first * 2, "Should publish events for both calls"
 

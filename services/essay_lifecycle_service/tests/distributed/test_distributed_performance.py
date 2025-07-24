@@ -269,7 +269,13 @@ class MockEventPublisher(EventPublisher):
         assert hasattr(event_data, "essay_id"), "EssaySlotAssignedV1 must have essay_id"
         assert hasattr(event_data, "file_upload_id"), "EssaySlotAssignedV1 must have file_upload_id"
         assert hasattr(event_data, "text_storage_id"), "EssaySlotAssignedV1 must have text_storage_id"
-        
+
+        # Validate field values
+        assert event_data.batch_id, "batch_id must not be empty"
+        assert event_data.essay_id, "essay_id must not be empty"
+        assert event_data.file_upload_id, "file_upload_id must not be empty"
+        assert event_data.text_storage_id, "text_storage_id must not be empty"
+
         async with self.lock:
             self.event_count += 1
 

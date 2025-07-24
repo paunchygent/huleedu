@@ -14,7 +14,6 @@ from uuid import UUID
 
 from common_core.domain_enums import get_course_language
 from common_core.error_enums import ErrorCode, FileValidationErrorCode
-from common_core.models.error_models import ErrorDetail
 from common_core.events.batch_coordination_events import (
     BatchEssaysReady,
     BatchEssaysRegistered,
@@ -25,6 +24,7 @@ from common_core.metadata_models import (
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
+from common_core.models.error_models import ErrorDetail
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.error_handling.error_detail_factory import (
     create_error_detail_with_context,

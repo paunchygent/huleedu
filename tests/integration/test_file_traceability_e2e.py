@@ -13,18 +13,15 @@ Tests the implementation of the File Service Client Traceability feature:
 
 from __future__ import annotations
 
-import asyncio
-import json
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from common_core.domain_enums import ContentType, CourseCode
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import EventEnvelope
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
-from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
 from common_core.events.file_events import EssayContentProvisionedV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -292,10 +289,10 @@ class TestFileTraceabilityE2E:
                 data = assignment["data"]
                 file_upload_id = data["file_upload_id"]
                 essay_id = data["essay_id"]
-                
+
                 assert file_upload_id in file_upload_ids, f"Unknown file_upload_id: {file_upload_id}"
                 assert essay_id in essay_ids, f"Essay ID not from pre-generated set: {essay_id}"
-                
+
                 # Ensure no duplicate mappings
                 assert file_upload_id not in file_to_essay_mapping, f"Duplicate mapping for {file_upload_id}"
                 file_to_essay_mapping[file_upload_id] = essay_id

@@ -219,7 +219,7 @@ class ResultAggregatorKafkaConsumer:
             elif record.topic == topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED):
                 # Import here to avoid circular imports
                 from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
-                
+
                 slot_envelope = EventEnvelope[EssaySlotAssignedV1].model_validate_json(
                     message_value_str
                 )

@@ -106,7 +106,7 @@ class EventProcessorImpl(EventProcessorProtocol):
 
             # Invalidate cache to ensure fresh data includes file_upload_id
             await self.state_store.invalidate_batch(data.batch_id)
-            
+
             # Get batch to find user_id for cache invalidation
             batch = await self.batch_repository.get_batch(data.batch_id)
             if batch:

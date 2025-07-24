@@ -1,69 +1,44 @@
-# WebSocket Frontend Migration Guide
+# WebSocket Frontend Integration Guide
 
 ## Overview
 
-This guide explains how to migrate your frontend application from the old WebSocket implementation in the API Gateway to the new dedicated WebSocket service.
+This guide explains how to integrate your frontend application with the WebSocket service for real-time notifications.
 
-## Key Changes
+## WebSocket Service Details
 
-### 1. Endpoint URL Change
+### 1. Endpoint URL
 
-**Old Endpoint:**
-```
-ws://api-gateway:8080/ws/v1/status/{client_id}
-```
+**WebSocket Endpoint:**
 
-**New Endpoint:**
 ```
 ws://websocket-service:8081/ws?token={jwt_token}
 ```
 
-**Production URLs:**
+**Environment URLs:**
+
 - Development: `ws://localhost:8081/ws?token={jwt_token}`
 - Production: `wss://your-domain.com/websocket/ws?token={jwt_token}`
 
-### 2. Authentication Method Change
+### 2. Authentication Method
 
-**Old Method:** JWT token in Authorization header (during HTTP upgrade)
-```javascript
-// Old approach - NOT SUPPORTED by most WebSocket clients
-const ws = new WebSocket('ws://api-gateway:8080/ws/v1/status/user123', {
-  headers: {
-    'Authorization': `Bearer ${jwtToken}`
-  }
-});
-```
+JWT token must be passed as a query parameter:
 
-**New Method:** JWT token as query parameter
 ```javascript
-// New approach - Universal WebSocket client support
+// Universal WebSocket client support
 const ws = new WebSocket(`ws://websocket-service:8081/ws?token=${jwtToken}`);
 ```
 
-### 3. Client ID Handling
+### 3. User ID Handling
 
-**Old:** Client ID was part of the URL path and validated against JWT
-**New:** User ID is extracted directly from JWT token, no need to pass separately
+User ID is extracted directly from the JWT token - no need to pass it separately in the URL.
 
-## Migration Steps
+## Integration Steps
 
-### Step 1: Update WebSocket Connection Code
+### Step 1: Create WebSocket Connection
 
-Replace your existing WebSocket connection code:
+Implement the WebSocket connection function:
 
 ```javascript
-// OLD CODE
-function connectWebSocket(userId, jwtToken) {
-  const ws = new WebSocket(`ws://api-gateway:8080/ws/v1/status/${userId}`, {
-    headers: {
-      'Authorization': `Bearer ${jwtToken}`
-    }
-  });
-  
-  return ws;
-}
-
-// NEW CODE
 function connectWebSocket(jwtToken) {
   const ws = new WebSocket(`ws://websocket-service:8081/ws?token=${jwtToken}`);
   
@@ -71,17 +46,11 @@ function connectWebSocket(jwtToken) {
 }
 ```
 
-### Step 2: Update Environment Configuration
+### Step 2: Configure Environment Variables
 
-Update your environment variables or configuration files:
+Set up your environment configuration:
 
 ```javascript
-// OLD CONFIG
-const config = {
-  wsEndpoint: process.env.API_GATEWAY_WS_URL || 'ws://localhost:8080/ws/v1/status'
-};
-
-// NEW CONFIG
 const config = {
   wsEndpoint: process.env.WEBSOCKET_SERVICE_URL || 'ws://localhost:8081/ws'
 };
@@ -89,7 +58,7 @@ const config = {
 
 ### Step 3: Handle Connection Errors
 
-The new service uses standard WebSocket close codes:
+The service uses standard WebSocket close codes:
 
 ```javascript
 ws.onclose = (event) => {
@@ -112,9 +81,9 @@ ws.onclose = (event) => {
 };
 ```
 
-## Complete Migration Example
+## Complete Integration Example
 
-Here's a complete example of a migrated WebSocket client:
+Here's a complete example of a WebSocket client implementation:
 
 ```javascript
 class WebSocketClient {
@@ -217,9 +186,10 @@ The message format remains unchanged. Messages are still JSON-encoded strings:
 }
 ```
 
-## Testing the Migration
+## Testing the Integration
 
 1. **Test Authentication:**
+
    ```javascript
    // Test with valid token
    const ws1 = new WebSocket(`ws://localhost:8081/ws?token=${validToken}`);
@@ -233,6 +203,7 @@ The message format remains unchanged. Messages are still JSON-encoded strings:
 
 2. **Test Message Reception:**
    - Use Redis CLI to publish test messages:
+
    ```bash
    redis-cli
    > PUBLISH ws:user123 '{"event_type":"test","data":{"message":"Hello"}}'
@@ -242,24 +213,11 @@ The message format remains unchanged. Messages are still JSON-encoded strings:
    - Open multiple connections with the same token
    - Verify that old connections are closed when limit is exceeded
 
-## Rollback Plan
-
-If issues arise during migration:
-
-1. The old WebSocket endpoint has been removed from API Gateway
-2. To rollback, you would need to redeploy the previous version of API Gateway
-3. Recommended: Fix forward with the new WebSocket service
-
 ## Support
 
 For issues or questions:
+
 - Check WebSocket service logs: `docker logs huleedu_websocket_service`
 - Verify JWT token validity
 - Ensure Redis is accessible
 - Check service health: `curl http://localhost:8081/healthz`
-
-## Timeline
-
-- Old endpoint removed: 2025-07-18
-- New endpoint available: 2025-07-18
-- Frontend migration deadline: [To be determined by frontend team]

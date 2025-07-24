@@ -372,7 +372,7 @@ class TestBatchCoordinationBusinessImpact:
         # Verify content assignment happened before publishing failure
         mock_batch_tracker.assign_slot_to_content.assert_called_once()
         mock_repository.create_essay_state_with_content_idempotency.assert_called_once()
-        
+
         # NOTE: mark_slot_fulfilled is NOT called due to publishing failure in current architecture
         # TODO: ARCHITECTURAL DEBT - Business logic should be decoupled from event publishing
         # The coordination handler currently fails the entire operation when publishing fails,
