@@ -335,6 +335,8 @@ services:
         condition: service_completed_successfully
       content_service:
         condition: service_healthy
+      file_service_db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     networks:
@@ -350,6 +352,9 @@ services:
       - FILE_SERVICE_HOST=0.0.0.0
       - FILE_SERVICE_LOG_LEVEL=INFO
       - FILE_SERVICE_REDIS_URL=redis://redis:6379
+      - FILE_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@file_service_db:5432/file_service_db
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=file_service
       - OTEL_TRACES_EXPORTER=otlp

@@ -265,6 +265,7 @@ markers = [
     "e2e: marks tests as end-to-end pipeline tests",
     "functional: marks functional tests that verify cross-service behavior",
     "timeout: marks tests with specific timeout requirements",
+    "no_prometheus_clear: marks tests that should not have their Prometheus registry cleared",
 ]
 
 filterwarnings = [

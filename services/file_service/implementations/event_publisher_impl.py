@@ -8,6 +8,7 @@ from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
 from services.file_service.config import Settings
@@ -17,24 +18,26 @@ logger = create_service_logger("file_service.implementations.event_publisher")
 
 
 class DefaultEventPublisher(EventPublisherProtocol):
-    """Default implementation of EventPublisherProtocol with Kafka and Redis support."""
+    """Default implementation of EventPublisherProtocol with transactional outbox pattern."""
 
     def __init__(
         self,
         kafka_bus: KafkaPublisherProtocol,
         settings: Settings,
         redis_client: AtomicRedisClientProtocol,
+        outbox_repository: OutboxRepositoryProtocol,
     ):
         self.kafka_bus = kafka_bus
         self.settings = settings
         self.redis_client = redis_client
+        self.outbox_repository = outbox_repository
 
     async def publish_essay_content_provisioned(
         self,
         event_data: EssayContentProvisionedV1,
         correlation_id: uuid.UUID,
     ) -> None:
-        """Publish EssayContentProvisionedV1 event to Kafka."""
+        """Publish EssayContentProvisionedV1 event via transactional outbox."""
         try:
             # Construct EventEnvelope
             from huleedu_service_libs.observability import inject_trace_context
@@ -51,19 +54,23 @@ class DefaultEventPublisher(EventPublisherProtocol):
             if envelope.metadata is not None:
                 inject_trace_context(envelope.metadata)
 
-            # Publish to Kafka using KafkaBus
-            await self.kafka_bus.publish(
+            # Store event in outbox for reliable delivery
+            await self.outbox_repository.add_event(
+                aggregate_id=event_data.file_upload_id,
+                aggregate_type="file_upload",
+                event_type=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
+                event_data=envelope.model_dump(mode="json"),
                 topic=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
-                envelope=envelope,
+                event_key=event_data.file_upload_id,
             )
 
             logger.info(
-                f"Published EssayContentProvisionedV1 event for file: "
+                f"Stored EssayContentProvisionedV1 event in outbox for file: "
                 f"{event_data.original_file_name}",
             )
 
         except Exception as e:
-            logger.error(f"Error publishing EssayContentProvisionedV1 event: {e}")
+            logger.error(f"Error storing EssayContentProvisionedV1 event in outbox: {e}")
             raise
 
     async def publish_essay_validation_failed(
@@ -71,7 +78,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
         event_data: EssayValidationFailedV1,
         correlation_id: uuid.UUID,
     ) -> None:
-        """Publish EssayValidationFailedV1 event to Kafka."""
+        """Publish EssayValidationFailedV1 event via transactional outbox."""
         try:
             # Construct EventEnvelope
             from huleedu_service_libs.observability import inject_trace_context
@@ -88,19 +95,23 @@ class DefaultEventPublisher(EventPublisherProtocol):
             if envelope.metadata is not None:
                 inject_trace_context(envelope.metadata)
 
-            # Publish to Kafka using KafkaBus
-            await self.kafka_bus.publish(
+            # Store event in outbox for reliable delivery
+            await self.outbox_repository.add_event(
+                aggregate_id=event_data.file_upload_id,
+                aggregate_type="file_upload",
+                event_type=self.settings.ESSAY_VALIDATION_FAILED_TOPIC,
+                event_data=envelope.model_dump(mode="json"),
                 topic=self.settings.ESSAY_VALIDATION_FAILED_TOPIC,
-                envelope=envelope,
+                event_key=event_data.file_upload_id,
             )
 
             logger.info(
-                f"Published EssayValidationFailedV1 event for file: "
+                f"Stored EssayValidationFailedV1 event in outbox for file: "
                 f"{event_data.original_file_name}",
             )
 
         except Exception as e:
-            logger.error(f"Error publishing EssayValidationFailedV1 event: {e}")
+            logger.error(f"Error storing EssayValidationFailedV1 event in outbox: {e}")
             raise
 
     async def publish_batch_file_added_v1(
@@ -108,7 +119,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
         event_data: BatchFileAddedV1,
         correlation_id: uuid.UUID,
     ) -> None:
-        """Publish BatchFileAddedV1 event to both Kafka and Redis."""
+        """Publish BatchFileAddedV1 event via transactional outbox and Redis."""
         try:
             # Construct EventEnvelope
             from huleedu_service_libs.observability import inject_trace_context
@@ -125,18 +136,22 @@ class DefaultEventPublisher(EventPublisherProtocol):
             if envelope.metadata is not None:
                 inject_trace_context(envelope.metadata)
 
-            # Publish to Kafka using KafkaBus
-            await self.kafka_bus.publish(
+            # Store event in outbox for reliable delivery
+            await self.outbox_repository.add_event(
+                aggregate_id=event_data.batch_id,
+                aggregate_type="batch",
+                event_type=self.settings.BATCH_FILE_ADDED_TOPIC,
+                event_data=envelope.model_dump(mode="json"),
                 topic=self.settings.BATCH_FILE_ADDED_TOPIC,
-                envelope=envelope,
+                event_key=event_data.batch_id,
             )
 
             logger.info(
-                f"Published BatchFileAddedV1 event for batch {event_data.batch_id}, "
+                f"Stored BatchFileAddedV1 event in outbox for batch {event_data.batch_id}, "
                 f"file {event_data.file_upload_id}, filename: {event_data.filename}",
             )
 
-            # Publish to Redis for real-time updates
+            # Publish to Redis for real-time updates (maintained as-is)
             await self._publish_file_event_to_redis(
                 event_data.user_id,
                 "batch_file_added",
@@ -157,28 +172,39 @@ class DefaultEventPublisher(EventPublisherProtocol):
         event_data: BatchFileRemovedV1,
         correlation_id: uuid.UUID,
     ) -> None:
-        """Publish BatchFileRemovedV1 event to both Kafka and Redis."""
+        """Publish BatchFileRemovedV1 event via transactional outbox and Redis."""
         try:
             # Construct EventEnvelope
+            from huleedu_service_libs.observability import inject_trace_context
+
             envelope = EventEnvelope[BatchFileRemovedV1](
                 event_type=self.settings.BATCH_FILE_REMOVED_TOPIC,
                 source_service=self.settings.SERVICE_NAME,
                 correlation_id=correlation_id,
                 data=event_data,
+                metadata={},
             )
 
-            # Publish to Kafka using KafkaBus
-            await self.kafka_bus.publish(
+            # Inject current trace context into the envelope metadata
+            if envelope.metadata is not None:
+                inject_trace_context(envelope.metadata)
+
+            # Store event in outbox for reliable delivery
+            await self.outbox_repository.add_event(
+                aggregate_id=event_data.batch_id,
+                aggregate_type="batch",
+                event_type=self.settings.BATCH_FILE_REMOVED_TOPIC,
+                event_data=envelope.model_dump(mode="json"),
                 topic=self.settings.BATCH_FILE_REMOVED_TOPIC,
-                envelope=envelope,
+                event_key=event_data.batch_id,
             )
 
             logger.info(
-                f"Published BatchFileRemovedV1 event for batch {event_data.batch_id}, "
+                f"Stored BatchFileRemovedV1 event in outbox for batch {event_data.batch_id}, "
                 f"file {event_data.file_upload_id}, filename: {event_data.filename}",
             )
 
-            # Publish to Redis for real-time updates
+            # Publish to Redis for real-time updates (maintained as-is)
             await self._publish_file_event_to_redis(
                 event_data.user_id,
                 "batch_file_removed",

@@ -17,6 +17,9 @@ dependencies = [
     "prometheus-client",
     "dishka",
     "quart-dishka",
+    "alembic",
+    "asyncpg",
+    "sqlalchemy",
     "huleedu-common-core",
     "huleedu-service-libs",
 ]

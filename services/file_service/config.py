@@ -9,8 +9,12 @@ from __future__ import annotations
 
 from common_core.config_enums import Environment
 from common_core.event_enums import ProcessingEvent, topic_name
+from dotenv import find_dotenv, load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env file from repository root, regardless of current working directory
+load_dotenv(find_dotenv(".env"))
 
 
 class Settings(BaseSettings):
@@ -68,12 +72,57 @@ class Settings(BaseSettings):
         default=1000, description="Maximum size of fallback queue for failed Kafka messages"
     )
 
+    # Transactional Outbox Configuration
+    OUTBOX_POLL_INTERVAL_SECONDS: float = Field(
+        default=5.0, description="How often to poll for new outbox events"
+    )
+    OUTBOX_BATCH_SIZE: int = Field(
+        default=100, description="Maximum number of events to process per poll"
+    )
+    OUTBOX_MAX_RETRIES: int = Field(
+        default=5, description="Maximum retry attempts before marking event as failed"
+    )
+    OUTBOX_ERROR_RETRY_INTERVAL_SECONDS: float = Field(
+        default=30.0, description="How long to wait after an error"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
         env_prefix="FILE_SERVICE_",
     )
+
+    @property
+    def DATABASE_URL(self) -> str:
+        """Return the PostgreSQL database URL for both runtime and migrations.
+
+        Standardized PostgreSQL configuration following HuleEdu pattern.
+        Uses environment-specific connection details.
+        """
+        import os
+
+        # Check for environment variable first (Docker environment)
+        env_url = os.getenv("FILE_SERVICE_DATABASE_URL")
+        if env_url:
+            return env_url
+
+        # Fallback to local development configuration (loaded from .env via dotenv)
+        db_user = os.getenv("HULEEDU_DB_USER")
+        db_password = os.getenv("HULEEDU_DB_PASSWORD")
+
+        if not db_user or not db_password:
+            raise ValueError(
+                "Database credentials not found. Please set HULEEDU_DB_USER and HULEEDU_DB_PASSWORD in .env file"
+            )
+
+        # Use service-specific database name
+        db_name = "file_service_db"
+        db_host = os.getenv("HULEEDU_DB_HOST", "localhost")
+        db_port = os.getenv("HULEEDU_DB_PORT", "5439")  # File Service specific port
+
+        # Construct URL for asyncpg (alembic will handle sync conversion)
+        return f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
 
 # Create a single instance for the application to use

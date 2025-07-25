@@ -7,12 +7,14 @@ File Service dependencies to enable clean architecture and testability.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
 
 from common_core.domain_enums import ContentType
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
+from common_core.status_enums import ProcessingStatus
 
 
 class ContentServiceClientProtocol(Protocol):
@@ -186,5 +188,59 @@ class BatchStateValidatorProtocol(Protocol):
 
         Raises:
             HuleEduError: If batch status cannot be retrieved
+        """
+        ...
+
+
+class FileRepositoryProtocol(Protocol):
+    """
+    Protocol for File Service repository operations.
+    
+    Currently minimal as File Service is primarily stateless, but provides
+    extensibility for future features like file processing history tracking.
+    """
+
+    async def record_file_processing(
+        self,
+        file_upload_id: str,
+        batch_id: str,
+        file_name: str,
+        status: ProcessingStatus,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        Record file processing event (optional - for future use).
+        
+        Args:
+            file_upload_id: Unique identifier for the file upload
+            batch_id: Associated batch identifier
+            file_name: Original file name
+            status: Processing status
+            metadata: Optional metadata about the processing
+            
+        Note:
+            This is a placeholder for future functionality. File Service
+            currently operates statelessly but may need to track processing
+            history or metrics in the future.
+        """
+        ...
+
+    async def get_processing_history(
+        self,
+        batch_id: str,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """
+        Retrieve file processing history for a batch (optional - for future use).
+        
+        Args:
+            batch_id: Batch identifier to query
+            limit: Maximum number of records to return
+            
+        Returns:
+            List of processing history records
+            
+        Note:
+            This is a placeholder for future functionality.
         """
         ...

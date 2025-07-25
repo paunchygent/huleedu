@@ -10,10 +10,13 @@ from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.outbox import OutboxProvider, OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.relay import OutboxSettings
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from prometheus_client import REGISTRY, CollectorRegistry
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from services.file_service.config import Settings, settings
 from services.file_service.content_validator import FileContentValidator
@@ -22,6 +25,7 @@ from services.file_service.implementations.content_service_client_impl import (
     DefaultContentServiceClient,
 )
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
+from services.file_service.implementations.file_repository_impl import MinimalFileRepository
 from services.file_service.implementations.text_extractor_impl import DefaultTextExtractor
 from services.file_service.metrics import METRICS
 from services.file_service.protocols import (
@@ -29,6 +33,7 @@ from services.file_service.protocols import (
     ContentServiceClientProtocol,
     ContentValidatorProtocol,
     EventPublisherProtocol,
+    FileRepositoryProtocol,
     TextExtractorProtocol,
 )
 
@@ -70,6 +75,7 @@ class CoreInfrastructureProvider(Provider):
         circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> KafkaPublisherProtocol:
         """Provide Kafka bus for event publishing with optional circuit breaker protection."""
+        print("DEBUG: CoreInfrastructureProvider.provide_kafka_bus() called - using REAL Kafka!")
         # Create base KafkaBus instance
         base_kafka_bus = KafkaBus(
             client_id=f"{settings.SERVICE_NAME}-producer",
@@ -124,6 +130,34 @@ class CoreInfrastructureProvider(Provider):
 
         return redis_client
 
+    @provide(scope=Scope.APP)
+    async def provide_database_engine(self, settings: Settings) -> AsyncEngine:
+        """Provide async database engine for File Service."""
+        engine = create_async_engine(
+            settings.DATABASE_URL,
+            echo=False,  # Set to True for SQL debugging
+            pool_size=5,
+            max_overflow=10,
+            pool_pre_ping=True,  # Verify connections before use
+        )
+        return engine
+
+    @provide(scope=Scope.APP)
+    def provide_service_name(self, settings: Settings) -> str:
+        """Provide service name for outbox configuration."""
+        return settings.SERVICE_NAME
+
+    @provide(scope=Scope.APP)
+    def provide_outbox_settings(self, settings: Settings) -> OutboxSettings:
+        """Provide custom outbox settings from service configuration."""
+        return OutboxSettings(
+            poll_interval_seconds=settings.OUTBOX_POLL_INTERVAL_SECONDS,
+            batch_size=settings.OUTBOX_BATCH_SIZE,
+            max_retries=settings.OUTBOX_MAX_RETRIES,
+            error_retry_interval_seconds=settings.OUTBOX_ERROR_RETRY_INTERVAL_SECONDS,
+            enable_metrics=True,
+        )
+
 
 class ServiceImplementationsProvider(Provider):
     """Provider for service implementation dependencies."""
@@ -138,14 +172,23 @@ class ServiceImplementationsProvider(Provider):
         return DefaultContentServiceClient(http_session, settings)
 
     @provide(scope=Scope.APP)
+    def provide_file_repository(
+        self,
+        engine: AsyncEngine,
+    ) -> FileRepositoryProtocol:
+        """Provide minimal file repository implementation."""
+        return MinimalFileRepository(engine)
+
+    @provide(scope=Scope.APP)
     def provide_event_publisher(
         self,
         kafka_bus: KafkaPublisherProtocol,
         settings: Settings,
         redis_client: AtomicRedisClientProtocol,
+        outbox_repository: OutboxRepositoryProtocol,
     ) -> EventPublisherProtocol:
-        """Provide event publisher implementation with Redis support."""
-        return DefaultEventPublisher(kafka_bus, settings, redis_client)
+        """Provide event publisher implementation with outbox pattern support."""
+        return DefaultEventPublisher(kafka_bus, settings, redis_client, outbox_repository)
 
     @provide(scope=Scope.APP)
     def provide_text_extractor(self) -> TextExtractorProtocol:
