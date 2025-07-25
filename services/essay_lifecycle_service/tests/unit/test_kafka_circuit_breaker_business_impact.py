@@ -110,6 +110,14 @@ def mock_redis_client() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_outbox_repository() -> AsyncMock:
+    """Mock OutboxRepository for testing with outbox pattern."""
+    repo = AsyncMock()
+    repo.add_event = AsyncMock()
+    return repo
+
+
+@pytest.fixture
 def failing_kafka_bus() -> AsyncMock:
     """Kafka bus that fails to simulate circuit breaker scenarios."""
     bus = AsyncMock(spec=KafkaPublisherProtocol)
@@ -136,6 +144,7 @@ class TestBatchCoordinationBusinessImpact:
         mock_batch_tracker: AsyncMock,
         mock_repository: AsyncMock,
         mock_redis_client: AsyncMock,
+        mock_outbox_repository: AsyncMock,
         mock_settings: Settings,
         business_context: BusinessWorkflowContext,
     ) -> None:
@@ -150,6 +159,7 @@ class TestBatchCoordinationBusinessImpact:
             settings=mock_settings,
             redis_client=mock_redis_client,
             batch_tracker=mock_batch_tracker,
+            outbox_repository=mock_outbox_repository,
         )
 
         coordination_handler = DefaultBatchCoordinationHandler(
@@ -280,6 +290,7 @@ class TestBatchCoordinationBusinessImpact:
         mock_batch_tracker: AsyncMock,
         mock_repository: AsyncMock,
         mock_redis_client: AsyncMock,
+        mock_outbox_repository: AsyncMock,
         mock_settings: Settings,
         business_context: BusinessWorkflowContext,
     ) -> None:
@@ -294,6 +305,7 @@ class TestBatchCoordinationBusinessImpact:
             settings=mock_settings,
             redis_client=mock_redis_client,
             batch_tracker=mock_batch_tracker,
+            outbox_repository=mock_outbox_repository,
         )
 
         coordination_handler = DefaultBatchCoordinationHandler(
@@ -402,6 +414,7 @@ class TestServiceRequestDispatchBusinessImpact:
     async def test_spellcheck_dispatch_failure_prevents_processing(
         self,
         failing_kafka_bus: AsyncMock,
+        mock_outbox_repository: AsyncMock,
         mock_settings: Settings,
         business_context: BusinessWorkflowContext,
     ) -> None:
@@ -414,6 +427,7 @@ class TestServiceRequestDispatchBusinessImpact:
         dispatcher = DefaultSpecializedServiceRequestDispatcher(
             kafka_bus=failing_kafka_bus,
             settings=mock_settings,
+            outbox_repository=mock_outbox_repository,
         )
 
         essays_to_process = [
@@ -458,6 +472,7 @@ class TestServiceRequestDispatchBusinessImpact:
     @pytest.mark.asyncio
     async def test_cj_assessment_dispatch_failure_prevents_assessment(
         self,
+        mock_outbox_repository: AsyncMock,
         mock_settings: Settings,
         business_context: BusinessWorkflowContext,
     ) -> None:
@@ -473,6 +488,7 @@ class TestServiceRequestDispatchBusinessImpact:
         dispatcher = DefaultSpecializedServiceRequestDispatcher(
             kafka_bus=failing_kafka_bus,
             settings=mock_settings,
+            outbox_repository=mock_outbox_repository,
         )
 
         essays_to_process = [
@@ -529,6 +545,7 @@ class TestDualChannelPublishingBusinessImpact:
     @pytest.mark.asyncio
     async def test_kafka_success_redis_failure_creates_ui_inconsistency(
         self,
+        mock_outbox_repository: AsyncMock,
         mock_settings: Settings,
         mock_batch_tracker: AsyncMock,
         business_context: BusinessWorkflowContext,
@@ -550,6 +567,7 @@ class TestDualChannelPublishingBusinessImpact:
             settings=mock_settings,
             redis_client=failing_redis_client,
             batch_tracker=mock_batch_tracker,
+            outbox_repository=mock_outbox_repository,
         )
 
         essay_ref = EntityReference(
@@ -600,6 +618,7 @@ class TestDualChannelPublishingBusinessImpact:
     @pytest.mark.asyncio
     async def test_redis_success_kafka_failure_breaks_service_coordination(
         self,
+        mock_outbox_repository: AsyncMock,
         mock_settings: Settings,
         mock_batch_tracker: AsyncMock,
         business_context: BusinessWorkflowContext,
@@ -621,6 +640,7 @@ class TestDualChannelPublishingBusinessImpact:
             settings=mock_settings,
             redis_client=working_redis_client,
             batch_tracker=mock_batch_tracker,
+            outbox_repository=mock_outbox_repository,
         )
 
         essay_ref = EntityReference(
@@ -668,6 +688,7 @@ class TestBusinessWorkflowRecoveryScenarios:
     @pytest.mark.asyncio
     async def test_batch_workflow_recovery_after_kafka_restoration(
         self,
+        mock_outbox_repository: AsyncMock,
         mock_settings: Settings,
         mock_batch_tracker: AsyncMock,
         mock_repository: AsyncMock,
@@ -699,6 +720,7 @@ class TestBusinessWorkflowRecoveryScenarios:
             settings=mock_settings,
             redis_client=mock_redis_client,
             batch_tracker=mock_batch_tracker,
+            outbox_repository=mock_outbox_repository,
         )
 
         essay_ref = EntityReference(
@@ -759,6 +781,7 @@ class TestBusinessImpactIntegrationScenarios:
     @pytest.mark.asyncio
     async def test_complete_batch_workflow_with_intermittent_failures(
         self,
+        mock_outbox_repository: AsyncMock,
         mock_settings: Settings,
         mock_batch_tracker: AsyncMock,
         mock_repository: AsyncMock,
@@ -789,6 +812,7 @@ class TestBusinessImpactIntegrationScenarios:
             settings=mock_settings,
             redis_client=mock_redis_client,
             batch_tracker=mock_batch_tracker,
+            outbox_repository=mock_outbox_repository,
         )
 
         coordination_handler = DefaultBatchCoordinationHandler(
@@ -801,6 +825,7 @@ class TestBusinessImpactIntegrationScenarios:
         _dispatcher = DefaultSpecializedServiceRequestDispatcher(
             kafka_bus=intermittent_kafka_bus,
             settings=mock_settings,
+            outbox_repository=mock_outbox_repository,
         )
 
         # Act: Execute complete business workflow with failures

@@ -158,7 +158,6 @@ class EventRelayWorker:
             # Remove internal fields that shouldn't be published
             envelope_data.pop("topic", None)
 
-
             logger.info(
                 "Publishing event from outbox to Kafka",
                 extra={

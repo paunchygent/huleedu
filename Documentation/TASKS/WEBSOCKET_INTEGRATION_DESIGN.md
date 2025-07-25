@@ -6,21 +6,23 @@ This document outlines the integration design for real-time notifications of `Es
 
 ## Current WebSocket Architecture
 
-Based on the codebase analysis, HuleEdu uses a Redis-based pub/sub pattern for real-time notifications:
+Based on the codebase analysis, HuleEdu uses a Redis-based pub/sub pattern for real-time notifications with established protocol contracts:
 
 ```
-Service → Kafka (async processing)
+Service → Kafka (async processing via outbox)
     ↓
 Service → Redis pub/sub → WebSocket Service → Client
-         (real-time notifications)
+         (real-time notifications via AtomicRedisClientProtocol)
 ```
 
 ### Key Components
 
-1. **Redis Channels**: `ws:{user_id}` - User-specific notification channels
-2. **Event Publishing**: Services dual-publish to Kafka and Redis
-3. **WebSocket Service**: Generic relay that doesn't understand event types
-4. **Client Subscription**: WebSocket clients subscribe to their user channel
+1. **Protocol Interface**: `AtomicRedisClientProtocol.publish_user_notification()` - Structured notification publishing
+2. **Redis Channels**: `ws:{user_id}` - User-specific notification channels (managed by protocol)
+3. **Event Publishing**: Services dual-publish to Kafka and Redis using DI-injected protocols
+4. **WebSocket Service**: Generic relay that doesn't understand event types
+5. **Client Subscription**: WebSocket clients subscribe to their user channel
+6. **Existing Pattern**: ELS already uses this for status updates via `_publish_essay_status_to_redis()`
 
 ## Integration Requirements
 
@@ -46,12 +48,14 @@ Teachers need real-time notification when files are assigned to essay slots:
 
 ### ELS Redis Publishing Implementation
 
+**Architectural Note**: The `DefaultEventPublisher` already uses protocol-based DI with `AtomicRedisClientProtocol` and follows established patterns from `_publish_essay_status_to_redis()`. This implementation leverages existing infrastructure.
+
 Modify `DefaultEventPublisher` to dual-publish `EssaySlotAssignedV1`:
 
 ```python
 async def publish_essay_slot_assigned(self, event_data: EssaySlotAssignedV1, correlation_id: UUID) -> None:
     """Publish essay slot assignment event to Kafka and Redis."""
-    # Existing Kafka publishing
+    # Existing Kafka publishing (via outbox pattern)
     await self._publish_event_to_kafka(...)
     
     # NEW: Redis publishing for real-time notification
@@ -60,18 +64,22 @@ async def publish_essay_slot_assigned(self, event_data: EssaySlotAssignedV1, cor
 async def _publish_essay_slot_assigned_to_redis(
     self, event_data: EssaySlotAssignedV1, correlation_id: UUID
 ) -> None:
-    """Publish slot assignment to Redis for WebSocket notification."""
+    """Publish slot assignment to Redis for WebSocket notification.
+    
+    Uses existing AtomicRedisClientProtocol.publish_user_notification() method
+    following the same pattern as _publish_essay_status_to_redis().
+    """
     try:
-        # Get user_id from batch
-        batch_status = await self.batch_tracker.get_batch_status(event_data.batch_id)
-        if not batch_status or "user_id" not in batch_status:
+        # Get user_id from batch (following existing pattern)
+        user_id = await self.batch_tracker.get_user_id_for_essay(event_data.essay_id)
+        
+        if not user_id:
             logger.warning(
                 "Cannot publish WebSocket notification: user_id not found",
                 batch_id=event_data.batch_id,
+                essay_id=event_data.essay_id,
             )
             return
-        
-        user_id = batch_status["user_id"]
         
         # Get filename from repository (optional enhancement)
         filename = None
@@ -79,37 +87,35 @@ async def _publish_essay_slot_assigned_to_redis(
         if essay_state and essay_state.processing_metadata:
             filename = essay_state.processing_metadata.get("original_file_name")
         
-        # Build notification payload
-        notification = {
-            "event": "essay_slot_assigned",
-            "correlation_id": str(correlation_id),
-            "timestamp": datetime.now(UTC).isoformat(),
-            "data": {
+        # Use existing protocol method for structured notifications
+        await self.redis_client.publish_user_notification(
+            user_id=user_id,
+            event_type="essay_slot_assigned",
+            data={
                 "batch_id": event_data.batch_id,
                 "essay_id": event_data.essay_id,
                 "file_upload_id": event_data.file_upload_id,
                 "filename": filename,
                 "text_storage_id": event_data.text_storage_id,
+                "correlation_id": str(correlation_id),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
-        }
-        
-        # Publish to user's WebSocket channel
-        channel = f"ws:{user_id}"
-        await self.redis_client.publish(channel, json.dumps(notification))
+        )
         
         logger.info(
             "Published slot assignment to WebSocket",
-            channel=channel,
+            user_id=user_id,
             essay_id=event_data.essay_id,
             file_upload_id=event_data.file_upload_id,
         )
         
     except Exception as e:
-        # Log but don't fail - WebSocket is best-effort
+        # Log but don't fail - WebSocket is best-effort (following existing pattern)
         logger.error(
             "Failed to publish WebSocket notification",
             error=str(e),
             batch_id=event_data.batch_id,
+            essay_id=event_data.essay_id,
         )
 ```
 
@@ -191,18 +197,49 @@ GET /internal/v1/batches/{batch_id}/status
 ## Testing Strategy
 
 ### Unit Tests
+
+**Protocol-Based Testing**: Following established patterns for testing `AtomicRedisClientProtocol` dependencies.
+
 ```python
 async def test_essay_slot_assigned_redis_publishing():
-    """Test that slot assignment publishes to Redis."""
-    mock_redis = AsyncMock()
-    event_publisher = DefaultEventPublisher(redis_client=mock_redis, ...)
+    """Test that slot assignment publishes to Redis using protocol method."""
+    # Mock the protocol interface (following existing test patterns)
+    mock_redis = AsyncMock(spec=AtomicRedisClientProtocol)
+    mock_batch_tracker = AsyncMock()
+    mock_batch_tracker.get_user_id_for_essay.return_value = "test_user_123"
     
-    await event_publisher.publish_essay_slot_assigned(slot_event, correlation_id)
+    event_publisher = DefaultEventPublisher(
+        redis_client=mock_redis,
+        batch_tracker=mock_batch_tracker,
+        ...
+    )
     
-    mock_redis.publish.assert_called_once()
-    channel, payload = mock_redis.publish.call_args[0]
-    assert channel == "ws:test_user_123"
-    assert "essay_slot_assigned" in payload
+    slot_event = EssaySlotAssignedV1(
+        batch_id="batch-123",
+        essay_id="essay-456", 
+        file_upload_id="upload-789",
+        text_storage_id="storage-abc"
+    )
+    
+    await event_publisher._publish_essay_slot_assigned_to_redis(
+        slot_event, 
+        UUID("12345678-1234-5678-9012-123456789012")
+    )
+    
+    # Verify protocol method was called with correct structure
+    mock_redis.publish_user_notification.assert_called_once_with(
+        user_id="test_user_123",
+        event_type="essay_slot_assigned",
+        data={
+            "batch_id": "batch-123",
+            "essay_id": "essay-456",
+            "file_upload_id": "upload-789",
+            "text_storage_id": "storage-abc",
+            "filename": None,
+            "correlation_id": "12345678-1234-5678-9012-123456789012",
+            "timestamp": ANY,  # Dynamic timestamp
+        }
+    )
 ```
 
 ### Integration Tests
@@ -226,4 +263,13 @@ async def test_essay_slot_assigned_redis_publishing():
 
 ## Conclusion
 
-The WebSocket integration for `EssaySlotAssignedV1` events provides immediate feedback to users about file-to-essay assignment, improving the user experience while maintaining system decoupling through the existing Redis pub/sub infrastructure. The implementation is straightforward, leveraging existing patterns in the codebase.
+The WebSocket integration for `EssaySlotAssignedV1` events provides immediate feedback to users about file-to-essay assignment, improving the user experience while maintaining system decoupling through the existing Redis pub/sub infrastructure.
+
+**Architectural Alignment**: This implementation leverages established patterns:
+
+- Uses existing `AtomicRedisClientProtocol.publish_user_notification()` method
+- Follows the same DI patterns as `DefaultEventPublisher._publish_essay_status_to_redis()`
+- Maintains protocol-based testing approaches
+- Preserves existing error handling and lifecycle management
+
+The implementation requires minimal new code since it builds directly on proven architectural patterns already in production.

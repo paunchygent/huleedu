@@ -1,21 +1,17 @@
-Of course. Here is the fully merged and consolidated task ticket. It combines the strategic overview of the epic with the detailed, file-specific implementation steps for the File Service pilot, creating a single, actionable document for your team.
-
------
-
-### **Epic: Implement Transactional Outbox Pattern via Shared Library**
+# **Epic: Implement Transactional Outbox Pattern via Shared Library**
 
 **Ticket ID:** `ARCH-012`
 **Type:** Epic
 **Assignee:** Tech Lead, Core Services Team
 **Reporter:** CTO
 
-#### **1. Summary**
+## **1. Summary**
 
 To guarantee reliable event delivery and prevent data inconsistency across our microservices, we will implement the Transactional Outbox pattern. This will be achieved by creating a robust, shared library (`huleedu-outbox-relay`) that provides a standardized implementation for all Kafka-publishing services.
 
 This initiative decouples our services' core business logic from the availability of the Kafka message broker, ensuring that database updates and their corresponding event publications are atomic.
 
-#### **2. Acceptance Criteria**
+## **2. Acceptance Criteria**
 
 - A new shared library, `huleedu-outbox-relay`, exists within `libs/huleedu_service_libs/`.
 - The library provides a generic `EventOutbox` SQLAlchemy model, a `PostgreSQLOutboxRepository`, a configurable `EventRelayWorker`, and a `Dishka` provider for easy integration.
@@ -24,11 +20,11 @@ This initiative decouples our services' core business logic from the availabilit
 - Standardized Prometheus metrics for outbox depth, relay rate, and error count are implemented in the shared library and are active for the File Service's `/metrics` endpoint.
 - An `implementation_guide.md` is created, documenting how other services can adopt the new pattern.
 
-#### **3. Tasks / Sub-tasks**
+## **3. Tasks / Sub-tasks**
 
 -----
 
-**Story 1: [Foundation] Create the `huleedu-outbox-relay` Shared Library**
+### **Story 1: [Foundation] Create the `huleedu-outbox-relay` Shared Library**
 
 - **Description:** Build the core components of the shared library. This forms the foundation for all subsequent service integrations.
 - **Tasks:**
@@ -43,7 +39,7 @@ This initiative decouples our services' core business logic from the availabilit
 
 -----
 
-**Story 2: [Pilot] Migrate File Service to Use the Outbox Pattern**
+### **Story 2: [Pilot] Migrate File Service to Use the Outbox Pattern**
 
 - **Description:** As the first and most critical adopter, the **File Service** must be migrated to use the new `huleedu-outbox-relay` shared library. This will protect its four critical outbound events (`EssayContentProvisionedV1`, `EssayValidationFailedV1`, `BatchFileAddedV1`, `BatchFileRemovedV1`) from being lost if Kafka is unavailable, which currently breaks the entire essay processing pipeline.
 

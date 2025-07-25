@@ -92,11 +92,16 @@ class TestRedisTransactionAndDatabaseUpdate:
             # Create mock kafka bus for this test
             mock_kafka_bus = AsyncMock()
 
+            # Create mock outbox repository for testing
+            mock_outbox_repository = AsyncMock()
+            mock_outbox_repository.add_event.return_value = None
+
             event_publisher = DefaultEventPublisher(
                 kafka_bus=mock_kafka_bus,  # Mock for this test
                 settings=settings,
                 redis_client=redis_client,
                 batch_tracker=batch_tracker,
+                outbox_repository=mock_outbox_repository,
             )
 
             handler = DefaultBatchCoordinationHandler(

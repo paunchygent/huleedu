@@ -112,9 +112,10 @@ async def test_file_service_events_contain_raw_storage_id():
                         assert "raw_file_storage_id" in event_data, (
                             "Missing raw_file_storage_id in failure event"
                         )
+                        validation_detail = event_data.get('validation_error_detail', {})
+                        error_message = validation_detail.get('message', 'Unknown error')
                         print(
-                            f"⚠️ Unexpected validation failure: "
-                            f"{event_data.get('validation_error_message')}",
+                            f"⚠️ Unexpected validation failure: {error_message}",
                         )
                         print(f"   - raw_file_storage_id: {event_data['raw_file_storage_id']}")
 
@@ -201,8 +202,12 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
                         "Missing raw_file_storage_id in validation failure event"
                     )
                     assert "validation_error_code" in event_data, "Missing validation_error_code"
-                    assert "validation_error_message" in event_data, (
-                        "Missing validation_error_message"
+                    assert "validation_error_detail" in event_data, (
+                        "Missing validation_error_detail"
+                    )
+                    # Ensure the error detail has a message
+                    assert "message" in event_data["validation_error_detail"], (
+                        "Missing message in validation_error_detail"
                     )
                     assert event_data["batch_id"] == batch_id
 
@@ -210,7 +215,7 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
                     print(f"   - raw_file_storage_id: {event_data['raw_file_storage_id']}")
                     print(f"   - validation_error_code: {event_data['validation_error_code']}")
                     print(
-                        f"   - validation_error_message: {event_data['validation_error_message']}",
+                        f"   - validation_error_message: {event_data['validation_error_detail']['message']}",
                     )
 
                     event_received = True

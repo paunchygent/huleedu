@@ -125,6 +125,29 @@ class MockEventPublisher(EventPublisher):
 
         self.published_events.append(("essay_slot_assigned", event_data, correlation_id))
 
+    async def publish_to_outbox(
+        self,
+        aggregate_type: str,
+        aggregate_id: str,
+        event_type: str,
+        event_data: Any,
+        topic: str,
+    ) -> None:
+        """Mock outbox publishing - records event for testing."""
+        self.published_events.append(
+            (
+                "outbox",
+                {
+                    "aggregate_type": aggregate_type,
+                    "aggregate_id": aggregate_id,
+                    "event_type": event_type,
+                    "event_data": event_data,
+                    "topic": topic,
+                },
+                event_data.metadata.correlation_id if hasattr(event_data, "metadata") else None,
+            )
+        )
+
 
 class TestAtomicBatchCreationIntegration:
     """Integration tests for atomic batch creation behavior with real infrastructure."""

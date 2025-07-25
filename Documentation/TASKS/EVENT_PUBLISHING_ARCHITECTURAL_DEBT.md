@@ -311,9 +311,12 @@ The investment is justified by the significant improvement in system resilience 
 
 ### 3. Extend to Other Services
 The pattern has been proven in Essay Lifecycle Service and should be extended to:
+- File Service
 - Batch Orchestrator Service
 - Result Aggregator Service
 - Any other services with event publishing in critical paths
+
+documentation/TASKS/OUTBOX_IMPLEMENTATION_TASK.md can be used as a reference for implementation details.
 
 ### 4. Performance Optimization
 - Consider batch publishing from relay worker for efficiency

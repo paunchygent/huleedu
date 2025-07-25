@@ -56,11 +56,16 @@ class TestRedisNotifications:
         mock_batch_tracker: AsyncMock,
     ) -> DefaultEventPublisher:
         """Provide event publisher with all mocked dependencies."""
+        # Create a mock for the outbox repository
+        mock_outbox_repository = AsyncMock()
+        mock_outbox_repository.add_event = AsyncMock()
+
         return DefaultEventPublisher(
             kafka_bus=mock_kafka_bus,
             settings=mock_settings,
             redis_client=mock_redis_client,
             batch_tracker=mock_batch_tracker,
+            outbox_repository=mock_outbox_repository,
         )
 
     async def test_publish_status_update_with_valid_user_id(

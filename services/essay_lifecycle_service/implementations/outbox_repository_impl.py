@@ -16,10 +16,10 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 if TYPE_CHECKING:
-    from services.essay_lifecycle_service.models_db import EventOutbox as EventOutboxDB
+    from services.essay_lifecycle_service.models_db import EventOutbox as EventOutbox
     from services.essay_lifecycle_service.protocols import OutboxEvent
 
-from services.essay_lifecycle_service.models_db import EventOutbox as EventOutboxDB
+from services.essay_lifecycle_service.models_db import EventOutbox as EventOutbox
 from services.essay_lifecycle_service.protocols import OutboxRepositoryProtocol
 
 logger = create_service_logger("outbox_repository")
@@ -32,7 +32,7 @@ class OutboxEventImpl:
     Wraps the SQLAlchemy model to satisfy the protocol interface.
     """
 
-    def __init__(self, db_model: EventOutboxDB) -> None:
+    def __init__(self, db_model: EventOutbox) -> None:
         """Initialize from database model."""
         self.id = db_model.id
         self.aggregate_id = db_model.aggregate_id
@@ -87,7 +87,7 @@ class PostgreSQLOutboxRepository(OutboxRepositoryProtocol):
         async with self._session_factory() as session:
             try:
                 # Create new outbox entry
-                outbox_event = EventOutboxDB(
+                outbox_event = EventOutbox(
                     aggregate_id=aggregate_id,
                     aggregate_type=aggregate_type,
                     event_type=event_type,
@@ -138,9 +138,9 @@ class PostgreSQLOutboxRepository(OutboxRepositoryProtocol):
             try:
                 # Query unpublished events
                 stmt = (
-                    select(EventOutboxDB)
-                    .where(EventOutboxDB.published_at.is_(None))
-                    .order_by(EventOutboxDB.created_at)
+                    select(EventOutbox)
+                    .where(EventOutbox.published_at.is_(None))
+                    .order_by(EventOutbox.created_at)
                     .limit(limit)
                 )
 
@@ -181,8 +181,8 @@ class PostgreSQLOutboxRepository(OutboxRepositoryProtocol):
             try:
                 # Update published timestamp
                 stmt = (
-                    update(EventOutboxDB)
-                    .where(EventOutboxDB.id == event_id)
+                    update(EventOutbox)
+                    .where(EventOutbox.id == event_id)
                     .values(published_at=datetime.now(UTC).replace(tzinfo=None))
                 )
 
@@ -225,10 +225,10 @@ class PostgreSQLOutboxRepository(OutboxRepositoryProtocol):
             try:
                 # Update error info and increment retry count
                 stmt = (
-                    update(EventOutboxDB)
-                    .where(EventOutboxDB.id == event_id)
+                    update(EventOutbox)
+                    .where(EventOutbox.id == event_id)
                     .values(
-                        retry_count=EventOutboxDB.retry_count + 1,
+                        retry_count=EventOutbox.retry_count + 1,
                         last_error=error_message[:1000],  # Truncate to fit column
                     )
                 )
@@ -276,7 +276,7 @@ class PostgreSQLOutboxRepository(OutboxRepositoryProtocol):
         async with self._session_factory() as session:
             try:
                 # Query by ID
-                stmt = select(EventOutboxDB).where(EventOutboxDB.id == event_id)
+                stmt = select(EventOutbox).where(EventOutbox.id == event_id)
 
                 result = await session.execute(stmt)
                 db_event = result.scalar_one_or_none()
@@ -310,11 +310,10 @@ class PostgreSQLOutboxRepository(OutboxRepositoryProtocol):
             try:
                 # Update event with final error and leave published_at as None
                 stmt = (
-                    update(EventOutboxDB)
-                    .where(EventOutboxDB.id == event_id)
+                    update(EventOutbox)
+                    .where(EventOutbox.id == event_id)
                     .values(
                         last_error=error,
-                        updated_at=datetime.now(UTC),
                     )
                 )
 
@@ -353,11 +352,10 @@ class PostgreSQLOutboxRepository(OutboxRepositoryProtocol):
             try:
                 # Update event with published timestamp
                 stmt = (
-                    update(EventOutboxDB)
-                    .where(EventOutboxDB.id == event_id)
+                    update(EventOutbox)
+                    .where(EventOutbox.id == event_id)
                     .values(
-                        published_at=datetime.now(UTC),
-                        updated_at=datetime.now(UTC),
+                        published_at=datetime.now(UTC).replace(tzinfo=None),
                     )
                 )
 
@@ -393,7 +391,7 @@ class PostgreSQLOutboxRepository(OutboxRepositoryProtocol):
         async with self._session_factory() as session:
             try:
                 # First get current retry count
-                stmt = select(EventOutboxDB).where(EventOutboxDB.id == event_id)
+                stmt = select(EventOutbox).where(EventOutbox.id == event_id)
                 result = await session.execute(stmt)
                 db_event = result.scalar_one_or_none()
 
@@ -406,12 +404,11 @@ class PostgreSQLOutboxRepository(OutboxRepositoryProtocol):
 
                 # Update with incremented retry count and error
                 update_stmt = (
-                    update(EventOutboxDB)
-                    .where(EventOutboxDB.id == event_id)
+                    update(EventOutbox)
+                    .where(EventOutbox.id == event_id)
                     .values(
                         retry_count=db_event.retry_count + 1,
                         last_error=error,
-                        updated_at=datetime.now(UTC),
                     )
                 )
 

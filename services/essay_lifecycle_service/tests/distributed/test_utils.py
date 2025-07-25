@@ -31,7 +31,7 @@ class MockEventPublisher(EventPublisher):
     """
 
     def __init__(self) -> None:
-        self.published_events: list[tuple[str, Any, UUID]] = []
+        self.published_events: list[tuple[str, Any, UUID | None]] = []
         self.lock = asyncio.Lock()
 
     async def publish_status_update(
@@ -121,6 +121,30 @@ class MockEventPublisher(EventPublisher):
             assert event_data.text_storage_id, "text_storage_id must not be empty"
 
             self.published_events.append(("essay_slot_assigned", event_data, correlation_id))
+
+    async def publish_to_outbox(
+        self,
+        aggregate_type: str,
+        aggregate_id: str,
+        event_type: str,
+        event_data: Any,
+        topic: str,
+    ) -> None:
+        """Mock outbox publishing - records event for testing."""
+        async with self.lock:
+            self.published_events.append(
+                (
+                    "outbox",
+                    {
+                        "aggregate_type": aggregate_type,
+                        "aggregate_id": aggregate_id,
+                        "event_type": event_type,
+                        "event_data": event_data,
+                        "topic": topic,
+                    },
+                    event_data.metadata.correlation_id if hasattr(event_data, "metadata") else None,
+                )
+            )
 
 
 class PerformanceMetrics:

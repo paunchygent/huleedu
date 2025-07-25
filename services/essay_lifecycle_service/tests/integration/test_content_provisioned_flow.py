@@ -108,11 +108,16 @@ class TestContentProvisionedFlow:
 
             mock_kafka_bus.publish.side_effect = capture_event
 
+            # Create mock outbox repository for testing
+            mock_outbox_repository = AsyncMock()
+            mock_outbox_repository.add_event.return_value = None
+
             event_publisher = DefaultEventPublisher(
                 kafka_bus=mock_kafka_bus,
                 settings=settings,
                 redis_client=redis_client,
                 batch_tracker=batch_tracker,
+                outbox_repository=mock_outbox_repository,
             )
 
             handler = DefaultBatchCoordinationHandler(
@@ -130,6 +135,7 @@ class TestContentProvisionedFlow:
                 "event_publisher": event_publisher,
                 "published_events": published_events,
                 "mock_kafka_bus": mock_kafka_bus,
+                "mock_outbox_repository": mock_outbox_repository,
             }
 
             # Cleanup
@@ -142,7 +148,7 @@ class TestContentProvisionedFlow:
         """Test atomic slot assignment with proper Redis transactions."""
         handler = test_infrastructure["handler"]
         repository = test_infrastructure["repository"]
-        published_events = test_infrastructure["published_events"]
+        mock_outbox_repository = test_infrastructure["mock_outbox_repository"]
 
         # Setup: Register batch
         batch_id = str(uuid4())
@@ -199,22 +205,32 @@ class TestContentProvisionedFlow:
         assert assigned_essay.storage_references[ContentType.ORIGINAL_ESSAY] == text_storage_id
         assert assigned_essay.current_status == EssayStatus.READY_FOR_PROCESSING
 
-        # Verify event published
-        assert len(published_events) > 0, "Should publish events"
+        # Verify event published to outbox
+        assert mock_outbox_repository.add_event.called, "Should add event to outbox"
 
-        # Find the EssaySlotAssignedV1 event
-        slot_assigned_event = None
-        for event in published_events:
-            if "essay.slot.assigned" in event["topic"]:
-                envelope = event["envelope"]
-                if "essay.slot.assigned" in envelope.event_type:
-                    slot_assigned_event = envelope
-                    break
+        # Check the call arguments for the EssaySlotAssignedV1 event
+        found_slot_assigned = False
+        for call in mock_outbox_repository.add_event.call_args_list:
+            args = call[1]  # Get keyword arguments
+            if args.get("event_type") == "huleedu.els.essay.slot.assigned.v1":
+                found_slot_assigned = True
+                # Verify the event data
+                event_data = args.get("event_data")
+                assert event_data is not None
+                assert args.get("aggregate_id") == str(assigned_essay.essay_id)
+                assert args.get("aggregate_type") == "essay"
+                # The event_data should contain the topic
+                assert event_data.get("topic") == "huleedu.els.essay.slot.assigned.v1"
 
-        assert slot_assigned_event is not None, "EssaySlotAssignedV1 should be published"
-        assert slot_assigned_event.data.file_upload_id == file_upload_id
-        assert slot_assigned_event.data.essay_id == str(assigned_essay.essay_id)
-        assert slot_assigned_event.data.text_storage_id == text_storage_id
+                # Also verify the data inside the event
+                data = event_data.get("data")
+                assert data is not None
+                assert data.get("file_upload_id") == file_upload_id
+                assert data.get("essay_id") == str(assigned_essay.essay_id)
+                assert data.get("text_storage_id") == text_storage_id
+                break
+
+        assert found_slot_assigned, "EssaySlotAssignedV1 should be added to outbox"
 
     async def test_concurrent_content_provisioning(
         self, test_infrastructure: dict[str, Any]
@@ -370,9 +386,11 @@ class TestContentProvisionedFlow:
     async def test_event_publishing_failure_handling(
         self, test_infrastructure: dict[str, Any]
     ) -> None:
-        """Test behavior when event publishing fails."""
+        """Test behavior when event publishing fails - with outbox pattern, operations should succeed."""
         handler = test_infrastructure["handler"]
         mock_kafka_bus = test_infrastructure["mock_kafka_bus"]
+        mock_outbox_repository = test_infrastructure["mock_outbox_repository"]
+        repository = test_infrastructure["repository"]
 
         # Setup: Register batch
         batch_id = str(uuid4())
@@ -399,7 +417,7 @@ class TestContentProvisionedFlow:
 
         await handler.handle_batch_essays_registered(batch_event, correlation_id)
 
-        # Configure Kafka to fail
+        # Configure Kafka to fail - this should NOT affect the operation anymore
         mock_kafka_bus.publish.side_effect = Exception("Kafka unavailable")
 
         # Test: Try to provision content
@@ -414,12 +432,14 @@ class TestContentProvisionedFlow:
             correlation_id=correlation_id,
         )
 
-        # This reveals the architectural debt - if Kafka fails, the operation fails
-        with pytest.raises(
-            Exception,
-            match=r"\[KAFKA_PUBLISH_ERROR\].*Failed to publish essay slot assigned event to Kafka",
-        ):
-            await handler.handle_essay_content_provisioned(content_event, correlation_id)
+        # With outbox pattern, this should succeed even when Kafka is down
+        success = await handler.handle_essay_content_provisioned(content_event, correlation_id)
+        assert success, "Content provisioning should succeed even when Kafka is unavailable"
 
-        # This is the problem identified in the session context -
-        # event publishing is in the critical path!
+        # Verify the event was stored in the outbox
+        assert mock_outbox_repository.add_event.called, "Event should be stored in outbox"
+
+        # Verify database state was updated
+        essays = await repository.list_essays_by_batch(batch_id)
+        assigned_essays = [e for e in essays if ContentType.ORIGINAL_ESSAY in e.storage_references]
+        assert len(assigned_essays) == 1, "Essay should have content assigned despite Kafka failure"
