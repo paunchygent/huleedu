@@ -7,7 +7,6 @@ File Service dependencies to enable clean architecture and testability.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -195,7 +194,7 @@ class BatchStateValidatorProtocol(Protocol):
 class FileRepositoryProtocol(Protocol):
     """
     Protocol for File Service repository operations.
-    
+
     Currently minimal as File Service is primarily stateless, but provides
     extensibility for future features like file processing history tracking.
     """
@@ -210,14 +209,14 @@ class FileRepositoryProtocol(Protocol):
     ) -> None:
         """
         Record file processing event (optional - for future use).
-        
+
         Args:
             file_upload_id: Unique identifier for the file upload
             batch_id: Associated batch identifier
             file_name: Original file name
             status: Processing status
             metadata: Optional metadata about the processing
-            
+
         Note:
             This is a placeholder for future functionality. File Service
             currently operates statelessly but may need to track processing
@@ -232,14 +231,14 @@ class FileRepositoryProtocol(Protocol):
     ) -> list[dict[str, Any]]:
         """
         Retrieve file processing history for a batch (optional - for future use).
-        
+
         Args:
             batch_id: Batch identifier to query
             limit: Maximum number of records to return
-            
+
         Returns:
             List of processing history records
-            
+
         Note:
             This is a placeholder for future functionality.
         """

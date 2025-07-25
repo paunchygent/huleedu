@@ -7,10 +7,10 @@ components, following HuleEdu's established DI patterns with Dishka.
 
 from __future__ import annotations
 
-
 from dishka import Provider, Scope, provide
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from sqlalchemy.ext.asyncio import AsyncEngine
+
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
 from .protocols import EventTypeMapperProtocol, OutboxRepositoryProtocol
 from .relay import EventRelayWorker, OutboxSettings
@@ -30,7 +30,7 @@ class OutboxProvider(Provider):
 
     Example usage in service DI:
         from huleedu_service_libs.outbox import OutboxProvider
-        
+
         container = make_async_container(
             CoreInfrastructureProvider(),
             ServiceImplementationsProvider(),
@@ -85,10 +85,10 @@ class OutboxProvider(Provider):
     def provide_event_type_mapper(self) -> EventTypeMapperProtocol | None:
         """
         Provide default event type mapper (None for direct topic usage).
-        
+
         Services can override this to provide custom event type mapping.
         When None, the relay worker uses topics directly from outbox records.
-        
+
         Returns:
             None (default - use topics directly)
         """
@@ -138,7 +138,7 @@ class OutboxSettingsProvider(Provider):
             batch_size=50,
             max_retries=10,
         )
-        
+
         container = make_async_container(
             CoreInfrastructureProvider(),
             OutboxSettingsProvider(custom_settings),

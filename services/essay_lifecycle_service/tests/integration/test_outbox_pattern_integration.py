@@ -28,6 +28,10 @@ from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.redis_client import RedisClient
 from sqlalchemy import text as sa_text
+from testcontainers.kafka import KafkaContainer
+from testcontainers.postgres import PostgresContainer
+from testcontainers.redis import RedisContainer
+
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
     DefaultBatchCoordinationHandler,
@@ -49,11 +53,6 @@ from services.essay_lifecycle_service.implementations.outbox_repository_impl imp
 from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
     RedisBatchCoordinator,
 )
-from services.essay_lifecycle_service.models_db import Base
-from sqlalchemy.ext.asyncio import create_async_engine
-from testcontainers.kafka import KafkaContainer
-from testcontainers.postgres import PostgresContainer
-from testcontainers.redis import RedisContainer
 
 logger = create_service_logger("test.outbox_integration")
 
@@ -145,7 +144,7 @@ class TestOutboxPatternIntegration:
         with postgres, redis, kafka:
             # Properly wait for Kafka to be ready
             kafka_url = kafka.get_bootstrap_server()
-            
+
             # Get other connection strings
             db_url = (
                 f"postgresql+asyncpg://{postgres.username}:{postgres.password}@"
@@ -164,17 +163,17 @@ class TestOutboxPatternIntegration:
                 OUTBOX_MAX_RETRIES=3,
                 OUTBOX_ERROR_RETRY_INTERVAL_SECONDS=0.5,
             )
-            
+
             # Initialize essay repository first (it creates its own engine)
             essay_repo = PostgreSQLEssayRepository(test_settings)
             # Initialize the repository schema and run migrations
             await essay_repo.initialize_db_schema()
             await essay_repo.run_migrations()
-            
+
             # Use the engine from the essay repository for all other components
             # This ensures all components share the same database connection pool
             engine = essay_repo.engine
-            
+
             # Add a small delay to ensure all services are fully ready
             await asyncio.sleep(2)
 
@@ -288,23 +287,23 @@ class TestOutboxPatternIntegration:
 
             success = await handler.handle_batch_essays_registered(batch_event, correlation_id)
             assert success, "Batch registration should succeed"
-            
+
             # Give the system a moment to ensure database writes are committed
             await asyncio.sleep(0.5)
-            
+
             # Verify batch was created in database before proceeding
             async with engine.begin() as conn:
                 result = await conn.execute(
                     sa_text("SELECT COUNT(*) FROM batch_essay_trackers WHERE batch_id = :batch_id"),
-                    {"batch_id": batch_id}
+                    {"batch_id": batch_id},
                 )
                 count = result.scalar()
                 assert count == 1, f"Batch not found in database after registration: {count}"
-                
+
                 # Also check essay_states
                 result = await conn.execute(
                     sa_text("SELECT COUNT(*) FROM essay_states WHERE batch_id = :batch_id"),
-                    {"batch_id": batch_id}
+                    {"batch_id": batch_id},
                 )
                 essay_count = result.scalar()
                 logger.info(f"Found {essay_count} essay states for batch {batch_id}")
@@ -463,10 +462,10 @@ class TestOutboxPatternIntegration:
 
             # This should fail - handler raises exception for invalid input
             from huleedu_service_libs.error_handling import HuleEduError
-            
+
             with pytest.raises(HuleEduError) as exc_info:
                 await handler.handle_batch_essays_registered(batch_event, correlation_id)
-            
+
             # Verify it's a processing error
             assert exc_info.value.error_detail.error_code == "PROCESSING_ERROR"
 

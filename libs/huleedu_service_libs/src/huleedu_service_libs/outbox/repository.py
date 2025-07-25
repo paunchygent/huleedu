@@ -94,7 +94,9 @@ class PostgreSQLOutboxRepository:
     pattern, ensuring atomic transactions and reliable event storage.
     """
 
-    def __init__(self, engine: AsyncEngine, service_name: str = "unknown", enable_metrics: bool = True) -> None:
+    def __init__(
+        self, engine: AsyncEngine, service_name: str = "unknown", enable_metrics: bool = True
+    ) -> None:
         """
         Initialize the repository with a database engine.
 
@@ -146,15 +148,18 @@ class PostgreSQLOutboxRepository:
         if session is not None:
             # Use provided session for transaction sharing
             return await self._add_event_with_session(
-                session, aggregate_id, aggregate_type, event_type, 
-                event_data_with_topic, event_key
+                session, aggregate_id, aggregate_type, event_type, event_data_with_topic, event_key
             )
         else:
             # Create own session (existing behavior)
             async with self._session_factory() as session:
                 event_id = await self._add_event_with_session(
-                    session, aggregate_id, aggregate_type, event_type,
-                    event_data_with_topic, event_key
+                    session,
+                    aggregate_id,
+                    aggregate_type,
+                    event_type,
+                    event_data_with_topic,
+                    event_key,
                 )
                 await session.commit()
                 return event_id
@@ -170,7 +175,7 @@ class PostgreSQLOutboxRepository:
     ) -> UUID:
         """
         Helper method to add event using a specific session.
-        
+
         Args:
             session: The database session to use
             aggregate_id: ID of the aggregate this event relates to
@@ -178,7 +183,7 @@ class PostgreSQLOutboxRepository:
             event_type: Type of the event
             event_data_with_topic: Event data with topic included
             event_key: Optional key for Kafka partitioning
-            
+
         Returns:
             UUID: The ID of the created outbox event
         """
@@ -201,11 +206,11 @@ class PostgreSQLOutboxRepository:
                 "event_type": event_type,
             },
         )
-        
+
         # Record metrics if enabled
         if self.metrics:
             self.metrics.increment_events_added(event_type)
-        
+
         return outbox_event.id
 
     async def get_unpublished_events(self, limit: int = 100) -> list[OutboxEvent]:
@@ -276,11 +281,7 @@ class PostgreSQLOutboxRepository:
             error = error[:max_error_length]
 
         async with self._session_factory() as session:
-            stmt = (
-                update(EventOutbox)
-                .where(EventOutbox.id == event_id)
-                .values(last_error=error)
-            )
+            stmt = update(EventOutbox).where(EventOutbox.id == event_id).values(last_error=error)
             result = await session.execute(stmt)
             await session.commit()
 

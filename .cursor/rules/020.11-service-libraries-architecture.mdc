@@ -50,6 +50,14 @@ libs/huleedu_service_libs/
 │       ├── error_handling/         # Enhanced error context
 │       │   ├── __init__.py
 │       │   └── factories.py        # Error context with tracing
+│       ├── outbox/                 # Transactional outbox pattern
+│       │   ├── __init__.py         # Main exports
+│       │   ├── models.py           # EventOutbox SQLAlchemy model
+│       │   ├── protocols.py        # OutboxRepositoryProtocol interface
+│       │   ├── repository.py       # PostgreSQLOutboxRepository implementation
+│       │   ├── relay.py            # EventRelayWorker background processor
+│       │   ├── monitoring.py       # Prometheus metrics for outbox operations
+│       │   └── di.py               # OutboxProvider for Dishka DI
 │       └── py.typed                # Type stub marker
 └── tests/                          # Test suite
     ├── test_idempotency.py
@@ -257,6 +265,13 @@ from huleedu_service_libs.middleware.frameworks.fastapi_middleware import setup_
 - **MUST** integrate with service registry for aggregation
 - **Pattern**: Middleware applied in app factory function
 
+### 6.10. Transactional Outbox Pattern
+- **MUST** use outbox for all business-critical inter-service events
+- **MUST** include EventOutbox table in service database migrations
+- **MUST** start EventRelayWorker in application lifecycle
+- **MUST** share database session between business logic and outbox operations
+- **Pattern**: Store events in outbox within same transaction as business operations
+
 ## 7. Testing Considerations
 
 ### 7.1. Mock Implementations
@@ -267,5 +282,6 @@ from huleedu_service_libs.middleware.frameworks.fastapi_middleware import setup_
 ### 7.2. Integration Testing
 - Redis: Use testcontainers or real instance
 - Kafka: Use testcontainers for full integration
+- Outbox: Use testcontainers for PostgreSQL and Kafka testing
 - Verify lifecycle management works correctly
 - Observability: Optional, mock tracer in unit tests

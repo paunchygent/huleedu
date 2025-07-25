@@ -113,7 +113,8 @@ class Settings(BaseSettings):
 
         if not db_user or not db_password:
             raise ValueError(
-                "Database credentials not found. Please set HULEEDU_DB_USER and HULEEDU_DB_PASSWORD in .env file"
+                "Database credentials not found. Please set HULEEDU_DB_USER and "
+                "HULEEDU_DB_PASSWORD in .env file"
             )
 
         # Use service-specific database name

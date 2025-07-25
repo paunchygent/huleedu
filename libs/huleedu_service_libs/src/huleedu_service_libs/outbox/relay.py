@@ -79,7 +79,7 @@ class EventRelayWorker:
         self.event_mapper = event_mapper
         self._running = False
         self._task: asyncio.Task[None] | None = None
-        
+
         # Initialize metrics if enabled
         self.metrics = OutboxMetrics() if settings.enable_metrics else None
 
@@ -141,7 +141,7 @@ class EventRelayWorker:
                         f"Processing {len(events)} unpublished events from outbox",
                         extra={"event_count": len(events), "service": self.service_name},
                     )
-                    
+
                     # Update metrics
                     if self.metrics:
                         self.metrics.set_queue_depth(len(events))
@@ -162,11 +162,11 @@ class EventRelayWorker:
                     extra={"error": str(e), "service": self.service_name},
                     exc_info=True,
                 )
-                
+
                 # Record error in metrics
                 if self.metrics:
                     self.metrics.increment_errors()
-                
+
                 # Continue running but with a longer delay after error
                 await asyncio.sleep(self.settings.error_retry_interval_seconds)
 
@@ -196,11 +196,11 @@ class EventRelayWorker:
                     event_id=event.id,
                     error=f"Exceeded max retries ({self.settings.max_retries})",
                 )
-                
+
                 # Update metrics
                 if self.metrics:
                     self.metrics.increment_failed_events()
-                
+
                 return
 
             # Extract topic from event data
@@ -218,7 +218,8 @@ class EventRelayWorker:
                         topic = "unknown.events"  # Fallback topic
                 else:
                     logger.warning(
-                        f"No topic found in event data and no mapper provided for {event.event_type}",
+                        f"No topic found in event data and no mapper provided for "
+                        f"{event.event_type}",
                         extra={"event_type": event.event_type, "service": self.service_name},
                     )
                     topic = "unknown.events"  # Fallback topic
@@ -268,7 +269,7 @@ class EventRelayWorker:
                     "service": self.service_name,
                 },
             )
-            
+
             # Update metrics
             if self.metrics:
                 self.metrics.increment_published_events()
@@ -293,7 +294,7 @@ class EventRelayWorker:
                 event_id=event.id,
                 error=error_message,
             )
-            
+
             # Update metrics
             if self.metrics:
                 self.metrics.increment_errors()

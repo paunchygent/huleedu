@@ -6,7 +6,7 @@ reliably published to Kafka, implementing the Transactional Outbox Pattern
 for the File Service.
 
 Revision ID: 0001
-Revises: 
+Revises:
 Create Date: 2025-07-25
 """
 
@@ -97,7 +97,7 @@ def upgrade() -> None:
     )
 
     # Create indexes for efficient querying
-    
+
     # Index for polling unpublished events (partial index)
     op.create_index(
         "ix_event_outbox_unpublished",
@@ -106,7 +106,7 @@ def upgrade() -> None:
         unique=False,
         postgresql_where=sa.text("published_at IS NULL"),
     )
-    
+
     # Index for looking up events by aggregate
     op.create_index(
         "ix_event_outbox_aggregate",
@@ -114,7 +114,7 @@ def upgrade() -> None:
         ["aggregate_type", "aggregate_id"],
         unique=False,
     )
-    
+
     # Index for monitoring/debugging by event type
     op.create_index(
         "ix_event_outbox_event_type",
@@ -130,6 +130,6 @@ def downgrade() -> None:
     op.drop_index("ix_event_outbox_event_type", table_name="event_outbox")
     op.drop_index("ix_event_outbox_aggregate", table_name="event_outbox")
     op.drop_index("ix_event_outbox_unpublished", table_name="event_outbox")
-    
+
     # Drop table
     op.drop_table("event_outbox")

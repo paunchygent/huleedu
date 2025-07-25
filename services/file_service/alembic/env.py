@@ -22,10 +22,11 @@ project_root = Path(__file__).parents[3]
 sys.path.insert(0, str(project_root))
 
 # Now we can import from the project
-from libs.huleedu_service_libs.src.huleedu_service_libs.outbox.models import Base as OutboxBase
-
 # Load configuration
 from dotenv import find_dotenv, load_dotenv
+
+from libs.huleedu_service_libs.src.huleedu_service_libs.outbox.models import Base as OutboxBase
+
 load_dotenv(find_dotenv(".env"))
 
 # This is the Alembic Config object, which provides
@@ -52,20 +53,20 @@ def get_url() -> str:
         # Fallback to local development configuration
         db_user = os.getenv("HULEEDU_DB_USER")
         db_password = os.getenv("HULEEDU_DB_PASSWORD")
-        
+
         if not db_user or not db_password:
             raise ValueError(
                 "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
                 "HULEEDU_DB_PASSWORD are set in your .env file."
             )
-        
+
         # File Service specific database
         db_name = "file_service_db"
         db_host = os.getenv("HULEEDU_DB_HOST", "localhost")
         db_port = os.getenv("HULEEDU_DB_PORT", "5439")  # File Service specific port
-        
+
         url = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-    
+
     # Convert asyncpg to psycopg2 for synchronous operations
     if url.startswith("postgresql+asyncpg://"):
         url = url.replace("postgresql+asyncpg://", "postgresql://")
@@ -114,11 +115,11 @@ async def run_migrations_online() -> None:
     # Convert back to async for online mode
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+asyncpg://")
-    
+
     # Create async engine configuration
     configuration = config.get_section(config.config_ini_section) or {}
     configuration["sqlalchemy.url"] = url
-    
+
     # Create async engine
     connectable = AsyncEngine(
         engine_from_config(

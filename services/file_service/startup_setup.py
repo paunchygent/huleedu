@@ -6,11 +6,11 @@ from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
+from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from quart import Quart
 from quart_dishka import QuartDishka
 
 from services.file_service.config import Settings
-from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from services.file_service.di import CoreInfrastructureProvider, ServiceImplementationsProvider
 
 logger = create_service_logger("file_service.startup")
@@ -63,7 +63,7 @@ async def shutdown_services(app: Quart | None = None) -> None:
             relay_worker = app.extensions["relay_worker"]
             await relay_worker.stop()
             logger.info("EventRelayWorker stopped")
-        
+
         # Close any other async resources if needed
         logger.info("File Service shutdown completed")
     except Exception as e:

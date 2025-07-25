@@ -22,7 +22,7 @@ logger = create_service_logger("file_service.repository")
 class MinimalFileRepository(FileRepositoryProtocol):
     """
     Minimal implementation of FileRepositoryProtocol.
-    
+
     Currently provides no-op implementations as File Service is stateless.
     This repository exists to support the outbox pattern infrastructure
     and can be extended in the future for tracking file processing history.
@@ -31,7 +31,7 @@ class MinimalFileRepository(FileRepositoryProtocol):
     def __init__(self, engine: AsyncEngine) -> None:
         """
         Initialize the repository with a database engine.
-        
+
         Args:
             engine: SQLAlchemy async engine (required for consistency with other services)
         """
@@ -48,7 +48,7 @@ class MinimalFileRepository(FileRepositoryProtocol):
     ) -> None:
         """
         Record file processing event (no-op for now).
-        
+
         This is a placeholder that can be implemented when File Service
         needs to track processing history in the database.
         """
@@ -69,7 +69,7 @@ class MinimalFileRepository(FileRepositoryProtocol):
     ) -> list[dict[str, Any]]:
         """
         Retrieve file processing history (returns empty list for now).
-        
+
         This is a placeholder that can be implemented when File Service
         needs to track processing history in the database.
         """

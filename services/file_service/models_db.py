@@ -16,7 +16,7 @@ Base = declarative_base()
 # File Service currently doesn't have domain-specific models
 # as it's primarily a stateless file processing service.
 # The event outbox table is provided by the shared library.
-# 
+#
 # Future models could include:
 # - FileProcessingHistory: Track processed files
 # - FileMetadata: Store additional file information

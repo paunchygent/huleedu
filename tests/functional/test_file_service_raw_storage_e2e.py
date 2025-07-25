@@ -112,8 +112,8 @@ async def test_file_service_events_contain_raw_storage_id():
                         assert "raw_file_storage_id" in event_data, (
                             "Missing raw_file_storage_id in failure event"
                         )
-                        validation_detail = event_data.get('validation_error_detail', {})
-                        error_message = validation_detail.get('message', 'Unknown error')
+                        validation_detail = event_data.get("validation_error_detail", {})
+                        error_message = validation_detail.get("message", "Unknown error")
                         print(
                             f"⚠️ Unexpected validation failure: {error_message}",
                         )

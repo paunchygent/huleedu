@@ -26,7 +26,20 @@ Example: `huleedu.essay.spellcheck.requested.v1`
 - **FORBIDDEN**: Large data blobs in events
 - **MUST** use `StorageReferenceMetadata` for data references
 
-## 3. Kafka Topics
+## 3. Event Publishing
+
+### 3.1. Transactional Outbox Pattern (Preferred)
+- **MUST** use outbox pattern for business-critical events
+- **Pattern**: Store events in database transaction, relay worker publishes to Kafka
+- **Benefits**: Atomicity, reliability, Kafka downtime tolerance
+- **Implementation**: Use `huleedu_service_libs.outbox` components
+
+### 3.2. Direct Kafka Publishing (Limited Use)
+- **Use Cases**: Non-critical events, external integrations
+- **Requirements**: Must handle Kafka failures gracefully
+- **Pattern**: Circuit breaker protection with graceful degradation
+
+### 3.3. Kafka Topics
 - **Naming**: `<project>.<environment>.<domain>.<entity>`
 - **Publication**: Serialize `EventEnvelope` to JSON
 
@@ -43,5 +56,11 @@ Example: `huleedu.essay.spellcheck.requested.v1`
 - **MUST** use generic platform error handling patterns
 - **MUST** implement correlation ID propagation
 - **MUST** use `HuleEduError` for structured error reporting
+
+### 6.1. Outbox Pattern Error Handling
+- **Database Transaction Failures**: Business operation and event storage both rollback
+- **Kafka Failures**: Events accumulate in outbox, automatic retry when Kafka recovers
+- **Relay Worker Failures**: Events marked for retry up to configurable max attempts
+- **Poison Events**: Failed events logged and marked as permanently failed
 
 Use graceful degradation as a **platform standard** for all event-driven services

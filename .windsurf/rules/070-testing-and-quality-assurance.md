@@ -87,9 +87,101 @@ def _clear_prometheus_registry():
 
 See [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc) Section 8.2 for Pydantic testing patterns.
 
-## 8. Performance Testing Strategy
+## 8. Outbox Pattern Testing Guidelines
 
-### 8.1. Testing Strategy Matrix
+### 8.1. Unit Testing Outbox Repository
+
+```python
+@pytest.mark.asyncio
+async def test_outbox_repository_stores_event():
+    """Test outbox repository in isolation."""
+    outbox_repo = PostgreSQLOutboxRepository(test_engine)
+    
+    event_id = await outbox_repo.add_event(
+        aggregate_id="test-123",
+        aggregate_type="test_entity",
+        event_type="test.event.v1",
+        event_data={"test": "data"},
+        topic="test.events",
+    )
+    
+    # Verify event stored correctly
+    event = await outbox_repo.get_event_by_id(event_id)
+    assert event.aggregate_id == "test-123"
+    assert event.published_at is None  # Not yet published
+```
+
+### 8.2. Integration Testing with Testcontainers
+
+```python
+@pytest.mark.asyncio
+async def test_event_relay_worker_publishes_events(
+    postgres_container,
+    kafka_container,
+):
+    """Test relay worker with real infrastructure."""
+    outbox_repo = PostgreSQLOutboxRepository(postgres_engine)
+    kafka_bus = KafkaBus(kafka_container.bootstrap_servers)
+    
+    worker = EventRelayWorker(
+        outbox_repository=outbox_repo,
+        kafka_bus=kafka_bus,
+        settings=OutboxSettings(poll_interval_seconds=0.1),
+        service_name="test_service",
+    )
+    
+    # Store test event
+    await outbox_repo.add_event(
+        aggregate_id="test-123",
+        event_data={"topic": "test.events", "data": "test"},
+        topic="test.events",
+    )
+    
+    # Verify event published
+    await worker.start()
+    await asyncio.sleep(0.2)
+    await worker.stop()
+    
+    events = await outbox_repo.get_unpublished_events()
+    assert len(events) == 0  # All events published
+```
+
+### 8.3. Business Logic with Outbox Testing
+
+```python
+@pytest.mark.asyncio
+async def test_business_operation_with_outbox():
+    """Test atomic business logic and event storage."""
+    async with test_session.begin() as session:
+        # Business operation
+        result = await repository.update_entity(
+            entity_id="test-id",
+            updates={"status": "processed"},
+            session=session,
+        )
+        
+        # Verify outbox event stored
+        await outbox_repository.add_event(
+            aggregate_id="test-id",
+            event_data={"result": result.model_dump()},
+            session=session,
+        )
+        
+        # Both operations committed atomically
+        await session.commit()
+    
+    # Verify both database and outbox updated
+    entity = await repository.get_entity("test-id")
+    assert entity.status == "processed"
+    
+    events = await outbox_repository.get_unpublished_events()
+    assert len(events) == 1
+    assert events[0].aggregate_id == "test-id"
+```
+
+## 9. Performance Testing Strategy
+
+### 9.1. Testing Strategy Matrix
 
 | Test Type         | Infrastructure | LLM Provider | Purpose                    | Example Use Case |
 |------------------|----------------|--------------|----------------------------|------------------|
@@ -97,6 +189,7 @@ See [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc) Section 8
 | Integration      | Real          | Mock         | Infrastructure validation | Database/Queue performance |
 | Performance      | Real          | Mock         | Meaningful metrics        | Redis pipeline benchmarks |
 | E2E             | Real          | Real         | Full system validation    | End-to-end workflows |
+| Outbox Testing   | Real (testcontainers) | Mock | Event reliability | Outbox + relay worker |
 
 ### 8.2. Infrastructure vs Mock Testing Guidelines
 

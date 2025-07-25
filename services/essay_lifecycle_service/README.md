@@ -30,6 +30,7 @@ ELS is a hybrid service combining a Kafka-based worker for asynchronous processi
 - **Primary Processing Engine**: A Kafka consumer worker (`worker_main.py`) handles events and commands.
 - **API Layer**: A Quart application (`app.py`) provides RESTful endpoints. It's served by Hypercorn.
 - **State Persistence**: The service uses a dual-repository pattern. **PostgreSQL** is the production database, implemented via `PostgreSQLEssayRepository`. For development and testing, an `SQLiteEssayStateStore` is used.
+- **Event Publishing**: Implements the **Transactional Outbox Pattern** for reliable event delivery. Events are stored in the `event_outbox` table within the same transaction as business logic, then published asynchronously by the Event Relay Worker.
 - **Dependency Injection**: Utilizes Dishka for managing dependencies. Providers in `di.py` supply implementations for protocols defined in `protocols.py`.
 - **Implementation Layer**: Business logic is cleanly separated in the `implementations/` directory, covering command handlers, event publishers, and repository logic.
 - **Batch Coordination**: The `batch_tracker.py` module implements count-based aggregation for coordinating batch readiness.
@@ -49,6 +50,7 @@ ELS participates in these communication patterns:
   - **Excess Content**: `ExcessContentProvisionedV1` to BOS for content overflow.
   - **Service Requests**: `EssayLifecycleSpellcheckRequestV1` to specialized services.
   - **Phase Outcome (CRITICAL)**: `ELSBatchPhaseOutcomeV1` to BOS, reporting the result of a completed phase for an entire batch, enabling the next step in the dynamic pipeline.
+  - **All events published via Transactional Outbox Pattern** for guaranteed delivery and consistency.
 
 - **HTTP API**:
   - **Query-Only**: Provides read-only access to essay and batch state information.
@@ -96,6 +98,74 @@ Circuit breaker metrics are integrated into the service's Prometheus metrics:
 - **`circuit_breaker_calls_total`**: Call result counter with labels: `service`, `circuit_name`, `result` (success/failure/blocked)
 
 Circuit breakers protect Kafka publishing operations and are configurable via `ESSAY_LIFECYCLE_SERVICE_CIRCUIT_BREAKER_` environment variables.
+
+## 🔄 Transactional Outbox Pattern
+
+ELS implements the Transactional Outbox Pattern to ensure atomic database updates and reliable event publishing:
+
+### Event Publishing Architecture
+
+```python
+# Event storage in outbox (same transaction as business logic)
+async def publish_to_outbox(
+    self,
+    aggregate_type: str,
+    aggregate_id: str,
+    event_type: str,
+    event_data: EventEnvelope[Any],
+    topic: str,
+) -> None:
+    """Store event in outbox for reliable delivery."""
+    serialized_data = event_data.model_dump(mode="json")
+    serialized_data["topic"] = topic
+    
+    await self.outbox_repository.add_event(
+        aggregate_id=aggregate_id,
+        aggregate_type=aggregate_type,
+        event_type=event_type,
+        event_data=serialized_data,
+        event_key=aggregate_id,
+    )
+```
+
+### Event Relay Worker
+
+The Event Relay Worker runs as a background task, polling the outbox table and publishing events to Kafka:
+
+- **Poll Interval**: 5 seconds (configurable)
+- **Batch Size**: 100 events per poll
+- **Retry Logic**: Up to 5 attempts with exponential backoff
+- **Error Handling**: Failed events marked with error details
+- **Monitoring**: Prometheus metrics for queue depth, success/failure rates
+
+### Database Schema
+
+```sql
+CREATE TABLE event_outbox (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aggregate_id VARCHAR(255) NOT NULL,
+    aggregate_type VARCHAR(100) NOT NULL,
+    event_type VARCHAR(255) NOT NULL,
+    event_data JSONB NOT NULL,
+    event_key VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    published_at TIMESTAMPTZ,
+    retry_count INTEGER DEFAULT 0,
+    last_error TEXT
+);
+
+-- Performance indexes
+CREATE INDEX ix_event_outbox_unpublished ON event_outbox (published_at, created_at) 
+WHERE published_at IS NULL;
+```
+
+### Benefits
+
+- **Atomicity**: Events published only if business transaction succeeds
+- **Reliability**: Events persist until successfully published to Kafka
+- **Resilience**: Tolerates Kafka downtime without data loss
+- **Observability**: Comprehensive metrics and error tracking
+- **Consistency**: All inter-service events use the same reliable pattern
 
 ## 📊 Technical Patterns
 

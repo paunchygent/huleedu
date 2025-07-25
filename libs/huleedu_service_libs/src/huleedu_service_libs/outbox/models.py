@@ -14,8 +14,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, DateTime, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQL_UUID
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, declarative_base, mapped_column
 
 Base = declarative_base()
 

@@ -116,6 +116,4 @@ class OutboxMetrics:
 
     def observe_processing_time(self, duration_seconds: float) -> None:
         """Record the processing time for an event."""
-        outbox_relay_processing_seconds.labels(service=self.service_name).observe(
-            duration_seconds
-        )
+        outbox_relay_processing_seconds.labels(service=self.service_name).observe(duration_seconds)

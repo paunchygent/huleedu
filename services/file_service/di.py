@@ -10,7 +10,7 @@ from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.outbox import OutboxProvider, OutboxRepositoryProtocol
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.outbox.relay import OutboxSettings
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient

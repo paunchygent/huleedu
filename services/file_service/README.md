@@ -17,7 +17,9 @@ The service follows HuleEdu's standard microservice patterns:
 
 - **Blueprint-based API**: Organized route definitions in `api/` directory.
 - **Protocol-based DI**: Clean architecture with Dishka dependency injection.
-- **Event-driven coordination**: Publishes events to Kafka for ELS.
+- **Event-driven coordination**: Publishes events to Kafka for ELS via **Transactional Outbox Pattern**.
+- **Reliable Event Publishing**: All events stored in `event_outbox` table for guaranteed delivery.
+- **Event Relay Worker**: Background worker publishes events asynchronously from outbox to Kafka.
 - **Async operations**: Full async/await implementation.
 
 ## API Endpoints
@@ -48,6 +50,8 @@ The service uses Pydantic settings with the `FILE_SERVICE_` environment variable
 
 ## Event Integration
 
+All events are published using the **Transactional Outbox Pattern** to ensure reliable delivery and atomicity with business operations.
+
 ### Published Events
 
 #### `EssayContentProvisionedV1` (on Success)
@@ -55,12 +59,20 @@ The service uses Pydantic settings with the `FILE_SERVICE_` environment variable
 - **Topic:** `huleedu.file.essay.content.provisioned.v1`
 - **Purpose**: Published when a file is successfully validated and its text content is stored.
 - **Payload**: Includes `batch_id`, `original_file_name`, `raw_file_storage_id`, and `text_storage_id`.
+- **Delivery**: Stored in outbox table, published asynchronously by Event Relay Worker.
 
 #### `EssayValidationFailedV1` (on Failure)
 
 - **Topic:** `huleedu.file.essay.validation.failed.v1`
 - **Purpose**: Published when a file fails the content validation step. This is critical for ELS to adjust its batch expectations and prevent stalls.
 - **Payload**: Includes `batch_id`, `original_file_name`, `raw_file_storage_id` (for traceability), and a specific `validation_error_code`.
+- **Delivery**: Guaranteed delivery via outbox pattern, even if Kafka is temporarily unavailable.
+
+#### `BatchFileAddedV1` / `BatchFileRemovedV1`
+
+- **Purpose**: File management events for batch coordination.
+- **Dual Publishing**: Stored in outbox for Kafka delivery + immediate Redis notification for real-time UI updates.
+- **Resilience**: Outbox ensures Kafka delivery; Redis failures don't affect core functionality.
 
 ## Development
 
@@ -217,7 +229,70 @@ if storage_failed:
     await event_publisher.publish_essay_validation_failed(event, correlation_id)
 ```
 
-### 5. Performance Optimization
+### 5. Transactional Outbox Pattern
+
+**Event Publishing Architecture**:
+
+```python
+class DefaultEventPublisher(EventPublisherProtocol):
+    def __init__(
+        self,
+        kafka_bus: KafkaPublisherProtocol,
+        outbox_repository: OutboxRepositoryProtocol,
+        settings: Settings,
+    ):
+        self.kafka_bus = kafka_bus
+        self.outbox_repository = outbox_repository
+        self.settings = settings
+
+    async def publish_essay_content_provisioned(
+        self,
+        event_data: EssayContentProvisionedV1,
+        correlation_id: UUID,
+    ) -> None:
+        """Publish event via transactional outbox."""
+        envelope = EventEnvelope[EssayContentProvisionedV1](
+            event_type=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
+            source_service=self.settings.SERVICE_NAME,
+            correlation_id=correlation_id,
+            data=event_data,
+        )
+        
+        # Store in outbox for reliable delivery
+        await self.outbox_repository.add_event(
+            aggregate_id=event_data.file_upload_id,
+            aggregate_type="file_upload",
+            event_type=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
+            event_data=envelope.model_dump(mode="json"),
+            topic=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
+            event_key=event_data.file_upload_id,
+        )
+```
+
+**Database Schema**:
+
+```sql
+CREATE TABLE event_outbox (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aggregate_id VARCHAR(255) NOT NULL,
+    aggregate_type VARCHAR(100) NOT NULL,
+    event_type VARCHAR(255) NOT NULL,
+    event_data JSONB NOT NULL,
+    event_key VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    published_at TIMESTAMPTZ,
+    retry_count INTEGER DEFAULT 0,
+    last_error TEXT
+);
+
+-- Optimized for relay worker polling
+CREATE INDEX ix_event_outbox_unpublished ON event_outbox (published_at, created_at) 
+WHERE published_at IS NULL;
+```
+
+**Event Relay Worker**: Background worker polls outbox every 5 seconds, publishes events to Kafka with retry logic up to 5 attempts.
+
+### 6. Performance Optimization
 
 **Concurrent file processing** with task management:
 
@@ -260,6 +335,16 @@ METRICS = {
     "content_validation_duration_seconds": Histogram(
         "file_service_content_validation_duration_seconds",
         "Time spent validating extracted content"
+    ),
+    # Outbox pattern metrics
+    "outbox_queue_depth_total": Gauge(
+        "file_service_outbox_queue_depth_total",
+        "Number of unpublished events in outbox"
+    ),
+    "outbox_events_published_total": Counter(
+        "file_service_outbox_events_published_total",
+        "Total events successfully published from outbox",
+        ["event_type"]
     )
 }
 ```
@@ -268,3 +353,5 @@ METRICS = {
 - All file operations use async/await
 - HTTP client session reused via DI (`Scope.APP`)
 - No blocking I/O in request handlers
+- Event Relay Worker runs as background task
+- Outbox repository uses connection pooling for optimal performance

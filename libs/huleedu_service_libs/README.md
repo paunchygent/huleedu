@@ -31,7 +31,8 @@ huleedu_service_libs/
 ├── middleware/             # Framework-specific middleware
 ├── observability/          # Distributed tracing
 ├── resilience/             # Circuit breakers & resilience
-└── error_handling/         # Enhanced error context
+├── error_handling/         # Enhanced error context
+└── outbox/                 # Transactional outbox pattern
 ```
 
 ## Installation
@@ -53,6 +54,7 @@ This library documentation is organized into focused areas for better navigation
 ### Core Infrastructure
 - **[Kafka & Redis](docs/kafka-redis.md)** - Event publishing and distributed caching patterns
 - **[Database Utilities](docs/database.md)** - PostgreSQL monitoring, health checks, and metrics
+- **[Transactional Outbox](docs/outbox.md)** - Reliable event publishing with database consistency
 - **[Error Handling](docs/error-handling.md)** - Structured error handling with framework separation
 
 ### Observability & Reliability
@@ -108,6 +110,49 @@ from huleedu_service_libs.error_handling import (
     raise_validation_error,
     raise_authentication_error
 )
+```
+
+### Transactional Outbox Pattern
+
+```python
+from huleedu_service_libs.outbox import (
+    PostgreSQLOutboxRepository, 
+    EventRelayWorker, 
+    OutboxSettings,
+    OutboxProvider
+)
+
+# In your service's di.py
+class ServiceProvider(Provider):
+    @provide(scope=Scope.APP)
+    async def provide_outbox_repository(self, engine: AsyncEngine) -> OutboxRepositoryProtocol:
+        return PostgreSQLOutboxRepository(engine)
+    
+    @provide(scope=Scope.APP)
+    async def provide_event_relay_worker(
+        self,
+        outbox_repo: OutboxRepositoryProtocol,
+        kafka_bus: KafkaPublisherProtocol,
+        settings: Settings,
+    ) -> EventRelayWorker:
+        return EventRelayWorker(
+            outbox_repository=outbox_repo,
+            kafka_bus=kafka_bus,
+            settings=OutboxSettings(),
+            service_name=settings.SERVICE_NAME,
+        )
+
+# In your event publisher
+async def publish_event(self, event_data, correlation_id, aggregate_id):
+    envelope = EventEnvelope(...)
+    await self.outbox_repository.add_event(
+        aggregate_id=aggregate_id,
+        aggregate_type="entity",
+        event_type=envelope.event_type,
+        event_data=envelope.model_dump(mode="json"),
+        topic="entity.events",
+        event_key=aggregate_id,
+    )
 ```
 
 ### Idempotent Event Processing
@@ -172,6 +217,15 @@ from huleedu_service_libs.protocols import (
     KafkaPublisherProtocol,      # Event publishing
     RedisClientProtocol,         # Redis operations
     AtomicRedisClientProtocol,   # Redis transactions
+)
+
+from huleedu_service_libs.outbox import (
+    OutboxRepositoryProtocol,    # Outbox storage operations
+    EventOutbox,                 # SQLAlchemy model
+    PostgreSQLOutboxRepository,  # Default outbox implementation
+    EventRelayWorker,            # Background event publisher
+    OutboxSettings,              # Worker configuration
+    OutboxProvider,              # DI provider
 )
 ```
 
