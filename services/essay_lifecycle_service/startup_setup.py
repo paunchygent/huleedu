@@ -5,6 +5,7 @@ from __future__ import annotations
 from dishka import make_async_container
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.outbox import OutboxProvider
 from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 
@@ -42,6 +43,7 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
             ServiceClientsProvider(),
             CommandHandlerProvider(),
             BatchCoordinationProvider(),
+            OutboxProvider(),
         )
         QuartDishka(app=app, container=container)
 

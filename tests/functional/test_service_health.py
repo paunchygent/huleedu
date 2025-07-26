@@ -27,7 +27,7 @@ class TestServiceHealth:
         expected_services = [
             "content_service",
             "batch_orchestrator_service",
-            "essay_lifecycle_service",
+            "essay_lifecycle_api",
             "file_service",
         ]
 
