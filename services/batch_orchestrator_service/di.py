@@ -11,12 +11,15 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.relay import OutboxSettings
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
 from huleedu_service_libs.resilience.resilient_client import make_resilient
 from prometheus_client import CollectorRegistry
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from services.batch_orchestrator_service.config import Settings, settings
 from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import (
@@ -200,9 +203,38 @@ class CoreInfrastructureProvider(Provider):
 
         return redis_client
 
+    @provide(scope=Scope.APP)
+    def provide_service_name(self, settings: Settings) -> str:
+        """Provide service name for outbox configuration."""
+        return settings.SERVICE_NAME
+
+    @provide(scope=Scope.APP)
+    def provide_outbox_settings(self, settings: Settings) -> OutboxSettings:
+        """Provide custom outbox settings from service configuration."""
+        return OutboxSettings(
+            poll_interval_seconds=settings.OUTBOX_POLL_INTERVAL_SECONDS,
+            batch_size=settings.OUTBOX_BATCH_SIZE,
+            max_retries=settings.OUTBOX_MAX_RETRIES,
+            error_retry_interval_seconds=settings.OUTBOX_ERROR_RETRY_INTERVAL_SECONDS,
+            enable_metrics=True,
+        )
+
 
 class RepositoryAndPublishingProvider(Provider):
     """Provider for data repository and event publishing dependencies."""
+
+    @provide(scope=Scope.APP)
+    async def provide_database_engine(self, settings: Settings) -> AsyncEngine:
+        """Provide async database engine for outbox pattern."""
+        engine = create_async_engine(
+            settings.database_url,
+            echo=False,
+            future=True,
+            pool_size=settings.DB_POOL_SIZE,
+            max_overflow=settings.DB_MAX_OVERFLOW,
+            pool_pre_ping=True,  # Validate connections before use
+        )
+        return engine
 
     @provide(scope=Scope.APP)
     def provide_database_metrics(self, settings: Settings) -> DatabaseMetrics:
@@ -227,10 +259,13 @@ class RepositoryAndPublishingProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_batch_event_publisher(
-        self, kafka_bus: KafkaPublisherProtocol
+        self,
+        kafka_bus: KafkaPublisherProtocol,
+        outbox_repository: OutboxRepositoryProtocol,
+        settings: Settings,
     ) -> BatchEventPublisherProtocol:
-        """Provide batch event publisher implementation."""
-        return DefaultBatchEventPublisherImpl(kafka_bus)
+        """Provide batch event publisher implementation with outbox support."""
+        return DefaultBatchEventPublisherImpl(kafka_bus, outbox_repository, settings)
 
 
 class ExternalClientsProvider(Provider):

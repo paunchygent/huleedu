@@ -9,6 +9,7 @@ from huleedu_service_libs import init_tracing
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
+from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 
@@ -35,11 +36,12 @@ logger = create_service_logger("bos.startup")
 # Global references for service management (unavoidable for Quart lifecycle)
 kafka_consumer_instance: BatchKafkaConsumer | None = None
 consumer_task: asyncio.Task | None = None
+event_relay_worker: EventRelayWorker | None = None
 
 
 async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
     """Initialize DI container, Quart-Dishka integration, metrics, and Kafka consumer."""
-    global kafka_consumer_instance, consumer_task
+    global kafka_consumer_instance, consumer_task, event_relay_worker
 
     try:
         # Initialize DI container with all provider instances
@@ -53,6 +55,7 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
             PipelineCoordinationProvider(),
             EventHandlingProvider(),
             InitiatorMapProvider(),
+            OutboxProvider(),
         )
 
         # Initialize guaranteed HuleEduApp infrastructure immediately
@@ -92,9 +95,15 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
             consumer_task = asyncio.create_task(kafka_consumer_instance.start_consumer())
             logger.info("Kafka consumer background task started")
 
+            # Start EventRelayWorker for outbox pattern
+            event_relay_worker = await request_container.get(EventRelayWorker)
+            await event_relay_worker.start()
+            app.extensions["relay_worker"] = event_relay_worker
+            logger.info("EventRelayWorker started for outbox pattern")
+
         logger.info(
             "Batch Orchestrator Service DI container, quart-dishka integration, "
-            "and Kafka consumer initialized successfully.",
+            "Kafka consumer, and outbox worker initialized successfully.",
         )
     except Exception as e:
         logger.critical(f"Failed to initialize Batch Orchestrator Service: {e}", exc_info=True)
@@ -102,10 +111,16 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
 
 
 async def shutdown_services() -> None:
-    """Gracefully shutdown the Kafka consumer and background tasks."""
-    global kafka_consumer_instance, consumer_task
+    """Gracefully shutdown the Kafka consumer, outbox worker, and background tasks."""
+    global kafka_consumer_instance, consumer_task, event_relay_worker
 
     try:
+        # Stop EventRelayWorker first
+        if event_relay_worker:
+            logger.info("Stopping EventRelayWorker...")
+            await event_relay_worker.stop()
+            logger.info("EventRelayWorker stopped")
+
         if kafka_consumer_instance:
             logger.info("Stopping Kafka consumer...")
             await kafka_consumer_instance.stop_consumer()

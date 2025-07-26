@@ -281,6 +281,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         Handle validation failure by adjusting batch expectations.
 
         Prevents ELS from waiting indefinitely for content that will never arrive.
+        If batch doesn't exist yet, stores failure as pending.
         """
         validation_failed = EssayValidationFailedV1.model_validate(event_data)
         batch_id = validation_failed.batch_id
@@ -303,6 +304,16 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         }
 
         await self._redis_coordinator.track_validation_failure(batch_id, failure_data)
+
+        # Check if batch exists before attempting completion check
+        batch_status = await self._redis_coordinator.get_batch_status(batch_id)
+        if batch_status is None:
+            # Batch not registered yet - failure stored as pending
+            self._logger.info(
+                f"Stored pending validation failure for unregistered batch {batch_id}: "
+                f"{validation_failed.validation_error_code} ({validation_failed.original_file_name})"
+            )
+            return None
 
         # Get current failure count
         failure_count = await self._redis_coordinator.get_validation_failure_count(batch_id)

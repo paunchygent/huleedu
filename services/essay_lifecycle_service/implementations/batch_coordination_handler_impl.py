@@ -93,6 +93,30 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 },
             )
 
+            # Check if batch is immediately complete due to pending failures
+            batch_completion_result = await self.batch_tracker.check_batch_completion(
+                event_data.batch_id
+            )
+            if batch_completion_result is not None:
+                batch_ready_event, original_correlation_id = batch_completion_result
+                # Use original correlation ID from batch registration
+                publish_correlation_id = original_correlation_id or correlation_id
+
+                logger.info(
+                    "Batch is immediately complete due to pending failures, publishing BatchEssaysReady event",
+                    extra={
+                        "batch_id": batch_ready_event.batch_id,
+                        "ready_count": len(batch_ready_event.ready_essays),
+                        "validation_failures": len(batch_ready_event.validation_failures or []),
+                        "correlation_id": str(publish_correlation_id),
+                    },
+                )
+
+                await self.event_publisher.publish_batch_essays_ready(
+                    event_data=batch_ready_event,
+                    correlation_id=publish_correlation_id,
+                )
+
             return True
 
         except Exception as e:

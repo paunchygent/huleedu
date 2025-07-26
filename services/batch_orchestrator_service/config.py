@@ -91,6 +91,20 @@ class Settings(BaseSettings):
         default=1000, description="Maximum size of fallback queue for failed Kafka messages"
     )
 
+    # Outbox Pattern Settings
+    OUTBOX_POLL_INTERVAL_SECONDS: float = Field(
+        default=5.0, description="How often to poll for new events in the outbox"
+    )
+    OUTBOX_BATCH_SIZE: int = Field(
+        default=100, description="Maximum number of events to process per poll"
+    )
+    OUTBOX_MAX_RETRIES: int = Field(
+        default=5, description="Maximum retry attempts before marking event as failed"
+    )
+    OUTBOX_ERROR_RETRY_INTERVAL_SECONDS: float = Field(
+        default=30.0, description="How long to wait after an error before retrying"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

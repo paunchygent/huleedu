@@ -80,11 +80,13 @@ class FakeRedisClient:
         if self.should_fail:
             raise Exception(self.failure_message)
 
-        self.notifications.append({
-            "user_id": user_id,
-            "event_type": event_type,
-            "data": data,
-        })
+        self.notifications.append(
+            {
+                "user_id": user_id,
+                "event_type": event_type,
+                "data": data,
+            }
+        )
 
 
 @pytest.fixture
@@ -219,9 +221,7 @@ class TestDefaultEventPublisher:
 
         # When
         with patch("huleedu_service_libs.observability.inject_trace_context"):
-            await event_publisher.publish_essay_validation_failed(
-                event_data, sample_correlation_id
-            )
+            await event_publisher.publish_essay_validation_failed(event_data, sample_correlation_id)
 
         # Then
         assert len(fake_outbox.add_event_calls) == 1
@@ -259,9 +259,7 @@ class TestDefaultEventPublisher:
 
         # When
         with patch("huleedu_service_libs.observability.inject_trace_context"):
-            await event_publisher.publish_batch_file_added_v1(
-                event_data, sample_correlation_id
-            )
+            await event_publisher.publish_batch_file_added_v1(event_data, sample_correlation_id)
 
         # Then - Verify outbox storage
         assert len(fake_outbox.add_event_calls) == 1
@@ -302,9 +300,7 @@ class TestDefaultEventPublisher:
 
         # When
         with patch("huleedu_service_libs.observability.inject_trace_context"):
-            await event_publisher.publish_batch_file_removed_v1(
-                event_data, sample_correlation_id
-            )
+            await event_publisher.publish_batch_file_removed_v1(event_data, sample_correlation_id)
 
         # Then - Verify outbox storage
         assert len(fake_outbox.add_event_calls) == 1
@@ -379,9 +375,7 @@ class TestDefaultEventPublisher:
         # When
         with patch("huleedu_service_libs.observability.inject_trace_context"):
             # Should not raise exception despite Redis failure
-            await event_publisher.publish_batch_file_added_v1(
-                event_data, sample_correlation_id
-            )
+            await event_publisher.publish_batch_file_added_v1(event_data, sample_correlation_id)
 
         # Then - Verify outbox storage succeeded
         assert len(fake_outbox.add_event_calls) == 1
@@ -412,10 +406,7 @@ class TestDefaultEventPublisher:
         mock_inject = Mock()
 
         # When
-        with patch(
-            "huleedu_service_libs.observability.inject_trace_context",
-            mock_inject
-        ):
+        with patch("huleedu_service_libs.observability.inject_trace_context", mock_inject):
             await event_publisher.publish_essay_content_provisioned(
                 event_data, sample_correlation_id
             )
@@ -462,9 +453,7 @@ class TestDefaultEventPublisher:
 
         # When
         with patch("huleedu_service_libs.observability.inject_trace_context"):
-            await event_publisher.publish_essay_validation_failed(
-                event_data, sample_correlation_id
-            )
+            await event_publisher.publish_essay_validation_failed(event_data, sample_correlation_id)
 
         # Then
         call = fake_outbox.add_event_calls[0]

@@ -312,8 +312,6 @@ class ServiceResultHandler(Protocol):
         ...
 
 
-
-
 class BatchPhaseCoordinator(Protocol):
     """Protocol for coordinating batch-level phase completion and outcome publishing."""
 

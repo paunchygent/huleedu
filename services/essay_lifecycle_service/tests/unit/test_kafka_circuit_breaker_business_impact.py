@@ -267,7 +267,9 @@ class TestBatchCoordinationBusinessImpact:
             )
 
         # Verify it's a database/outbox error
-        assert "Database connection lost" in str(exc_info.value) or "EXTERNAL_SERVICE_ERROR" in str(exc_info.value)
+        assert "Database connection lost" in str(exc_info.value) or "EXTERNAL_SERVICE_ERROR" in str(
+            exc_info.value
+        )
 
         # Assert: Verify outbox storage was attempted and failed
         mock_outbox_repository.add_event.assert_called()
@@ -387,7 +389,9 @@ class TestBatchCoordinationBusinessImpact:
             )
 
         # Verify it's a database/outbox error
-        assert "Database write failed" in str(exc_info.value) or "EXTERNAL_SERVICE_ERROR" in str(exc_info.value)
+        assert "Database write failed" in str(exc_info.value) or "EXTERNAL_SERVICE_ERROR" in str(
+            exc_info.value
+        )
 
         # Assert: Business impact verification
         # Even though the handler raised an exception, we can verify partial progress
@@ -505,7 +509,9 @@ class TestServiceRequestDispatchBusinessImpact:
         Note: With outbox pattern, we test database failures during dispatch.
         """
         # Arrange: Set up outbox to fail when storing CJ assessment requests
-        mock_outbox_repository.add_event.side_effect = Exception("Database connection pool exhausted")
+        mock_outbox_repository.add_event.side_effect = Exception(
+            "Database connection pool exhausted"
+        )
 
         # Create a mock Kafka bus (won't be used directly with outbox pattern)
         failing_kafka_bus = AsyncMock(spec=KafkaPublisherProtocol)
@@ -829,7 +835,9 @@ class TestBusinessWorkflowRecoveryScenarios:
 
         # Verify Redis operations only happen after outbox recovery
         # (Redis is only called when outbox succeeds with the outbox pattern)
-        assert mock_redis_client.publish_user_notification.call_count == 1  # Only called on the successful third attempt
+        assert (
+            mock_redis_client.publish_user_notification.call_count == 1
+        )  # Only called on the successful third attempt
 
 
 # Integration test combining multiple business impact scenarios
@@ -916,7 +924,9 @@ class TestBusinessImpactIntegrationScenarios:
 
         # Note: Batch registration doesn't publish events, only registers with tracker and creates DB records
         assert kafka_bus.publish.call_count == 0
-        assert mock_outbox_repository.add_event.call_count == 0  # No events published during registration
+        assert (
+            mock_outbox_repository.add_event.call_count == 0
+        )  # No events published during registration
 
         # Step 2: Status update (should fail - first outbox call)
         essay_ref = EntityReference(

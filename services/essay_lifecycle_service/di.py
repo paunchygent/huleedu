@@ -269,7 +269,6 @@ class ServiceClientsProvider(Provider):
         return DefaultSpecializedServiceRequestDispatcher(kafka_bus, settings, outbox_repository)
 
 
-
 class CommandHandlerProvider(Provider):
     """Provider for command handler implementations."""
 

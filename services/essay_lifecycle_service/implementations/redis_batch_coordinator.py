@@ -77,6 +77,8 @@ class RedisBatchCoordinator:
         """
         Initialize available slots for batch with metadata.
 
+        Also processes any pending validation failures that arrived before registration.
+
         Args:
             batch_id: The batch identifier
             essay_ids: List of essay IDs to use as slots
@@ -125,9 +127,63 @@ class RedisBatchCoordinator:
                 f"Registered batch {batch_id} with {len(essay_ids)} slots, timeout: {timeout}s"
             )
 
+            # Process any pending validation failures
+            await self._process_pending_failures(batch_id, timeout)
+
         except Exception as e:
             self._logger.error(f"Failed to register batch {batch_id}: {e}", exc_info=True)
             raise
+
+    async def _process_pending_failures(self, batch_id: str, timeout: int) -> None:
+        """
+        Process pending validation failures that arrived before batch registration.
+
+        Args:
+            batch_id: The batch identifier
+            timeout: The batch timeout in seconds
+        """
+        try:
+            pending_key = self._get_pending_failures_key(batch_id)
+            failures_key = self._get_validation_failures_key(batch_id)
+            slots_key = self._get_available_slots_key(batch_id)
+
+            # Get all pending failures
+            pending_failures = await self._redis.lrange(pending_key, 0, -1)
+            if not pending_failures:
+                return
+
+            self._logger.info(
+                f"Processing {len(pending_failures)} pending validation failures for batch {batch_id}"
+            )
+
+            # Use atomic transaction to move failures and adjust slots
+            pipeline = await self._redis.create_transaction_pipeline()
+            pipeline.multi()
+
+            # Move failures from pending to actual failures list
+            for failure_json in pending_failures:
+                pipeline.rpush(failures_key, failure_json)
+                # Remove a slot for each failure
+                pipeline.spop(slots_key)
+
+            # Delete pending failures key
+            pipeline.delete_key(pending_key)
+
+            # Set TTL on failures key
+            pipeline.expire(failures_key, timeout)
+
+            # Execute atomically
+            results = await pipeline.execute()
+
+            self._logger.info(
+                f"Processed {len(pending_failures)} pending validation failures for batch {batch_id}"
+            )
+
+        except Exception as e:
+            self._logger.error(
+                f"Failed to process pending failures for batch {batch_id}: {e}", exc_info=True
+            )
+            # Don't raise - this is a best-effort operation
 
     async def assign_slot_atomic(
         self, batch_id: str, content_metadata: dict[str, Any]
@@ -451,6 +507,8 @@ class RedisBatchCoordinator:
                 self._get_metadata_key(batch_id),
                 self._get_timeout_key(batch_id),
                 self._get_content_assignments_key(batch_id),  # Clean up content deduplication data
+                self._get_validation_failures_key(batch_id),  # Clean up validation failures
+                self._get_pending_failures_key(batch_id),  # Clean up any remaining pending failures
             ]
 
             for key in keys_to_delete:
@@ -568,18 +626,43 @@ class RedisBatchCoordinator:
         """Get Redis key for validation failures list."""
         return f"batch:{batch_id}:validation_failures"
 
+    def _get_pending_failures_key(self, batch_id: str) -> str:
+        """Get Redis key for pending validation failures that arrived before batch registration."""
+        return f"batch:{batch_id}:pending_failures"
+
     async def track_validation_failure(self, batch_id: str, failure: dict[str, Any]) -> None:
         """
         Track a validation failure for a batch atomically.
+
+        If batch doesn't exist yet, stores the failure as pending to be processed
+        when the batch is registered. This handles race conditions where validation
+        failures arrive before batch registration.
 
         Args:
             batch_id: The batch identifier
             failure: Validation failure data (will be JSON-encoded)
         """
         try:
+            # First check if batch exists
+            batch_status = await self.get_batch_status(batch_id)
+            failure_json = json.dumps(failure)
+
+            if batch_status is None:
+                # Batch not registered yet - store as pending failure
+                pending_key = self._get_pending_failures_key(batch_id)
+                await self._redis.rpush(pending_key, failure_json)
+                # Set TTL on pending failures to prevent memory leak
+                await self._redis.expire(pending_key, 86400)  # 24 hours
+
+                self._logger.info(
+                    f"Stored pending validation failure for unregistered batch {batch_id}: "
+                    f"{failure.get('original_file_name', 'unknown')}"
+                )
+                return
+
+            # Batch exists - process normally
             failures_key = self._get_validation_failures_key(batch_id)
             slots_key = self._get_available_slots_key(batch_id)
-            failure_json = json.dumps(failure)
 
             # Use atomic transaction to ensure both operations succeed or fail together
             pipeline = await self._redis.create_transaction_pipeline()

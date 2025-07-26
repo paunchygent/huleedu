@@ -214,9 +214,8 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
                     print("✅ Found validation failure event with raw_file_storage_id")
                     print(f"   - raw_file_storage_id: {event_data['raw_file_storage_id']}")
                     print(f"   - validation_error_code: {event_data['validation_error_code']}")
-                    print(
-                        f"   - validation_error_message: {event_data['validation_error_detail']['message']}",
-                    )
+                    error_msg = event_data['validation_error_detail']['message']
+                    print(f"   - validation_error_message: {error_msg}")
 
                     event_received = True
                     break
