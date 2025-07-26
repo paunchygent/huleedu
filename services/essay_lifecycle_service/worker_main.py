@@ -23,6 +23,7 @@ from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from opentelemetry.trace import Tracer
 
@@ -34,7 +35,6 @@ from services.essay_lifecycle_service.di import (
     CoreInfrastructureProvider,
     ServiceClientsProvider,
 )
-from services.essay_lifecycle_service.implementations.event_relay_worker import EventRelayWorker
 from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
     BatchCoordinationHandler,
@@ -227,6 +227,7 @@ async def main() -> None:
         ServiceClientsProvider(),
         CommandHandlerProvider(),
         BatchCoordinationProvider(),
+        OutboxProvider(),
     )
 
     consumer = None

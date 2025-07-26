@@ -12,10 +12,10 @@ from uuid import UUID
 if TYPE_CHECKING:
     from common_core.metadata_models import EntityReference
     from common_core.status_enums import EssayStatus
+    from huleedu_service_libs.outbox import OutboxRepositoryProtocol
     from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
     from services.essay_lifecycle_service.config import Settings
-    from services.essay_lifecycle_service.protocols import OutboxRepositoryProtocol
 
 from huleedu_service_libs.error_handling import (
     raise_external_service_error,
@@ -622,6 +622,7 @@ class DefaultEventPublisher(EventPublisher):
                 aggregate_type=aggregate_type,
                 event_type=event_type,
                 event_data=serialized_data,
+                topic=topic,
                 event_key=event_key,
             )
 

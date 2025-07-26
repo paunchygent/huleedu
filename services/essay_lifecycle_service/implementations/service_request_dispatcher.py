@@ -13,10 +13,10 @@ from uuid import UUID
 if TYPE_CHECKING:
     from common_core.events.ai_feedback_events import AIFeedbackInputDataV1
     from common_core.metadata_models import EssayProcessingInputRefV1
+    from huleedu_service_libs.outbox import OutboxRepositoryProtocol
     from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
     from services.essay_lifecycle_service.config import Settings
-    from services.essay_lifecycle_service.protocols import OutboxRepositoryProtocol
 
 from common_core.domain_enums import CourseCode, Language
 from huleedu_service_libs.error_handling import (
@@ -113,12 +113,12 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
                 # Serialize envelope for outbox storage
                 event_data = envelope.model_dump(mode="json")
-                event_data["topic"] = topic  # Add topic to event data for relay worker
                 await self.outbox_repository.add_event(
                     aggregate_id=essay_ref.essay_id,
                     aggregate_type="essay",
                     event_type=envelope.event_type,
                     event_data=event_data,
+                    topic=topic,
                     event_key=essay_ref.essay_id,
                 )
 
@@ -259,12 +259,12 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
             topic = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
             # For batch-level events, use batch_id as aggregate
             event_data = envelope.model_dump(mode="json")
-            event_data["topic"] = topic  # Add topic to event data for relay worker
             await self.outbox_repository.add_event(
                 aggregate_id=batch_id,
                 aggregate_type="batch",
                 event_type=envelope.event_type,
                 event_data=event_data,
+                topic=topic,
                 event_key=batch_id,
             )
 

@@ -152,15 +152,13 @@ class TestBatchCoordinationBusinessImpact:
         BUSINESS SCENARIO: BatchEssaysReady event storage fails during slot fulfillment.
         BUSINESS IMPACT: Batches get stuck in content provisioning state permanently.
         WORKFLOW DISRUPTION: No processing phases (spellcheck, assessment) initiated.
-        
+
         Note: With outbox pattern, we test database failures, not direct Kafka failures.
         """
         # Arrange: Set up outbox repository to fail when trying to store BatchEssaysReady
-        from huleedu_service_libs.error_handling import HuleEduError
-        
+
         # Make outbox fail specifically for batch ready events
         mock_outbox_repository.add_event.side_effect = Exception("Database connection lost")
-        
         event_publisher = DefaultEventPublisher(
             kafka_bus=failing_kafka_bus,
             settings=mock_settings,
@@ -307,12 +305,12 @@ class TestBatchCoordinationBusinessImpact:
         BUSINESS SCENARIO: Content provisioning completes but readiness event storage fails.
         BUSINESS IMPACT: Essays are ready for processing but batch never transitions.
         WORKFLOW DISRUPTION: Batch appears incomplete despite all content being ready.
-        
+
         Note: With outbox pattern, we test database failures, not direct Kafka failures.
         """
         # Arrange: Set up outbox to fail when storing batch ready events
         mock_outbox_repository.add_event.side_effect = Exception("Database write failed")
-        
+
         event_publisher = DefaultEventPublisher(
             kafka_bus=failing_kafka_bus,
             settings=mock_settings,
@@ -406,7 +404,7 @@ class TestBatchCoordinationBusinessImpact:
 
         # Verify outbox storage was attempted and failed
         mock_outbox_repository.add_event.assert_called()
-        
+
         # Kafka should NOT be called directly with outbox pattern
         failing_kafka_bus.publish.assert_not_called()
 
@@ -438,12 +436,12 @@ class TestServiceRequestDispatchBusinessImpact:
         BUSINESS SCENARIO: Spellcheck request storage fails after batch readiness.
         BUSINESS IMPACT: Processing pipeline starts but specialized services never engaged.
         WORKFLOW DISRUPTION: Essays remain in "awaiting spellcheck" state indefinitely.
-        
+
         Note: With outbox pattern, we test database failures during dispatch.
         """
         # Arrange: Set up outbox to fail when storing spellcheck requests
         mock_outbox_repository.add_event.side_effect = Exception("Database unavailable")
-        
+
         dispatcher = DefaultSpecializedServiceRequestDispatcher(
             kafka_bus=failing_kafka_bus,
             settings=mock_settings,
@@ -475,7 +473,7 @@ class TestServiceRequestDispatchBusinessImpact:
 
         # Verify outbox storage was attempted and failed
         mock_outbox_repository.add_event.assert_called()
-        
+
         # Kafka should NOT be called directly with outbox pattern
         assert failing_kafka_bus.publish.call_count == 0
 
@@ -503,12 +501,12 @@ class TestServiceRequestDispatchBusinessImpact:
         BUSINESS SCENARIO: CJ assessment request storage fails during dispatch.
         BUSINESS IMPACT: Batch processing stalls at assessment phase.
         WORKFLOW DISRUPTION: Essays remain in "awaiting assessment" state indefinitely.
-        
+
         Note: With outbox pattern, we test database failures during dispatch.
         """
         # Arrange: Set up outbox to fail when storing CJ assessment requests
         mock_outbox_repository.add_event.side_effect = Exception("Database connection pool exhausted")
-        
+
         # Create a mock Kafka bus (won't be used directly with outbox pattern)
         failing_kafka_bus = AsyncMock(spec=KafkaPublisherProtocol)
 
@@ -545,7 +543,7 @@ class TestServiceRequestDispatchBusinessImpact:
 
         # Verify outbox storage was attempted and failed
         mock_outbox_repository.add_event.assert_called_once()
-        
+
         # Kafka should NOT be called directly with outbox pattern
         assert failing_kafka_bus.publish.call_count == 0
 
@@ -584,12 +582,12 @@ class TestDualChannelPublishingBusinessImpact:
         BUSINESS SCENARIO: Event storage succeeds but Redis notifications fail.
         BUSINESS IMPACT: Essay status updates are stored for eventual delivery but not in UI.
         WORKFLOW DISRUPTION: Teachers see stale status while processing continues.
-        
+
         Note: With outbox pattern, events are stored first, then Redis notification attempted.
         """
         # Arrange: Outbox succeeds, Redis fails
         working_kafka_bus = AsyncMock(spec=KafkaPublisherProtocol)
-        
+
         # Outbox will succeed
         mock_outbox_repository.add_event.return_value = uuid4()
 
@@ -629,7 +627,7 @@ class TestDualChannelPublishingBusinessImpact:
 
         # Verify outbox storage succeeded before the Redis failure
         mock_outbox_repository.add_event.assert_called_once()
-        
+
         # Kafka should NOT be called directly with outbox pattern
         working_kafka_bus.publish.assert_not_called()
 
@@ -665,7 +663,7 @@ class TestDualChannelPublishingBusinessImpact:
         BUSINESS SCENARIO: Event storage fails, preventing both service and UI updates.
         BUSINESS IMPACT: Neither services nor UI receive status updates.
         WORKFLOW DISRUPTION: Complete communication breakdown for essay status.
-        
+
         Note: With outbox pattern, database storage failure prevents all downstream notifications.
         """
         # Arrange: Outbox fails, preventing any notifications
@@ -708,10 +706,10 @@ class TestDualChannelPublishingBusinessImpact:
 
         # Verify outbox storage was attempted and failed
         mock_outbox_repository.add_event.assert_called_once()
-        
+
         # Kafka should NOT be called directly with outbox pattern
         kafka_bus.publish.assert_not_called()
-        
+
         # Redis should NOT be called because outbox failed first
         working_redis_client.publish_user_notification.assert_not_called()
 
@@ -748,18 +746,18 @@ class TestBusinessWorkflowRecoveryScenarios:
         BUSINESS SCENARIO: Outbox storage recovers during batch processing workflow.
         BUSINESS IMPACT: Events can be stored again, workflow continues.
         RECOVERY VERIFICATION: Business continuity restored without data loss.
-        
+
         Note: With outbox pattern, we test database recovery scenarios.
         """
         # Arrange: Initially failing outbox that will recover
         call_attempts: list[int] = []
 
-        def outbox_side_effect(*args: Any, **kwargs: Any) -> UUID:
+        def outbox_side_effect(*_args: Any, **_kwargs: Any) -> str:
             call_attempts.append(len(call_attempts))
             if len(call_attempts) <= 2:  # First 2 calls fail
                 raise Exception("Database temporarily unavailable")
             else:  # Subsequent calls succeed
-                return uuid4()
+                return str(uuid4())
 
         mock_outbox_repository.add_event.side_effect = outbox_side_effect
 
@@ -790,7 +788,7 @@ class TestBusinessWorkflowRecoveryScenarios:
                 status=EssayStatus.AWAITING_SPELLCHECK,
                 correlation_id=correlation_id,
             )
-        
+
         # Verify it's an external service error (database)
         assert "EXTERNAL_SERVICE_ERROR" in str(exc_info.value)
 
@@ -801,7 +799,7 @@ class TestBusinessWorkflowRecoveryScenarios:
                 status=EssayStatus.SPELLCHECKING_IN_PROGRESS,
                 correlation_id=correlation_id,
             )
-        
+
         # Verify it's still a database error
         assert "EXTERNAL_SERVICE_ERROR" in str(exc_info.value)
 
@@ -815,7 +813,7 @@ class TestBusinessWorkflowRecoveryScenarios:
         # Assert: Recovery verification
         assert len(call_attempts) >= 3
         assert mock_outbox_repository.add_event.call_count >= 3
-        
+
         # Kafka should NOT be called directly with outbox pattern
         kafka_bus.publish.assert_not_called()
 
@@ -852,20 +850,20 @@ class TestBusinessImpactIntegrationScenarios:
         BUSINESS SCENARIO: Complete batch workflow with intermittent outbox failures.
         BUSINESS IMPACT: Test end-to-end business resilience during database issues.
         INTEGRATION VERIFICATION: Business workflows remain functional despite failures.
-        
+
         Note: With outbox pattern, we test database/outbox intermittent failures.
         """
         # Arrange: Outbox with realistic intermittent failures
         # Set up specific side effects for each outbox call
         # Call 0: Failure (first status update)
-        # Call 1: Success (second status update) 
+        # Call 1: Success (second status update)
         # Call 2: Success (if needed)
         mock_outbox_repository.add_event.side_effect = [
             Exception("Database connection lost"),  # Call 0: Failure (first status update)
             uuid4(),  # Call 1: Success (second status update)
             uuid4(),  # Call 2: Success (if needed)
         ]
-        
+
         # Create mock Kafka bus (won't be called directly with outbox pattern)
         kafka_bus = AsyncMock(spec=KafkaPublisherProtocol)
 

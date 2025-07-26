@@ -15,6 +15,8 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.relay import OutboxSettings
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
@@ -46,15 +48,11 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
     PostgreSQLEssayRepository,
 )
 from services.essay_lifecycle_service.implementations.event_publisher import DefaultEventPublisher
-from services.essay_lifecycle_service.implementations.event_relay_worker import EventRelayWorker
 from services.essay_lifecycle_service.implementations.future_services_command_handlers import (
     FutureServicesCommandHandler,
 )
 from services.essay_lifecycle_service.implementations.metrics_collector import (
     DefaultMetricsCollector,
-)
-from services.essay_lifecycle_service.implementations.outbox_repository_impl import (
-    PostgreSQLOutboxRepository,
 )
 from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
     RedisBatchCoordinator,
@@ -77,7 +75,6 @@ from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
     EventPublisher,
     MetricsCollector,
-    OutboxRepositoryProtocol,
     ServiceResultHandler,
     SpecializedServiceRequestDispatcher,
 )
@@ -223,9 +220,20 @@ class CoreInfrastructureProvider(Provider):
             return postgres_repo
 
     @provide(scope=Scope.APP)
-    def provide_outbox_repository(self, engine: AsyncEngine) -> OutboxRepositoryProtocol:
-        """Provide outbox repository for transactional event publishing."""
-        return PostgreSQLOutboxRepository(engine)
+    def provide_service_name(self, settings: Settings) -> str:
+        """Provide service name for outbox configuration."""
+        return settings.SERVICE_NAME
+
+    @provide(scope=Scope.APP)
+    def provide_outbox_settings(self, settings: Settings) -> OutboxSettings:
+        """Provide custom outbox settings from service configuration."""
+        return OutboxSettings(
+            poll_interval_seconds=settings.OUTBOX_POLL_INTERVAL_SECONDS,
+            batch_size=settings.OUTBOX_BATCH_SIZE,
+            max_retries=settings.OUTBOX_MAX_RETRIES,
+            error_retry_interval_seconds=settings.OUTBOX_ERROR_RETRY_INTERVAL_SECONDS,
+            enable_metrics=True,
+        )
 
 
 class ServiceClientsProvider(Provider):
@@ -260,15 +268,6 @@ class ServiceClientsProvider(Provider):
         """Provide specialized service request dispatcher implementation with outbox support."""
         return DefaultSpecializedServiceRequestDispatcher(kafka_bus, settings, outbox_repository)
 
-    @provide(scope=Scope.APP)
-    def provide_event_relay_worker(
-        self,
-        outbox_repository: OutboxRepositoryProtocol,
-        kafka_bus: KafkaPublisherProtocol,
-        settings: Settings,
-    ) -> EventRelayWorker:
-        """Provide event relay worker for processing outbox events."""
-        return EventRelayWorker(outbox_repository, kafka_bus, settings)
 
 
 class CommandHandlerProvider(Provider):
