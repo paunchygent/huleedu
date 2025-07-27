@@ -70,7 +70,7 @@ class TestClientPipelineResolutionWorkflow:
         required_services = [
             "batch_orchestrator_service",
             "batch_conductor_service",
-            "essay_lifecycle_service",
+            "essay_lifecycle_api",
             "content_service",
         ]
 
