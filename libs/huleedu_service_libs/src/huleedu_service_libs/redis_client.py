@@ -665,6 +665,71 @@ class RedisClient(AtomicRedisClientProtocol):
             )
             raise
 
+    async def lpush(self, key: str, *values: str) -> int:
+        """
+        Prepend values to a Redis list.
+
+        Args:
+            key: Redis key for the list
+            values: One or more values to prepend
+
+        Returns:
+            Length of the list after operation
+        """
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            result = await self.client.lpush(key, *values)
+            length = int(result)
+            logger.debug(
+                f"Redis LPUSH by '{self.client_id}': key='{key}' "
+                f"added={len(values)} values, new_length={length}",
+            )
+            return length
+        except Exception as e:
+            logger.error(
+                f"Error in Redis LPUSH operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def blpop(self, keys: list[str], timeout: float = 0) -> tuple[str, str] | None:
+        """
+        Remove and get the first element in a list, or block until one is available.
+
+        Args:
+            keys: List of keys to check
+            timeout: Maximum time in seconds to block. 0 means block indefinitely.
+
+        Returns:
+            Tuple of (key, value) if an element was popped, None if timeout
+        """
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            result = await self.client.blpop(keys, timeout=timeout)
+            if result:
+                key, value = result
+                logger.debug(
+                    f"Redis BLPOP by '{self.client_id}': keys={keys} "
+                    f"timeout={timeout}s got value from key='{key}'",
+                )
+                return (key, value)
+            else:
+                logger.debug(
+                    f"Redis BLPOP by '{self.client_id}': keys={keys} "
+                    f"timeout={timeout}s timed out",
+                )
+                return None
+        except Exception as e:
+            logger.error(
+                f"Error in Redis BLPOP operation by '{self.client_id}' for keys {keys}: {e}",
+                exc_info=True,
+            )
+            raise
+
     async def ttl(self, key: str) -> int:
         """
         Get TTL of a Redis key in seconds.

@@ -25,7 +25,7 @@ sys.path.insert(0, str(project_root))
 # Load configuration
 from dotenv import find_dotenv, load_dotenv
 
-from libs.huleedu_service_libs.src.huleedu_service_libs.outbox.models import Base as OutboxBase
+from huleedu_service_libs.outbox.models import Base as OutboxBase
 
 load_dotenv(find_dotenv(".env"))
 

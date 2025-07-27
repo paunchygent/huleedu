@@ -199,25 +199,6 @@ class EventPublisher(Protocol):
         """Publish ELSBatchPhaseOutcomeV1 event when batch phase is complete."""
         ...
 
-    async def publish_to_outbox(
-        self,
-        aggregate_type: str,
-        aggregate_id: str,
-        event_type: str,
-        event_data: Any,  # EventEnvelope[Any]
-        topic: str,
-    ) -> None:
-        """
-        Store event in outbox for reliable delivery.
-
-        Args:
-            aggregate_type: Type of aggregate (e.g., "essay", "batch")
-            aggregate_id: ID of the aggregate that produced the event
-            event_type: Type of event being published
-            event_data: Complete event envelope to publish
-            topic: Kafka topic to publish to
-        """
-        ...
 
 
 class BatchCommandHandler(Protocol):
@@ -398,6 +379,12 @@ class BatchEssayTracker(Protocol):
         self, batch_id: str, internal_essay_id: str, text_storage_id: str
     ) -> Any | None:  # BatchEssaysReady | None
         """Mark a slot as fulfilled and check if batch is complete."""
+        ...
+
+    async def check_batch_completion(
+        self, batch_id: str
+    ) -> tuple[Any, UUID] | None:  # tuple[BatchEssaysReady, UUID] | None
+        """Check if batch is complete and return ready event with correlation ID if so."""
         ...
 
     async def get_batch_status(self, batch_id: str) -> dict[str, Any] | None:

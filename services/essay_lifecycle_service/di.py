@@ -16,7 +16,6 @@ from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
-from huleedu_service_libs.outbox.relay import OutboxSettings
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
@@ -223,17 +222,6 @@ class CoreInfrastructureProvider(Provider):
     def provide_service_name(self, settings: Settings) -> str:
         """Provide service name for outbox configuration."""
         return settings.SERVICE_NAME
-
-    @provide(scope=Scope.APP)
-    def provide_outbox_settings(self, settings: Settings) -> OutboxSettings:
-        """Provide custom outbox settings from service configuration."""
-        return OutboxSettings(
-            poll_interval_seconds=settings.OUTBOX_POLL_INTERVAL_SECONDS,
-            batch_size=settings.OUTBOX_BATCH_SIZE,
-            max_retries=settings.OUTBOX_MAX_RETRIES,
-            error_retry_interval_seconds=settings.OUTBOX_ERROR_RETRY_INTERVAL_SECONDS,
-            enable_metrics=True,
-        )
 
 
 class ServiceClientsProvider(Provider):
