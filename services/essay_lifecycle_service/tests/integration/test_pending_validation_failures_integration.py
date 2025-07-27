@@ -106,6 +106,25 @@ class TestPendingValidationFailuresIntegration:
 
         mock_redis.hset = AsyncMock(side_effect=mock_hset)
 
+        # Mock hlen for hash length
+        async def mock_hlen(key: str) -> int:
+            return len(mock_redis._data["hashes"].get(key, {}))
+
+        mock_redis.hlen = AsyncMock(side_effect=mock_hlen)
+
+        # Mock hget for hash field
+        async def mock_hget(key: str, field: str) -> str | None:
+            hash_data = mock_redis._data["hashes"].get(key, {})
+            return hash_data.get(field)
+
+        mock_redis.hget = AsyncMock(side_effect=mock_hget)
+        
+        # Mock get for string values
+        async def mock_get(key: str) -> str | None:
+            return mock_redis._data["strings"].get(key)
+
+        mock_redis.get = AsyncMock(side_effect=mock_get)
+
         # Mock llen for failure count
         async def mock_llen(key: str) -> int:
             return len(mock_redis._data["lists"].get(key, []))
@@ -132,8 +151,20 @@ class TestPendingValidationFailuresIntegration:
 
         mock_redis.set = AsyncMock(side_effect=mock_set)
 
+        # Mock set_if_not_exists for atomic completion flag
+        async def mock_set_if_not_exists(key: str, value: str, ttl_seconds: int | None = None) -> bool:
+            if key in mock_redis._data["strings"]:
+                return False
+            mock_redis._data["strings"][key] = value
+            return True
+
+        mock_redis.set_if_not_exists = AsyncMock(side_effect=mock_set_if_not_exists)
+
         # Mock expire
         mock_redis.expire = AsyncMock(return_value=True)
+        
+        # Mock ttl
+        mock_redis.ttl = AsyncMock(return_value=86400)  # Return a default TTL
 
         # Mock delete
         async def mock_delete(key: str) -> int:
@@ -174,6 +205,14 @@ class TestPendingValidationFailuresIntegration:
 
             def hset(self, key: str, field: str, value: str) -> MockPipeline:
                 self.operations.append(("hset", key, field, value))
+                return self
+
+            def hlen(self, key: str) -> MockPipeline:
+                self.operations.append(("hlen", key))
+                return self
+
+            def hget(self, key: str, field: str) -> MockPipeline:
+                self.operations.append(("hget", key, field))
                 return self
 
             def sadd(self, key: str, *values: str) -> MockPipeline:
@@ -237,6 +276,13 @@ class TestPendingValidationFailuresIntegration:
                             self.redis._data["hashes"][key] = {}
                         self.redis._data["hashes"][key][field] = value
                         results.append(1)
+                    elif op[0] == "hlen":
+                        _, key = op
+                        results.append(len(self.redis._data["hashes"].get(key, {})))
+                    elif op[0] == "hget":
+                        _, key, field = op
+                        hash_data = self.redis._data["hashes"].get(key, {})
+                        results.append(hash_data.get(field))
                     elif op[0] == "sadd":
                         _, key, value = op
                         if key not in self.redis._data["sets"]:
@@ -314,24 +360,44 @@ class TestPendingValidationFailuresIntegration:
     async def coordination_handler(
         self,
         batch_tracker: DefaultBatchEssayTracker,
-    ) -> tuple[DefaultBatchCoordinationHandler, AsyncMock]:
+        redis_client: AsyncMock,
+        settings: Settings,
+    ) -> tuple[DefaultBatchCoordinationHandler, DefaultEventPublisher]:
         """Create coordination handler with mocked dependencies."""
         from unittest.mock import AsyncMock
 
-        # Mock repository and event publisher (we're testing coordination logic)
+        # Mock repository (we're testing coordination logic)
         mock_repository = AsyncMock()
         mock_repository.create_essay_records_batch = AsyncMock()
 
-        mock_event_publisher = AsyncMock(spec=DefaultEventPublisher)
-        mock_event_publisher.publish_batch_essays_ready = AsyncMock()
+        # Mock Kafka bus
+        mock_kafka_bus = AsyncMock()
+        mock_kafka_bus.publish = AsyncMock()
+
+        # Mock outbox repository
+        mock_outbox_repository = AsyncMock()
+        mock_outbox_repository.add_event = AsyncMock(return_value=uuid4())
+
+        # Add lpush to existing redis_client mock for wake-up notifications
+        if not hasattr(redis_client, 'lpush'):
+            redis_client.lpush = AsyncMock(return_value=1)
+
+        # Create real event publisher with mocked dependencies
+        event_publisher = DefaultEventPublisher(
+            kafka_bus=mock_kafka_bus,
+            settings=settings,
+            redis_client=redis_client,
+            batch_tracker=batch_tracker,
+            outbox_repository=mock_outbox_repository,
+        )
 
         handler = DefaultBatchCoordinationHandler(
             batch_tracker=batch_tracker,
             repository=mock_repository,
-            event_publisher=mock_event_publisher,
+            event_publisher=event_publisher,
         )
 
-        return handler, mock_event_publisher
+        return handler, event_publisher
 
     async def test_validation_failure_before_batch_registration_completes_batch(
         self,
@@ -393,8 +459,8 @@ class TestPendingValidationFailuresIntegration:
             essay_instructions="Write an essay",
         )
 
-        # Unpack handler and mock event publisher
-        handler, mock_event_publisher = coordination_handler
+        # Unpack handler and event publisher
+        handler, event_publisher = coordination_handler
 
         # Act 2: Register batch (should process pending failure and complete)
         registration_result = await handler.handle_batch_essays_registered(
@@ -419,12 +485,21 @@ class TestPendingValidationFailuresIntegration:
         is_completed = await redis_client.exists(completed_key)
         assert is_completed is True
 
-        # Verify BatchEssaysReady event was published
-        mock_event_publisher.publish_batch_essays_ready.assert_called_once()
-        call_args = mock_event_publisher.publish_batch_essays_ready.call_args
-        ready_event = call_args.kwargs["event_data"]
+        # Verify BatchEssaysReady event was published via Kafka (Kafka-first pattern)
+        # Access the underlying Kafka bus mock from the event publisher
+        kafka_bus = event_publisher.kafka_bus
+        kafka_bus.publish.assert_called_once()
+        call_args = kafka_bus.publish.call_args
+        envelope = call_args.kwargs["envelope"]
+        
+        # Extract the event data from the envelope
+        # In Kafka-first pattern, the data is the actual object, not serialized
+        ready_event = envelope.data
+        
+        # Import the type to check
+        from common_core.events.batch_coordination_events import BatchEssaysReady
 
-        assert isinstance(ready_event, BatchEssaysReady)
+        assert isinstance(ready_event, BatchEssaysReady)  # Event is the actual object
         assert ready_event.batch_id == batch_id
         assert len(ready_event.ready_essays) == 0  # No successful essays
         assert ready_event.validation_failures is not None
@@ -498,18 +573,20 @@ class TestPendingValidationFailuresIntegration:
             essay_instructions="Write an essay",
         )
 
-        # Unpack handler and mock event publisher
-        handler, mock_event_publisher = coordination_handler
+        # Unpack handler and event publisher
+        handler, event_publisher = coordination_handler
         
-        # Track published events
+        # Track published events by wrapping the Kafka bus mock
         published_events = []
-        original_publish = mock_event_publisher.publish_batch_essays_ready
+        kafka_bus = event_publisher.kafka_bus
+        original_publish = kafka_bus.publish
 
-        async def capture_publish(event_data: Any, correlation_id: UUID) -> None:
-            published_events.append(event_data)
-            await original_publish(event_data, correlation_id)
+        async def capture_publish(**kwargs: Any) -> None:
+            if "envelope" in kwargs:
+                published_events.append(kwargs["envelope"].data)
+            return await original_publish(**kwargs)
 
-        mock_event_publisher.publish_batch_essays_ready = capture_publish
+        kafka_bus.publish = capture_publish
 
         # Act: Register batch
         registration_result = await handler.handle_batch_essays_registered(
@@ -527,6 +604,11 @@ class TestPendingValidationFailuresIntegration:
         # Batch should be completed immediately
         assert len(published_events) == 1
         ready_event = published_events[0]
+        
+        # Import the type to check
+        from common_core.events.batch_coordination_events import BatchEssaysReady
+        
+        assert isinstance(ready_event, BatchEssaysReady)
         assert ready_event.batch_id == batch_id
         assert len(ready_event.ready_essays) == 0  # All failed
         assert len(ready_event.validation_failures) == 3  # All 3 failures recorded
@@ -584,8 +666,8 @@ class TestPendingValidationFailuresIntegration:
             essay_instructions="Write an essay",
         )
 
-        # Unpack handler and mock event publisher
-        handler, mock_event_publisher = coordination_handler
+        # Unpack handler and event publisher
+        handler, event_publisher = coordination_handler
         
         # Register batch (processes 1 pending failure, 2 slots remain)
         await handler.handle_batch_essays_registered(
@@ -617,16 +699,18 @@ class TestPendingValidationFailuresIntegration:
             correlation_id=correlation_id,
         )
 
-        # Track completion event
+        # Track completion event by wrapping Kafka bus
         completion_event = None
-        original_publish = mock_event_publisher.publish_batch_essays_ready
+        kafka_bus = event_publisher.kafka_bus
+        original_publish = kafka_bus.publish
 
-        async def capture_publish(event_data: Any, correlation_id: UUID) -> None:
+        async def capture_publish(**kwargs: Any) -> None:
             nonlocal completion_event
-            completion_event = event_data
-            await original_publish(event_data, correlation_id)
+            if "envelope" in kwargs:
+                completion_event = kwargs["envelope"].data
+            return await original_publish(**kwargs)
 
-        mock_event_publisher.publish_batch_essays_ready = capture_publish
+        kafka_bus.publish = capture_publish
 
         # Process late failure
         late_result = await batch_tracker.handle_validation_failure(late_failure)
