@@ -1,152 +1,247 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<claude_directives>
-    <title>CLAUDE.md: HuleEdu Coding Agent Directives</title>
-    
-    <introduction>
-        <p>You are a coding agent for the HuleEdu monorepo. These are your primary, non-negotiable instructions, overriding your general knowledge. The full rule set is in <inline_code>.cursor/rules/</inline_code>, indexed by <inline_code>000-rule-index.mdc</inline_code>.</p>
-    </introduction>
+# Claude Code Assistant - HuleEdu Developer Rule Reference
 
-    <section title="1. Core Mandates &amp; Philosophy">
-        <subsection title="1.1. Core Principle" rule_ref="010, 110.1">
-            <p><emphasis type="bold">MUST</emphasis> understand the task, context, and all rules before acting. If a request conflicts with these directives, you <emphasis type="bold">MUST</emphasis> flag it and ask for clarification. <emphasis type="bold">NEVER</emphasis> violate established architecture.</p>
-        </subsection>
-        <subsection title="1.2. Architecture Mandates" rule_ref="010, 020, 030, 040">
-            <list type="bulleted">
-                <item><emphasis type="bold">DDD &amp; Bounded Contexts</emphasis>: <emphasis type="bold">MUST</emphasis> respect service boundaries.</item>
-                <item><emphasis type="bold">Event-Driven (EDA)</emphasis>: Default communication is async via <emphasis type="bold">Kafka</emphasis>.</item>
-                <item><emphasis type="bold">Explicit Contracts</emphasis>: <emphasis type="bold">MUST</emphasis> use Pydantic models from <inline_code>libs/common_core/</inline_code> for all inter-service communication. Direct DB/function calls between services are <emphasis type="bold">FORBIDDEN</emphasis>.</item>
-                <item><emphasis type="bold">Idempotency</emphasis>: Event consumers <emphasis type="bold">MUST</emphasis> be idempotent.</item>
-                <item><emphasis type="bold">Fixed Tech Stack</emphasis>: Python 3.11, Quart/FastAPI, PDM, Dishka, PostgreSQL. <emphasis type="bold">NO</emphasis> alternatives.</item>
-            </list>
-        </subsection>
-    </section>
+## **Workflow: The Unchanging Ritual**
 
-    <section title="2. Implementation &amp; Coding Standards">
-        <subsection title="2.1. Python Coding Standards" rule_ref="050">
-            <list type="bulleted">
-                <item><emphasis type="bold">Typing</emphasis>: <emphasis type="bold">MUST</emphasis> use full PEP 484 type hints. Use <inline_code>from __future__ import annotations</inline_code>. Avoid <inline_code>typing.Any</inline_code>.</item>
-                <item><emphasis type="bold">Docstrings</emphasis>: <emphasis type="bold">MUST</emphasis> use Google-style for all public members with Args/Returns/Raises sections.</item>
-                <item><emphasis type="bold">Formatting</emphasis>: Adhere to <emphasis type="bold">Ruff</emphasis> with <inline_code>line-length=100</inline_code>.</item>
-                <item><emphasis type="bold">File Size</emphasis>: <emphasis type="bold">MUST</emphasis> adhere to a 400 LoC limit. Propose refactoring for larger files.</item>
-            </list>
-        </subsection>
-        <subsection title="2.2. Dependency Injection (DI)" rule_ref="042">
-            <list type="bulleted">
-                <item><emphasis type="bold">Protocols First</emphasis>: Business logic <emphasis type="bold">MUST</emphasis> depend on <inline_code>typing.Protocol</inline_code>, not concrete classes.</item>
-                <item><emphasis type="bold">Dishka for DI</emphasis>: <emphasis type="bold">MUST</emphasis> use Dishka. Providers live in <inline_code>&lt;service&gt;/di.py</inline_code>.</item>
-                <item>
-                    <emphasis type="bold">DI Provider Pattern</emphasis>:
-                    <code language="python"><![CDATA[
-from __future__ import annotations
-from dishka import Provider, Scope, provide
-from huleedu_service_libs.clients import RedisClientProtocol
-from .implementations import MyServiceImpl
-from .protocols import MyServiceProtocol
+Your operational process for **every task** is fixed and non-negotiable.
 
-class ServiceProvider(Provider):
-    @provide(scope=Scope.APP)
-    async def provide_redis(self, settings: Settings) -> RedisClientProtocol:
-        # ... client creation and start() call ...
-        pass
+### **Step 1: Build Core Architectural Knowledge**
 
-    @provide(scope=Scope.REQUEST)
-    def provide_service(self, redis: RedisClientProtocol) -> MyServiceProtocol:
-        return MyServiceImpl(redis_client=redis)
-                    ]]></code>
-                </item>
-            </list>
-        </subsection>
-        <subsection title="2.3. Service Library Usage" rule_ref="020.11, 040">
-            <p><emphasis type="bold">MUST</emphasis> use <inline_code>huleedu-service-libs</inline_code> for infrastructure.</p>
-            <list type="bulleted">
-                <item><emphasis type="bold">FORBIDDEN</emphasis>: Direct imports of <inline_code>aiokafka</inline_code>, <inline_code>redis.asyncio</inline_code>, <inline_code>logging</inline_code>.</item>
-                <item><emphasis type="bold">REQUIRED</emphasis>: Use <inline_code>KafkaBus</inline_code>, <inline_code>RedisClient</inline_code>, and <inline_code>create_service_logger</inline_code>.</item>
-                <item><emphasis type="bold">REQUIRED</emphasis>: Wrap all Kafka consumers with <inline_code>@idempotent_consumer</inline_code>.</item>
-            </list>
-        </subsection>
-        <subsection title="2.4. Pydantic V2 Serialization" rule_ref="051">
-            <p>For JSON serialization (especially for Kafka), <emphasis type="bold">MUST</emphasis> use <inline_code>model_dump(mode="json")</inline_code> to handle <inline_code>UUID</inline_code> and <inline_code>datetime</inline_code> correctly.</p>
-            <code language="python"><![CDATA[
-def serialize_event(envelope: EventEnvelope) -> bytes:
-    """Serializes an EventEnvelope to JSON bytes for Kafka."""
-    json_payload = envelope.model_dump(mode="json")
-    return json.dumps(json_payload).encode("utf-8")
-            ]]></code>
-        </subsection>
-        <subsection title="2.5. SQLAlchemy &amp; Database" rule_ref="053, 042">
-            <list type="bulleted">
-                <item><emphasis type="bold">Repository Pattern</emphasis>: All DB access is via a repository implementing a <inline_code>Protocol</inline_code>.</item>
-                <item><emphasis type="bold">Session Management</emphasis>: Repository <emphasis type="bold">MUST</emphasis> manage its own <inline_code>async_sessionmaker</inline_code>.</item>
-                <item><emphasis type="bold">Eager Loading</emphasis>: <emphasis type="bold">MUST</emphasis> use <inline_code>options(selectinload(...))</inline_code> to prevent <inline_code>DetachedInstanceError</inline_code>.</item>
-            </list>
-            <code language="python"><![CDATA[
-class PostgreSQLRepositoryImpl(MyRepositoryProtocol):
-    def __init__(self, engine: AsyncEngine):
-        self._session_factory = async_sessionmaker(engine, expire_on_commit=False)
+#### **.cursor/rules/015-project-structure-standards.mdc MUST be RESPECTED**
 
-    async def get_class_with_students(self, class_id: UUID) -> UserClass | None:
-        async with self._session_factory() as session:
-            stmt = (
-                select(UserClass)
-                .where(UserClass.id == class_id)
-                .options(selectinload(UserClass.students))
-            )
-            return (await session.execute(stmt)).scalar_one_or_none()
-            ]]></code>
-        </subsection>
-        <subsection title="2.6. Import Resolution" rule_ref="055">
-            <p><emphasis type="bold">MUST</emphasis> use full, absolute module paths for all intra-repository imports to prevent conflicts.</p>
-            <code language="python"><![CDATA[
-# CORRECT
-from services.batch_orchestrator_service.protocols import BatchProcessingServiceProtocol
+#### **Begin each conversation by the files referenced below, as they provide a good overview of the project structure and architecture. You can use the index in the .cursor/rules/000-rule-index.mdc to navigate to the relevant files here and any other files you need to understand the project.**
 
-# INCORRECT
-from protocols import BatchProcessingServiceProtocol
-            ]]></code>
-        </subsection>
-    </section>
-    
-    <section title="3. Application &amp; Service Structure">
-        <subsection title="3.1. HTTP Service Blueprint" rule_ref="015, 041">
-             <p>HTTP services <emphasis type="bold">MUST</emphasis> use the Blueprint/Router pattern. <inline_code>app.py</inline_code>/<inline_code>main.py</inline_code> is for setup only (&lt;150 LoC); routes live in <inline_code>api/</inline_code> or <inline_code>routers/</inline_code>.</p>
-        </subsection>
-        <subsection title="3.2. Dockerization" rule_ref="084">
-            <p>Dockerfiles <emphasis type="bold">MUST</emphasis> set <inline_code>ENV PYTHONPATH=/app</inline_code>. <emphasis type="bold">MUST</emphasis> use Docker Compose v2 syntax (<inline_code>docker compose</inline_code>).</p>
-        </subsection>
-    </section>
+**MUST READ FIRST OR A CRITICAL FAILURE WILL OCCUR**
+.cursor/rules/080-repository-workflow-and-tooling.mdc
 
-    <section title="4. Tooling &amp; Workflow">
-        <subsection title="4.1. PDM is Law" rule_ref="081, 083">
-            <p><emphasis type="bold">PDM</emphasis> is the sole dependency manager. Use <inline_code>pdm run &lt;script_name&gt;</inline_code> for all tasks. Let PDM resolve dependency versions.</p>
-        </subsection>
-        <subsection title="4.2. Testing" rule_ref="070">
-            <list type="bulleted">
-                <item>Tests and <inline_code>mypy</inline_code> <emphasis type="bold">MUST</emphasis> be run from the repository root.</item>
-                <item>Mock dependencies at the <inline_code>Protocol</inline_code> boundary using DI.</item>
-                <item>
-                    <emphasis type="bold">Prometheus Metric Conflicts</emphasis>: <emphasis type="bold">MUST</emphasis> use a fixture to clear the Prometheus registry between tests.
-                    <code language="python"><![CDATA[
-# In tests/conftest.py
-@pytest.fixture(autouse=True)
-def _clear_prometheus_registry():
-    """Clears the Prometheus registry before each test."""
-    collectors = list(REGISTRY._collector_to_names.keys())
-    for collector in collectors:
-        REGISTRY.unregister(collector)
-    yield
-                    ]]></code>
-                </item>
-            </list>
-        </subsection>
-    </section>
+THEN:
 
-    <section title="5. Your Interaction Protocol" rule_ref="110">
-        <list type="numbered">
-            <item><emphasis type="bold">State Mode</emphasis>: Begin by stating your mode: Planning, Coding, Testing, etc.</item>
-            <item><emphasis type="bold">Plan First</emphasis>: Provide a numbered plan for non-trivial tasks.</item>
-            <item><emphasis type="bold">Generate Compliant Code</emphasis>: All code <emphasis type="bold">MUST</emphasis> adhere to all rules, including docstrings and types.</item>
-            <item><emphasis type="bold">Be Explicit</emphasis>: Use <inline_code>// ... existing code ...</inline_code> markers in file edits.</item>
-            <item><emphasis type="bold">Cite Sources</emphasis>: Reference rule numbers when applicable (e.g., "per Rule 053...").</item>
-        </list>
-    </section>
-</claude_directives>
+.cursor/rules/010-foundational-principles.mdc
+.cursor/rules/020-architectural-mandates.mdc
+.cursor/rules/030-event-driven-architecture-eda-standards.mdc
+.cursor/rules/042-async-patterns-and-di.mdc
+.cursor/rules/050-python-coding-standards.mdc
+.cursor/rules/100-terminology-and-definitions.mdc
+.cursor/rules/110.1-planning-mode.mdc
+.cursor/rules/110.2-coding-mode.mdc
+.cursor/rules/048-structured-error-handling-standards.mdc
+
+Before analyzing any specific task, you **MUST** first read and internalize the entire **Technical Reference** section of this document This summary of our core principles is your primary context. You must also access all rules referenced (.cursor/rules/) by using the index referenced in the below instructions (070 = .cursor/rules/070-testing-and-quality-assurance.mdc)
+
+### **Step 2: Task-Specific Analysis**
+
+1. **Select Interaction Mode:** Use the `.cursor/rules/110-ai-agent-interaction-modes.mdc` rule to select the correct mode for the given task (e.g., Planning, Coding, Debugging).
+2. **Consult Rule Index:** Use `.cursor/rules/000-rule-index.mdc` to identify any additional service-specific or pattern-specific rules relevant to the task.
+3. **Read Task Documentation:** Read the full task description from the `TASKS/` directory.
+
+When encountering errors or architectural questions:
+
+  1. **Investigate First, Propose Second**
+     - ALWAYS check the actual implementation before proposing changes
+     - Verify your assumptions by reading the code
+     - Look at how existing services solve similar problems
+
+  2. **Prefer Existing Patterns**
+     - Follow established patterns in the codebase
+     - Don't introduce new patterns without compelling reasons
+     - Simpler solutions are usually better
+
+  3. **Avoid Premature Architecture**
+     - Don't propose "dual" patterns, factories, or abstractions unless absolutely
+  necessary
+     - Single implementation > Multiple implementations
+     - Self-contained > Complex dependency injection
+
+  4. **Root Cause Analysis**
+     - Error messages often mask the real issue
+     - Import errors can cause cascade failures that look like design problems
+     - Fix the immediate issue before redesigning the system
+
+  Remember: The codebase already has working patterns. Use them.
+
+### **Step 3: Execution and Documentation**
+
+- **Document Progress:** As you complete meaningful work, update the relevant task document. Adhere to the standards in `/.cursor/rules/090-documentation-standards.mdc`. **NEVER CREATE FILES IN ROOT: FOLLOW THE APPROPRIATE FOLDER PATTERN**
+- **Update Rules:** If you identify outdated patterns or develop new best practices, you are required to propose updates to the rule files to ensure our architectural knowledge base remains current.
+- **Test and Verify:** All functional code changes require tests. Tests are only considered complete after they have been run at least once and confirmed as passing. Before concluding a task, run the appropriate test scope and verify that no regressions have been introduced.
+
+-----
+
+## **Technical Reference**
+
+### **`010: Foundational Principles`**
+
+#### 1\. Architecture Overview
+
+HuleEdu implements an event-driven microservice architecture using Domain-Driven Design (DDD) principles. Each service owns its bounded context, communicates primarily asynchronously via Kafka events, and may expose internal or external HTTP APIs for synchronous operations.
+
+#### 2\. Tech Stack
+
+- **Core Frameworks & Libraries**: Quart, PDM, Dishka, aiokafka, aiohttp, Pydantic (FastAPI in API Gateway)
+- **Database & Persistence**: PostgreSQL, SQLAlchemy, asyncpg, SQLite, aiosqlite, Filesystem
+- **Containerization & Orchestration**: Docker, Docker Compose
+- **Testing**: Pytest
+- **Monitoring & Observability**: Prometheus
+
+### **`020: Architectural Mandates`**
+
+#### 1\. Service Communication Patterns
+
+- **Asynchronous First**: The default communication pattern between services is asynchronous messaging via Kafka.
+- **Synchronous for Queries**: Direct HTTP calls between services are permitted for immediate, read-only queries or when a service requires an immediate response to continue its workflow.
+- **No Direct DB Access**: A service **MUST NEVER** access the database of another service directly.
+
+#### 2\. Database & Persistence
+
+- **SQLAlchemy ORM**: All database interactions **MUST** use SQLAlchemy's async capabilities with the `asyncpg` driver for PostgreSQL.
+  - **Evidence**: The use of `DeclarativeBase` and `Mapped` in **@services/batch\_orchestrator\_service/models\_db.py**.
+- **Service-Specific Databases**: Each service requiring persistence **MUST** have its own dedicated PostgreSQL database, managed via **@docker-compose.infrastructure.yml**.
+
+### **`042: Service Architecture & DI Patterns`**
+
+#### 1\. HTTP Service Pattern (Quart)
+
+All HTTP services **MUST** follow the Blueprint pattern for modularity.
+
+- **Lean `app.py`**: The main application file is for setup only: Quart app creation, DI container initialization, and Blueprint registration.
+- **Blueprints in `api/`**: All routes are defined in separate files within an `api/` directory.
+  - **Evidence**: The structure of **@services/file\_service/app.py** and its registration of Blueprints from **@services/file\_service/api/**.
+
+#### 2\. Worker Service Pattern (Kafka)
+
+Event-driven services **MUST** separate concerns into distinct modules.
+
+- `worker_main.py`: Handles the service lifecycle, DI setup, and the main consumption loop.
+- `event_processor.py`: Contains the core business logic for processing a single message by calling injected protocols.
+  - **Evidence**: The structure of **@services/spell\_checker\_service/**.
+
+#### 3\. Dependency Injection (Dishka & Protocols)
+
+- **Protocol-First Design**: All internal dependencies **MUST** be defined as interfaces using `typing.Protocol` in a `protocols.py` file.
+- **Provider Pattern**: Each service **MUST** define a Dishka `Provider` class in `di.py` to bind protocols to their concrete implementations.
+  - **Evidence**: The `CJAssessmentServiceProvider` in **@services/cj\_assessment\_service/di.py**.
+- **Scope Management**:
+  - `Scope.APP`: Used for stateless singletons (e.g., settings, HTTP client sessions).
+  - `Scope.REQUEST`: Used for per-operation instances (e.g., database sessions).
+
+### **`051 & 052: Event System & Data Contracts`**
+
+#### 1\. EventEnvelope Standard
+
+All events transmitted via Kafka **MUST** be wrapped in the standardized `EventEnvelope` Pydantic model.
+
+- **Evidence**: The `EventEnvelope` is a `pydantic.BaseModel` defined in **@common\_core/src/common\_core/events/envelope.py**.
+
+<!-- end list -->
+
+```python
+# Correct Pydantic Model from @libs/common_core/src/common_core/events/envelope.py
+class EventEnvelope(BaseModel, Generic[T_EventData]):
+    event_id: UUID = Field(default_factory=uuid4)
+    event_type: str
+    event_timestamp: datetime
+    source_service: str
+    correlation_id: Optional[UUID] = None
+    data: T_EventData
+```
+
+#### 2\. Topic Naming Convention
+
+Topic names **MUST** be generated via the `topic_name()` utility function.
+
+- **Evidence**: The `topic_name` function in **@common\_core/src/common\_core/event\_enums.py**.
+
+#### 3\. Thin Events
+
+For large data payloads, the event **MUST** contain a `StorageReferenceMetadata` object pointing to the content in the `Content Service`, not the content itself.
+
+### **`050 & 084: Coding & Containerization Standards`**
+
+#### 1\. Import Conventions
+
+- **Local Development**: All local execution **MUST** be done through `pdm run ...`.
+- **Docker**: All service `Dockerfile`s **MUST** include `ENV PYTHONPATH=/app`.
+  - **Evidence**: The `Dockerfile` for **@services/file\_service/Dockerfile**.
+
+#### 2\. Code Quality
+
+- **File Size Limit**: Python files **MUST NOT** exceed 400 lines of code (LoC).
+- **Linting & Formatting**: All code **MUST** be formatted and linted with Ruff using the configuration in the root **@pyproject.toml**.
+
+### **`070: Testing Architecture`**
+
+#### 1. Test Execution
+
+- Always run tests from the repository root using `pdm run`
+- Use pytest markers for test categorization (see `pyproject.toml` for configured markers)
+- Example: `pdm run pytest -m "not integration"` to skip integration tests
+
+#### 2. Mocking
+
+- Mock Protocols, not implementations:
+
+```python
+async def test_service(
+    # Mocks are of the protocol type
+    mock_repo: AsyncMock(spec=RepositoryProtocol),
+    mock_pub: AsyncMock(spec=EventPublisherProtocol)
+):
+    service = MyService(repo=mock_repo, publisher=mock_pub)
+    await service.execute()
+    mock_repo.get.assert_called_once()
+```
+
+#### 3. Database Migrations
+
+- **CRITICAL**: Always read `.cursor/rules/085-database-migration-standards.mdc` before working with Alembic migrations
+- Migrations must be run from the service directory using the provided PDM scripts
+- Never modify existing migration files - create new ones instead
+
+#### 4. Test Scopes
+
+- Unit tests: `pdm run pytest path/to/test_file.py -v`
+- Integration tests: `pdm run pytest -m integration`
+- Full test suite: `pdm run test-all` (from root)
+- Specific marker: `pdm run pytest -m "not (slow or integration)"`
+
+#### 5. Common Markers
+
+- `@pytest.mark.integration`: Tests requiring external services
+- `@pytest.mark.slow`: Long-running tests
+- `@pytest.mark.docker`: Tests needing Docker Compose
+- `@pytest.mark.kafka`: Tests requiring Kafka
+
+#### 6. Contract Testing
+
+Tests for any event-producing or consuming logic **MUST** include a serialization "round-trip" test to ensure the Pydantic models are correctly configured.
+
+#### 7. Test Execution Scope
+
+- **For New Features**: Run only the new test files you have created.
+  - **Example**: `pdm run pytest services/class_management_service/tests/api/test_class_routes.py`
+- **For Changes to Existing Code**: Run the tests for the specific service or module that has been affected.
+  - **Example**: `pdm run pytest services/file_service/tests/`
+- The `test-all` command should only be used for final validation before a major merge or when explicitly instructed.
+
+### **`080: Development Workflow & Tooling`**
+
+All standard development tasks are executed via PDM scripts defined in the root **@pyproject.toml**.
+
+#### 1\. Code Quality & Formatting
+
+- `pdm run format-all`: Formats all code across the monorepo using Ruff.
+- `pdm run lint-all`: Lints all code using Ruff.
+- `pdm run lint-fix`: Lints and automatically fixes all possible issues with Ruff.
+
+#### 2\. Static Analysis
+
+- `pdm run typecheck-all` from root: Runs MyPy on the entire codebase to perform static type checking. libs/ is special and needs to be checked using the method described in: .cursor/rules/086-mypy-configuration-standards.mdc
+
+#### 3\. Testing
+
+- `pdm run test-all`: Runs the complete test suite using `pytest`. (See Rule 070 for scoping).
+- `pdm run test-parallel`: Runs tests in parallel across multiple CPU cores (`pytest -n auto`).
+- `pdm run -p services/<service_name> test`: Runs the specific test suite for an individual service.
+
+### **`Docker & Service Management Tips`**
+
+- **DO NOT RESTART SERVICES AFTER CODE CHANGES; ALWAYS `docker compose build --no-cache {service with code changes}`**

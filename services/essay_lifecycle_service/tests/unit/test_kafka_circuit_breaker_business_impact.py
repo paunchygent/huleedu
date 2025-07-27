@@ -192,7 +192,7 @@ class TestBatchCoordinationBusinessImpact:
         
         # Create a BatchEssaysReady event that will be returned by check_batch_completion
         # to simulate immediate batch completion due to pending failures
-        ready_essays = []  # No ready essays since all failed
+        ready_essays: list[EssayProcessingInputRefV1] = []  # No ready essays since all failed
         batch_ready_event = BatchEssaysReady(
             batch_id=business_context.batch_id,
             ready_essays=ready_essays,

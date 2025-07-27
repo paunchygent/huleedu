@@ -280,8 +280,13 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             # **Step 3: Check Batch Completion**
             # At this point, final_essay_id should always be valid
             if final_essay_id is None:
-                raise ValueError(
-                    f"Unexpected None essay_id after content provisioning for batch {event_data.batch_id}"
+                raise_processing_error(
+                    service="essay_lifecycle_service",
+                    operation="handle_essay_content_provisioned",
+                    message=f"Unexpected None essay_id after content provisioning for batch {event_data.batch_id}",
+                    correlation_id=correlation_id,
+                    batch_id=event_data.batch_id,
+                    text_storage_id=event_data.text_storage_id
                 )
 
             batch_completion_result = await self.batch_tracker.mark_slot_fulfilled(

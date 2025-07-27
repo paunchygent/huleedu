@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from common_core.error_enums import ErrorCode
+from common_core.models.error_models import ErrorDetail
+from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
@@ -202,9 +205,23 @@ class RedisBatchCoordinator:
             timeout_seconds: Optional timeout override
         """
         if not essay_ids:
-            raise ValueError("Cannot register batch with empty essay_ids")
+            correlation_id = metadata.get("correlation_id", UUID("00000000-0000-0000-0000-000000000000"))
+            error_detail = ErrorDetail(
+                error_code=ErrorCode.VALIDATION_ERROR,
+                message="Cannot register batch with empty essay_ids",
+                correlation_id=correlation_id,
+                timestamp=datetime.now(UTC),
+                service="essay_lifecycle_service",
+                operation="register_batch_slots",
+                details={
+                    "batch_id": batch_id,
+                    "metadata": metadata
+                }
+            )
+            raise HuleEduError(error_detail)
 
         timeout = timeout_seconds or self._default_timeout
+        correlation_id = metadata.get("correlation_id", UUID("00000000-0000-0000-0000-000000000000"))
 
         try:
             # Create transaction pipeline - no watch needed for batch registration
@@ -237,7 +254,19 @@ class RedisBatchCoordinator:
             results = await pipeline.execute()
 
             if results is None:
-                raise RuntimeError(f"Batch registration transaction failed for batch {batch_id}")
+                error_detail = ErrorDetail(
+                    error_code=ErrorCode.PROCESSING_ERROR,
+                    message=f"Batch registration transaction failed for batch {batch_id}",
+                    correlation_id=correlation_id,
+                    timestamp=datetime.now(UTC),
+                    service="essay_lifecycle_service",
+                    operation="register_batch_slots",
+                    details={
+                        "batch_id": batch_id,
+                        "essay_count": len(essay_ids)
+                    }
+                )
+                raise HuleEduError(error_detail)
 
             self._logger.info(
                 f"Registered batch {batch_id} with {len(essay_ids)} slots, timeout: {timeout}s"
@@ -302,7 +331,7 @@ class RedisBatchCoordinator:
             # Don't raise - this is a best-effort operation
 
     async def assign_slot_atomic(
-        self, batch_id: str, content_metadata: dict[str, Any]
+        self, batch_id: str, content_metadata: dict[str, Any], correlation_id: UUID | None = None
     ) -> str | None:
         """
         Atomically assign an available slot to content using a Lua script.
@@ -319,10 +348,27 @@ class RedisBatchCoordinator:
         """
         text_storage_id = content_metadata.get("text_storage_id")
         if not text_storage_id:
-            raise ValueError("content_metadata must include text_storage_id")
+            if correlation_id is None:
+                correlation_id = UUID("00000000-0000-0000-0000-000000000000")
+            error_detail = ErrorDetail(
+                error_code=ErrorCode.VALIDATION_ERROR,
+                message="content_metadata must include text_storage_id",
+                correlation_id=correlation_id,
+                timestamp=datetime.now(UTC),
+                service="essay_lifecycle_service",
+                operation="assign_slot_atomic",
+                details={
+                    "batch_id": batch_id,
+                    "content_metadata": content_metadata
+                }
+            )
+            raise HuleEduError(error_detail)
 
         try:
             await self._ensure_scripts_loaded()
+            
+            # Type assertion: _ensure_scripts_loaded guarantees script is loaded
+            assert self._atomic_assign_script_sha is not None, "Script SHA must be loaded"
 
             keys = [
                 self._get_content_assignments_key(batch_id),
@@ -341,6 +387,29 @@ class RedisBatchCoordinator:
                     f"No available slots in batch {batch_id} for content {text_storage_id}"
                 )
                 return None
+            
+            # Validate that Redis returned a string essay_id
+            if not isinstance(result, str):
+                if correlation_id is None:
+                    correlation_id = UUID("00000000-0000-0000-0000-000000000000")
+                error_detail = ErrorDetail(
+                    error_code=ErrorCode.PROCESSING_ERROR,
+                    message=(
+                        f"Redis ATOMIC_ASSIGN_SCRIPT returned unexpected type: {type(result).__name__}. "
+                        f"Expected string essay_id or None, got: {result!r}"
+                    ),
+                    correlation_id=correlation_id,
+                    timestamp=datetime.now(UTC),
+                    service="essay_lifecycle_service",
+                    operation="assign_slot_atomic",
+                    details={
+                        "batch_id": batch_id,
+                        "text_storage_id": text_storage_id,
+                        "returned_type": type(result).__name__,
+                        "returned_value": str(result)
+                    }
+                )
+                raise HuleEduError(error_detail)
 
             self._logger.info(
                 f"Atomically assigned content {text_storage_id} to slot {result} "
@@ -355,7 +424,7 @@ class RedisBatchCoordinator:
             )
             raise
 
-    async def return_slot(self, batch_id: str, text_storage_id: str) -> bool:
+    async def return_slot(self, batch_id: str, text_storage_id: str, correlation_id: UUID | None = None) -> bool:
         """
         Atomically return a previously assigned slot to the available pool.
 
@@ -375,6 +444,9 @@ class RedisBatchCoordinator:
         """
         try:
             await self._ensure_scripts_loaded()
+            
+            # Type assertion: _ensure_scripts_loaded guarantees script is loaded
+            assert self._atomic_return_script_sha is not None, "Script SHA must be loaded"
 
             keys = [
                 self._get_content_assignments_key(batch_id),
@@ -385,16 +457,40 @@ class RedisBatchCoordinator:
 
             result = await self._redis.execute_script(self._atomic_return_script_sha, keys, args)
 
-            if result:
-                self._logger.info(
-                    f"Returned slot {result} to batch {batch_id} for content {text_storage_id}"
-                )
-                return True
-            else:
+            # Script returns essay_id string if successful, None if no assignment found
+            if result is None:
                 self._logger.warning(
                     f"No slot assignment found for content {text_storage_id} in batch {batch_id}"
                 )
                 return False
+            
+            # Validate the returned essay_id
+            if not isinstance(result, str):
+                if correlation_id is None:
+                    correlation_id = UUID("00000000-0000-0000-0000-000000000000")
+                error_detail = ErrorDetail(
+                    error_code=ErrorCode.PROCESSING_ERROR,
+                    message=(
+                        f"Redis ATOMIC_RETURN_SCRIPT returned unexpected type: {type(result).__name__}. "
+                        f"Expected string essay_id or None, got: {result!r}"
+                    ),
+                    correlation_id=correlation_id,
+                    timestamp=datetime.now(UTC),
+                    service="essay_lifecycle_service",
+                    operation="return_slot",
+                    details={
+                        "batch_id": batch_id,
+                        "text_storage_id": text_storage_id,
+                        "returned_type": type(result).__name__,
+                        "returned_value": str(result)
+                    }
+                )
+                raise HuleEduError(error_detail)
+            
+            self._logger.info(
+                f"Returned slot {result} to batch {batch_id} for content {text_storage_id}"
+            )
+            return True
 
         except Exception as e:
             self._logger.error(

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
@@ -40,6 +40,7 @@ from services.essay_lifecycle_service.implementations.event_publisher import (
 from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
     RedisBatchCoordinator,
 )
+from services.essay_lifecycle_service.tests.redis_test_utils import MockRedisPipeline
 
 
 @pytest.mark.integration
@@ -115,13 +116,15 @@ class TestPendingValidationFailuresIntegration:
         # Mock hget for hash field
         async def mock_hget(key: str, field: str) -> str | None:
             hash_data = mock_redis._data["hashes"].get(key, {})
-            return hash_data.get(field)
+            value = hash_data.get(field)
+            return str(value) if value is not None else None
 
         mock_redis.hget = AsyncMock(side_effect=mock_hget)
         
         # Mock get for string values
         async def mock_get(key: str) -> str | None:
-            return mock_redis._data["strings"].get(key)
+            value = mock_redis._data["strings"].get(key)
+            return str(value) if value is not None else None
 
         mock_redis.get = AsyncMock(side_effect=mock_get)
 
@@ -178,153 +181,117 @@ class TestPendingValidationFailuresIntegration:
 
         mock_redis.delete = AsyncMock(side_effect=mock_delete)
 
-        # Mock pipeline operations with actual behavior
-        class MockPipeline:
-            def __init__(self, redis_mock: Any) -> None:
-                self.redis = redis_mock
-                self.operations: list[tuple[Any, ...]] = []
-
-            def multi(self) -> MockPipeline:
-                return self
-
-            def rpush(self, key: str, value: str) -> MockPipeline:
-                self.operations.append(("rpush", key, value))
-                return self
-
-            def spop(self, key: str) -> MockPipeline:
-                self.operations.append(("spop", key))
-                return self
-
-            def delete(self, key: str) -> MockPipeline:
-                self.operations.append(("delete", key))
-                return self
-
-            def expire(self, key: str, seconds: int) -> MockPipeline:
-                self.operations.append(("expire", key, seconds))
-                return self
-
-            def hset(self, key: str, field: str, value: str) -> MockPipeline:
-                self.operations.append(("hset", key, field, value))
-                return self
-
-            def hlen(self, key: str) -> MockPipeline:
-                self.operations.append(("hlen", key))
-                return self
-
-            def hget(self, key: str, field: str) -> MockPipeline:
-                self.operations.append(("hget", key, field))
-                return self
-
-            def sadd(self, key: str, *values: str) -> MockPipeline:
-                for value in values:
-                    self.operations.append(("sadd", key, value))
-                return self
-
-            def set(self, key: str, value: str, *args: Any, **kwargs: Any) -> MockPipeline:
-                self.operations.append(("set", key, value))
-                return self
-
-            def setex(self, key: str, seconds: int, value: str) -> MockPipeline:
-                self.operations.append(("setex", key, seconds, value))
-                return self
-
-            def scard(self, key: str) -> MockPipeline:
-                self.operations.append(("scard", key))
-                return self
-
-            def llen(self, key: str) -> MockPipeline:
-                self.operations.append(("llen", key))
-                return self
-
-            def lrange(self, key: str, start: int, stop: int) -> MockPipeline:
-                self.operations.append(("lrange", key, start, stop))
-                return self
-
-            def exists(self, key: str) -> MockPipeline:
-                self.operations.append(("exists", key))
-                return self
-
-            async def execute(self) -> list[Any]:
+        # Create custom pipeline factory that uses our MockRedisPipeline but with stateful execution
+        def create_stateful_pipeline() -> MockRedisPipeline:
+            """Create a pipeline that modifies the mock Redis state during execute()."""
+            pipeline = MockRedisPipeline()
+            
+            # Override execute to actually modify the mock Redis state
+            original_execute = pipeline.execute
+            
+            async def stateful_execute() -> list[Any]:
                 results: list[Any] = []
-                for op in self.operations:
-                    if op[0] == "rpush":
-                        _, key, value = op
-                        if key not in self.redis._data["lists"]:
-                            self.redis._data["lists"][key] = []
-                        self.redis._data["lists"][key].append(value)
-                        results.append(len(self.redis._data["lists"][key]))
-                    elif op[0] == "spop":
-                        _, key = op
-                        if key in self.redis._data["sets"] and self.redis._data["sets"][key]:
-                            value = self.redis._data["sets"][key].pop()
+                for op in pipeline.operations:
+                    method_name, args, kwargs = op
+                    
+                    # Skip multi() from results as it's not part of the actual command results
+                    if method_name == "multi":
+                        continue
+                    
+                    if method_name == "rpush":
+                        key, value = args[0], args[1]
+                        if key not in mock_redis._data["lists"]:
+                            mock_redis._data["lists"][key] = []
+                        mock_redis._data["lists"][key].append(value)
+                        results.append(len(mock_redis._data["lists"][key]))
+                    elif method_name == "spop":
+                        key = args[0]
+                        if key in mock_redis._data["sets"] and mock_redis._data["sets"][key]:
+                            value = mock_redis._data["sets"][key].pop()
                             results.append(value)
                         else:
                             results.append(None)
-                    elif op[0] == "delete":
-                        _, key = op
+                    elif method_name == "delete":
+                        key = args[0]
                         deleted = 0
-                        for storage in self.redis._data.values():
+                        for storage in mock_redis._data.values():
                             if key in storage:
                                 del storage[key]
                                 deleted = 1
                         results.append(deleted)
-                    elif op[0] == "expire":
+                    elif method_name == "expire":
                         results.append(True)
-                    elif op[0] == "hset":
-                        _, key, field, value = op
-                        if key not in self.redis._data["hashes"]:
-                            self.redis._data["hashes"][key] = {}
-                        self.redis._data["hashes"][key][field] = value
+                    elif method_name == "hset":
+                        if len(args) == 3:  # hset(key, field, value)
+                            key, field, value = args
+                        else:  # hset(key, mapping=dict)
+                            key = args[0]
+                            mapping = kwargs.get("mapping", {})
+                            if key not in mock_redis._data["hashes"]:
+                                mock_redis._data["hashes"][key] = {}
+                            mock_redis._data["hashes"][key].update(mapping)
+                            results.append(len(mapping))
+                            continue
+                        if key not in mock_redis._data["hashes"]:
+                            mock_redis._data["hashes"][key] = {}
+                        mock_redis._data["hashes"][key][field] = value
                         results.append(1)
-                    elif op[0] == "hlen":
-                        _, key = op
-                        results.append(len(self.redis._data["hashes"].get(key, {})))
-                    elif op[0] == "hget":
-                        _, key, field = op
-                        hash_data = self.redis._data["hashes"].get(key, {})
+                    elif method_name == "hlen":
+                        key = args[0]
+                        results.append(len(mock_redis._data["hashes"].get(key, {})))
+                    elif method_name == "hget":
+                        key, field = args
+                        hash_data = mock_redis._data["hashes"].get(key, {})
                         results.append(hash_data.get(field))
-                    elif op[0] == "sadd":
-                        _, key, value = op
-                        if key not in self.redis._data["sets"]:
-                            self.redis._data["sets"][key] = set()
-                        if value not in self.redis._data["sets"][key]:
-                            self.redis._data["sets"][key].add(value)
-                            results.append(1)
-                        else:
-                            results.append(0)
-                    elif op[0] == "set":
-                        _, key, value = op
-                        self.redis._data["strings"][key] = value
+                    elif method_name == "sadd":
+                        key = args[0]
+                        values = args[1:]
+                        if key not in mock_redis._data["sets"]:
+                            mock_redis._data["sets"][key] = set()
+                        added = 0
+                        for value in values:
+                            if value not in mock_redis._data["sets"][key]:
+                                mock_redis._data["sets"][key].add(value)
+                                added += 1
+                        results.append(added)
+                    elif method_name == "set":
+                        key, value = args
+                        mock_redis._data["strings"][key] = value
                         results.append("OK")
-                    elif op[0] == "setex":
-                        _, key, seconds, value = op
-                        self.redis._data["strings"][key] = value
-                        # We don't actually implement expiry in the mock
+                    elif method_name == "setex":
+                        key, seconds, value = args
+                        mock_redis._data["strings"][key] = value
                         results.append("OK")
-                    elif op[0] == "scard":
-                        _, key = op
-                        results.append(len(self.redis._data["sets"].get(key, set())))
-                    elif op[0] == "llen":
-                        _, key = op
-                        results.append(len(self.redis._data["lists"].get(key, [])))
-                    elif op[0] == "lrange":
-                        _, key, start, stop = op
-                        data = self.redis._data["lists"].get(key, [])
-                        # Ensure start and stop are integers
+                    elif method_name == "scard":
+                        key = args[0]
+                        results.append(len(mock_redis._data["sets"].get(key, set())))
+                    elif method_name == "llen":
+                        key = args[0]
+                        results.append(len(mock_redis._data["lists"].get(key, [])))
+                    elif method_name == "lrange":
+                        key, start, stop = args
+                        data = mock_redis._data["lists"].get(key, [])
                         start_idx = int(start) if isinstance(start, int | str) else 0
                         stop_idx = int(stop) if isinstance(stop, int | str) else -1
                         results.append(
                             data[start_idx : stop_idx + 1] if stop_idx != -1 else data[start_idx:]
                         )
-                    elif op[0] == "exists":
-                        _, key = op
-                        exists = any(key in storage for storage in self.redis._data.values())
+                    elif method_name == "exists":
+                        key = args[0]
+                        exists = any(key in storage for storage in mock_redis._data.values())
                         results.append(1 if exists else 0)
+                    else:
+                        # Default for unknown operations
+                        results.append(True)
+                
                 return results
+            
+            # Type ignore for assigning to method - this is intentional for testing
+            pipeline.execute = stateful_execute  # type: ignore[method-assign]
+            return pipeline
 
-        mock_redis.create_transaction_pipeline = AsyncMock(
-            side_effect=lambda: MockPipeline(mock_redis)
-        )
+        # Use AsyncMock for create_transaction_pipeline since it's async in production
+        mock_redis.create_transaction_pipeline = AsyncMock(side_effect=create_stateful_pipeline)
 
         return mock_redis
 
@@ -584,7 +551,7 @@ class TestPendingValidationFailuresIntegration:
         async def capture_publish(**kwargs: Any) -> None:
             if "envelope" in kwargs:
                 published_events.append(kwargs["envelope"].data)
-            return await original_publish(**kwargs)
+            await original_publish(**kwargs)
 
         kafka_bus.publish = capture_publish
 
@@ -611,9 +578,11 @@ class TestPendingValidationFailuresIntegration:
         assert isinstance(ready_event, BatchEssaysReady)
         assert ready_event.batch_id == batch_id
         assert len(ready_event.ready_essays) == 0  # All failed
+        assert ready_event.validation_failures is not None
         assert len(ready_event.validation_failures) == 3  # All 3 failures recorded
 
         # Verify all failures are in the validation failures list
+        assert ready_event.validation_failures is not None
         failure_ids = {f.file_upload_id for f in ready_event.validation_failures}
         expected_ids = {f.file_upload_id for f in validation_failures}
         assert failure_ids == expected_ids
@@ -708,7 +677,7 @@ class TestPendingValidationFailuresIntegration:
             nonlocal completion_event
             if "envelope" in kwargs:
                 completion_event = kwargs["envelope"].data
-            return await original_publish(**kwargs)
+            await original_publish(**kwargs)
 
         kafka_bus.publish = capture_publish
 

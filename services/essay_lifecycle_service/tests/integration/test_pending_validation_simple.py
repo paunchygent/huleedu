@@ -7,7 +7,7 @@ Focuses on testing the core flow without extensive mocking.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -16,6 +16,7 @@ from common_core.domain_enums import CourseCode
 from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
     RedisBatchCoordinator,
 )
+from services.essay_lifecycle_service.tests.redis_test_utils import MockRedisPipeline
 
 
 @pytest.mark.integration
@@ -79,18 +80,11 @@ class TestPendingValidationSimple:
         mock_redis.lrange = AsyncMock(return_value=pending_failures)
 
         # Mock pipeline for atomic operations
-        mock_pipeline = AsyncMock()
-        mock_pipeline.multi = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.rpush = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.spop = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.delete = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.setex = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.sadd = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.hset = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.set = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.expire = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.execute = AsyncMock(return_value=[True, "slot1", True, True])
+        mock_pipeline = MockRedisPipeline(
+            results=[[True, "slot1", True, True]]  # Results for execute()
+        )
 
+        # Use AsyncMock for create_transaction_pipeline since it's async in production
         mock_redis.create_transaction_pipeline = AsyncMock(return_value=mock_pipeline)
 
         # Create coordinator
@@ -115,7 +109,11 @@ class TestPendingValidationSimple:
         mock_redis.lrange.assert_called_with(f"batch:{batch_id}:pending_failures", 0, -1)
 
         # Verify pending failures were deleted
-        mock_pipeline.delete.assert_any_call(f"batch:{batch_id}:pending_failures")
+        delete_operations = [
+            op for op in mock_pipeline.operations 
+            if op[0] == "delete" and f"batch:{batch_id}:pending_failures" in op[1]
+        ]
+        assert len(delete_operations) > 0, "Expected delete operation for pending failures"
 
     async def test_batch_completes_immediately_if_all_pending_failures(self) -> None:
         """Test that batch completes immediately if pending failures consume all slots."""
@@ -131,13 +129,11 @@ class TestPendingValidationSimple:
         mock_redis.lrange = AsyncMock(return_value=[str(pending_failure)])
 
         # Mock pipeline for processing
-        mock_pipeline = AsyncMock()
-        mock_pipeline.multi = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.rpush = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.spop = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.delete = AsyncMock(return_value=mock_pipeline)
-        mock_pipeline.execute = AsyncMock(return_value=[1, "slot1", 1])  # All slots consumed
+        mock_pipeline = MockRedisPipeline(
+            results=[[1, "slot1", 1]]  # All slots consumed
+        )
 
+        # Use AsyncMock for create_transaction_pipeline since it's async in production
         mock_redis.create_transaction_pipeline = AsyncMock(return_value=mock_pipeline)
 
         # Create coordinator

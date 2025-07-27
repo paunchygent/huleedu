@@ -7,13 +7,14 @@ Tests the race condition fix where validation failures arrive before batch regis
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
 from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
     RedisBatchCoordinator,
 )
+from services.essay_lifecycle_service.tests.redis_test_utils import MockRedisPipeline
 
 
 class TestPendingValidationFailures:
@@ -99,8 +100,7 @@ class TestPendingValidationFailures:
         mock_redis_client.lrange = AsyncMock(return_value=[json.dumps(pending_failure).encode()])
 
         # Mock pipeline for atomic operations
-        pipeline = MagicMock()
-        pipeline.execute = AsyncMock(return_value=[True])
+        pipeline = MockRedisPipeline(results=[[True]])
         mock_redis_client.create_transaction_pipeline = AsyncMock(return_value=pipeline)
 
         # Act
@@ -130,8 +130,7 @@ class TestPendingValidationFailures:
         mock_redis_client.lrange = AsyncMock(return_value=[])
 
         # Mock pipeline
-        pipeline = MagicMock()
-        pipeline.execute = AsyncMock(return_value=[True])
+        pipeline = MockRedisPipeline(results=[[True]])
         mock_redis_client.create_transaction_pipeline = AsyncMock(return_value=pipeline)
 
         # Act
@@ -158,9 +157,8 @@ class TestPendingValidationFailures:
         batch_id = "test-batch-789"
 
         # Mock pipeline that returns completion state
-        pipeline = MagicMock()
         # Return: 0 available slots, 1 failure, 0 assignments, expected=1, not already completed
-        pipeline.execute = AsyncMock(return_value=[0, 1, 0, b"1", False])
+        pipeline = MockRedisPipeline(results=[[0, 1, 0, b"1", False]])
         mock_redis_client.create_transaction_pipeline = AsyncMock(return_value=pipeline)
 
         # Act
