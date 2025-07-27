@@ -147,17 +147,6 @@ class CoreInfrastructureProvider(Provider):
         """Provide service name for outbox configuration."""
         return settings.SERVICE_NAME
 
-    @provide(scope=Scope.APP)
-    def provide_outbox_settings(self, settings: Settings) -> OutboxSettings:
-        """Provide custom outbox settings from service configuration."""
-        return OutboxSettings(
-            poll_interval_seconds=settings.OUTBOX_POLL_INTERVAL_SECONDS,
-            batch_size=settings.OUTBOX_BATCH_SIZE,
-            max_retries=settings.OUTBOX_MAX_RETRIES,
-            error_retry_interval_seconds=settings.OUTBOX_ERROR_RETRY_INTERVAL_SECONDS,
-            enable_metrics=True,
-        )
-
 
 class ServiceImplementationsProvider(Provider):
     """Provider for service implementation dependencies."""

@@ -167,7 +167,7 @@ class RedisBatchCoordinator:
                 pipeline.spop(slots_key)
 
             # Delete pending failures key
-            pipeline.delete_key(pending_key)
+            pipeline.delete(pending_key)
 
             # Set TTL on failures key
             pipeline.expire(failures_key, timeout)
@@ -231,28 +231,29 @@ class RedisBatchCoordinator:
         content_assignments_key = self._get_content_assignments_key(batch_id)
         assignments_key = self._get_assignments_key(batch_id)
 
+        # Check for duplicate content BEFORE starting transaction
+        existing_assignment = await self._redis.hget(content_assignments_key, text_storage_id)
+        if existing_assignment:
+            assignment_str = (
+                existing_assignment.decode("utf-8")
+                if isinstance(existing_assignment, bytes)
+                else existing_assignment
+            )
+            self._logger.info(
+                f"Content {text_storage_id} already assigned to essay {assignment_str} "
+                f"in batch {batch_id} (idempotent operation)"
+            )
+            return assignment_str
+
+        # Check for available slots BEFORE starting transaction
+        available_slots = await self._redis.smembers(slots_key)
+        if not available_slots:
+            self._logger.warning(f"No available slots in batch {batch_id}.")
+            return None
+
         async with await self._redis.create_transaction_pipeline(
             slots_key, content_assignments_key
         ) as pipe:
-            # Check for duplicate content first
-            existing_assignment = await pipe.hget(content_assignments_key, text_storage_id)
-            if existing_assignment:
-                assignment_str = (
-                    existing_assignment.decode("utf-8")
-                    if isinstance(existing_assignment, bytes)
-                    else existing_assignment
-                )
-                self._logger.info(
-                    f"Content {text_storage_id} already assigned to essay {assignment_str} "
-                    f"in batch {batch_id} (idempotent operation)"
-                )
-                return assignment_str
-
-            # Check for available slots
-            available_slots = await pipe.smembers(slots_key)
-            if not available_slots:
-                self._logger.warning(f"No available slots in batch {batch_id}.")
-                return None
 
             # Start the transaction
             pipe.multi()
@@ -333,14 +334,15 @@ class RedisBatchCoordinator:
         """
         Single function that determines completion across ALL scenarios.
 
-        Completion criteria (ALL must be satisfied):
-        1. Not already completed (prevents double-completion)
-        2. Either:
-           a) No available slots remaining (all assigned or failed), OR
-           b) Total processed (assigned + failed) >= expected count
+        Completion criteria:
+        1. Either no available slots remaining (all assigned or failed), OR  
+        2. Total processed (assigned + failed) >= expected count
+        
+        Note: The completion flag is used for double-publishing prevention in 
+        mark_batch_completed_atomically, NOT for completion detection.
         """
-        if state["already_completed"]:
-            return False
+        # REMOVED: The completion flag check was causing circular dependency
+        # A batch can be complete regardless of whether it's been marked as completed
 
         total_processed = state["assigned_count"] + state["failure_count"]
         expected = state["expected_count"]

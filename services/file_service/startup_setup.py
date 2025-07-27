@@ -6,7 +6,7 @@ from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
-from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
+from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider, OutboxSettingsProvider
 from quart import Quart
 from quart_dishka import QuartDishka
 
@@ -19,11 +19,26 @@ logger = create_service_logger("file_service.startup")
 async def initialize_services(app: Quart, _settings: Settings) -> None:
     """Initialize DI container, Quart-Dishka integration, and metrics."""
     try:
+        # Create OutboxSettings from service configuration
+        from huleedu_service_libs.outbox import OutboxSettings
+        
+        # Use the polling interval from settings (which is set by the field validator)
+        outbox_settings = OutboxSettings(
+            poll_interval_seconds=_settings.OUTBOX_POLL_INTERVAL_SECONDS,
+            batch_size=_settings.OUTBOX_BATCH_SIZE,
+            max_retries=_settings.OUTBOX_MAX_RETRIES,
+            error_retry_interval_seconds=_settings.OUTBOX_ERROR_RETRY_INTERVAL_SECONDS,
+            enable_metrics=True,
+        )
+
         # Initialize DI container with all providers
+        # IMPORTANT: OutboxProvider must come before OutboxSettingsProvider
+        # so that our custom settings override the defaults
         container = make_async_container(
             CoreInfrastructureProvider(),
             ServiceImplementationsProvider(),
-            OutboxProvider(),
+            OutboxProvider(),  # This provides default outbox settings
+            OutboxSettingsProvider(outbox_settings),  # This overrides with our custom settings
         )
         QuartDishka(app=app, container=container)
 

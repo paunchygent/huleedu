@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     """
 
     LOG_LEVEL: str = "INFO"
-    ENVIRONMENT: Environment = Environment.DEVELOPMENT
+    ENVIRONMENT: Environment = Field(default=Environment.DEVELOPMENT, validation_alias="ENVIRONMENT")
     SERVICE_NAME: str = "file-service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     REDIS_URL: str = "redis://redis:6379"
@@ -72,20 +72,7 @@ class Settings(BaseSettings):
         default=1000, description="Maximum size of fallback queue for failed Kafka messages"
     )
 
-    # Transactional Outbox Configuration
-    OUTBOX_POLL_INTERVAL_SECONDS: float = Field(
-        default=5.0, description="How often to poll for new outbox events"
-    )
-    OUTBOX_BATCH_SIZE: int = Field(
-        default=100, description="Maximum number of events to process per poll"
-    )
-    OUTBOX_MAX_RETRIES: int = Field(
-        default=5, description="Maximum retry attempts before marking event as failed"
-    )
-    OUTBOX_ERROR_RETRY_INTERVAL_SECONDS: float = Field(
-        default=30.0, description="How long to wait after an error"
-    )
-
+    # Outbox configuration is handled by the library's OutboxProvider based on ENVIRONMENT
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

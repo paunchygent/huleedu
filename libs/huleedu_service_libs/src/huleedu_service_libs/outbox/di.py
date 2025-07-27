@@ -10,7 +10,7 @@ from __future__ import annotations
 from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
+from huleedu_service_libs.protocols import KafkaPublisherProtocol, AtomicRedisClientProtocol
 
 from .protocols import EventTypeMapperProtocol, OutboxRepositoryProtocol
 from .relay import EventRelayWorker, OutboxSettings
@@ -41,21 +41,52 @@ class OutboxProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_outbox_settings(self) -> OutboxSettings:
         """
-        Provide default outbox settings.
+        Provide environment-aware outbox settings.
 
-        Services can override this provider to customize outbox behavior
-        such as poll intervals, batch sizes, and retry settings.
+        Settings adapt based on the ENVIRONMENT variable:
+        - testing: Fast polling (0.1s) with wake notifications
+        - development: Moderate polling (1s) with wake notifications
+        - production: Fallback polling (5s) with wake notifications
 
         Returns:
-            Default outbox configuration
+            Environment-appropriate outbox configuration
         """
-        return OutboxSettings(
-            poll_interval_seconds=5.0,
-            batch_size=100,
-            max_retries=5,
-            error_retry_interval_seconds=30.0,
-            enable_metrics=True,
-        )
+        import os
+        import sys
+        
+        environment = os.getenv("ENVIRONMENT", "production").lower()
+        
+        # Environment-specific configurations
+        if environment == "testing":
+            settings = OutboxSettings(
+                poll_interval_seconds=0.1,  # Fast for testing
+                batch_size=100,
+                max_retries=5,
+                error_retry_interval_seconds=1.0,  # Shorter for testing
+                enable_metrics=False,  # Disable in tests
+                enable_wake_notifications=True,
+            )
+        elif environment == "development":
+            settings = OutboxSettings(
+                poll_interval_seconds=1.0,  # Moderate for development
+                batch_size=100,
+                max_retries=5,
+                error_retry_interval_seconds=10.0,
+                enable_metrics=True,
+                enable_wake_notifications=True,
+            )
+        else:  # production
+            settings = OutboxSettings(
+                poll_interval_seconds=5.0,  # Conservative for production
+                batch_size=100,
+                max_retries=5,
+                error_retry_interval_seconds=30.0,
+                enable_metrics=True,
+                enable_wake_notifications=True,
+            )
+        
+        print(f"INFO: Outbox settings for environment '{environment}': poll_interval={settings.poll_interval_seconds}s, wake_notifications={settings.enable_wake_notifications}", file=sys.stderr)
+        return settings
 
     @provide(scope=Scope.APP)
     def provide_outbox_repository(
@@ -99,6 +130,7 @@ class OutboxProvider(Provider):
         self,
         outbox_repository: OutboxRepositoryProtocol,
         kafka_bus: KafkaPublisherProtocol,
+        redis_client: AtomicRedisClientProtocol,
         settings: OutboxSettings,
         service_name: str,
         event_mapper: EventTypeMapperProtocol | None = None,
@@ -109,18 +141,20 @@ class OutboxProvider(Provider):
         Args:
             outbox_repository: Repository for outbox operations
             kafka_bus: Kafka publisher for sending events
+            redis_client: Redis client for wake-up notifications
             settings: Worker configuration settings
             service_name: Name of the service (provided by service)
             event_mapper: Optional mapper for event type to topic mapping
 
         Returns:
-            Configured event relay worker
+            Configured event relay worker with Redis wake-up support
         """
         return EventRelayWorker(
             outbox_repository=outbox_repository,
             kafka_bus=kafka_bus,
             settings=settings,
             service_name=service_name,
+            redis_client=redis_client,
             event_mapper=event_mapper,
         )
 
@@ -159,4 +193,6 @@ class OutboxSettingsProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_outbox_settings(self) -> OutboxSettings:
         """Provide the custom outbox settings."""
+        import sys
+        print(f"INFO: OutboxSettingsProvider.provide_outbox_settings called - poll_interval={self._settings.poll_interval_seconds}s", file=sys.stderr)
         return self._settings

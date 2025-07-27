@@ -43,7 +43,7 @@ services:
       - huleedu_content_store_data:/data/huleedu_content_store
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - CONTENT_STORE_ROOT_PATH=/data/huleedu_content_store
       - PORT=8000
       - LOG_LEVEL=INFO
@@ -80,7 +80,7 @@ services:
       - "9096:9096"  # Metrics port
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - RESULT_AGGREGATOR_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/result_aggregator
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
@@ -120,7 +120,7 @@ services:
       - "4002:4002"
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - LOG_LEVEL=INFO
       - HTTP_PORT=4002
@@ -156,7 +156,7 @@ services:
       - "8002:8002"
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - LOG_LEVEL=DEBUG
@@ -199,12 +199,13 @@ services:
       - "5001:5000"
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - BATCH_ORCHESTRATOR_SERVICE_PORT=5000
       - LOG_LEVEL=INFO
       - BATCH_ORCHESTRATOR_SERVICE_REDIS_URL=redis://redis:6379
+      - BATCH_ORCHESTRATOR_SERVICE_ENVIRONMENT=${ENVIRONMENT:-production}
       # Database configuration
       - BATCH_ORCHESTRATOR_DB_HOST=batch_orchestrator_db
       - BATCH_ORCHESTRATOR_DB_PORT=5432
@@ -249,7 +250,7 @@ services:
       - "6001:6000"
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - ESSAY_LIFECYCLE_SERVICE_HTTP_PORT=6000
@@ -345,13 +346,14 @@ services:
       - "7001:7001"
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - FILE_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - FILE_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - FILE_SERVICE_HTTP_PORT=7001
       - FILE_SERVICE_HOST=0.0.0.0
       - FILE_SERVICE_LOG_LEVEL=INFO
       - FILE_SERVICE_REDIS_URL=redis://redis:6379
+      - FILE_SERVICE_ENVIRONMENT=${ENVIRONMENT:-production}
       - FILE_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@file_service_db:5432/file_service_db
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
@@ -390,7 +392,7 @@ services:
       - "9095:9090"
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - CJ_ASSESSMENT_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - CJ_ASSESSMENT_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - CJ_ASSESSMENT_SERVICE_LOG_LEVEL=INFO
@@ -438,7 +440,7 @@ services:
       - "8080:8080"
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - LOG_LEVEL=INFO
       - API_GATEWAY_SERVICE_PORT=8080
@@ -480,7 +482,7 @@ services:
       - "5002:5002"
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - LOG_LEVEL=INFO
       - CLASS_MANAGEMENT_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@class_management_db:5432/huledu_class_management
@@ -523,7 +525,7 @@ services:
       - "8090:8080"
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - LOG_LEVEL=INFO
       - LLM_PROVIDER_SERVICE_PORT=8080
@@ -577,7 +579,7 @@ services:
       - "8081:8080"
     environment:
       - ENV_TYPE=docker
-      - ENVIRONMENT=production
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - SERVICE_NAME=websocket_service
       - WEBSOCKET_PORT=8080
       - REDIS_URL=redis://redis:6379

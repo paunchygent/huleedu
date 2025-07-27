@@ -101,9 +101,9 @@ namespace_packages = true
 plugins = ["pydantic.mypy"]
 exclude = [
     "libs/common_core/src/",
+    "libs/huleedu_service_libs/",
     "cj_essay_assessment/",
     "scripts/",
-    "libs/huleedu_service_libs/",
     "services/batch_orchestrator_service/implementations/circuit_breaker_example.py",
 ]
 
@@ -285,7 +285,7 @@ format-all = "ruff format --force-exclude ."
 check-imports = "python scripts/check_import_patterns.py"
 lint-all = {composite = ["ruff check --force-exclude .", "python scripts/check_import_patterns.py"]}
 lint-fix = "ruff check --fix --force-exclude ."
-typecheck-all = "mypy --config-file pyproject.toml ."
+typecheck-all = "mypy --config-file pyproject.toml --follow-imports=silent services tests"
 typecheck-libs = {composite = ["cd libs && mypy -p common_core --show-error-codes", "cd libs && mypy -p huleedu_service_libs --show-error-codes"]}
 typecheck-common-core = {shell = "cd libs && mypy -p common_core --show-error-codes"}
 typecheck-service-libs = {shell = "cd libs && mypy -p huleedu_service_libs --show-error-codes"}

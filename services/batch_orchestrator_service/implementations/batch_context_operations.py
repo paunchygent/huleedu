@@ -73,10 +73,13 @@ class BatchContextOperations:
                     )
                     await session.execute(stmt)
 
+                # CRITICAL: Commit the transaction to persist the batch
+                await session.commit()
                 self.logger.info(f"Stored batch context for {batch_id}")
                 return True
 
             except Exception as e:
+                await session.rollback()
                 self.logger.error(f"Failed to store batch context for {batch_id}: {e}")
                 return False
 

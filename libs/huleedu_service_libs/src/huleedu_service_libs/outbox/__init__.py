@@ -24,14 +24,14 @@ Usage:
 
 from __future__ import annotations
 
-from .di import OutboxProvider
+from .di import OutboxProvider, OutboxSettingsProvider
 from .models import EventOutbox
 from .protocols import (
     EventTypeMapperProtocol,
     OutboxEvent,
     OutboxRepositoryProtocol,
 )
-from .relay import EventRelayWorker
+from .relay import EventRelayWorker, OutboxSettings
 from .repository import PostgreSQLOutboxRepository
 
 __all__ = [
@@ -42,4 +42,6 @@ __all__ = [
     "PostgreSQLOutboxRepository",
     "EventRelayWorker",
     "OutboxProvider",
+    "OutboxSettingsProvider",
+    "OutboxSettings",
 ]

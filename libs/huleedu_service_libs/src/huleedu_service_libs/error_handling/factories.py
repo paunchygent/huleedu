@@ -151,6 +151,34 @@ def raise_kafka_publish_error(
     raise HuleEduError(error_detail)
 
 
+def raise_outbox_storage_error(
+    service: str,
+    operation: str,
+    message: str,
+    correlation_id: UUID,
+    aggregate_id: str,
+    aggregate_type: str,
+    event_type: str,
+    **additional_context: Any,
+) -> NoReturn:
+    """Create and raise an outbox storage error."""
+    error_detail = create_error_detail_with_context(
+        error_code=ErrorCode.KAFKA_PUBLISH_ERROR,  # Use same code as it's part of publish flow
+        message=f"Outbox storage failed: {message}",
+        service=service,
+        operation=operation,
+        correlation_id=correlation_id,
+        details={
+            "aggregate_id": aggregate_id,
+            "aggregate_type": aggregate_type,
+            "event_type": event_type,
+            "outbox_operation": "store",
+            **additional_context,
+        },
+    )
+    raise HuleEduError(error_detail)
+
+
 def raise_content_service_error(
     service: str,
     operation: str,

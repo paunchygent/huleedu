@@ -208,17 +208,6 @@ class CoreInfrastructureProvider(Provider):
         """Provide service name for outbox configuration."""
         return settings.SERVICE_NAME
 
-    @provide(scope=Scope.APP)
-    def provide_outbox_settings(self, settings: Settings) -> OutboxSettings:
-        """Provide custom outbox settings from service configuration."""
-        return OutboxSettings(
-            poll_interval_seconds=settings.OUTBOX_POLL_INTERVAL_SECONDS,
-            batch_size=settings.OUTBOX_BATCH_SIZE,
-            max_retries=settings.OUTBOX_MAX_RETRIES,
-            error_retry_interval_seconds=settings.OUTBOX_ERROR_RETRY_INTERVAL_SECONDS,
-            enable_metrics=True,
-        )
-
 
 class RepositoryAndPublishingProvider(Provider):
     """Provider for data repository and event publishing dependencies."""
@@ -262,10 +251,11 @@ class RepositoryAndPublishingProvider(Provider):
         self,
         kafka_bus: KafkaPublisherProtocol,
         outbox_repository: OutboxRepositoryProtocol,
+        redis_client: AtomicRedisClientProtocol,
         settings: Settings,
     ) -> BatchEventPublisherProtocol:
         """Provide batch event publisher implementation with outbox support."""
-        return DefaultBatchEventPublisherImpl(kafka_bus, outbox_repository, settings)
+        return DefaultBatchEventPublisherImpl(kafka_bus, outbox_repository, redis_client, settings)
 
 
 class ExternalClientsProvider(Provider):

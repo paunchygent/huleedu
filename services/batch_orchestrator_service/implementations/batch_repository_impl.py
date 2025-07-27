@@ -112,7 +112,7 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         async with self._get_lock(batch_id):
             self.batch_essays[batch_id] = essays
             logger.info(f"Stored {len(essays)} essays for batch {batch_id}")
-            logger.debug(f"Essays stored: {[essay.get('essay_id', 'unknown') for essay in essays]}")
+            logger.debug(f"Essays stored: {[essay.essay_id for essay in essays]}")
             return True
 
     async def get_batch_essays(self, batch_id: str) -> list | None:
@@ -123,7 +123,7 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         if essays:
             logger.info(f"Retrieved {len(essays)} essays for batch {batch_id}")
             logger.debug(
-                f"Essays retrieved: {[essay.get('essay_id', 'unknown') for essay in essays]}",
+                f"Essays retrieved: {[essay.essay_id for essay in essays]}",
             )
         else:
             logger.warning(

@@ -9,7 +9,7 @@ from huleedu_service_libs import init_tracing
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
-from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
+from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider, OutboxSettingsProvider
 from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 
@@ -44,7 +44,23 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
     global kafka_consumer_instance, consumer_task, event_relay_worker
 
     try:
+        # Create OutboxSettings from service configuration
+        from huleedu_service_libs.outbox import OutboxSettings
+        
+        # Use the polling interval from settings (which is set by the field validator)
+        logger.info(f"DEBUG: settings.ENVIRONMENT = {settings.ENVIRONMENT}")
+        logger.info(f"DEBUG: settings.OUTBOX_POLL_INTERVAL_SECONDS = {settings.OUTBOX_POLL_INTERVAL_SECONDS}")
+        outbox_settings = OutboxSettings(
+            poll_interval_seconds=settings.OUTBOX_POLL_INTERVAL_SECONDS,
+            batch_size=settings.OUTBOX_BATCH_SIZE,
+            max_retries=settings.OUTBOX_MAX_RETRIES,
+            error_retry_interval_seconds=settings.OUTBOX_ERROR_RETRY_INTERVAL_SECONDS,
+            enable_metrics=True,
+        )
+
         # Initialize DI container with all provider instances
+        # IMPORTANT: OutboxProvider must come before OutboxSettingsProvider
+        # so that our custom settings override the defaults
         container = make_async_container(
             CoreInfrastructureProvider(),
             RepositoryAndPublishingProvider(),
@@ -55,7 +71,8 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
             PipelineCoordinationProvider(),
             EventHandlingProvider(),
             InitiatorMapProvider(),
-            OutboxProvider(),
+            OutboxProvider(),  # This provides default outbox settings
+            OutboxSettingsProvider(outbox_settings),  # This overrides with our custom settings
         )
 
         # Initialize guaranteed HuleEduApp infrastructure immediately

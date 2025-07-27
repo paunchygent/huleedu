@@ -333,6 +333,32 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         """
         pass
 
+    async def lpush(self, key: str, *values: str) -> int:
+        """
+        Prepend values to a Redis list (add to left/head).
+
+        Args:
+            key: Redis key for the list
+            values: One or more values to prepend
+
+        Returns:
+            Length of the list after operation
+        """
+        pass
+
+    async def blpop(self, keys: list[str], timeout: float) -> tuple[str, str] | None:
+        """
+        Blocking left pop from Redis lists with timeout.
+
+        Args:
+            keys: List of Redis keys to monitor
+            timeout: Timeout in seconds (0 for infinite)
+
+        Returns:
+            Tuple of (key, value) if item available, None if timeout
+        """
+        pass
+
     # Key operations
     async def ttl(self, key: str) -> int:
         """

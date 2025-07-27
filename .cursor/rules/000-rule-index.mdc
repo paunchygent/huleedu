@@ -33,7 +33,7 @@ alwaysApply: false
 - [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc): HTTP service architecture patterns and Blueprint implementation
 - [041-fastapi-integration-patterns.mdc](mdc:041-fastapi-integration-patterns.mdc): FastAPI integration patterns with comprehensive observability and testing
 - [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc): Async patterns, protocols, dependency injection, and worker service structure
-- [042.1-transactional-outbox-pattern.mdc](mdc:042.1-transactional-outbox-pattern.mdc): Transactional outbox pattern for reliable event publishing
+- [042.1-transactional-outbox-pattern.mdc](mdc:042.1-transactional-outbox-pattern.mdc): Transactional outbox pattern as fallback for Kafka failures
 - [042-http-proxy-service-patterns.mdc](mdc:042-http-proxy-service-patterns.mdc): HTTP proxy service patterns for request forwarding, error handling, and observability
 - [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc): Configuration management and logging standards
 - [044-service-debugging-and-troubleshooting.mdc](mdc:044-service-debugging-and-troubleshooting.mdc): CRITICAL debugging priority: service configuration over import patterns
