@@ -6,7 +6,7 @@ from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
-from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider, OutboxSettingsProvider
+from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from quart import Quart
 from quart_dishka import QuartDishka
 

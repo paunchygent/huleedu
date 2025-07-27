@@ -86,7 +86,7 @@ class DefaultEventPublisher(EventPublisher):
         # Try immediate Kafka publishing first
         topic = "essay.status.events"
         key = str(essay_ref.entity_id)
-        
+
         try:
             await self.kafka_bus.publish(
                 topic=topic,
@@ -105,7 +105,7 @@ class DefaultEventPublisher(EventPublisher):
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -114,7 +114,7 @@ class DefaultEventPublisher(EventPublisher):
                     "error": str(kafka_error),
                 },
             )
-            
+
             # Kafka failed - use outbox pattern as fallback
             try:
                 await self._publish_to_outbox(
@@ -260,14 +260,14 @@ class DefaultEventPublisher(EventPublisher):
         # Try immediate Kafka publishing first
         topic = "batch.phase.progress.events"
         key = batch_id
-        
+
         try:
             await self.kafka_bus.publish(
                 topic=topic,
                 envelope=envelope,
                 key=key,
             )
-            
+
             logger.info(
                 "Batch phase progress published directly to Kafka",
                 extra={
@@ -278,12 +278,12 @@ class DefaultEventPublisher(EventPublisher):
                 },
             )
             return  # Success - no outbox needed!
-            
+
         except Exception as kafka_error:
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -307,7 +307,7 @@ class DefaultEventPublisher(EventPublisher):
                 event_data=envelope,
                 topic=topic,
             )
-            
+
             # Wake up the relay worker immediately
             await self._notify_relay_worker()
 
@@ -388,14 +388,14 @@ class DefaultEventPublisher(EventPublisher):
         # Try immediate Kafka publishing first
         topic = "batch.phase.concluded.events"
         key = batch_id
-        
+
         try:
             await self.kafka_bus.publish(
                 topic=topic,
                 envelope=envelope,
                 key=key,
             )
-            
+
             logger.info(
                 "Batch phase conclusion published directly to Kafka",
                 extra={
@@ -407,12 +407,12 @@ class DefaultEventPublisher(EventPublisher):
                 },
             )
             return  # Success - no outbox needed!
-            
+
         except Exception as kafka_error:
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -436,7 +436,7 @@ class DefaultEventPublisher(EventPublisher):
                 event_data=envelope,
                 topic=topic,
             )
-            
+
             # Wake up the relay worker immediately
             await self._notify_relay_worker()
 
@@ -512,14 +512,14 @@ class DefaultEventPublisher(EventPublisher):
         topic = topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
         batch_id = getattr(event_data, "batch_id", "unknown")
         key = batch_id
-        
+
         try:
             await self.kafka_bus.publish(
                 topic=topic,
                 envelope=envelope,
                 key=key,
             )
-            
+
             logger.info(
                 "Excess content provisioned event published directly to Kafka",
                 extra={
@@ -529,12 +529,12 @@ class DefaultEventPublisher(EventPublisher):
                 },
             )
             return  # Success - no outbox needed!
-            
+
         except Exception as kafka_error:
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -557,7 +557,7 @@ class DefaultEventPublisher(EventPublisher):
                 event_data=envelope,
                 topic=topic,
             )
-            
+
             # Wake up the relay worker immediately
             await self._notify_relay_worker()
 
@@ -619,14 +619,14 @@ class DefaultEventPublisher(EventPublisher):
         topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
         batch_id = getattr(event_data, "batch_id", "unknown")
         key = batch_id
-        
+
         try:
             await self.kafka_bus.publish(
                 topic=topic,
                 envelope=envelope,
                 key=key,
             )
-            
+
             logger.info(
                 "Batch essays ready event published directly to Kafka",
                 extra={
@@ -637,12 +637,12 @@ class DefaultEventPublisher(EventPublisher):
                 },
             )
             return  # Success - no outbox needed!
-            
+
         except Exception as kafka_error:
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -665,7 +665,7 @@ class DefaultEventPublisher(EventPublisher):
                 event_data=envelope,
                 topic=topic,
             )
-            
+
             # Wake up the relay worker immediately
             await self._notify_relay_worker()
 
@@ -725,14 +725,14 @@ class DefaultEventPublisher(EventPublisher):
         topic = topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED)
         essay_id = getattr(event_data, "essay_id", "unknown")
         key = essay_id
-        
+
         try:
             await self.kafka_bus.publish(
                 topic=topic,
                 envelope=envelope,
                 key=key,
             )
-            
+
             logger.info(
                 "EssaySlotAssignedV1 event published directly to Kafka",
                 extra={
@@ -744,12 +744,12 @@ class DefaultEventPublisher(EventPublisher):
                 },
             )
             return  # Success - no outbox needed!
-            
+
         except Exception as kafka_error:
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -772,7 +772,7 @@ class DefaultEventPublisher(EventPublisher):
                 event_data=envelope,
                 topic=topic,
             )
-            
+
             # Wake up the relay worker immediately
             await self._notify_relay_worker()
 
@@ -837,14 +837,14 @@ class DefaultEventPublisher(EventPublisher):
         topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
         batch_id = getattr(event_data, "batch_id", "unknown")
         key = batch_id
-        
+
         try:
             await self.kafka_bus.publish(
                 topic=topic,
                 envelope=envelope,
                 key=key,
             )
-            
+
             logger.info(
                 "ELS batch phase outcome event published directly to Kafka",
                 extra={
@@ -856,12 +856,12 @@ class DefaultEventPublisher(EventPublisher):
                 },
             )
             return  # Success - no outbox needed!
-            
+
         except Exception as kafka_error:
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -884,7 +884,7 @@ class DefaultEventPublisher(EventPublisher):
                 event_data=envelope,
                 topic=topic,
             )
-            
+
             # Wake up the relay worker immediately
             await self._notify_relay_worker()
 

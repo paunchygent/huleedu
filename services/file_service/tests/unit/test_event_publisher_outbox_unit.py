@@ -493,7 +493,10 @@ class TestDefaultEventPublisher:
             operation="validate_content",
         )
 
-        events_to_test = [
+        # Type annotation for heterogeneous list of event publishing methods
+        from typing import Any, Callable
+        
+        events_to_test: list[tuple[Callable[..., Any], Any, str, str]] = [
             (
                 event_publisher.publish_essay_content_provisioned,
                 EssayContentProvisionedV1(

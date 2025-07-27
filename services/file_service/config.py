@@ -26,7 +26,9 @@ class Settings(BaseSettings):
     """
 
     LOG_LEVEL: str = "INFO"
-    ENVIRONMENT: Environment = Field(default=Environment.DEVELOPMENT, validation_alias="ENVIRONMENT")
+    ENVIRONMENT: Environment = Field(
+        default=Environment.DEVELOPMENT, validation_alias="ENVIRONMENT"
+    )
     SERVICE_NAME: str = "file-service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     REDIS_URL: str = "redis://redis:6379"

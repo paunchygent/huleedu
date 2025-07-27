@@ -10,7 +10,7 @@ from __future__ import annotations
 from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from huleedu_service_libs.protocols import KafkaPublisherProtocol, AtomicRedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
 from .protocols import EventTypeMapperProtocol, OutboxRepositoryProtocol
 from .relay import EventRelayWorker, OutboxSettings
@@ -53,9 +53,9 @@ class OutboxProvider(Provider):
         """
         import os
         import sys
-        
+
         environment = os.getenv("ENVIRONMENT", "production").lower()
-        
+
         # Environment-specific configurations
         if environment == "testing":
             settings = OutboxSettings(
@@ -84,8 +84,11 @@ class OutboxProvider(Provider):
                 enable_metrics=True,
                 enable_wake_notifications=True,
             )
-        
-        print(f"INFO: Outbox settings for environment '{environment}': poll_interval={settings.poll_interval_seconds}s, wake_notifications={settings.enable_wake_notifications}", file=sys.stderr)
+
+        print(
+            f"INFO: Outbox settings for environment '{environment}': poll_interval={settings.poll_interval_seconds}s, wake_notifications={settings.enable_wake_notifications}",
+            file=sys.stderr,
+        )
         return settings
 
     @provide(scope=Scope.APP)
@@ -194,5 +197,9 @@ class OutboxSettingsProvider(Provider):
     def provide_outbox_settings(self) -> OutboxSettings:
         """Provide the custom outbox settings."""
         import sys
-        print(f"INFO: OutboxSettingsProvider.provide_outbox_settings called - poll_interval={self._settings.poll_interval_seconds}s", file=sys.stderr)
+
+        print(
+            f"INFO: OutboxSettingsProvider.provide_outbox_settings called - poll_interval={self._settings.poll_interval_seconds}s",
+            file=sys.stderr,
+        )
         return self._settings

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 from common_core.events.envelope import EventEnvelope
 
 if TYPE_CHECKING:
-    from huleedu_service_libs.protocols import KafkaPublisherProtocol, AtomicRedisClientProtocol
+    from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
     from .protocols import EventTypeMapperProtocol, OutboxEvent, OutboxRepositoryProtocol
 
@@ -54,7 +54,7 @@ class EventRelayWorker:
 
     This worker implements the relay component of the Transactional Outbox Pattern,
     ensuring reliable event delivery even when Kafka is temporarily unavailable.
-    
+
     Key improvements:
     - Uses Redis BLPOP for instant wake-up when events are added
     - Adaptive polling to reduce unnecessary database queries
@@ -89,7 +89,7 @@ class EventRelayWorker:
         self.event_mapper = event_mapper
         self._running = False
         self._task: asyncio.Task[None] | None = None
-        
+
         # Redis key for wake-up notifications
         self.wake_key = f"outbox:wake:{service_name}"
 
@@ -111,7 +111,8 @@ class EventRelayWorker:
                 "poll_interval": self.settings.poll_interval_seconds,
                 "batch_size": self.settings.batch_size,
                 "max_retries": self.settings.max_retries,
-                "wake_notifications": self.settings.enable_wake_notifications and self.redis_client is not None,
+                "wake_notifications": self.settings.enable_wake_notifications
+                and self.redis_client is not None,
             },
         )
 
@@ -121,14 +122,14 @@ class EventRelayWorker:
             return
 
         self._running = False
-        
+
         # Send a wake-up to ensure the worker exits promptly
         if self.redis_client and self.settings.enable_wake_notifications:
             try:
                 await self.redis_client.lpush(self.wake_key, "stop")
             except Exception:
                 pass  # Ignore errors during shutdown
-                
+
         if self._task:
             self._task.cancel()
             try:
@@ -153,7 +154,7 @@ class EventRelayWorker:
         )
 
         consecutive_empty_polls = 0
-        
+
         while self._running:
             try:
                 # Fetch unpublished events from outbox
@@ -177,14 +178,14 @@ class EventRelayWorker:
 
                     # Reset empty poll counter on activity
                     consecutive_empty_polls = 0
-                    
+
                     # Immediately check for more events (no delay)
                     continue
-                    
+
                 else:
                     # No events found
                     consecutive_empty_polls += 1
-                    
+
                     # Adaptive polling based on activity
                     if consecutive_empty_polls < 3:
                         # Recent activity - check frequently
@@ -195,20 +196,19 @@ class EventRelayWorker:
                     else:
                         # Extended idle - use configured interval
                         poll_interval = self.settings.poll_interval_seconds
-                
+
                 # Wait for wake-up notification or timeout
                 if self.redis_client and self.settings.enable_wake_notifications:
                     try:
                         # BLPOP blocks until an item is available or timeout
                         result = await self.redis_client.blpop(
-                            keys=[self.wake_key],
-                            timeout=poll_interval
+                            keys=[self.wake_key], timeout=poll_interval
                         )
                         if result:
                             # We were woken up - process immediately
                             logger.debug(
                                 "Worker woken up by Redis notification",
-                                extra={"service": self.service_name}
+                                extra={"service": self.service_name},
                             )
                             continue
                     except Exception as e:

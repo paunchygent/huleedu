@@ -58,13 +58,13 @@ class DefaultEventPublisher(EventPublisherProtocol):
             # Try immediate Kafka publishing first
             topic = self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC
             key = event_data.file_upload_id
-            
+
             await self.kafka_bus.publish(
                 topic=topic,
                 envelope=envelope,
                 key=key,
             )
-            
+
             logger.info(
                 "EssayContentProvisionedV1 event published directly to Kafka",
                 extra={
@@ -75,12 +75,12 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 },
             )
             return  # Success - no outbox needed!
-            
+
         except Exception as kafka_error:
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -105,7 +105,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 topic=topic,
                 event_key=aggregate_id,
             )
-            
+
             # Wake up the relay worker immediately
             await self._notify_relay_worker()
 
@@ -161,14 +161,14 @@ class DefaultEventPublisher(EventPublisherProtocol):
         # Try immediate Kafka publishing first
         topic = self.settings.ESSAY_VALIDATION_FAILED_TOPIC
         key = event_data.file_upload_id
-        
+
         try:
             await self.kafka_bus.publish(
                 topic=topic,
                 envelope=envelope,
                 key=key,
             )
-            
+
             logger.info(
                 "EssayValidationFailedV1 event published directly to Kafka",
                 extra={
@@ -179,12 +179,12 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 },
             )
             return  # Success - no outbox needed!
-            
+
         except Exception as kafka_error:
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -208,7 +208,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 topic=topic,
                 event_key=aggregate_id,
             )
-            
+
             # Wake up the relay worker immediately
             await self._notify_relay_worker()
 
@@ -265,13 +265,13 @@ class DefaultEventPublisher(EventPublisherProtocol):
             # Try immediate Kafka publishing first
             topic = self.settings.BATCH_FILE_ADDED_TOPIC
             key = event_data.batch_id
-            
+
             await self.kafka_bus.publish(
                 topic=topic,
                 envelope=envelope,
                 key=key,
             )
-            
+
             logger.info(
                 "BatchFileAddedV1 event published directly to Kafka",
                 extra={
@@ -282,12 +282,12 @@ class DefaultEventPublisher(EventPublisherProtocol):
                     "topic": topic,
                 },
             )
-            
+
         except Exception as kafka_error:
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -296,7 +296,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                     "error_type": kafka_error.__class__.__name__,
                 },
             )
-            
+
             # Kafka failed - use outbox pattern as fallback
             aggregate_id = event_data.batch_id
             aggregate_type = "batch"
@@ -312,7 +312,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                     topic=topic,
                     event_key=aggregate_id,
                 )
-                
+
                 # Wake up the relay worker immediately
                 await self._notify_relay_worker()
 
@@ -348,7 +348,6 @@ class DefaultEventPublisher(EventPublisherProtocol):
 
         # Redis publication continues separately (this is for real-time UI updates)
         try:
-
             # Publish to Redis for real-time updates (maintained as-is)
             await self._publish_file_event_to_redis(
                 event_data.user_id,
@@ -390,13 +389,13 @@ class DefaultEventPublisher(EventPublisherProtocol):
             # Try immediate Kafka publishing first
             topic = self.settings.BATCH_FILE_REMOVED_TOPIC
             key = event_data.batch_id
-            
+
             await self.kafka_bus.publish(
                 topic=topic,
                 envelope=envelope,
                 key=key,
             )
-            
+
             logger.info(
                 "BatchFileRemovedV1 event published directly to Kafka",
                 extra={
@@ -407,12 +406,12 @@ class DefaultEventPublisher(EventPublisherProtocol):
                     "topic": topic,
                 },
             )
-            
+
         except Exception as kafka_error:
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -421,7 +420,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                     "error_type": kafka_error.__class__.__name__,
                 },
             )
-            
+
             # Kafka failed - use outbox pattern as fallback
             aggregate_id = event_data.batch_id
             aggregate_type = "batch"
@@ -437,7 +436,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                     topic=topic,
                     event_key=aggregate_id,
                 )
-                
+
                 # Wake up the relay worker immediately
                 await self._notify_relay_worker()
 
@@ -473,7 +472,6 @@ class DefaultEventPublisher(EventPublisherProtocol):
 
         # Redis publication continues separately (this is for real-time UI updates)
         try:
-
             # Publish to Redis for real-time updates (maintained as-is)
             await self._publish_file_event_to_redis(
                 event_data.user_id,
@@ -555,7 +553,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 "aggregate_type": aggregate_type,
             },
         )
-    
+
     async def _notify_relay_worker(self) -> None:
         """Notify the relay worker that new events are available in the outbox."""
         try:

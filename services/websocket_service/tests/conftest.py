@@ -119,6 +119,14 @@ class MockRedisClient(AtomicRedisClientProtocol):
         """Mock smembers method for set operations."""
         return set()
 
+    async def lpush(self, key: str, *values: str) -> int:
+        """Mock lpush method for list operations."""
+        return len(values)
+
+    async def blpop(self, keys: list[str], timeout: float) -> tuple[str, str] | None:
+        """Mock blpop method for blocking list operations."""
+        return None
+
     async def hset(self, key: str, field: str, value: str) -> int:
         """Mock hset method for hash operations."""
         return 1

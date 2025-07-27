@@ -200,7 +200,6 @@ class EventPublisher(Protocol):
         ...
 
 
-
 class BatchCommandHandler(Protocol):
     """Protocol for handling batch processing commands from Batch Service."""
 

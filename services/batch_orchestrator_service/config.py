@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     """
 
     LOG_LEVEL: str = "INFO"
-    ENVIRONMENT: Environment = Field(default=Environment.DEVELOPMENT, validation_alias="ENVIRONMENT")
+    ENVIRONMENT: Environment = Field(
+        default=Environment.DEVELOPMENT, validation_alias="ENVIRONMENT"
+    )
     SERVICE_NAME: str = "batch-service"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"

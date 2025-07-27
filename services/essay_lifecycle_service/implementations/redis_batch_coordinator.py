@@ -173,7 +173,7 @@ class RedisBatchCoordinator:
             pipeline.expire(failures_key, timeout)
 
             # Execute atomically
-            results = await pipeline.execute()
+            await pipeline.execute()
 
             self._logger.info(
                 f"Processed {len(pending_failures)} pending validation failures for batch {batch_id}"
@@ -254,7 +254,6 @@ class RedisBatchCoordinator:
         async with await self._redis.create_transaction_pipeline(
             slots_key, content_assignments_key
         ) as pipe:
-
             # Start the transaction
             pipe.multi()
 
@@ -335,10 +334,10 @@ class RedisBatchCoordinator:
         Single function that determines completion across ALL scenarios.
 
         Completion criteria:
-        1. Either no available slots remaining (all assigned or failed), OR  
+        1. Either no available slots remaining (all assigned or failed), OR
         2. Total processed (assigned + failed) >= expected count
-        
-        Note: The completion flag is used for double-publishing prevention in 
+
+        Note: The completion flag is used for double-publishing prevention in
         mark_batch_completed_atomically, NOT for completion detection.
         """
         # REMOVED: The completion flag check was causing circular dependency

@@ -329,13 +329,10 @@ class TestDefaultBatchEventPublisherImpl:
         mock_inject = Mock()
 
         # When
-        with patch(
-            "huleedu_service_libs.observability.get_current_span", 
-            return_value=mock_span
-        ):
+        with patch("huleedu_service_libs.observability.get_current_span", return_value=mock_span):
             with patch(
-                "services.batch_orchestrator_service.implementations.event_publisher_impl.inject_trace_context", 
-                mock_inject
+                "services.batch_orchestrator_service.implementations.event_publisher_impl.inject_trace_context",
+                mock_inject,
             ):
                 await event_publisher.publish_batch_event(event_envelope, key="batch-trace")
 
@@ -415,7 +412,8 @@ class TestDefaultBatchEventPublisherImpl:
 
         # Then
         # Verify event was stored in outbox
-        fake_outbox_instance = event_publisher.outbox_repository  # type: ignore
+        fake_outbox_instance = event_publisher.outbox_repository
+        assert isinstance(fake_outbox_instance, FakeOutboxRepository)
         assert len(fake_outbox_instance.add_event_calls) == 1
 
         # Verify Kafka was NOT called

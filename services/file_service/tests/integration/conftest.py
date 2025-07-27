@@ -7,7 +7,7 @@ including database setup, mock services, and test infrastructure.
 
 from __future__ import annotations
 
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING, Any, AsyncGenerator
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
@@ -23,9 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from services.file_service.config import Settings
 from services.file_service.di import CoreInfrastructureProvider, ServiceImplementationsProvider
 
+if TYPE_CHECKING:
+    from pytest import FixtureRequest
+
 
 @pytest.fixture(autouse=True)
-def _clear_prometheus_registry(request):
+def _clear_prometheus_registry(request: FixtureRequest) -> Any:
     """Clear the Prometheus registry before each test to prevent metric conflicts."""
     # Skip clearing for tests marked with no_prometheus_clear
     if request.node.get_closest_marker("no_prometheus_clear"):

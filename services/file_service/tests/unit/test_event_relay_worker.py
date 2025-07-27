@@ -7,7 +7,6 @@ Tests focus on behavior verification with minimal mocking of external dependenci
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
@@ -19,20 +18,72 @@ from huleedu_service_libs.outbox.protocols import OutboxEvent
 from huleedu_service_libs.outbox.relay import OutboxSettings
 
 
-@dataclass
 class FakeOutboxEvent:
     """Test implementation of OutboxEvent protocol."""
 
-    id: UUID
-    aggregate_id: str
-    aggregate_type: str
-    event_type: str
-    event_data: dict[str, Any]
-    event_key: str | None
-    created_at: datetime
-    published_at: datetime | None
-    retry_count: int
-    last_error: str | None
+    def __init__(
+        self,
+        id: UUID,
+        aggregate_id: str,
+        aggregate_type: str,
+        event_type: str,
+        event_data: dict[str, Any],
+        event_key: str | None,
+        created_at: datetime,
+        published_at: datetime | None = None,
+        retry_count: int = 0,
+        last_error: str | None = None,
+    ) -> None:
+        self._id = id
+        self._aggregate_id = aggregate_id
+        self._aggregate_type = aggregate_type
+        self._event_type = event_type
+        self._event_data = event_data
+        self._event_key = event_key
+        self._created_at = created_at
+        self._published_at = published_at
+        self._retry_count = retry_count
+        self._last_error = last_error
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    @property
+    def aggregate_id(self) -> str:
+        return self._aggregate_id
+
+    @property
+    def aggregate_type(self) -> str:
+        return self._aggregate_type
+
+    @property
+    def event_type(self) -> str:
+        return self._event_type
+
+    @property
+    def event_data(self) -> dict[str, Any]:
+        return self._event_data
+
+    @property
+    def event_key(self) -> str | None:
+        return self._event_key
+
+    @property
+    def created_at(self) -> datetime:
+        return self._created_at
+
+    @property
+    def published_at(self) -> datetime | None:
+        return self._published_at
+
+    @property
+    def retry_count(self) -> int:
+        return self._retry_count
+
+    @property
+    def last_error(self) -> str | None:
+        return self._last_error
 
 
 class FakeOutboxRepository:
@@ -43,6 +94,38 @@ class FakeOutboxRepository:
         self.published_events: set[UUID] = set()
         self.failed_events: dict[UUID, str] = {}
         self.retry_counts: dict[UUID, tuple[int, str]] = {}
+        self._next_id = 0
+
+    async def add_event(
+        self,
+        aggregate_id: str,
+        aggregate_type: str,
+        event_type: str,
+        event_data: dict[str, Any],
+        topic: str,
+        event_key: str | None = None,
+        session: Any = None,
+    ) -> UUID:
+        """Add a new event to the outbox."""
+        event_id = uuid4()
+        event = FakeOutboxEvent(
+            id=event_id,
+            aggregate_id=aggregate_id,
+            aggregate_type=aggregate_type,
+            event_type=event_type,
+            event_data=event_data,
+            event_key=event_key,
+            created_at=datetime.now(timezone.utc),
+            published_at=None,
+            retry_count=0,
+            last_error=None,
+        )
+        self.events.append(event)
+        return event_id
+
+    async def get_event_by_id(self, event_id: UUID) -> OutboxEvent | None:
+        """Get an event by its ID."""
+        return next((e for e in self.events if e.id == event_id), None)
 
     async def get_unpublished_events(self, limit: int = 100) -> list[OutboxEvent]:
         """Return unpublished events up to limit."""
@@ -64,10 +147,11 @@ class FakeOutboxRepository:
     async def increment_retry_count(self, event_id: UUID, error: str) -> None:
         """Increment retry count and record error."""
         event = next((e for e in self.events if e.id == event_id), None)
-        if event:
-            event.retry_count += 1
-            event.last_error = error
-            self.retry_counts[event_id] = (event.retry_count, error)
+        if event and isinstance(event, FakeOutboxEvent):
+            # Update internal state rather than modifying read-only properties
+            event._retry_count += 1
+            event._last_error = error
+            self.retry_counts[event_id] = (event._retry_count, error)
 
 
 class FakeKafkaPublisher:
@@ -211,6 +295,7 @@ class TestEventRelayWorker:
         assert len(fake_kafka.published_messages) == 0
         assert sample_event.id not in fake_repository.published_events
         assert sample_event.retry_count >= 1  # At least one retry
+        assert sample_event.last_error is not None
         assert "Kafka unavailable" in sample_event.last_error
 
     async def test_marks_events_failed_after_max_retries(
@@ -222,7 +307,7 @@ class TestEventRelayWorker:
     ) -> None:
         """Verify events are marked failed after exceeding max retries."""
         # Given
-        sample_event.retry_count = test_settings.max_retries
+        sample_event._retry_count = test_settings.max_retries
         worker = EventRelayWorker(
             outbox_repository=fake_repository,
             kafka_bus=fake_kafka,

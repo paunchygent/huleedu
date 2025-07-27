@@ -15,7 +15,7 @@ import pytest
 from huleedu_service_libs.outbox.models import EventOutbox
 from huleedu_service_libs.outbox.monitoring import OutboxMetrics
 from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 
 class FakeScalarResult:
@@ -49,51 +49,17 @@ class FakeResult:
         return self._data[0] if self._data else None
 
 
-class FakeAsyncSession:
-    """Fake implementation of AsyncSession for testing."""
-
-    def __init__(self) -> None:
+class MockAsyncSession(Mock):
+    """Mock AsyncSession with custom test attributes."""
+    
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs['spec'] = AsyncSession
+        super().__init__(*args, **kwargs)
         self.added_objects: list[Any] = []
-        self.committed = False
-        self.flushed = False
+        self.committed: bool = False
+        self.flushed: bool = False
         self.execute_results: dict[str, Any] = {}
         self.execute_calls: list[Any] = []
-
-    def add(self, instance: Any) -> None:
-        """Add an object to the session."""
-        self.added_objects.append(instance)
-        # Simulate ID assignment on add
-        if hasattr(instance, "id") and instance.id is None:
-            instance.id = uuid4()
-
-    async def flush(self) -> None:
-        """Flush pending changes."""
-        self.flushed = True
-        # Simulate ID assignment for added objects
-        for obj in self.added_objects:
-            if hasattr(obj, "id") and obj.id is None:
-                obj.id = uuid4()
-
-    async def commit(self) -> None:
-        """Commit the transaction."""
-        self.committed = True
-
-    async def execute(self, statement: Any) -> Any:
-        """Execute a statement and return configured result."""
-        self.execute_calls.append(statement)
-        # Return pre-configured results based on statement type
-        stmt_str = str(statement)
-        if "SELECT" in stmt_str and "event_outbox" in stmt_str:
-            if "WHERE event_outbox.published_at IS NULL" in stmt_str:
-                # Query for unpublished events
-                return self.execute_results.get("unpublished_events", FakeResult([]))
-            elif "WHERE event_outbox.id =" in stmt_str:
-                # Query for specific event by ID
-                return self.execute_results.get("event_by_id", FakeResult([]))
-        elif "UPDATE event_outbox" in stmt_str:
-            # Update statement
-            return self.execute_results.get("update", FakeResult([], rowcount=1))
-        return FakeResult([])
 
 
 @pytest.fixture
@@ -103,13 +69,39 @@ def mock_engine() -> Mock:
 
 
 @pytest.fixture
-def fake_session() -> FakeAsyncSession:
-    """Create a fake async session for testing."""
-    return FakeAsyncSession()
+def fake_session() -> MockAsyncSession:
+    """Create a mock async session for testing."""
+    session = MockAsyncSession()
+
+    async def mock_add(obj: Any) -> None:
+        session.added_objects.append(obj)
+
+    async def mock_commit() -> None:
+        session.committed = True
+
+    async def mock_flush() -> None:
+        session.flushed = True
+
+    async def mock_execute(stmt: Any) -> Any:
+        session.execute_calls.append(stmt)
+        # Return pre-configured results if available
+        stmt_str = str(stmt)
+        for key, result in session.execute_results.items():
+            if key in stmt_str:
+                return result
+        # Default to empty result
+        return FakeResult([])
+
+    session.add = Mock(side_effect=mock_add)
+    session.commit = Mock(side_effect=mock_commit)
+    session.flush = Mock(side_effect=mock_flush)
+    session.execute = Mock(side_effect=mock_execute)
+
+    return session
 
 
 @pytest.fixture
-def mock_session_factory(fake_session: FakeAsyncSession) -> Mock:
+def mock_session_factory(fake_session: MockAsyncSession) -> Mock:
     """Create a mock session factory that returns our fake session."""
     # Create a mock that acts as an async context manager
     context_manager = Mock()
@@ -144,7 +136,7 @@ class TestPostgreSQLOutboxRepository:
         self,
         mock_engine: Mock,
         mock_session_factory: Mock,
-        fake_session: FakeAsyncSession,
+        fake_session: MockAsyncSession,
     ) -> None:
         """Test adding an event without providing a session."""
         # Given
@@ -182,7 +174,7 @@ class TestPostgreSQLOutboxRepository:
     async def test_add_event_with_session(
         self,
         mock_engine: Mock,
-        fake_session: FakeAsyncSession,
+        fake_session: MockAsyncSession,
     ) -> None:
         """Test adding an event with a provided session for transaction sharing."""
         # Given
@@ -209,7 +201,7 @@ class TestPostgreSQLOutboxRepository:
         self,
         mock_engine: Mock,
         mock_session_factory: Mock,
-        fake_session: FakeAsyncSession,
+        fake_session: MockAsyncSession,
     ) -> None:
         """Test retrieving unpublished events."""
         # Given
@@ -239,16 +231,16 @@ class TestPostgreSQLOutboxRepository:
 
         # Then
         assert len(events) == 3
-        for i, event in enumerate(events):
-            assert event.aggregate_id == f"agg-{i}"
-            assert event.event_type == f"test.event.{i}"
-            assert event.event_data == {"index": i}
+        for i, outbox_event in enumerate(events):
+            assert outbox_event.aggregate_id == f"agg-{i}"
+            assert outbox_event.event_type == f"test.event.{i}"
+            assert outbox_event.event_data == {"index": i}
 
     async def test_mark_event_published(
         self,
         mock_engine: Mock,
         mock_session_factory: Mock,
-        fake_session: FakeAsyncSession,
+        fake_session: MockAsyncSession,
     ) -> None:
         """Test marking an event as published."""
         # Given
@@ -274,7 +266,7 @@ class TestPostgreSQLOutboxRepository:
         self,
         mock_engine: Mock,
         mock_session_factory: Mock,
-        fake_session: FakeAsyncSession,
+        fake_session: MockAsyncSession,
     ) -> None:
         """Test marking an event as permanently failed."""
         # Given
@@ -296,7 +288,7 @@ class TestPostgreSQLOutboxRepository:
         self,
         mock_engine: Mock,
         mock_session_factory: Mock,
-        fake_session: FakeAsyncSession,
+        fake_session: MockAsyncSession,
     ) -> None:
         """Test incrementing retry count for a failed event."""
         # Given
@@ -323,7 +315,7 @@ class TestPostgreSQLOutboxRepository:
         self,
         mock_engine: Mock,
         mock_session_factory: Mock,
-        fake_session: FakeAsyncSession,
+        fake_session: MockAsyncSession,
     ) -> None:
         """Test retrieving a specific event by ID."""
         # Given
@@ -359,7 +351,7 @@ class TestPostgreSQLOutboxRepository:
         self,
         mock_engine: Mock,
         mock_session_factory: Mock,
-        fake_session: FakeAsyncSession,
+        fake_session: MockAsyncSession,
     ) -> None:
         """Test retrieving a non-existent event returns None."""
         # Given
@@ -379,7 +371,7 @@ class TestPostgreSQLOutboxRepository:
         self,
         mock_engine: Mock,
         mock_session_factory: Mock,
-        fake_session: FakeAsyncSession,
+        fake_session: MockAsyncSession,
     ) -> None:
         """Test that long error messages are truncated."""
         # Given
@@ -404,7 +396,6 @@ class TestPostgreSQLOutboxRepository:
         self,
         mock_engine: Mock,
         mock_session_factory: Mock,
-        fake_session: FakeAsyncSession,
     ) -> None:
         """Test that metrics are recorded when enabled."""
         # Given

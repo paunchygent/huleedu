@@ -444,5 +444,5 @@ class TestOutboxPatternIntegration:
 
             # Both events should have the same correlation_id in their data
             for event in events:
-                event_data = event.event_data  # SQLAlchemy auto-deserializes JSON
-                assert event_data["correlation_id"] == str(correlation_id)
+                stored_event_data = event.event_data  # SQLAlchemy auto-deserializes JSON
+                assert stored_event_data["correlation_id"] == str(correlation_id)

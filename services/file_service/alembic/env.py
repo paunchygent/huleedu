@@ -15,6 +15,7 @@ from pathlib import Path
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 # Add project root to Python path for imports
@@ -24,7 +25,6 @@ sys.path.insert(0, str(project_root))
 # Now we can import from the project
 # Load configuration
 from dotenv import find_dotenv, load_dotenv
-
 from huleedu_service_libs.outbox.models import Base as OutboxBase
 
 load_dotenv(find_dotenv(".env"))
@@ -96,7 +96,7 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection):
+def do_run_migrations(connection: Connection) -> None:
     """Run migrations with the given connection."""
     context.configure(connection=connection, target_metadata=target_metadata)
 

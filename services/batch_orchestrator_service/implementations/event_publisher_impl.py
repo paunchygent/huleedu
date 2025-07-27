@@ -9,7 +9,7 @@ from huleedu_service_libs.error_handling import raise_outbox_storage_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
-from huleedu_service_libs.protocols import KafkaPublisherProtocol, AtomicRedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
 from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.protocols import BatchEventPublisherProtocol
@@ -47,7 +47,7 @@ class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
 
         # Determine topic (BOS uses event_type as topic)
         topic = event_envelope.event_type
-        
+
         # Try immediate Kafka publishing first
         try:
             await self.kafka_bus.publish(
@@ -55,7 +55,7 @@ class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
                 envelope=event_envelope,
                 key=key,
             )
-            
+
             logger.info(
                 "Event published directly to Kafka",
                 extra={
@@ -65,12 +65,12 @@ class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
                 },
             )
             return  # Success - no outbox needed!
-            
+
         except Exception as kafka_error:
             # Check if it's already a HuleEduError and re-raise
             if hasattr(kafka_error, "error_detail"):
                 raise
-            
+
             logger.warning(
                 "Kafka publish failed, falling back to outbox",
                 extra={
@@ -95,7 +95,7 @@ class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
                 topic=topic,
                 event_key=key,
             )
-            
+
             # Wake up the relay worker immediately
             await self._notify_relay_worker()
 
@@ -165,7 +165,7 @@ class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
                 "aggregate_type": aggregate_type,
             },
         )
-    
+
     async def _notify_relay_worker(self) -> None:
         """Notify the relay worker that new events are available in the outbox."""
         try:

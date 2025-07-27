@@ -719,8 +719,7 @@ class RedisClient(AtomicRedisClientProtocol):
                 return (key, value)
             else:
                 logger.debug(
-                    f"Redis BLPOP by '{self.client_id}': keys={keys} "
-                    f"timeout={timeout}s timed out",
+                    f"Redis BLPOP by '{self.client_id}': keys={keys} timeout={timeout}s timed out",
                 )
                 return None
         except Exception as e:

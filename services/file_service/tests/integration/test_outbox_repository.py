@@ -113,9 +113,9 @@ class TestOutboxRepositoryIntegration:
         # Assert
         assert len(unpublished_events) == 3  # 5 total - 2 published = 3 unpublished
 
-        for event in unpublished_events:
-            assert event.published_at is None
-            assert event.created_at is not None
+        for unpublished_event in unpublished_events:
+            assert unpublished_event.published_at is None
+            assert unpublished_event.created_at is not None
 
     async def test_get_unpublished_events_respects_limit(
         self,

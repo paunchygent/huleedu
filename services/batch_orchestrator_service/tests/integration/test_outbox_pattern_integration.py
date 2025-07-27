@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Callable
+from typing import Any, AsyncGenerator, Callable
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -33,7 +33,7 @@ from huleedu_service_libs.outbox import EventRelayWorker, OutboxRepositoryProtoc
 from huleedu_service_libs.outbox.models import EventOutbox
 from huleedu_service_libs.outbox.relay import OutboxSettings
 from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -58,6 +58,8 @@ class OutboxTestProvider(Provider):
         self._engine = engine
         self._kafka_publisher = kafka_publisher
         self._settings = settings
+        self._redis_client = AsyncMock(spec=AtomicRedisClientProtocol)
+        self._redis_client.lpush = AsyncMock(return_value=None)
 
     @provide(scope=Scope.APP)
     async def provide_engine(self) -> AsyncEngine:
@@ -79,22 +81,28 @@ class OutboxTestProvider(Provider):
         """Provide outbox repository."""
         return PostgreSQLOutboxRepository(engine)
 
+    @provide(scope=Scope.APP)
+    def provide_redis_client(self) -> AtomicRedisClientProtocol:
+        """Provide mock Redis client."""
+        return self._redis_client
+    
     @provide(scope=Scope.REQUEST)
     def provide_event_publisher(
         self,
         kafka_publisher: KafkaPublisherProtocol,
         outbox_repository: OutboxRepositoryProtocol,
+        redis_client: AtomicRedisClientProtocol,
         settings: Settings,
     ) -> BatchEventPublisherProtocol:
         """Provide event publisher with outbox support."""
-        return DefaultBatchEventPublisherImpl(kafka_publisher, outbox_repository, settings)
+        return DefaultBatchEventPublisherImpl(kafka_publisher, outbox_repository, redis_client, settings)
 
     @provide(scope=Scope.APP)
     def provide_event_relay_worker(
         self,
         outbox_repository: OutboxRepositoryProtocol,
         kafka_publisher: KafkaPublisherProtocol,
-        settings: Settings,
+        settings: Any,
     ) -> EventRelayWorker:
         """Provide event relay worker with configurable settings."""
         # Use settings from fixture, allowing tests to customize
@@ -103,7 +111,7 @@ class OutboxTestProvider(Provider):
             batch_size=settings.OUTBOX_BATCH_SIZE,
             max_retries=settings.OUTBOX_MAX_RETRIES,
         )
-        
+
         return EventRelayWorker(
             outbox_repository=outbox_repository,
             kafka_bus=kafka_publisher,
@@ -125,7 +133,9 @@ class TestOutboxPatternIntegration:
         container.stop()
 
     @pytest.fixture
-    async def test_engine(self, postgres_container: PostgresContainer) -> AsyncGenerator[AsyncEngine, None]:
+    async def test_engine(
+        self, postgres_container: PostgresContainer
+    ) -> AsyncGenerator[AsyncEngine, None]:
         """Create test database engine with proper cleanup."""
         connection_url = postgres_container.get_connection_url()
         # Convert to asyncpg URL
@@ -133,24 +143,28 @@ class TestOutboxPatternIntegration:
         connection_url = connection_url.replace("postgresql://", "postgresql+asyncpg://")
 
         engine = create_async_engine(connection_url, echo=False)
-        
+
         try:
             # Create outbox table
             async with engine.begin() as conn:
                 await conn.run_sync(EventOutbox.metadata.create_all)
-            
+
             yield engine
         finally:
             # Proper engine disposal
             await engine.dispose()
 
     @pytest.fixture
-    async def db_session_factory(self, test_engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    async def db_session_factory(
+        self, test_engine: AsyncEngine
+    ) -> async_sessionmaker[AsyncSession]:
         """Create session factory for tests."""
         return async_sessionmaker(test_engine, expire_on_commit=False)
 
     @pytest.fixture
-    async def db_session(self, db_session_factory: async_sessionmaker[AsyncSession]) -> AsyncGenerator[AsyncSession, None]:
+    async def db_session(
+        self, db_session_factory: async_sessionmaker[AsyncSession]
+    ) -> AsyncGenerator[AsyncSession, None]:
         """Create database session with automatic cleanup."""
         async with db_session_factory() as session:
             yield session
@@ -161,24 +175,26 @@ class TestOutboxPatternIntegration:
         mock = AsyncMock(spec=KafkaPublisherProtocol)
         mock.publish = AsyncMock(return_value=None)
         mock.published_events = []  # Track published events
-        
+
         # Side effect to track calls
-        async def track_publish(**kwargs):
+        async def track_publish(**kwargs: Any) -> None:
             mock.published_events.append(kwargs)
-            
+
         mock.publish.side_effect = track_publish
         return mock
 
     @pytest.fixture
-    def make_test_settings(self) -> Callable[[float, int], Settings]:
+    def make_test_settings(self) -> Callable[[float, int], Any]:
         """Factory for creating test settings with custom values."""
-        def _make_settings(poll_interval: float = 0.1, batch_size: int = 5) -> Settings:
-            settings = MagicMock(spec=Settings)
+
+        def _make_settings(poll_interval: float = 0.1, batch_size: int = 5) -> Any:
+            settings = MagicMock()
             settings.SERVICE_NAME = "batch-orchestrator-service"
             settings.OUTBOX_POLL_INTERVAL_SECONDS = poll_interval
             settings.OUTBOX_BATCH_SIZE = batch_size
             settings.OUTBOX_MAX_RETRIES = 5
             return settings
+
         return _make_settings
 
     @asynccontextmanager
@@ -189,9 +205,7 @@ class TestOutboxPatternIntegration:
         settings: Settings,
     ) -> AsyncGenerator[AsyncContainer, None]:
         """Create DI container with proper cleanup."""
-        container = make_async_container(
-            OutboxTestProvider(engine, kafka_publisher, settings)
-        )
+        container = make_async_container(OutboxTestProvider(engine, kafka_publisher, settings))
         try:
             yield container
         finally:
@@ -209,9 +223,9 @@ class TestOutboxPatternIntegration:
         # Clean before test
         async with test_engine.begin() as conn:
             await conn.execute(delete(EventOutbox))
-        
+
         yield
-        
+
         # Clean after test (for good measure)
         async with test_engine.begin() as conn:
             await conn.execute(delete(EventOutbox))
@@ -239,60 +253,61 @@ class TestOutboxPatternIntegration:
         """Test relay worker batch processing with event-based synchronization."""
         # Create settings with specific batch size
         settings = make_test_settings(poll_interval=0.05, batch_size=5)
-        
-        async with self.create_test_container(test_engine, mock_kafka_publisher, settings) as container:
+
+        async with self.create_test_container(
+            test_engine, mock_kafka_publisher, settings
+        ) as container:
             # Store 15 events
             async with container() as request_container:
                 event_publisher = await request_container.get(BatchEventPublisherProtocol)
-                
+
                 for i in range(15):
                     command_data = BatchServiceSpellcheckInitiateCommandDataV1(
                         event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
                         entity_ref=EntityReference(entity_id=f"batch-{i}", entity_type="batch"),
                         essays_to_process=[
-                            EssayProcessingInputRefV1(essay_id=f"essay{i}", text_storage_id=f"storage{i}"),
+                            EssayProcessingInputRefV1(
+                                essay_id=f"essay{i}", text_storage_id=f"storage{i}"
+                            ),
                         ],
                         language="en",
                     )
-                    
+
                     event_envelope = EventEnvelope[BatchServiceSpellcheckInitiateCommandDataV1](
                         event_type="huleedu.batch.spellcheck.initiate.command.v1",
                         source_service="batch-orchestrator-service",
                         correlation_id=correlation_id,
                         data=command_data,
                     )
-                    
+
                     await event_publisher.publish_batch_event(event_envelope, key=f"batch-{i}")
 
             # Process with relay worker using event-based waiting
             async with container() as request_container:
                 relay_worker = await request_container.get(EventRelayWorker)
-                
+
                 # Start worker
                 await relay_worker.start()
-                
+
                 try:
                     # Wait for first batch (5 events)
                     await self.wait_for_condition(
-                        lambda: len(mock_kafka_publisher.published_events) >= 5,
-                        timeout=1.0
+                        lambda: len(mock_kafka_publisher.published_events) >= 5, timeout=1.0
                     )
                     assert len(mock_kafka_publisher.published_events) == 5
-                    
+
                     # Wait for second batch (10 events total)
                     await self.wait_for_condition(
-                        lambda: len(mock_kafka_publisher.published_events) >= 10,
-                        timeout=1.0
+                        lambda: len(mock_kafka_publisher.published_events) >= 10, timeout=1.0
                     )
                     assert len(mock_kafka_publisher.published_events) == 10
-                    
+
                     # Wait for final batch (15 events total)
                     await self.wait_for_condition(
-                        lambda: len(mock_kafka_publisher.published_events) >= 15,
-                        timeout=1.0
+                        lambda: len(mock_kafka_publisher.published_events) >= 15, timeout=1.0
                     )
                     assert len(mock_kafka_publisher.published_events) == 15
-                    
+
                 finally:
                     # Always stop the worker
                     await relay_worker.stop()
@@ -305,7 +320,7 @@ class TestOutboxPatternIntegration:
     ) -> None:
         """Test that outbox writes are transactional with business operations."""
         outbox_repository = PostgreSQLOutboxRepository(test_engine)
-        
+
         # Test rollback scenario
         try:
             async with db_session_factory() as session:
@@ -320,18 +335,18 @@ class TestOutboxPatternIntegration:
                         event_key="test-key",
                         session=session,
                     )
-                    
+
                     # Verify it exists within transaction
                     result = await session.execute(
                         select(EventOutbox).where(EventOutbox.id == event_id)
                     )
                     assert result.scalar_one_or_none() is not None
-                    
+
                     # Force rollback
                     raise Exception("Intentional rollback")
         except Exception as e:
             assert str(e) == "Intentional rollback"
-        
+
         # Verify event was rolled back
         async with db_session_factory() as session:
             result = await session.execute(
@@ -348,64 +363,69 @@ class TestOutboxPatternIntegration:
     ) -> None:
         """Test concurrent relay workers don't double-process with proper locking."""
         settings = make_test_settings(poll_interval=0.05, batch_size=10)
-        
+
         # Create mock that tracks which worker processed each event
         processed_by_worker = {}
-        
-        async def track_worker_publish(**kwargs):
-            event_id = kwargs['envelope'].event_id
-            worker_id = asyncio.current_task().get_name()
+
+        async def track_worker_publish(**kwargs: Any) -> None:
+            event_id = kwargs["envelope"].event_id
+            task = asyncio.current_task()
+            worker_id = task.get_name() if task else "unknown"
             processed_by_worker[event_id] = worker_id
             mock_kafka_publisher.published_events.append(kwargs)
-        
+
         mock_kafka_publisher.publish.side_effect = track_worker_publish
-        
-        async with self.create_test_container(test_engine, mock_kafka_publisher, settings) as container:
+
+        async with self.create_test_container(
+            test_engine, mock_kafka_publisher, settings
+        ) as container:
             # Create test events
             async with container() as request_container:
                 event_publisher = await request_container.get(BatchEventPublisherProtocol)
-                
+
                 for i in range(5):
                     command_data = BatchServiceNLPInitiateCommandDataV1(
                         event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND,
-                        entity_ref=EntityReference(entity_id=f"concurrent-{i}", entity_type="batch"),
+                        entity_ref=EntityReference(
+                            entity_id=f"concurrent-{i}", entity_type="batch"
+                        ),
                         essays_to_process=[
-                            EssayProcessingInputRefV1(essay_id=f"essay{i}", text_storage_id=f"storage{i}"),
+                            EssayProcessingInputRefV1(
+                                essay_id=f"essay{i}", text_storage_id=f"storage{i}"
+                            ),
                         ],
                         language="en",
                     )
-                    
+
                     event_envelope = EventEnvelope[BatchServiceNLPInitiateCommandDataV1](
                         event_type="huleedu.batch.nlp.initiate.command.v1",
                         source_service="batch-orchestrator-service",
                         correlation_id=correlation_id,
                         data=command_data,
                     )
-                    
+
                     await event_publisher.publish_batch_event(event_envelope, key=f"concurrent-{i}")
-            
+
             # Start two workers concurrently
-            workers = []
             async with container() as request_container1:
                 async with container() as request_container2:
                     worker1 = await request_container1.get(EventRelayWorker)
                     worker2 = await request_container2.get(EventRelayWorker)
-                    
+
                     # Name tasks for tracking
                     task1 = asyncio.create_task(worker1.start(), name="worker1")
                     task2 = asyncio.create_task(worker2.start(), name="worker2")
-                    
+
                     try:
                         # Wait for all events to be processed
                         await self.wait_for_condition(
-                            lambda: len(mock_kafka_publisher.published_events) == 5,
-                            timeout=2.0
+                            lambda: len(mock_kafka_publisher.published_events) == 5, timeout=2.0
                         )
-                        
+
                         # Verify no double processing
                         assert len(mock_kafka_publisher.published_events) == 5
                         assert len(set(processed_by_worker.keys())) == 5  # All unique events
-                        
+
                     finally:
                         # Stop both workers
                         await worker1.stop()
