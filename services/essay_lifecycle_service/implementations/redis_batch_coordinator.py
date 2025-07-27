@@ -9,20 +9,112 @@ from __future__ import annotations
 
 import asyncio
 import json
-import random
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
-from redis.exceptions import WatchError
 
 if TYPE_CHECKING:
     from services.essay_lifecycle_service.config import Settings
 
 
 logger = create_service_logger(__name__)
+
+
+# -----------------------------------------------------------------------------
+# ATOMIC SLOT ASSIGNMENT LUA SCRIPT
+# -----------------------------------------------------------------------------
+# This script performs idempotent and atomic slot assignment.
+#
+# Logic:
+# 1. Idempotency Check: Checks if the content (text_storage_id) has already
+#    been assigned a slot. If so, it returns the existing essay_id.
+# 2. Atomic Slot Pop: If not already assigned, it atomically pops a slot from
+#    the available_slots set using SPOP.
+# 3. Handle No Slots: If SPOP returns nil (no slots available), the script
+#    returns nil immediately.
+# 4. Atomic Assignment: If a slot is acquired, it performs two HSET operations:
+#    - Maps the content_id -> essay_id for future idempotency checks.
+#    - Maps the essay_id -> content_metadata for data retrieval.
+# 5. Return Value: Returns the assigned essay_id on success.
+#
+# KEYS[1]: content_assignments_key (e.g., batch:{id}:content_assignments) HASH
+# KEYS[2]: available_slots_key (e.g., batch:{id}:available_slots) SET
+# KEYS[3]: assignments_key (e.g., batch:{id}:assignments) HASH
+#
+# ARGV[1]: text_storage_id
+# ARGV[2]: content_metadata_json
+# -----------------------------------------------------------------------------
+ATOMIC_ASSIGN_SCRIPT = """
+local content_assignments_key = KEYS[1]
+local available_slots_key = KEYS[2]
+local assignments_key = KEYS[3]
+
+local text_storage_id = ARGV[1]
+local content_metadata_json = ARGV[2]
+
+-- 1. Idempotency Check: See if this content is already assigned a slot
+local existing_essay_id = redis.call('HGET', content_assignments_key, text_storage_id)
+if existing_essay_id then
+    return existing_essay_id
+end
+
+-- 2. Atomically get an available slot
+local assigned_essay_id = redis.call('SPOP', available_slots_key)
+
+-- 3. If no slots are available, return nil
+if not assigned_essay_id then
+    return nil
+end
+
+-- 4. A slot was found, so perform the assignments
+redis.call('HSET', content_assignments_key, text_storage_id, assigned_essay_id)
+redis.call('HSET', assignments_key, assigned_essay_id, content_metadata_json)
+
+-- 5. Return the assigned slot ID
+return assigned_essay_id
+"""
+
+
+# -----------------------------------------------------------------------------
+# ATOMIC SLOT RETURN LUA SCRIPT
+# -----------------------------------------------------------------------------
+# This script atomically returns a previously assigned slot to the available pool.
+#
+# Use Case: This is for POST-ASSIGNMENT rollback scenarios where a slot was
+# successfully assigned but needs to be returned due to downstream processing
+# failures. NOT for pre-assignment validation failures (which use SPOP).
+#
+# KEYS[1]: content_assignments_key (e.g., batch:{id}:content_assignments) HASH
+# KEYS[2]: available_slots_key (e.g., batch:{id}:available_slots) SET
+# KEYS[3]: assignments_key (e.g., batch:{id}:assignments) HASH
+#
+# ARGV[1]: text_storage_id
+# -----------------------------------------------------------------------------
+ATOMIC_RETURN_SCRIPT = """
+local content_assignments_key = KEYS[1]
+local available_slots_key = KEYS[2]
+local assignments_key = KEYS[3]
+
+local text_storage_id = ARGV[1]
+
+-- Get current assignment
+local essay_id = redis.call('HGET', content_assignments_key, text_storage_id)
+if not essay_id then
+    return nil
+end
+
+-- Remove assignment
+redis.call('HDEL', content_assignments_key, text_storage_id)
+redis.call('HDEL', assignments_key, essay_id)
+
+-- Return slot to available set
+redis.call('SADD', available_slots_key, essay_id)
+
+return essay_id
+"""
 
 
 class RedisBatchCoordinator:
@@ -47,6 +139,11 @@ class RedisBatchCoordinator:
             86400  # 24 hours for complex processing including overnight LLM batches
         )
 
+        # Script loading state with concurrency protection
+        self._script_load_lock = asyncio.Lock()
+        self._atomic_assign_script_sha: str | None = None
+        self._atomic_return_script_sha: str | None = None
+
     def _get_available_slots_key(self, batch_id: str) -> str:
         """Get Redis key for available slots set."""
         return f"batch:{batch_id}:available_slots"
@@ -66,6 +163,25 @@ class RedisBatchCoordinator:
     def _get_content_assignments_key(self, batch_id: str) -> str:
         """Get Redis key for content assignments hash (text_storage_id -> essay_id mapping)."""
         return f"batch:{batch_id}:content_assignments"
+
+    async def _ensure_scripts_loaded(self) -> None:
+        """Load Lua scripts if not already loaded, protected by a lock."""
+        if self._atomic_assign_script_sha and self._atomic_return_script_sha:
+            return
+
+        async with self._script_load_lock:
+            # Double-check inside the lock to prevent re-loading
+            if self._atomic_assign_script_sha is None:
+                self._atomic_assign_script_sha = await self._redis.register_script(
+                    ATOMIC_ASSIGN_SCRIPT
+                )
+                self._logger.info("Loaded atomic slot assignment script")
+
+            if self._atomic_return_script_sha is None:
+                self._atomic_return_script_sha = await self._redis.register_script(
+                    ATOMIC_RETURN_SCRIPT
+                )
+                self._logger.info("Loaded atomic slot return script")
 
     async def register_batch_slots(
         self,
@@ -189,93 +305,103 @@ class RedisBatchCoordinator:
         self, batch_id: str, content_metadata: dict[str, Any]
     ) -> str | None:
         """
-        Atomically assign an available slot to content using a full Redis transaction
-        with retries on WatchError.
+        Atomically assign an available slot to content using a Lua script.
+
+        This method is idempotent - calling it multiple times with the same
+        text_storage_id will return the same essay_id without consuming additional slots.
 
         Args:
             batch_id: The batch identifier
             content_metadata: Content metadata including text_storage_id
 
         Returns:
-            The assigned internal essay ID if successful, None if no slots are available
-            or if a race condition caused the transaction to fail after retries.
+            The assigned essay ID if successful, None if no slots available
         """
         text_storage_id = content_metadata.get("text_storage_id")
         if not text_storage_id:
             raise ValueError("content_metadata must include text_storage_id")
 
-        for attempt in range(self._settings.redis_transaction_retries):
-            try:
-                return await self._attempt_slot_assignment(
-                    batch_id, text_storage_id, content_metadata
+        try:
+            await self._ensure_scripts_loaded()
+
+            keys = [
+                self._get_content_assignments_key(batch_id),
+                self._get_available_slots_key(batch_id),
+                self._get_assignments_key(batch_id),
+            ]
+            args = [
+                text_storage_id,
+                json.dumps(content_metadata),
+            ]
+
+            result = await self._redis.execute_script(self._atomic_assign_script_sha, keys, args)
+
+            if result is None:
+                self._logger.warning(
+                    f"No available slots in batch {batch_id} for content {text_storage_id}"
                 )
-            except WatchError:
-                if attempt < self._settings.redis_transaction_retries - 1:
-                    delay = (2**attempt) * 0.01 + random.uniform(0, 0.01)
-                    self._logger.warning(
-                        f"WatchError on attempt {attempt + 1} for {text_storage_id}, retrying in {delay:.3f}s..."
-                    )
-                    await asyncio.sleep(delay)
-                else:
-                    self._logger.error(
-                        f"Final attempt failed for {text_storage_id} due to WatchError."
-                    )
-                    return None
+                return None
 
-        return None  # Should not be reached, but for safety
-
-    async def _attempt_slot_assignment(
-        self, batch_id: str, text_storage_id: str, content_metadata: dict[str, Any]
-    ) -> str | None:
-        slots_key = self._get_available_slots_key(batch_id)
-        content_assignments_key = self._get_content_assignments_key(batch_id)
-        assignments_key = self._get_assignments_key(batch_id)
-
-        # Check for duplicate content BEFORE starting transaction
-        existing_assignment = await self._redis.hget(content_assignments_key, text_storage_id)
-        if existing_assignment:
-            assignment_str = (
-                existing_assignment.decode("utf-8")
-                if isinstance(existing_assignment, bytes)
-                else existing_assignment
-            )
             self._logger.info(
-                f"Content {text_storage_id} already assigned to essay {assignment_str} "
-                f"in batch {batch_id} (idempotent operation)"
+                f"Atomically assigned content {text_storage_id} to slot {result} "
+                f"in batch {batch_id}"
             )
-            return assignment_str
+            return result
 
-        # Check for available slots BEFORE starting transaction
-        available_slots = await self._redis.smembers(slots_key)
-        if not available_slots:
-            self._logger.warning(f"No available slots in batch {batch_id}.")
-            return None
-
-        async with await self._redis.create_transaction_pipeline(
-            slots_key, content_assignments_key
-        ) as pipe:
-            # Start the transaction
-            pipe.multi()
-
-            # Pop a slot and perform assignments
-            assigned_essay_id = available_slots.pop()
-            pipe.srem(slots_key, assigned_essay_id)
-            pipe.hset(content_assignments_key, text_storage_id, assigned_essay_id)
-            pipe.hset(assignments_key, assigned_essay_id, json.dumps(content_metadata))
-
-            # Execute the transaction. Throws WatchError if optimistic lock fails.
-            await pipe.execute()
-
-            # Decode bytes to string for return
-            essay_id_str = (
-                assigned_essay_id.decode("utf-8")
-                if isinstance(assigned_essay_id, bytes)
-                else assigned_essay_id
+        except Exception as e:
+            self._logger.error(
+                f"Failed to assign slot for content {text_storage_id} in batch {batch_id}: {e}",
+                exc_info=True,
             )
-            self._logger.info(
-                f"Successfully assigned content {text_storage_id} to slot {essay_id_str}"
+            raise
+
+    async def return_slot(self, batch_id: str, text_storage_id: str) -> bool:
+        """
+        Atomically return a previously assigned slot to the available pool.
+
+        This is for POST-ASSIGNMENT rollback scenarios where a slot was
+        successfully assigned but needs to be returned due to downstream
+        processing failures.
+
+        NOTE: This is NOT for pre-assignment validation failures, which
+        are handled by track_validation_failure using SPOP.
+
+        Args:
+            batch_id: The batch identifier
+            text_storage_id: The content ID whose slot should be returned
+
+        Returns:
+            True if slot was returned, False if no assignment existed
+        """
+        try:
+            await self._ensure_scripts_loaded()
+
+            keys = [
+                self._get_content_assignments_key(batch_id),
+                self._get_available_slots_key(batch_id),
+                self._get_assignments_key(batch_id),
+            ]
+            args = [text_storage_id]
+
+            result = await self._redis.execute_script(self._atomic_return_script_sha, keys, args)
+
+            if result:
+                self._logger.info(
+                    f"Returned slot {result} to batch {batch_id} for content {text_storage_id}"
+                )
+                return True
+            else:
+                self._logger.warning(
+                    f"No slot assignment found for content {text_storage_id} in batch {batch_id}"
+                )
+                return False
+
+        except Exception as e:
+            self._logger.error(
+                f"Failed to return slot for content {text_storage_id} in batch {batch_id}: {e}",
+                exc_info=True,
             )
-            return essay_id_str
+            raise
 
     async def check_batch_completion(self, batch_id: str) -> bool:
         """

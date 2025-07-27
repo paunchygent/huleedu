@@ -884,6 +884,69 @@ class RedisClient(AtomicRedisClientProtocol):
             )
         return await self._pubsub.publish_user_notification(user_id, event_type, data)
 
+    # Lua script operations for atomic complex operations
+    async def register_script(self, script_body: str) -> str:
+        """
+        Load a Lua script into Redis and return its SHA1 hash.
+
+        Args:
+            script_body: The Lua script as a string
+
+        Returns:
+            The SHA1 hash of the script for use with EVALSHA
+
+        Raises:
+            RuntimeError: If Redis client is not running
+            Exception: If script registration fails
+        """
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+        
+        try:
+            # The script_load method returns the SHA1 hash of the script
+            sha = await self.client.script_load(script_body)
+            logger.debug(f"Lua script registered by '{self.client_id}' with SHA: {sha}")
+            return sha
+        except Exception as e:
+            logger.error(
+                f"Error registering Lua script by '{self.client_id}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def execute_script(self, sha: str, keys: list[str], args: list[Any]) -> Any:
+        """
+        Execute a pre-loaded Lua script by its SHA hash.
+
+        Args:
+            sha: The SHA1 hash of the script
+            keys: A list of key names used by the script
+            args: A list of argument values used by the script
+
+        Returns:
+            The result of the script execution
+
+        Raises:
+            RuntimeError: If Redis client is not running
+            Exception: If script execution fails
+        """
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+        
+        try:
+            result = await self.client.evalsha(sha, len(keys), *keys, *args)
+            logger.debug(
+                f"Executed Lua script by '{self.client_id}' with SHA: {sha}, "
+                f"keys: {keys}, args: {args}"
+            )
+            return result
+        except Exception as e:
+            logger.error(
+                f"Error executing Lua script by '{self.client_id}' with SHA: {sha}: {e}",
+                exc_info=True,
+            )
+            raise
+
     # PubSub management
     @property
     def pubsub(self) -> RedisPubSub | None:

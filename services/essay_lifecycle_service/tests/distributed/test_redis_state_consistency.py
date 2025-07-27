@@ -101,7 +101,7 @@ class RedisStateValidator:
         successful_assignments = [r for r in results if isinstance(r, str)]
         failed_assignments = [r for r in results if r is None]
         error_assignments = [r for r in results if isinstance(r, Exception)]
-        
+
         # Count unique essay IDs to handle idempotent operations
         unique_essay_ids = set(successful_assignments)
 
@@ -314,7 +314,7 @@ class TestRedisStateConsistency:
         # Assert - Analyze results
         successful_assignments = [r for r in results if isinstance(r, str)]
         failed_assignments = [r for r in results if r is None]
-        
+
         # Count unique essay IDs assigned (due to idempotency)
         unique_essay_ids = set(successful_assignments)
 
@@ -322,7 +322,7 @@ class TestRedisStateConsistency:
         assert len(unique_essay_ids) == slot_count, (
             f"Lock contention failed: {len(unique_essay_ids)} unique assignments != {slot_count} slots"
         )
-        
+
         # The total operations should equal successful + failed
         assert len(successful_assignments) + len(failed_assignments) == contention_level, (
             f"Lost operations: {len(successful_assignments)} + {len(failed_assignments)} != {contention_level}"

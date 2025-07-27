@@ -384,6 +384,41 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         """
         pass
 
+    # Lua script operations for atomic complex operations
+    async def register_script(self, script_body: str) -> str:
+        """
+        Load a Lua script into Redis and return its SHA1 hash.
+
+        Args:
+            script_body: The Lua script as a string
+
+        Returns:
+            The SHA1 hash of the script for use with EVALSHA
+
+        Raises:
+            RuntimeError: If Redis client is not running
+            Exception: If script registration fails
+        """
+        pass
+
+    async def execute_script(self, sha: str, keys: list[str], args: list[Any]) -> Any:
+        """
+        Execute a pre-loaded Lua script by its SHA hash.
+
+        Args:
+            sha: The SHA1 hash of the script
+            keys: A list of key names used by the script
+            args: A list of argument values used by the script
+
+        Returns:
+            The result of the script execution
+
+        Raises:
+            RuntimeError: If Redis client is not running
+            Exception: If script execution fails
+        """
+        pass
+
 
 class KafkaPublisherProtocol(Protocol):
     """
