@@ -201,7 +201,10 @@ async def test_duplicate_event_skipped(
     # Store with transaction-aware format indicating completed status
     mock_redis_client.keys[
         f"huleedu:idempotency:v2:cj-assessment-service:huleedu_els_cj_assessment_requested_v1:{deterministic_id}"
-    ] = '{"status": "completed", "processed_at": 1640995200.0, "processed_by": "cj-assessment-service"}'
+    ] = (
+        '{"status": "completed", "processed_at": 1640995200.0, '
+        '"processed_by": "cj-assessment-service"}'
+    )
 
     config = IdempotencyConfig(
         service_name="cj-assessment-service",

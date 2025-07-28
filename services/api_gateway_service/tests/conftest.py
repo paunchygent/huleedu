@@ -187,7 +187,7 @@ def create_test_app_with_isolated_registry(registry: CollectorRegistry):
     from ..app.rate_limiter import limiter
     from ..routers import batch_routes, class_routes, file_routes, status_routes
     from ..routers.health_routes import router as health_router
-    
+
     app = FastAPI(
         title=settings.SERVICE_NAME,
         version="1.0.0",

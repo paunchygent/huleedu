@@ -6,8 +6,8 @@ import time
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional
 
 from fastapi import Request, Response
+from prometheus_client import REGISTRY, CollectorRegistry, Counter, Histogram
 from starlette.middleware.base import BaseHTTPMiddleware
-from prometheus_client import Counter, Histogram, CollectorRegistry, REGISTRY
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 class StandardMetricsMiddleware(BaseHTTPMiddleware):
     """Standard HTTP metrics middleware for FastAPI applications.
-    
+
     Collects standard HTTP metrics following HuleEdu service library patterns:
     - Request count by method, endpoint, and status code
     - Request duration histogram by method and endpoint
@@ -31,24 +31,24 @@ class StandardMetricsMiddleware(BaseHTTPMiddleware):
         """
         super().__init__(app)
         self.service_name = service_name
-        
+
         # Use provided registry or default global registry
         if registry is None:
             registry = REGISTRY
-        
+
         # Standard HTTP metrics following service library patterns
         self.http_requests_total = Counter(
             f"{service_name}_http_requests_total",
             "Total number of HTTP requests",
             ["method", "endpoint", "status_code"],
-            registry=registry
+            registry=registry,
         )
-        
+
         self.http_request_duration_seconds = Histogram(
-            f"{service_name}_http_request_duration_seconds", 
+            f"{service_name}_http_request_duration_seconds",
             "HTTP request duration in seconds",
             ["method", "endpoint"],
-            registry=registry
+            registry=registry,
         )
 
     async def dispatch(
@@ -64,47 +64,41 @@ class StandardMetricsMiddleware(BaseHTTPMiddleware):
             The response with metrics recorded
         """
         start_time = time.time()
-        
+
         # Get endpoint path (normalized without query params)
         endpoint = request.url.path
         method = request.method
-        
+
         try:
             # Process the request
             response = await call_next(request)
             status_code = str(response.status_code)
-            
+
             # Record metrics
             duration = time.time() - start_time
-            
+
             self.http_requests_total.labels(
-                method=method,
-                endpoint=endpoint,
-                status_code=status_code
+                method=method, endpoint=endpoint, status_code=status_code
             ).inc()
-            
-            self.http_request_duration_seconds.labels(
-                method=method,
-                endpoint=endpoint
-            ).observe(duration)
-            
+
+            self.http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(
+                duration
+            )
+
             return response
-            
+
         except Exception:
             # Record error metrics
             duration = time.time() - start_time
-            
+
             self.http_requests_total.labels(
-                method=method,
-                endpoint=endpoint,
-                status_code="500"
+                method=method, endpoint=endpoint, status_code="500"
             ).inc()
-            
-            self.http_request_duration_seconds.labels(
-                method=method,
-                endpoint=endpoint
-            ).observe(duration)
-            
+
+            self.http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(
+                duration
+            )
+
             raise
 
 

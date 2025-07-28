@@ -92,7 +92,8 @@ async def test_duplicate_event_skipped(
     )
     # Store with transaction-aware format indicating completed status
     redis_client.keys[v2_key] = (
-        '{"status": "completed", "processed_at": 1640995200, "processed_by": "spell-checker-service"}'
+        '{"status": "completed", "processed_at": 1640995200, '
+        '"processed_by": "spell-checker-service"}'
     )
 
     config = IdempotencyConfig(service_name="spell-checker-service")

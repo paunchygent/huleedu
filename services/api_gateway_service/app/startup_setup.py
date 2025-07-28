@@ -8,10 +8,10 @@ from fastapi import FastAPI
 
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.middleware.frameworks.fastapi_middleware import setup_tracing_middleware
 from huleedu_service_libs.middleware.frameworks.fastapi_metrics_middleware import (
     setup_standard_service_metrics_middleware,
 )
+from huleedu_service_libs.middleware.frameworks.fastapi_middleware import setup_tracing_middleware
 from services.api_gateway_service.app.auth_provider import AuthProvider
 from services.api_gateway_service.app.di import ApiGatewayProvider
 
@@ -50,10 +50,10 @@ def setup_tracing_and_middleware(app: FastAPI):
     try:
         logger.info("Initializing distributed tracing...")
         tracer = init_tracing("api_gateway_service")
-        
+
         # Store tracer in app state for access in routes
         app.state.tracer = tracer
-        
+
         # Add FastAPI tracing middleware from service libraries
         setup_tracing_middleware(app, tracer)
         logger.info("Tracing middleware added successfully")
@@ -68,10 +68,10 @@ def setup_tracing_and_middleware(app: FastAPI):
 
 def setup_standard_metrics_middleware(app: FastAPI, registry=None):
     """Setup standard HTTP metrics middleware for the API Gateway.
-    
-    This adds infrastructure-level HTTP metrics while preserving existing 
+
+    This adds infrastructure-level HTTP metrics while preserving existing
     business-specific GatewayMetrics for route-level metrics.
-    
+
     Args:
         app: FastAPI application instance
         registry: Optional Prometheus registry for test isolation

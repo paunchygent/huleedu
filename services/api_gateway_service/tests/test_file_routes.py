@@ -40,10 +40,10 @@ async def client_with_mocks(mock_http_client, monkeypatch):
     """Create test client with pure Dishka container and mocked HTTP client."""
     # Create container with test providers including mocked HTTP client
     from prometheus_client import CollectorRegistry
-    
+
     # Create isolated registry for this test
     test_registry = CollectorRegistry()
-    
+
     container = make_async_container(
         HttpClientTestProvider(mock_http_client),  # Override HTTP client
         AuthTestProvider(user_id=USER_ID),

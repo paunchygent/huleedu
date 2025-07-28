@@ -43,7 +43,9 @@ class ApiGatewayProvider(Provider):
                 circuit_breaker = CircuitBreaker(
                     name=f"{config.SERVICE_NAME}.http_client",
                     failure_threshold=config.HTTP_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
-                    recovery_timeout=timedelta(seconds=config.HTTP_CIRCUIT_BREAKER_RECOVERY_TIMEOUT),
+                    recovery_timeout=timedelta(
+                        seconds=config.HTTP_CIRCUIT_BREAKER_RECOVERY_TIMEOUT
+                    ),
                     success_threshold=config.HTTP_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
                     expected_exception=httpx.HTTPError,
                 )
