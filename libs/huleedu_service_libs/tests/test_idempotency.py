@@ -8,12 +8,13 @@ Uses real handler functions instead of mocks to follow testing best practices.
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from datetime import UTC, datetime
 
 import pytest
 from aiokafka import ConsumerRecord
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
 
 # Real handler functions for testing (not mocks)
@@ -162,12 +163,14 @@ async def test_first_time_event_processing(
     )
 
     # Apply decorator to real handler
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handler(msg: ConsumerRecord, *args, **kwargs) -> str:
-        return await tracked_handler(msg, tracker, *args, **kwargs)
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handler(msg: ConsumerRecord, *, confirm_idempotency, **kwargs) -> str:
+        result = await tracked_handler(msg, tracker, "extra_arg", keyword_arg="test")
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process message
-    result = await handler(kafka_msg, "extra_arg", keyword_arg="test")
+    result = await handler(kafka_msg, keyword_arg="test")
 
     # Assertions
     assert result == f"tracked_result_{kafka_msg.offset}"
@@ -181,9 +184,10 @@ async def test_first_time_event_processing(
     import json
 
     value_data = json.loads(set_call[1])
-    assert "processed_at" in value_data
+    assert "started_at" in value_data  # Transaction-aware pattern starts with "started_at"
     assert value_data["processed_by"] == "test-service"
-    assert set_call[2] == 3600
+    assert value_data["status"] == "processing"  # Initial status before confirmation
+    assert set_call[2] == 300  # Transaction-aware pattern uses 5 minutes for processing state
 
     # Verify handler was called with correct arguments
     assert tracker.call_count == 1
@@ -212,22 +216,27 @@ async def test_duplicate_event_skipped(
     redis_key = config.generate_redis_key(
         "test.event.v1", sample_event_data["event_id"], deterministic_id
     )
-    mock_redis_client.keys[redis_key] = '{"processed_at": 1234567890}'
+    # Store with the new transaction-aware format
+    mock_redis_client.keys[redis_key] = json.dumps(
+        {"status": "completed", "processed_at": time.time()}
+    )
 
     # Create call tracker for verification
     tracker = HandlerCallTracker()
 
     # Apply decorator to real handler
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handler(msg: ConsumerRecord) -> str:
-        return await tracked_handler(msg, tracker)
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handler(msg: ConsumerRecord, *, confirm_idempotency) -> str:
+        result = await tracked_handler(msg, tracker)
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process message
     result = await handler(kafka_msg)
 
     # Assertions
     assert result is None  # Should return None for duplicates
-    assert len(mock_redis_client.set_calls) == 1  # SETNX was attempted
+    assert len(mock_redis_client.set_calls) == 0  # No SETNX for duplicates (GET detects it first)
     assert len(mock_redis_client.delete_calls) == 0  # No cleanup needed
 
     # Handler should NOT have been called
@@ -247,9 +256,11 @@ async def test_processing_failure_releases_lock(
     config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
     # Apply decorator to real failing handler
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handler(msg: ConsumerRecord) -> str:
-        return await failing_handler(msg)
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handler(msg: ConsumerRecord, *, confirm_idempotency) -> str:
+        result = await failing_handler(msg)
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process message and expect exception
     with pytest.raises(Exception, match="Processing failed"):
@@ -280,9 +291,11 @@ async def test_redis_set_failure_fallback(
     config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
     # Apply decorator to real handler
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handler(msg: ConsumerRecord) -> str:
-        return await successful_handler(msg)
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handler(msg: ConsumerRecord, *, confirm_idempotency) -> str:
+        result = await successful_handler(msg)
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process message - should succeed despite Redis failure
     result = await handler(kafka_msg)
@@ -309,9 +322,11 @@ async def test_redis_delete_failure_logged(
     config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
     # Apply decorator to real failing handler
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handler(msg: ConsumerRecord) -> str:
-        return await failing_handler(msg)
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handler(msg: ConsumerRecord, *, confirm_idempotency) -> str:
+        result = await failing_handler(msg)
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process message and expect original exception
     with pytest.raises(Exception, match="Processing failed"):
@@ -338,9 +353,11 @@ async def test_default_ttl_applied(
     )
 
     # Apply decorator
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handler(msg: ConsumerRecord) -> str:
-        return await successful_handler(msg)
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handler(msg: ConsumerRecord, *, confirm_idempotency) -> str:
+        result = await successful_handler(msg)
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process message
     result = await handler(kafka_msg)
@@ -349,9 +366,12 @@ async def test_default_ttl_applied(
     assert result == f"processed_offset_{kafka_msg.offset}"
     assert len(mock_redis_client.set_calls) == 1
 
-    # Verify default TTL (86400 seconds = 24 hours)
+    # With transaction-aware pattern:
+    # - Initial SETNX uses 300s TTL for "processing" state
+    # - After confirmation, SETEX uses configured TTL (86400) for "completed" state
+    # The test checks the initial SETNX call which should be 300s
     set_call = mock_redis_client.set_calls[0]
-    assert set_call[2] == 86400
+    assert set_call[2] == 300  # Processing state TTL
 
 
 @pytest.mark.asyncio
@@ -379,9 +399,11 @@ async def test_deterministic_key_generation(mock_redis_client: MockRedisClient) 
     config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
     # Apply decorator to real handler
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handler(msg: ConsumerRecord) -> str:
-        return await tracked_handler(msg, tracker)
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handler(msg: ConsumerRecord, *, confirm_idempotency) -> str:
+        result = await tracked_handler(msg, tracker)
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process first message
     result1 = await handler(msg1)
@@ -391,11 +413,10 @@ async def test_deterministic_key_generation(mock_redis_client: MockRedisClient) 
     result2 = await handler(msg2)
     assert result2 is None  # Should be None for duplicate
 
-    # Verify both messages generated the same Redis key
-    assert len(mock_redis_client.set_calls) == 2
+    # With transaction-aware pattern, duplicate detection happens via GET
+    # Only the first message attempts SETNX
+    assert len(mock_redis_client.set_calls) == 1
     key1 = mock_redis_client.set_calls[0][0]
-    key2 = mock_redis_client.set_calls[1][0]
-    assert key1 == key2
     # Verify v2 key format
     assert key1.startswith("huleedu:idempotency:v2:test-service:test_event_v1:")
 
@@ -427,9 +448,11 @@ async def test_different_data_generates_different_keys(mock_redis_client: MockRe
     config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
     # Apply decorator to real handler
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handler(msg: ConsumerRecord) -> str:
-        return await tracked_handler(msg, tracker)
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handler(msg: ConsumerRecord, *, confirm_idempotency) -> str:
+        result = await tracked_handler(msg, tracker)
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process both messages
     result1 = await handler(msg1)

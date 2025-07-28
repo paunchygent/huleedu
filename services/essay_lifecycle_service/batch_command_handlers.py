@@ -303,7 +303,9 @@ async def _route_event(
                 ).inc()
 
             spellcheck_result: bool = await service_result_handler.handle_spellcheck_result(
-                result_data=result_data, correlation_id=correlation_id, confirm_idempotency=confirm_idempotency
+                result_data=result_data,
+                correlation_id=correlation_id,
+                confirm_idempotency=confirm_idempotency,
             )
             return spellcheck_result
 
@@ -319,7 +321,9 @@ async def _route_event(
                 ).inc()
 
             cj_result: bool = await service_result_handler.handle_cj_assessment_completed(
-                result_data=cj_result_data, correlation_id=correlation_id, confirm_idempotency=confirm_idempotency
+                result_data=cj_result_data,
+                correlation_id=correlation_id,
+                confirm_idempotency=confirm_idempotency,
             )
             return cj_result
 

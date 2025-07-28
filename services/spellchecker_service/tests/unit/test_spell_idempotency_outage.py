@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
 from services.spellchecker_service.event_processor import process_single_message
 from services.spellchecker_service.protocols import SpellLogicProtocol
@@ -32,8 +32,8 @@ async def test_exception_failure_releases_lock(
 
     config = IdempotencyConfig(service_name="spell-checker-service")
 
-    @idempotent_consumer_v2(redis_client=redis_client, config=config)
-    async def handle_message_with_exception(msg: ConsumerRecord) -> bool:
+    @idempotent_consumer(redis_client=redis_client, config=config)
+    async def handle_message_with_exception(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
         raise RuntimeError("Unexpected infrastructure failure")
 
     with pytest.raises(RuntimeError, match="Unexpected infrastructure failure"):
@@ -57,9 +57,9 @@ async def test_redis_failure_fallback(
 
     config = IdempotencyConfig(service_name="spell-checker-service")
 
-    @idempotent_consumer_v2(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
-        return await process_single_message(
+    @idempotent_consumer(redis_client=redis_client, config=config)
+    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        result = await process_single_message(
             msg=msg,
             http_session=http_session,
             content_client=content_client,
@@ -69,11 +69,15 @@ async def test_redis_failure_fallback(
             kafka_bus=kafka_bus,
             consumer_group_id="test-group",
         )
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     result = await handle_message_idempotently(kafka_msg)
 
     assert result is True
-    assert len(redis_client.set_calls) == 1
+    # With transaction-aware pattern, GET is attempted first and fails
+    # No SET operation occurs when GET fails during outage
+    assert len(redis_client.set_calls) == 0  # No SET attempted during outage
     assert len(redis_client.delete_calls) == 0
     content_client.fetch_content.assert_called_once()
     result_store.store_content.assert_called_once()

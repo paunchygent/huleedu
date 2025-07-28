@@ -113,7 +113,7 @@ class BatchKafkaConsumer:
         logger.info("Starting BOS message processing loop with idempotency")
 
         # Import v2 decorator locally to avoid circular imports
-        from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+        from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
         # Create idempotency configuration for BOS
         idempotency_config = IdempotencyConfig(
@@ -122,9 +122,10 @@ class BatchKafkaConsumer:
         )
 
         # Apply idempotency v2 decorator with service-specific configuration
-        @idempotent_consumer_v2(redis_client=self.redis_client, config=idempotency_config)
-        async def handle_message_idempotently(msg: Any) -> bool:
+        @idempotent_consumer(redis_client=self.redis_client, config=idempotency_config)
+        async def handle_message_idempotently(msg: Any, *, confirm_idempotency) -> bool:
             await self._handle_message(msg)
+            await confirm_idempotency()  # Confirm after successful processing
             return True  # Success - existing _handle_message raises on failure
 
         try:

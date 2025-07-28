@@ -20,7 +20,7 @@ from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.status_enums import EssayStatus, OperationStatus
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from services.batch_conductor_service.metrics import get_kafka_consumer_metrics
@@ -73,9 +73,10 @@ class BCSKafkaConsumer:
         )
 
         # Create idempotent message processor with v2 configuration
-        @idempotent_consumer_v2(redis_client=redis_client, config=idempotency_config)
-        async def handle_message_idempotently(msg: ConsumerRecord) -> None:
+        @idempotent_consumer(redis_client=redis_client, config=idempotency_config)
+        async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> None:
             await self._handle_message(msg)
+            await confirm_idempotency()  # Confirm after successful processing
 
         self._handle_message_idempotently = handle_message_idempotently
 

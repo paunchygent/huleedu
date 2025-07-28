@@ -145,7 +145,7 @@ async def test_exception_failure_releases_lock(
     mock_redis_client: MockRedisClient,
 ) -> None:
     """Test that unhandled exceptions release Redis lock to allow retry."""
-    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
     # Setup mock process with exception
     mock_process = AsyncMock(side_effect=Exception("Unhandled processing error"))
@@ -157,9 +157,10 @@ async def test_exception_failure_releases_lock(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
         await mock_process(msg)
+        await confirm_idempotency()  # Confirm after successful processing
         return True  # Should never reach this due to exception
 
     with pytest.raises(Exception, match="Unhandled processing error"):
@@ -180,7 +181,7 @@ async def test_redis_failure_fallback(
     mock_redis_client: MockRedisClient,
 ) -> None:
     """Test that Redis failures result in fail-open behavior."""
-    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
     # Set the mock redis client to fail on set operation
     mock_redis_client.should_fail_set = True
@@ -195,9 +196,9 @@ async def test_redis_failure_fallback(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
-        return await process_single_message(
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        result = await process_single_message(
             msg=msg,
             database=database,
             content_client=content_client,
@@ -205,11 +206,15 @@ async def test_redis_failure_fallback(
             llm_interaction=llm_interaction,
             settings_obj=settings,
         )
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     result = await handle_message_idempotently(kafka_msg)
 
     assert result is True
-    assert len(mock_redis_client.set_calls) == 1
+    # With transaction-aware pattern, GET is attempted first and fails
+    # No SET operation occurs when GET fails during outage
+    assert len(mock_redis_client.set_calls) == 0  # No SET attempted during outage
     assert len(mock_redis_client.delete_calls) == 0
 
     content_client.fetch_content.assert_called()

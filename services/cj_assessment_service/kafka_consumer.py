@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaConnectionError
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 
@@ -67,9 +67,11 @@ class CJAssessmentKafkaConsumer:
         )
 
         # Processor for assessment request messages
-        @idempotent_consumer_v2(redis_client=redis_client, config=config)
-        async def process_assessment_request_idempotently(msg: Any) -> bool | None:
-            return await process_single_message(
+        @idempotent_consumer(redis_client=redis_client, config=config)
+        async def process_assessment_request_idempotently(
+            msg: Any, *, confirm_idempotency
+        ) -> bool | None:
+            result = await process_single_message(
                 msg=msg,
                 database=self.database,
                 content_client=self.content_client,
@@ -78,17 +80,23 @@ class CJAssessmentKafkaConsumer:
                 settings_obj=self.settings,
                 tracer=self.tracer,
             )
+            await confirm_idempotency()  # Confirm after successful processing
+            return result
 
         # Processor for LLM callback messages
-        @idempotent_consumer_v2(redis_client=redis_client, config=config)
-        async def process_llm_callback_idempotently(msg: Any) -> bool | None:
-            return await process_llm_result(
+        @idempotent_consumer(redis_client=redis_client, config=config)
+        async def process_llm_callback_idempotently(
+            msg: Any, *, confirm_idempotency
+        ) -> bool | None:
+            result = await process_llm_result(
                 msg=msg,
                 database=self.database,
                 event_publisher=self.event_publisher,
                 settings_obj=self.settings,
                 tracer=self.tracer,
             )
+            await confirm_idempotency()  # Confirm after successful processing
+            return result
 
         self._process_assessment_request_idempotently = process_assessment_request_idempotently
         self._process_llm_callback_idempotently = process_llm_callback_idempotently

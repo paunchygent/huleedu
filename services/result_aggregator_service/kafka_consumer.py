@@ -16,7 +16,7 @@ from common_core.events import (
     EventEnvelope,
     SpellcheckResultDataV1,
 )
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from pydantic import ValidationError
@@ -80,9 +80,11 @@ class ResultAggregatorKafkaConsumer:
         )
 
         # Create idempotent message processor with v2 configuration
-        @idempotent_consumer_v2(redis_client=redis_client, config=idempotency_config)
-        async def process_message_idempotently(msg: ConsumerRecord) -> bool:
-            return await self._process_message_impl(msg)
+        @idempotent_consumer(redis_client=redis_client, config=idempotency_config)
+        async def process_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+            result = await self._process_message_impl(msg)
+            await confirm_idempotency()  # Confirm after successful processing
+            return result
 
         self._process_message_idempotently = process_message_idempotently
 

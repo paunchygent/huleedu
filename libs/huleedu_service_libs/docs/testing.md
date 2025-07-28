@@ -227,7 +227,7 @@ async def test_validation_error_details():
 ### Idempotency Decorator Testing
 
 ```python
-from huleedu_service_libs.idempotency_v2 import idempotent_consumer_v2, IdempotencyConfig
+from huleedu_service_libs.idempotency_v2 import idempotent_consumer, IdempotencyConfig
 
 async def test_idempotent_processing_first_time(mock_redis_client):
     """Test that event is processed on first occurrence."""
@@ -241,7 +241,7 @@ async def test_idempotent_processing_first_time(mock_redis_client):
     
     process_called = False
     
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
     async def process_event(msg):
         nonlocal process_called
         process_called = True
@@ -265,7 +265,7 @@ async def test_idempotent_processing_duplicate(mock_redis_client):
     
     process_called = False
     
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
     async def process_event(msg):
         nonlocal process_called
         process_called = True
@@ -351,7 +351,7 @@ async def test_idempotency_with_real_redis(redis_client):
     
     call_count = 0
     
-    @idempotent_consumer_v2(redis_client=redis_client, config=config)
+    @idempotent_consumer(redis_client=redis_client, config=config)
     async def process_event(msg):
         nonlocal call_count
         call_count += 1

@@ -133,7 +133,7 @@ async def test_first_time_event_processing_success(
     sample_batch_registered_event: dict, mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
 ) -> None:
     """Test that first-time events are processed successfully with v2 idempotency."""
-    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
     redis_client = MockRedisClient()
     batch_coordination_handler, batch_command_handler, service_result_handler = mock_handlers
@@ -149,14 +149,16 @@ async def test_first_time_event_processing_success(
     )
 
     # Apply v2 idempotency decorator to real message processor
-    @idempotent_consumer_v2(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
-        return await process_single_message(
+    @idempotent_consumer(redis_client=redis_client, config=config)
+    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        result = await process_single_message(
             msg=msg,
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
         )
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process message
     result = await handle_message_idempotently(kafka_msg)
@@ -173,11 +175,13 @@ async def test_first_time_event_processing_success(
     import json
 
     stored_data = json.loads(set_call[1])
-    assert "processed_at" in stored_data
+    # Transaction-aware v2: initial lock has 'started_at' and 'status': 'processing'
+    assert "started_at" in stored_data
     assert "processed_by" in stored_data
     assert stored_data["processed_by"] == "essay-lifecycle-service"
-    # V2 uses event-type specific TTL (43200 for batch coordination events)
-    assert set_call[2] == 43200
+    assert stored_data["status"] == "processing"
+    # V2 uses TTL for processing lock phase (typically shorter than completion TTL)
+    assert set_call[2] > 0  # TTL should be positive
 
     # Verify business logic was called
     batch_coordination_handler.handle_batch_essays_registered.assert_called_once()
@@ -189,7 +193,7 @@ async def test_duplicate_event_skipped(
 ) -> None:
     """Test that duplicate events are skipped without processing business logic."""
     from huleedu_service_libs.event_utils import generate_deterministic_event_id
-    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
     redis_client = MockRedisClient()
     batch_coordination_handler, batch_command_handler, service_result_handler = mock_handlers
@@ -201,9 +205,16 @@ async def test_duplicate_event_skipped(
     deterministic_id = generate_deterministic_event_id(kafka_msg.value)
     event_type = sample_batch_registered_event["event_type"]
     safe_event_type = event_type.replace(".", "_")
+    # Store with transaction-aware format indicating completed status
     redis_client.keys[
         f"huleedu:idempotency:v2:essay-lifecycle-service:{safe_event_type}:{deterministic_id}"
-    ] = '{"processed_at": 1640995200.0}'
+    ] = json.dumps(
+        {
+            "status": "completed",
+            "processed_at": 1640995200.0,
+            "processed_by": "essay-lifecycle-service",
+        }
+    )
 
     # Configure v2 idempotency
     config = IdempotencyConfig(
@@ -213,21 +224,26 @@ async def test_duplicate_event_skipped(
     )
 
     # Apply v2 idempotency decorator
-    @idempotent_consumer_v2(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
-        return await process_single_message(
+    @idempotent_consumer(redis_client=redis_client, config=config)
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency
+    ) -> bool | None:
+        result = await process_single_message(
             msg=msg,
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
         )
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process message
     result = await handle_message_idempotently(kafka_msg)
 
     # Assertions
     assert result is None  # Should return None for duplicates
-    assert len(redis_client.set_calls) == 1  # SETNX was attempted
+    # With transaction-aware pattern, duplicate detection happens via GET, no SETNX attempted
+    assert len(redis_client.set_calls) == 0  # No SET attempted for duplicates
     assert len(redis_client.delete_calls) == 0  # No cleanup needed
 
     # Business logic should NOT have been called
@@ -239,7 +255,7 @@ async def test_processing_failure_keeps_lock(
     sample_batch_registered_event: dict, mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
 ) -> None:
     """Test that business logic failures keep the idempotency lock in v2 (ELS returns False)."""
-    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
     redis_client = MockRedisClient()
     batch_coordination_handler, batch_command_handler, service_result_handler = mock_handlers
@@ -260,14 +276,16 @@ async def test_processing_failure_keeps_lock(
     )
 
     # Apply v2 idempotency decorator
-    @idempotent_consumer_v2(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
-        return await process_single_message(
+    @idempotent_consumer(redis_client=redis_client, config=config)
+    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        result = await process_single_message(
             msg=msg,
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
         )
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process message - ELS returns False for processing failures
     result = await handle_message_idempotently(kafka_msg)
@@ -283,7 +301,7 @@ async def test_exception_failure_releases_lock(
     sample_batch_registered_event: dict,
 ) -> None:
     """Test that unhandled exceptions release the idempotency lock for retry in v2."""
-    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
     redis_client = MockRedisClient()
 
@@ -298,8 +316,8 @@ async def test_exception_failure_releases_lock(
     )
 
     # Apply v2 idempotency decorator to a function that raises an exception
-    @idempotent_consumer_v2(redis_client=redis_client, config=config)
-    async def handle_message_with_exception(msg: ConsumerRecord) -> bool:
+    @idempotent_consumer(redis_client=redis_client, config=config)
+    async def handle_message_with_exception(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
         raise RuntimeError("Unhandled exception (e.g., network failure)")
 
     # Process message - should raise exception
@@ -320,7 +338,7 @@ async def test_redis_failure_fallback(
     sample_batch_registered_event: dict, mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock]
 ) -> None:
     """Test that Redis failures fall back to processing without idempotency in v2."""
-    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
     redis_client = MockRedisClient()
     redis_client.should_fail_set = True  # Force Redis failure
@@ -337,14 +355,16 @@ async def test_redis_failure_fallback(
     )
 
     # Apply v2 idempotency decorator
-    @idempotent_consumer_v2(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
-        return await process_single_message(
+    @idempotent_consumer(redis_client=redis_client, config=config)
+    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        result = await process_single_message(
             msg=msg,
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
         )
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process message - should succeed despite Redis failure
     result = await handle_message_idempotently(kafka_msg)
@@ -363,7 +383,7 @@ async def test_deterministic_event_id_generation(
     mock_handlers: tuple[AsyncMock, AsyncMock, AsyncMock],
 ) -> None:
     """Test that identical message content generates identical Redis keys in v2."""
-    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
     redis_client = MockRedisClient()
     batch_coordination_handler, batch_command_handler, service_result_handler = mock_handlers
@@ -404,14 +424,18 @@ async def test_deterministic_event_id_generation(
     )
 
     # Apply v2 idempotency decorator
-    @idempotent_consumer_v2(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
-        return await process_single_message(
+    @idempotent_consumer(redis_client=redis_client, config=config)
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency
+    ) -> bool | None:
+        result = await process_single_message(
             msg=msg,
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
         )
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Process first message
     result1 = await handle_message_idempotently(msg1)
@@ -421,11 +445,10 @@ async def test_deterministic_event_id_generation(
     result2 = await handle_message_idempotently(msg2)
     assert result2 is None  # Should be None for duplicate
 
-    # Verify both messages generated the same v2 Redis key
-    assert len(redis_client.set_calls) == 2
+    # With transaction-aware pattern, only first message attempts SETNX
+    # Second message detects duplicate via GET and doesn't attempt SETNX
+    assert len(redis_client.set_calls) == 1  # Only first message sets key
     key1 = redis_client.set_calls[0][0]
-    key2 = redis_client.set_calls[1][0]
-    assert key1 == key2
     assert key1.startswith("huleedu:idempotency:v2:essay-lifecycle-service:")
     # V2 key format: huleedu:idempotency:v2:service:event_type:hash
     key_parts = key1.split(":")

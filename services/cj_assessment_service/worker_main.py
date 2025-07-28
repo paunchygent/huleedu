@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 from aiokafka import AIOKafkaConsumer
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -64,9 +64,9 @@ async def run_consumer(
         enable_debug_logging=True,  # Enable for AI workflow monitoring
     )
 
-    @idempotent_consumer_v2(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: Any) -> bool:
-        return await process_single_message(
+    @idempotent_consumer(redis_client=redis_client, config=config)
+    async def handle_message_idempotently(msg: Any, *, confirm_idempotency) -> bool:
+        result = await process_single_message(
             msg=msg,
             database=database,
             content_client=content_client,
@@ -75,6 +75,8 @@ async def run_consumer(
             settings_obj=settings,
             tracer=tracer,
         )
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     # Message consumption loop with idempotency support
     try:

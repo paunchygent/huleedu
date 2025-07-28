@@ -102,298 +102,49 @@ class IdempotencyConfig:
         return f"{self.key_prefix}:{self.service_name}:{safe_event_type}:{deterministic_hash}"
 
 
-def idempotent_consumer_v2(
-    redis_client: RedisClientProtocol,
-    config: IdempotencyConfig,
-) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any | None]]]:
-    """
-    Advanced idempotency decorator with service namespacing and configurable TTLs.
-
-    This redesigned decorator addresses the limitations of the original implementation
-    by providing:
-
-    1. **Service Isolation**: Each service maintains separate idempotency namespace
-    2. **Event-Type Specific TTLs**: Optimized memory usage based on business requirements
-    3. **Enhanced Observability**: Comprehensive structured logging for debugging
-    4. **Robust Error Handling**: Fail-open behavior with proper cleanup
-    5. **Backward Compatibility**: Drop-in replacement for existing decorator
-
-    Args:
-        redis_client: Active Redis client implementing RedisClientProtocol
-        config: IdempotencyConfig with service name, TTL settings, and debug options
-
-    Returns:
-        Decorator function that wraps message handlers with advanced idempotency logic
-
-    Example:
-        ```python
-        config = IdempotencyConfig(
-            service_name="essay-lifecycle-service",
-            enable_debug_logging=True
-        )
-
-        @idempotent_consumer_v2(redis_client=redis_client, config=config)
-        async def handle_message(msg: ConsumerRecord) -> Any:
-            # Process message logic here
-            return result
-        ```
-    """
-
-    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any | None]]:
-        @functools.wraps(func)
-        async def wrapper(msg: ConsumerRecord, *args: Any, **kwargs: Any) -> Any | None:
-            start_time = time.time()
-
-            try:
-                # Parse event envelope for metadata
-                event_dict = json.loads(msg.value)
-                event_id = event_dict.get("event_id")
-                event_type = event_dict.get("event_type", "unknown")
-                correlation_id = event_dict.get("correlation_id")
-                source_service = event_dict.get("source_service", "unknown")
-
-                # Generate deterministic hash using existing proven logic
-                deterministic_hash = generate_deterministic_event_id(msg.value)
-
-                # Create service-namespaced Redis key
-                redis_key = config.generate_redis_key(event_type, event_id, deterministic_hash)
-
-                # Get TTL for this specific event type
-                ttl_seconds = config.get_ttl_for_event_type(event_type)
-
-                # Structured logging for observability
-                log_context = {
-                    "service": config.service_name,
-                    "event_type": event_type,
-                    "event_id": event_id,
-                    "correlation_id": correlation_id,
-                    "source_service": source_service,
-                    "deterministic_hash": deterministic_hash[:16]
-                    + "...",  # Truncated for readability
-                    "redis_key": redis_key,
-                    "ttl_seconds": ttl_seconds,
-                    "kafka_topic": msg.topic,
-                    "kafka_partition": msg.partition,
-                    "kafka_offset": msg.offset,
-                }
-
-                if config.enable_debug_logging:
-                    logger.debug("Starting idempotency check", extra=log_context)
-
-                # Atomic Redis SETNX operation
-                redis_start = time.time()
-                is_first_time = await redis_client.set_if_not_exists(
-                    redis_key,
-                    json.dumps(
-                        {
-                            "processed_at": time.time(),
-                            "processed_by": config.service_name,
-                            "event_id": event_id,
-                            "correlation_id": correlation_id,
-                            "source_service": source_service,
-                        }
-                    ),
-                    ttl_seconds=ttl_seconds,
-                )
-                redis_duration = time.time() - redis_start
-
-                log_context["redis_duration_ms"] = round(redis_duration * 1000, 2)
-
-                if not is_first_time:
-                    # Duplicate detected - enhanced logging for debugging
-                    logger.warning(
-                        "DUPLICATE_EVENT_DETECTED: Event already processed, skipping",
-                        extra={
-                            **log_context,
-                            "action": "skipped_duplicate",
-                            "total_duration_ms": round((time.time() - start_time) * 1000, 2),
-                        },
-                    )
-                    return None  # Signal duplicate to caller
-
-                # First-time processing
-                if config.enable_debug_logging:
-                    logger.debug(
-                        "FIRST_TIME_EVENT: Processing new event",
-                        extra={**log_context, "action": "processing_new"},
-                    )
-
-                # Execute business logic
-                try:
-                    processing_start = time.time()
-                    result = await func(msg, *args, **kwargs)
-                    processing_duration = time.time() - processing_start
-
-                    # Success logging
-                    logger.debug(
-                        "PROCESSING_SUCCESS: Event processed successfully",
-                        extra={
-                            **log_context,
-                            "action": "completed_successfully",
-                            "processing_duration_ms": round(processing_duration * 1000, 2),
-                            "total_duration_ms": round((time.time() - start_time) * 1000, 2),
-                        },
-                    )
-
-                    return result
-
-                except Exception as processing_error:
-                    # Processing failed - release idempotency lock for retry
-                    logger.error(
-                        "PROCESSING_FAILED: Releasing idempotency lock for retry",
-                        extra={
-                            **log_context,
-                            "action": "failed_releasing_lock",
-                            "error": str(processing_error),
-                            "error_type": type(processing_error).__name__,
-                        },
-                        exc_info=True,
-                    )
-
-                    # Cleanup idempotency key to allow retry
-                    try:
-                        cleanup_start = time.time()
-                        deleted_count = await redis_client.delete_key(redis_key)
-                        cleanup_duration = time.time() - cleanup_start
-
-                        logger.debug(
-                            "CLEANUP_SUCCESS: Idempotency key released for retry",
-                            extra={
-                                **log_context,
-                                "action": "cleanup_completed",
-                                "deleted_keys": deleted_count,
-                                "cleanup_duration_ms": round(cleanup_duration * 1000, 2),
-                            },
-                        )
-
-                    except Exception as cleanup_error:
-                        logger.error(
-                            "CLEANUP_FAILED: Could not release idempotency key",
-                            extra={
-                                **log_context,
-                                "action": "cleanup_failed",
-                                "cleanup_error": str(cleanup_error),
-                                "cleanup_error_type": type(cleanup_error).__name__,
-                            },
-                            exc_info=True,
-                        )
-
-                    # Re-raise original processing exception
-                    raise processing_error
-
-            except json.JSONDecodeError as json_error:
-                # Invalid JSON - fail open and process anyway
-                logger.error(
-                    "INVALID_JSON: Message is not valid JSON, processing without idempotency",
-                    extra={
-                        "service": config.service_name,
-                        "action": "processing_without_idempotency",
-                        "error": str(json_error),
-                        "kafka_topic": msg.topic,
-                        "kafka_partition": msg.partition,
-                        "kafka_offset": msg.offset,
-                        "raw_message_length": len(msg.value),
-                    },
-                    exc_info=True,
-                )
-                return await func(msg, *args, **kwargs)
-
-            except Exception as redis_error:
-                # Redis operation failed - fail open and process anyway
-                logger.error(
-                    "REDIS_ERROR: Idempotency check failed, processing without protection",
-                    extra={
-                        "service": config.service_name,
-                        "action": "processing_without_idempotency",
-                        "error": str(redis_error),
-                        "error_type": type(redis_error).__name__,
-                        "kafka_topic": msg.topic,
-                        "kafka_partition": msg.partition,
-                        "kafka_offset": msg.offset,
-                        "total_duration_ms": round((time.time() - start_time) * 1000, 2),
-                    },
-                    exc_info=True,
-                )
-                return await func(msg, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-# Backward compatibility function - provides same interface as original decorator
 def idempotent_consumer(
-    redis_client: RedisClientProtocol,
-    ttl_seconds: int = DEFAULT_TTL_SECONDS,
-    service_name: str = "unknown-service",
-) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any | None]]]:
-    """
-    Backward-compatible wrapper for the original idempotent_consumer interface.
-
-    This function provides a seamless migration path from the original decorator
-    while leveraging the improved v2 implementation under the hood.
-
-    Args:
-        redis_client: Active Redis client
-        ttl_seconds: TTL for idempotency keys (backward compatibility)
-        service_name: Service identifier for namespacing
-
-    Returns:
-        Decorator with the same interface as the original implementation
-    """
-    config = IdempotencyConfig(
-        service_name=service_name,
-        default_ttl=ttl_seconds,
-        enable_debug_logging=False,  # Disabled by default for backward compatibility
-    )
-
-    return idempotent_consumer_v2(redis_client=redis_client, config=config)
-
-
-def idempotent_consumer_transaction_aware(
     redis_client: RedisClientProtocol,
     config: IdempotencyConfig,
 ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any | None]]]:
     """
     Transaction-aware idempotency decorator for Kafka message handlers with Unit of Work.
-    
+
     This decorator provides two-phase idempotency that integrates with transactional
     handlers using the Unit of Work pattern. It prevents duplicate processing while
     ensuring idempotency keys are only confirmed after successful transaction commits.
-    
+
     Key Features:
     1. **Two-Phase Commit**: Sets "processing" status initially, confirms after success
     2. **Transaction Safety**: Only marks as completed after Unit of Work commits
     3. **Crash Recovery**: Processing keys expire quickly to allow retry after crashes
-    4. **Backward Compatible**: Works with existing idempotency infrastructure
-    
+    4. **Service Isolation**: Each service maintains separate idempotency namespace
+    5. **Event-Type Specific TTLs**: Optimized memory usage based on business requirements
+
     Args:
         redis_client: Active Redis client implementing RedisClientProtocol
         config: IdempotencyConfig with service name, TTL settings, and debug options
-        
+
     Returns:
         Decorator that wraps handlers with transaction-aware idempotency
-        
+
     Example:
         ```python
-        @idempotent_consumer_transaction_aware(redis_client=redis, config=config)
-        async def handle_message(msg: ConsumerRecord, confirm_idempotency: Callable) -> Any:
+        @idempotent_consumer(redis_client=redis, config=config)
+        async def handle_message(msg: ConsumerRecord, *, confirm_idempotency) -> Any:
             # Start transaction
             async with session.begin():
                 # Do work...
                 await repository.save(entity)
-            
+
             # Confirm idempotency AFTER transaction commits
             await confirm_idempotency()
             return result
         ```
     """
-    
+
     def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any | None]]:
         @functools.wraps(func)
         async def wrapper(msg: ConsumerRecord, *args: Any, **kwargs: Any) -> Any | None:
-            start_time = time.time()
-            
             try:
                 # Parse event envelope for metadata
                 event_dict = json.loads(msg.value)
@@ -401,13 +152,13 @@ def idempotent_consumer_transaction_aware(
                 event_type = event_dict.get("event_type", "unknown")
                 correlation_id = event_dict.get("correlation_id")
                 source_service = event_dict.get("source_service", "unknown")
-                
+
                 # Generate deterministic hash using existing proven logic
                 deterministic_hash = generate_deterministic_event_id(msg.value)
-                
+
                 # Create service-namespaced Redis key
                 redis_key = config.generate_redis_key(event_type, event_id, deterministic_hash)
-                
+
                 # Structured logging for observability
                 log_context = {
                     "service": config.service_name,
@@ -421,18 +172,18 @@ def idempotent_consumer_transaction_aware(
                     "kafka_partition": msg.partition,
                     "kafka_offset": msg.offset,
                 }
-                
+
                 if config.enable_debug_logging:
                     logger.debug("Starting transaction-aware idempotency check", extra=log_context)
-                
+
                 # Check if already exists and get current status
                 existing_value = await redis_client.get(redis_key)
-                
+
                 if existing_value:
                     try:
                         existing_data = json.loads(existing_value)
                         status = existing_data.get("status", IDEMPOTENCY_STATUS_COMPLETED)
-                        
+
                         if status == IDEMPOTENCY_STATUS_COMPLETED:
                             # Already successfully processed
                             logger.warning(
@@ -444,7 +195,7 @@ def idempotent_consumer_transaction_aware(
                                 },
                             )
                             return None
-                            
+
                         elif status == IDEMPOTENCY_STATUS_PROCESSING:
                             # Check if processing is stale (crashed worker)
                             started_at = existing_data.get("started_at", 0)
@@ -477,24 +228,26 @@ def idempotent_consumer_transaction_aware(
                             extra={**log_context, "action": "skipped_legacy"},
                         )
                         return None
-                
+
                 # Set processing state with short TTL
-                processing_data = json.dumps({
-                    "status": IDEMPOTENCY_STATUS_PROCESSING,
-                    "started_at": time.time(),
-                    "processed_by": config.service_name,
-                    "event_id": event_id,
-                    "correlation_id": correlation_id,
-                    "source_service": source_service,
-                })
-                
+                processing_data = json.dumps(
+                    {
+                        "status": IDEMPOTENCY_STATUS_PROCESSING,
+                        "started_at": time.time(),
+                        "processed_by": config.service_name,
+                        "event_id": event_id,
+                        "correlation_id": correlation_id,
+                        "source_service": source_service,
+                    }
+                )
+
                 # Use shorter TTL for processing state
                 is_first_time = await redis_client.set_if_not_exists(
                     redis_key,
                     processing_data,
                     ttl_seconds=DEFAULT_PROCESSING_TTL_SECONDS,
                 )
-                
+
                 if not is_first_time:
                     # Lost race condition to another worker
                     logger.warning(
@@ -502,28 +255,30 @@ def idempotent_consumer_transaction_aware(
                         extra={**log_context, "action": "skipped_race_condition"},
                     )
                     return None
-                
+
                 # Define confirmation callback
                 async def confirm_idempotency() -> None:
                     """Confirm successful processing after transaction commit."""
                     try:
                         # Get appropriate TTL for this event type
                         ttl_seconds = config.get_ttl_for_event_type(event_type)
-                        
+
                         # Update to completed status with full TTL
-                        completed_data = json.dumps({
-                            "status": IDEMPOTENCY_STATUS_COMPLETED,
-                            "started_at": time.time(),
-                            "completed_at": time.time(),
-                            "processed_by": config.service_name,
-                            "event_id": event_id,
-                            "correlation_id": correlation_id,
-                            "source_service": source_service,
-                        })
-                        
+                        completed_data = json.dumps(
+                            {
+                                "status": IDEMPOTENCY_STATUS_COMPLETED,
+                                "started_at": time.time(),
+                                "completed_at": time.time(),
+                                "processed_by": config.service_name,
+                                "event_id": event_id,
+                                "correlation_id": correlation_id,
+                                "source_service": source_service,
+                            }
+                        )
+
                         # Overwrite with completed status and proper TTL
                         await redis_client.setex(redis_key, ttl_seconds, completed_data)
-                        
+
                         logger.debug(
                             "IDEMPOTENCY_CONFIRMED: Processing confirmed after commit",
                             extra={
@@ -543,16 +298,18 @@ def idempotent_consumer_transaction_aware(
                             },
                             exc_info=True,
                         )
-                
+
                 # Execute business logic with confirmation callback
                 try:
                     processing_start = time.time()
-                    
+
                     # Pass confirmation callback as a keyword argument
-                    result = await func(msg, *args, confirm_idempotency=confirm_idempotency, **kwargs)
-                    
+                    result = await func(
+                        msg, *args, confirm_idempotency=confirm_idempotency, **kwargs
+                    )
+
                     processing_duration = time.time() - processing_start
-                    
+
                     # Log success (confirmation happens in handler after commit)
                     logger.debug(
                         "PROCESSING_COMPLETE: Awaiting transaction commit confirmation",
@@ -562,9 +319,9 @@ def idempotent_consumer_transaction_aware(
                             "processing_duration_ms": round(processing_duration * 1000, 2),
                         },
                     )
-                    
+
                     return result
-                    
+
                 except Exception as processing_error:
                     # Processing failed - release idempotency lock for retry
                     logger.error(
@@ -577,7 +334,7 @@ def idempotent_consumer_transaction_aware(
                         },
                         exc_info=True,
                     )
-                    
+
                     # Cleanup idempotency key to allow retry
                     try:
                         await redis_client.delete_key(redis_key)
@@ -595,10 +352,10 @@ def idempotent_consumer_transaction_aware(
                             },
                             exc_info=True,
                         )
-                    
+
                     # Re-raise original processing exception
                     raise processing_error
-                    
+
             except json.JSONDecodeError as json_error:
                 # Invalid JSON - fail open and process anyway
                 logger.error(
@@ -613,8 +370,13 @@ def idempotent_consumer_transaction_aware(
                     },
                     exc_info=True,
                 )
-                return await func(msg, *args, **kwargs)
-                
+
+                # Create no-op confirm function for fail-open scenario
+                async def noop_confirm():
+                    pass
+
+                return await func(msg, *args, confirm_idempotency=noop_confirm, **kwargs)
+
             except Exception as redis_error:
                 # Redis operation failed - fail open and process anyway
                 logger.error(
@@ -630,8 +392,13 @@ def idempotent_consumer_transaction_aware(
                     },
                     exc_info=True,
                 )
-                return await func(msg, *args, **kwargs)
-        
+
+                # Create no-op confirm function for fail-open scenario
+                async def noop_confirm():
+                    pass
+
+                return await func(msg, *args, confirm_idempotency=noop_confirm, **kwargs)
+
         return wrapper
-    
+
     return decorator

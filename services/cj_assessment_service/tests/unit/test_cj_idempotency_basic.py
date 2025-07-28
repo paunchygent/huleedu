@@ -18,7 +18,7 @@ import pytest
 from aiokafka import ConsumerRecord
 from common_core.domain_enums import CourseCode, EssayComparisonWinner
 from huleedu_service_libs.event_utils import generate_deterministic_event_id
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_single_message
@@ -143,9 +143,9 @@ async def test_first_time_event_processing_success(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
-        return await process_single_message(
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        result = await process_single_message(
             msg=msg,
             database=database,
             content_client=content_client,
@@ -153,6 +153,8 @@ async def test_first_time_event_processing_success(
             llm_interaction=llm_interaction,
             settings_obj=settings,
         )
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     result = await handle_message_idempotently(kafka_msg)
 
@@ -166,10 +168,13 @@ async def test_first_time_event_processing_success(
     import json
 
     stored_data = json.loads(set_call[1])
-    assert "processed_at" in stored_data
+    # Transaction-aware pattern starts with "started_at" in processing state
+    assert "started_at" in stored_data
     assert "processed_by" in stored_data
     assert stored_data["processed_by"] == "cj-assessment-service"
-    assert set_call[2] == 86400
+    assert stored_data["status"] == "processing"  # Initial status before confirmation
+    # Transaction-aware pattern: initial SETNX uses 300s for processing state
+    assert set_call[2] == 300  # Processing state TTL
 
     content_client.fetch_content.assert_called()
     event_publisher.publish_assessment_completed.assert_called_once()
@@ -190,9 +195,10 @@ async def test_duplicate_event_skipped(
 
     deterministic_id = generate_deterministic_event_id(kafka_msg.value)
     # Update key format for v2
+    # Store with transaction-aware format indicating completed status
     mock_redis_client.keys[
         f"huleedu:idempotency:v2:cj-assessment-service:huleedu_els_cj_assessment_requested_v1:{deterministic_id}"
-    ] = '{"processed_at": 1640995200.0}'
+    ] = '{"status": "completed", "processed_at": 1640995200.0, "processed_by": "cj-assessment-service"}'
 
     config = IdempotencyConfig(
         service_name="cj-assessment-service",
@@ -200,9 +206,11 @@ async def test_duplicate_event_skipped(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
-        return await process_single_message(
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency
+    ) -> bool | None:
+        result = await process_single_message(
             msg=msg,
             database=database,
             content_client=content_client,
@@ -210,11 +218,14 @@ async def test_duplicate_event_skipped(
             llm_interaction=llm_interaction,
             settings_obj=settings,
         )
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     result = await handle_message_idempotently(kafka_msg)
 
     assert result is None
-    assert len(mock_redis_client.set_calls) == 1
+    # With transaction-aware pattern, duplicate detection happens via GET, no SETNX attempted
+    assert len(mock_redis_client.set_calls) == 0  # No SET attempted for duplicates
     assert len(mock_redis_client.delete_calls) == 0
 
     content_client.fetch_content.assert_not_called()
@@ -274,9 +285,11 @@ async def test_deterministic_event_id_generation(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
-        return await process_single_message(
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency
+    ) -> bool | None:
+        result = await process_single_message(
             msg=msg,
             database=database,
             content_client=content_client,
@@ -284,6 +297,8 @@ async def test_deterministic_event_id_generation(
             llm_interaction=llm_interaction,
             settings_obj=settings,
         )
+        await confirm_idempotency()  # Confirm after successful processing
+        return result
 
     result1 = await handle_message_idempotently(kafka_msg1)
     assert result1 is True
@@ -291,12 +306,12 @@ async def test_deterministic_event_id_generation(
     result2 = await handle_message_idempotently(kafka_msg2)
     assert result2 is None
 
-    assert len(mock_redis_client.set_calls) == 2
+    # With transaction-aware pattern, only first message attempts SETNX
+    # Second message detects duplicate via GET and doesn't attempt SETNX
+    assert len(mock_redis_client.set_calls) == 1  # Only first message sets key
     assert len(mock_redis_client.delete_calls) == 0
 
     key1 = mock_redis_client.set_calls[0][0]
-    key2 = mock_redis_client.set_calls[1][0]
-    assert key1 == key2
     assert key1.startswith("huleedu:idempotency:v2:cj-assessment-service:")
     # Key format: huleedu:idempotency:v2:service:event_type:hash
     key_parts = key1.split(":")

@@ -341,8 +341,10 @@ class TestPendingValidationFailuresIntegration:
 
         # Add mock session factory to repository
         mock_session = create_mock_session()
+
         def mock_session_factory_instance():
             return mock_session
+
         mock_repository.get_session_factory = AsyncMock(return_value=mock_session_factory_instance)
 
         # Mock Kafka bus

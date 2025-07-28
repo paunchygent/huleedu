@@ -53,6 +53,8 @@ class MockRedisClient:
 
     async def get(self, key: str) -> str | None:
         """Mock GET operation that retrieves values."""
+        if self.should_fail_set:  # Simulate full Redis outage
+            raise Exception("Redis connection failed")
         return self.keys.get(key)
 
     async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:

@@ -339,7 +339,7 @@ Services using idempotency v2 decorator but lacking dedicated idempotency tests:
 4. **Validation Criteria**:
    - All tests must pass without cheats or shortcuts
    - Must validate actual Batch Conductor event types and workflows
-   - Must use v2 API (`IdempotencyConfig`, `idempotent_consumer_v2`)
+   - Must use v2 API (`IdempotencyConfig`, `idempotent_consumer`)
    - Must follow HuleEdu testing patterns (protocol-based mocking only)
 
 ### Phase 10: Performance Optimization and Monitoring 🔧 PENDING

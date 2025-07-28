@@ -33,7 +33,7 @@ class IdempotencyConfig:
     def get_ttl_for_event_type(self, event_type: str) -> int
     def generate_redis_key(self, event_type: str, event_id: str, deterministic_hash: str) -> str
 
-def idempotent_consumer_v2(
+def idempotent_consumer(
     redis_client: RedisClientProtocol,
     config: IdempotencyConfig,
 ) -> Callable
@@ -51,7 +51,7 @@ def idempotent_consumer(
 ### V2 API (Recommended)
 
 ```python
-from huleedu_service_libs.idempotency_v2 import idempotent_consumer_v2, IdempotencyConfig
+from huleedu_service_libs.idempotency_v2 import idempotent_consumer, IdempotencyConfig
 
 # Configure idempotency with service-specific settings
 config = IdempotencyConfig(
@@ -64,7 +64,7 @@ config = IdempotencyConfig(
     enable_debug_logging=True
 )
 
-@idempotent_consumer_v2(redis_client=redis_client, config=config)
+@idempotent_consumer(redis_client=redis_client, config=config)
 async def handle_essay_submitted(msg: ConsumerRecord) -> None:
     envelope = EventEnvelope.model_validate_json(msg.value)
     
@@ -180,7 +180,7 @@ class EventProcessor:
         self.redis_client = redis_client
         self.config = config
     
-    @idempotent_consumer_v2(redis_client=self.redis_client, config=self.config)
+    @idempotent_consumer(redis_client=self.redis_client, config=self.config)
     async def process_event(self, msg: ConsumerRecord) -> None:
         envelope = EventEnvelope.model_validate_json(msg.value)
         await self._handle_event(envelope)
@@ -194,7 +194,7 @@ class MultiEventProcessor:
         self.redis_client = redis_client
         self.config = config
     
-    @idempotent_consumer_v2(redis_client=self.redis_client, config=self.config)
+    @idempotent_consumer(redis_client=self.redis_client, config=self.config)
     async def process_essay_events(self, msg: ConsumerRecord) -> None:
         envelope = EventEnvelope.model_validate_json(msg.value)
         
@@ -205,7 +205,7 @@ class MultiEventProcessor:
         else:
             logger.warning(f"Unknown event type: {envelope.event_type}")
     
-    @idempotent_consumer_v2(redis_client=self.redis_client, config=self.config)
+    @idempotent_consumer(redis_client=self.redis_client, config=self.config)
     async def process_grading_events(self, msg: ConsumerRecord) -> None:
         envelope = EventEnvelope.model_validate_json(msg.value)
         # Different TTL rules apply based on event type
@@ -217,7 +217,7 @@ class MultiEventProcessor:
 ### Automatic Lock Release
 
 ```python
-@idempotent_consumer_v2(redis_client=redis_client, config=config)
+@idempotent_consumer(redis_client=redis_client, config=config)
 async def process_with_error_handling(msg: ConsumerRecord) -> None:
     envelope = EventEnvelope.model_validate_json(msg.value)
     
@@ -263,7 +263,7 @@ except RetryableError:
 ```python
 import pytest
 from unittest.mock import AsyncMock
-from huleedu_service_libs.idempotency_v2 import idempotent_consumer_v2, IdempotencyConfig
+from huleedu_service_libs.idempotency_v2 import idempotent_consumer, IdempotencyConfig
 
 @pytest.fixture
 def mock_redis():
@@ -282,7 +282,7 @@ async def test_idempotent_processing_first_time(mock_redis, idempotency_config):
     """Test that event is processed on first occurrence."""
     process_called = False
     
-    @idempotent_consumer_v2(redis_client=mock_redis, config=idempotency_config)
+    @idempotent_consumer(redis_client=mock_redis, config=idempotency_config)
     async def process_event(msg):
         nonlocal process_called
         process_called = True
@@ -301,7 +301,7 @@ async def test_idempotent_processing_duplicate(mock_redis, idempotency_config):
     
     process_called = False
     
-    @idempotent_consumer_v2(redis_client=mock_redis, config=idempotency_config)
+    @idempotent_consumer(redis_client=mock_redis, config=idempotency_config)
     async def process_event(msg):
         nonlocal process_called
         process_called = True
@@ -325,7 +325,7 @@ async def test_idempotency_with_real_redis(redis_client):
     
     call_count = 0
     
-    @idempotent_consumer_v2(redis_client=redis_client, config=config)
+    @idempotent_consumer(redis_client=redis_client, config=config)
     async def process_event(msg):
         nonlocal call_count
         call_count += 1
@@ -367,14 +367,14 @@ async def handle_message(msg):
     pass
 
 # New v2 API (recommended)
-from huleedu_service_libs.idempotency_v2 import idempotent_consumer_v2, IdempotencyConfig
+from huleedu_service_libs.idempotency_v2 import idempotent_consumer, IdempotencyConfig
 
 config = IdempotencyConfig(
     service_name="my-service",
     enable_debug_logging=True
 )
 
-@idempotent_consumer_v2(redis_client=redis_client, config=config)
+@idempotent_consumer(redis_client=redis_client, config=config)
 async def handle_message(msg):
     # Same processing logic - no changes needed
     pass

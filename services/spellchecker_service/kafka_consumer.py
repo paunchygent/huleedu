@@ -27,7 +27,7 @@ from huleedu_service_libs.error_handling.error_detail_factory import (
     create_error_detail_with_context,
 )
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import KafkaPublisherProtocol, RedisClientProtocol
 
@@ -81,9 +81,9 @@ class SpellCheckerKafkaConsumer:
         )
 
         # Create idempotent message processor with v2 decorator
-        @idempotent_consumer_v2(redis_client=redis_client, config=idempotency_config)
-        async def process_message_idempotently(msg: object) -> bool | None:
-            return await process_single_message(
+        @idempotent_consumer(redis_client=redis_client, config=idempotency_config)
+        async def process_message_idempotently(msg: object, *, confirm_idempotency) -> bool | None:
+            result = await process_single_message(
                 msg=msg,
                 http_session=self.http_session,
                 content_client=self.content_client,
@@ -94,6 +94,8 @@ class SpellCheckerKafkaConsumer:
                 tracer=self.tracer,
                 consumer_group_id=self.consumer_group,
             )
+            await confirm_idempotency()  # Confirm after successful processing
+            return result
 
         self._process_message_idempotently = process_message_idempotently
 

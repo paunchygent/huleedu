@@ -35,7 +35,7 @@ from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus, ProcessingStage
 from huleedu_service_libs.event_utils import generate_deterministic_event_id
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from services.batch_conductor_service.kafka_consumer import BCSKafkaConsumer
 
 # --- Test Helpers ---
@@ -285,9 +285,10 @@ async def test_spellcheck_first_time_event_processing_success(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
         await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await confirm_idempotency()  # Confirm after successful processing
         return True
 
     # Act
@@ -302,13 +303,14 @@ async def test_spellcheck_first_time_event_processing_success(
     set_call = mock_redis_client.set_calls[0]
     assert set_call[0].startswith("huleedu:idempotency:v2:batch-conductor-service:")
     assert "SpellcheckResultDataV1" in set_call[0]
-    assert set_call[2] == 86400  # 24 hours TTL for coordination events
+    assert set_call[2] == 300  # Initial processing state uses 5 minutes TTL
 
     # Verify V2 stores JSON metadata instead of "1"
     stored_data = json.loads(set_call[1])
-    assert "processed_at" in stored_data
+    assert "started_at" in stored_data  # Transaction-aware pattern starts with "started_at"
     assert "processed_by" in stored_data
     assert stored_data["processed_by"] == "batch-conductor-service"
+    assert stored_data["status"] == "processing"  # Initial status before confirmation
 
     # Verify real business logic was executed
     assert len(mock_batch_state_repo.recorded_completions) == 1
@@ -346,9 +348,10 @@ async def test_cj_assessment_first_time_event_processing_success(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
         await bcs_kafka_consumer._handle_cj_assessment_completed(msg)
+        await confirm_idempotency()  # Confirm after successful processing
         return True
 
     # Act
@@ -363,13 +366,15 @@ async def test_cj_assessment_first_time_event_processing_success(
     set_call = mock_redis_client.set_calls[0]
     assert set_call[0].startswith("huleedu:idempotency:v2:batch-conductor-service:")
     assert "CJAssessmentCompletedV1" in set_call[0]
-    assert set_call[2] == 86400  # 24 hours TTL for coordination events
+    # With transaction-aware pattern, initial SETNX uses 300s for processing state
+    assert set_call[2] == 300  # Processing state TTL
 
-    # Verify V2 stores JSON metadata
+    # Verify V2 stores JSON metadata for processing state
     stored_data = json.loads(set_call[1])
-    assert "processed_at" in stored_data
+    assert "started_at" in stored_data  # Transaction-aware pattern starts with "started_at"
     assert "processed_by" in stored_data
     assert stored_data["processed_by"] == "batch-conductor-service"
+    assert stored_data["status"] == "processing"  # Initial status before confirmation
 
     # Verify real business logic was executed - CJ assessment creates completion for each essay
     assert len(mock_batch_state_repo.recorded_completions) == len(essay_ids)
@@ -404,8 +409,13 @@ async def test_duplicate_spellcheck_event_skipped(
     existing_key = (
         f"huleedu:idempotency:v2:batch-conductor-service:SpellcheckResultDataV1:{deterministic_id}"
     )
+    # Store with transaction-aware format indicating completed status
     mock_redis_client.keys[existing_key] = json.dumps(
-        {"processed_at": datetime.now(UTC).timestamp(), "processed_by": "batch-conductor-service"}
+        {
+            "status": "completed",
+            "processed_at": datetime.now(UTC).timestamp(),
+            "processed_by": "batch-conductor-service",
+        }
     )
 
     config = IdempotencyConfig(
@@ -414,9 +424,12 @@ async def test_duplicate_spellcheck_event_skipped(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency
+    ) -> bool | None:
         await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await confirm_idempotency()  # Confirm after successful processing
         return True
 
     # Act
@@ -424,7 +437,8 @@ async def test_duplicate_spellcheck_event_skipped(
 
     # Assert
     assert result is None  # Duplicate detected
-    assert len(mock_redis_client.set_calls) == 1  # One attempt to set, but key existed
+    # With transaction-aware pattern, duplicate detection happens via GET, no SETNX attempted
+    assert len(mock_redis_client.set_calls) == 0  # No SET attempted for duplicates
     assert len(mock_redis_client.delete_calls) == 0
 
     # Verify business logic was NOT executed
@@ -453,8 +467,13 @@ async def test_duplicate_cj_assessment_event_skipped(
     existing_key = (
         f"huleedu:idempotency:v2:batch-conductor-service:CJAssessmentCompletedV1:{deterministic_id}"
     )
+    # Store with transaction-aware format indicating completed status
     mock_redis_client.keys[existing_key] = json.dumps(
-        {"processed_at": datetime.now(UTC).timestamp(), "processed_by": "batch-conductor-service"}
+        {
+            "status": "completed",
+            "processed_at": datetime.now(UTC).timestamp(),
+            "processed_by": "batch-conductor-service",
+        }
     )
 
     config = IdempotencyConfig(
@@ -463,9 +482,12 @@ async def test_duplicate_cj_assessment_event_skipped(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency
+    ) -> bool | None:
         await bcs_kafka_consumer._handle_cj_assessment_completed(msg)
+        await confirm_idempotency()  # Confirm after successful processing
         return True
 
     # Act
@@ -473,7 +495,8 @@ async def test_duplicate_cj_assessment_event_skipped(
 
     # Assert
     assert result is None  # Duplicate detected
-    assert len(mock_redis_client.set_calls) == 1  # One attempt to set, but key existed
+    # With transaction-aware pattern, duplicate detection happens via GET, no SETNX attempted
+    assert len(mock_redis_client.set_calls) == 0  # No SET attempted for duplicates
     assert len(mock_redis_client.delete_calls) == 0
 
     # Verify business logic was NOT executed
@@ -511,14 +534,16 @@ async def test_cross_event_type_idempotency_separation(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_spellcheck_idempotently(msg: ConsumerRecord) -> bool:
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_spellcheck_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
         await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await confirm_idempotency()  # Confirm after successful processing
         return True
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_cj_idempotently(msg: ConsumerRecord) -> bool:
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_cj_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
         await bcs_kafka_consumer._handle_cj_assessment_completed(msg)
+        await confirm_idempotency()  # Confirm after successful processing
         return True
 
     # Act
@@ -567,9 +592,10 @@ async def test_redis_key_format_verification(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
         await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await confirm_idempotency()  # Confirm after successful processing
         return True
 
     # Act
@@ -623,9 +649,10 @@ async def test_coordination_event_ttl_verification(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool:
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
         await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await confirm_idempotency()  # Confirm after successful processing
         return True
 
     # Act
@@ -635,9 +662,10 @@ async def test_coordination_event_ttl_verification(
     assert result is True
     assert len(mock_redis_client.set_calls) == 1
 
-    # Verify TTL is 24 hours (86400 seconds) for coordination events
+    # With transaction-aware pattern, initial SETNX uses 300s for processing state
+    # The configured TTL (86400) is only applied after confirmation via SETEX
     set_call = mock_redis_client.set_calls[0]
-    assert set_call[2] == 86400  # TTL in seconds
+    assert set_call[2] == 300  # Processing state TTL
 
 
 @pytest.mark.asyncio
@@ -714,9 +742,12 @@ async def test_deterministic_event_id_generation_consistency(
         enable_debug_logging=True,
     )
 
-    @idempotent_consumer_v2(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord) -> bool | None:
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency
+    ) -> bool | None:
         await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await confirm_idempotency()  # Confirm after successful processing
         return True
 
     # Act
@@ -726,12 +757,166 @@ async def test_deterministic_event_id_generation_consistency(
     # Assert
     assert result1 is True  # First message processed
     assert result2 is None  # Second message (retry) skipped
-    assert len(mock_redis_client.set_calls) == 2  # Two attempts to set the same key
+    # With transaction-aware pattern, only first message attempts SETNX
+    # Second message detects duplicate via GET and doesn't attempt SETNX
+    assert len(mock_redis_client.set_calls) == 1  # Only first message sets key
 
-    # Verify same key was generated for both messages
+    # Verify deterministic key generation by checking the key used
     key1 = mock_redis_client.set_calls[0][0]
-    key2 = mock_redis_client.set_calls[1][0]
-    assert key1 == key2
+    # The key should be consistent for identical event content
+    assert "SpellcheckResultDataV1" in key1
 
     # Verify only one business operation was executed
     assert len(mock_batch_state_repo.recorded_completions) == 1
+
+
+@pytest.mark.asyncio
+async def test_async_confirmation_pattern(
+    mock_redis_client: MockRedisClient,
+    mock_batch_state_repo: MockBatchStateRepository,
+    bcs_kafka_consumer: BCSKafkaConsumer,
+) -> None:
+    """Test realistic async confirmation pattern with potential failure scenarios."""
+    import asyncio
+    import sys
+    sys.path.insert(0, '/Users/olofs_mba/Documents/Repos/huledu-reboot')
+    from libs.huleedu_service_libs.tests.idempotency_test_utils import AsyncConfirmationTestHelper
+    
+    # Arrange
+    essay_id = str(uuid.uuid4())
+    batch_id = str(uuid.uuid4())
+    
+    envelope = create_spellcheck_completion_event(essay_id, batch_id)
+    record = create_mock_kafka_record(
+        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+        event_envelope=envelope,
+    )
+    
+    config = IdempotencyConfig(
+        service_name="batch-conductor-service",
+        default_ttl=86400,
+        enable_debug_logging=True,
+    )
+    
+    helper = AsyncConfirmationTestHelper()
+    
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_with_controlled_confirmation(
+        msg: ConsumerRecord, *, confirm_idempotency
+    ) -> bool:
+        return await helper.process_with_controlled_confirmation(
+            bcs_kafka_consumer._handle_spellcheck_completed,
+            msg,
+            confirm_idempotency
+        )
+    
+    # Start processing in background
+    process_task = asyncio.create_task(handle_message_with_controlled_confirmation(record))
+    
+    # Wait for processing to complete but before confirmation
+    await helper.wait_for_processing_complete()
+    
+    # At this point, Redis should have "processing" status
+    assert len(mock_redis_client.set_calls) == 1
+    redis_key = mock_redis_client.set_calls[0][0]
+    stored_value = mock_redis_client.keys.get(redis_key)
+    assert stored_value is not None
+    
+    import json
+    stored_data = json.loads(stored_value)
+    assert stored_data["status"] == "processing"
+    assert "started_at" in stored_data
+    
+    # Verify TTL is 300s for processing state
+    assert mock_redis_client.set_calls[0][2] == 300
+    
+    # Now allow confirmation to proceed
+    helper.allow_confirmation()
+    
+    # Wait for task to complete
+    result = await process_task
+    
+    # Verify confirmation happened
+    assert helper.confirmed is True
+    assert result is True
+    
+    # Verify business logic was executed
+    assert len(mock_batch_state_repo.recorded_completions) == 1
+    completion = mock_batch_state_repo.recorded_completions[0]
+    assert completion["batch_id"] == batch_id
+    assert completion["essay_id"] == essay_id
+
+
+@pytest.mark.asyncio
+async def test_crash_before_confirmation(
+    mock_redis_client: MockRedisClient,
+    mock_batch_state_repo: MockBatchStateRepository,
+    bcs_kafka_consumer: BCSKafkaConsumer,
+) -> None:
+    """Test that a crash before confirmation leaves message in processing state."""
+    import asyncio
+    import sys
+    sys.path.insert(0, '/Users/olofs_mba/Documents/Repos/huledu-reboot')
+    from libs.huleedu_service_libs.tests.idempotency_test_utils import AsyncConfirmationTestHelper
+    
+    # Arrange
+    essay_id = str(uuid.uuid4())
+    batch_id = str(uuid.uuid4())
+    
+    envelope = create_spellcheck_completion_event(essay_id, batch_id)
+    record = create_mock_kafka_record(
+        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+        event_envelope=envelope,
+    )
+    
+    config = IdempotencyConfig(
+        service_name="batch-conductor-service",
+        default_ttl=86400,
+        enable_debug_logging=True,
+    )
+    
+    # Simulate crash by not allowing confirmation
+    crash_simulation = asyncio.Event()
+    
+    @idempotent_consumer(redis_client=mock_redis_client, config=config)
+    async def handle_message_that_crashes(
+        msg: ConsumerRecord, *, confirm_idempotency
+    ) -> bool:
+        # Process successfully
+        await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        
+        # Wait indefinitely (simulating crash)
+        await crash_simulation.wait()
+        
+        # Never reaches confirmation
+        await confirm_idempotency()
+        return True
+    
+    # Start processing with timeout
+    process_task = asyncio.create_task(handle_message_that_crashes(record))
+    
+    # Give it time to process but not confirm
+    await asyncio.sleep(0.1)
+    
+    # Cancel to simulate crash
+    process_task.cancel()
+    
+    try:
+        await process_task
+    except asyncio.CancelledError:
+        pass
+    
+    # Verify state is still "processing"
+    assert len(mock_redis_client.set_calls) == 1
+    redis_key = mock_redis_client.set_calls[0][0]
+    stored_value = mock_redis_client.keys.get(redis_key)
+    
+    import json
+    stored_data = json.loads(stored_value)
+    assert stored_data["status"] == "processing"
+    
+    # Verify business logic was executed (but not confirmed)
+    assert len(mock_batch_state_repo.recorded_completions) == 1
+    
+    # Now another worker should be able to detect and retry
+    # (after processing TTL expires - not tested here)

@@ -45,8 +45,9 @@ class TestKafkaConsumerIdempotency:
         # Assert
         assert result is True  # First time processing
         assert len(mock_redis_client.set_calls) == 1
-        # V2 uses event-specific TTLs: batch registration events use 43200 seconds (12 hours)
-        assert mock_redis_client.set_calls[0][2] == 43200  # TTL check for batch events
+        # Transaction-aware pattern: initial SETNX uses 300s for processing state
+        # The configured TTL (43200) is only applied after confirmation via SETEX
+        assert mock_redis_client.set_calls[0][2] == 300  # Processing state TTL
         mock_event_processor.process_batch_registered.assert_called_once()
 
     async def test_idempotency_duplicate_message_skipped(
@@ -74,7 +75,9 @@ class TestKafkaConsumerIdempotency:
 
         # Assert
         assert result2 is None  # Duplicate detected
-        assert len(mock_redis_client.set_calls) == 2
+        # With transaction-aware pattern, only first message attempts SETNX
+        # Second message detects duplicate via GET and doesn't attempt SETNX
+        assert len(mock_redis_client.set_calls) == 1  # Only first message sets key
         assert mock_event_processor.process_batch_registered.call_count == 1  # Only called once
 
     async def test_idempotency_key_deleted_on_processing_error(
@@ -126,6 +129,7 @@ class TestKafkaConsumerIdempotency:
         # Create a failing Redis client
         failing_redis = AsyncMock(spec=RedisClientProtocol)
         failing_redis.set_if_not_exists.side_effect = Exception("Redis connection failed")
+        failing_redis.get.side_effect = Exception("Redis connection failed")  # Simulate full outage
 
         # Create consumer with failing Redis
         consumer = ResultAggregatorKafkaConsumer(

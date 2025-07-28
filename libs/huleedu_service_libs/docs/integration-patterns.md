@@ -146,7 +146,7 @@ async def get_content(
 
 ```python
 # In event_processor.py
-from huleedu_service_libs.idempotency_v2 import idempotent_consumer_v2, IdempotencyConfig
+from huleedu_service_libs.idempotency_v2 import idempotent_consumer, IdempotencyConfig
 
 class EventProcessor:
     def __init__(
@@ -162,7 +162,7 @@ class EventProcessor:
             enable_debug_logging=True
         )
     
-    @idempotent_consumer_v2(redis_client=self.redis_client, config=self.config)
+    @idempotent_consumer(redis_client=self.redis_client, config=self.config)
     async def process_content_event(self, msg: ConsumerRecord):
         with trace_operation(self.tracer, "process_content_event"):
             envelope = EventEnvelope.model_validate_json(msg.value)

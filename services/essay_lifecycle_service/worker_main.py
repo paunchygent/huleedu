@@ -21,7 +21,10 @@ from aiokafka import AIOKafkaConsumer, ConsumerRecord, TopicPartition
 from common_core.event_enums import ProcessingEvent, topic_name
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_transaction_aware
+from huleedu_service_libs.idempotency_v2 import (
+    IdempotencyConfig,
+    idempotent_consumer,
+)
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
@@ -136,7 +139,7 @@ async def run_consumer_loop(
         )
 
         # Apply transaction-aware idempotency decorator
-        decorated_handler = idempotent_consumer_transaction_aware(
+        decorated_handler = idempotent_consumer(
             redis_client=redis_client, config=idempotency_config
         )(_process_message_wrapper)
 

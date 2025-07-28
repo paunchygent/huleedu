@@ -221,7 +221,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                 session=session,
                             )
                         # Transaction commits here
-                
+
                 # Confirm idempotency after successful transaction commit
                 if confirm_idempotency is not None:
                     await confirm_idempotency()

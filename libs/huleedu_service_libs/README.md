@@ -158,14 +158,14 @@ async def publish_event(self, event_data, correlation_id, aggregate_id):
 ### Idempotent Event Processing
 
 ```python
-from huleedu_service_libs.idempotency_v2 import idempotent_consumer_v2, IdempotencyConfig
+from huleedu_service_libs.idempotency_v2 import idempotent_consumer, IdempotencyConfig
 
 config = IdempotencyConfig(
     service_name="your-service-name",
     enable_debug_logging=True
 )
 
-@idempotent_consumer_v2(redis_client=redis_client, config=config)
+@idempotent_consumer(redis_client=redis_client, config=config)
 async def handle_event(msg: ConsumerRecord) -> None:
     envelope = EventEnvelope.model_validate_json(msg.value)
     # Process event - guaranteed to run only once per unique event
@@ -257,7 +257,7 @@ Core configuration variables used across all services:
 1. **Always use lifecycle management**: Call `start()` and `stop()` on clients
 2. **Use protocols for dependency injection**: Depend on protocols, not concrete classes
 3. **Configure logging early**: Call `configure_service_logging()` in startup
-4. **Use idempotency decorator**: Wrap all Kafka consumers with `@idempotent_consumer_v2`
+4. **Use idempotency decorator**: Wrap all Kafka consumers with `@idempotent_consumer`
 5. **Add circuit breakers**: Protect external service calls with circuit breakers
 6. **Propagate trace context**: Use `inject_trace_context()` and `extract_trace_context()`
 7. **Monitor database health**: Use `DatabaseHealthChecker` in health endpoints
