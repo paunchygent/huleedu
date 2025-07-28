@@ -8,7 +8,7 @@ Refactored to follow clean architecture with DI pattern.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Awaitable, Callable
 from uuid import uuid4
 
 if TYPE_CHECKING:
@@ -82,7 +82,7 @@ class SpellCheckerKafkaConsumer:
 
         # Create idempotent message processor with v2 decorator
         @idempotent_consumer(redis_client=redis_client, config=idempotency_config)
-        async def process_message_idempotently(msg: object, *, confirm_idempotency) -> bool | None:
+        async def process_message_idempotently(msg: object, *, confirm_idempotency: Callable[[], Awaitable[None]]) -> bool | None:
             result = await process_single_message(
                 msg=msg,
                 http_session=self.http_session,

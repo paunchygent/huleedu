@@ -21,7 +21,10 @@ This task addresses critical shortcuts and unrealistic mocking in the idempotenc
   - Added `test_async_confirmation_pattern` 
   - Added `test_crash_before_confirmation`
   - Created shared `AsyncConfirmationTestHelper` in `libs/huleedu_service_libs/tests/idempotency_test_utils.py`
-- `services/batch_orchestrator_service/tests/unit/test_idempotency_basic.py`
+- ✅ `services/batch_orchestrator_service/tests/unit/test_idempotency_basic.py` - COMPLETED
+  - Added `test_async_confirmation_pattern`
+  - Added `test_crash_before_confirmation`
+  - Uses shared `AsyncConfirmationTestHelper` for realistic async confirmation testing
 - `services/cj_assessment_service/tests/unit/test_cj_idempotency_basic.py`
 - `services/essay_lifecycle_service/tests/unit/test_els_idempotency_integration.py`
 - `services/spellchecker_service/tests/unit/test_spell_idempotency_basic.py`

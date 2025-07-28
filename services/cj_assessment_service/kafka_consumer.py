@@ -8,7 +8,7 @@ Follows clean architecture with DI pattern.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
@@ -69,7 +69,7 @@ class CJAssessmentKafkaConsumer:
         # Processor for assessment request messages
         @idempotent_consumer(redis_client=redis_client, config=config)
         async def process_assessment_request_idempotently(
-            msg: Any, *, confirm_idempotency
+            msg: Any, *, confirm_idempotency: Callable[[], Awaitable[None]]
         ) -> bool | None:
             result = await process_single_message(
                 msg=msg,
@@ -86,7 +86,7 @@ class CJAssessmentKafkaConsumer:
         # Processor for LLM callback messages
         @idempotent_consumer(redis_client=redis_client, config=config)
         async def process_llm_callback_idempotently(
-            msg: Any, *, confirm_idempotency
+            msg: Any, *, confirm_idempotency: Callable[[], Awaitable[None]]
         ) -> bool | None:
             result = await process_llm_result(
                 msg=msg,

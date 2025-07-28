@@ -7,16 +7,20 @@ Follows boundary mocking pattern - mocks Redis client but uses real handlers.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from datetime import UTC, datetime
 from typing import cast
+from collections.abc import Callable, Coroutine
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
 from common_core.domain_enums import CourseCode
 from common_core.pipeline_models import PhaseName
+from libs.huleedu_service_libs.tests.idempotency_test_utils import AsyncConfirmationTestHelper
 
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
@@ -36,6 +40,7 @@ class MockRedisClient:
     def __init__(self) -> None:
         self.keys: dict[str, str] = {}
         self.set_calls: list[tuple[str, str, int]] = []
+        self.setex_calls: list[tuple[str, int, str]] = []
         self.delete_calls: list[str] = []
         self.should_fail_set = False
 
@@ -63,6 +68,7 @@ class MockRedisClient:
 
     async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
         """Mock SETEX operation that sets values with TTL."""
+        self.setex_calls.append((key, ttl_seconds, value))
         self.keys[key] = value
         return True
 
@@ -202,7 +208,9 @@ class TestBOSIdempotencyBasic:
         config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
 
         @idempotent_consumer(redis_client=redis_client, config=config)
-        async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        async def handle_message_idempotently(
+            msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+        ) -> bool:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
@@ -265,7 +273,9 @@ class TestBOSIdempotencyBasic:
         )
 
         @idempotent_consumer(redis_client=redis_client, config=config)
-        async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        async def handle_message_idempotently(
+            msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+        ) -> bool:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
@@ -304,7 +314,9 @@ class TestBOSIdempotencyBasic:
         config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
 
         @idempotent_consumer(redis_client=redis_client, config=config)
-        async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        async def handle_message_idempotently(
+            msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+        ) -> bool:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
@@ -323,3 +335,119 @@ class TestBOSIdempotencyBasic:
         assert len(redis_client.delete_calls) == 0
         phase_coordinator_mock = cast(AsyncMock, els_phase_outcome_handler.phase_coordinator)
         phase_coordinator_mock.handle_phase_concluded.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_async_confirmation_pattern(
+        self,
+        sample_batch_essays_ready_event: dict,
+        mock_handlers: tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
+        mock_client_pipeline_request_handler: AsyncMock,
+    ) -> None:
+        """Test that processing and confirmation happen at separate times (async pattern)."""
+        from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
+
+        redis_client = MockRedisClient()
+        batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
+        kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
+        helper = AsyncConfirmationTestHelper()
+
+        config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
+
+        @idempotent_consumer(redis_client=redis_client, config=config)
+        async def handle_message_with_controlled_confirmation(
+            msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+        ) -> bool:
+            consumer = BatchKafkaConsumer(
+                kafka_bootstrap_servers="test:9092",
+                consumer_group="test-group",
+                batch_essays_ready_handler=batch_essays_ready_handler,
+                els_batch_phase_outcome_handler=els_phase_outcome_handler,
+                client_pipeline_request_handler=mock_client_pipeline_request_handler,
+                redis_client=redis_client,
+            )
+            return await helper.process_with_controlled_confirmation(
+                consumer._handle_message, msg, confirm_idempotency
+            )
+
+        # Start processing in background
+        process_task = asyncio.create_task(handle_message_with_controlled_confirmation(kafka_msg))
+
+        # Wait for processing to complete but before confirmation
+        await helper.wait_for_processing_complete()
+
+        # Verify "processing" state with initial TTL
+        assert len(redis_client.set_calls) == 1
+        set_call = redis_client.set_calls[0]
+        stored_data = json.loads(set_call[1])
+        assert stored_data["status"] == "processing"
+        assert set_call[2] == 300  # Processing TTL
+
+        # Allow confirmation and wait for completion
+        helper.allow_confirmation()
+        result = await process_task
+
+        # Verify successful completion
+        assert result is True
+        assert helper.confirmed is True
+
+        # Verify business logic was executed
+        batch_repo_mock = cast(AsyncMock, batch_essays_ready_handler.batch_repo)
+        batch_repo_mock.store_batch_essays.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_crash_before_confirmation(
+        self,
+        sample_batch_essays_ready_event: dict,
+        mock_handlers: tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
+        mock_client_pipeline_request_handler: AsyncMock,
+    ) -> None:
+        """Test that a crash before confirmation leaves processing state intact."""
+        from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
+
+        redis_client = MockRedisClient()
+        batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
+        kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
+        helper = AsyncConfirmationTestHelper()
+
+        config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
+
+        @idempotent_consumer(redis_client=redis_client, config=config)
+        async def handle_message_with_controlled_confirmation(
+            msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+        ) -> bool:
+            consumer = BatchKafkaConsumer(
+                kafka_bootstrap_servers="test:9092",
+                consumer_group="test-group",
+                batch_essays_ready_handler=batch_essays_ready_handler,
+                els_batch_phase_outcome_handler=els_phase_outcome_handler,
+                client_pipeline_request_handler=mock_client_pipeline_request_handler,
+                redis_client=redis_client,
+            )
+            return await helper.process_with_controlled_confirmation(
+                consumer._handle_message, msg, confirm_idempotency
+            )
+
+        # Start processing in background
+        process_task = asyncio.create_task(handle_message_with_controlled_confirmation(kafka_msg))
+
+        # Wait for processing to complete but before confirmation
+        await helper.wait_for_processing_complete()
+
+        # Verify "processing" state is set
+        assert len(redis_client.set_calls) == 1
+        set_call = redis_client.set_calls[0]
+        stored_data = json.loads(set_call[1])
+        assert stored_data["status"] == "processing"
+        assert set_call[2] == 300  # Processing TTL
+
+        # Simulate crash by cancelling the task without allowing confirmation
+        process_task.cancel()
+
+        # Verify processing state remains (would be cleaned up by TTL in real Redis)
+        final_stored_data = json.loads(redis_client.keys[set_call[0]])
+        assert final_stored_data["status"] == "processing"
+        assert helper.confirmed is False
+
+        # Verify business logic was executed despite the crash
+        batch_repo_mock = cast(AsyncMock, batch_essays_ready_handler.batch_repo)
+        batch_repo_mock.store_batch_essays.assert_called_once()

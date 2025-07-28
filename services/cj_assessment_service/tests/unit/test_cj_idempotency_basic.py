@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock
@@ -144,7 +145,9 @@ async def test_first_time_event_processing_success(
     )
 
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+    ) -> bool:
         result = await process_single_message(
             msg=msg,
             database=database,
@@ -208,7 +211,7 @@ async def test_duplicate_event_skipped(
 
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(
-        msg: ConsumerRecord, *, confirm_idempotency
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
     ) -> bool | None:
         result = await process_single_message(
             msg=msg,
@@ -287,7 +290,7 @@ async def test_deterministic_event_id_generation(
 
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(
-        msg: ConsumerRecord, *, confirm_idempotency
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
     ) -> bool | None:
         result = await process_single_message(
             msg=msg,

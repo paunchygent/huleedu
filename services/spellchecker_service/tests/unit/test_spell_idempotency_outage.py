@@ -7,6 +7,8 @@ Idempotency tests for outage and failure scenarios in the Spell Checker Service.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Coroutine
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -33,7 +35,9 @@ async def test_exception_failure_releases_lock(
     config = IdempotencyConfig(service_name="spell-checker-service")
 
     @idempotent_consumer(redis_client=redis_client, config=config)
-    async def handle_message_with_exception(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+    async def handle_message_with_exception(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+    ) -> bool:
         raise RuntimeError("Unexpected infrastructure failure")
 
     with pytest.raises(RuntimeError, match="Unexpected infrastructure failure"):
@@ -58,7 +62,9 @@ async def test_redis_failure_fallback(
     config = IdempotencyConfig(service_name="spell-checker-service")
 
     @idempotent_consumer(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+    ) -> bool:
         result = await process_single_message(
             msg=msg,
             http_session=http_session,

@@ -10,6 +10,8 @@ Basic idempotency tests for the Spell Checker Service.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable, Coroutine
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -40,7 +42,9 @@ async def test_first_time_event_processing_success(
     config = IdempotencyConfig(service_name="spell-checker-service")
 
     @idempotent_consumer(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+    ) -> bool:
         result = await process_single_message(
             msg=msg,
             http_session=http_session,
@@ -95,7 +99,7 @@ async def test_duplicate_event_skipped(
 
     @idempotent_consumer(redis_client=redis_client, config=config)
     async def handle_message_idempotently(
-        msg: ConsumerRecord, *, confirm_idempotency
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
     ) -> bool | None:
         result = await process_single_message(
             msg=msg,
@@ -136,7 +140,9 @@ async def test_processing_failure_keeps_lock(
     config = IdempotencyConfig(service_name="spell-checker-service")
 
     @idempotent_consumer(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+    ) -> bool:
         result = await process_single_message(
             msg=msg,
             http_session=http_session,
@@ -204,7 +210,7 @@ async def test_deterministic_event_id_generation(
 
     @idempotent_consumer(redis_client=redis_client, config=config)
     async def handle_message_idempotently(
-        msg: ConsumerRecord, *, confirm_idempotency
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
     ) -> bool | None:
         result = await process_single_message(
             msg=msg,

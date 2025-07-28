@@ -82,12 +82,13 @@ class TestRepositoryPerformanceOptimizations:
             await sqlite_store.create_essay_record(
                 EntityReference(
                     entity_id=essay.essay_id, entity_type="essay", parent_id=essay.batch_id
-                )
+                ),
+                session=None
             )
 
         # Update one essay to SPELLCHECKED_SUCCESS status
         await sqlite_store.update_essay_state(
-            "essay-3", EssayStatus.SPELLCHECKED_SUCCESS, {"updated_for_test": True}
+            "essay-3", EssayStatus.SPELLCHECKED_SUCCESS, {"updated_for_test": True}, session=None
         )
 
         # Mock list_essays_by_batch to track calls
@@ -126,12 +127,13 @@ class TestRepositoryPerformanceOptimizations:
             await sqlite_store.create_essay_record(
                 EntityReference(
                     entity_id=essay.essay_id, entity_type="essay", parent_id=essay.batch_id
-                )
+                ),
+                session=None
             )
 
         # Update one essay to SPELLCHECKED_SUCCESS status to create variation
         await sqlite_store.update_essay_state(
-            "essay-3", EssayStatus.SPELLCHECKED_SUCCESS, {"updated_for_test": True}
+            "essay-3", EssayStatus.SPELLCHECKED_SUCCESS, {"updated_for_test": True}, session=None
         )
 
         # Get results from both methods

@@ -11,6 +11,8 @@ import json
 import uuid
 from datetime import UTC, datetime
 from typing import cast
+from collections.abc import Callable, Coroutine
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -182,7 +184,9 @@ class TestBOSIdempotencyOutage:
         config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
 
         @idempotent_consumer(redis_client=redis_client, config=config)
-        async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        async def handle_message_idempotently(
+            msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+        ) -> bool:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
@@ -216,7 +220,7 @@ class TestBOSIdempotencyOutage:
 
         @idempotent_consumer(redis_client=redis_client, config=config)
         async def handle_message_with_exception(
-            msg: ConsumerRecord, *, confirm_idempotency
+            msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
         ) -> bool:
             raise RuntimeError("Unhandled exception (e.g., network failure)")
 
@@ -248,7 +252,9 @@ class TestBOSIdempotencyOutage:
         config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
 
         @idempotent_consumer(redis_client=redis_client, config=config)
-        async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        async def handle_message_idempotently(
+            msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+        ) -> bool:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",

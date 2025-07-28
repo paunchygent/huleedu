@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import UTC, datetime
-from typing import Dict, List
+from typing import Awaitable, Callable, Dict, List
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
 from common_core.event_enums import ProcessingEvent, topic_name
@@ -81,7 +81,7 @@ class ResultAggregatorKafkaConsumer:
 
         # Create idempotent message processor with v2 configuration
         @idempotent_consumer(redis_client=redis_client, config=idempotency_config)
-        async def process_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+        async def process_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Awaitable[None]]) -> bool:
             result = await self._process_message_impl(msg)
             await confirm_idempotency()  # Confirm after successful processing
             return result

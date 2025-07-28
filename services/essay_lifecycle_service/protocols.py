@@ -49,7 +49,7 @@ class EssayRepositoryProtocol(Protocol):
         essay_id: str,
         new_status: EssayStatus,
         metadata: dict[str, Any],
-        session: AsyncSession,
+        session: AsyncSession | None = None,
         storage_reference: tuple[ContentType, str] | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -61,7 +61,7 @@ class EssayRepositoryProtocol(Protocol):
         essay_id: str,
         new_status: EssayStatus,
         metadata: dict[str, Any],
-        session: AsyncSession,
+        session: AsyncSession | None = None,
         storage_reference: tuple[ContentType, str] | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -69,7 +69,7 @@ class EssayRepositoryProtocol(Protocol):
         ...
 
     async def create_essay_record(
-        self, essay_ref: EntityReference, session: AsyncSession, correlation_id: UUID | None = None
+        self, essay_ref: EntityReference, session: AsyncSession | None = None, correlation_id: UUID | None = None
     ) -> EssayState:
         """Create new essay record from entity reference."""
         ...
@@ -77,7 +77,7 @@ class EssayRepositoryProtocol(Protocol):
     async def create_essay_records_batch(
         self,
         essay_refs: list[EntityReference],
-        session: AsyncSession,
+        session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> list[EssayState]:
         """Create multiple essay records in single atomic transaction."""
@@ -112,7 +112,7 @@ class EssayRepositoryProtocol(Protocol):
         file_size: int,
         content_hash: str | None,
         initial_status: EssayStatus,
-        session: AsyncSession,
+        session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> EssayState:
         """Create or update essay state for slot assignment with content metadata."""
@@ -130,7 +130,7 @@ class EssayRepositoryProtocol(Protocol):
         text_storage_id: str,
         essay_data: dict[str, Any],
         correlation_id: UUID,
-        session: AsyncSession,
+        session: AsyncSession | None = None,
     ) -> tuple[bool, str | None]:
         """
         Create essay state with atomic idempotency check for content provisioning.
@@ -318,7 +318,7 @@ class BatchPhaseCoordinator(Protocol):
         essay_state: EssayState,
         phase_name: PhaseName,
         correlation_id: UUID,
-        session: AsyncSession,
+        session: AsyncSession | None = None,
     ) -> None:
         """
         Check if all essays in a batch phase are complete and publish ELSBatchPhaseOutcomeV1 if so.

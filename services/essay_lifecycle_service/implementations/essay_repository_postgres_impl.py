@@ -221,7 +221,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         essay_id: str,
         new_status: EssayStatus,
         metadata: dict[str, Any],
-        session: AsyncSession,
+        session: AsyncSession | None = None,
         storage_reference: tuple[ContentType, str] | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -231,6 +231,12 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             from uuid import uuid4
 
             correlation_id = uuid4()
+
+        if session is None:
+            async with self.session() as session:
+                return await self.update_essay_state(
+                    essay_id, new_status, metadata, session, storage_reference, correlation_id
+                )
 
         try:
             # Use SELECT FOR UPDATE to prevent race conditions
@@ -316,7 +322,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         essay_id: str,
         new_status: EssayStatus,
         metadata: dict[str, Any],
-        session: AsyncSession,
+        session: AsyncSession | None = None,
         storage_reference: tuple[ContentType, str] | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -331,7 +337,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         )
 
     async def create_essay_record(
-        self, essay_ref: EntityReference, session: AsyncSession, correlation_id: UUID | None = None
+        self, essay_ref: EntityReference, session: AsyncSession | None = None, correlation_id: UUID | None = None
     ) -> ConcreteEssayState:
         """Create new essay record from entity reference."""
         # Generate correlation_id if not provided for error handling
@@ -339,6 +345,10 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             from uuid import uuid4
 
             correlation_id = uuid4()
+
+        if session is None:
+            async with self.session() as session:
+                return await self.create_essay_record(essay_ref, session, correlation_id)
 
         try:
             # Debug logging to trace batch_id issue
@@ -379,7 +389,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
     async def create_essay_records_batch(
         self,
         essay_refs: list[EntityReference],
-        session: AsyncSession,
+        session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> list[EssayState]:
         """Create multiple essay records in single atomic transaction."""
@@ -388,6 +398,10 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             from uuid import uuid4
 
             correlation_id = uuid4()
+
+        if session is None:
+            async with self.session() as session:
+                return await self.create_essay_records_batch(essay_refs, session, correlation_id)
 
         if not essay_refs:
             return []
@@ -517,7 +531,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         file_size: int,
         content_hash: str | None,
         initial_status: EssayStatus,
-        session: AsyncSession,
+        session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> ConcreteEssayState:
         """Create or update essay state for slot assignment with content metadata."""
@@ -526,6 +540,13 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             from uuid import uuid4
 
             correlation_id = uuid4()
+
+        if session is None:
+            async with self.session() as session:
+                return await self.create_or_update_essay_state_for_slot_assignment(
+                    internal_essay_id, batch_id, text_storage_id, original_file_name,
+                    file_size, content_hash, initial_status, session, correlation_id
+                )
 
         try:
             # Check if essay already exists
@@ -659,7 +680,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         text_storage_id: str,
         essay_data: dict[str, Any],
         correlation_id: UUID,
-        session: AsyncSession,
+        session: AsyncSession | None = None,
     ) -> tuple[bool, str | None]:
         """
         Create essay state with atomic idempotency check for content provisioning.
@@ -681,6 +702,12 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         Raises:
             HuleEduError: For database errors or constraint violations
         """
+        if session is None:
+            async with self.session() as session:
+                return await self.create_essay_state_with_content_idempotency(
+                    batch_id, text_storage_id, essay_data, correlation_id, session
+                )
+
         try:
             # Use SELECT FOR UPDATE for row-level locking to prevent concurrent assignments
             # First check if this content is already assigned to any essay in this batch

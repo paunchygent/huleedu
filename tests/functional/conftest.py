@@ -87,8 +87,7 @@ async def verify_redis_is_pristine(clean_distributed_state, get_redis_client):
         # This assertion will halt the test immediately with detailed info
         assert total_found == 0, (
             f"Redis was not clean for ELS after setup. Found {total_found} keys: "
-            f"huleedu:events:seen:* = {len(found_keys)}, "
-            f"els-msg-idempotency:* = {len(old_pattern_keys)}. "
+            f"huleedu:idempotency:v2:* = {len(found_keys)}. "
             f"Sample keys: {all_keys[:5]}"
         )
     else:

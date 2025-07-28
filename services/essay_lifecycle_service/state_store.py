@@ -16,6 +16,7 @@ import aiosqlite
 from common_core.domain_enums import ContentType
 from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.essay_lifecycle_service.implementations.database_schema_manager import (
     SQLiteDatabaseSchemaManager,
@@ -64,6 +65,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         essay_id: str,
         new_status: EssayStatus,
         metadata: dict[str, Any],
+        session: AsyncSession | None = None,
         storage_reference: tuple[ContentType, str] | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -75,6 +77,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         essay_id: str,
         new_status: EssayStatus,
         metadata: dict[str, Any],
+        session: AsyncSession | None = None,
         storage_reference: tuple[ContentType, str] | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -82,13 +85,13 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         await self.crud_ops.update_essay_state(essay_id, new_status, metadata)
 
     async def create_essay_record(
-        self, essay_ref: EntityReference, correlation_id: UUID | None = None
+        self, essay_ref: EntityReference, session: AsyncSession | None = None, correlation_id: UUID | None = None
     ) -> EssayState:
         """Create new essay record from entity reference."""
         return await self.crud_ops.create_essay_record(essay_ref=essay_ref)
 
     async def create_essay_records_batch(
-        self, essay_refs: list[EntityReference], correlation_id: UUID | None = None
+        self, essay_refs: list[EntityReference], session: AsyncSession | None = None, correlation_id: UUID | None = None
     ) -> list[ProtocolEssayState]:
         """Create multiple essay records in single atomic transaction."""
         results = []
@@ -103,6 +106,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         text_storage_id: str,
         essay_data: dict[str, Any],
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> tuple[bool, str | None]:
         """
         Create essay state with atomic idempotency check for content provisioning.
@@ -252,6 +256,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         file_size: int,
         content_hash: str | None,
         initial_status: EssayStatus,
+        session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> EssayState:
         """Create or update essay state for slot assignment with content metadata."""
@@ -340,7 +345,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
             return essay_state
 
     async def list_essays_by_batch_and_phase(
-        self, batch_id: str, phase_name: str
+        self, batch_id: str, phase_name: str, session: AsyncSession | None = None
     ) -> list[ProtocolEssayState]:
         """List all essays in a batch that are part of a specific processing phase."""
         async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
@@ -382,3 +387,11 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
                         essay_states.append(essay_state)  # type: ignore[arg-type]
 
                 return essay_states
+
+    def get_session_factory(self) -> Any:
+        """Get the session factory for transaction management.
+        
+        For SQLite implementation, returns None as we manage connections directly.
+        This method exists to satisfy the protocol but is not used in SQLite context.
+        """
+        return None

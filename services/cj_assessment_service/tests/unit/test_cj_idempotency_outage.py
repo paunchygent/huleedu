@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -158,7 +159,9 @@ async def test_exception_failure_releases_lock(
     )
 
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+    ) -> bool:
         await mock_process(msg)
         await confirm_idempotency()  # Confirm after successful processing
         return True  # Should never reach this due to exception
@@ -197,7 +200,9 @@ async def test_redis_failure_fallback(
     )
 
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+    ) -> bool:
         result = await process_single_message(
             msg=msg,
             database=database,

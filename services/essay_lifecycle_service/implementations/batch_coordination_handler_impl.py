@@ -6,7 +6,8 @@ Handles batch coordination events like batch registration and content provisioni
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -37,7 +38,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
         batch_tracker: BatchEssayTracker,
         repository: EssayRepositoryProtocol,
         event_publisher: EventPublisher,
-        session_factory: async_sessionmaker,
+        session_factory: async_sessionmaker | Callable[[], Any],
     ) -> None:
         self.batch_tracker = batch_tracker
         self.repository = repository
