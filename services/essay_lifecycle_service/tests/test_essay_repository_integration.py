@@ -143,10 +143,13 @@ class TestPostgreSQLEssayRepositoryIntegration:
 
         essay_ref = EntityReference(entity_id=essay_id, entity_type="essay", parent_id=batch_id)
 
-        created_essay = await postgres_repository.create_essay_record(essay_ref)
-        assert created_essay.essay_id == essay_id
-        assert created_essay.batch_id == batch_id
-        assert created_essay.current_status == EssayStatus.UPLOADED
+        # Use Unit of Work pattern with session
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                created_essay = await postgres_repository.create_essay_record(essay_ref, session=session)
+                assert created_essay.essay_id == essay_id
+                assert created_essay.batch_id == batch_id
+                assert created_essay.current_status == EssayStatus.UPLOADED
 
     @pytest.mark.asyncio
     async def test_create_and_retrieve_essay(
@@ -163,8 +166,10 @@ class TestPostgreSQLEssayRepositoryIntegration:
             [sample_entity_reference.entity_id],
         )
 
-        # Act - Create essay
-        created_essay = await postgres_repository.create_essay_record(sample_entity_reference)
+        # Act - Create essay using Unit of Work pattern
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                created_essay = await postgres_repository.create_essay_record(sample_entity_reference, session=session)
 
         # Act - Retrieve essay
         retrieved_essay = await postgres_repository.get_essay_state(
@@ -198,16 +203,21 @@ class TestPostgreSQLEssayRepositoryIntegration:
             [sample_entity_reference.entity_id],
         )
 
-        # Arrange - Create essay
-        await postgres_repository.create_essay_record(sample_entity_reference)
+        # Arrange - Create essay using Unit of Work pattern
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                await postgres_repository.create_essay_record(sample_entity_reference, session=session)
 
-        # Act - Update essay state
+        # Act - Update essay state using Unit of Work pattern
         new_metadata = {"updated_by": "test", "processing_step": "spellcheck"}
-        await postgres_repository.update_essay_state(
-            essay_id=sample_entity_reference.entity_id,
-            new_status=EssayStatus.AWAITING_SPELLCHECK,
-            metadata=new_metadata,
-        )
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                await postgres_repository.update_essay_state(
+                    essay_id=sample_entity_reference.entity_id,
+                    new_status=EssayStatus.AWAITING_SPELLCHECK,
+                    metadata=new_metadata,
+                    session=session,
+                )
 
         # Act - Retrieve updated essay
         updated_essay = await postgres_repository.get_essay_state(sample_entity_reference.entity_id)
@@ -232,16 +242,19 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # Create batch tracker first to satisfy foreign key constraint
         await self.create_batch_tracker(postgres_repository, batch_id, [essay_id])
 
-        # Act - Create essay for slot assignment
-        created_essay = await postgres_repository.create_or_update_essay_state_for_slot_assignment(
-            internal_essay_id=essay_id,
-            batch_id=batch_id,
-            text_storage_id=text_storage_id,
-            original_file_name="test_essay.txt",
-            file_size=1024,
-            content_hash="abc123",
-            initial_status=EssayStatus.READY_FOR_PROCESSING,
-        )
+        # Act - Create essay for slot assignment using Unit of Work pattern
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                created_essay = await postgres_repository.create_or_update_essay_state_for_slot_assignment(
+                    internal_essay_id=essay_id,
+                    batch_id=batch_id,
+                    text_storage_id=text_storage_id,
+                    original_file_name="test_essay.txt",
+                    file_size=1024,
+                    content_hash="abc123",
+                    initial_status=EssayStatus.READY_FOR_PROCESSING,
+                    session=session,
+                )
 
         # Assert essay creation
         assert created_essay.essay_id == essay_id
@@ -274,21 +287,30 @@ class TestPostgreSQLEssayRepositoryIntegration:
             essay_ref = EntityReference(
                 entity_id=f"essay-{i}", entity_type="essay", parent_id=batch_id
             )
-            await postgres_repository.create_essay_record(essay_ref)
+            # Create essay using Unit of Work pattern
+            async with postgres_repository.get_session_factory()() as session:
+                async with session.begin():
+                    await postgres_repository.create_essay_record(essay_ref, session=session)
 
-            # Update some to different statuses
+            # Update some to different statuses using Unit of Work pattern
             if i == 0:
-                await postgres_repository.update_essay_state(
-                    essay_id=f"essay-{i}",
-                    new_status=EssayStatus.AWAITING_SPELLCHECK,
-                    metadata={},
-                )
+                async with postgres_repository.get_session_factory()() as session:
+                    async with session.begin():
+                        await postgres_repository.update_essay_state(
+                            essay_id=f"essay-{i}",
+                            new_status=EssayStatus.AWAITING_SPELLCHECK,
+                            metadata={},
+                            session=session,
+                        )
             elif i == 1:
-                await postgres_repository.update_essay_state(
-                    essay_id=f"essay-{i}",
-                    new_status=EssayStatus.SPELLCHECKED_SUCCESS,
-                    metadata={},
-                )
+                async with postgres_repository.get_session_factory()() as session:
+                    async with session.begin():
+                        await postgres_repository.update_essay_state(
+                            essay_id=f"essay-{i}",
+                            new_status=EssayStatus.SPELLCHECKED_SUCCESS,
+                            metadata={},
+                            session=session,
+                        )
 
         # Act - List essays by batch
         batch_essays = await postgres_repository.list_essays_by_batch(batch_id)
@@ -330,10 +352,13 @@ class TestPostgreSQLEssayRepositoryIntegration:
             essay_ref = EntityReference(
                 entity_id=f"phase-essay-{i}", entity_type="essay", parent_id=batch_id
             )
-            await postgres_repository.create_essay_record(essay_ref)
-            await postgres_repository.update_essay_state(
-                essay_id=f"phase-essay-{i}", new_status=status, metadata={}
-            )
+            # Create and update essay using Unit of Work pattern
+            async with postgres_repository.get_session_factory()() as session:
+                async with session.begin():
+                    await postgres_repository.create_essay_record(essay_ref, session=session)
+                    await postgres_repository.update_essay_state(
+                        essay_id=f"phase-essay-{i}", new_status=status, metadata={}, session=session
+                    )
 
         # Act - List essays by spellcheck phase
         spellcheck_essays = await postgres_repository.list_essays_by_batch_and_phase(
@@ -372,11 +397,14 @@ class TestPostgreSQLEssayRepositoryIntegration:
 
         # Test update (should raise HuleEduError with RESOURCE_NOT_FOUND)
         with pytest.raises(HuleEduError) as exc_info:
-            await postgres_repository.update_essay_state(
-                essay_id=nonexistent_id,
-                new_status=EssayStatus.AWAITING_SPELLCHECK,
-                metadata={},
-            )
+            async with postgres_repository.get_session_factory()() as session:
+                async with session.begin():
+                    await postgres_repository.update_essay_state(
+                        essay_id=nonexistent_id,
+                        new_status=EssayStatus.AWAITING_SPELLCHECK,
+                        metadata={},
+                        session=session,
+                    )
 
         # Validate error structure
         error = exc_info.value
@@ -406,23 +434,31 @@ class TestPostgreSQLEssayRepositoryIntegration:
             [sample_entity_reference.entity_id],
         )
 
-        # Arrange - Create essay
-        await postgres_repository.create_essay_record(sample_entity_reference)
+        # Arrange - Create essay using Unit of Work pattern
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                await postgres_repository.create_essay_record(sample_entity_reference, session=session)
 
-        # Act - Update multiple times to build timeline
+        # Act - Update multiple times to build timeline using Unit of Work pattern
         metadata1 = {"step": "spellcheck", "data": {"corrections": 5}}
-        await postgres_repository.update_essay_state(
-            essay_id=sample_entity_reference.entity_id,
-            new_status=EssayStatus.AWAITING_SPELLCHECK,
-            metadata=metadata1,
-        )
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                await postgres_repository.update_essay_state(
+                    essay_id=sample_entity_reference.entity_id,
+                    new_status=EssayStatus.AWAITING_SPELLCHECK,
+                    metadata=metadata1,
+                    session=session,
+                )
 
         metadata2 = {"step": "completed", "data": {"final_score": 85}}
-        await postgres_repository.update_essay_state(
-            essay_id=sample_entity_reference.entity_id,
-            new_status=EssayStatus.SPELLCHECKED_SUCCESS,
-            metadata=metadata2,
-        )
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                await postgres_repository.update_essay_state(
+                    essay_id=sample_entity_reference.entity_id,
+                    new_status=EssayStatus.SPELLCHECKED_SUCCESS,
+                    metadata=metadata2,
+                    session=session,
+                )
 
         # Act - Retrieve final state
         final_essay = await postgres_repository.get_essay_state(sample_entity_reference.entity_id)
@@ -459,8 +495,10 @@ class TestPostgreSQLEssayRepositoryIntegration:
             for i in range(1, 4)  # 3 essays
         ]
 
-        # Act - Create all essays in atomic batch operation
-        created_essays = await postgres_repository.create_essay_records_batch(essay_refs)
+        # Act - Create all essays in atomic batch operation using Unit of Work pattern
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                created_essays = await postgres_repository.create_essay_records_batch(essay_refs, session=session)
 
         # Assert - All essays created successfully
         assert len(created_essays) == 3
@@ -494,8 +532,10 @@ class TestPostgreSQLEssayRepositoryIntegration:
         self, postgres_repository: PostgreSQLEssayRepository
     ) -> None:
         """Test atomic batch creation with empty list returns empty result."""
-        # Act - Create batch with empty list
-        created_essays = await postgres_repository.create_essay_records_batch([])
+        # Act - Create batch with empty list using Unit of Work pattern
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                created_essays = await postgres_repository.create_essay_records_batch([], session=session)
 
         # Assert - Empty list returned
         assert created_essays == []
@@ -515,7 +555,10 @@ class TestPostgreSQLEssayRepositoryIntegration:
         existing_ref = EntityReference(
             entity_id="duplicate-essay-001", entity_type="essay", parent_id=batch_id
         )
-        await postgres_repository.create_essay_record(existing_ref)
+        # Create existing essay using Unit of Work pattern
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                await postgres_repository.create_essay_record(existing_ref, session=session)
 
         # Arrange - Create batch that includes the duplicate
         batch_refs = [
@@ -530,7 +573,9 @@ class TestPostgreSQLEssayRepositoryIntegration:
 
         # Act & Assert - Batch creation should fail completely
         with pytest.raises(HuleEduError):
-            await postgres_repository.create_essay_records_batch(batch_refs)
+            async with postgres_repository.get_session_factory()() as session:
+                async with session.begin():
+                    await postgres_repository.create_essay_records_batch(batch_refs, session=session)
 
         # Assert - No new essays should exist (atomic rollback)
         # The existing essay should still be there

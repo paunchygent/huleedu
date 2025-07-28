@@ -336,6 +336,10 @@ class TestPendingValidationFailuresIntegration:
         # Mock repository (we're testing coordination logic)
         mock_repository = AsyncMock()
         mock_repository.create_essay_records_batch = AsyncMock()
+        
+        # Add mock session factory to repository
+        mock_session_factory_instance = mock_session_factory()
+        mock_repository.get_session_factory = AsyncMock(return_value=mock_session_factory_instance)
 
         # Mock Kafka bus
         mock_kafka_bus = AsyncMock()
@@ -362,6 +366,7 @@ class TestPendingValidationFailuresIntegration:
             batch_tracker=batch_tracker,
             repository=mock_repository,
             event_publisher=event_publisher,
+            session_factory=mock_session_factory_instance,
         )
 
         return handler, event_publisher

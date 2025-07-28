@@ -97,19 +97,25 @@ class TestBatchStatusPerformanceIntegration:
             for i in range(essay_count)
         ]
 
-        # Create all essays in batch
-        await postgres_repository.create_essay_records_batch(essay_refs)
+        # Create all essays in batch using Unit of Work pattern
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                await postgres_repository.create_essay_records_batch(essay_refs, session=session)
 
-        # Update some essays to different statuses for variation
+        # Update some essays to different statuses for variation using Unit of Work pattern
         for i in range(20):  # 20% to SPELLCHECKED_SUCCESS
-            await postgres_repository.update_essay_state(
-                f"essay-{i:03d}", EssayStatus.SPELLCHECKED_SUCCESS, {"performance_test": True}
-            )
+            async with postgres_repository.get_session_factory()() as session:
+                async with session.begin():
+                    await postgres_repository.update_essay_state(
+                        f"essay-{i:03d}", EssayStatus.SPELLCHECKED_SUCCESS, {"performance_test": True}, session=session
+                    )
 
         for i in range(20, 30):  # 10% to SPELLCHECK_FAILED
-            await postgres_repository.update_essay_state(
-                f"essay-{i:03d}", EssayStatus.SPELLCHECK_FAILED, {"performance_test": True}
-            )
+            async with postgres_repository.get_session_factory()() as session:
+                async with session.begin():
+                    await postgres_repository.update_essay_state(
+                        f"essay-{i:03d}", EssayStatus.SPELLCHECK_FAILED, {"performance_test": True}, session=session
+                    )
 
         # Test old N+1 pattern performance (simulated)
         start_time = time.perf_counter()
@@ -183,10 +189,12 @@ class TestBatchStatusPerformanceIntegration:
             for i in range(essay_count)
         ]
 
-        # Create all essays in batch
-        await postgres_repository.create_essay_records_batch(essay_refs)
+        # Create all essays in batch using Unit of Work pattern
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                await postgres_repository.create_essay_records_batch(essay_refs, session=session)
 
-        # Update essays to various statuses to create realistic distribution
+        # Update essays to various statuses to create realistic distribution using Unit of Work pattern
         status_updates = [
             (range(0, 50), EssayStatus.SPELLCHECKED_SUCCESS),  # 25% success
             (range(50, 70), EssayStatus.SPELLCHECK_FAILED),  # 10% failed
@@ -198,9 +206,11 @@ class TestBatchStatusPerformanceIntegration:
 
         for essay_range, status in status_updates:
             for i in essay_range:
-                await postgres_repository.update_essay_state(
-                    f"large-essay-{i:03d}", status, {"large_batch_test": True}
-                )
+                async with postgres_repository.get_session_factory()() as session:
+                    async with session.begin():
+                        await postgres_repository.update_essay_state(
+                            f"large-essay-{i:03d}", status, {"large_batch_test": True}, session=session
+                        )
 
         # Measure performance of optimized get_batch_status_summary
         start_time = time.perf_counter()

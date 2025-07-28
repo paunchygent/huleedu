@@ -14,6 +14,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 from common_core.domain_enums import CourseCode
 from common_core.error_enums import ErrorCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
@@ -47,7 +48,7 @@ class MockEventPublisher(EventPublisher):
         self.published_events: list[tuple[str, Any, Any]] = []
 
     async def publish_status_update(
-        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID
+        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID, session: AsyncSession | None = None
     ) -> None:
         """Record status update events for verification."""
         self.published_events.append(("status_update", (essay_ref, status), correlation_id))
@@ -60,6 +61,7 @@ class MockEventPublisher(EventPublisher):
         failed_count: int,
         total_essays_in_phase: int,
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Record batch phase progress events for verification."""
         self.published_events.append(
@@ -83,6 +85,7 @@ class MockEventPublisher(EventPublisher):
         status: str,
         details: dict[str, Any],
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Record batch phase concluded events for verification."""
         self.published_events.append(
@@ -93,21 +96,21 @@ class MockEventPublisher(EventPublisher):
             )
         )
 
-    async def publish_batch_essays_ready(self, event_data: Any, correlation_id: UUID) -> None:
+    async def publish_batch_essays_ready(self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None) -> None:
         """Record published events for verification."""
         self.published_events.append(("batch_essays_ready", event_data, correlation_id))
 
     async def publish_excess_content_provisioned(
-        self, event_data: Any, correlation_id: UUID
+        self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None
     ) -> None:
         """Record published events for verification."""
         self.published_events.append(("excess_content_provisioned", event_data, correlation_id))
 
-    async def publish_els_batch_phase_outcome(self, event_data: Any, correlation_id: UUID) -> None:
+    async def publish_els_batch_phase_outcome(self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None) -> None:
         """Record published events for verification."""
         self.published_events.append(("els_batch_phase_outcome", event_data, correlation_id))
 
-    async def publish_essay_slot_assigned(self, event_data: Any, correlation_id: UUID) -> None:
+    async def publish_essay_slot_assigned(self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None) -> None:
         """Record published events for verification."""
         # Validate EssaySlotAssignedV1 structure
         assert hasattr(event_data, "batch_id"), "EssaySlotAssignedV1 must have batch_id"
@@ -132,6 +135,7 @@ class MockEventPublisher(EventPublisher):
         event_type: str,
         event_data: Any,
         topic: str,
+        session: AsyncSession | None = None,
     ) -> None:
         """Mock outbox publishing - records event for testing."""
         self.published_events.append(
@@ -295,17 +299,24 @@ class TestAtomicBatchCreationIntegration:
         )
 
     @pytest.fixture
+    def session_factory(self, postgres_repository: PostgreSQLEssayRepository):
+        """Get session factory from repository for Unit of Work pattern."""
+        return postgres_repository.get_session_factory()
+
+    @pytest.fixture
     async def coordination_handler(
         self,
         batch_tracker: DefaultBatchEssayTracker,
         postgres_repository: PostgreSQLEssayRepository,
         event_publisher: MockEventPublisher,
+        session_factory,
     ) -> DefaultBatchCoordinationHandler:
-        """Create coordination handler with real components."""
+        """Create coordination handler with real components including session factory."""
         return DefaultBatchCoordinationHandler(
             batch_tracker=batch_tracker,
             repository=postgres_repository,
             event_publisher=event_publisher,
+            session_factory=session_factory,
         )
 
     @pytest.mark.asyncio
